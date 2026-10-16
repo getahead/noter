@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Menu bar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.mi{display:flex;align-items:center;gap:10px;height:24px;padding:0 10px;margin:0 5px;border-radius:5px;font-size:13px;color:var(--text)}
+.mi.on{background:var(--accent);color:#fff}
+.mi.on .k{color:rgba(255,255,255,.75)}
+.mi.dim{color:var(--text3)}
+.mi .k{margin-left:auto;font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.sep{height:1px;background:var(--line);margin:5px 14px}
+.hd{padding:8px 15px 6px;display:flex;flex-direction:column;gap:3px}
+.hd .t{font-size:13px;font-weight:600}
+.hd .s{font-size:11px;color:var(--text2)}
+.rec{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 0 3px rgba(255,69,58,.25)}
+.chk{width:14px;display:inline-flex;justify-content:center;font-size:11px;flex:none}
+.glyph{width:14px;display:inline-flex;justify-content:center;font-size:12px;flex:none;color:var(--text2)}
+.mi.on .glyph{color:#fff}
+.mb{height:24px;display:flex;align-items:center;gap:14px;padding:0 10px;font-size:12px;font-weight:600;background:var(--mb);color:var(--text);border-bottom:1px solid var(--line)}
+.mb .ic{height:20px;padding:0 6px;border-radius:4px;display:inline-flex;align-items:center;gap:4px;font-weight:600;font-variant-numeric:tabular-nums}
+.mb .ic.on{background:var(--sel)}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}};--mb:{{c.mb}};--menu:{{c.menu}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: {{c.desk}}; width: 420px; height: 460px; display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); box-sizing: border-box">
+
+  <div class="mb" aria-label="Menu bar">
+    <div style="flex: 1 1 auto"></div>
+    <span class="ic on" aria-label="Noter, recording 23 min 14 s"><span class="rec"></span><span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-weight: 500">23:14</span></span>
+    <span class="ic" aria-hidden="true">◐</span>
+    <span class="ic" aria-hidden="true">⌔</span>
+    <span class="ic" aria-hidden="true">▭ 82 %</span>
+    <span class="ic" aria-hidden="true">Thu 16 Oct 10:51</span>
+  </div>
+
+  <div style="position: relative; flex: 1 1 auto">
+    <div role="menu" aria-label="Noter" style="position: absolute; top: 6px; right: 142px; width: 290px; padding: 5px 0; border-radius: 10px; background: var(--menu); border: 1px solid var(--line); box-shadow: 0 10px 30px var(--shadow), 0 0 0 .5px var(--line); backdrop-filter: blur(20px)">
+      <div class="hd">
+        <div class="t" style="display: flex; align-items: center; gap: 8px"><span class="rec"></span>Recording · Planning sync</div>
+        <div class="s">23 min · 4 speakers · EN / RU · copilot on · 2 cards waiting</div>
+        <div class="s" style="color: var(--text3)">Teams · call screen on Display 2</div>
+      </div>
+      <div class="sep"></div>
+      <div class="mi" role="menuitem"><span class="glyph">■</span>Stop recording<span class="k">⌃⌥R</span></div>
+      <div class="mi" role="menuitem"><span class="glyph">❚❚</span>Pause<span class="k">⌃⌥P</span></div>
+      <div class="sep"></div>
+      <div class="mi on" role="menuitem"><span class="glyph">⚑</span>Mark this moment<span class="k">⌃⌥M</span></div>
+      <div class="mi" role="menuitem"><span class="glyph">↻</span>Catch me up<span class="k">⌃⌥C</span></div>
+      <div class="mi" role="menuitem"><span class="glyph">?</span>Ask about this call…<span class="k">⌃⌥A</span></div>
+      <div class="mi" role="menuitem"><span class="chk">✓</span>Copilot cards<span class="k">⌃⌥K</span></div>
+      <div class="mi" role="menuitem"><span class="chk"></span>Mute copilot for 10 min</div>
+      <div class="sep"></div>
+      <div class="mi" role="menuitem"><span class="glyph">▣</span>Open call screen<span class="k">⌃⌥N</span></div>
+      <div class="mi" role="menuitem"><span class="glyph">▤</span>Floating panel instead</div>
+      <div class="mi" role="menuitem"><span class="glyph">≡</span>Open last summary<span class="k">Design review · 09:30</span></div>
+      <div class="sep"></div>
+      <div class="mi dim" role="menuitem"><span class="glyph"></span>Next: Stand-up 11:00 · auto-record on</div>
+      <div class="sep"></div>
+      <div class="mi" role="menuitem"><span class="glyph"></span>Open Noter<span class="k">⌘O</span></div>
+      <div class="mi" role="menuitem"><span class="glyph"></span>Settings…<span class="k">⌘,</span></div>
+      <div class="mi" role="menuitem"><span class="glyph"></span>Quit Noter<span class="k">⌘Q</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":420,"height":460}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.5)', mb: 'rgba(40,40,40,0.9)', menu: 'rgba(44,44,46,0.96)', desk: '#3A3F4B'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.18)', mb: 'rgba(246,246,246,0.92)', menu: 'rgba(250,250,250,0.97)', desk: '#C9D3E2'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

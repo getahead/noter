@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Agents</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.btn[disabled]{opacity:.45;cursor:default}
+.nav{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text)}
+.nav.on{background:var(--sel);font-weight:600}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row.on{background:var(--sel)}
+.tab{height:24px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;color:var(--text2)}
+.tab.on{background:var(--ctrl);color:var(--text);box-shadow:0 1px 1px var(--shadow);border:1px solid var(--line)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text2)}
+.input{height:28px;border:1px solid var(--line);border-radius:7px;background:var(--ctrl);padding:0 10px;font:13px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;color:var(--text)}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text)}
+.chk input{width:15px;height:15px;margin:0;accent-color:var(--accent)}
+.sw{width:30px;height:18px;border-radius:9px;background:var(--green);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+.sw.off{background:var(--line)}
+.sw.off::after{right:auto;left:2px}
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);color:var(--text2)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);padding:8px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); min-height: 1000px; display: flex; flex-wrap: wrap; border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+
+  <nav aria-label="Sidebar" style="width: 220px; flex: 0 0 220px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span></div>
+    <a class="nav" href="Main.dc.html"><span>Today</span></a>
+    <a class="nav" href="Library.dc.html"><span>Calls</span></a>
+    <a class="nav" href="Person.dc.html"><span>People</span></a>
+    <a class="nav" href="Library.dc.html"><span>Topics</span></a>
+    <a class="nav" href="Ask.dc.html"><span>Ask</span></a>
+    <div class="h" style="padding: 14px 10px 4px">Workspace</div>
+    <a class="nav" href="Settings.dc.html"><span>Sources</span></a>
+    <a class="nav on" href="Agents.dc.html"><span>Agents</span></a>
+    <a class="nav" href="Performance.dc.html"><span>Performance</span></a>
+    <a class="nav" href="Activity.dc.html"><span>Activity</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Settings</span></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <header style="height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg)">
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Agents</h1>
+      <span style="color: var(--text3)">7 agents · fused live, parallel after the call</span>
+      <div style="flex: 1 1 auto"></div>
+      <button class="btn primary" type="button"><span style="font-size: 16px; line-height: 1">+</span> Add agent</button>
+    </header>
+
+    <div style="display: flex; flex: 1 1 auto; min-height: 0; flex-wrap: wrap">
+      <section aria-label="Agent list" style="width: 340px; flex: 0 0 340px; border-right: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box">
+        <div class="h">Built in · order is the tie-break in ranking</div>
+        <div class="card">
+          <div class="row"><span class="sw" role="img" aria-label="enabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Product manager</div><div style="font-size: 12px; color: var(--text2)">Claude Code · fast class · medium</div></div><span class="badge">31%</span></div>
+          <div class="row"><span class="sw" role="img" aria-label="enabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Designer</div><div style="font-size: 12px; color: var(--text2)">Claude Code · fast class · medium</div></div><span class="badge">19%</span></div>
+          <div class="row"><span class="sw" role="img" aria-label="enabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Backend engineer</div><div style="font-size: 12px; color: var(--text2)">Claude Code · fast class · medium</div></div><span class="badge">27%</span></div>
+          <div class="row"><span class="sw" role="img" aria-label="enabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Frontend engineer</div><div style="font-size: 12px; color: var(--text2)">Claude Code · fast class · medium</div></div><span class="badge">34%</span></div>
+          <div class="row"><span class="sw" role="img" aria-label="enabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Teamlead</div><div style="font-size: 12px; color: var(--text2)">Claude Code · fast class · high</div></div><span class="badge">42%</span></div>
+          <div class="row on"><span class="sw" role="img" aria-label="enabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Architect</div><div style="font-size: 12px; color: var(--text2)">Claude Code · standard class · high</div></div><span class="badge">38%</span></div>
+        </div>
+        <div class="h" style="margin-top: 6px">Added by you</div>
+        <div class="card">
+          <div class="row"><span class="sw off" role="img" aria-label="disabled"></span><div style="flex: 1 1 auto"><div style="font-weight: 600">Security reviewer</div><div style="font-size: 12px; color: var(--text2)">Local · Qwen3 8B · low · vendor calls only</div></div><span class="badge">new</span></div>
+        </div>
+        <div style="font-size: 12px; color: var(--text3)">Percentages are cards rated useful or used over the last 20 calls. An agent dismissed in a call type for ten calls switches itself off there.</div>
+      </section>
+
+      <section aria-label="Agent editor" style="flex: 1 1 420px; min-width: 0; padding: 16px 24px 32px; display: flex; flex-direction: column; gap: 16px; max-width: 760px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600">Architect</h2>
+          <span class="badge">built in</span>
+          <div style="flex: 1 1 auto"></div>
+          <button class="btn" type="button">Edit skill</button>
+          <button class="btn" type="button" disabled>Remove</button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+          <label class="field">Name<input class="input" value="Architect"></label>
+          <label class="field">Skill<input class="input" value="skills/roles/architect/SKILL.md" readonly></label>
+          <label class="field">Runtime<select class="input"><option>Claude Code (API key)</option><option>Codex CLI</option><option>Local (Ollama)</option></select></label>
+          <label class="field">Model<select class="input"><option>Standard class</option><option>Fast class</option><option>Frontier class</option></select></label>
+          <div class="field">Effort
+            <div style="display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--side); border: 1px solid var(--line); align-self: flex-start"><span class="tab">Low</span><span class="tab">Medium</span><span class="tab on">High</span><span class="tab">Max</span></div>
+          </div>
+          <label class="field">Budget share<input class="input" type="range" min="0" max="40" value="18" style="padding: 0"></label>
+        </div>
+
+        <div class="field">Tools (parallel mode only; live ticks never call tools)
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px">
+            <label class="chk"><input type="checkbox" checked> noter-mcp read tools</label>
+            <label class="chk"><input type="checkbox" checked> Jira (your MCP config)</label>
+            <label class="chk"><input type="checkbox"> Confluence source</label>
+            <label class="chk"><input type="checkbox"> Screen context (v1.x)</label>
+          </div>
+        </div>
+
+        <div class="field">Runs on call types
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px">
+            <label class="chk"><input type="checkbox"> 1:1</label>
+            <label class="chk"><input type="checkbox" checked> Planning</label>
+            <label class="chk"><input type="checkbox" checked> Cross-team</label>
+            <label class="chk"><input type="checkbox"> Interview</label>
+            <label class="chk"><input type="checkbox" checked> Incident</label>
+            <label class="chk"><input type="checkbox"> Vendor</label>
+          </div>
+        </div>
+
+        <div class="field">Stance (from the skill, read-only here)
+          <div style="padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); line-height: 1.5; color: var(--text)">Reads for boundaries, coupling, versioning, backwards compatibility, operational cost and contradictions with the current architecture. Raises a card only when it would interrupt a colleague for it. Never comments on copy, visual design or people.</div>
+        </div>
+
+        <div>
+          <div class="h" style="margin-bottom: 8px">Council mode per call type</div>
+          <div class="card">
+            <table>
+              <thead><tr><th>Call type</th><th>Live</th><th>After the call</th><th>Agents</th></tr></thead>
+              <tbody>
+                <tr><td>1:1</td><td>Fused</td><td>Parallel</td><td>Teamlead, PM</td></tr>
+                <tr><td>Planning, grooming, retro</td><td>Fused</td><td>Parallel</td><td>All six</td></tr>
+                <tr><td>Cross-team sync</td><td>Fused</td><td>Parallel</td><td>All six</td></tr>
+                <tr><td>Incident</td><td>Parallel <span class="badge" style="color: var(--orange); border-color: var(--orange)">opt-in</span></td><td>Parallel</td><td>Backend, Architect, Teamlead</td></tr>
+                <tr><td>Vendor</td><td>Fused · local</td><td>Local</td><td>PM, Security reviewer</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

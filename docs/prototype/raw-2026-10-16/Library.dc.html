@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Calls</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.nav{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text)}
+.nav.on{background:var(--sel);font-weight:600}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.pill{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--sel);color:var(--accent)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--ctrl);font-size:12px;color:var(--text)}
+.chip.on{background:var(--sel);border-color:transparent;color:var(--accent);font-weight:600}
+.lang{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--text3);border:1px solid var(--line);border-radius:4px;padding:1px 4px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);padding:8px 12px;border-bottom:1px solid var(--line)}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.on td{background:var(--sel)}
+mark{background:rgba(255,204,0,0.45);color:inherit;border-radius:2px;padding:0 1px}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); min-height: 1000px; display: flex; flex-wrap: wrap; border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+
+  <nav aria-label="Sidebar" style="width: 220px; flex: 0 0 220px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span></div>
+    <a class="nav" href="Main.dc.html"><span>Today</span></a>
+    <a class="nav on" href="Library.dc.html"><span>Calls</span></a>
+    <a class="nav" href="Person.dc.html"><span>People</span></a>
+    <a class="nav" href="Library.dc.html"><span>Topics</span></a>
+    <a class="nav" href="Ask.dc.html"><span>Ask</span></a>
+    <div class="h" style="padding: 14px 10px 4px">Workspace</div>
+    <a class="nav" href="Settings.dc.html"><span>Sources</span></a>
+    <a class="nav" href="Agents.dc.html"><span>Agents</span></a>
+    <a class="nav" href="Performance.dc.html"><span>Performance</span></a>
+    <a class="nav" href="Activity.dc.html"><span>Activity</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Settings</span></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <header style="height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg)">
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Calls</h1>
+      <span style="color: var(--text3)">212 calls · 148 hours · since 2 Sep</span>
+      <div style="flex: 1 1 auto"></div>
+      <label style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--ctrl); border: 1px solid var(--line); width: 360px; box-sizing: border-box; color: var(--text3)">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input type="search" value="websocket уведомления" style="border: 0; outline: 0; background: transparent; font: inherit; color: var(--text); width: 100%">
+      </label>
+    </header>
+
+    <div style="padding: 14px 24px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+      <span class="chip on">All people</span><span class="chip">Anna</span><span class="chip">Dmitri</span><span class="chip">Backend team</span>
+      <span style="width: 1px; height: 18px; background: var(--line)"></span>
+      <span class="chip">1:1</span><span class="chip on">Planning</span><span class="chip on">Cross-team</span><span class="chip">Incident</span>
+      <span style="width: 1px; height: 18px; background: var(--line)"></span>
+      <span class="chip">EN</span><span class="chip on">RU</span><span class="chip">DE</span>
+      <span style="width: 1px; height: 18px; background: var(--line)"></span>
+      <span class="chip">Has open items</span>
+    </div>
+
+    <div style="padding: 14px 24px 32px; display: flex; flex-direction: column; gap: 16px">
+      <div class="h">Best matches · keyword and meaning, Russian query matched English transcripts too</div>
+      <div class="card">
+        <table>
+          <thead><tr><th style="width: 110px">When</th><th>Call</th><th style="width: 360px">Matched span</th><th style="width: 90px">Open</th></tr></thead>
+          <tbody>
+            <tr class="on">
+              <td style="color: var(--text2)">Today 10:00</td>
+              <td><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Planning: VHI 8.0 drawer redesign</a><div style="font-size: 12px; color: var(--text2)">Anna, Pavel, Dmitri · <span class="lang">EN</span> <span class="lang">RU</span> <span class="lang">DE</span></div></td>
+              <td style="font-size: 12px; line-height: 1.45"><span style="color: var(--text3)">Dmitri · 00:23:40</span><br>Drawer events go through the <mark>notification</mark> service; the direct <mark>websocket</mark> is not used by the drawer.</td>
+              <td><span class="pill">4 items</span></td>
+            </tr>
+            <tr>
+              <td style="color: var(--text2)">2 Oct 16:00</td>
+              <td><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Backend sync: websocket notifications</a><div style="font-size: 12px; color: var(--text2)">Dmitri, Oleg · <span class="lang">RU</span> <span class="lang">EN</span></div></td>
+              <td style="font-size: 12px; line-height: 1.45"><span style="color: var(--text3)">Dmitri · 00:41:10</span><br>Договорились: drawer слушает <mark>notification service</mark>, прямой <mark>websocket</mark> не трогаем.</td>
+              <td><span class="pill">1 item</span></td>
+            </tr>
+            <tr>
+              <td style="color: var(--text2)">24 Sep 11:00</td>
+              <td><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Incident: notifications stopped after upgrade</a><div style="font-size: 12px; color: var(--text2)">Dmitri, Oleg, QA · <span class="lang">EN</span></div></td>
+              <td style="font-size: 12px; line-height: 1.45"><span style="color: var(--text3)">Timeline · 00:12:05</span><br>Reconnect storm: 3,000 clients re-subscribed to the <mark>websocket</mark> within a minute; nginx dropped half.</td>
+              <td><span style="color: var(--text3)">closed</span></td>
+            </tr>
+            <tr>
+              <td style="color: var(--text2)">18 Sep 14:30</td>
+              <td><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">1:1 with Dmitri</a><div style="font-size: 12px; color: var(--text2)">Dmitri · <span class="lang">RU</span></div></td>
+              <td style="font-size: 12px; line-height: 1.45"><span style="color: var(--text3)">Dmitri · 00:08:33</span><br>Replay-буфер для реконнектов хочу сделать в 8.0, если backend даст окно.</td>
+              <td><span class="pill">1 item</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px">
+        <div class="h">Topic thread</div>
+        <span class="chip on">Websocket notifications · 4 calls · 2 decisions · 1 open question</span>
+        <a class="btn quiet" href="Ask.dc.html">Ask about this thread</a>
+      </div>
+
+      <div class="h">All calls</div>
+      <div class="card">
+        <table>
+          <thead><tr><th style="width: 110px">When</th><th>Call</th><th style="width: 140px">Type</th><th style="width: 120px">Length</th><th style="width: 90px">Open</th></tr></thead>
+          <tbody>
+            <tr><td style="color: var(--text2)">Today 10:00</td><td><a href="PostCall.dc.html" style="font-weight: 600">Planning: VHI 8.0 drawer redesign</a></td><td>Planning</td><td>48 min</td><td><span class="pill">4</span></td></tr>
+            <tr><td style="color: var(--text2)">Yesterday 15:00</td><td><a href="PostCall.dc.html" style="font-weight: 600">Cross-team: release notes 8.0</a></td><td>Cross-team</td><td>35 min</td><td><span class="pill">2</span></td></tr>
+            <tr><td style="color: var(--text2)">Yesterday 11:30</td><td><a href="PostCall.dc.html" style="font-weight: 600">1:1 with Pavel</a></td><td>1:1</td><td>27 min</td><td><span class="pill">1</span></td></tr>
+            <tr><td style="color: var(--text2)">14 Oct 09:30</td><td><a href="PostCall.dc.html" style="font-weight: 600">Daily</a></td><td>Standup</td><td>12 min</td><td><span style="color: var(--text3)">0</span></td></tr>
+            <tr><td style="color: var(--text2)">13 Oct 16:00</td><td><a href="PostCall.dc.html" style="font-weight: 600">Vendor: monitoring SaaS demo</a> <span class="lang" style="color: var(--orange); border-color: var(--orange)">local only</span></td><td>Vendor</td><td>41 min</td><td><span class="pill">3</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

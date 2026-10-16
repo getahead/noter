@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Person page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.btn.danger{color:var(--red)}
+.nav{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text)}
+.nav.on{background:var(--sel);font-weight:600}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.tab{height:24px;padding:0 10px;border-radius:6px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;color:var(--text2)}
+.tab.on{background:var(--ctrl);color:var(--text);box-shadow:0 1px 1px var(--shadow);border:1px solid var(--line)}
+.pill{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--sel);color:var(--accent)}
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);color:var(--text2)}
+.chk{width:16px;height:16px;margin:0;accent-color:var(--accent);flex:none}
+.ev{font-size:11px;color:var(--accent)}
+.hist{display:flex;gap:12px;padding:10px 12px;border-top:1px solid var(--line);font-size:12px;line-height:1.45}
+.hist:first-child{border-top:0}
+.when{width:96px;flex:none;color:var(--text3);font-variant-numeric:tabular-nums}
+.actor{width:120px;flex:none;color:var(--text2)}
+del{color:var(--red);text-decoration:line-through}
+ins{color:var(--green);text-decoration:none}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); min-height: 1000px; display: flex; flex-wrap: wrap; border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+
+  <nav aria-label="Sidebar" style="width: 220px; flex: 0 0 220px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span></div>
+    <a class="nav" href="Main.dc.html"><span>Today</span></a>
+    <a class="nav" href="Library.dc.html"><span>Calls</span></a>
+    <a class="nav on" href="Person.dc.html"><span>People</span></a>
+    <a class="nav" href="Library.dc.html"><span>Topics</span></a>
+    <a class="nav" href="Ask.dc.html"><span>Ask</span></a>
+    <div class="h" style="padding: 14px 10px 4px">People · 23</div>
+    <a class="nav on" href="Person.dc.html" style="font-weight: 400; background: transparent"><span>Anna K.</span><span class="pill" style="margin-left: auto">3</span></a>
+    <a class="nav" href="Person.dc.html"><span>Dmitri S.</span><span class="pill" style="margin-left: auto">1</span></a>
+    <a class="nav" href="Person.dc.html"><span>Pavel R.</span><span class="pill" style="margin-left: auto">2</span></a>
+    <a class="nav" href="Person.dc.html"><span>Oleg M.</span></a>
+    <a class="nav" href="Person.dc.html" style="color: var(--text3)"><span>Speaker 2 · 3 calls</span></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <header style="height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg)">
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Anna K.</h1>
+      <span style="color: var(--text3)">Frontend · 31 calls since Sep · 1:1 weekly</span>
+      <div style="flex: 1 1 auto"></div>
+      <div style="display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--side); border: 1px solid var(--line)">
+        <span class="tab on">Overview</span><span class="tab">Calls</span><span class="tab">History</span>
+      </div>
+    </header>
+
+    <div style="padding: 20px 24px 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 1180px">
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div class="h">Open commitments · 3</div>
+        <div class="card">
+          <div class="row"><input class="chk" type="checkbox" id="c1"><label for="c1" style="flex: 1 1 auto">Drawer redesign spec, incl. empty and reconnecting states <span class="ev">today · 00:19:58</span></label><span style="color: var(--text3); font-size: 12px">Fri</span></div>
+          <div class="row"><input class="chk" type="checkbox" id="c2"><label for="c2" style="flex: 1 1 auto">Migrate the settings form to the new uikit <span class="ev">1:1 · 2 Oct</span></label><span style="color: var(--orange); font-size: 12px">2 weeks</span></div>
+          <div class="row"><input class="chk" type="checkbox" id="c3"><label for="c3" style="flex: 1 1 auto">Review Pavel's table virtualisation PR <span class="ev">daily · 14 Oct</span></label></div>
+        </div>
+        <div class="h" style="margin-top: 6px">She asked you · 1 open</div>
+        <div class="card">
+          <div class="row"><input class="chk" type="checkbox" id="c4"><label for="c4" style="flex: 1 1 auto">Answer on the conference budget <span class="ev">1:1 · 9 Oct · 00:22:10</span></label></div>
+        </div>
+        <div class="h" style="margin-top: 6px">Topics you keep returning to</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <span class="pill">Drawer redesign · 6 calls</span><span class="pill">uikit migration · 4</span><span class="pill">Onboarding of the new hire · 3</span><span class="pill">Conference · 2</span>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div class="h">Identity and consent</div>
+        <div class="card">
+          <div class="row"><div style="flex: 1 1 auto"><div style="font-weight: 600">Consent to record</div><div style="font-size: 12px; color: var(--text2)">Confirmed on 3 Oct in the 1:1 · applies to all calls</div></div><span class="badge" style="color: var(--green); border-color: var(--green)">consented</span></div>
+          <div class="row"><div style="flex: 1 1 auto"><div style="font-weight: 600">Voice profile</div><div style="font-size: 12px; color: var(--text2)">Opted in on 3 Oct · 2 centroids (AirPods, laptop mic) · matched in 28 calls</div></div><button class="btn danger" type="button">Delete profile</button></div>
+          <div class="row"><div style="flex: 1 1 auto"><div style="font-weight: 600">Languages</div><div style="font-size: 12px; color: var(--text2)">Russian 71% · English 26% · German 3%</div></div></div>
+          <div class="row"><div style="flex: 1 1 auto"><div style="font-weight: 600">Talk-time share</div><div style="font-size: 12px; color: var(--text2)">Off in Settings · behaviour data</div></div><span class="badge">hidden</span></div>
+        </div>
+        <div class="h" style="margin-top: 6px">Last calls</div>
+        <div class="card">
+          <div class="row"><div style="width: 80px; color: var(--text2)">Today</div><a href="PostCall.dc.html" style="flex: 1 1 auto; font-weight: 600; color: var(--accent)">Planning: VHI 8.0 drawer redesign</a><span class="pill">4</span></div>
+          <div class="row"><div style="width: 80px; color: var(--text2)">9 Oct</div><a href="PostCall.dc.html" style="flex: 1 1 auto; font-weight: 600; color: var(--accent)">1:1 with Anna</a><span class="pill">2</span></div>
+          <div class="row"><div style="width: 80px; color: var(--text2)">2 Oct</div><a href="PostCall.dc.html" style="flex: 1 1 auto; font-weight: 600; color: var(--accent)">1:1 with Anna</a><span style="color: var(--text3)">0</span></div>
+        </div>
+      </section>
+
+      <section style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 10px"><div class="h">History · changes to this person's records</div><div style="flex: 1 1 auto"></div><span class="badge">all actors</span><span class="badge">all jobs</span></div>
+        <div class="card">
+          <div class="hist"><span class="when">Today 10:52</span><span class="actor">job: evidence</span><div style="flex: 1 1 auto">Proposed closing "Review Pavel's table virtualisation PR": PR #448 merged on 15 Oct, no linked key · <span style="color: var(--orange)">waiting for you</span></div><button class="btn quiet" type="button">Open</button></div>
+          <div class="hist"><span class="when">Today 10:50</span><span class="actor">job: reconcile people</span><div style="flex: 1 1 auto">Offline pass relabelled 2 segments in today's planning call from "Speaker 2" to Anna (profile match 0.86) · batch of 2</div><button class="btn quiet" type="button">Undo</button></div>
+          <div class="hist"><span class="when">14 Oct 18:01</span><span class="actor">you</span><div style="flex: 1 1 auto">Edited action item: <del>migrate settings to uikit</del> <ins>Migrate the settings form to the new uikit</ins></div><button class="btn quiet" type="button">Undo</button></div>
+          <div class="hist"><span class="when">9 Oct 15:04</span><span class="actor">llm: post-call</span><div style="flex: 1 1 auto">Created 2 action items and 1 open question from the 1:1 · Claude Code · skill 1on1 v3</div><button class="btn quiet" type="button">Open</button></div>
+          <div class="hist"><span class="when">3 Oct 14:40</span><span class="actor">you</span><div style="flex: 1 1 auto">Created voice profile with consent recorded · 1 centroid</div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

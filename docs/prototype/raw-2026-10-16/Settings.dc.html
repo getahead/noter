@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.nav{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text)}
+.nav.on{background:var(--sel);font-weight:600}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.input{height:28px;border:1px solid var(--line);border-radius:7px;background:var(--ctrl);padding:0 10px;font:13px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;color:var(--text)}
+.radio{display:flex;align-items:center;gap:6px;font-size:13px}
+.radio input{margin:0;accent-color:var(--accent)}
+.sw{width:30px;height:18px;border-radius:9px;background:var(--green);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+.sw.off{background:var(--line)}
+.sw.off::after{right:auto;left:2px}
+.badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);color:var(--text2)}
+.lbl{flex:1 1 auto;min-width:0}
+.lbl small{display:block;font-size:12px;color:var(--text2);margin-top:2px}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); min-height: 1000px; display: flex; flex-wrap: wrap; border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+
+  <nav aria-label="Settings sections" style="width: 220px; flex: 0 0 220px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span></div>
+    <a class="nav" href="Main.dc.html"><span>‹ Back to Today</span></a>
+    <div class="h" style="padding: 14px 10px 4px">Settings</div>
+    <a class="nav" href="Settings.dc.html"><span>General</span></a>
+    <a class="nav on" href="Settings.dc.html"><span>Authentication</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Privacy and consent</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Audio and transcription</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Call screen and menu bar</span></a>
+    <a class="nav" href="Agents.dc.html"><span>Agents</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Repositories</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Knowledge sources</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Evidence sources</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Maintenance and updates</span></a>
+    <a class="nav" href="Performance.dc.html"><span>Performance</span></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <header style="height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg)">
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Authentication, consent and repositories</h1>
+    </header>
+
+    <div style="padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 22px; max-width: 820px">
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <div class="h">Authentication</div>
+        <div class="card">
+          <div class="row"><div class="lbl">Anthropic API key<small>Used for every automated task through Claude Code with `--bare`. Stored in the Keychain.</small></div><span class="badge" style="color: var(--green); border-color: var(--green)">configured</span><button class="btn" type="button">Replace</button></div>
+          <div class="row"><div class="lbl">Codex API key<small>Used when an agent or handoff targets Codex.</small></div><span class="badge">not set</span><button class="btn" type="button">Add</button></div>
+          <div class="row"><span class="sw off" role="img" aria-label="off"></span><div class="lbl">Use my own Claude or ChatGPT login instead<small>Personal use only. Anthropic reserves subscription logins for ordinary individual use; automated ticks may be throttled or blocked, and Noter never stores the login.</small></div></div>
+          <div class="row"><div class="lbl">Local runtime<small>Ollama detected · Qwen3 8B pulled · used as fallback and for sensitive calls</small></div><span class="badge" style="color: var(--green); border-color: var(--green)">ready</span></div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <div class="h">Privacy and consent</div>
+        <div class="card">
+          <div class="row" style="align-items: flex-start"><div class="lbl">Before capture<small>Germany requires every participant's consent to record a conversation.</small></div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <label class="radio"><input type="radio" name="consent" checked> Require the participants-informed flag</label>
+              <label class="radio"><input type="radio" name="consent"> Remind only</label>
+            </div>
+          </div>
+          <div class="row"><div class="lbl">Privacy mode<small>What may leave the machine through the LLM adapters.</small></div><select class="input"><option>Cloud with redaction</option><option>Cloud allowed</option><option>Local only</option></select></div>
+          <div class="row"><div class="lbl">Audio retention<small>Transcripts and per-call files are always kept.</small></div><select class="input"><option>30 days</option><option>7 days</option><option>90 days</option><option>Forever</option><option>Never store audio</option></select></div>
+          <div class="row"><span class="sw off" role="img" aria-label="off"></span><div class="lbl">Show talk-time share and "who was silent"<small>Behaviour data about colleagues; off by default.</small></div></div>
+          <div class="row"><div class="lbl">Voice profiles<small>3 people opted in: Anna (3 Oct), Dmitri (3 Oct), Pavel (10 Oct). Biometric; encrypted; deletable per person.</small></div><a class="btn" href="Person.dc.html">Manage on person pages</a></div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <div class="h">Repositories · where handoffs land</div>
+        <div class="card">
+          <div class="row"><div class="lbl">VSTOR · component frontend<small>~/projects/vhi-frontend</small></div><span class="badge">Claude Code</span><button class="btn quiet" type="button">Edit</button></div>
+          <div class="row"><div class="lbl">VHP<small>~/projects/vhp-frontend</small></div><span class="badge">Claude Code</span><button class="btn quiet" type="button">Edit</button></div>
+          <div class="row"><div class="lbl">Noter<small>~/projects/noter · improvement briefs land here</small></div><span class="badge">Codex</span><button class="btn quiet" type="button">Edit</button></div>
+          <div class="row"><button class="btn" type="button">+ Add mapping</button><span style="font-size: 12px; color: var(--text3)">Launch handlers found: claude-cli://, claude://, codex:// · terminal fallback: iTerm</span></div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <div class="h">Knowledge sources</div>
+        <div class="card">
+          <div class="row"><div class="lbl">~/Documents/VHI specs<small>Folder · 214 documents · indexed 2 min ago</small></div><span class="badge">normal</span><button class="btn quiet" type="button">Re-index</button></div>
+          <div class="row"><div class="lbl">Confluence · DEV space<small>MCP, indexed · 1,180 pages · nightly · token in Keychain</small></div><span class="badge">normal</span><button class="btn quiet" type="button">Revoke token</button></div>
+          <div class="row"><div class="lbl">Jira<small>MCP, live · queried by the agents at answer time · no token in Noter</small></div><span class="badge">live</span></div>
+          <div class="row"><div class="lbl">~/Documents/Vendor contracts<small>Folder · 12 documents · local runtime only</small></div><span class="badge" style="color: var(--orange); border-color: var(--orange)">sensitive</span></div>
+          <div class="row"><button class="btn" type="button">+ Add folder</button><button class="btn" type="button">+ Add MCP server</button></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

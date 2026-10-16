@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.nav{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text)}
+.nav.on{background:var(--sel);font-weight:600}
+.chk{width:16px;height:16px;margin:0;accent-color:var(--accent);flex:none}
+.pill{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font-size:11px;font-weight:600;background:var(--sel);color:var(--accent)}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); min-height: 1000px; display: flex; flex-wrap: wrap; border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+
+  <nav aria-label="Sidebar" style="width: 220px; flex: 0 0 220px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px">
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span>
+      <span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span>
+    </div>
+    <a class="nav on" href="Main.dc.html"><span>Today</span></a>
+    <a class="nav" href="Library.dc.html"><span>Calls</span></a>
+    <a class="nav" href="Person.dc.html"><span>People</span></a>
+    <a class="nav" href="Library.dc.html"><span>Topics</span></a>
+    <a class="nav" href="Ask.dc.html"><span>Ask</span></a>
+    <div class="h" style="padding: 14px 10px 4px">Workspace</div>
+    <a class="nav" href="Settings.dc.html"><span>Sources</span></a>
+    <a class="nav" href="Agents.dc.html"><span>Agents</span></a>
+    <a class="nav" href="Performance.dc.html"><span>Performance</span></a>
+    <a class="nav" href="Activity.dc.html" style="justify-content: space-between"><span>Activity</span><span class="pill">3</span></a>
+    <a class="nav" href="Settings.dc.html"><span>Settings</span></a>
+    <div style="flex: 1 1 auto"></div>
+    <div style="padding: 8px 10px; font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 8px"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--green)"></span>Idle · API key · local fallback ready</div>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <header style="height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg)">
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Today</h1>
+      <span style="color: var(--text3)">Thursday 16 October</span>
+      <div style="flex: 1 1 auto"></div>
+      <label style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--ctrl); border: 1px solid var(--line); width: 280px; box-sizing: border-box; color: var(--text3)">
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input type="search" placeholder="Search calls, people, documents" style="border: 0; outline: 0; background: transparent; font: inherit; color: var(--text); width: 100%">
+      </label>
+      <button class="btn" type="button"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--red)"></span>Record</button>
+    </header>
+
+    <div style="padding: 20px 24px 32px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 1180px">
+
+      <section style="grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px">
+        <div class="h">Today · 3 calls</div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px">
+            <div style="width: 52px; font-variant-numeric: tabular-nums; color: var(--text2)">10:00</div>
+            <div style="flex: 1 1 auto; min-width: 0">
+              <div style="font-weight: 600">Planning: VHI 8.0 drawer redesign</div>
+              <div style="color: var(--text2); font-size: 12px">Anna, Pavel, Dmitri · Teams · last time: estimates parked, owner missing for the empty state</div>
+            </div>
+            <span class="pill">6 agents · fused</span>
+            <a class="btn primary" href="CallScreen.dc.html">Open call screen</a>
+          </div>
+          <div class="row"><input class="chk" type="checkbox" id="t1"><label for="t1" style="flex: 1 1 auto">Anna: drawer redesign spec by Friday <span style="color: var(--text3)">· owed to you · from 1:1 on 9 Oct</span></label><a class="btn quiet" href="PostCall.dc.html">Evidence</a></div>
+          <div class="row"><input class="chk" type="checkbox" id="t2"><label for="t2" style="flex: 1 1 auto">You: decide on virtualised table for 10k rows <span style="color: var(--text3)">· due today · handed off to Claude Code, awaiting PR</span></label><span class="pill" style="background: transparent; color: var(--orange); border: 1px solid var(--orange)">handed off</span></div>
+          <div class="row"><input class="chk" type="checkbox" id="t3"><label for="t3" style="flex: 1 1 auto">Open question: which notification service for the drawer? <span style="color: var(--text3)">· parked on 2 Oct, Architect flagged it twice</span></label></div>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px">
+            <div style="width: 52px; font-variant-numeric: tabular-nums; color: var(--text2)">14:30</div>
+            <div style="flex: 1 1 auto; min-width: 0">
+              <div style="font-weight: 600">1:1 with Anna</div>
+              <div style="color: var(--text2); font-size: 12px">Teams · 2 agents (Teamlead, PM) · 3 items from the last two 1:1s still open</div>
+            </div>
+            <a class="btn" href="Person.dc.html">Person page</a>
+          </div>
+          <div class="row"><input class="chk" type="checkbox" id="t4"><label for="t4" style="flex: 1 1 auto">Anna: migrate the settings form to the new uikit <span style="color: var(--text3)">· 2 weeks old</span></label></div>
+          <div class="row"><input class="chk" type="checkbox" id="t5"><label for="t5" style="flex: 1 1 auto">You: answer on the conference budget <span style="color: var(--text3)">· she asked on 9 Oct</span></label></div>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px">
+            <div style="width: 52px; font-variant-numeric: tabular-nums; color: var(--text2)">16:00</div>
+            <div style="flex: 1 1 auto; min-width: 0">
+              <div style="font-weight: 600">Backend sync: websocket notifications</div>
+              <div style="color: var(--text2); font-size: 12px">Zoom · mixed RU/EN · Backend engineer and Architect agents on</div>
+            </div>
+            <span style="color: var(--text3); font-size: 12px">Nothing open</span>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div class="h">This week</div>
+        <div class="card">
+          <div class="row"><div style="width: 44px; color: var(--text2)">Tue</div><div style="flex: 1 1 auto"><div style="font-weight: 600">Cross-team QA sync</div><div style="font-size: 12px; color: var(--text2)">2 items owed to QA · last summary: flaky autotests on the stand</div></div></div>
+          <div class="row"><div style="width: 44px; color: var(--text2)">Wed</div><div style="flex: 1 1 auto"><div style="font-weight: 600">Retro · sprint 42</div><div style="font-size: 12px; color: var(--text2)">Retro skill · all six agents</div></div></div>
+          <div class="row"><div style="width: 44px; color: var(--text2)">Fri</div><div style="flex: 1 1 auto"><div style="font-weight: 600">Vendor call: monitoring SaaS</div><div style="font-size: 12px; color: var(--text2)">Sensitive · local only</div></div><span class="pill" style="color: var(--orange); background: transparent; border: 1px solid var(--orange)">local only</span></div>
+        </div>
+        <div class="h" style="margin-top: 6px">Due this week, no call</div>
+        <div class="card">
+          <div class="row"><input class="chk" type="checkbox" id="w1"><label for="w1" style="flex: 1 1 auto">Pavel: write the migration plan for VSTOR-9841 <span style="color: var(--text3)">· Thu</span></label></div>
+          <div class="row"><input class="chk" type="checkbox" id="w2"><label for="w2" style="flex: 1 1 auto">You: review the release-notes draft <span style="color: var(--text3)">· Fri</span></label></div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <div class="h">Proposals waiting · 3</div>
+        <div class="card">
+          <div class="row" style="align-items: flex-start"><div style="flex: 1 1 auto"><div style="font-weight: 600">Close "virtualised table for 10k rows"</div><div style="font-size: 12px; color: var(--text2)">PR #448 merged on 15 Oct carries VSTOR-1234 · confidence 0.92</div></div><button class="btn" type="button">Reject</button><button class="btn primary" type="button">Accept</button></div>
+          <div class="row" style="align-items: flex-start"><div style="flex: 1 1 auto"><div style="font-weight: 600">Apply term "ostor" to 14 older transcripts</div><div style="font-size: 12px; color: var(--text2)">From your correction on 14 Oct · variants: остор, o-store</div></div><button class="btn" type="button">Reject</button><button class="btn primary" type="button">Accept</button></div>
+          <div class="row" style="align-items: flex-start"><div style="flex: 1 1 auto"><div style="font-weight: 600">"Speaker 2" in 3 calls is Dmitri</div><div style="font-size: 12px; color: var(--text2)">Voice profile match 0.81 · Dmitri opted in on 3 Oct</div></div><button class="btn" type="button">Reject</button><button class="btn primary" type="button">Accept</button></div>
+        </div>
+        <a class="btn quiet" href="Activity.dc.html" style="align-self: flex-start">All activity</a>
+      </section>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

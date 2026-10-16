@@ -1,0 +1,295 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-16T01:40:00Z"
+  },
+  "title": "Noter UI prototype",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Today dashboard · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CallScreen.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1920,
+      "h": 1080,
+      "title": "Call screen on the dedicated display · light",
+      "is_interactive": true
+    },
+    "FloatingPanel.dc.html": {
+      "x": 3520,
+      "y": 0,
+      "w": 420,
+      "h": 760,
+      "title": "Floating panel (single display) · light"
+    },
+    "PostCall.dc.html": {
+      "x": 4020,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "Post-call outputs with handoff drawer · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Main-dark.dc.html": {
+      "x": 0,
+      "y": 1200,
+      "w": 1440,
+      "h": 1000,
+      "title": "Today dashboard · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "CallScreen-dark.dc.html": {
+      "x": 1520,
+      "y": 1200,
+      "w": 1920,
+      "h": 1080,
+      "title": "Call screen · dark",
+      "is_interactive": true
+    },
+    "FloatingPanel-dark.dc.html": {
+      "x": 3520,
+      "y": 1200,
+      "w": 420,
+      "h": 760,
+      "title": "Floating panel · dark"
+    },
+    "PostCall-dark.dc.html": {
+      "x": 4020,
+      "y": 1200,
+      "w": 1440,
+      "h": 1000,
+      "title": "Post-call outputs · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Agents.dc.html": {
+      "x": 0,
+      "y": 2800,
+      "w": 1440,
+      "h": 1000,
+      "title": "Agents · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Settings.dc.html": {
+      "x": 1520,
+      "y": 2800,
+      "w": 1440,
+      "h": 1000,
+      "title": "Settings · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Agents-dark.dc.html": {
+      "x": 0,
+      "y": 3920,
+      "w": 1440,
+      "h": 1000,
+      "title": "Agents · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Settings-dark.dc.html": {
+      "x": 1520,
+      "y": 3920,
+      "w": 1440,
+      "h": 1000,
+      "title": "Settings · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Library.dc.html": {
+      "x": 0,
+      "y": 5440,
+      "w": 1440,
+      "h": 1000,
+      "title": "Library · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Ask.dc.html": {
+      "x": 1520,
+      "y": 5440,
+      "w": 1440,
+      "h": 1000,
+      "title": "Ask · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Person.dc.html": {
+      "x": 3040,
+      "y": 5440,
+      "w": 1440,
+      "h": 1000,
+      "title": "Person page with History · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Activity.dc.html": {
+      "x": 4560,
+      "y": 5440,
+      "w": 1440,
+      "h": 1000,
+      "title": "Activity and proposals · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Library-dark.dc.html": {
+      "x": 0,
+      "y": 6560,
+      "w": 1440,
+      "h": 1000,
+      "title": "Library · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Ask-dark.dc.html": {
+      "x": 1520,
+      "y": 6560,
+      "w": 1440,
+      "h": 1000,
+      "title": "Ask · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Person-dark.dc.html": {
+      "x": 3040,
+      "y": 6560,
+      "w": 1440,
+      "h": 1000,
+      "title": "Person page · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Activity-dark.dc.html": {
+      "x": 4560,
+      "y": 6560,
+      "w": 1440,
+      "h": 1000,
+      "title": "Activity · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Performance.dc.html": {
+      "x": 0,
+      "y": 8080,
+      "w": 1440,
+      "h": 1000,
+      "title": "Performance · light",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "FirstRun.dc.html": {
+      "x": 1520,
+      "y": 8080,
+      "w": 760,
+      "h": 560,
+      "title": "First-run wizard · light",
+      "is_interactive": true
+    },
+    "MenuBar.dc.html": {
+      "x": 2360,
+      "y": 8080,
+      "w": 420,
+      "h": 460,
+      "title": "Menu bar quick actions · light"
+    },
+    "Performance-dark.dc.html": {
+      "x": 0,
+      "y": 9200,
+      "w": 1440,
+      "h": 1000,
+      "title": "Performance · dark",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "FirstRun-dark.dc.html": {
+      "x": 1520,
+      "y": 9200,
+      "w": 760,
+      "h": 560,
+      "title": "First-run wizard · dark",
+      "is_interactive": true
+    },
+    "MenuBar-dark.dc.html": {
+      "x": 2360,
+      "y": 9200,
+      "w": 420,
+      "h": 460,
+      "title": "Menu bar · dark"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "CallScreen.dc.html",
+    "FloatingPanel.dc.html",
+    "PostCall.dc.html",
+    "Main-dark.dc.html",
+    "CallScreen-dark.dc.html",
+    "FloatingPanel-dark.dc.html",
+    "PostCall-dark.dc.html",
+    "Agents.dc.html",
+    "Settings.dc.html",
+    "Agents-dark.dc.html",
+    "Settings-dark.dc.html",
+    "Library.dc.html",
+    "Ask.dc.html",
+    "Person.dc.html",
+    "Activity.dc.html",
+    "Library-dark.dc.html",
+    "Ask-dark.dc.html",
+    "Person-dark.dc.html",
+    "Activity-dark.dc.html",
+    "Performance.dc.html",
+    "FirstRun.dc.html",
+    "MenuBar.dc.html",
+    "Performance-dark.dc.html",
+    "FirstRun-dark.dc.html",
+    "MenuBar-dark.dc.html"
+  ],
+  "notes": {
+    "t-core": {
+      "x": 0,
+      "y": -260,
+      "text": "Core call flow: Today → call screen → post-call and handoff (light row, then dark)",
+      "kind": "title1",
+      "maxW": 5460
+    },
+    "t-agents": {
+      "x": 0,
+      "y": 2540,
+      "text": "Agents and settings",
+      "kind": "title1",
+      "maxW": 2960
+    },
+    "t-library": {
+      "x": 0,
+      "y": 5180,
+      "text": "Library, Ask, People and Activity",
+      "kind": "title1",
+      "maxW": 6000
+    },
+    "t-perf": {
+      "x": 0,
+      "y": 7820,
+      "text": "Performance, first run and the menu bar",
+      "kind": "title1",
+      "maxW": 2780
+    }
+  },
+  "designSystems": []
+}

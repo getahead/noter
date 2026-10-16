@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Call screen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:30px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.seg{display:flex;gap:10px;padding:10px 0;align-items:flex-start}
+.who{width:120px;flex:none;font-weight:600;font-size:14px}
+.t{width:56px;flex:none;color:var(--text3);font-variant-numeric:tabular-nums;font-size:12px;padding-top:2px}
+.lang{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--text3);border:1px solid var(--line);border-radius:4px;padding:1px 4px;margin-left:8px;vertical-align:middle}
+.badge{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px solid var(--line);color:var(--text2)}
+.kind{font-size:11px;font-weight:600;color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--ctrl);font-size:12px}
+.key{font-size:11px;color:var(--text3);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; width: 1920px; height: 1080px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 14px; color: var(--text); background: var(--bg); display: flex; flex-direction: column; overflow: hidden">
+
+  <div style="flex: 1 1 auto; min-height: 0; display: flex">
+
+    <section aria-label="Live transcript" style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line)">
+      <header style="height: 64px; display: flex; align-items: center; gap: 14px; padding: 0 28px; border-bottom: 1px solid var(--line)">
+        <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--red)"></span>
+        <h1 style="margin: 0; font-size: 17px; font-weight: 600">Planning: VHI 8.0 drawer redesign</h1>
+        <span style="color: var(--text3)">Teams · Anna, Pavel, Dmitri, you</span>
+        <div style="flex: 1 1 auto"></div>
+        <span class="chip">EN · RU · DE</span>
+        <span class="chip"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--green)"></span>Hypothesis 1.4 s · confirmed 3.1 s</span>
+      </header>
+
+      <div style="flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 12px 28px; display: flex; flex-direction: column; justify-content: flex-end; gap: 0; font-size: 15px; line-height: 1.5">
+        <div class="seg" style="border-top: 1px solid var(--line)"><span class="t">00:19:40</span><span class="who">Pavel</span><div>The empty state for the drawer is still undefined. We ship without it and users see a blank panel. <span class="lang">EN</span></div></div>
+        <div class="seg" style="border-top: 1px solid var(--line)"><span class="t">00:19:58</span><span class="who">Anna</span><div>Я сделаю drawer redesign до пятницы, но мне нужен ответ по notification service. <span class="lang">RU</span></div></div>
+        <div class="seg" style="border-top: 1px solid var(--line)"><span class="t">00:20:21</span><span class="who" style="color: var(--accent)">You</span><div>We parked that two weeks ago. Dmitri, is the websocket channel ready for the drawer events? <span class="lang">EN</span></div></div>
+        <div class="seg" style="border-top: 1px solid var(--line)"><span class="t">00:20:35</span><span class="who">Dmitri</span><div>Fast, ja. Der Kanal ist da, aber Reconnects verlieren noch Events. Wir brauchen einen Replay-Buffer. <span class="lang">DE</span></div></div>
+        <div class="seg" style="border-top: 1px solid var(--line)"><span class="t">00:20:52</span><span class="who">Anna</span><div>Then the drawer has to show "reconnecting" and refetch. Who decides the acceptance criteria for that? <span class="lang">EN</span></div></div>
+        <div class="seg" style="border-top: 1px solid var(--line); color: var(--text3)"><span class="t">00:21:04</span><span class="who" style="color: var(--text3)">Pavel</span><div>I think we should ask the backend team whether the replay buffer is in eight point zero or…</div></div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 28px 14px">
+        <span class="chip" style="background: var(--sel); border-color: transparent; color: var(--accent); font-weight: 600">● Live</span>
+        <span style="color: var(--text3); font-size: 12px">grey text is the hypothesis; it settles into black when confirmed</span>
+      </div>
+    </section>
+
+    <aside aria-label="Council cards" style="width: 640px; flex: 0 0 640px; display: flex; flex-direction: column; background: var(--content)">
+      <header style="height: 64px; display: flex; align-items: center; gap: 12px; padding: 0 22px; border-bottom: 1px solid var(--line)">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Council</h2>
+        <span style="color: var(--text3)">fused · 6 agents · cloud, redacted</span>
+        <div style="flex: 1 1 auto"></div>
+        <button class="btn quiet" type="button">Mute</button>
+      </header>
+
+      <div style="padding: 16px 22px; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto" aria-live="polite">
+        <article class="card" style="border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="badge">Architect</span><span class="kind">Context</span><div style="flex: 1 1 auto"></div><span class="key">⌘1</span></div>
+          <div style="font-size: 15px; line-height: 1.45">On 2 Oct you and Dmitri agreed the drawer uses the notification service, not a direct websocket. Today's plan contradicts that.</div>
+          <div style="font-size: 12px; color: var(--text3)">From Backend sync · 2 Oct · 00:41:10 · <a href="PostCall.dc.html" style="color: var(--accent)">open span</a></div>
+          <div style="display: flex; gap: 8px"><button class="btn" type="button">Pin</button><button class="btn quiet" type="button">Dismiss</button></div>
+        </article>
+
+        <article class="card">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="badge">PM</span><span class="badge" style="border-style: dashed">+ Designer</span><span class="kind">Ask</span><div style="flex: 1 1 auto"></div><span class="key">⌘2</span></div>
+          <div style="font-size: 15px; line-height: 1.45">Who owns the acceptance criteria for the "reconnecting" state, and what does the user see while events replay?</div>
+          <div style="font-size: 12px; color: var(--text3)">This call · 00:20:52 · no owner named in the last 4 minutes</div>
+          <div style="display: flex; gap: 8px"><button class="btn" type="button">Pin</button><button class="btn quiet" type="button">Dismiss</button></div>
+        </article>
+
+        <article class="card">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="badge">Teamlead</span><span class="kind">Pin</span><div style="flex: 1 1 auto"></div><span class="key">⌘3</span></div>
+          <div style="font-size: 15px; line-height: 1.45">Pin: Anna delivers the drawer redesign by Friday 17 Oct, blocked on the notification-service answer?</div>
+          <div style="font-size: 12px; color: var(--text3)">This call · 00:19:58 · Anna already has 3 open items</div>
+          <div style="display: flex; gap: 8px"><button class="btn primary" type="button">Pin as action item</button><button class="btn quiet" type="button">Dismiss</button></div>
+        </article>
+
+        <div style="flex: 1 1 auto"></div>
+        <div>
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px">Context in the packet</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span class="chip">Planning · 2 Oct</span><span class="chip">1:1 Anna · 9 Oct</span><span class="chip">Confluence: Drawer spec §3</span><span class="chip" style="border-style: dashed">Jira VSTOR-1234 (screen, v1.x)</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer style="height: 60px; display: flex; align-items: center; gap: 16px; padding: 0 28px; border-top: 1px solid var(--line); background: var(--content)">
+    <span style="font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600">00:21:08</span>
+    <span class="chip"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--red)"></span>Recording · consent set</span>
+    <span class="chip">Budget $0.31 of $1.00</span>
+    <span class="chip">2 pinned</span>
+    <div style="flex: 1 1 auto"></div>
+    <button class="btn" type="button">Mark moment <span class="key">⌘M</span></button>
+    <button class="btn" type="button">Catch me up <span class="key">⌘U</span></button>
+    <button class="btn" type="button">Pause</button>
+    <a class="btn" href="PostCall.dc.html">End call</a>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#1A1A1A', content: '#202020', card: '#2A2A2A', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#F5F5F7', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

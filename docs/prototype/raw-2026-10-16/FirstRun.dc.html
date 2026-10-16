@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — First run</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.step{display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text2)}
+.step.on{background:var(--sel);color:var(--text);font-weight:600}
+.step .n{width:18px;height:18px;border-radius:50%;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text3);flex:none}
+.step .n.done{background:var(--green);border-color:var(--green);color:#fff}
+.step.on .n{background:var(--accent);border-color:var(--accent);color:#fff}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.ok{background:var(--green)}.warn{background:var(--orange)}.bad{background:var(--red)}
+.meter{display:flex;gap:2px;align-items:flex-end;height:14px}
+.meter i{width:4px;background:var(--green);border-radius:1px;display:block}
+.meter i.off{background:var(--line)}
+.chk{width:14px;height:14px;border-radius:4px;border:1px solid var(--line);background:var(--ctrl);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.chk.on{background:var(--accent);border-color:var(--accent);color:#fff;font-size:10px;font-weight:700}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); width: 760px; height: 560px; display: flex; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 12px 40px var(--shadow); box-sizing: border-box">
+
+  <aside style="width: 210px; flex: 0 0 210px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span></div>
+    <div class="h" style="padding: 0 10px 8px">Set up Noter</div>
+    <div class="step"><span class="n done">✓</span><span>Welcome</span></div>
+    <div class="step"><span class="n done">✓</span><span>Models</span></div>
+    <div class="step on"><span class="n">3</span><span>Permissions</span></div>
+    <div class="step"><span class="n">4</span><span>Call display</span></div>
+    <div class="step"><span class="n">5</span><span>Consent</span></div>
+    <div class="step"><span class="n">6</span><span>Assistants</span></div>
+    <div style="flex: 1 1 auto"></div>
+    <div style="font-size: 11px; color: var(--text3); padding: 0 10px; line-height: 1.4">Everything here runs on this Mac. Nothing leaves it until you connect an assistant in step 6.</div>
+  </aside>
+
+  <main style="flex: 1 1 auto; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <div style="padding: 22px 24px 0; display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto">
+      <div>
+        <h1 style="margin: 0 0 4px; font-size: 17px; font-weight: 600">Microphone and system audio</h1>
+        <div style="color: var(--text2)">Noter captures your voice from the microphone and the other participants from whatever app plays them. Both are tested here before the first call.</div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <span class="dot ok"></span>
+          <div style="flex: 1 1 auto"><div style="font-weight: 600">Microphone</div><div style="font-size: 12px; color: var(--text2)">MacBook Pro Microphone · granted · voice processing off</div></div>
+          <div class="meter" aria-label="Microphone level"><i style="height: 4px"></i><i style="height: 7px"></i><i style="height: 11px"></i><i style="height: 14px"></i><i style="height: 9px"></i><i style="height: 12px"></i><i style="height: 6px"></i><i class="off" style="height: 10px"></i><i class="off" style="height: 13px"></i><i class="off" style="height: 8px"></i></div>
+          <span class="st" style="color: var(--green)">Hearing you</span>
+        </div>
+        <div class="row">
+          <span class="dot warn"></span>
+          <div style="flex: 1 1 auto"><div style="font-weight: 600">System audio recording</div><div style="font-size: 12px; color: var(--text2)">Needed for the other side of the call · Noter is not in the list yet</div></div>
+          <button class="btn" type="button">Open System Settings…</button>
+        </div>
+        <div class="row">
+          <span class="dot" style="background: var(--line)"></span>
+          <div style="flex: 1 1 auto"><div style="font-weight: 600">Self-test</div><div style="font-size: 12px; color: var(--text2)">Plays a 3-second clip through your speakers and checks that both streams arrive and line up</div></div>
+          <button class="btn" type="button" disabled style="opacity: .55">Run test</button>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 8px; background: var(--sel); font-size: 12px">
+        <div style="flex: 1 1 auto"><span style="font-weight: 600">How to grant it:</span> System Settings → Privacy &amp; Security → Screen &amp; System Audio Recording → turn on Noter. macOS asks once per app; Noter never records the screen.</div>
+      </div>
+
+      <div style="display: flex; gap: 20px; font-size: 12px; color: var(--text2)">
+        <label style="display: inline-flex; align-items: center; gap: 8px"><span class="chk on">✓</span>Exclude Noter's own sounds from capture</label>
+        <label style="display: inline-flex; align-items: center; gap: 8px"><span class="chk on">✓</span>Store audio as AAC and keep it after transcription</label>
+      </div>
+    </div>
+
+    <footer style="display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--bg)">
+      <span style="font-size: 12px; color: var(--text3)">macOS 15.1 · Core Audio process tap</span>
+      <div style="flex: 1 1 auto"></div>
+      <button class="btn quiet" type="button">Skip for now</button>
+      <button class="btn" type="button">Back</button>
+      <button class="btn primary" type="button">Continue</button>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":760,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>

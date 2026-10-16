@@ -2,7 +2,7 @@
 Source of truth for Noter development.
 Living copy (edit, comment, review tab): https://claude.ai/code/artifact/8f34b45a-2903-468f-98d9-5de89e7163cc
 This file is regenerated from the living copy whenever the PRD, the design or the UI prototype changes.
-Last sync: 2026-10-16. Review findings: docs/REVIEW-2026-10-16.md. Diagrams: docs/diagrams/.
+Last sync: 2026-10-16. Review findings: docs/REVIEW-2026-10-16.md. Diagrams: docs/diagrams/. UI prototype snapshots (raw, need approval): docs/prototype/.
 -->
 
 # Noter — PRD & Technical Design
@@ -825,6 +825,24 @@ Six milestones of two to four weeks each, about 22 weeks to v1 as specified (the
 Each band is a milestone with its scope; the diamond under it is the gate, and the line beside the diamond is the measurement that has to pass before the next milestone starts.
 
 The copilot sits late on purpose: it is the most distinctive feature and the one most likely to eat the schedule, and it is only as good as the confirmed-text latency and the retrieval quality the earlier milestones establish. Week one of M0 is a throwaway Swift CLI that creates the global tap and the mic stream from a sandboxed helper, confirms the permission prompt and non-zero buffers, runs one WhisperKit Turbo instance over both channels with per-utterance language ID on a real three-language call, and prints hypothesis and confirmed latency; that measurement decides the streaming policy, the sandbox question and whether Parakeet joins as a second backend. v1.x (calendar, screen context from the first screen, Jira and Slack through MCP, the pre-call brief, more skills) starts after M5 ships and after a week of daily use has produced the first list of what actually hurts.
+
+## UI prototype
+
+The screens are prototyped as a Design artifact in the standard macOS look (system font, source-list sidebar, toolbar, push buttons, system accent), light and dark: [Noter UI prototype](https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9), Oct 16, 2026. Status: raw, awaiting the owner's approval; a dated snapshot of the board sources is kept in the repository under `docs/prototype/raw-2026-10-16/` for history, and an approved set will move to `docs/prototype/approved/`. Decisions taken in the prototype are folded into the sections above and into `docs/PRD.md`, which stays the source of truth for development.
+
+| Row | Boards | Size |
+| --- | --- | --- |
+| Core call flow | Today dashboard, Call screen, Floating panel, Post-call summary with handoff drawer | 1440×1000 · 1920×1080 · 420×760 · 1440×1000 |
+| Agents and settings | Agents (list, editor, council modes), Settings (authentication, privacy and consent, repositories, knowledge sources) | 1440×1000 |
+| Library, Ask, People, Activity | Calls with search and topic thread, Ask with cited answer, Person page with history diff, Activity with proposals queue and undo | 1440×1000 |
+| Performance and first run | Performance (targets, stage timeline, bottlenecks, improvement brief), First-run wizard, Menu bar extra | 1440×1000 · 760×560 · 420×460 |
+
+UI-level decisions made in the prototype (refinements of the features above, no architecture change):
+
+- Menu bar extra shows the recording state and timer; its menu offers Stop, Pause, Mark this moment, Catch me up, Ask about this call, a Copilot cards toggle, Mute copilot for 10 min, Open call screen, Floating panel instead, Open last summary, and the next calendar call with its auto-record state.
+- Performance page has a period selector (last call, 7 days, 30 days), a Quality block (words corrected, speaker relabels, language-ID flips, cards pinned/shown, cards dismissed in under 3 s), a Cost block (per runtime, local share, per-call average) and a preview card of the improvement brief with Copy as prompt and Open in Claude Code.
+- First run is six steps: Welcome, Models, Permissions (microphone and system audio with a 3-second self-test that checks both streams arrive and line up; Skip for now allowed), Call display, Consent, Assistants.
+- Activity offers an "Always for this term" accept on reconciliation proposals and a 10-second redo window after a batch undo.
 
 ## Decision log
 

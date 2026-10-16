@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  STATUS: RAW — NEEDS APPROVAL
+  Noter UI prototype, snapshot 2026-10-16. Not reviewed by the owner; nothing here is a committed design decision.
+  Live, editable copy (Design artifact): https://claude.ai/artifact/Kuh85UsA1zoFYNh4U7B2U9
+  Source of truth for product decisions: docs/PRD.md (section "UI prototype").
+  This file is a board of that artifact and needs its runtime (./support.js, served by the artifact) to render; it is kept here for history and diffing, not for standalone viewing.
+-->
+<title>Noter — Ask</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}a:hover{color:inherit}
+.btn{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--line);background:var(--ctrl);color:var(--text);font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 1px 1px var(--shadow)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.nav{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--text)}
+.nav.on{background:var(--sel);font-weight:600}
+.h{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text3)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px}
+.cite{display:flex;gap:10px;padding:10px 12px;border-top:1px solid var(--line);font-size:12px;line-height:1.45}
+.cite:first-child{border-top:0}
+.num{width:20px;height:20px;border-radius:50%;background:var(--sel);color:var(--accent);font-weight:700;font-size:11px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.sup{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--sel);color:var(--accent);font-size:10px;font-weight:700;vertical-align:super;margin-left:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--ctrl);font-size:12px;color:var(--text)}
+.lang{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--text3);border:1px solid var(--line);border-radius:4px;padding:1px 4px}
+</style>
+</helmet>
+<div style="--bg:{{c.bg}};--side:{{c.side}};--content:{{c.content}};--card:{{c.card}};--line:{{c.line}};--text:{{c.text}};--text2:{{c.text2}};--text3:{{c.text3}};--accent:{{c.accent}};--sel:{{c.sel}};--green:{{c.green}};--orange:{{c.orange}};--red:{{c.red}};--ctrl:{{c.ctrl}};--shadow:{{c.shadow}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; font-size: 13px; color: var(--text); background: var(--bg); min-height: 1000px; display: flex; flex-wrap: wrap; border-radius: 10px; overflow: hidden; border: 1px solid var(--line)">
+
+  <nav aria-label="Sidebar" style="width: 220px; flex: 0 0 220px; background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box">
+    <div aria-hidden="true" style="display: flex; gap: 8px; padding: 2px 4px 14px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #FF5F57"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #FEBC2E"></span><span style="width: 12px; height: 12px; border-radius: 50%; background: #28C840"></span></div>
+    <a class="nav" href="Main.dc.html"><span>Today</span></a>
+    <a class="nav" href="Library.dc.html"><span>Calls</span></a>
+    <a class="nav" href="Person.dc.html"><span>People</span></a>
+    <a class="nav" href="Library.dc.html"><span>Topics</span></a>
+    <a class="nav on" href="Ask.dc.html"><span>Ask</span></a>
+    <div class="h" style="padding: 14px 10px 4px">Recent questions</div>
+    <a class="nav" href="Ask.dc.html" style="font-size: 12px; color: var(--text2)"><span>what did we agree with backend…</span></a>
+    <a class="nav" href="Ask.dc.html" style="font-size: 12px; color: var(--text2)"><span>open items for Anna this month</span></a>
+    <a class="nav" href="Ask.dc.html" style="font-size: 12px; color: var(--text2)"><span>release-notes process?</span></a>
+    <div style="flex: 1 1 auto"></div>
+    <a class="nav" href="Settings.dc.html"><span>Settings</span></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; background: var(--content); display: flex; flex-direction: column">
+    <header style="height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid var(--line); background: var(--bg)">
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Ask your calls and documents</h1>
+      <div style="flex: 1 1 auto"></div>
+      <span class="chip">Claude Code · noter-mcp · 2 lookups</span>
+      <span class="chip">All calls · all sources</span>
+    </header>
+
+    <div style="padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 18px; max-width: 860px">
+      <label style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--ctrl); border: 1px solid var(--line)">
+        <span class="h" style="padding-top: 3px">Q</span>
+        <textarea style="flex: 1 1 auto; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--text); resize: none; height: 44px">What did we agree with backend about the websocket notifications, and what is still open?</textarea>
+        <button class="btn primary" type="button">Ask</button>
+      </label>
+
+      <section class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="font-size: 15px; line-height: 1.6">
+          <p style="margin: 0 0 10px">On 2 October the backend sync agreed that the drawer listens to the notification service and the direct websocket is left alone<span class="sup">1</span>. Today's planning call reaffirmed that<span class="sup">2</span> and added a second decision: backend builds a replay buffer for reconnects in 8.0, and the drawer shows a "reconnecting" state and refetches on recovery<span class="sup">3</span>.</p>
+          <p style="margin: 0 0 10px">Still open: who owns the acceptance criteria for the reconnecting state<span class="sup">4</span>, and whether the replay buffer lands in 8.0 or 8.1, which Pavel wanted to confirm with the backend team<span class="sup">5</span>. The Confluence drawer spec, section 3, still describes the old direct-websocket design and has not been updated<span class="sup">6</span>.</p>
+          <p style="margin: 0; color: var(--text2); font-size: 12px">Answered from 3 calls and 1 document · nothing in this answer is from the model's own knowledge · 6.2 s</p>
+        </div>
+        <div style="display: flex; gap: 8px"><button class="btn" type="button">Pin as decision summary</button><button class="btn quiet" type="button">Copy with citations</button><button class="btn quiet" type="button">Ask a follow-up</button></div>
+      </section>
+
+      <section>
+        <div class="h" style="margin-bottom: 8px">Citations · click to play the span or open the page</div>
+        <div class="card">
+          <div class="cite"><span class="num">1</span><div><div><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Backend sync: websocket notifications</a> · 2 Oct · Dmitri · 00:41:10 <span class="lang">RU</span></div><div style="color: var(--text2)">«Договорились: drawer слушает notification service, прямой websocket не трогаем.»</div></div></div>
+          <div class="cite"><span class="num">2</span><div><div><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Planning: VHI 8.0 drawer redesign</a> · today · Dmitri · 00:23:40 <span class="lang">EN</span></div><div style="color: var(--text2)">"Drawer events go through the notification service; the direct websocket is not used by the drawer."</div></div></div>
+          <div class="cite"><span class="num">3</span><div><div><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Planning: VHI 8.0 drawer redesign</a> · today · Dmitri, Anna · 00:24:12 <span class="lang">DE</span> <span class="lang">EN</span></div><div style="color: var(--text2)">"Wir brauchen einen Replay-Buffer." / "Then the drawer has to show reconnecting and refetch."</div></div></div>
+          <div class="cite"><span class="num">4</span><div><div><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Planning: VHI 8.0 drawer redesign</a> · today · open question · 00:20:52</div><div style="color: var(--text2)">"Who decides the acceptance criteria for that?"</div></div></div>
+          <div class="cite"><span class="num">5</span><div><div><a href="PostCall.dc.html" style="font-weight: 600; color: var(--accent)">Planning: VHI 8.0 drawer redesign</a> · today · Pavel · 00:21:04</div><div style="color: var(--text2)">"…ask the backend team whether the replay buffer is in 8.0 or…"</div></div></div>
+          <div class="cite"><span class="num">6</span><div><div><span style="font-weight: 600">Drawer spec</span> · Confluence, DEV space · section 3 "Event delivery" · indexed source, last synced last night</div><div style="color: var(--text2)">"The drawer subscribes directly to the cluster websocket…"</div></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Appearance"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    const c = dark ? {
+      bg: '#282828', side: '#232323', content: '#1E1E1E', card: '#262626', line: 'rgba(255,255,255,0.12)',
+      text: '#F2F2F2', text2: 'rgba(255,255,255,0.62)', text3: 'rgba(255,255,255,0.45)',
+      accent: '#0A84FF', sel: 'rgba(10,132,255,0.28)', green: '#30D158', orange: '#FF9F0A', red: '#FF453A',
+      ctrl: '#333333', shadow: 'rgba(0,0,0,0.4)'
+    } : {
+      bg: '#ECECEC', side: '#F3F3F3', content: '#FFFFFF', card: '#FFFFFF', line: 'rgba(0,0,0,0.12)',
+      text: '#1D1D1F', text2: 'rgba(0,0,0,0.62)', text3: 'rgba(0,0,0,0.48)',
+      accent: '#007AFF', sel: 'rgba(0,122,255,0.14)', green: '#28A745', orange: '#C77700', red: '#E0362B',
+      ctrl: '#FFFFFF', shadow: 'rgba(0,0,0,0.08)'
+    };
+    return { c, dark };
+  }
+}
+</script>
+</body>
+</html>
