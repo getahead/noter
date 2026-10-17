@@ -28,8 +28,13 @@ impl WindowLabel {
             WindowLabel::FirstRun => "first-run",
         }
     }
-    pub const ALL: [WindowLabel; 5] =
-        [WindowLabel::Main, WindowLabel::CallScreen, WindowLabel::RecordPrompt, WindowLabel::Settings, WindowLabel::FirstRun];
+    pub const ALL: [WindowLabel; 5] = [
+        WindowLabel::Main,
+        WindowLabel::CallScreen,
+        WindowLabel::RecordPrompt,
+        WindowLabel::Settings,
+        WindowLabel::FirstRun,
+    ];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -99,16 +104,36 @@ pub enum SettingsPane {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NavTarget {
     Today,
-    CallPage { call_id: CallId, tab: CallPageTab, span: Option<TimeSpan> },
-    Item { item_id: ItemId },
-    Person { person_id: PersonId },
-    Topic { topic_id: TopicId },
-    Ask { thread_id: Option<AskThreadId> },
+    CallPage {
+        call_id: CallId,
+        tab: CallPageTab,
+        span: Option<TimeSpan>,
+    },
+    Item {
+        item_id: ItemId,
+    },
+    Person {
+        person_id: PersonId,
+    },
+    Topic {
+        topic_id: TopicId,
+    },
+    Ask {
+        thread_id: Option<AskThreadId>,
+    },
     Activity,
-    Agents { agent_id: Option<AgentId> },
-    Performance { call_id: Option<CallId> },
-    Settings { pane: SettingsPane },
-    FirstRun { step: Option<SetupStep> },
+    Agents {
+        agent_id: Option<AgentId>,
+    },
+    Performance {
+        call_id: Option<CallId>,
+    },
+    Settings {
+        pane: SettingsPane,
+    },
+    FirstRun {
+        step: Option<SetupStep>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -134,10 +159,19 @@ pub struct AnnounceArgs {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExternalTarget {
     /// http(s) only; opened in the default browser.
-    Url { url: String },
-    Document { document_id: DocumentId, chunk_id: Option<ChunkId> },
-    SystemSettings { permission: PermissionKind },
-    RevealInFinder { path: String },
+    Url {
+        url: String,
+    },
+    Document {
+        document_id: DocumentId,
+        chunk_id: Option<ChunkId>,
+    },
+    SystemSettings {
+        permission: PermissionKind,
+    },
+    RevealInFinder {
+        path: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -168,13 +202,33 @@ pub enum UiLogLevel {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EntityChanged {
-    Call { call: CallRow },
-    Item { item: ItemView },
-    Person { person: PersonRow },
-    Topic { topic: TopicRow },
-    Agent { agent: AgentView },
-    Source { source: SourceRow },
-    Handoff { handoff: HandoffView },
-    Speakers { call_id: CallId, speakers: Vec<SpeakerView> },
-    Removed { kind: EntityKind, id: String },
+    Call {
+        call: CallRow,
+    },
+    Item {
+        item: ItemView,
+    },
+    Person {
+        person: PersonRow,
+    },
+    Topic {
+        topic: TopicRow,
+    },
+    Agent {
+        agent: AgentView,
+    },
+    Source {
+        source: SourceRow,
+    },
+    Handoff {
+        handoff: HandoffView,
+    },
+    Speakers {
+        call_id: CallId,
+        speakers: Vec<SpeakerView>,
+    },
+    Removed {
+        kind: EntityKind,
+        id: String,
+    },
 }

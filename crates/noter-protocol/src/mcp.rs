@@ -10,7 +10,10 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::common::{AudioChannel, CallId, CallTypeId, ChunkId, DocumentId, ItemId, Lang, LocalDate, OffsetMs, PersonId, SegmentId, TimestampMs, TopicId};
+use crate::common::{
+    AudioChannel, CallId, CallTypeId, ChunkId, DocumentId, ItemId, Lang, LocalDate, OffsetMs,
+    PersonId, SegmentId, TimestampMs, TopicId,
+};
 use crate::skills::CardCandidate;
 
 /// Tool names exactly as the CLIs see them (`mcp__noter__<name>`).

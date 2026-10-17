@@ -1,0 +1,26 @@
+{
+  "name": "@noter/desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "smoke": "tsx src/core/contract.smoke.ts",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:unit:coverage": "vitest run --config vitest.unit.config.ts --coverage",
+    "test:conformance": "vitest run --config vitest.conformance.config.ts",
+    "test:e2e": "playwright test --project=e2e --pass-with-no-tests",
+    "test:visual": "playwright test --project=visual",
+    "test:visual:update": "playwright test --project=visual --update-snapshots"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.12.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "5.0.3",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  }
+}

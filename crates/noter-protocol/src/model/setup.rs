@@ -74,12 +74,16 @@ pub enum SelfTestState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SelfTestFailure {
-    OneStreamSilent { channel: AudioChannel },
+    OneStreamSilent {
+        channel: AudioChannel,
+    },
     /// System audio permission granted but buffers are zero (missing usage key, PRD).
     ZeroBuffers,
     OwnSoundsLeak,
     TimedOut,
-    PermissionMissing { kind: PermissionKind },
+    PermissionMissing {
+        kind: PermissionKind,
+    },
     ModelNotReady,
 }
 
@@ -156,11 +160,23 @@ pub struct SelfTestMsg {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SelfTestEvent {
-    Levels { mic_db: f32, sys_db: f32 },
+    Levels {
+        mic_db: f32,
+        sys_db: f32,
+    },
     /// A live transcript line proving the pipeline end to end.
-    Line { channel: AudioChannel, text: String },
-    StreamArrived { channel: AudioChannel },
+    Line {
+        channel: AudioChannel,
+        text: String,
+    },
+    StreamArrived {
+        channel: AudioChannel,
+    },
     Passed,
-    Failed { reason: SelfTestFailure },
-    Ended { reason: StreamEndReason },
+    Failed {
+        reason: SelfTestFailure,
+    },
+    Ended {
+        reason: StreamEndReason,
+    },
 }

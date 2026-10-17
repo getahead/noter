@@ -11,9 +11,15 @@ use crate::model::CouncilMode;
 pub enum AgentStatus {
     Ok,
     /// Runtime unavailable; `fix` is the one-click switch the UI may offer (with Undo).
-    Paused { reason: crate::error::RuntimeUnavailableReason, fix: Option<RuntimeChoice> },
+    Paused {
+        reason: crate::error::RuntimeUnavailableReason,
+        fix: Option<RuntimeChoice>,
+    },
     /// Switched itself off in a call type after ten calls of dismissed cards.
-    SwitchedOff { call_type: CallTypeId, after_calls: u16 },
+    SwitchedOff {
+        call_type: CallTypeId,
+        after_calls: u16,
+    },
     Disabled,
 }
 

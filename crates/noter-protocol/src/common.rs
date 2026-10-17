@@ -76,41 +76,110 @@ id_type!(
 /// A call type, such as `one_on_one`, `planning` or a user-added type.
 /// Call types are data, not code: each one is a skill directory
 /// (`skills/<type>/`) and the list comes from `settings_call_types`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Type, JsonSchema,
+)]
 #[serde(transparent)]
 pub struct CallTypeId(pub String);
 
 /// Milliseconds since the Unix epoch (UTC). Exported to TypeScript as `number`
 /// (exact up to the year 285 616).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Type,
+    JsonSchema,
+)]
 #[serde(transparent)]
 pub struct TimestampMs(#[specta(type = specta_typescript::Number)] pub i64);
 
 /// Milliseconds from the start of a call (session-relative audio time).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Type,
+    JsonSchema,
+)]
 #[serde(transparent)]
 pub struct OffsetMs(pub u32);
 
 /// A duration in milliseconds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Type,
+    JsonSchema,
+)]
 #[serde(transparent)]
 pub struct DurationMs(pub u32);
 
 /// A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema,
+)]
 #[serde(transparent)]
 pub struct LocalDate(pub String);
 
 /// Per-stream sequence number. Starts at 1, increases by exactly 1 per
 /// message of one subscription, so the UI can detect a gap (and resubscribe).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Type,
+    JsonSchema,
+)]
 #[serde(transparent)]
 pub struct Seq(#[specta(type = specta_typescript::Number)] pub u64);
 
 /// Row version for optimistic concurrency. Every editable record carries it;
 /// every edit command sends the `rev` it was based on and gets
 /// `ErrorCode::Conflict` when the record changed since (UI: "Item changed since").
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Type, JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Type,
+    JsonSchema,
+)]
 #[serde(transparent)]
 pub struct Rev(pub u32);
 
@@ -267,8 +336,13 @@ pub struct PersonChip {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PersonRef {
-    Existing { person_id: PersonId },
-    New { display_name: String, email: Option<String> },
+    Existing {
+        person_id: PersonId,
+    },
+    New {
+        display_name: String,
+        email: Option<String>,
+    },
 }
 
 /// A call as a compact reference.
@@ -300,13 +374,37 @@ pub struct AgentRef {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Provenance {
-    ThisCall { span: TimeSpan },
-    PastCall { call: CallRef, span: TimeSpan },
-    Jira { key: String, url: Option<String>, looked_up_at: TimestampMs },
-    Document { source_id: SourceId, document_id: DocumentId, chunk_id: ChunkId, title: String, section: Option<String>, source_name: String },
-    LiveLookup { server: String, summary: String, at: TimestampMs },
+    ThisCall {
+        span: TimeSpan,
+    },
+    PastCall {
+        call: CallRef,
+        span: TimeSpan,
+    },
+    Jira {
+        key: String,
+        url: Option<String>,
+        looked_up_at: TimestampMs,
+    },
+    Document {
+        source_id: SourceId,
+        document_id: DocumentId,
+        chunk_id: ChunkId,
+        title: String,
+        section: Option<String>,
+        source_name: String,
+    },
+    LiveLookup {
+        server: String,
+        summary: String,
+        at: TimestampMs,
+    },
     /// v1.x: "from your screen: Jira VSTOR-1234 at 14:32".
-    Screen { context_item_id: ContextItemId, label: String, at: TimestampMs },
+    Screen {
+        context_item_id: ContextItemId,
+        label: String,
+        at: TimestampMs,
+    },
     /// "Model guess · unverified"; ranked last.
     ModelGuess,
 }

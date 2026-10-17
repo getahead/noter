@@ -7,3 +7,5 @@ The Noter contracts as Rust types: UI ↔ core IPC (`ipc`), view models (`model`
     cargo run  -p noter-protocol --bin noter-contract-export -- --check   # CI: fail if anything is stale
 
 To change the contract: edit the types and the registry in `src/ipc/mod.rs`, regenerate, update the fake handlers in `apps/desktop/src/core/fake/handlers.ts` if a frozen surface changed, bump `CONTRACT_VERSION`, and get one core and one UI review (DESIGN-core 4.1).
+
+The crate is checked by `just contract` and counts toward the 90% unit-coverage gate (fixtures excluded as data); see docs/HARNESS.md.

@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::common::*;
-use crate::model::{ArchiveStatus, CalendarEventRef, GapView, ItemView, MarkView, OutputsStatus, SpeakerView, StreamEndReason};
+use crate::model::{
+    ArchiveStatus, CalendarEventRef, GapView, ItemView, MarkView, OutputsStatus, SpeakerView,
+    StreamEndReason,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -169,16 +172,28 @@ pub struct SearchArgs {
 pub enum SearchMode {
     Hybrid,
     /// Index rebuild running: keyword-only with progress.
-    KeywordOnly { rebuild_progress: f32 },
+    KeywordOnly {
+        rebuild_progress: f32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HitTarget {
-    Segment { span: TimeSpan },
-    Item { item_id: ItemId },
-    Summary { call_id: CallId, summary_id: SummaryId },
-    Document { document_id: DocumentId, chunk_id: ChunkId },
+    Segment {
+        span: TimeSpan,
+    },
+    Item {
+        item_id: ItemId,
+    },
+    Summary {
+        call_id: CallId,
+        summary_id: SummaryId,
+    },
+    Document {
+        document_id: DocumentId,
+        chunk_id: ChunkId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -302,13 +317,26 @@ pub struct AskMsg {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AskEvent {
-    Started { runtime: RuntimeChoice, mode: EffectiveMode },
+    Started {
+        runtime: RuntimeChoice,
+        mode: EffectiveMode,
+    },
     /// Append to the answer text.
-    Delta { text: String },
-    Citation { citation: Citation },
-    Done { answer: AskAnswer },
-    Failed { error: crate::error::CoreError },
-    Ended { reason: StreamEndReason },
+    Delta {
+        text: String,
+    },
+    Citation {
+        citation: Citation,
+    },
+    Done {
+        answer: AskAnswer,
+    },
+    Failed {
+        error: crate::error::CoreError,
+    },
+    Ended {
+        reason: StreamEndReason,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

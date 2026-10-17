@@ -97,24 +97,64 @@ pub struct StartSession {
 pub enum EngineCommand {
     Ping,
     StartSession(StartSession),
-    Pause { call_id: CallId },
-    Resume { call_id: CallId },
+    Pause {
+        call_id: CallId,
+    },
+    Resume {
+        call_id: CallId,
+    },
     /// Flush, close the files, write `timeline.json`, then `session_stopped`.
-    Stop { call_id: CallId },
-    SetGlossary { entries: Vec<GlossaryEntry> },
-    SetLanguages { languages: Vec<Lang> },
-    ExcludeProcess { call_id: CallId, bundle_id: String },
+    Stop {
+        call_id: CallId,
+    },
+    SetGlossary {
+        entries: Vec<GlossaryEntry>,
+    },
+    SetLanguages {
+        languages: Vec<Lang>,
+    },
+    ExcludeProcess {
+        call_id: CallId,
+        bundle_id: String,
+    },
     /// Offline pass: Large v3 + VBx clustering; constraints from the user's corrections.
-    OfflinePass { call_id: CallId, session_dir: String, result_path: String, constraints_path: Option<String>, backend: AsrBackend },
+    OfflinePass {
+        call_id: CallId,
+        session_dir: String,
+        result_path: String,
+        constraints_path: Option<String>,
+        backend: AsrBackend,
+    },
     /// 256-d WeSpeaker embedding of spans, written to `out_path` (encrypted by the core afterwards).
-    SpeakerEmbedding { request_id: String, call_id: CallId, channel: AudioChannel, spans: Vec<EngineSpan>, out_path: String },
+    SpeakerEmbedding {
+        request_id: String,
+        call_id: CallId,
+        channel: AudioChannel,
+        spans: Vec<EngineSpan>,
+        out_path: String,
+    },
     /// bge-m3 embeddings for chunks; `inline` for one query (search latency), a file otherwise.
-    EmbedTexts { request_id: String, texts: Vec<String>, out_path: Option<String> },
+    EmbedTexts {
+        request_id: String,
+        texts: Vec<String>,
+        out_path: Option<String>,
+    },
     /// Start or stop call detection listeners (off until the self-test passes).
-    SetDetection { enabled: bool, known_bundle_ids: Vec<String> },
-    SelfTest { play_clip: bool, timeout_ms: u32 },
+    SetDetection {
+        enabled: bool,
+        known_bundle_ids: Vec<String>,
+    },
+    SelfTest {
+        play_clip: bool,
+        timeout_ms: u32,
+    },
     /// Play a span natively (replay); the engine excludes its own process from the tap.
-    Play { call_id: CallId, from_ms: OffsetMs, to_ms: Option<OffsetMs>, channel: Option<AudioChannel> },
+    Play {
+        call_id: CallId,
+        from_ms: OffsetMs,
+        to_ms: Option<OffsetMs>,
+        channel: Option<AudioChannel>,
+    },
     StopPlayback,
     Shutdown,
 }
@@ -179,36 +219,121 @@ pub enum EngineErrorCode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EngineEvent {
-    Ready { protocol_version: String, engine_version: String, models: Vec<String>, sandboxed: bool },
-    Ack { cmd_id: u64 },
-    Error { cmd_id: Option<u64>, code: EngineErrorCode, message: String },
+    Ready {
+        protocol_version: String,
+        engine_version: String,
+        models: Vec<String>,
+        sandboxed: bool,
+    },
+    Ack {
+        cmd_id: u64,
+    },
+    Error {
+        cmd_id: Option<u64>,
+        code: EngineErrorCode,
+        message: String,
+    },
     /// A known meeting app or a browser plays audio while holding the microphone.
-    CallDetected { bundle_id: String, app_name: String, pid: i32 },
+    CallDetected {
+        bundle_id: String,
+        app_name: String,
+        pid: i32,
+    },
     /// The meeting app released audio and the mic (the core applies the 20 s rule).
-    CallAudioReleased { bundle_id: String },
+    CallAudioReleased {
+        bundle_id: String,
+    },
     /// Another process started playing into the tap.
-    AudioSourceAdded { call_id: CallId, bundle_id: String, app_name: String },
-    SessionStarted { call_id: CallId, mic_device: String, output_device: String },
-    DeviceChanged { call_id: CallId, device_name: String, gap_from_ms: OffsetMs, gap_to_ms: OffsetMs },
-    PermissionLost { call_id: CallId, channel: AudioChannel },
-    Segment { segment: EngineSegment },
-    SpeakerTurn { call_id: CallId, channel: AudioChannel, speaker_label: String, at_ms: OffsetMs },
+    AudioSourceAdded {
+        call_id: CallId,
+        bundle_id: String,
+        app_name: String,
+    },
+    SessionStarted {
+        call_id: CallId,
+        mic_device: String,
+        output_device: String,
+    },
+    DeviceChanged {
+        call_id: CallId,
+        device_name: String,
+        gap_from_ms: OffsetMs,
+        gap_to_ms: OffsetMs,
+    },
+    PermissionLost {
+        call_id: CallId,
+        channel: AudioChannel,
+    },
+    Segment {
+        segment: EngineSegment,
+    },
+    SpeakerTurn {
+        call_id: CallId,
+        channel: AudioChannel,
+        speaker_label: String,
+        at_ms: OffsetMs,
+    },
     /// At most every 100 ms; droppable.
-    Levels { call_id: Option<CallId>, mic_db: f32, sys_db: f32 },
+    Levels {
+        call_id: Option<CallId>,
+        mic_db: f32,
+        sys_db: f32,
+    },
     /// No segment for N seconds while audio flows (the core decides on "stalled").
-    NoSegments { call_id: CallId, since_ms: OffsetMs },
+    NoSegments {
+        call_id: CallId,
+        since_ms: OffsetMs,
+    },
     /// VAD heard nothing on either channel since this offset.
-    Silence { call_id: CallId, since_ms: OffsetMs },
-    SessionStopped { call_id: CallId, timeline_path: String, mic_path: Option<String>, sys_path: Option<String> },
-    OfflineProgress { call_id: CallId, progress: f32 },
-    OfflineDone { call_id: CallId, result_path: String },
-    OfflineFailed { call_id: CallId, code: EngineErrorCode },
-    SpeakerEmbeddingDone { request_id: String, out_path: String },
+    Silence {
+        call_id: CallId,
+        since_ms: OffsetMs,
+    },
+    SessionStopped {
+        call_id: CallId,
+        timeline_path: String,
+        mic_path: Option<String>,
+        sys_path: Option<String>,
+    },
+    OfflineProgress {
+        call_id: CallId,
+        progress: f32,
+    },
+    OfflineDone {
+        call_id: CallId,
+        result_path: String,
+    },
+    OfflineFailed {
+        call_id: CallId,
+        code: EngineErrorCode,
+    },
+    SpeakerEmbeddingDone {
+        request_id: String,
+        out_path: String,
+    },
     /// One query: inline vector (1024 floats). Batches: `out_path` with float32 little-endian rows.
-    Embeddings { request_id: String, inline: Option<Vec<f32>>, out_path: Option<String>, count: u32 },
-    SelfTestStream { channel: AudioChannel },
-    SelfTestLine { channel: AudioChannel, text: String },
-    SelfTestResult { passed: bool, failure: Option<EngineErrorCode>, own_sounds_leak: bool },
-    PlaybackPosition { call_id: CallId, at_ms: OffsetMs, playing: bool },
+    Embeddings {
+        request_id: String,
+        inline: Option<Vec<f32>>,
+        out_path: Option<String>,
+        count: u32,
+    },
+    SelfTestStream {
+        channel: AudioChannel,
+    },
+    SelfTestLine {
+        channel: AudioChannel,
+        text: String,
+    },
+    SelfTestResult {
+        passed: bool,
+        failure: Option<EngineErrorCode>,
+        own_sounds_leak: bool,
+    },
+    PlaybackPosition {
+        call_id: CallId,
+        at_ms: OffsetMs,
+        playing: bool,
+    },
     Pong,
 }

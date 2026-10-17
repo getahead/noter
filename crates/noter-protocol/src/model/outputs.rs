@@ -27,7 +27,10 @@ pub enum SectionState {
     Writing,
     Ready,
     Empty,
-    Failed { code: crate::error::ErrorCode, local_fallback_available: bool },
+    Failed {
+        code: crate::error::ErrorCode,
+        local_fallback_available: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

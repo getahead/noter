@@ -75,7 +75,7 @@ The core is one process with one writer. It owns every record, runs the call lif
 
 Requirements that significantly influence architecture decisions.
 
-**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`. Earlier architecture decisions are rows of PRD › Decision log; this design builds on them and does not repeat them.
+**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`. Earlier architecture decisions are rows of PRD › Decision log; this design builds on them and does not repeat them.
 
 The PRD has no requirement IDs, so the first column names the PRD section, as in `docs/DESIGN.md`.
 
@@ -226,9 +226,9 @@ A command carries the user's intent as wanted state (never a toggle) and the rev
 
 - [ ] `p2` - **ID**: `cpt-noter-principle-core-fakes`
 
-Each boundary can be replaced in tests: the fake core for the UI, the engine's file mode and a scripted engine for the core, a scripted runtime for the router, and fixture databases for retrieval. Parallel development depends on it.
+Each boundary can be replaced in tests: the fake core for the UI, the engine's file mode and a scripted engine for the core, a scripted runtime for the router, and fixture databases for retrieval. Parallel development depends on it. The conformance suite that the fake core passes is the one the real core must pass (through `noter-core-harness`, docs/HARNESS.md).
 
-**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth`
+**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0003-harness-and-quality-gates`
 
 ### 2.2 Constraints
 
@@ -2595,6 +2595,8 @@ A draft surface becomes frozen at its milestone gate: Copilot and Agents when th
 | UI typecheck and smoke | `tsc` and `contract.smoke.ts` against the fake | The UI or the fake no longer matches the bindings; snapshot-then-stream, window scoping or error typing broken |
 | Handler parity (from M0) | A test in `src-tauri` that the registered command list equals `COMMANDS` and that each window's capability file allows exactly its commands | A command is missing, extra or wrongly scoped in the real core |
 | Fixture parity (from M1) | The fake's fixture world is loaded into a fixture database and read back through the real `CoreApi` | Real and fake disagree on a frozen read model |
+| Conformance (fake now, real core from M0) | `pnpm test:conformance` with `NOTER_CORE=fake`, then `NOTER_CORE=stdio` against `noter-core-harness` | Window scope, typed errors, snapshot-then-stream or revision rules differ between the core and the contract |
+| Quality bars (ADR-0003) | `just gate`: unit coverage, E2E coverage, screenshots, performance, architecture checks, `cfs validate`; the single required check `gate` on `main` | Any bar in `harness/harness.toml` is missed (docs/HARNESS.md) |
 
 **What the UI can build now, against the fake core.** Every frozen group; the fake answers 89 of 161 commands with realistic data today (`contract.smoke.ts` reports the count) and rejects the rest with `not_implemented`. Stories steer it with `failNext(command, code)` and by editing `fake.world`; every error, empty and degraded state in DESIGN.md can be produced this way.
 
@@ -2666,7 +2668,8 @@ Questions this design could not settle alone. Q1, Q2 and Q5 were answered by the
 - Unit: per crate; the state machines (capture, item, card, account, change) get table-driven tests from section 3.1.
 - Contract: the CI gates in 4.1.
 - Integration: `noter-core` against a scripted engine (file mode) and a scripted runtime that replays recorded CLI output; fixture databases from the golden set.
-- End to end: the UI's three PRD flows through Tauri WebDriver against the real core with a recorded engine stream.
+- End to end: the conformance suite and the UI flows against the real core through `noter-core-harness` (Playwright, WebKit) with a recorded engine stream; the real-app flows on the Mac runner through the WebdriverIO embedded driver, because `tauri-driver` does not support WKWebView (ADR-0003).
+- Gates: the bars, how each is measured and where it is enforced are in ADR-0003 and docs/HARNESS.md; `just gate` is the exit criteria of every FEATURE.
 - Reliability: engine kill during capture, WebView kill during a call, database corruption drill, disk-full drill.
 - Privacy: the CI network-monitor test; a test that no adapter is reachable except through the egress gate.
 - Performance: stage timings recorded for every tick; golden-set replay measures hypothesis and confirmed lag.
@@ -2706,7 +2709,7 @@ Items of the DESIGN checklist that do not apply, with the reason; everything els
 
 - **PRD**: [PRD.md](./PRD.md) — Part B is the technical intent this design makes exact
 - **UI design**: [DESIGN.md](./DESIGN.md) — `cpt-noter-interface-ui-core-ipc` is realised by `cpt-noter-interface-core-ipc`
-- **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`
+- **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`
 - **Contract**: [crates/noter-protocol](../crates/noter-protocol/), [contracts/](../contracts/), [apps/desktop/src/core](../apps/desktop/src/core/)
 - **Features**: not yet written; FEATURE specs will reference the component, interface and sequence IDs of this document
 

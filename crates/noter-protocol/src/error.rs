@@ -25,7 +25,12 @@ pub struct CoreError {
 impl CoreError {
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
         let retryable = code.default_retryable();
-        Self { code, message: message.into(), retryable, detail: None }
+        Self {
+            code,
+            message: message.into(),
+            retryable,
+            detail: None,
+        }
     }
     pub fn with_detail(mut self, detail: ErrorDetail) -> Self {
         self.detail = Some(detail);
@@ -53,13 +58,21 @@ pub enum ErrorDetail {
     /// `permission_missing` / `permission_denied`.
     Permission { kind: PermissionKind },
     /// `runtime_unavailable`: which runtime and the one-step fix the UI may offer.
-    Runtime { runtime: RuntimeChoice, reason: RuntimeUnavailableReason, fix: Option<RuntimeChoice> },
+    Runtime {
+        runtime: RuntimeChoice,
+        reason: RuntimeUnavailableReason,
+        fix: Option<RuntimeChoice>,
+    },
     /// `hotkey_conflict`: the app that owns the shortcut, when macOS says.
     HotkeyOwner { owner: Option<String> },
     /// `partially_applied`: a batch where some rows were edited later and skipped.
     Partial { applied: u32, skipped: u32 },
     /// `cli_version_unsupported`.
-    CliVersion { tool: String, found: String, supported: String },
+    CliVersion {
+        tool: String,
+        found: String,
+        supported: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -249,27 +262,81 @@ impl ErrorCode {
         use ErrorCode::*;
         matches!(
             self,
-            Internal | NotReady | Offline | EngineUnavailable | SearchFailed | SourceSyncFailed | KeychainLocked | ChangeLogUnreadable
+            Internal
+                | NotReady
+                | Offline
+                | EngineUnavailable
+                | SearchFailed
+                | SourceSyncFailed
+                | KeychainLocked
+                | ChangeLogUnreadable
         )
     }
 
     /// Every code, in declaration order (used by the contract tests and the exporter).
     pub const ALL: &'static [ErrorCode] = &[
-        ErrorCode::NotFound, ErrorCode::Conflict, ErrorCode::InvalidInput, ErrorCode::WindowNotAllowed,
-        ErrorCode::FeatureDisabled, ErrorCode::NotReady, ErrorCode::NotImplemented, ErrorCode::Internal,
-        ErrorCode::SetupIncomplete, ErrorCode::PermissionMissing, ErrorCode::PermissionDenied, ErrorCode::DiskLow,
-        ErrorCode::DiskFull, ErrorCode::Offline, ErrorCode::ChecksumFailed, ErrorCode::ModelNotReady,
-        ErrorCode::AlreadyRecording, ErrorCode::NotRecording, ErrorCode::NoticeExpired, ErrorCode::ContinueWindowClosed,
-        ErrorCode::EngineUnavailable, ErrorCode::DetectionExpired, ErrorCode::AudioDeleted, ErrorCode::ReplayNeedsHeadphones,
-        ErrorCode::OwnSoundsNotExcluded, ErrorCode::OutputRouteUnknown, ErrorCode::TranscriptUpgraded, ErrorCode::NoSuchCard,
-        ErrorCode::CardGone, ErrorCode::BudgetPaused, ErrorCode::CopilotOff, ErrorCode::OutputsNotReady,
-        ErrorCode::UnreviewedInScope, ErrorCode::RepoNotMapped, ErrorCode::RepoPathMissing, ErrorCode::NoLinkHandler,
-        ErrorCode::AutomationDenied, ErrorCode::PromptNotReady, ErrorCode::IndexRebuilding, ErrorCode::SearchFailed,
-        ErrorCode::AnswerStopped, ErrorCode::UndoExpired, ErrorCode::PartiallyApplied, ErrorCode::ProposalNotApplicable,
-        ErrorCode::ChangeLogUnreadable, ErrorCode::JobBlocked, ErrorCode::EvidenceToolMissing, ErrorCode::RuntimeUnavailable,
-        ErrorCode::KeyRejected, ErrorCode::KeychainLocked, ErrorCode::CliMissing, ErrorCode::CliVersionUnsupported,
-        ErrorCode::SignInCancelled, ErrorCode::SignInTimedOut, ErrorCode::PlanNotEligible, ErrorCode::AccountSignedOut,
-        ErrorCode::PersonalUseNotConfirmed, ErrorCode::SourceSyncFailed, ErrorCode::SourceSignInExpired, ErrorCode::HotkeyConflict,
-        ErrorCode::HotkeyReserved, ErrorCode::StorageInCloudFolder, ErrorCode::Cancelled,
+        ErrorCode::NotFound,
+        ErrorCode::Conflict,
+        ErrorCode::InvalidInput,
+        ErrorCode::WindowNotAllowed,
+        ErrorCode::FeatureDisabled,
+        ErrorCode::NotReady,
+        ErrorCode::NotImplemented,
+        ErrorCode::Internal,
+        ErrorCode::SetupIncomplete,
+        ErrorCode::PermissionMissing,
+        ErrorCode::PermissionDenied,
+        ErrorCode::DiskLow,
+        ErrorCode::DiskFull,
+        ErrorCode::Offline,
+        ErrorCode::ChecksumFailed,
+        ErrorCode::ModelNotReady,
+        ErrorCode::AlreadyRecording,
+        ErrorCode::NotRecording,
+        ErrorCode::NoticeExpired,
+        ErrorCode::ContinueWindowClosed,
+        ErrorCode::EngineUnavailable,
+        ErrorCode::DetectionExpired,
+        ErrorCode::AudioDeleted,
+        ErrorCode::ReplayNeedsHeadphones,
+        ErrorCode::OwnSoundsNotExcluded,
+        ErrorCode::OutputRouteUnknown,
+        ErrorCode::TranscriptUpgraded,
+        ErrorCode::NoSuchCard,
+        ErrorCode::CardGone,
+        ErrorCode::BudgetPaused,
+        ErrorCode::CopilotOff,
+        ErrorCode::OutputsNotReady,
+        ErrorCode::UnreviewedInScope,
+        ErrorCode::RepoNotMapped,
+        ErrorCode::RepoPathMissing,
+        ErrorCode::NoLinkHandler,
+        ErrorCode::AutomationDenied,
+        ErrorCode::PromptNotReady,
+        ErrorCode::IndexRebuilding,
+        ErrorCode::SearchFailed,
+        ErrorCode::AnswerStopped,
+        ErrorCode::UndoExpired,
+        ErrorCode::PartiallyApplied,
+        ErrorCode::ProposalNotApplicable,
+        ErrorCode::ChangeLogUnreadable,
+        ErrorCode::JobBlocked,
+        ErrorCode::EvidenceToolMissing,
+        ErrorCode::RuntimeUnavailable,
+        ErrorCode::KeyRejected,
+        ErrorCode::KeychainLocked,
+        ErrorCode::CliMissing,
+        ErrorCode::CliVersionUnsupported,
+        ErrorCode::SignInCancelled,
+        ErrorCode::SignInTimedOut,
+        ErrorCode::PlanNotEligible,
+        ErrorCode::AccountSignedOut,
+        ErrorCode::PersonalUseNotConfirmed,
+        ErrorCode::SourceSyncFailed,
+        ErrorCode::SourceSignInExpired,
+        ErrorCode::HotkeyConflict,
+        ErrorCode::HotkeyReserved,
+        ErrorCode::StorageInCloudFolder,
+        ErrorCode::Cancelled,
     ];
 }

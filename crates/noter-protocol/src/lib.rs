@@ -16,13 +16,13 @@
 //! engine team can all build against it from day one.
 
 pub mod common;
-pub mod error;
-pub mod model;
-pub mod ipc;
 pub mod engine;
-pub mod mcp;
-pub mod skills;
+pub mod error;
 pub mod fixtures;
+pub mod ipc;
+pub mod mcp;
+pub mod model;
+pub mod skills;
 
 pub use common::*;
 pub use error::{CoreError, ErrorCode, ErrorDetail};

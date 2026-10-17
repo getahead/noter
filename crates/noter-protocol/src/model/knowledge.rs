@@ -25,15 +25,24 @@ pub enum SourceMode {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SourceScope {
     AllCalls,
-    Limited { call_types: Vec<CallTypeId>, people: Vec<PersonId> },
+    Limited {
+        call_types: Vec<CallTypeId>,
+        people: Vec<PersonId>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SourceStatus {
     Idle,
-    Indexing { done: u32, total: Option<u32> },
-    Failed { code: crate::error::ErrorCode, at: TimestampMs },
+    Indexing {
+        done: u32,
+        total: Option<u32>,
+    },
+    Failed {
+        code: crate::error::ErrorCode,
+        at: TimestampMs,
+    },
     SignInExpired,
 }
 

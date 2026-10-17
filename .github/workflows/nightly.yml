@@ -1,0 +1,39 @@
+# Nightly: the full gate on main, plus the measurements that need real Apple
+# Silicon (wall-clock performance, golden-set latency, real-app E2E) on the
+# dedicated runner once it exists (set the repository variable NOTER_MAC_RUNNER=true).
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  full-gate:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  mac-perf:
+    name: Wall-clock performance (Apple Silicon)
+    if: vars.NOTER_MAC_RUNNER == 'true'
+    runs-on: [self-hosted, macOS, ARM64, noter]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compare with main as it was a day ago
+        run: NOTER_BASE_REF="$(git rev-list -1 --before='1 day ago' origin/main)" just perf-wall
+      # From M1: golden-set replay through the engine's file mode (latency, footprint), see docs/HARNESS.md.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-wall
+          path: target/perf
+          if-no-files-found: ignore

@@ -10,8 +10,15 @@ use crate::model::{EvidenceView, JobRunRow};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Actor {
     You,
-    Job { job_id: JobId, name: String },
-    Model { llm_run_id: LlmRunId, runtime: RuntimeChoice, model: String },
+    Job {
+        job_id: JobId,
+        name: String,
+    },
+    Model {
+        llm_run_id: LlmRunId,
+        runtime: RuntimeChoice,
+        model: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -101,9 +108,13 @@ pub struct HistoryListArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum UndoTarget {
-    Change { change_id: ChangeId },
+    Change {
+        change_id: ChangeId,
+    },
     /// Undoing a propagation undoes the whole batch.
-    Batch { batch_id: BatchId },
+    Batch {
+        batch_id: BatchId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

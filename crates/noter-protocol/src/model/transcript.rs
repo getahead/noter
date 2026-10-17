@@ -28,9 +28,13 @@ pub enum TranscriptPass {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SpeakerLabel {
     You,
-    Person { person: PersonChip },
+    Person {
+        person: PersonChip,
+    },
     /// "Speaker 2".
-    Unnamed { n: u16 },
+    Unnamed {
+        n: u16,
+    },
     /// Another voice on the user's microphone.
     GuestYourSide,
 }
@@ -160,17 +164,32 @@ pub struct TranscriptMsg {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TranscriptEvent {
     /// Replace the current hypothesis of `segment.channel`.
-    Hypothesis { segment: SegmentView },
+    Hypothesis {
+        segment: SegmentView,
+    },
     /// Append; removes the hypothesis it confirms.
-    Confirmed { segment: SegmentView },
+    Confirmed {
+        segment: SegmentView,
+    },
     /// A correction changed confirmed rows (term fix, rename): replace by id.
-    SegmentsUpdated { segments: Vec<SegmentView> },
+    SegmentsUpdated {
+        segments: Vec<SegmentView>,
+    },
     /// Speaker labels changed (rename, offline relabel: "speakers updated").
-    SpeakersUpdated { speakers: Vec<SpeakerView>, relabelled_by_archive: bool },
-    Gap { gap: GapView },
-    Mark { mark: MarkView },
+    SpeakersUpdated {
+        speakers: Vec<SpeakerView>,
+        relabelled_by_archive: bool,
+    },
+    Gap {
+        gap: GapView,
+    },
+    Mark {
+        mark: MarkView,
+    },
     /// The stream ended; the snapshot stays valid.
-    Ended { reason: StreamEndReason },
+    Ended {
+        reason: StreamEndReason,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]

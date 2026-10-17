@@ -1,8 +1,10 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-17
 description: "The IPC rules every command, Channel and event follows: wanted state with revisions, snapshot then stream with seq, whole-state events, one typed error."
 decision-makers: Mikhail Petrov (product owner)
+status-history:
+  - "2026-10-17: PROPOSED -> ACCEPTED (owner approved the harness proposal, ADR-0003)"
 ---
 
 # IPC conventions: intent commands with revisions, Channels with sequence numbers, whole-state events, typed errors

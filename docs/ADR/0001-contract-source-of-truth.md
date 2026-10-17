@@ -1,8 +1,10 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-17
 description: "Where the UI ↔ core contract lives (noter-protocol), how TypeScript, schemas and fixtures are generated from it, and why a fake core ships with it."
 decision-makers: Mikhail Petrov (product owner)
+status-history:
+  - "2026-10-17: PROPOSED -> ACCEPTED (owner approved the harness proposal, ADR-0003)"
 ---
 
 # The UI ↔ core contract is Rust types in a Tauri-free crate, with generated TypeScript and a fake core

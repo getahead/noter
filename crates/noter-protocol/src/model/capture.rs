@@ -58,7 +58,10 @@ pub enum CaptureNotice {
     /// While hidden for presenting: no countdown; stops after 10 minutes.
     CallSeemsEnded { stops_at: TimestampMs },
     /// The next calendar event started, or the meeting app's meeting changed.
-    NewMeeting { event: Option<CalendarEventRef>, app_name: Option<String> },
+    NewMeeting {
+        event: Option<CalendarEventRef>,
+        app_name: Option<String>,
+    },
     /// Nothing heard for 5 minutes after the start.
     NothingHeard { since: TimestampMs },
     /// Stopped automatically; offered until `continue_until`.

@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::common::*;
-use crate::model::{AccountsView, CaptureState, CallDetection, CopilotStatus, ProposalCounts, SetupStatus, WindowLabel};
+use crate::model::{
+    AccountsView, CallDetection, CaptureState, CopilotStatus, ProposalCounts, SetupStatus,
+    WindowLabel,
+};
 
 /// `app_snapshot`: everything app-level a window renders from, in one call.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -121,10 +124,16 @@ pub struct UpdateInfo {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AppBanner {
     /// "Noter quit during a recording" (PM-46).
-    RecordingInterruptedByQuit { call: CallRef },
-    UpdateReady { version: String },
+    RecordingInterruptedByQuit {
+        call: CallRef,
+    },
+    UpdateReady {
+        version: String,
+    },
     /// Performance roll-up failed.
-    RollUpFailed { at: TimestampMs },
+    RollUpFailed {
+        at: TimestampMs,
+    },
 }
 
 /// One row of PRD › Live copilot loop › Degraded states, plus the app-wide
@@ -133,22 +142,65 @@ pub enum AppBanner {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DegradedState {
-    SecondAudioSource { call_id: CallId, app_name: String, bundle_id: String, since: TimestampMs },
-    NothingHeard { call_id: CallId, since: TimestampMs },
-    BudgetPaused { call_id: CallId, spent_usd: f32, cap_usd: f32 },
-    SwitchedToLocal { call_id: Option<CallId>, reason: crate::error::RuntimeUnavailableReason, retry_at: Option<TimestampMs> },
-    TranscriptionStalled { call_id: CallId, since: TimestampMs },
-    SystemAudioLost { call_id: CallId, since: TimestampMs },
-    DeviceChanged { call_id: CallId, device_name: String, gap_ms: DurationMs },
-    ArchivePending { call_id: CallId },
-    DiskLow { free_mb: u32 },
-    DiskFull { free_mb: u32 },
-    AgentPaused { agent: AgentRef, reason: crate::error::RuntimeUnavailableReason, fix: Option<RuntimeChoice> },
-    KeywordOnlySearch { progress: f32 },
+    SecondAudioSource {
+        call_id: CallId,
+        app_name: String,
+        bundle_id: String,
+        since: TimestampMs,
+    },
+    NothingHeard {
+        call_id: CallId,
+        since: TimestampMs,
+    },
+    BudgetPaused {
+        call_id: CallId,
+        spent_usd: f32,
+        cap_usd: f32,
+    },
+    SwitchedToLocal {
+        call_id: Option<CallId>,
+        reason: crate::error::RuntimeUnavailableReason,
+        retry_at: Option<TimestampMs>,
+    },
+    TranscriptionStalled {
+        call_id: CallId,
+        since: TimestampMs,
+    },
+    SystemAudioLost {
+        call_id: CallId,
+        since: TimestampMs,
+    },
+    DeviceChanged {
+        call_id: CallId,
+        device_name: String,
+        gap_ms: DurationMs,
+    },
+    ArchivePending {
+        call_id: CallId,
+    },
+    DiskLow {
+        free_mb: u32,
+    },
+    DiskFull {
+        free_mb: u32,
+    },
+    AgentPaused {
+        agent: AgentRef,
+        reason: crate::error::RuntimeUnavailableReason,
+        fix: Option<RuntimeChoice>,
+    },
+    KeywordOnlySearch {
+        progress: f32,
+    },
     NoAssistant,
     SetupIncomplete,
-    CopilotOff { call_id: CallId, reason: CopilotOffReason },
-    HotkeyNotRegistered { action: crate::model::HotkeyAction },
+    CopilotOff {
+        call_id: CallId,
+        reason: CopilotOffReason,
+    },
+    HotkeyNotRegistered {
+        action: crate::model::HotkeyAction,
+    },
     CalendarAccessDenied,
 }
 

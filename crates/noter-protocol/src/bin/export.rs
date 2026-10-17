@@ -38,11 +38,19 @@ fn camel(s: &str) -> String {
 }
 
 fn snake_json<T: serde::Serialize>(v: &T) -> String {
-    serde_json::to_value(v).unwrap().as_str().unwrap().to_string()
+    serde_json::to_value(v)
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 fn ts_doc(doc: &str, indent: &str) -> String {
-    let lines: Vec<&str> = doc.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+    let lines: Vec<&str> = doc
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
     if lines.is_empty() {
         return String::new();
     }
@@ -63,13 +71,19 @@ fn bindings_ts() -> String {
 
     let mut s = body;
     s.push_str("\n// ───────────────────────── contract surface ─────────────────────────\n\n");
-    s.push_str(&format!("export const CONTRACT_VERSION = \"{CONTRACT_VERSION}\";\n\n"));
+    s.push_str(&format!(
+        "export const CONTRACT_VERSION = \"{CONTRACT_VERSION}\";\n\n"
+    ));
     s.push_str("export type Result<T, E = CoreError> = { status: \"ok\"; data: T } | { status: \"error\"; error: E };\n\n");
 
     // command metadata
     s.push_str("/** Every command: group, stability and the windows allowed to call it (PM-08). */\nexport const COMMANDS = {\n");
     for c in COMMANDS {
-        let windows: Vec<String> = c.windows.iter().map(|w| format!("\"{}\"", w.as_str())).collect();
+        let windows: Vec<String> = c
+            .windows
+            .iter()
+            .map(|w| format!("\"{}\"", w.as_str()))
+            .collect();
         s.push_str(&format!(
             "  {}: {{ group: \"{}\", stability: \"{}\", windows: [{}], channel: {} }},\n",
             c.name,
@@ -104,12 +118,22 @@ fn bindings_ts() -> String {
     }
     s.push_str("}\n\nexport type EventName = keyof EventPayloads;\n\nexport const EVENTS = {\n");
     for e in EVENTS {
-        s.push_str(&format!("  \"{}\": {{ stability: \"{}\" }},\n", e.name, snake_json(&e.stability)));
+        s.push_str(&format!(
+            "  \"{}\": {{ stability: \"{}\" }},\n",
+            e.name,
+            snake_json(&e.stability)
+        ));
     }
     s.push_str("} as const satisfies Record<EventName, { stability: Stability }>;\n\n");
 
-    let codes: Vec<String> = ErrorCode::ALL.iter().map(|c| format!("\"{}\"", snake_json(c))).collect();
-    s.push_str(&format!("export const ERROR_CODES: readonly ErrorCode[] = [{}];\n\n", codes.join(", ")));
+    let codes: Vec<String> = ErrorCode::ALL
+        .iter()
+        .map(|c| format!("\"{}\"", snake_json(c)))
+        .collect();
+    s.push_str(&format!(
+        "export const ERROR_CODES: readonly ErrorCode[] = [{}];\n\n",
+        codes.join(", ")
+    ));
 
     // transport + client
     s.push_str(r#"/**
@@ -160,14 +184,16 @@ export function createCore(transport: Transport) {
             None => s.push_str(&format!("    {}: (args: {}) => call(\"{}\", args),\n", camel(c.name), ty(c.args), c.name)),
         }
     }
-    s.push_str(r#"    /** Subscribe to an event; resolves to the unsubscribe function. */
+    s.push_str(
+        r#"    /** Subscribe to an event; resolves to the unsubscribe function. */
     on: <E extends EventName>(event: E, handler: (payload: EventPayloads[E]) => void) =>
       transport.listen(event, handler as (payload: unknown) => void),
   };
 }
 
 export type Core = ReturnType<typeof createCore>;
-"#);
+"#,
+    );
     s
 }
 
@@ -253,34 +279,91 @@ fn main() {
         .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."));
     let mut diffs = Vec::new();
 
-    write(&root, "apps/desktop/src/core/bindings.ts", &bindings_ts(), check, &mut diffs);
-    write(&root, "contracts/ipc.manifest.json", &pretty(&manifest()), check, &mut diffs);
+    write(
+        &root,
+        "apps/desktop/src/core/bindings.ts",
+        &bindings_ts(),
+        check,
+        &mut diffs,
+    );
+    write(
+        &root,
+        "contracts/ipc.manifest.json",
+        &pretty(&manifest()),
+        check,
+        &mut diffs,
+    );
     let engine = json!({
         "protocol_version": engine::ENGINE_PROTOCOL_VERSION,
         "command_line": schema_for!(engine::EngineCommandLine),
         "event_line": schema_for!(engine::EngineEventLine),
     });
-    write(&root, "contracts/engine.schema.json", &pretty(&engine), check, &mut diffs);
-    write(&root, "contracts/mcp-tools.schema.json", &pretty(&mcp_schemas()), check, &mut diffs);
+    write(
+        &root,
+        "contracts/engine.schema.json",
+        &pretty(&engine),
+        check,
+        &mut diffs,
+    );
+    write(
+        &root,
+        "contracts/mcp-tools.schema.json",
+        &pretty(&mcp_schemas()),
+        check,
+        &mut diffs,
+    );
     let skills_out: [(&str, Value); 6] = [
-        ("council-tick", serde_json::to_value(schema_for!(skills::CouncilTickOutput)).unwrap()),
-        ("post-call", serde_json::to_value(schema_for!(skills::PostCallOutput)).unwrap()),
-        ("role-review", serde_json::to_value(schema_for!(skills::RoleReviewOutput)).unwrap()),
-        ("handoff", serde_json::to_value(schema_for!(skills::HandoffPromptOutput)).unwrap()),
-        ("ask-answer", serde_json::to_value(schema_for!(skills::AskAnswerOutput)).unwrap()),
-        ("reconcile", serde_json::to_value(schema_for!(skills::ReconcileJudgementOutput)).unwrap()),
+        (
+            "council-tick",
+            serde_json::to_value(schema_for!(skills::CouncilTickOutput)).unwrap(),
+        ),
+        (
+            "post-call",
+            serde_json::to_value(schema_for!(skills::PostCallOutput)).unwrap(),
+        ),
+        (
+            "role-review",
+            serde_json::to_value(schema_for!(skills::RoleReviewOutput)).unwrap(),
+        ),
+        (
+            "handoff",
+            serde_json::to_value(schema_for!(skills::HandoffPromptOutput)).unwrap(),
+        ),
+        (
+            "ask-answer",
+            serde_json::to_value(schema_for!(skills::AskAnswerOutput)).unwrap(),
+        ),
+        (
+            "reconcile",
+            serde_json::to_value(schema_for!(skills::ReconcileJudgementOutput)).unwrap(),
+        ),
     ];
     for (name, schema) in skills_out {
-        write(&root, &format!("contracts/skills/{name}.schema.json"), &pretty(&schema), check, &mut diffs);
+        write(
+            &root,
+            &format!("contracts/skills/{name}.schema.json"),
+            &pretty(&schema),
+            check,
+            &mut diffs,
+        );
     }
     let world = serde_json::to_value(noter_protocol::fixtures::world()).unwrap();
-    write(&root, "contracts/fixtures/world.json", &pretty(&world), check, &mut diffs);
+    write(
+        &root,
+        "contracts/fixtures/world.json",
+        &pretty(&world),
+        check,
+        &mut diffs,
+    );
 
     if check {
         if diffs.is_empty() {
             println!("contract artefacts are up to date");
         } else {
-            eprintln!("out of date (run the exporter and commit): {}", diffs.join(", "));
+            eprintln!(
+                "out of date (run the exporter and commit): {}",
+                diffs.join(", ")
+            );
             std::process::exit(1);
         }
     }

@@ -9,6 +9,12 @@ artifacts = [
   { path = "docs/DESIGN-core.md", kind = "DESIGN", traceability = "DOCS-ONLY" },
   { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "DOCS-ONLY" },
   { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "DOCS-ONLY" },
+  { path = "docs/ADR/0003-harness-and-quality-gates.md", kind = "ADR", traceability = "DOCS-ONLY" },
 ]
-codebase = []
+# Code checked by `cfs validate` for @cpt-* markers. Traceability becomes FULL
+# per FEATURE once FEATURE artifacts with to_code IDs exist (docs/HARNESS.md).
+codebase = [
+  { name = "Rust crates", path = "crates", extensions = [".rs"] },
+  { name = "Desktop UI", path = "apps/desktop/src", extensions = [".ts", ".tsx"] },
+]
 children = []

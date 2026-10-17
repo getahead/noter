@@ -536,3 +536,12 @@
 # Rust and Node build output (noter-protocol, apps/desktop)
 /target/
 node_modules/
+
+# Harness outputs (docs/HARNESS.md)
+/coverage/
+apps/desktop/coverage/
+apps/desktop/test-results/
+apps/desktop/playwright-report/
+apps/desktop/blob-report/
+/.harness-transfer/
+__pycache__/

@@ -43,6 +43,6 @@ fake.failNext("api_key_set", "key_rejected");      // story: Replace a rejected 
 fake.world.app.environment.disk_free_mb = 300;    // story: Not enough disk space
 ```
 
-Smoke check: `npx tsx apps/desktop/src/core/contract.smoke.ts`.
+Smoke check: `pnpm --dir apps/desktop smoke`. The behaviour rules above are also checked by the conformance suite (`pnpm --dir apps/desktop test:conformance`, `apps/desktop/tests/conformance`), which runs against this fake today and against the real core through `noter-core-harness` from M0 (docs/HARNESS.md).
 
-Dependencies the UI scaffold must add: `@tauri-apps/api@^2`; for the smoke check `tsx` and `@types/node`. `tsconfig` needs `resolveJsonModule` for the fixtures import.
+Dependencies are in `apps/desktop/package.json` (pinned); `tsconfig.core.json` enables `resolveJsonModule` for the fixtures import.

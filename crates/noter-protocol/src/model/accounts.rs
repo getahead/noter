@@ -19,8 +19,12 @@ pub enum KeyStatus {
     NotSet,
     Verifying,
     /// "Configured · Stored in the Keychain". The key itself is never sent back.
-    Configured { verified_at: TimestampMs },
-    Rejected { reason: crate::error::RuntimeUnavailableReason },
+    Configured {
+        verified_at: TimestampMs,
+    },
+    Rejected {
+        reason: crate::error::RuntimeUnavailableReason,
+    },
     KeychainLocked,
 }
 
@@ -66,10 +70,17 @@ pub struct AccountIdentity {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AccountStatus {
     NotSignedIn,
-    SigningIn { session_id: SignInSessionId },
-    SignedIn { identity: AccountIdentity, since: TimestampMs },
+    SigningIn {
+        session_id: SignInSessionId,
+    },
+    SignedIn {
+        identity: AccountIdentity,
+        since: TimestampMs,
+    },
     /// "Signed out by Claude" / "Signed out by ChatGPT".
-    SignedOutByProvider { at: TimestampMs },
+    SignedOutByProvider {
+        at: TimestampMs,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

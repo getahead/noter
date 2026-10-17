@@ -41,9 +41,16 @@ pub enum Rating {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CarryForward {
-    HandoffLanded { item_id: ItemId },
-    EvidenceClosure { item_id: ItemId, evidence_id: EvidenceId },
-    OpenFromLastTime { item_id: ItemId },
+    HandoffLanded {
+        item_id: ItemId,
+    },
+    EvidenceClosure {
+        item_id: ItemId,
+        evidence_id: EvidenceId,
+    },
+    OpenFromLastTime {
+        item_id: ItemId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -100,10 +107,14 @@ pub struct BudgetState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MuteScope {
-    ForMinutes { minutes: u16 },
+    ForMinutes {
+        minutes: u16,
+    },
     ThisCall,
     /// "For All Planning Calls", named after the current call type.
-    CallType { call_type: CallTypeId },
+    CallType {
+        call_type: CallTypeId,
+    },
     /// Unmute.
     Off,
 }
@@ -175,17 +186,34 @@ pub struct CardMsg {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CardEvent {
     /// New card with its first line; slides in at the top.
-    Added { card: CardView },
+    Added {
+        card: CardView,
+    },
     /// Body or provenance filled in, number or state changed: replace by id.
-    Updated { card: CardView },
+    Updated {
+        card: CardView,
+    },
     /// Remove from the visible stack (expired, dismissed, topic moved on); moves to `earlier`.
-    Removed { card_id: CardId, state: CardState },
+    Removed {
+        card_id: CardId,
+        state: CardState,
+    },
     /// A card from another agent merged into this one.
-    Merged { card_id: CardId, merged_agents: Vec<AgentRef> },
+    Merged {
+        card_id: CardId,
+        merged_agents: Vec<AgentRef>,
+    },
     /// A card that would arrive after its 12 s window was dropped (metrics, "Card too late").
-    DroppedLate { agent: AgentRef, trigger_at_ms: OffsetMs },
-    Status { status: CopilotStatus },
-    Ended { reason: StreamEndReason },
+    DroppedLate {
+        agent: AgentRef,
+        trigger_at_ms: OffsetMs,
+    },
+    Status {
+        status: CopilotStatus,
+    },
+    Ended {
+        reason: StreamEndReason,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

@@ -260,7 +260,9 @@ pub enum HotkeyStatus {
     Registered,
     /// Card keys are registered only during capture.
     RegisteredDuringCapture,
-    Conflict { owner: Option<String> },
+    Conflict {
+        owner: Option<String>,
+    },
     ReservedBySystem,
     NotSet,
 }
@@ -429,8 +431,12 @@ pub struct ShareTestRow {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CaptureTestOutcome {
     NotRun,
-    Passed { at: TimestampMs },
-    Failed { code: crate::error::ErrorCode },
+    Passed {
+        at: TimestampMs,
+    },
+    Failed {
+        code: crate::error::ErrorCode,
+    },
     /// Refused while a call is being recorded.
     BlockedByCall,
 }
