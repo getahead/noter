@@ -2,7 +2,7 @@
 Source of truth for Noter development.
 Living copy (edit, comment, review tab): https://claude.ai/code/artifact/8f34b45a-2903-468f-98d9-5de89e7163cc
 This file is regenerated from the living copy whenever the PRD, the design or the UI prototype changes.
-Last sync: 2026-10-16. Review findings: docs/REVIEW-2026-10-16.md. Diagrams: docs/diagrams/. UI prototype snapshots (raw, need approval): docs/prototype/.
+Last sync: 2026-10-17. Review findings: docs/REVIEW-2026-10-16.md. UI design: docs/DESIGN.md. Diagrams: docs/diagrams/. UI prototype snapshots (raw, need approval): docs/prototype/.
 -->
 
 # Noter — PRD & Technical Design
@@ -73,14 +73,14 @@ v1 is a single-user app that is already useful on its own for every call type in
 **v1 — single user, local-first**
 
 - Call detection and one-click capture of system audio plus microphone from any app (Zoom, Teams, Meet, Slack, browser).
-- Consent first: capture starts only with the participants-informed flag set for the call; people carry a consent status; "never store audio" is an option from first run.
+- One-click capture: informing the participants of a call is the user's own responsibility, outside the app; "never store audio" is an option from first run.
 - Live transcript with speaker labels, handling English, Russian and German in the same call; hypothesis and confirmed text from Noter's own streaming loop on WhisperKit.
 - Live copilot panel: suggested questions, draft answers to questions aimed at you, "catch me up" after a distraction.
 - Copilot surfaces: one call-screen window that fills a dedicated display when one is connected and runs as a compact floating panel on a single display, plus menu bar quick actions (start, pause, mark moment, catch me up, mute copilot, open call screen).
 - Role council: six built-in role agents plus any you add; each agent has its own skill, runtime, model, effort, tools and call types; fused mode during calls by default, parallel mode optional; each agent writes a short review after the call.
 - Post-call outputs within two minutes of hanging up, from the live transcript: summary, decisions, action items with owners, open questions, per-participant breakdown; regenerated with a diff when the offline pass finishes.
 - Handoff: engineering action items carry a ready-to-run prompt with one Open in Claude Code or Codex button (deep links, terminal fallback) and Copy, and remember that they were handed off.
-- Speaker identity: you vs others from the two audio channels; per-call speaker labels with one-click rename; cross-call voice profiles only opt-in per person with explicit consent.
+- Speaker identity: you vs others from the two audio channels; per-call speaker labels with one-click rename; cross-call voice profiles only opt-in, created per person by the user.
 - Local library: every call searchable by meaning and by keyword, per-person pages, per-topic threads across calls.
 - Knowledge sources: folders of documents (Markdown, PDF, Word, text, code) and MCP tools (Confluence, Jira, Notion, wikis) connected as sources, indexed into the same local vector store, searchable and citable beside calls.
 - Today dashboard: the open action items and questions that matter for the calls on your calendar today and this week, ranked, with checkboxes for manual completion.
@@ -124,7 +124,7 @@ Fourteen feature areas; the live copilot and its role council have their own sec
 
 - Noter notices a call starting when a meeting app or a browser begins playing audio while the microphone is in use (Core Audio process properties, observed with listeners), and shows a small non-activating "Record this call?" panel at the top of the main display for 15 seconds with one Record button and the hotkey hint; nothing steals focus from the call. A global hotkey starts or stops capture from anywhere.
 - Two channels are captured separately and kept separate end to end: system audio (the other participants) and the microphone (you). This gives a free, exact "me vs them" split before any diarization runs.
-- Consent: Germany requires every participant's consent to record a non-public conversation (§ 201 StGB), and a buffered transcript can count as a recording. Capture therefore starts only when the participants-informed flag for this call is set; a reminder-only mode exists for jurisdictions where that suffices. People carry a consent status (consented, declined, unknown), and a recognised participant marked declined blocks capture. "Never store audio" is offered at first run. These are product safeguards, not legal advice.
+- Informing the participants of a call is the user's own responsibility, outside the app; capture starts with Record alone. "Never store audio" is offered at first run.
 - A visible recording indicator in the menu bar and in the call screen; pause drops audio entirely rather than muting it.
 - Audio is stored as 16 kHz mono per channel as AAC-LC (`.m4a`, which WhisperKit reads back), with a retention rule (default: delete audio after 30 days; the transcript and the per-call transcript files are kept).
 
@@ -241,7 +241,6 @@ The dashboard is the first screen after launch: what matters before the calls yo
 | Agents | Per agent: skill, runtime, model, effort, tools, call types, budget share; + to add from a template, remove added agents; council mode per call type (fused / parallel) | Six built-in agents; fused live, parallel post-call |
 | Privacy mode | Cloud allowed, cloud with redaction, local only | Cloud with redaction |
 | Sensitive call | Per-call toggle forcing local-only processing | Off |
-| Consent | Require the participants-informed flag before capture, or remind only; per-person consent status | Require |
 | Audio retention | Keep 7 / 30 / 90 days / forever / never store audio | 30 days |
 | Summary language | English, Russian, German, or "language of the call" | English |
 | Storage location | Local folder (iCloud and Dropbox folders discouraged) | \~/Library/Application Support/Noter |
@@ -330,13 +329,13 @@ The copilot lives on a second display when there is one, in the menu bar always,
 
 - Call screen on a dedicated display. When a call starts and a second display is connected, Noter opens the call screen there, full size: transcript on the left (speakers, languages, confirmed and hypothesis text), cards on the right with agent badges, a bottom strip with the call clock, recording state, pinned items and the catch-up button. It is a non-activating panel, so it never takes focus from the call app. It is hidden from screen sharing where the other side's capture honours that (Teams, Meet, and Zoom with window filtering); when you present, share a window rather than a whole display, and a self-test on the Privacy page shows what a share would see. The display is remembered by its identity, and the default is the display that does not hold the call app. On a single display the same window runs in a compact floating layout; nothing is lost when a display is unplugged mid-call.
 - Menu bar. A status icon with four monochrome template glyphs (idle, recording, paused, copilot muted); macOS's own orange microphone indicator shows recording in colour. Its menu is the quick-action control: Start or stop recording, Pause, Mark moment, Catch me up, Mute copilot, Open call screen, Open last summary, with the hotkey next to each. Every action takes effect within a second and never opens a dialog after setup. An optional live strip shows the newest card in the menu bar itself, capped at 24 characters with the card type first ("Ask: owner for drawer?").
-- First run. A wizard downloads the models (size, progress, resumable), asks for Microphone and System Audio Recording with a ten-second self-test (play any tab, see two level meters and a live transcript), picks the call display, sets the consent default and offers "never store audio". Call detection stays off until the self-test passes, so no permission prompt ever appears mid-meeting.
+- First run. A wizard downloads the models (size, progress, resumable), asks for Microphone and System Audio Recording with a ten-second self-test (play any tab, see two level meters and a live transcript), picks the call display and offers "never store audio". Call detection stays off until the self-test passes, so no permission prompt ever appears mid-meeting.
 - Screen context (v1.x). "Pick from screen" opens the system window picker for the first screen (the picker itself needs no permission; reading the picked windows asks for Screen Recording once); you choose the windows the copilot may read (an IDE, a Jira board, a Bitbucket pull request, the Zoom or Teams window). Noter reads them on-device: text by OCR, plus structured data where a connector exists (open files and their problems from a JetBrains IDE, the page URL and title from the browser, which Noter resolves to the Jira issue or pull request through its usual tools rather than OCR, and the participant list from Zoom or Teams, which feeds speaker naming). What was read appears as context chips in the call screen; you can pin, unpin or drop each one. Pinned and recent chips go into the council's packet, into ask mode and into the post-call analysis, cited as "from your screen: Jira VSTOR-1234 at 14:32". Later: "watch this window" keeps a chosen window in context continuously at a low rate.
 - Privacy for screen context: only picked windows are ever read; frames are discarded after OCR and never stored; extracted text is kept per call like the transcript and follows the same privacy mode and retention.
 
 ## Success metrics and quality bars
 
-v1 is a success if, in the four weeks after M3 ships, the owner runs Noter on four calls out of five and asks the library a question at least five times a week. The metrics below are the ones that have to hold for that to happen. Transcription targets are relative to a baseline measured in M1 on the golden set (ten consented, hand-corrected calls), because published meeting benchmarks sit far from the read-speech numbers vendors quote: Whisper large-v3 reports about 16% WER on AMI meeting audio in English, and code-switching between scripts (Russian and English) is several times worse than monolingual speech.
+v1 is a success if, in the four weeks after M3 ships, the owner runs Noter on four calls out of five and asks the library a question at least five times a week. The metrics below are the ones that have to hold for that to happen. Transcription targets are relative to a baseline measured in M1 on the golden set (ten hand-corrected calls), because published meeting benchmarks sit far from the read-speech numbers vendors quote: Whisper large-v3 reports about 16% WER on AMI meeting audio in English, and code-switching between scripts (Russian and English) is several times worse than monolingual speech.
 
 | Area | Metric | Target | How it is measured |
 | --- | --- | --- | --- |
@@ -389,7 +388,6 @@ The three risks that can sink v1 are mixed-language transcription quality, speak
 | Background jobs rewrite history wrongly (a term propagated to the wrong word, an item closed that was not done) | Medium | High | Propose-first propagation in v1, auto-close only for linked keys with dated evidence, every change logged with evidence and undo, batch undo, reopen in one click |
 | Russian keyword search is poor because FTS5 neither folds ё nor stems | High | Medium | Normalised, stemmed shadow column in the keyword index; Russian queries in the evaluation set |
 | Evidence sources are unreachable or their CLIs change | Medium | Low | Jobs degrade to "no evidence found", never to a guess; adapters per source behind one interface |
-| Recording colleagues without consent (§ 201 StGB; a buffered transcript can count as a recording) | Medium | High | Capture requires the participants-informed flag; per-person consent status; "never store audio" option; Betriebsvereinbarung, DPIA and explicit consent for voice profiles before any team rollout |
 | macOS audio APIs shift under us (process taps are 14.4+, ScreenCaptureKit keeps changing) | Medium | Medium | Capture behind an interface with two backends; the engine is the only module that touches Core Audio |
 | Your own voice leaks into system audio when on speakers | Medium | Low | Headphones recommended; LocalVQE echo cancellation with the tap as reference in speakers mode; crosstalk marking |
 | "Super advanced" becomes "never ships": v1 is far more than one part-time person can build in 22 weeks | High | High | Decide the scope cut in the Review tab; milestones with measured gates; copilot and council behind a flag until the latency budget holds |
@@ -458,7 +456,7 @@ Capture is a global system-audio tap plus the microphone, kept as two separate 1
 
 **Why a global tap and not a per-app tap.** A per-process tap needs the PID that actually plays audio, and browsers split a meeting across renderer, helper and GPU processes, which is exactly where Google Meet lives (see [Recall.ai on Core Audio taps](https://www.recall.ai/blog/core-audio-taps)). A global tap excluding Noter captures whatever app is in the call. Music or notification sounds that leak in are cheap to ignore: VAD drops them, and anything left is attributed to no speaker.
 
-**Call detection.** Core Audio exposes the list of process objects with `kAudioProcessPropertyIsRunningInput` and `kAudioProcessPropertyIsRunningOutput`. The engine installs property listeners on the process list rather than polling: a process from the known list (Zoom, Teams, Slack, Discord, FaceTime, Webex) or any browser that is both playing audio and holding the microphone means a call is likely on. The core shows the non-activating "Record this call?" panel; with calendar integration it auto-starts for events the user marked. The consent rules in the PRD apply before any audio is kept, and a second audio source appearing during a call (a video in another tab, a Slack huddle) raises a banner with "exclude this app" rather than silently mixing in.
+**Call detection.** Core Audio exposes the list of process objects with `kAudioProcessPropertyIsRunningInput` and `kAudioProcessPropertyIsRunningOutput`. The engine installs property listeners on the process list rather than polling: a process from the known list (Zoom, Teams, Slack, Discord, FaceTime, Webex) or any browser that is both playing audio and holding the microphone means a call is likely on. The core shows the non-activating "Record this call?" panel; with calendar integration it auto-starts for events the user marked. A second audio source appearing during a call (a video in another tab, a Slack huddle) raises a banner with "exclude this app" rather than silently mixing in.
 
 **Clock and alignment.** Both streams carry host-time timestamps from their IOProcs. At session start the engine measures the offset between the two devices and corrects it; a drift check runs every minute. Every segment the ASR emits carries session-relative milliseconds, so transcript, audio playback and diarization line up to within one 20 ms frame.
 
@@ -513,7 +511,7 @@ Speaker attribution is three layers: the channel split gives "you" for free, str
 
 Figures are the vendor's own, measured on an M4 Pro against VoxConverse and AMI ([FluidAudio docs](https://docs.fluidinference.com/introduction.md)); the golden set will give Noter's real numbers on call audio, which is compressed and often worse than those corpora.
 
-**From clusters to people.** Every cluster gets a 256-dimensional WeSpeaker embedding from FluidAudio (`extractEmbedding`; `enrollSpeaker` on the streaming diarizers). For people who have opted in, the core compares it with their voice profiles: cosine similarity above 0.75 and a margin over the runner-up assigns the person; otherwise the cluster is shown as "Speaker 2". Renaming "Speaker 2" to Anna applies to this call only. Creating Anna's profile is a separate, explicit step on her person page that records her consent and its date; from then on the match is automatic. With calendar integration the candidate set narrows to the meeting's attendees, which removes most confusions between similar voices.
+**From clusters to people.** Every cluster gets a 256-dimensional WeSpeaker embedding from FluidAudio (`extractEmbedding`; `enrollSpeaker` on the streaming diarizers). For people who have opted in, the core compares it with their voice profiles: cosine similarity above 0.75 and a margin over the runner-up assigns the person; otherwise the cluster is shown as "Speaker 2". Renaming "Speaker 2" to Anna applies to this call only. Creating Anna's profile is a separate, explicit step on her person page; from then on the match is automatic. With calendar integration the candidate set narrows to the meeting's attendees, which removes most confusions between similar voices.
 
 **Profiles that survive real life, and the law.** A person holds several centroids, not one: AirPods, laptop mic and a conference room sound different. New centroids are added when a confirmed match is far from the existing ones; old ones decay after 90 days unused. Voice profiles and per-call cluster centroids are biometric data under GDPR Article 9, so both are stored encrypted with a Keychain-held key, profiles exist only for people who explicitly opted in, are deletable per person in one click, and are never exported or synced. The team rollout additionally needs the written policy described in the security section.
 
@@ -622,8 +620,8 @@ One SQLite file in WAL mode holds everything: relational tables, FTS5 full-text 
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
-| `calls` | One row per captured call | id, started\_at, ended\_at, title, call\_type, platform, calendar\_event\_id, privacy\_class (normal / sensitive), consent\_flag, status, audio\_retention\_until |
-| `people` | Everyone who has ever been on a call | id, display\_name, email, aliases (JSON), role, org, notes, consent\_status (consented / declined / unknown), voice\_profile\_optin, optin\_date |
+| `calls` | One row per captured call | id, started\_at, ended\_at, title, call\_type, platform, calendar\_event\_id, privacy\_class (normal / sensitive), status, audio\_retention\_until |
+| `people` | Everyone who has ever been on a call | id, display\_name, email, aliases (JSON), role, org, notes, voice\_profile\_optin, optin\_date |
 | `call_participants` | Who was on which call | call\_id, person\_id, speaker\_label, channel, talk\_time\_ms (shown only when enabled) |
 | `speakers` | Diarization clusters per call, before and after mapping to a person | id, call\_id, label, person\_id (nullable), centroid (BLOB, encrypted), pass (live / offline) |
 | `voice_profiles` | Biometric centroids for opted-in people, several per person | id, person\_id, embedding (BLOB, encrypted), device\_hint, sample\_count, last\_used\_at |
@@ -759,7 +757,7 @@ Audio and voice profiles never leave the machine under any setting. Transcript t
 
 **Supply chain.** Models are downloaded from pinned URLs with checksums and stored read-only; the CLIs are the user's own installs, version-checked at startup. The engine and noter-mcp are signed with the same Developer ID as the app and run with hardened runtime.
 
-**For the team rollout.** Recording colleagues touches consent law (in Germany every participant must agree, § 201 StGB), GDPR Article 9 for voice profiles and cluster centroids, and works-council co-determination: under § 87 (1) 6 BetrVG a tool that is objectively able to monitor performance or behaviour needs the works council's agreement regardless of intent, which for an AI meeting tool usually means a Betriebsvereinbarung. Prerequisites for the team release are therefore a Betriebsvereinbarung where a works council exists, a data-protection impact assessment, explicit opt-in consent for voice profiles, talk-time and "silent people" metrics off unless the agreement allows them, and an API key or a Bedrock or Vertex credential per user under Anthropic's Commercial Terms. The product safeguards make that policy possible; they do not replace it.
+**For the team rollout.** Voice profiles and cluster centroids fall under GDPR Article 9, and works-council co-determination applies: under § 87 (1) 6 BetrVG a tool that is objectively able to monitor performance or behaviour needs the works council's agreement regardless of intent, which for an AI meeting tool usually means a Betriebsvereinbarung. Prerequisites for the team release are therefore a Betriebsvereinbarung where a works council exists, a data-protection impact assessment, talk-time and "silent people" metrics off unless the agreement allows them, and an API key or a Bedrock or Vertex credential per user under Anthropic's Commercial Terms. The product safeguards make that policy possible; they do not replace it.
 
 ## Repository layout, build, packaging and developer workflow
 
@@ -793,7 +791,7 @@ noter/
     roles/                   council.md plus pm/, designer/, backend/, frontend/, teamlead/, architect/
     handoff/                 the handoff prompt skill and its schema
     reconcile/               judgement prompts for low-confidence term, reference and evidence decisions
-  evals/                     golden calls (consented), 50-question set, 20 document questions, corruption drill, scoring scripts
+  evals/                     golden calls, 50-question set, 20 document questions, corruption drill, scoring scripts
   scripts/                   model download, sidecar rename, signing, release
   CLAUDE.md, AGENTS.md       instructions for the agents that build Noter
 ```
@@ -833,7 +831,7 @@ The screens are prototyped as a Design artifact in the standard macOS look (syst
 | Row | Boards | Size |
 | --- | --- | --- |
 | Core call flow | Today dashboard, Call screen, Floating panel, Post-call summary with handoff drawer | 1440×1000 · 1920×1080 · 420×760 · 1440×1000 |
-| Agents and settings | Agents (list, editor, council modes), Settings (authentication, privacy and consent, repositories, knowledge sources) | 1440×1000 |
+| Agents and settings | Agents (list, editor, council modes), Settings (authentication, privacy, repositories, knowledge sources) | 1440×1000 |
 | Library, Ask, People, Activity | Calls with search and topic thread, Ask with cited answer, Person page with history diff, Activity with proposals queue and undo | 1440×1000 |
 | Performance and first run | Performance (targets, stage timeline, bottlenecks, improvement brief), First-run wizard, Menu bar extra | 1440×1000 · 760×560 · 420×460 |
 
@@ -841,7 +839,7 @@ UI-level decisions made in the prototype (refinements of the features above, no 
 
 - Menu bar extra shows the recording state and timer; its menu offers Stop, Pause, Mark this moment, Catch me up, Ask about this call, a Copilot cards toggle, Mute copilot for 10 min, Open call screen, Floating panel instead, Open last summary, and the next calendar call with its auto-record state.
 - Performance page has a period selector (last call, 7 days, 30 days), a Quality block (words corrected, speaker relabels, language-ID flips, cards pinned/shown, cards dismissed in under 3 s), a Cost block (per runtime, local share, per-call average) and a preview card of the improvement brief with Copy as prompt and Open in Claude Code.
-- First run is six steps: Welcome, Models, Permissions (microphone and system audio with a 3-second self-test that checks both streams arrive and line up; Skip for now allowed), Call display, Consent, Assistants.
+- First run is six steps: Welcome, Models, Permissions (microphone and system audio with a 3-second self-test that checks both streams arrive and line up; Skip for now allowed), Call display, Audio storage, Assistants.
 - Activity offers an "Always for this term" accept on reconciliation proposals and a 10-second redo window after a batch undo.
 
 ## Decision log
@@ -850,11 +848,12 @@ Choices made so far, newest first. Rows marked "Product owner" are the owner's a
 
 | Date | Decision | Decided by | Rationale |
 | --- | --- | --- | --- |
+| 2026-10-17 | No consent or informing features: informing call participants is the owner's own responsibility, outside the app; capture starts with Record alone. The participants-informed flag, reminder mode, per-person consent status, declined-person blocking and the first-run consent step are removed | Product owner | Request; supersedes the consent part of the 16 Oct privacy row; recorded as PM-56 in docs/DESIGN.md |
 | 2026-10-16 | Performance page with per-stage metrics, a bottleneck list and an exportable improvement brief; Today dashboard of action items ordered by the calendar with manual checkboxes; agents configurable (skill, runtime, model, effort, tools) and addable or removable with a + button | Product owner | Request |
 | 2026-10-16 | API key is the primary auth path for every automated task; a subscription login is a personal-use switch only; team release needs API keys or Bedrock/Vertex per user | Review | Anthropic's legal page: products and Agent SDK users must use API keys; OAuth is for ordinary individual use |
 | 2026-10-16 | Noter's own streaming loop on open-source WhisperKit, Pro SDK as the budgeted fallback, Parakeet TDT v3 as the second backend; latency bars provisional until M1 | Review | The open-source SDK has no LocalAgreement streaming; the published figures are Pro |
 | 2026-10-16 | Council in two modes: fused (one request, all agents) live by default, parallel (one session per agent) post-call and opt-in live | Review | Six tool-using sessions cannot hold the live budget; per-agent model and effort need separate sessions |
-| 2026-10-16 | Consent: capture requires the participants-informed flag; per-person consent status; voice profiles opt-in per person; monitoring-style metrics off by default | Review | § 201 StGB, GDPR Art. 9, § 87 BetrVG |
+| 2026-10-16 | Voice profiles opt-in per person; monitoring-style metrics off by default | Review | GDPR Art. 9, § 87 BetrVG |
 | 2026-10-16 | Core is the only SQLite writer and noter-mcp a thin client; embeddings in-process; evidence as time spans; AAC audio; per-call transcript files; sandboxed engine; normalised keyword index | Review | Architecture and backend findings |
 | 2026-10-16 | Handoff launches through claude-cli://open, claude://code/new and codex://new with a terminal fallback; the prompt is passed by file | Review | Deep links are documented |
 | 2026-10-16 | Copilot surfaces: full call screen on a dedicated display (same window as the floating panel), menu bar quick actions; screen context from picked windows on the first screen in v1.x | Product owner | Request; on-device OCR plus app connectors, only picked windows, frames never stored |
