@@ -75,6 +75,7 @@ e2e:
     pnpm --dir apps/desktop test:conformance
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance; fi
     pnpm --dir apps/desktop test:e2e
+    if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e; fi
     python3 scripts/harness/e2e_coverage.py
 
 # Native macOS UI tests (XCUITest): the menu bar extra and its menu, tray glyphs, the non-activating
