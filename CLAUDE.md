@@ -8,6 +8,7 @@ ALWAYS resolve and enforce prerequisites of skills/workflows/commands BEFORE app
 
 ## Noter harness (docs/HARNESS.md, docs/ADR/0003)
 
+- Setup, daily loop, branches and labels, screenshots, contract changes, where tests live: docs/DEVELOPMENT.md (`just setup` once per machine).
 - Done means `just gate` passes; keep `just gate-fast` green while you work. Never report work as finished while either fails. CI runs the same gates as the required `gate` check.
 - Quality bars (harness/harness.toml): unit line coverage ≥ 80% per side and on changed lines; E2E ≥ 60% of delivered frozen commands and stories against the real core; screenshots ≥ 98% pixel match; performance scenarios ≤ 10% worse than base (instruction counts), ≥ 60% of due registry entries covered; design-element trace coverage never lower than on the base branch.
 - Write the failing test first. E2E tests name the story ID they cover (`cpt-noter-seq-…`); XCUITest tests of native surfaces (`apps/desktop/tests/native`, `just native`) spell it with underscores in the test name (`test_cpt_noter_seq_…`).
