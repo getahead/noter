@@ -10,7 +10,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch: {}
-  workflow_call: {}
+  workflow_call:
+    secrets:
+      CF_STUDIO_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -35,19 +38,25 @@ jobs:
       core_harness: ${{ steps.d.outputs.core_harness }}
       native_tests: ${{ steps.d.outputs.native_tests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - id: d
         run: |
-          echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "native_tests=$([ -d apps/desktop/tests/native/NoterNativeTests.xcodeproj ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          {
+            echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)"
+            echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)"
+            echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)"
+            echo "native_tests=$([ -d apps/desktop/tests/native/NoterNativeTests.xcodeproj ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint and type checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - run: just lint
 
@@ -55,7 +64,9 @@ jobs:
     name: Contract
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - run: just contract
 
@@ -63,8 +74,9 @@ jobs:
     name: Architecture checks, trace coverage and gate config
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
@@ -83,15 +95,16 @@ jobs:
     name: Unit tests and coverage (80%)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
           tools: just,cargo-llvm-cov
       - run: just cov-unit
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-unit
           path: |
@@ -107,11 +120,13 @@ jobs:
     if: ${{ !cancelled() && needs.detect.result == 'success' && (needs.macos.result == 'success' || needs.macos.result == 'skipped') }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - name: XCUITest results from the macos job
         if: needs.detect.outputs.native_tests == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-native
           path: coverage/native
@@ -124,7 +139,7 @@ jobs:
         run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
       - run: just e2e
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-e2e
           path: |
@@ -143,8 +158,9 @@ jobs:
       HOME: /root
     steps:
       - run: command -v git >/dev/null || (apt-get update -q && apt-get install -y -q git)
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Baselines change only with the owner's approval
         if: github.ref != 'refs/heads/main'
@@ -159,10 +175,11 @@ jobs:
           if [ -n "$changed" ] && ! echo ",$PR_LABELS," | grep -q ',visual-change-approved,'; then
             echo "::error::Screenshot baselines changed without the 'visual-change-approved' label:"; echo "$changed"; exit 1
           fi
-      - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile
+      # pnpm pinned to the packageManager version; the container has no corepack-free alternative
+      - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile # zizmor: ignore[adhoc-packages]
       - run: pnpm --dir apps/desktop test:visual
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: visual-diffs
           path: |
@@ -174,8 +191,9 @@ jobs:
     name: Performance (60% scenarios, <= 10% regression)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
@@ -183,7 +201,7 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
       - run: just perf
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: perf
           path: target/perf
@@ -193,8 +211,10 @@ jobs:
     name: Constructor Studio validate
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
       - name: Fetch the pinned Constructor Studio core
@@ -209,7 +229,9 @@ jobs:
     if: needs.detect.outputs.engine == 'true' || needs.detect.outputs.tauri == 'true'
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
         with:
           tools: just,cargo-llvm-cov
@@ -223,7 +245,7 @@ jobs:
         if: needs.detect.outputs.tauri == 'true'
         run: just native
       - if: always() && needs.detect.outputs.tauri == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-native
           path: coverage/native

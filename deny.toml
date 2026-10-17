@@ -1,0 +1,50 @@
+# cargo-deny: what the Rust dependency tree may contain (docs/DELIVERY.md).
+# PRs run `cargo deny check licenses bans sources` (pr.yml); advisories run
+# nightly (security.yml), so a new advisory never turns an unrelated PR red.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+# Permissive licenses, plus MPL-2.0 (file-level copyleft, fine in a shipped app).
+# GPL/AGPL family is not allowed: Noter ships as a closed binary.
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "Unlicense",
+  "CC0-1.0",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "MPL-2.0",
+]
+confidence-threshold = 0.9
+# The allow list anticipates the Tauri tree; licenses not (yet) present are fine.
+unused-allowed-license = "allow"
+
+[licenses.private]
+# Workspace crates are `publish = false` and UNLICENSED.
+ignore = true
+
+[bans]
+# Tauri and its platform crates pull duplicate versions; report them, do not fail.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

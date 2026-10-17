@@ -1,6 +1,8 @@
 ## What and why
 
-<!-- One or two sentences: the change, and the FEATURE / story / ADR it serves (IDs). -->
+<!-- One or two sentences: the change, and the FEATURE / story / ADR it serves (IDs).
+     The PR title becomes the squash commit and the changelog line: Conventional Commits,
+     e.g. "feat(ui): show the speaker split" or "fix(core): keep late results out". -->
 
 ## Exit criteria
 
