@@ -12,6 +12,20 @@ not in source lines (the macOS WebView cannot be instrumented reliably):
   in the title of an E2E test that passed (recorded by the Vitest setup and the
   Playwright story reporter into the same logs).
 
+Native macOS surfaces (menu bar extra, tray, panels, notifications, hotkeys, card
+keys) are driven by the XCUITest suite in apps/desktop/tests/native against the
+built app, with the real core inside it (`just native`, macOS only). They count
+the same way, from coverage/native/:
+
+* commands-*.json: the same command-log format, written by the app under test
+  (target "app") with the commands its core ran successfully, from windows and
+  from native callers (`Caller::Native`);
+* xcuitest-*.json: `xcrun xcresulttool get test-results tests` of the run. A story
+  counts when a test case that passed names its ID. Swift identifiers cannot hold
+  hyphens, so a test spells the ID with underscores, optionally followed by a
+  double underscore and a description:
+  `test_cpt_noter_seq_menu_bar_control_recording__pause_and_resume()`.
+
 Runs against the fake core are not counted: end-to-end means the real core.
 
 Both must reach gates.e2e.*_min. It also checks that milestones.toml places every
@@ -29,8 +43,22 @@ from pathlib import Path
 from common import ROOT, HarnessError, delivered_milestones, fail, harness_config, load_toml, pct, write_summary
 
 STORY_ID = re.compile(r"cpt-noter-seq-[a-z0-9-]+[a-z0-9]")
-DEFAULT_TEST_DIRS = ["apps/desktop/tests/conformance", "apps/desktop/tests/e2e", "crates"]
+# The same ID in a Swift (or Rust) test name: hyphens spelled as single underscores;
+# a double underscore ends the ID (`test_cpt_noter_seq_x_y__what_it_checks`).
+STORY_ID_IDENT = re.compile(r"cpt_noter_seq_[a-z0-9]+(?:_[a-z0-9]+)*")
+DEFAULT_TEST_DIRS = ["apps/desktop/tests/conformance", "apps/desktop/tests/e2e", "apps/desktop/tests/native", "crates"]
 TEST_SUFFIXES = (".ts", ".tsx", ".rs", ".swift")
+# Logs of the E2E runs: the Vitest and Playwright suites (coverage/e2e) and the
+# XCUITest run against the built app (coverage/native, written by `just native`).
+DEFAULT_COMMAND_LOGS = ["coverage/e2e/commands-*.json", "coverage/native/commands-*.json"]
+DEFAULT_XCUITEST_RESULTS = ["coverage/native/xcuitest-*.json"]
+
+
+def story_ids(text: str) -> set[str]:
+    """Story IDs named in a test title or test name, in either spelling."""
+    found = set(STORY_ID.findall(text))
+    found.update(m.replace("_", "-") for m in STORY_ID_IDENT.findall(text))
+    return found
 
 
 def manifest_commands(root: Path) -> dict[str, dict]:
@@ -80,6 +108,25 @@ def invoked_commands(patterns: list[str], include_fake: bool = False) -> set[str
     return read_logs(patterns, include_fake)[0]
 
 
+def xcuitest_stories(patterns: list[str]) -> set[str]:
+    """Stories whose XCUITest case passed, from `xcrun xcresulttool get test-results tests`
+    JSON. XCUITest always drives the built app, so the real core is behind it."""
+    stories: set[str] = set()
+
+    def walk(nodes: list[dict]) -> None:
+        for node in nodes:
+            if node.get("nodeType") == "Test Case":
+                if node.get("result") == "Passed":
+                    stories.update(story_ids(f"{node.get('name', '')} {node.get('nodeIdentifier', '')}"))
+                continue
+            walk(node.get("children", []))
+
+    for pattern in patterns:
+        for path in glob.glob(pattern, recursive=True):
+            walk(json.loads(Path(path).read_text(encoding="utf-8")).get("testNodes", []))
+    return stories
+
+
 def named_stories(root: Path, dirs: list[str]) -> set[str]:
     found: set[str] = set()
     for d in dirs:
@@ -88,7 +135,7 @@ def named_stories(root: Path, dirs: list[str]) -> set[str]:
             continue
         for path in base.rglob("*"):
             if path.is_file() and path.suffix in TEST_SUFFIXES and ("tests" in path.parts or "e2e" in path.parts):
-                found.update(STORY_ID.findall(path.read_text(encoding="utf-8", errors="ignore")))
+                found.update(story_ids(path.read_text(encoding="utf-8", errors="ignore")))
     return found
 
 
@@ -132,14 +179,17 @@ def evaluate(root: Path, cfg: dict, milestones: dict, invoked: set[str], named: 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--commands-log", action="append", default=None, help="glob of command logs (repeatable)")
+    ap.add_argument("--xcuitest-results", action="append", default=None,
+                    help="glob of `xcresulttool get test-results tests` JSON from the XCUITest run (repeatable)")
     ap.add_argument("--tests", action="append", default=None, help="directories scanned for story IDs (report only)")
     ap.add_argument("--include-fake", action="store_true", help="also count runs against the fake core (local insight only)")
     args = ap.parse_args(argv)
     try:
         cfg = harness_config()
         milestones = load_toml(ROOT / "harness" / "milestones.toml")
-        logs = args.commands_log or [str(ROOT / "coverage" / "e2e" / "commands-*.json")]
+        logs = args.commands_log or [str(ROOT / p) for p in DEFAULT_COMMAND_LOGS]
         commands, stories = read_logs(logs, args.include_fake)
+        stories |= xcuitest_stories(args.xcuitest_results or [str(ROOT / p) for p in DEFAULT_XCUITEST_RESULTS])
         errors, report = evaluate(ROOT, cfg, milestones, commands, stories, named_stories(ROOT, args.tests or DEFAULT_TEST_DIRS))
     except HarnessError as e:
         fail(str(e))

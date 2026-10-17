@@ -33,6 +33,7 @@ jobs:
       engine: ${{ steps.d.outputs.engine }}
       tauri: ${{ steps.d.outputs.tauri }}
       core_harness: ${{ steps.d.outputs.core_harness }}
+      native_tests: ${{ steps.d.outputs.native_tests }}
     steps:
       - uses: actions/checkout@v4
       - id: d
@@ -40,6 +41,7 @@ jobs:
           echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "native_tests=$([ -d apps/desktop/tests/native/NoterNativeTests.xcodeproj ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint and type checks
@@ -99,11 +101,20 @@ jobs:
 
   e2e:
     name: End-to-end and E2E coverage (60%)
-    needs: detect
+    # After the macos job: stories and commands its XCUITest run proves against the built
+    # app count toward the same bar, so the coverage is judged here over both (HARNESS.md).
+    needs: [detect, macos]
+    if: ${{ !cancelled() && needs.detect.result == 'success' && (needs.macos.result == 'success' || needs.macos.result == 'skipped') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      - name: XCUITest results from the macos job
+        if: needs.detect.outputs.native_tests == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-native
+          path: coverage/native
       - name: Build the core harness (real core over stdio)
         if: needs.detect.outputs.core_harness == 'true'
         run: |
@@ -193,7 +204,7 @@ jobs:
       - run: python3 .cf-studio/.core/skills/studio/scripts/studio.py validate --local-only
 
   macos:
-    name: macOS (engine, Tauri host)
+    name: macOS (engine, Tauri host, native UI tests)
     needs: detect
     if: needs.detect.outputs.engine == 'true' || needs.detect.outputs.tauri == 'true'
     runs-on: macos-15
@@ -208,6 +219,15 @@ jobs:
       - name: Tauri host tests (handler parity, window capabilities)
         if: needs.detect.outputs.tauri == 'true'
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - name: Native UI tests (XCUITest)
+        if: needs.detect.outputs.tauri == 'true'
+        run: just native
+      - if: always() && needs.detect.outputs.tauri == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-native
+          path: coverage/native
+          if-no-files-found: ignore
 
   gate:
     name: gate
