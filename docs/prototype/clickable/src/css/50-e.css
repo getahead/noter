@@ -263,3 +263,8 @@
 .st-group__box > [data-component="cpt-noter-component-ui-hotkey-recorder"] { padding: 7px 12px; }
 .np-sheet .st-row { padding: 6px 0; }
 @media (max-width: 760px) { .st-body { flex-direction: column; height: auto; } .st-panes { width: 100%; border-right: 0; border-bottom: 1px solid var(--sep); } .st-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+/* Audio & Transcription › Output devices (PM-67): headphones marked per device */
+.st-devlist { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.st-dev { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-dev__name { font-weight: 600; }
+.st-dev__route { color: var(--label-2); font-size: 12px; }

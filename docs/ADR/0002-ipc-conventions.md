@@ -39,6 +39,8 @@ DESIGN.md requires that the UI holds no state the core does not have, that a win
 * A missed event must not leave a stale banner.
 * Every failure must be a closed, typed code the UI maps once.
 * Tauri guidance: events are not for high-rate streams; Channels are ordered and bound to one call.
+* Channel messages, events and command results travel on different transports and are not ordered relative to each other.
+* The UI team builds on frozen surfaces as final while the contract keeps growing.
 
 ## Considered Options
 
@@ -50,16 +52,24 @@ DESIGN.md requires that the UI holds no state the core does not have, that a win
 
 Chosen option: "Intent commands, Channels with seq, whole-state events, typed errors", because each DESIGN.md rule maps to one mechanism: snapshot with `last_seq` then a Channel for reload and replay; `rev` on every editable record and `conflict` for concurrent edits; whole-state events for app-level state; `entity:changed` with whole records for everything else; one `CoreError` with a closed `ErrorCode` list.
 
+Three rules make these mechanisms hold across transports:
+
+* Channel messages and command results are not ordered relative to each other. The generated transport buffers a Channel's messages until the subscribing `invoke` resolves with the snapshot, then drops `seq ≤ last_seq` and delivers the rest in order. The UI acknowledges with `stream_ack` every 100 messages or 1 s, and the core ends a subscription with `lagged` at 2 000 unacknowledged messages.
+* Every whole-state payload carries a `version: u64`, monotonic per payload kind, and the matching command results and snapshot slices carry the same version. The UI keeps the highest, so a late event never overwrites a newer state.
+* A frozen surface changes only additively in a minor version (a new optional field, a new command, a new enum variant the UI can ignore); anything else needs a major version both sides sign off. A draft surface may change in any minor version until its milestone gate.
+
 ### Consequences
 
 * Good, because the UI's store logic is uniform: replace records by id, append stream messages in `seq` order, resubscribe on a gap.
 * Good, because "Item changed since" and **Undo** have exact mechanisms (`conflict`, `change_id`).
 * Bad, because whole records on `entity:changed` cost more bytes than patches; acceptable for a local app at human edit rates.
 * Bad, because every editable table carries `rev`, and every edit command carries it.
+* Bad, because the generated transport must buffer early Channel messages and the UI must acknowledge them; both are generated code, not hand-written per screen.
+* Neutral, because whole-state payloads carry a `version` the UI compares before it replaces state.
 
 ### Confirmation
 
-Contract tests check names, scopes and the error list; the fake core enforces window scoping, `rev` conflicts and `seq` continuity and the smoke test asserts them; from M1 the same assertions run against the real core.
+Contract tests check names, stability per name, scopes and the error list; the fake core enforces window scoping, `rev` conflicts and `seq` continuity, and sends its first Channel message before the snapshot resolves, so the smoke test also covers the transport's buffering and `version` ordering; from M1 the same assertions run against the real core.
 
 ## Pros and Cons of the Options
 

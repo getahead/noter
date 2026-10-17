@@ -19,8 +19,16 @@ pub enum JobKind {
     SourceSync,
     MetricsRollUp,
     Backup,
-    /// Post-call pipeline (offline pass, outputs) and regeneration.
+    /// Post-call analysis of the live transcript (outputs, items). Runs during a later live
+    /// call at low priority, after live ASR (D2).
     PostCall,
+    /// The offline Large v3 pass that replaces the live transcript; waits for the call to end.
+    ArchivePass,
+    /// `outputs_regenerate` runs; wait for the call to end.
+    Regeneration,
+    /// Nightly: deletes audio past its retention date (logged, not undoable), live segments
+    /// after 7 days and metrics after 365 days.
+    Retention,
     ModelDownload,
     CliInstall,
 }
@@ -67,7 +75,7 @@ pub struct JobRow {
     pub allow_on_battery: bool,
     pub last_run: Option<JobRunRow>,
     pub running: bool,
-    /// Jobs never run during a live call.
+    /// Waits while a call is live: every job except post-call analysis (D2).
     pub blocked_by_call: bool,
 }
 
@@ -85,7 +93,9 @@ pub struct JobIdArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct JobUpdateArgs {
     pub job_id: JobId,
+    #[serde(default)]
     pub enabled: Option<bool>,
+    #[serde(default)]
     pub allow_on_battery: Option<bool>,
 }
 

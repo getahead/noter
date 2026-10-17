@@ -376,21 +376,6 @@
           }
         ]
       },
-      "EngineOutputMode": {
-        "oneOf": [
-          {
-            "enum": [
-              "headphones"
-            ],
-            "type": "string"
-          },
-          {
-            "const": "speakers_with_echo_cancellation",
-            "description": "Speakers with LocalVQE echo cancellation, system tap as far-end reference.",
-            "type": "string"
-          }
-        ]
-      },
       "EngineSpan": {
         "properties": {
           "t0_ms": {
@@ -439,13 +424,29 @@
         "type": "object"
       },
       "Lang": {
-        "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
-        "enum": [
-          "en",
-          "ru",
-          "de"
+        "anyOf": [
+          {
+            "enum": [
+              "en",
+              "ru",
+              "de"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+            "properties": {
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          }
         ],
-        "type": "string"
+        "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
       },
       "OffsetMs": {
         "description": "Milliseconds from the start of a call (session-relative audio time).",
@@ -496,6 +497,7 @@
             ]
           },
           "exclude_bundle_ids": {
+            "description": "Processes left out of the system tap, besides the engine and the app themselves.",
             "items": {
               "type": "string"
             },
@@ -519,9 +521,6 @@
               "null"
             ]
           },
-          "output_mode": {
-            "$ref": "#/$defs/EngineOutputMode"
-          },
           "resume_from_ms": {
             "anyOf": [
               {
@@ -531,10 +530,10 @@
                 "type": "null"
               }
             ],
-            "description": "Resume from the ring buffer after an engine restart in the same call."
+            "description": "Resume from the capture ring's write position after an engine restart in the same call."
           },
           "session_dir": {
-            "description": "`audio/<call_id>/` inside the sandbox container path the core handed over.",
+            "description": "`audio/<call_id>/`, relative to the App Group container.",
             "type": "string"
           },
           "speaker_priors": {
@@ -552,7 +551,6 @@
           "call_id",
           "session_dir",
           "store_audio",
-          "output_mode",
           "exclude_bundle_ids",
           "languages",
           "backend",
@@ -832,22 +830,28 @@
             "type": "object"
           },
           {
+            "description": "System audio has been exact digital zeros since `since_ms`. The System Audio Recording\npermission cannot be queried, so this is the inference: `confidence` 0..1 that access is off\nrather than a silent call.",
             "properties": {
               "call_id": {
                 "$ref": "#/$defs/CallId"
               },
-              "channel": {
-                "$ref": "#/$defs/AudioChannel"
+              "confidence": {
+                "format": "float",
+                "type": "number"
+              },
+              "since_ms": {
+                "$ref": "#/$defs/OffsetMs"
               },
               "type": {
-                "const": "permission_lost",
+                "const": "system_audio_silent",
                 "type": "string"
               }
             },
             "required": [
               "type",
               "call_id",
-              "channel"
+              "since_ms",
+              "confidence"
             ],
             "type": "object"
           },
@@ -1159,6 +1163,7 @@
             "type": "object"
           },
           {
+            "description": "The self-test passes only with non-zero buffers on both channels.",
             "properties": {
               "failure": {
                 "anyOf": [
@@ -1317,13 +1322,29 @@
         "type": "string"
       },
       "Lang": {
-        "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
-        "enum": [
-          "en",
-          "ru",
-          "de"
+        "anyOf": [
+          {
+            "enum": [
+              "en",
+              "ru",
+              "de"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+            "properties": {
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          }
         ],
-        "type": "string"
+        "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
       },
       "OffsetMs": {
         "description": "Milliseconds from the start of a call (session-relative audio time).",
@@ -1360,5 +1381,5 @@
     "title": "EngineEventLine",
     "type": "object"
   },
-  "protocol_version": "1.0"
+  "protocol_version": "2.0"
 }

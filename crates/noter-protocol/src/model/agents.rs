@@ -15,7 +15,9 @@ pub enum AgentStatus {
         reason: crate::error::RuntimeUnavailableReason,
         fix: Option<RuntimeChoice>,
     },
-    /// Switched itself off in a call type after ten calls of dismissed cards.
+    /// Switched itself off for a call type because at least 80 % of its cards were dismissed
+    /// over the last 10 calls of that type (D4). Logged in History, undoable, announced once
+    /// on the Agents page.
     SwitchedOff {
         call_type: CallTypeId,
         after_calls: u16,
@@ -26,7 +28,7 @@ pub enum AgentStatus {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AgentStats {
     pub cards_7d: u32,
-    /// 0..1 useful or used, over the last 7 days.
+    /// 0..1 of its cards rated useful or used, over the last 20 calls.
     pub useful_share: Option<f32>,
 }
 
@@ -98,6 +100,7 @@ pub enum AgentTemplate {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AgentCreateArgs {
     pub template: AgentTemplate,
+    #[serde(default)]
     pub name: Option<String>,
 }
 

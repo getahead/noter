@@ -9,7 +9,7 @@
   const C = NP.C;
 
   /* ---------------- 1. Record prompt ----------------
-     recordPrompt({variant: default|disk-low|system-audio-off|call-ended|new-meeting, state, app, key}) */
+     recordPrompt({variant: default|disk-full|model-missing|system-audio-off|call-ended|new-meeting, state, app, key}) */
   C.recordPrompt = (o) => {
     o = o || {};
     const variant = o.variant || 'default';
@@ -42,16 +42,21 @@
       actions = html`<div class="rp-inline" role="group" aria-label="Don't ask for ${app}">
         ${safari ? html`<p>Calls in Safari, such as Google Meet, won't be offered for recording either.</p>` : html`<p>${app} won't be offered for recording again.</p>`}
         <div class="rp-inline__btns">${P.button('Back', { action: ['rp.dontAskBack'] })}${P.button("Don't Ask", { variant: 'primary', action: ['rp.dontAsk'] })}</div></div>`;
-    } else if (variant === 'disk-low') {
+    } else if (variant === 'model-missing') {
+      /* R1/O1: the live speech model is the only setup item that refuses a start */
+      actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>The speech model is still downloading (62 %)</span></div>
+        <div class="rp-btnrow">${notNow}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', disabled: true, kbd: '⌃⌥⌘R' })}</div>`;
+    } else if (variant === 'disk-full') {
       actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>Not enough disk space to record (420 MB free)</span></div>
         <div class="rp-btnrow">${notNow}${P.button('Delete Old Audio…', { action: ['rp.deleteOldAudio'] })}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', disabled: true, kbd: '⌃⌥⌘R' })}</div>`;
     } else if (variant === 'system-audio-off') {
-      actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>System audio access is off</span></div>
-        <div class="rp-btnrow">${notNow}<span class="np-tb__spacer"></span>${P.button('Open System Settings…', { variant: 'primary', action: ['rp.openSysSettings'] })}</div>`;
+      /* PM-60: a warning only; Record stays the primary button and starts capture */
+      actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>System audio access is off · only your side will be recorded</span></div>
+        <div class="rp-btnrow">${notNow}${P.button('Open System Settings…', { action: ['rp.openSysSettings'] })}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', action: ['rp.record', { sysOff: true }], kbd: '⌃⌥⌘R' })}</div>`;
     } else {
       actions = html`<div class="rp-btnrow">${notNow}${P.button('Record as Sensitive', { action: ['rp.record', { sensitive: true }] })}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', action: ['rp.record'], kbd: '⌃⌥⌘R' })}</div>`;
     }
-    return comp('record-prompt', { variant, state: variant === 'disk-low' || variant === 'system-audio-off' ? 'disabled' : (L.dontAsk ? 'not-a-call' : 'default'), cls: 'rp-panel', attrs: { role: 'dialog', 'aria-label': 'Record this call?' } },
+    return comp('record-prompt', { variant, state: (variant === 'disk-full' || variant === 'model-missing') ? 'disabled' : (L.dontAsk ? 'not-a-call' : 'default'), cls: 'rp-panel', attrs: { role: 'dialog', 'aria-label': 'Record this call?' } },
       html`${NP.region('RP-R1', { tag: 'div', cls: 'rp-r1' }, html`
         <span class="rp-appicon" aria-hidden="true">${icon(safari ? 'globe' : 'people', { size: 20 })}</span>
         <div class="rp-r1__text"><div class="rp-title">Record this call?</div><div class="rp-sub">${o.event ? html`<span lang="en">${o.event}</span>` : `${app} is using the microphone`}</div></div>

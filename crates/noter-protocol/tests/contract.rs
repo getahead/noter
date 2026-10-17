@@ -217,3 +217,197 @@ fn wire_format_is_snake_case_with_type_tags() {
     assert_eq!(w, "call-screen");
     assert_eq!(WindowLabel::CallScreen.as_str(), "call-screen");
 }
+
+/// Walks every named type an argument type can contain and returns the `Option` fields that
+/// lack `#[serde(default)]` (BA18). Such a field is required on the wire even though its type
+/// says it may be absent, so a UI that omits it gets `invalid_input`.
+fn option_fields_without_default(types: &specta::Types) -> Vec<String> {
+    use specta::datatype::{DataType, Fields};
+    fn check(owner: &str, fields: &Fields, container_default: bool, out: &mut Vec<String>) {
+        if let Fields::Named(named) = fields {
+            for (name, field) in &named.fields {
+                let nullable = matches!(field.ty, Some(DataType::Nullable(_)));
+                let default =
+                    container_default || field.attributes.contains_key("serde:field:default");
+                if nullable && !default {
+                    out.push(format!("{owner}.{name}"));
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for ndt in types.into_unsorted_iter() {
+        match &ndt.ty {
+            Some(DataType::Struct(st)) => {
+                let container_default = st.attributes.contains_key("serde:container:default");
+                check(&ndt.name, &st.fields, container_default, &mut out);
+            }
+            Some(DataType::Enum(en)) => {
+                for (variant, v) in &en.variants {
+                    check(
+                        &format!("{}::{}", ndt.name, variant),
+                        &v.fields,
+                        false,
+                        &mut out,
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    out.sort();
+    out
+}
+
+#[test]
+fn every_option_field_of_an_argument_type_has_serde_default() {
+    let types = noter_protocol::ipc::register_arg_types(specta::Types::default());
+    let missing = option_fields_without_default(&types);
+    assert!(missing.is_empty(), "add #[serde(default)] to: {missing:#?}");
+}
+
+#[test]
+fn option_fields_without_default_parse_when_absent() {
+    // The attribute the test above reads really makes serde accept an absent field.
+    let v: noter_protocol::model::CaptureStartArgs =
+        serde_json::from_str(r#"{"source":"hotkey","sensitive":false}"#).unwrap();
+    assert!(v.detection_id.is_none() && v.calendar_event_id.is_none());
+}
+
+#[test]
+fn whole_state_events_carry_a_version() {
+    use specta::datatype::{DataType, Fields};
+    // Events that carry one record or one step, not a whole state.
+    let not_whole_state = [
+        "entity:changed",
+        "outputs:progress",
+        "jobs:progress",
+        "signin:progress",
+        "nav:request",
+    ];
+    let types = noter_protocol::ipc::ipc_types();
+    for e in EVENTS.iter().filter(|e| !not_whole_state.contains(&e.name)) {
+        let ndt = types
+            .into_unsorted_iter()
+            .find(|t| t.name == e.payload)
+            .unwrap_or_else(|| panic!("{} payload {} not exported", e.name, e.payload));
+        let has_version = match &ndt.ty {
+            Some(DataType::Struct(st)) => match &st.fields {
+                Fields::Named(n) => n.fields.iter().any(|(name, _)| name == "version"),
+                _ => false,
+            },
+            _ => false,
+        };
+        assert!(
+            has_version,
+            "{} ({}) is a whole-state payload without `version`",
+            e.name, e.payload
+        );
+    }
+}
+
+#[test]
+fn stability_per_name() {
+    // Draft until their milestone gate or v1.x; everything else named here is frozen.
+    for (name, stability) in [
+        ("storage_move", Stability::Draft),
+        ("context_chip_set", Stability::Draft),
+        ("card_unpin", Stability::Draft),
+        ("cards_subscribe", Stability::Draft),
+        ("capture_start", Stability::Frozen),
+        ("capture_hold_notice", Stability::Frozen),
+        ("capture_keep_recording", Stability::Frozen),
+        ("capture_keep_source", Stability::Frozen),
+        ("capture_resume_interrupted", Stability::Frozen),
+        ("banner_dismiss", Stability::Frozen),
+        ("stream_ack", Stability::Frozen),
+        ("change_redo", Stability::Frozen),
+        ("hotkeys_reset", Stability::Frozen),
+        ("job_cancel", Stability::Frozen),
+        ("handoff_cancel", Stability::Frozen),
+        ("window_report_view", Stability::Frozen),
+    ] {
+        assert_eq!(
+            command(name)
+                .unwrap_or_else(|| panic!("no command {name}"))
+                .stability,
+            stability,
+            "{name}"
+        );
+    }
+    let event = |n: &str| EVENTS.iter().find(|e| e.name == n).unwrap().stability;
+    assert_eq!(event("copilot:status"), Stability::Draft);
+    assert_eq!(event("capture:state"), Stability::Frozen);
+    assert_eq!(event("degraded:changed"), Stability::Frozen);
+}
+
+#[test]
+fn window_scopes_from_the_review() {
+    let allows = |n: &str, w: WindowLabel| command(n).unwrap().allows(w);
+    assert!(allows("item_reopen", WindowLabel::CallScreen));
+    for w in [
+        WindowLabel::FirstRun,
+        WindowLabel::Main,
+        WindowLabel::Settings,
+    ] {
+        assert!(
+            allows("account_test", w) && allows("account_sign_out", w),
+            "{w:?}"
+        );
+    }
+    assert!(allows("capture_hold_notice", WindowLabel::RecordPrompt));
+    assert!(
+        allows("window_report_view", WindowLabel::Main)
+            && !allows("window_report_view", WindowLabel::CallScreen)
+    );
+    for w in WindowLabel::ALL {
+        assert!(allows("stream_ack", w), "stream_ack from {w:?}");
+    }
+}
+
+#[test]
+fn capture_start_is_never_gated_on_setup() {
+    // O1: no setup or permission code exists that capture_start could raise.
+    let codes: Vec<String> = ErrorCode::ALL
+        .iter()
+        .map(|c| {
+            serde_json::to_value(c)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect();
+    for gone in [
+        "setup_incomplete",
+        "disk_low",
+        "partially_applied",
+        "model_not_ready",
+    ] {
+        assert!(!codes.iter().any(|c| c == gone), "{gone} must not exist");
+    }
+    for needed in [
+        "already_recording",
+        "disk_full",
+        "model_missing",
+        "already_undone",
+        "not_undone",
+        "not_undoable",
+        "edited_later",
+        "calendar_unavailable",
+        "tracker_unreachable",
+    ] {
+        assert!(codes.iter().any(|c| c == needed), "{needed} is missing");
+    }
+}
+
+#[test]
+fn lang_other_round_trips_as_an_object() {
+    use noter_protocol::Lang;
+    assert_eq!(serde_json::to_value(Lang::Ru).unwrap(), "ru");
+    let fr = Lang::Other { code: "fr".into() };
+    let v = serde_json::to_value(&fr).unwrap();
+    assert_eq!(v["code"], "fr");
+    assert_eq!(serde_json::from_value::<Lang>(v).unwrap(), fr);
+    assert_eq!(serde_json::from_str::<Lang>("\"de\"").unwrap(), Lang::De);
+}

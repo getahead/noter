@@ -20,9 +20,17 @@ fn core_error_takes_retryable_from_the_code() {
 
 #[test]
 fn core_error_carries_detail_and_displays_code_and_message() {
-    let e = CoreError::new(ErrorCode::DiskFull, "disk")
-        .with_detail(ErrorDetail::DiskSpace { free_mb: 12 });
-    assert_eq!(e.detail, Some(ErrorDetail::DiskSpace { free_mb: 12 }));
+    let e = CoreError::new(ErrorCode::DiskFull, "disk").with_detail(ErrorDetail::DiskSpace {
+        free_mb: 12,
+        needed_mb: 500,
+    });
+    assert_eq!(
+        e.detail,
+        Some(ErrorDetail::DiskSpace {
+            free_mb: 12,
+            needed_mb: 500
+        })
+    );
     assert_eq!(e.to_string(), "DiskFull: disk");
     let as_std: &dyn std::error::Error = &e;
     assert!(as_std.source().is_none());
@@ -39,6 +47,7 @@ fn only_transient_codes_are_retryable_by_default() {
     assert_eq!(
         retryable,
         [
+            "CalendarUnavailable",
             "ChangeLogUnreadable",
             "EngineUnavailable",
             "Internal",
@@ -47,6 +56,7 @@ fn only_transient_codes_are_retryable_by_default() {
             "Offline",
             "SearchFailed",
             "SourceSyncFailed",
+            "TrackerUnreachable",
         ]
     );
 }

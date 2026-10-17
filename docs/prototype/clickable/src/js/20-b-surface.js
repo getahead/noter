@@ -19,11 +19,11 @@
     askOpen: false, askText: '',
     notice: null, discardConfirm: false, countdown: 10, countdownPaused: false,
     closing: null, closed: null, hidden: null,
-    banner: null,               // audio-lost | stalled | disk | second-source
+    banner: null,               // sys-silent | mic-off | engine-stopped | stalled | disk | second-source
     copilotBanner: null,        // switched-local | budget | muted | sensitive-off
     copilot: 'council',         // council | single | off
     muted: false, budget: 'normal', keyTaken: false, keyTakenSeen: false, dismissKeys: false, panelKey: false,
-    micOnly: false,
+    micOnly: false, noMic: false, engineStopped: false,
     route: 'headphones', playback: null,
     detached: false, newLines: 12,
     newCall: false, waiting: false,
@@ -40,7 +40,7 @@
     const base = D.segments;
     const hyp = base.filter((s) => s.hypothesis);
     const rest = base.filter((s) => !s.hypothesis);
-    return rest.concat(l.extraRows).concat(state.rec.status === 'paused' || l.closing ? [] : hyp);
+    return rest.concat(l.extraRows).concat(state.rec.status === 'paused' || l.closing || l.engineStopped ? [] : hyp);
   };
   const title = () => (L().newCall ? '1:1 with Anna K.' : D.call(state.rec.callId).title);
   const participants = () => (L().newCall ? ['p-anna', 'p-you'] : ['p-anna', 'p-pavel', 'p-dmitri', 'Speaker 3', 'p-you'].filter((p) => !(p === 'Speaker 3' && !D.segments.some((s) => s.speaker === 'Speaker 3'))));
@@ -69,10 +69,14 @@
   };
 
   const transcriptBanner = (compact) => {
-    const b = L().banner;
+    /* capture health first (PM-60, PM-67): a missing permission never blocks the start, it shows here */
+    const h = NP.captureHealth();
+    const b = L().banner || (h === 'engine-stopped' ? 'engine-stopped' : h === 'mic-only' ? 'sys-silent' : h === 'no-mic' ? 'mic-off' : null);
     if (!b) return '';
     const map = {
-      'audio-lost': { severity: 'error', text: 'System audio lost', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Privacy & Security › Screen & System Audio Recording' }] }] },
+      'sys-silent': { severity: 'error', text: 'System audio silent', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Privacy & Security › Screen & System Audio Recording' }] }] },
+      'mic-off': { severity: 'error', text: 'Microphone off', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Privacy & Security › Microphone' }] }] },
+      'engine-stopped': { severity: 'error', text: 'Not recording · engine stopped', actions: [{ label: 'Try Again', variant: 'primary', action: ['cw.engineRetry'] }] },
       stalled: { severity: 'error', text: 'Transcription stalled · restarting', actions: [] },
       disk: { severity: 'warning', text: '2 GB free on this Mac. Recording continues.', actions: [{ label: 'Delete Old Audio…', action: ['cw.deleteOldAudio'] }] },
       'second-source': { severity: 'warning', text: 'Slack is also playing audio', actions: [{ label: 'Exclude Slack', action: ['cw.bannerClose'] }, { label: 'Keep', action: ['cw.bannerClose'] }] },
@@ -99,7 +103,7 @@
     const single = l.copilot === 'single';
     const segs = segments();
     const paused = state.rec.status === 'paused';
-    const recStatus = l.closing ? 'stopped' : paused ? 'paused' : l.micOnly ? 'mic-only' : 'recording';
+    const recStatus = l.closing ? 'stopped' : NP.liveStatus();
     const langs = l.newCall ? ['EN'] : ['EN', 'RU', 'DE'];
     const header = region('CS-R1', { cls: 'cs-r1', tag: 'header', label: 'Call header' }, html`
       <div class="cs-r1__line">
@@ -134,7 +138,7 @@
         ${comp('copilot-card-stack', { variant: 'earlier-cards', state: l.earlierOpen ? 'expanded' : 'collapsed', cls: 'cs-earlier' }, html`${P.disclosure('Earlier cards (' + l.earlier.length + ')', l.earlierOpen, { action: ['cw.earlier'] })}
           ${l.earlierOpen ? html`<div class="cs-earlier__list">${l.earlier.map((c) => html`<div class="cs-earlier__row">${C.copilotCard(c, { variant: 'read-only', single })}${P.button('Pin', { size: 'small', action: ['cw.pinEarlier', { id: c.id }] })}</div>`)}</div>` : ''}`)}`)}
     </div>`;
-    return comp('cpt-noter-component-screen-call-screen', { cls: 'cs' + (off ? ' is-copilot-off' : ''), state: l.closing ? 'closing' : paused ? 'paused' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council' },
+    return comp('cpt-noter-component-screen-call-screen', { cls: 'cs' + (off ? ' is-copilot-off' : ''), state: l.closing ? 'closing' : l.engineStopped ? 'engine-stopped' : paused ? 'paused' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council' },
       html`${l.notice ? region('CS-R0', { cls: 'cs-r0' }, C.captureNotice({ variant: l.notice, layout: 'dedicated' })) : ''}
       <div class="cs-cols">${transcript}${right}</div>
       ${C.callStatusStrip({ variant: off ? 'copilot-off' : 'dedicated' })}`);
@@ -150,7 +154,7 @@
     const tail = !off && (h >= 680 || l.showTranscript);
     const paused = state.rec.status === 'paused';
     const header = region('FP-R1', { cls: 'fp-r1', tag: 'header', label: 'Panel header' }, html`
-      ${C.recordingIndicator({ variant: 'dot', status: paused ? 'paused' : l.micOnly ? 'mic-only' : 'recording', clock: false })}
+      ${C.recordingIndicator({ variant: 'dot', status: NP.liveStatus(), clock: false })}
       <span class="fp-title" title="${title()}">${title()}</span>
       <span class="np-tnum fp-clock">${NP.clock(false)}</span>
       ${shareGlyph()}
@@ -168,7 +172,7 @@
       ${C.copilotCardStack({ variant: single ? 'single-agent' : 'compact', cards: l.muted ? [] : l.cards, held: l.held.length, maxVisible: maxCards, showAll: l.showAllCards, single, muted: l.muted })}`);
     const tailRegion = tail ? region('FP-R5', { cls: 'fp-r5' }, l.playback ? C.playbackBar({ variant: 'live-headphones', at: l.playback.t, speaker: l.playback.speaker, key: 'cw' }) : C.transcriptView({ variant: 'tail', key: 'cw-tail', segments: segments(), tailLines: 3 })) : '';
     const offBody = off ? region('FP-R5', { cls: 'fp-r5 fp-r5--full' }, C.transcriptView({ variant: 'tail', key: 'cw-tail', segments: segments(), tailLines: 8 })) : '';
-    return comp('cpt-noter-component-screen-floating-panel', { cls: 'fp', state: paused ? 'paused' : l.notice ? 'notice' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council', attrs: { style: `height:${h}px` } },
+    return comp('cpt-noter-component-screen-floating-panel', { cls: 'fp', state: l.engineStopped ? 'engine-stopped' : paused ? 'paused' : l.notice ? 'notice' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council', attrs: { style: `height:${h}px` } },
       html`${header}${notice}${modeLine}${banners ? html`<div class="fp-r3" data-region="FP-R3">${banners}</div>` : ''}${cards}${tailRegion}${offBody}
       ${region('FP-R6', { cls: 'fp-r6', tag: 'footer' }, C.callStatusStrip({ variant: off ? 'copilot-off' : 'compact' }))}`);
   };
@@ -191,7 +195,7 @@
       <span class="cw-proto__lbl">Layout</span>
       ${btn('Call screen · display 2', lay === 'dedicated', 'cw.layout', { layout: 'dedicated' })}${btn('Floating panel', lay === 'floating', 'cw.layout', { layout: 'floating' })}${btn('Collapsed strip', lay === 'collapsed', 'cw.layout', { layout: 'collapsed' })}
       ${lay === 'floating' ? html`<span class="cw-proto__lbl">Panel height</span>${btn('360', l.fpHeight === 360, 'cw.fpHeight', { h: 360 })}${btn('560', l.fpHeight === 560, 'cw.fpHeight', { h: 560 })}${btn('720', l.fpHeight === 720, 'cw.fpHeight', { h: 720 })}` : ''}
-      <span class="cw-proto__lbl">Output</span>${btn('Headphones', l.route === 'headphones', 'cw.route', { route: 'headphones' })}${btn('Speakers', l.route === 'speakers', 'cw.route', { route: 'speakers' })}
+      <span class="cw-proto__lbl">Output</span>${btn('Headphones', l.route === 'headphones', 'cw.route', { route: 'headphones' })}${btn('Speakers', l.route === 'speakers', 'cw.route', { route: 'speakers' })}${btn('Not identified', l.route === 'unknown', 'cw.route', { route: 'unknown' })}
       <span class="cw-proto__lbl">Simulate</span>${btn('New card', false, 'cw.simCard')}${btn('Card keys ⌃⌥⌘1–3', false, 'cw.simKey')}${btn('Panel becomes key', l.panelKey, 'cw.panelKey')}
     </div>`;
   };
@@ -229,7 +233,9 @@
       { id: 'nothing-heard', label: 'Nothing heard yet' },
       { id: 'closing-manual', label: 'Closing after Stop Recording' },
       { id: 'closing-auto', label: 'Closing after automatic stop' },
-      { id: 'mic-only', label: 'System audio lost (mic only)' },
+      { id: 'mic-only', label: 'System audio silent (mic only)' },
+      { id: 'mic-off', label: 'Microphone off (others only)' },
+      { id: 'engine-stopped', label: 'Not recording · engine stopped' },
       { id: 'stalled', label: 'Transcription stalled' },
       { id: 'disk', label: 'Disk nearly full' },
       { id: 'second-source', label: 'Second audio source' },
@@ -240,6 +246,7 @@
       { id: 'detached', label: 'Scrolled up (Jump to Live)' },
       { id: 'replay', label: 'Replaying on headphones' },
       { id: 'speakers', label: 'Recording on speakers (replay off)' },
+      { id: 'unknown-route', label: 'Output not identified (replay off)' },
       { id: 'paused', label: 'Paused' },
       { id: 'presenting', label: 'Hidden for presenting' },
       { id: 'unplugged', label: 'Display unplugged → floating' },
@@ -265,7 +272,9 @@
         case 'nothing-heard': l.notice = 'nothing-heard'; l.waiting = true; l.cards = []; break;
         case 'closing-manual': l.closing = 'manual'; state.rec.status = 'closing'; break;
         case 'closing-auto': l.closing = 'auto'; state.rec.status = 'closing'; break;
-        case 'mic-only': l.micOnly = true; l.banner = 'audio-lost'; l.extraRows.push({ gap: true, t: '00:30:02', text: 'System audio lost 00:30:02–00:30:40' }); break;
+        case 'mic-only': l.micOnly = true; l.banner = 'sys-silent'; l.extraRows.push({ gap: true, t: '00:30:02', text: 'System audio silent 00:30:02–00:30:40' }); break;
+        case 'mic-off': l.noMic = true; l.banner = 'mic-off'; break;
+        case 'engine-stopped': l.engineStopped = true; l.banner = 'engine-stopped'; break;
         case 'stalled': l.banner = 'stalled'; break;
         case 'disk': l.banner = 'disk'; break;
         case 'second-source': l.banner = 'second-source'; break;
@@ -276,6 +285,7 @@
         case 'detached': l.detached = true; break;
         case 'replay': l.playback = { t: '00:19:58', speaker: 'p-anna' }; break;
         case 'speakers': l.route = 'speakers'; break;
+        case 'unknown-route': l.route = 'unknown'; break;
         case 'paused': state.rec.status = 'paused'; state.rec.pausedAt = Date.now(); break;
         case 'presenting': l.hidden = 'presenting'; break;
         case 'unplugged': state.rec.layout = 'floating'; NP.flash('cw-proto', 'Display 2 was unplugged: the same window switched to the floating layout. Cards, pins and the transcript position are kept.', 6000); break;
@@ -323,6 +333,7 @@
     'cw.fpHeight': (a) => { L().fpHeight = a.h; },
     'cw.route': (a) => { const l = L(); l.route = a.route; if (a.route === 'speakers' && l.playback) { l.playback.stopped = true; setTimeout(() => { L().playback = null; NP.render(); }, 3000); } },
     'cw.panelKey': () => { L().panelKey = !L().panelKey; },
+    'cw.engineRetry': () => { const l = L(); l.engineStopped = false; l.banner = null; pushRow({ gap: true, t: '00:31:40', text: 'Engine stopped 00:31:40–00:32:15' }); NP.flash('call-status', 'Recording again · same call', 2500); },
     'cw.simCard': () => {
       const l = L();
       const pool = clone(D.cwHeldCards).concat([{ id: 'k5', kind: 'Answer', agent: 'Architect', merged: ['QA lead'], age: 'now', text: 'VSTOR-9912 is open and unassigned; the replay buffer has no estimate yet.', prov: { kind: 'jira', label: 'Jira · looked up ' + new Date().toTimeString().slice(0, 5) } }]);

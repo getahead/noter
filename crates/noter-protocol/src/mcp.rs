@@ -1,9 +1,15 @@
-//! noter-mcp tools (`cpt-noter-interface-mcp-tools`) and the noter-mcp ↔ core
-//! socket protocol (`cpt-noter-interface-mcp-core-socket`).
+// @cpt-interface:cpt-noter-interface-mcp-tools:p1
+//! noter-mcp tools and the noter-mcp ↔ core socket protocol
+//! (`cpt-noter-interface-mcp-tools`).
 //!
-//! noter-mcp is a child of Claude Code or Codex. It speaks MCP over stdio to
-//! the CLI and JSON-RPC 2.0 over a Unix socket to the core; it never opens the
-//! database (the core is the only writer). Each tool's input and output schema
+//! noter-mcp runs only locally and is never exposed to the network (O2). It is a
+//! stdio child of Claude Code or Codex for one run, speaks MCP over stdio to the
+//! CLI and JSON-RPC 2.0 over the core's Unix socket with a per-run token; it never
+//! opens a TCP port and never opens the database (the core is the only writer).
+//! The core's socket handler is part of the egress gate: for a run on a cloud
+//! runtime, every tool result is redacted with the run's map and pseudonyms and
+//! gets an `audit_log` row (`kind = tool_result`, linked by `llm_run_id`) before
+//! it is returned. Each tool's input and output schema
 //! is exported from these types into `contracts/mcp-tools.schema.json` and
 //! served by noter-mcp in `tools/list`.
 
@@ -17,6 +23,12 @@ use crate::common::{
 use crate::skills::CardCandidate;
 
 /// Tool names exactly as the CLIs see them (`mcp__noter__<name>`).
+///
+/// Live MCP sources (the user's own MCP servers) are never put in a run's MCP config. Only in
+/// privacy mode "Cloud allowed" (owner decision D1), and only for post-call runs and Ask (never
+/// live ticks), noter-mcp also relays their tools as `live_<source>_<tool>`: it starts the
+/// server with its own transport and credentials and writes an `audit_log` row of kind `lookup`
+/// through the core before forwarding each call. noter-mcp itself still opens no network port.
 pub const TOOLS: &[(&str, bool)] = &[
     // (name, writes) — write tools only stage changes for the user.
     ("search_calls", false),
@@ -233,7 +245,8 @@ pub struct McpRunContext {
     /// The `llm_runs` row this session belongs to.
     pub llm_run_id: String,
     pub call_id: Option<CallId>,
-    /// Cloud runtimes never receive sensitive sources or sensitive calls.
+    /// Cloud runtimes never receive sensitive sources or sensitive calls, and every tool
+    /// result for them is redacted and audited before it is returned.
     pub cloud: bool,
 }
 

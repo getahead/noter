@@ -45,6 +45,12 @@ fn snake_json<T: serde::Serialize>(v: &T) -> String {
         .to_string()
 }
 
+/// A Constructor Studio scope marker line for the generated TypeScript (`@cpt-{kind}:{id}:p1`).
+/// Built here, not written out literally, so this generator does not count as implementing the ID.
+fn cpt_marker(kind: &str, id: &str) -> String {
+    format!("// @cpt-{kind}:{id}:p1\n")
+}
+
 fn ts_doc(doc: &str, indent: &str) -> String {
     let lines: Vec<&str> = doc
         .lines()
@@ -71,6 +77,7 @@ fn bindings_ts() -> String {
 
     let mut s = body;
     s.push_str("\n// ───────────────────────── contract surface ─────────────────────────\n\n");
+    s.push_str(&cpt_marker("interface", "cpt-noter-interface-ui-core-ipc"));
     s.push_str(&format!(
         "export const CONTRACT_VERSION = \"{CONTRACT_VERSION}\";\n\n"
     ));
@@ -134,6 +141,16 @@ fn bindings_ts() -> String {
         "export const ERROR_CODES: readonly ErrorCode[] = [{}];\n\n",
         codes.join(", ")
     ));
+    let retryable: Vec<String> = ErrorCode::ALL
+        .iter()
+        .filter(|c| c.default_retryable())
+        .map(|c| format!("\"{}\"", snake_json(c)))
+        .collect();
+    s.push_str("/** Codes for which **Try Again** makes sense by default (`ErrorCode::default_retryable`). */\n");
+    s.push_str(&format!(
+        "export const DEFAULT_RETRYABLE: readonly ErrorCode[] = [{}];\n\n",
+        retryable.join(", ")
+    ));
 
     // transport + client
     s.push_str(r#"/**
@@ -150,22 +167,103 @@ export function isCoreError(e: unknown): e is CoreError {
   return typeof e === "object" && e !== null && "code" in e && "retryable" in e;
 }
 
-function toCoreError(e: unknown): CoreError {
-  if (isCoreError(e)) return e;
-  return { code: "internal", message: e instanceof Error ? e.message : String(e), retryable: true, detail: null };
+/** Whether **Try Again** makes sense for this code by default. */
+export function isDefaultRetryable(code: ErrorCode): boolean {
+  return DEFAULT_RETRYABLE.includes(code);
 }
 
-/** Typed client. One method per command; every method resolves to a `Result`, never throws. */
+/**
+ * Every rejection becomes a `CoreError`. Tauri itself rejects with a plain string when the
+ * window's capability does not grant the command ("… not allowed …") and when it cannot
+ * read the command's arguments ("invalid args …"); those map to `window_not_allowed` and
+ * `invalid_input`. Anything else is `internal`.
+ */
+export function toCoreError(e: unknown): CoreError {
+  if (isCoreError(e)) return e;
+  const message = e instanceof Error ? e.message : String(e);
+  if (/not allowed/i.test(message)) return { code: "window_not_allowed", message, retryable: false, detail: null };
+  if (/invalid args|missing field|unknown variant|invalid type/i.test(message)) {
+    return { code: "invalid_input", message, retryable: false, detail: null };
+  }
+  return { code: "internal", message, retryable: true, detail: null };
+}
+
+type StreamMessage = { seq: number; event?: { type?: string } };
+
+/**
+ * Snapshot, then stream, made safe: Channel messages can reach the page before the `invoke`
+ * that returns the snapshot resolves. The gate buffers them until it does, then drops
+ * `seq <= last_seq` and delivers the rest in `seq` order; later duplicates are dropped too.
+ * It also acknowledges the stream (`stream_ack`) every 100 messages or after 1 s.
+ */
+function channelGate(transport: Transport, onMessage: (message: unknown) => void) {
+  let buffer: StreamMessage[] | null = [];
+  let lastSeq = 0;
+  let subscription: string | null = null;
+  let unacked = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+  const ack = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!subscription || !unacked) return;
+    unacked = 0;
+    transport.invoke("stream_ack", { subscription_id: subscription, seq: lastSeq }).catch(() => undefined);
+  };
+  const deliver = (m: StreamMessage) => {
+    if (closed || m.seq <= lastSeq) return;
+    lastSeq = m.seq;
+    onMessage(m);
+    if (m.event?.type === "ended") {
+      closed = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      return;
+    }
+    unacked++;
+    if (unacked >= 100) ack();
+    else if (!timer) timer = setTimeout(ack, 1000);
+  };
+  return {
+    push(message: unknown) {
+      const m = message as StreamMessage;
+      if (buffer) buffer.push(m);
+      else deliver(m);
+    },
+    open(result: unknown) {
+      const r = (result ?? {}) as { last_seq?: unknown; subscription_id?: unknown };
+      lastSeq = typeof r.last_seq === "number" ? r.last_seq : 0;
+      subscription = typeof r.subscription_id === "string" ? r.subscription_id : null;
+      const pending = buffer ?? [];
+      buffer = null;
+      pending.sort((a, b) => a.seq - b.seq).forEach(deliver);
+    },
+    close() {
+      buffer = null;
+      closed = true;
+    },
+  };
+}
+
+"#);
+    s.push_str(&cpt_marker(
+        "component",
+        "cpt-noter-component-app-core-bridge",
+    ));
+    s.push_str(r#"/** Typed client. One method per command; every method resolves to a `Result`, never throws. */
 export function createCore(transport: Transport) {
   async function call<K extends CommandName>(
     cmd: K,
     args: CommandArgs[K],
     onMessage?: (message: never) => void,
   ): Promise<Result<CommandResults[K]>> {
+    const gate = onMessage ? channelGate(transport, onMessage as (m: unknown) => void) : undefined;
     try {
-      const data = await transport.invoke(cmd, args, onMessage as ((m: unknown) => void) | undefined);
+      const data = await transport.invoke(cmd, args, gate?.push);
+      gate?.open(data);
       return { status: "ok", data: data as CommandResults[K] };
     } catch (e) {
+      gate?.close();
       return { status: "error", error: toCoreError(e) };
     }
   }
@@ -223,6 +321,7 @@ fn manifest() -> Value {
         "commands": commands,
         "events": events,
         "error_codes": ErrorCode::ALL,
+        "default_retryable": ErrorCode::ALL.iter().filter(|c| c.default_retryable()).collect::<Vec<_>>(),
         "mcp_tools": mcp::TOOLS.iter().map(|(n, w)| json!({"name": n, "writes": w})).collect::<Vec<_>>(),
     })
 }

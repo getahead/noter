@@ -5,14 +5,17 @@ name = "Noter"
 slug = "noter"
 kit = "sdlc"
 artifacts = [
-  { path = "docs/DESIGN.md", kind = "DESIGN", traceability = "DOCS-ONLY" },
-  { path = "docs/DESIGN-core.md", kind = "DESIGN", traceability = "DOCS-ONLY" },
-  { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "DOCS-ONLY" },
-  { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "DOCS-ONLY" },
-  { path = "docs/ADR/0003-harness-and-quality-gates.md", kind = "ADR", traceability = "DOCS-ONLY" },
+  { path = "docs/DESIGN.md", kind = "DESIGN", traceability = "FULL" },
+  { path = "docs/DESIGN-core.md", kind = "DESIGN", traceability = "FULL" },
+  { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "FULL" },
+  { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "FULL" },
+  { path = "docs/ADR/0003-harness-and-quality-gates.md", kind = "ADR", traceability = "FULL" },
 ]
-# Code checked by `cfs validate` for @cpt-* markers. Traceability becomes FULL
-# per FEATURE once FEATURE artifacts with to_code IDs exist (docs/HARNESS.md).
+# Traceability is FULL for every artifact (owner, 17 Oct 2026): `cfs validate` checks
+# that each @cpt-* marker in the code below names an ID these artifacts define.
+# DESIGN and ADR IDs have to_code = false, so markers are not required yet; FEATURE
+# IDs (to_code = true) will require them. `just trace` (scripts/harness/trace_gate.py)
+# reports how many design elements have a marker and fails if that ever goes down.
 codebase = [
   { name = "Rust crates", path = "crates", extensions = [".rs"] },
   { name = "Desktop UI", path = "apps/desktop/src", extensions = [".ts", ".tsx"] },

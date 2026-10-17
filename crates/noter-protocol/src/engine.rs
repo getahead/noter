@@ -1,3 +1,4 @@
+// @cpt-interface:cpt-noter-interface-engine-stdio:p1
 //! Core ↔ engine protocol (`cpt-noter-interface-engine-stdio`).
 //!
 //! JSON Lines over the engine's stdin/stdout, one message per line, UTF-8.
@@ -14,6 +15,15 @@
 //!   files referenced by path inside the session or scratch directory.
 //! * Every command has an `id`; the engine answers with `ack` or `error`
 //!   carrying the same id, then emits events.
+//! * Every path in this protocol is relative to the App Group container
+//!   `<TEAMID>.ai.noter` that the app and the sandboxed engine share
+//!   (`audio/`, `models/`, `engine-io/` and the capture ring).
+//! * The engine keeps the capture ring in a memory-mapped file in that container.
+//!   After an engine crash the supervisor restarts it in capture-first mode (taps
+//!   before models load) and sends `start_session` with `resume_from_ms`; the
+//!   expected gap is at most 2 s and counts as a dropout.
+//! * The engine also plays replay audio (D6): it owns the files and is excluded
+//!   from the tap; the tap also excludes the app's own process.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -21,7 +31,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::{AudioChannel, CallId, Lang, OffsetMs, TimestampMs};
 
 /// Engine protocol version; `ready` reports it and the core refuses a mismatch of the major.
-pub const ENGINE_PROTOCOL_VERSION: &str = "1.0";
+pub const ENGINE_PROTOCOL_VERSION: &str = "2.0";
 
 /// A line from the core to the engine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -37,14 +47,6 @@ pub struct EngineEventLine {
     pub seq: u64,
     pub at: TimestampMs,
     pub event: EngineEvent,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum EngineOutputMode {
-    Headphones,
-    /// Speakers with LocalVQE echo cancellation, system tap as far-end reference.
-    SpeakersWithEchoCancellation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -75,12 +77,12 @@ pub struct SpeakerPrior {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StartSession {
     pub call_id: CallId,
-    /// `audio/<call_id>/` inside the sandbox container path the core handed over.
+    /// `audio/<call_id>/`, relative to the App Group container.
     pub session_dir: String,
     /// `false` = "Never store audio": nothing is written, ASR still runs.
     pub store_audio: bool,
     pub mic_device_uid: Option<String>,
-    pub output_mode: EngineOutputMode,
+    /// Processes left out of the system tap, besides the engine and the app themselves.
     pub exclude_bundle_ids: Vec<String>,
     pub languages: Vec<Lang>,
     pub backend: AsrBackend,
@@ -88,7 +90,7 @@ pub struct StartSession {
     pub speaker_priors: Vec<SpeakerPrior>,
     /// Up to four enrolled attendees switch live diarization to Sortformer.
     pub enrolled_embeddings_path: Option<String>,
-    /// Resume from the ring buffer after an engine restart in the same call.
+    /// Resume from the capture ring's write position after an engine restart in the same call.
     pub resume_from_ms: Option<OffsetMs>,
 }
 
@@ -260,9 +262,13 @@ pub enum EngineEvent {
         gap_from_ms: OffsetMs,
         gap_to_ms: OffsetMs,
     },
-    PermissionLost {
+    /// System audio has been exact digital zeros since `since_ms`. The System Audio Recording
+    /// permission cannot be queried, so this is the inference: `confidence` 0..1 that access is off
+    /// rather than a silent call.
+    SystemAudioSilent {
         call_id: CallId,
-        channel: AudioChannel,
+        since_ms: OffsetMs,
+        confidence: f32,
     },
     Segment {
         segment: EngineSegment,
@@ -325,6 +331,7 @@ pub enum EngineEvent {
         channel: AudioChannel,
         text: String,
     },
+    /// The self-test passes only with non-zero buffers on both channels.
     SelfTestResult {
         passed: bool,
         failure: Option<EngineErrorCode>,

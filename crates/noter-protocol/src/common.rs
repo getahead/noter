@@ -61,7 +61,6 @@ id_type!(SignInSessionId, "sis");
 id_type!(ContextItemId, "ctx");
 id_type!(GlossaryTermId, "gls");
 id_type!(TickId, "tick");
-id_type!(RedoToken, "redo");
 id_type!(
     /// macOS display identity (CGDirectDisplay UUID), stable across reconnects.
     DisplayId,
@@ -163,6 +162,28 @@ pub struct LocalDate(pub String);
 #[serde(transparent)]
 pub struct Seq(#[specta(type = specta_typescript::Number)] pub u64);
 
+/// Version of a whole-state payload (`capture:state`, `degraded:changed`, …).
+/// Monotonic per payload kind for the life of the core process; the same
+/// counter stamps the matching command results and `app_snapshot` slices, so
+/// the UI keeps the payload with the highest version and drops a late older one.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    Type,
+    JsonSchema,
+)]
+#[serde(transparent)]
+pub struct StateVersion(#[specta(type = specta_typescript::Number)] pub u64);
+
 /// Row version for optimistic concurrency. Every editable record carries it;
 /// every edit command sends the `rev` it was based on and gets
 /// `ErrorCode::Conflict` when the record changed since (UI: "Item changed since").
@@ -188,13 +209,22 @@ pub struct Rev(pub u32);
 #[serde(transparent)]
 pub struct Cursor(pub String);
 
-/// Content language. Detection is restricted to these three (PRD › Transcription pipeline).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type, JsonSchema)]
+/// Content language. Detection is restricted to English, Russian and German
+/// (PRD › Transcription pipeline); any other language is `other` with its code.
+/// On the wire the three are plain strings (`"en"`) and `other` is an object
+/// (`{"code": "fr"}`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Lang {
     En,
     Ru,
     De,
+    /// A language outside the three, set by hand on a call or a glossary term.
+    /// `code` is the ISO 639-1 code, lower case (`"fr"`).
+    #[serde(untagged)]
+    Other {
+        code: String,
+    },
 }
 
 /// The two capture channels, kept separate end to end.
@@ -213,6 +243,7 @@ pub enum AudioChannel {
 pub struct TimeSpan {
     pub call_id: CallId,
     /// `null` means both channels.
+    #[serde(default)]
     pub channel: Option<AudioChannel>,
     pub t0_ms: OffsetMs,
     pub t1_ms: OffsetMs,
@@ -341,6 +372,7 @@ pub enum PersonRef {
     },
     New {
         display_name: String,
+        #[serde(default)]
         email: Option<String>,
     },
 }

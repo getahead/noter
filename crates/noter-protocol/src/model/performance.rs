@@ -54,6 +54,7 @@ pub struct Bottleneck {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct PerfOverviewArgs {
     pub period: PerfPeriod,
+    #[serde(default)]
     pub call_type: Option<CallTypeId>,
 }
 
@@ -76,6 +77,8 @@ pub struct StageTiming {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct TickTiming {
     pub tick_id: TickId,
+    /// The LLM run of this tick, when one ran.
+    pub llm_run_id: Option<LlmRunId>,
     pub at_ms: OffsetMs,
     pub trigger: String,
     pub stages: Vec<StageTiming>,
@@ -87,6 +90,10 @@ pub struct TickTiming {
 pub struct CallPerf {
     pub call: CallRef,
     pub ticks: Vec<TickTiming>,
+    /// Total length of dropouts (gaps with reason `interrupted`, `engine_restart`,
+    /// `device_changed` or `stalled` longer than 2 s).
+    pub dropout_ms: DurationMs,
+    /// Cost of runs on API keys only; runs on the user's own account are not priced.
     pub cost_usd: f32,
     pub tokens_in: u32,
     pub tokens_out: u32,
@@ -102,6 +109,7 @@ pub enum BriefAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct BriefArgs {
     pub period: PerfPeriod,
+    #[serde(default)]
     pub call_type: Option<CallTypeId>,
     pub action: BriefAction,
 }

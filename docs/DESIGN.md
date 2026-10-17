@@ -2,10 +2,13 @@
 title: "Technical Design — Noter UI"
 description: "Layouts, reusable components, user paths and UX decisions for every surface of the Noter macOS app, designed from the PRD."
 status: ACCEPTED
-version: "1.0"
+version: "1.1"
 date: "2026-10-17"
 prd: docs/PRD.md
 note: "The PRD is not yet a registered kit artifact, so this design traces to PRD sections by name and uses no PRD IDs."
+history:
+  - "1.0 (17 Oct 2026): accepted; the clickable prototype is the UI prototype of record (PM-59)."
+  - "1.1 (17 Oct 2026): owner decisions of the backend design review, docs/REVIEW-2026-10-17-design-core.md (PM-60 to PM-68): Record is never gated on setup or permissions, Microphone off, System audio silent and Not recording · engine stopped states, Today ranking default, agents switch themselves off at 80 % dismissed, behaviour metrics counted from when they are switched on, post-call analysis during a back-to-back call, headphones marked per output device, retention applied at the next nightly run, live MCP lookups only in Cloud allowed; the test approach and traceability follow the quality-gate harness of ADR-0003."
 ---
 
 # Technical Design — Noter UI
@@ -68,7 +71,7 @@ The UI is a thin, honest view of the core. The core owns every record, and each 
 
 Requirements that significantly influence architecture decisions.
 
-**ADRs**: Not applicable because Noter has no ADR documents yet; architecture decisions are recorded in PRD › Decision log, and UI decisions in section 4.1 of this document.
+**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth` and `cpt-noter-adr-0002-ipc-conventions` (the contract the core bridge and the generated types follow), `cpt-noter-adr-0003-harness-and-quality-gates` (how the UI is tested and gated). Other architecture decisions are recorded in PRD › Decision log, and UI decisions in section 4.1 of this document.
 
 The PRD has no requirement IDs, so the first column of each table names the PRD section and item instead.
 
@@ -76,7 +79,7 @@ The PRD has no requirement IDs, so the first column of each table names the PRD 
 
 | Requirement | Design Response |
 |-------------|------------------|
-| PRD › Feature specification › 1. Capture | Capture starts with **Record** alone, or with ⌃⌥⌘R, the menu bar or Today, and **Finish Setup…** takes its place while audio access is missing (PM-30); informing the participants is the user's own responsibility, outside the app (PM-56); **Record as Sensitive** for calls that are not in the calendar (PM-41); capture notices for call end, silence and a new meeting that starts during capture (PM-39); **Continue Recording** for 5 minutes after any stop (PM-43); recording state on every call surface. `cpt-noter-component-screen-record-prompt`, `cpt-noter-component-ui-record-prompt`, `cpt-noter-component-ui-capture-notice`, `cpt-noter-component-ui-recording-indicator`, `cpt-noter-component-ui-call-status-strip` |
+| PRD › Feature specification › 1. Capture | Capture starts with **Record** alone, or with ⌃⌥⌘R, the menu bar or Today, and no start control waits for setup or permissions: only a disk below 500 MB or a missing speech model keeps **Record** dimmed (PM-30, PM-60); informing the participants is the user's own responsibility, outside the app (PM-56); **Record as Sensitive** for calls that are not in the calendar (PM-41); capture notices for call end, silence and a new meeting that starts during capture (PM-39); **Continue Recording** for 5 minutes after any stop (PM-43); recording state on every call surface. `cpt-noter-component-screen-record-prompt`, `cpt-noter-component-ui-record-prompt`, `cpt-noter-component-ui-capture-notice`, `cpt-noter-component-ui-recording-indicator`, `cpt-noter-component-ui-call-status-strip` |
 | PRD › Feature specification › 2. Live transcript | A virtualised transcript with confirmed and hypothesis rows; speaker, time and language on every segment, with **Guest (your side)** for another voice on the user's microphone and both candidate speakers on a crosstalk row; rename and term fix in place, with the original wording of a corrected term in its help tag; replay after the call, and during it only on headphones. `cpt-noter-component-ui-transcript-view`, `cpt-noter-component-ui-transcript-segment-row`, `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-language-tag`, `cpt-noter-component-ui-term-fix-popover`, `cpt-noter-component-ui-playback-bar` |
 | PRD › Feature specification › 3. Live copilot, and PRD › Live copilot | A stack of at most three numbered cards with provenance and agent badges; global card keys; **Catch Me Up** and **Ask About This Call…**; carry-forward cards that ask whether a handoff landed or let the owner object to an evidence closure; a listening state and copilot banners. `cpt-noter-component-screen-call-screen`, `cpt-noter-component-screen-floating-panel`, `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-ui-copilot-card`, `cpt-noter-component-ui-agent-badge`, `cpt-noter-component-ui-provenance-chip`, `cpt-noter-component-ui-context-chip` |
 | PRD › Feature specification › 4. Post-call outputs | A Call page with sections in PRD order, a review step for suggested items, edits kept on regeneration with a diff, speaker naming and one-action sharing. `cpt-noter-component-screen-call-page`, `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-output-item-row`, `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-ui-share-menu`, `cpt-noter-component-ui-version-switcher`, `cpt-noter-component-ui-diff-view` |
@@ -88,7 +91,7 @@ The PRD has no requirement IDs, so the first column of each table names the PRD 
 | PRD › Feature specification › 10. Self-maintenance | Proposals on Today and in Activity; jobs in Settings › Maintenance; items closed by evidence with **Reopen**; a keyword-only notice during index rebuilds. `cpt-noter-component-screen-activity`, `cpt-noter-component-ui-proposal-row`, `cpt-noter-component-ui-status-row`, `cpt-noter-component-ui-inline-banner` |
 | PRD › Feature specification › 11. History and change log | History in the Call page, with **Export Log…** for that call, in the Person page and in the Item inspector; the Activity day log with batches and **Export Log…** for a period; an undo strip with **Redo**. `cpt-noter-component-ui-history-timeline`, `cpt-noter-component-ui-change-row`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-ui-item-inspector` |
 | PRD › Feature specification › 12. Performance and continuous improvement | Target tiles and stage budgets taken from the PRD (PM-52), a stage timeline, a bottleneck list, a per-call drill-down and the improvement brief, which opens in Claude Code or Codex. `cpt-noter-component-screen-performance`, `cpt-noter-component-ui-metric-tile`, `cpt-noter-component-ui-stage-timeline`, `cpt-noter-component-ui-bottleneck-row` |
-| PRD › Feature specification › 13. Today dashboard | Call cards in calendar order with ranked items, ticks with **Undo**, a review line for suggested items, proposals waiting, and Calendar access on request. `cpt-noter-component-screen-today`, `cpt-noter-component-ui-upcoming-call-card`, `cpt-noter-component-ui-action-item-row` |
+| PRD › Feature specification › 13. Today dashboard | Call cards in calendar order with ranked items (owed to people on today's calls first, then due date, then age, PM-63), ticks with **Undo**, a review line for suggested items, proposals waiting, and Calendar access on request. `cpt-noter-component-screen-today`, `cpt-noter-component-ui-upcoming-call-card`, `cpt-noter-component-ui-action-item-row` |
 | PRD › Feature specification › 14. Settings | A separate Settings window with 11 panes, including Privacy, Repositories, Knowledge Sources, Maintenance and Hotkeys; **Models & Runtimes** holds the API keys and, separately, **Your Claude account** and **Your ChatGPT account** with a full sign-in sheet (PM-58). `cpt-noter-component-screen-settings`, `cpt-noter-component-ui-credential-row`, `cpt-noter-component-ui-hotkey-recorder`, `cpt-noter-component-ui-display-picker` |
 | PRD › Live copilot › Surfaces | One call window with dedicated and floating layouts, opened at capture start while **Open the call screen automatically** is on; the share warning in both layouts (D50, PM-49); the menu bar extra; the first-run wizard; screen-context chips (v1.x) only where they shape the v1 layout. `cpt-noter-component-shell-call-window`, `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-ui-status-item`, `cpt-noter-component-screen-first-run`, `cpt-noter-component-ui-context-chip` |
 | PRD › Live copilot loop › Degraded states | Every row has a named place and named words: capture notices, transcript and copilot banners, menu bar info lines, and a notification when no Noter surface is visible. `cpt-noter-component-ui-inline-banner`, `cpt-noter-component-ui-capture-notice`, `cpt-noter-component-ui-status-item`, `cpt-noter-component-screen-notifications` |
@@ -102,7 +105,7 @@ This table maps non-functional requirements from PRD to specific design/architec
 |--------|-------------|--------------|-----------------|----------------------|
 | PRD › Live copilot › Latency budget | A card appears within 5–6 s at p50 (the median) and 8–10 s at p95 (the time 95 % of cards stay within) after the triggering utterance; a late card is dropped | `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-app-core-bridge` | The stack renders a card as soon as the stream delivers it and shows its first line before the source line (partial display); the UI never batches cards or adds a delay | Each card reports the time it was actually shown; the Performance stage timeline compares each stage with its budget in the table of where the time goes in PRD › Live copilot loop |
 | PRD › Success metrics › Live | Hypothesis text lags speech by at most 2 s and confirmed text by at most 4 s | `cpt-noter-component-ui-transcript-view`, `cpt-noter-component-app-window-store` | The transcript stream is buffered and drawn every 100 ms in a virtualised list with follow-output and **Jump to Live** (REVIEW › F6) | Engine timestamps against shown times; a 90-minute recorded stream replayed into the UI |
-| PRD › Live copilot › Surfaces › Menu bar | Every quick action takes effect within a second and never opens a dialog after setup | `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-ui-status-item` | The native menu calls the same core commands as the hotkeys; no menu item opens a window except **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Finish Setup…** and **Settings…** | End-to-end test of each menu item and hotkey |
+| PRD › Live copilot › Surfaces › Menu bar | Every quick action takes effect within a second and never opens a dialog after setup | `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-ui-status-item` | The native menu calls the same core commands as the hotkeys; no menu item opens a window except **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Finish Setup…** (a link to the first-run window, never in place of **Start Recording**) and **Settings…** | A core test of each menu item and hotkey action (DESIGN-core 4.4); the menu bar and the hotkeys themselves on the macOS checklist in `docs/HARNESS.md` |
 | PRD › Success metrics › Post-call | Outputs are ready within 2 minutes on the cloud path and 10 minutes on the local path | `cpt-noter-component-screen-call-page`, `cpt-noter-component-ui-output-section` | Sections appear one by one as each is validated, with progress text; the transcript is readable at once | Local app telemetry (PRD) |
 | PRD › Success metrics › Footprint | Extra memory during a call stays within 4 GB without a local LLM and 8 GB with it | `cpt-noter-component-ui-transcript-view`, `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-app-window-store` | Virtualised lists, at most three live cards, a collapsed list of earlier cards, and no media in the WebView | Activity Monitor during a 90-minute call (PRD) |
 | PRD › Success metrics › Privacy | No audio bytes leave the Mac; no cloud request goes without a log entry | `cpt-noter-constraint-local-only-ui`, `cpt-noter-component-app-core-bridge` | The WebView loads no remote content and makes no network requests; untrusted text renders as text only (PM-08) | The CI network-monitor test (PRD) covers the app process with the UI running |
@@ -184,9 +187,9 @@ The diagram shows the UI in its context. Each WebView window has its own store, 
 
 ### 2.1 Design Principles
 
-The principles are listed in priority order: when two conflict, the one listed first wins. Each names its source; no ADRs exist, so the **Source** line takes the place of the template's ADR references.
+The principles are listed in priority order: when two conflict, the one listed first wins. Each names its source; no ADR decides a UI principle, so the **Source** line takes the place of the template's ADR references.
 
-**ADRs**: Not applicable because no ADR documents exist for Noter; each principle names its PRD source instead.
+**ADRs**: Not applicable because no ADR decides a UI principle; each principle names its PRD source instead.
 
 #### Privacy and recording state stay visible
 
@@ -272,7 +275,7 @@ Noter follows the macOS 27 design language and the HIG: the system font; an edge
 
 Each constraint names its type and source. Legacy integration constraints are not applicable because Noter is a new product: the UI replaces no existing system and reads no legacy data format.
 
-**ADRs**: Not applicable because no ADR documents exist for Noter; each constraint names its PRD source instead.
+**ADRs**: Not applicable because no ADR sets a UI constraint; each constraint names its PRD source instead.
 
 #### macOS 14.4 or later on Apple Silicon
 
@@ -326,17 +329,17 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 - [ ] `p1` - **ID**: `cpt-noter-constraint-no-dialog-after-setup`
 
-**Type**: Product. Quick actions in the menu bar and on call surfaces take effect within a second and never open a dialog after first run. Permission prompts appear only in the first-run wizard or after a button the user pressed for that purpose. While audio access is missing, every start control reads **Finish Setup…** and opens the first-run wizard at the permissions step (PM-30).
+**Type**: Product. Quick actions in the menu bar and on call surfaces take effect within a second and never open a dialog after first run. Permission prompts appear only in the first-run wizard, after a button the user pressed for that purpose, or, when macOS has never asked, at the first capture, which macOS itself triggers. No start control ever reads **Finish Setup…**: **Record** and **Start Recording** start capture whatever the setup state, and a missing permission shows as a degraded state during capture (PM-30, PM-60).
 
-**Source**: PRD › Live copilot › Surfaces › Menu bar and First run; PM-30.
+**Source**: PRD › Live copilot › Surfaces › Menu bar and First run; PM-30, PM-60.
 
 #### Behaviour metrics off by default
 
 - [ ] `p2` - **ID**: `cpt-noter-constraint-behaviour-metrics-off`
 
-**Type**: Product. Talk-time share and "who was silent" are behaviour data about colleagues. Their rows do not exist anywhere in the UI unless the user switches them on in Settings › Privacy.
+**Type**: Product. Talk-time share and "who was silent" are behaviour data about colleagues. Their rows do not exist anywhere in the UI unless the user switches them on in Settings › Privacy, and they count only calls recorded from that moment; earlier calls are never computed back (PM-65).
 
-**Source**: PRD › Feature specification › 5. Library and search; REVIEW › P4; D47.
+**Source**: PRD › Feature specification › 5. Library and search; REVIEW › P4; D47, PM-65.
 
 #### Local-only UI
 
@@ -374,7 +377,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 - [ ] `p1` - **ID**: `cpt-noter-constraint-copilot-flag`
 
-**Type**: Scope. The copilot and the council ship behind a flag until the latency budget holds, and the review proposes a single-agent copilot as a scope cut. Every call surface therefore has a layout without the council column and a single-agent variant (PM-01, D9).
+**Type**: Scope. Full v1 is kept (owner decision, 17 Oct); the copilot ships behind a flag until the M4 latency gate. Every call surface therefore has a layout without the council column, and a single-agent variant for a council of one (PM-01, D9, PM-67).
 
 **Source**: PRD › Risks, assumptions and open decisions; PRD › Roadmap and milestones; REVIEW › Decisions left to the owner.
 
@@ -511,14 +514,14 @@ flowchart LR
     mb -->|"Open Last Summary"| pc
     mb -->|"Open Noter"| td
     mb -->|"Settings…"| st
-    mb -->|"Finish Setup…"| fr
+    mb -->|"Finish Setup… link"| fr
     cs -->|"display unplugged"| fp
     fp -->|"display connected"| cs
     cs -->|"Stop Recording, outputs written"| ntf
     fp -->|"Stop Recording, outputs written"| ntf
     ntf -->|"click"| pc
     td -->|"Open Call Screen"| cs
-    td -->|"Finish Setup…"| fr
+    td -->|"Finish Setup… link"| fr
     td -->|"evidence or Last time"| pc
     td -->|"person chip"| pe
     td -->|"item info"| ii
@@ -782,7 +785,7 @@ The app menu is native and belongs to the main window and the Settings window wh
 - **File**: **New Question** ⌘N, **Export…** ⌘E, **Delete…** ⌘⌫.
 - **Edit**: **Undo** and **Redo** (the last change-log action when no text field has focus), **Cut**, **Copy**, **Paste**, **Copy for Slack** ⌘⇧C, **Copy for Jira** ⌥⌘C, **Copy as Markdown** ⌥⇧⌘C, **Accept Item**, **Accept All Suggestions**, **Reject Item**, **Find** ⌘F.
 - **View**: **Hide Sidebar** or **Show Sidebar** ⌃⌘S, **Show Inspector** ⌥⌘I, **Today** ⌘1 to **Performance** ⌘8, **Actual Size** ⌘0, **Zoom In** ⌘+, **Zoom Out** ⌘−.
-- **Call**: **Start Recording** or **Stop Recording** ⌃⌥⌘R, **Pause** or **Resume** ⌃⌥⌘P, **Mark Moment** ⌃⌥⌘M, **Catch Me Up** ⌃⌥⌘C, **Ask About This Call…** ⌃⌥⌘A, **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel**, **Mute Copilot ▸**, **Hide for Presenting** ⌃⌥⌘0. These items call the same core commands as the hotkeys. While microphone or system-audio access was never granted, **Start Recording** reads **Finish Setup…** and opens the first-run window at its permissions step (PM-30).
+- **Call**: **Start Recording** or **Stop Recording** ⌃⌥⌘R, **Pause** or **Resume** ⌃⌥⌘P, **Mark Moment** ⌃⌥⌘M, **Catch Me Up** ⌃⌥⌘C, **Ask About This Call…** ⌃⌥⌘A, **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel**, **Mute Copilot ▸**, **Hide for Presenting** ⌃⌥⌘0. These items call the same core commands as the hotkeys. **Start Recording** always starts capture, whatever the setup state (PM-60).
 - **Window** and **Help**: the standard macOS menus.
 
 **Size behaviour**
@@ -827,7 +830,7 @@ The app menu is native and belongs to the main window and the Settings window wh
 
 | State | Region | What the user sees | Source | Story |
 | --- | --- | --- | --- | --- |
-| App-level banner | MW-R5 | One banner, for example **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…**; others wait behind **+2 More** | UX B.0; D35, D64 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
+| App-level banner | MW-R5 | One banner, for example **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** · **Finish Setup…**; others wait behind **+2 More** | UX B.0; D35, D64 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
 | Calendar access denied | MW-R5 on Today | **Calendar access is off** · **Open System Settings…** | PM-18 | `cpt-noter-seq-today-review-before-call` (Error — Calendar access denied) |
 | Keyword-only search | MW-R5; on Search results and Ask the line moves into the page's info line so it shows once | **Searching by keyword only while the index rebuilds · 64 %** with a progress bar | PRD › Feature specification › 10 | `cpt-noter-seq-library-search-calls` (Error — Index rebuilding) |
 | Switched to local | MW-R2 footer | **Switched to local** with the mode glyph | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-call-screen-read-copilot-state` (Error — Switched to local) |
@@ -838,7 +841,7 @@ The app menu is native and belongs to the main window and the Settings window wh
 | Call page loaded in the background | MW-R3 | After a stop the call's page loads without taking focus | D81 | `cpt-noter-seq-call-screen-stop-at-call-end` (Happy path) |
 | Hidden for presenting | Whole window | The window is hidden; any show action restores it exactly as it was | D84 | `cpt-noter-seq-call-screen-hide-for-presenting` (Happy path) |
 | Update ready | MW-R5 | **Version 1.2 installs on next launch** · **Restart Now** | PRD › Feature specification › 10 | `cpt-noter-seq-settings-check-privacy` (Other — Install an update) |
-| Reopened after Noter quit during a recording | MW-R3 on Today, MW-R5 | The main window opens on Today with **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** · **Open Call** · **Resume Recording** | PM-46 | `cpt-noter-seq-today-review-before-call` (Error — Noter quit during a recording) |
+| Reopened after Noter quit during a recording | MW-R3 on Today, MW-R5 | The main window opens on Today with **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** · **Open Call** · **Resume Recording** and a close × | PM-46 | `cpt-noter-seq-today-review-before-call` (Error — Noter quit during a recording) |
 | Window reloaded | MW-R3 | The same page, with skeleton rows after 300 ms until the snapshot arrives | DESIGN 3.3, Reload and replay | Transient; no path |
 
 #### Shell — Call window
@@ -855,7 +858,7 @@ The call screen and the floating panel are one Tauri window converted to a non-a
 - Switches the layout when a display connects or is unplugged and keeps cards, held cards, pins, marks and the transcript position (D1).
 - Holds the notice slot at the top of the window, CS-R0 in the dedicated layout and FP-R0 in the floating one, for decisions about the recording, including a new meeting that starts while recording (D77, PM-39).
 - Holds the banner slots CS-R3 and CS-R4d, and FP-R3 in the floating layout, for informational and degraded states.
-- Lets keys reach the call: panel-local keys only while the panel is key, global hotkeys and card keys at all times (D53, D70).
+- Lets keys reach the call: panel-local keys only while the panel is key, global hotkeys at all times, and card keys while capture runs with the copilot on, not muted and Noter not hidden (D53, D70, PM-67).
 - Shows a closing state for 10 s after any stop, with **Continue Recording** for 5 minutes, then closes (D80, PM-43).
 - Hides with every other Noter surface for presenting, and comes back exactly as it was after hiding or after a crash of its window (D84, PM-46).
 
@@ -951,7 +954,7 @@ Closing state after a manual and after an automatic stop:
 | Element | Component | References |
 | --- | --- | --- |
 | **The call seems to have ended** with **Keep Recording** (default button) and **Stop Now** | `cpt-noter-component-ui-capture-notice`, call-ended variant | **Keep Recording** dismisses it until the next 20 s without call audio, and not again after a second keep; **Stop Now** stops and shows the closing state; hover or focus pauses the countdown and shows **Paused while you're here** (PM-16, D80) |
-| **A new meeting may have started: 1:1 with Anna K.**, the line **Microsoft Teams joined a new meeting at 14:30.**, **Start as New Call** (default button) and **Keep in This Call** | `cpt-noter-component-ui-capture-notice`, new-meeting variant | Shown while recording when the next calendar event starts or the meeting app's meeting changes; **Start as New Call** saves this call and starts the next one with its own title, attendees and outputs; **Keep in This Call** keeps one recording; while the window is hidden the notice shows at the record prompt's position (PM-39) |
+| **A new meeting may have started: 1:1 with Anna K.**, the line **Microsoft Teams joined a new meeting at 14:30.**, **Start as New Call** (default button) and **Keep in This Call** | `cpt-noter-component-ui-capture-notice`, new-meeting variant | Shown while recording when the next calendar event starts or the meeting app's meeting changes; **Start as New Call** saves this call and starts the next one with its own title, attendees and outputs; **Keep in This Call** keeps one recording; unanswered for 60 s, **Start as New Call** applies; while the window is hidden the notice shows at the record prompt's position, and while Noter is hidden for presenting it is a menu bar line instead (PM-39, PM-67) |
 | **Nothing heard yet** with two level meters (**You**, **Others**), **Discard Recording** and **Keep Recording** | `cpt-noter-component-ui-capture-notice`, nothing-heard variant | **Discard Recording** opens the inline second step **Discard this recording? This can't be undone.** · **Discard** · **Back** (D38); **Keep Recording** closes the notice (PM-59) |
 | Countdown bar | `cpt-noter-component-ui-capture-notice` | Drains over 10 s; absent under Reduce motion, where only the seconds text changes |
 | **Continue Recording** | Push button in both closing states | Works for 5 minutes after any stop, manual or automatic, also from the menu bar; appends to the same call with a gap row **Stopped 11:02–11:04** (PM-43) |
@@ -997,7 +1000,7 @@ Closing state after a manual and after an automatic stop:
 | ⌃⌥⌘P | Pause or resume | Global |
 | ⌃⌥⌘M, ⌃⌥⌘C, ⌃⌥⌘A | Mark a moment, catch up, ask about this call (opens the ask field and makes the panel key) | Global |
 | ⌃⌥⌘N | Show the call window without making it key; press again to use its keys, with focus on the notice when one shows (PM-40) | Global |
-| ⌃⌥⌘K | Mute the copilot for 10 minutes | Global |
+| ⌃⌥⌘K | Mute the copilot for 10 minutes; pressed again while muted, unmutes | Global |
 | ⌃⌥⌘0 | Hide for presenting, and show Noter again | Global |
 | ⌃⌥⌘1 to ⌃⌥⌘3, ⌃⌥⌘Z | Pin card 1, 2 or 3, and undo the last card action within 30 s; registered only while capture runs, the copilot is on and not muted, and Noter is not hidden | Global |
 | ⌃⌥⌘⇧1 to ⌃⌥⌘⇧3 | Dismiss card 1, 2 or 3; registered only while Settings › Hotkeys › **Dismiss with keys** is on, which is off by default, and under the same conditions as the pin keys | Global |
@@ -1030,6 +1033,7 @@ Closing state after a manual and after an automatic stop:
 | Notice while collapsed | Collapsed strip | The strip expands for the notice and collapses after the choice | D83 | `cpt-noter-seq-floating-panel-collapse-strip` (Error — Capture notice while collapsed) |
 | Hidden by the user | Whole window | Hidden to the menu bar; capture continues; a call-ended or new-meeting notice shows at the record prompt's position | D80, PM-39 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Happy path), `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Call window hidden) |
 | Hidden for presenting | Whole window | Hidden with every Noter surface; no countdown at call end; any show action restores it | D84 | `cpt-noter-seq-call-screen-hide-for-presenting` (Happy path), `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Hidden for presenting) |
+| Not recording · engine stopped | CS-R3, FP-R3; CS-R5 | Error banner **Not recording · engine stopped** · **Try Again** when the audio engine could not be restarted; the indicator reads **Not recording**; **Try Again** continues the same call with a gap row; NT-3 is sent when the window is hidden | PM-67 | `cpt-noter-seq-call-screen-recover-capture` (Error — Engine stopped) |
 | Reopened after a UI crash | Whole window | The window disappears while the menu bar icon keeps its recording form; ⌃⌥⌘N brings it back with the same transcript, cards, pins and marks; capture never stopped | PM-46; `cpt-noter-principle-core-owns-state` | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Panel closed by a crash) |
 
 #### App layer — Core bridge
@@ -1169,7 +1173,7 @@ Each WebView window renders from an in-memory copy of the records the core sent,
 
 ##### Why this component exists
 
-The first-run wizard gets the Mac ready before the first real call, so that no permission prompt ever appears during a meeting (PRD › Live copilot › Surfaces › First run). It runs in six steps: Welcome, Models, Permissions with the audio self-test, Call display, Audio storage, and Assistants (D64, D65, D66). Call detection stays off until the self-test passes, while a manual start already works once both audio permissions are granted (PM-30). Nothing on this screen is v1.x.
+The first-run wizard gets the Mac ready before the first real call, so that no permission prompt appears during a meeting unless the wizard was skipped; then macOS's own prompt appears at the first capture, and the recording does not wait for it (PRD › Live copilot › Surfaces › First run; PM-60). It runs in six steps: Welcome, Models, Permissions with the audio self-test, Call display, Audio storage, and Assistants (D64, D65, D66). Call detection stays off until the self-test passes; a manual start works at any point, before, during or after the wizard, whatever it says about permissions (PM-30, PM-60). Nothing on this screen is v1.x.
 
 ##### Responsibility scope
 
@@ -1203,9 +1207,9 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 - `cpt-noter-component-app-core-bridge` — sends actions through
 - `cpt-noter-component-screen-today` — navigates to (**Finish**)
 - `cpt-noter-component-screen-settings` — is opened by (**Run Setup Again…** in Settings › General)
-- `cpt-noter-component-screen-menu-bar` — is opened by (**Finish Setup…**)
-- `cpt-noter-component-screen-today` — is opened by (**Finish Setup…** in the place of **Record**, PM-30)
-- `cpt-noter-component-shell-main-window` — is opened by (**Run Setup Again…** in the app menu, **Finish Setup…** in the Call menu)
+- `cpt-noter-component-screen-menu-bar` — is opened by (**Finish Setup…** link in MB-R2)
+- `cpt-noter-component-screen-today` — is opened by (**Finish Setup…** in the TD-R2 setup banner, PM-60)
+- `cpt-noter-component-shell-main-window` — is opened by (**Run Setup Again…** in the app menu)
 
 ##### Layout
 
@@ -1287,15 +1291,15 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 | Back from System Settings | FR-R2, the permission row | A small spinner and **Checking…** while Noter reads the permission again, then **Granted**; the self-test's **System audio recording is not allowed yet.** line goes away | PM-59 | `cpt-noter-seq-first-run-complete-setup` (Error — System audio not allowed) |
 | Self-test passed | FR-R2, self-test | **Self-test passed** above **System audio arrives**, **Your microphone arrives**, **Both streams line up** and **Noter's own sounds stay out of the recording**, announced politely | D66, D99 | `cpt-noter-seq-first-run-complete-setup` (Happy path) |
 | One stream silent | FR-R2, self-test | **We hear your microphone but not system audio. Play any sound in another app and try again.** | D66 | `cpt-noter-seq-first-run-complete-setup` (Error — Self-test hears only one stream) |
-| Self-test skipped | FR-R1, then Today TD-R2 | Step 3 marked skipped with a dash, read as **Skipped**; after **Finish**, Today shows **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…**; a manual start still works with both permissions granted | D64, PM-30 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
+| Self-test skipped | FR-R1, then Today TD-R2 | Step 3 marked skipped with a dash, read as **Skipped**; after **Finish**, Today shows **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** · **Finish Setup…**; **Record** works as always | D64, PM-30, PM-60 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
 | Remaining steps | FR-R2, steps 4 to 6 | **Call display** with the display without the call app chosen and **Open the call screen automatically** on; **Audio storage** with **Keep audio for 30 days**; **Assistants** | D64, D65 | `cpt-noter-seq-first-run-complete-setup` (Other — Finish the remaining steps) |
 | One display | FR-R2, step 4 | A picture of the floating panel and a line about the floating layout | PRD › Live copilot › Surfaces | `cpt-noter-seq-first-run-complete-setup` (Other — Finish the remaining steps) |
 | Key rejected | FR-R2, step 6 | Error under the field: **Anthropic rejected this key (invalid key)** | PRD › Security, privacy and permissions › Credentials | `cpt-noter-seq-first-run-connect-assistant` (Error — API key rejected) |
 | Assistants · sign in with your account | FR-R2, step 6 | **Your Claude account** and **Your ChatGPT account** rows, **Not signed in**; after the sign-in sheet the row reads **Signed in** with the email and plan, and **Finish** counts it as a connected assistant | PM-58 | `cpt-noter-seq-first-run-connect-assistant` (Other — Sign in with your own account) |
 | Installing a local runtime | FR-R2, step 6 | **Local runtime:** **Installing Ollama…** with a spinner, then **Ollama detected**; the warning below goes away | PRD › Live copilot › Surfaces › First run | `cpt-noter-seq-first-run-connect-assistant` (Happy path) |
 | No key and no local runtime | FR-R2, step 6 | Warning **Without an assistant Noter still records and transcribes; summaries wait until one is connected.**, shown while no key is stored, no account is signed in and no local runtime is found | PRD › Product principles › 6 | `cpt-noter-seq-first-run-connect-assistant` (Empty — No key and no local runtime) |
-| Setup left unfinished | Menu bar, MB-R2 | **Setup incomplete · call detection off** with **Finish Setup…**; **Start Recording** still works while both audio permissions are granted | D64, PM-30 | `cpt-noter-seq-menu-bar-check-state` (Error — Setup incomplete) |
-| Audio access never granted | Menu bar, MB-R3; Today, TD-R1 | **Finish Setup…** in the place of **Start Recording** and **Record**; it opens this window at **Microphone and system audio**, and **Start Recording** is back once both permissions are granted | PM-30 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Error — Audio access never granted) |
+| Setup left unfinished | Menu bar, MB-R2; Today, TD-R2 | **Setup incomplete · call detection off** with the **Finish Setup…** link, which opens this window where setup stopped; **Start Recording** and **Record** work as always | D64, PM-30, PM-60 | `cpt-noter-seq-menu-bar-check-state` (Error — Setup incomplete) |
+| Audio access not granted yet | Menu bar, MB-R3; Today, TD-R1; then the call window | **Start Recording** and **Record** stay; the first capture brings up the macOS prompt if macOS never asked; a capture without microphone access shows **Microphone off**, one without system audio **System audio silent** | PM-60 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Error — Audio access not granted yet) |
 
 #### Screen — Record prompt
 
@@ -1310,7 +1314,7 @@ The record prompt lets the user start capture with one click or the start hotkey
 - Shows the detected app or the matching calendar event, and the start hotkey.
 - Lets the user start capture with **Record** or ⌃⌥⌘R, start it as a sensitive call with **Record as Sensitive**, or let the prompt go with **Not Now**, × or the 15-second timeout, which pauses while the pointer or focus is on it (D5).
 - Lets the user stop the prompt for an app that opens the microphone outside calls, with **Don't Ask for Microsoft Teams…** or **Don't Ask for Safari…**, named after the detected app, in the **Not Now** pull-down, confirmed inline for any app (PM-55, PM-59).
-- Shows why capture cannot start: too little disk space, with **Delete Old Audio…**, or system audio access turned off.
+- Shows why capture cannot start: too little disk space, with **Delete Old Audio…**. A known problem that does not stop capture, such as system audio access turned off, is a warning line above an enabled **Record** (PM-60).
 - Opens the call window after a start: the call screen when a second display is connected, the floating panel otherwise.
 - Shows the call-ended notice with **Keep Recording** and **Stop Now**, and the new-meeting notice with **Start as New Call** and **Keep in This Call**, at the prompt's position while the call window is hidden (D80, PM-39).
 - Posts a native announcement when it appears, so that VoiceOver users hear it without focus moving (D55).
@@ -1372,7 +1376,7 @@ menu bar ───────────────────────�
 | **Not Now** and × | `cpt-noter-component-ui-record-prompt` | Close the prompt for this call; the menu bar offers **Call Detected · Start Recording** while the call runs. Clicking **Not Now** opens its pull-down: **Not Now**, a separator, **Don't Ask for Microsoft Teams…** |
 | **Don't Ask for Safari…** in the **Not Now** pull-down | `cpt-noter-component-ui-record-prompt` | Named after the detected app; for any app it first replaces RP-R3 with an inline confirmation, **Microsoft Teams won't be offered for recording again.**, or for a browser **Calls in Safari, such as Google Meet, won't be offered for recording either.**, with **Back** and **Don't Ask** (primary) (PM-55, PM-59); then no more prompts for that app, which is listed in Settings › General › **Apps Noter doesn't ask about** with **Remove** |
 | **Delete Old Audio…** | `cpt-noter-component-ui-record-prompt` (disk low) | Opens the sheet **Delete audio older than 30 days? Frees 6.2 GB. Transcripts and summaries stay.** in the main window (`cpt-noter-component-screen-dialogs`); after **Delete Audio**, the menu bar's **Call Detected · Start Recording** starts the call |
-| **Open System Settings…** | `cpt-noter-component-ui-primitives` (push button) | Takes the place of **Record**, as the primary button, when system audio access is off; opens the macOS privacy pane; macOS then asks **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen**, a prompt that is macOS's own (PM-30) |
+| **Open System Settings…** | `cpt-noter-component-ui-primitives` (push button) | A secondary button beside **Record**, which stays the primary button, when system audio access is off; opens the macOS privacy pane; macOS then asks **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen**, a prompt that is macOS's own (PM-30, PM-60) |
 | **Keep Recording** | `cpt-noter-component-ui-record-prompt` (call-ended variant) | Default button; the notice comes back after the next 20 s of silence, and not again in this call after a second **Keep Recording** (D80) |
 | **Stop Now** | `cpt-noter-component-ui-record-prompt` (call-ended variant) | Stops capture; the main window loads the Call page without taking focus (D81) |
 | Countdown in the body | `cpt-noter-component-ui-record-prompt` (call-ended variant) | **Stopping in 10 s** counts down once a second; hover or focus pauses it and shows **Paused while you're here** |
@@ -1399,9 +1403,9 @@ menu bar ───────────────────────�
 | Recorded as sensitive | RP-R3; then the call screen, CS-R4a | **Record as Sensitive**; then **Sensitive · local** in the council header | PM-41 | `cpt-noter-seq-record-prompt-start-recording` (Other — Vendor call recorded as sensitive) |
 | Not a call | RP-R3 | **Not Now** pull-down with **Not Now** and **Don't Ask for Safari…**; the browser line **Calls in Safari, such as Google Meet, won't be offered for recording either.** with **Back** and **Don't Ask**; then no prompt for Safari, which Settings › General lists under **Apps Noter doesn't ask about** with **Remove** | PM-55, PM-59 | `cpt-noter-seq-record-prompt-start-recording` (Other — Not a call) |
 | Disk below 500 MB | RP-R3 | A warning line **Not enough disk space to record (420 MB free)** above **Not Now**, **Delete Old Audio…** and a dimmed **Record** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-record-prompt-start-recording` (Error — Not enough disk space) |
-| System audio access off | RP-R3 | A warning line **System audio access is off** above **Not Now** and **Open System Settings…** in the place of **Record**; after the switch in System Settings, macOS's own prompt **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen** | PRD › Live copilot loop › Degraded states; PM-30 | `cpt-noter-seq-record-prompt-start-recording` (Error — System audio access is off) |
+| System audio access off | RP-R3 | A warning line **System audio access is off · only your side will be recorded** above **Not Now**, **Open System Settings…** and **Record** (primary); **Record** starts capture, and the call window shows **System audio silent**; after the switch in System Settings, macOS's own prompt **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen** | PRD › Live copilot loop › Degraded states; PM-30, PM-60 | `cpt-noter-seq-record-prompt-start-recording` (Error — System audio access is off) |
 | Closed unanswered | Menu bar, MB-R2 | The prompt closes after 15 s; the menu offers **Call Detected · Start Recording** for as long as the call runs | D5 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Empty — Prompt closed unanswered) |
-| Setup incomplete | None; menu bar, MB-R2 | No prompt, because call detection is off; the menu shows **Setup incomplete · call detection off**, and **Start Recording** still works while both audio permissions are granted | D64, PM-30 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Error — Setup incomplete) |
+| Setup incomplete | None; menu bar, MB-R2 | No prompt, because call detection is off; the menu shows **Setup incomplete · call detection off** with the **Finish Setup…** link, and **Start Recording** works as always | D64, PM-30, PM-60 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Error — Setup incomplete) |
 | Hidden for presenting | None; menu bar, MB-R2 | No prompt; the menu offers **Call Detected · Start Recording** | D84 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Empty — Hidden for presenting) |
 | Call ended, call window hidden | Whole panel | The call-ended variant at the prompt's position | D80 | `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Call window hidden) |
 | New meeting, call window hidden | Whole panel | The new-meeting variant at the prompt's position, with **Start as New Call** and **Keep in This Call** | PM-39 | `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Next meeting starts straight away) |
@@ -1460,7 +1464,7 @@ Today is the first screen after launch: what matters before today's and this wee
 - `cpt-noter-component-screen-activity` — navigates to (**Show All in Activity**)
 - `cpt-noter-component-screen-library` — navigates to (search field, Return)
 - `cpt-noter-component-screen-dialogs` — opens (the self-test sheet from **Run Audio Self-Test…**)
-- `cpt-noter-component-screen-first-run` — opens (**Finish Setup…** in the place of **Record**, PM-30)
+- `cpt-noter-component-screen-first-run` — opens (**Finish Setup…** in the TD-R2 setup banner, PM-60)
 
 ##### Layout
 
@@ -1468,7 +1472,7 @@ Today is the first screen after launch: what matters before today's and this wee
 
 | Region | Size and position | Elements | References |
 | --- | --- | --- | --- |
-| TD-R1 Toolbar | MW-R1, 56 high, the unified toolbar with glass capsule groups | Title **Today**, subtitle with the long date (**Thursday 16 October**); search field with the placeholder **Search calls, people, documents**; **Record** with a record icon and the help tag **Start recording (⌃⌥⌘R)**, which reads **Finish Setup…** (help tag **Microphone or system audio access was never granted**) while audio access was never granted and becomes a `cpt-noter-component-ui-recording-indicator` button **● 23:14** while capturing | D13, PM-30, PM-57 |
+| TD-R1 Toolbar | MW-R1, 56 high, the unified toolbar with glass capsule groups | Title **Today**, subtitle with the long date (**Thursday 16 October**); search field with the placeholder **Search calls, people, documents**; **Record** with a record icon and the help tag **Start recording (⌃⌥⌘R)**, in every setup state, which becomes a `cpt-noter-component-ui-recording-indicator` button **● 23:14** while capturing | D13, PM-30, PM-57, PM-60 |
 | TD-R2 Banner | MW-R5, full content width | One `cpt-noter-component-ui-inline-banner` at a time, highest severity first, the rest behind **+2 More** | D35 |
 | TD-R8 Review line | Full width above TD-R3, only while something waits | **To review: 7 suggested items from 2 calls · 2 unnamed speakers** and one link per call | D73 |
 | TD-R3 Today | Full width, at most 1180 | Header **Today · 3 calls**; one `cpt-noter-component-ui-upcoming-call-card` per event, the next call expanded and the later ones collapsed to one line (time, title, **2 open items** or **Nothing open**); an expanded card's header shows the time, title, attendees and platform, with nested compact `cpt-noter-component-ui-action-item-row` and `cpt-noter-component-ui-output-item-row`, at most 5 rows, then **Show 4 More** | PRD › Feature specification › 13. Today dashboard; PM-59 |
@@ -1510,10 +1514,10 @@ Today is the first screen after launch: what matters before today's and this wee
 
 | Element | Component | References |
 | --- | --- | --- |
-| **Record** | `cpt-noter-component-ui-primitives` (push button) | Starts capture (PM-56); while capturing it becomes the recording button that shows the call window; while microphone or system-audio access was never granted it reads **Finish Setup…** and opens the first-run window at **Microphone and system audio** (PM-30) |
+| **Record** | `cpt-noter-component-ui-primitives` (push button) | Starts capture (PM-56); while capturing it becomes the recording button that shows the call window. It never reads **Finish Setup…** and never waits for setup or permissions; it is dimmed only while the disk has less than 500 MB free or the speech model is not downloaded yet, with the reason in its help tag (PM-30, PM-60) |
 | Search field | `cpt-noter-component-ui-primitives` (search field) | Return opens Library search results |
-| **Run Audio Self-Test…** | `cpt-noter-component-ui-inline-banner` | Opens the self-test sheet with `cpt-noter-component-ui-self-test-panel` |
-| **Open Call** and **Resume Recording** | `cpt-noter-component-ui-inline-banner` | After Noter quit during a recording: **Open Call** opens that Call page at **Transcript**; **Resume Recording** (primary), shown only while the call app still uses audio, records the same call again in the call window, with the lost minutes as a gap row (PM-46) |
+| **Run Audio Self-Test…** and **Finish Setup…** | `cpt-noter-component-ui-inline-banner` | **Run Audio Self-Test…** opens the self-test sheet with `cpt-noter-component-ui-self-test-panel`; the **Finish Setup…** link, shown while setup is incomplete, opens the first-run window where setup stopped (PM-60) |
+| **Open Call**, **Resume Recording** and × | `cpt-noter-component-ui-inline-banner` | After Noter quit during a recording: **Open Call** opens that Call page at **Transcript**; **Resume Recording** (primary) continues the same call in the call window, with the lost minutes as a gap row; × dismisses the banner and ends the offer, as does starting another capture (PM-46, PM-67) |
 | **Allow Calendar Access** | `cpt-noter-component-ui-empty-state` | The macOS prompt **“Noter” would like to access your calendars.** follows the click, with **Don't Allow** and **Allow Full Access** (PM-18, PM-59) |
 | **Open System Settings…** | `cpt-noter-component-ui-inline-banner` | Opens the Calendar privacy pane of System Settings |
 | TD-R8 call links such as **Planning: VHI 8.0 drawer redesign ›** | `cpt-noter-component-ui-primitives` (link) | Opens that call's Call page with **Start Review** applied |
@@ -1548,14 +1552,16 @@ Today is the first screen after launch: what matters before today's and this wee
 | --- | --- | --- | --- | --- |
 | First use, nothing recorded | TD-R5; TD-R3 cards | Empty state **Nothing open yet** · **Items from your calls appear here. Noter offers to record when a call starts.**; cards read **Nothing open**; no review line | PRD › Feature specification › 13. Today dashboard |
 | Nothing due, nothing waiting, nothing ticked | TD-R5; TD-R6; TD-R7 | One secondary line each: **Nothing due without a call**, **Nothing waiting. Noter asks before it changes older records.**, **Nothing ticked today** | PM-59 | `cpt-noter-seq-today-tick-item` (Empty — Nothing open yet) |
-| Marked as sensitive | TD-R3 card | **Local only** tag with a lock after the attendees | PM-41, PM-59 | `cpt-noter-seq-today-review-before-call` (Happy path) | `cpt-noter-seq-today-tick-item` (Empty — Nothing open yet) |
+|  Marked as sensitive | TD-R3 card | **Local only** tag with a lock after the attendees | PM-41, PM-59 | `cpt-noter-seq-today-review-before-call` (Happy path); `cpt-noter-seq-today-tick-item` (Empty — Nothing open yet) |
 | Calendar not asked yet | TD-R3 | Empty state **See today's calls here** · **Noter reads your macOS Calendar to line up open items before each call.** · **Allow Calendar Access**; the header reads **Today** without a count, and TD-R4 is not shown | D63, PM-18, PM-34, PM-59 | `cpt-noter-seq-today-review-before-call` (Empty — Calendar not allowed yet) |
 | Calendar access denied | TD-R2; TD-R3 | **Calendar access is off** · **Open System Settings…**; TD-R3 and TD-R4 give way to TD-R5 and TD-R6 | D63 | `cpt-noter-seq-today-review-before-call` (Error — Calendar access denied) |
 | No calls today | TD-R3 | One secondary line, **No calls today**; the other regions stay | PRD › Feature specification › 13. Today dashboard | `cpt-noter-seq-today-review-before-call` (Empty — No calls today) |
 | Loading | TD-R3 | Two skeleton cards when the calendar read takes longer than 300 ms | `cpt-noter-principle-degrade-visibly` | Transient; no path |
 | Calendar read failed | TD-R3 | One error line **Couldn't read today's calendar.** with **Try Again** in place of the call cards; **Try Again** shows the loading cards, then the calls | D35, PM-59 | `cpt-noter-seq-today-review-before-call` (Error — Calendar read failed) |
-| Self-test not passed | TD-R2 | **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** | D64 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
-| Noter quit during a recording | TD-R2 | **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** · **Open Call** · **Resume Recording**; **Resume Recording** only while the call app still uses audio | PM-46 | `cpt-noter-seq-today-review-before-call` (Error — Noter quit during a recording) |
+| Self-test not passed | TD-R2 | **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** · **Finish Setup…** (a link); **Record** works as always | D64, PM-60 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
+| Speech model not downloaded yet | TD-R1 | **Record** dimmed, with the help tag **Waiting for the speech model · 62 %**; the only start blocker besides a full disk | PM-60 | `cpt-noter-seq-first-run-download-models` (Error — Speech model not downloaded yet) |
+| Not recording · engine stopped | TD-R2; TD-R1 | Error banner **Not recording · engine stopped** · **Try Again** for the call being recorded when the audio engine could not be restarted; **Record** comes back in TD-R1; **Try Again** starts capture again in the same call | PM-67 | `cpt-noter-seq-call-screen-recover-capture` (Error — Engine stopped) |
+| Noter quit during a recording | TD-R2 | **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** · **Open Call** · **Resume Recording** · ×; **Resume Recording** until the banner is dismissed or another capture starts | PM-46, PM-67 | `cpt-noter-seq-today-review-before-call` (Error — Noter quit during a recording) |
 | Suggested items waiting | TD-R8; rows | The review line, and the **Suggested** tag on rows | D73 | `cpt-noter-seq-call-page-review-suggested-items` (Happy path) |
 | Nothing to review | TD-R8 | The line is not shown | D73 | `cpt-noter-seq-call-page-review-suggested-items` (Empty — Nothing to review) |
 | Ticked | The row, then TD-R7 | Strike-through and **Done · Undo** for 10 s; a suggested item reads **Accepted and done · Undo** | D42, D73 | `cpt-noter-seq-today-tick-item` (Happy path) |
@@ -1737,7 +1743,9 @@ The call screen is the dedicated layout of the call window on a second display. 
 | Sensitive call | CS-R4a; CS-R4d; CS-R4c | **Sensitive · local**; with no local model, **Copilot off for this sensitive call (no local model)** in the banner and in place of the listening line | PRD › Live copilot › Guardrails; PM-59 | `cpt-noter-seq-call-screen-read-copilot-state` (Error — Copilot off for a sensitive call) |
 | Made sensitive during the call | CS-R1 ⋯; CS-R4a; CS-R5 | **From now on, nothing from this call leaves this Mac.** in CS-R5; the mode changes to **Sensitive · local** | PM-41 | `cpt-noter-seq-call-screen-read-copilot-state` (Other — Make the call sensitive during the call) |
 | Copilot muted | CS-R4d; CS-R4c | **Copilot muted for 10 min** · **Unmute**; number badges and the legend disappear, and the card keys are released | D11, D70 | `cpt-noter-seq-menu-bar-mute-copilot` (Error — Card keys stop while muted) |
-| System audio lost | CS-R3; CS-R1; CS-R2 | **System audio lost** · **Open System Settings…**; the indicator reads **Recording · mic only**; gap row **System audio lost 00:30:02–00:30:40** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-call-screen-recover-capture` (Error — System audio lost) |
+| System audio silent | CS-R3; CS-R1; CS-R2 | **System audio silent** · **Open System Settings…**, also when system audio access was never granted; the indicator reads **Recording · mic only**; gap row **System audio silent 00:30:02–00:30:40** | PRD › Live copilot loop › Degraded states; PM-60 | `cpt-noter-seq-call-screen-recover-capture` (Error — System audio silent) |
+| Microphone off | CS-R3; CS-R1; CS-R5 | **Microphone off** · **Open System Settings…** when microphone access is off; capture of the other side goes on and the indicator reads **Recording · no mic** | PM-60 | `cpt-noter-seq-call-screen-recover-capture` (Error — Microphone off) |
+| Not recording · engine stopped | CS-R3; CS-R5 | **Not recording · engine stopped** · **Try Again**; the indicator reads **Not recording**; the transcript keeps what was confirmed | PM-67 | `cpt-noter-seq-call-screen-recover-capture` (Error — Engine stopped) |
 | Transcription stalled | CS-R3 | **Transcription stalled · restarting** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-call-screen-recover-capture` (Error — Transcription stalled) |
 | Nothing heard yet | CS-R0; CS-R2; CS-R4c | Capture notice **Nothing heard yet** with the **You** and **Others** meters, **Discard Recording** and **Keep Recording**; the transcript shows **Waiting for speech…** and the stack its listening line | PRD › Live copilot loop › Degraded states; D77, PM-59 | `cpt-noter-seq-call-screen-recover-capture` (Empty — Nothing heard yet) |
 | Disk nearly full | CS-R3 | Warning **2 GB free on this Mac. Recording continues.** with **Delete Old Audio…** | PRD › Live copilot loop › Degraded states; PM-59 | `cpt-noter-seq-call-screen-recover-capture` (Error — Disk nearly full) |
@@ -1751,8 +1759,8 @@ The call screen is the dedicated layout of the call window on a second display. 
 | Paused | CS-R5; CS-R2 | **Resume** becomes the primary button; the indicator reads **Paused**; on resume, gap row **Paused 00:21:08–00:23:40** | PRD › Feature specification › 1. Capture | `cpt-noter-seq-menu-bar-control-recording` (Happy path) |
 | Replaying on headphones | CS-R2b | **Replaying while recording · headphones** | D85 | `cpt-noter-seq-call-screen-replay-line` (Happy path) |
 | Recording on speakers | CS-R2 | Play control disabled; help tag **Replay is off while recording on speakers: the call would hear it. Use headphones, or replay after the call.** | D85, PM-25 | `cpt-noter-seq-call-screen-replay-line` (Error — Recording on speakers) |
-| Output switches to speakers | CS-R2b | Replay stops at once; **Replay stopped: output switched to speakers** for 3 s | D85 | `cpt-noter-seq-call-screen-replay-line` (Error — Output switches to speakers) |
-| Output not identified | CS-R2 | Play control disabled; **Noter can't tell whether this output is headphones. Choose Headphones in Settings › Audio & Transcription to replay while recording.** | D85 | `cpt-noter-seq-call-screen-replay-line` (Error — Output not identified) |
+| Output switches to speakers | CS-R2b | Replay stops at once, also on a device marked as headphones once macOS reports speakers; **Replay stopped: output switched to speakers** for 3 s | D85, PM-67 | `cpt-noter-seq-call-screen-replay-line` (Error — Output switches to speakers) |
+| Output not identified | CS-R2 | Play control disabled; **Noter can't tell whether this output is headphones. Mark it as headphones in Settings › Audio & Transcription to replay while recording.** | D85, PM-67 | `cpt-noter-seq-call-screen-replay-line` (Error — Output not identified) |
 | Noter's own sounds not excluded | CS-R2 | Play control disabled; **Replay would be recorded. Turn on Exclude Noter's own sounds in Settings › Audio & Transcription.** | D85, D99 | `cpt-noter-seq-call-screen-replay-line` (Error — Noter's own sounds not excluded) |
 | Hidden for presenting | Whole window | Nothing on screen; capture, transcript and copilot keep running; the menu bar glyph carries the eye-slash mark | D84, PM-28 | `cpt-noter-seq-call-screen-hide-for-presenting` (Happy path) |
 | Copilot flag off | CS-R4; CS-R5 | No council column; the transcript fills the screen; CS-R5 has no budget, **Pinned** or **Catch Me Up** | D9 | `cpt-noter-seq-call-screen-read-copilot-state` (Empty — No card yet) |
@@ -1912,11 +1920,11 @@ Collapsed strip, 56 high:
 | Copilot muted | FP-C2; FP-R3 | **Copilot muted** in place of the card line; expanded, **Copilot muted for 10 min** · **Unmute** | D11, D83 | `cpt-noter-seq-floating-panel-collapse-strip` (Empty — Copilot muted while collapsed) |
 | Paused | FP-C1; FP-R6 | The strip clock reads **Paused 3 min**; ⋯ offers **Resume** | D83 | `cpt-noter-seq-menu-bar-control-recording` (Happy path) |
 | Copilot flag off | FP-R2; FP-R4; FP-C2 | No mode line or cards; the transcript tail fills the panel, and the strip has no card area | D9 | `cpt-noter-seq-floating-panel-collapse-strip` (Happy path) |
-| Degraded | FP-R3 | Compact copies of the CS-R3 and CS-R4d banners, such as **System audio lost** · **Open System Settings…** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
+| Degraded | FP-R3 | Compact copies of the CS-R3 and CS-R4d banners, such as **System audio silent** · **Open System Settings…**, **Microphone off** · **Open System Settings…** or **Not recording · engine stopped** · **Try Again** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
 | Share warning, first open | FP-R3; FP-R1 | **Hidden from window shares only. Before sharing your whole screen, press** ⌃⌥⌘0. · **Got It**; the share-protection glyph and its help tag stay in FP-R1 | PM-49 | `cpt-noter-seq-call-screen-hide-for-presenting` (Other — Share warning in the floating panel) |
 | New meeting | FP-R0 | **A new meeting may have started: 1:1 with Anna K.** with **Start as New Call** and **Keep in This Call**, stacked | PM-39 | `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Next meeting starts straight away) |
 | Hidden with **Hide** | None | Nothing on screen; the menu bar keeps the state, and **Open Call Screen** or ⌃⌥⌘N reopens the panel while the call app keeps focus | D84, PM-40 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Happy path) |
-| Capture problem while hidden | Notification | NT-3 **System audio lost** · **Recording continues with your microphone.** | D67 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
+| Capture problem while hidden | Notification | NT-3 **System audio silent** · **Recording continues with your microphone.** (or **Microphone off**, or **Not recording · engine stopped**); none while hidden for presenting | D67, PM-67 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
 | Closed by a crash | Whole panel | The panel disappears while the menu bar icon keeps its recording form; ⌃⌥⌘N brings it back with the same transcript, cards, pins and marks | PM-46 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Panel closed by a crash) |
 | Hidden for presenting | None | Nothing on screen; the card keys are released | D84 | `cpt-noter-seq-call-screen-hide-for-presenting` (Happy path) |
 
@@ -1942,7 +1950,7 @@ The menu bar extra is the one place the user checks whether Noter is recording, 
 
 - Draws no custom views; the header is a set of disabled menu items, and the menu and its submenu take the system's glass menu material (D3, PM-57).
 - Shows no colour; the system's orange microphone indicator carries it (`cpt-noter-constraint-menu-bar-template-icons`).
-- Opens no window except through **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Settings…** and **Finish Setup…**, and no dialog except the alert for quitting while recording (D37).
+- Opens no window except through **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Settings…** and the **Finish Setup…** link, and no dialog except the alert for quitting while recording (D37).
 - Holds no state; the core builds the menu and updates it while it is open (PRD › Live copilot loop › Surfaces).
 
 ##### Related components (by ID)
@@ -1954,7 +1962,7 @@ The menu bar extra is the one place the user checks whether Noter is recording, 
 - `cpt-noter-component-screen-call-page` — navigates to (**Open Last Summary**)
 - `cpt-noter-component-screen-today` — navigates to (**Open Noter**)
 - `cpt-noter-component-screen-settings` — opens (**Settings…**)
-- `cpt-noter-component-screen-first-run` — opens (**Finish Setup…**)
+- `cpt-noter-component-screen-first-run` — opens (**Finish Setup…** link)
 - `cpt-noter-component-screen-dialogs` — opens (the quit alert)
 
 ##### Layout
@@ -1965,7 +1973,7 @@ The menu bar extra is the one place the user checks whether Noter is recording, 
 | --- | --- | --- | --- |
 | MB-R1 Status item | Noter's slot in the menu bar of every display | Template glyph; optional title from Settings › Call Screen & Menu Bar › **Menu bar title**: **None** (default), **Elapsed Time** or **Newest Card** (24 characters, card type first, **Ask: owner for drawer?**) | D10 |
 | MB-R2 Info lines | Top of the menu, disabled items | State line; call and time; people, languages and mode; one degraded line; **Call Detected · Start Recording** as the one enabled item here when it applies | D3 |
-| MB-R3 Capture | Under MB-R2 | **Start Recording** or **Stop Recording** ⌃⌥⌘R, with **Finish Setup…** in its place while audio access was never granted; **Pause** or **Resume** ⌃⌥⌘P; **Keep Recording** and **Stop Now** while the call-ended notice is open; **Continue Recording** for 5 minutes after any stop | PRD › Feature specification › 1. Capture; PM-30, PM-43 |
+| MB-R3 Capture | Under MB-R2 | **Start Recording** or **Stop Recording** ⌃⌥⌘R, whatever the setup state; **Try Again** while capture failed; **Pause** or **Resume** ⌃⌥⌘P; **Keep Recording** and **Stop Now** while the call-ended notice is open; **Continue Recording** for 5 minutes after any stop | PRD › Feature specification › 1. Capture; PM-30, PM-43, PM-60 |
 | MB-R4 Copilot | Under MB-R3, while recording | **Mark Moment** ⌃⌥⌘M, **Catch Me Up** ⌃⌥⌘C, **Ask About This Call…** ⌃⌥⌘A, **Unmute** while the copilot is muted, **Mute Copilot ▸** | D11, PM-59 |
 | MB-R5 Surfaces | Under MB-R4 | **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel**, **Open Last Summary — Design review · 09:30**, **Hide for Presenting** ⌃⌥⌘0 | D84 |
 | MB-R6 Next call | Disabled line | **Next: Stand-up 11:00** | PM-14 |
@@ -2005,8 +2013,7 @@ MB-R1  idle glyph, no title (None)                    MB-R1  recording glyph, no
 
 | Element | Component | References |
 | --- | --- | --- |
-| **Start Recording** and **Stop Recording** ⌃⌥⌘R | `cpt-noter-component-ui-status-item` | Starting opens the call window; works once both audio permissions are granted, even before the self-test passes (PM-30) |
-| **Finish Setup…** in the place of **Start Recording** | `cpt-noter-component-ui-status-item` | While microphone or system-audio access was never granted; opens the first-run window at **Microphone and system audio** (PM-30) |
+| **Start Recording** and **Stop Recording** ⌃⌥⌘R | `cpt-noter-component-ui-status-item` | Starting opens the call window; works whatever the setup state, before the self-test passes and before audio access is granted, and is dimmed only below 500 MB free or without the speech model (PM-30, PM-60) |
 | **Call Detected · Start Recording** | `cpt-noter-component-ui-status-item` | Under the first info line while a call is detected and not recorded; starts capture like **Record** |
 | **Pause** and **Resume** ⌃⌥⌘P | `cpt-noter-component-ui-status-item` | Pause drops audio entirely (PRD › Feature specification › 1. Capture) |
 | **Mark Moment** ⌃⌥⌘M | `cpt-noter-component-ui-status-item` | Adds a mark row; nothing opens |
@@ -2020,7 +2027,7 @@ MB-R1  idle glyph, no title (None)                    MB-R1  recording glyph, no
 | **Hide for Presenting** and **Show Noter** ⌃⌥⌘0 | `cpt-noter-component-ui-status-item` | One toggle; the label follows the state (D84) |
 | **Open Noter** | `cpt-noter-component-ui-status-item` | The main window; ends hidden mode |
 | **Settings…** ⌘, | `cpt-noter-component-ui-status-item` | The Settings window |
-| **Finish Setup…** | `cpt-noter-component-ui-status-item` | The first-run wizard at the step where setup stopped |
+| **Finish Setup…** | `cpt-noter-component-ui-status-item` | A link under **Setup incomplete · call detection off** in MB-R2, never in place of **Start Recording**; the first-run wizard at the step where setup stopped (PM-60) |
 | **Quit Noter** ⌘Q | `cpt-noter-component-ui-status-item` | While recording, the quit alert in `cpt-noter-component-screen-dialogs`: **Noter is recording “Planning: VHI 8.0 drawer redesign”**, **Quitting stops the recording. The transcript so far is kept.**, with **Cancel** (default) and **Stop and Quit**; when idle, Noter quits at once |
 | **Keep Recording** and **Stop Now** | `cpt-noter-component-ui-status-item` | At the top of MB-R3 while the call-ended notice is open (D80) |
 | **Continue Recording** | `cpt-noter-component-ui-status-item` | For 5 minutes after any stop, manual or automatic, under the closing line **Saved · 48 min · Summary in about 2 minutes** or **Stopped at 11:02 · the call had ended · 48 min saved**; appends to the same call (D80, PM-43) |
@@ -2045,15 +2052,17 @@ MB-R1  idle glyph, no title (None)                    MB-R1  recording glyph, no
 | Paused for 5 minutes | MB-R1; MB-R2 | Paused glyph; **Paused for 5 min** | PRD › Feature specification › 1. Capture | `cpt-noter-seq-menu-bar-control-recording` (Error — Paused for 5 minutes) |
 | Quit while recording | MB-R7 | The quit alert | D37 | `cpt-noter-seq-menu-bar-control-recording` (Error — Quit while recording) |
 | Switched to local | MB-R2 | **Switched to local** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-menu-bar-check-state` (Error — Switched to local) |
-| Setup incomplete | MB-R2 | **Setup incomplete · call detection off** with **Finish Setup…**; **Start Recording** still works while both audio permissions are granted | D64, PM-30 | `cpt-noter-seq-menu-bar-check-state` (Error — Setup incomplete) |
-| Audio access never granted | MB-R3 | **Finish Setup…** where **Start Recording** usually is; **Start Recording** comes back once both permissions are granted | PM-30 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Error — Audio access never granted) |
+| Setup incomplete | MB-R2 | **Setup incomplete · call detection off** with the **Finish Setup…** link; **Start Recording** works as always | D64, PM-30, PM-60 | `cpt-noter-seq-menu-bar-check-state` (Error — Setup incomplete) |
+| Audio access not granted yet | MB-R3 | **Start Recording** as always; the capture runs and the menu shows **Microphone off** or **System audio silent** as its degraded line | PM-60 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Error — Audio access not granted yet) |
 | Copilot muted | MB-R1; MB-R4 | Copilot-muted glyph; **Unmute** in MB-R4, and ✓ on the active option with **Unmute** in the submenu | D11, PM-21, PM-59 | `cpt-noter-seq-menu-bar-mute-copilot` (Happy path) |
 | Card keys released while muted | MB-R4 | The card keys stop working until **Unmute** | D70 | `cpt-noter-seq-menu-bar-mute-copilot` (Error — Card keys stop while muted) |
 | Call detected, not recorded | MB-R2 | **Call Detected · Start Recording** | D5 | `cpt-noter-seq-record-prompt-record-after-missed-prompt` (Empty — Prompt closed unanswered) |
 | Call seems to have ended | MB-R2; MB-R3 | **Call seems to have ended · stopping in 8 s**, updating while open; **Keep Recording** and **Stop Now** | D80 | `cpt-noter-seq-call-screen-stop-at-call-end` (Happy path) |
 | Hidden for presenting | MB-R1; MB-R2; MB-R5 | Glyph with the eye-slash mark and no title; while recording, **Hidden for presenting** under the recording lines; **Show Noter**; while not recording, a detected call adds **Call Detected · Start Recording**, which starts capture without showing anything; VoiceOver label **Noter, recording, hidden for presenting, 23 minutes** | D84, PM-59 | `cpt-noter-seq-call-screen-hide-for-presenting` (Happy path) |
 | Call ended while hidden | MB-R2 | **Call seems to have ended**, with no countdown; after 10 minutes, **Stopped at 11:12 · the call had ended** | D80 | `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Hidden for presenting) |
-| Capture problem, no surface visible | MB-R2 | Degraded line **System audio lost**, announced assertively | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
+| New meeting while hidden | MB-R2; MB-R3 | **A new meeting may have started: 1:1 with Anna K.**; **Start as New Call** and **Keep in This Call** in MB-R3; unanswered for 60 s, **Start as New Call** applies | PM-39, PM-67 | `cpt-noter-seq-menu-bar-check-state` (Other — New meeting while hidden) |
+| Capture problem, no surface visible | MB-R2 | Degraded line **System audio silent** or **Microphone off**, announced assertively; the only place it shows while Noter is hidden for presenting | PRD › Live copilot loop › Degraded states; PM-60 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
+| Not recording · engine stopped | MB-R1; MB-R2; MB-R3 | Idle glyph; degraded line **Not recording · engine stopped** and **Try Again** in MB-R3, which starts capture again in the same call | PM-67 | `cpt-noter-seq-call-screen-recover-capture` (Error — Engine stopped) |
 | Hotkey not registered | MB-R3 to MB-R5 | The item shows no key | D52 | `cpt-noter-seq-call-screen-pin-card` (Error — Card key used by another app) |
 
 #### Screen — Call page
@@ -2280,8 +2289,8 @@ Notifications tell the user that outputs are ready or failed, or that capture ha
 - Sends NT-3 when capture has a problem and no Noter surface is visible.
 - Opens the matching place on click: the Call page, or the call window for NT-3.
 - Carries titles and counts only, groups each call's notifications in one thread, and makes no sound by default (D67).
-- Waits while a call is being recorded, and delivers what was held, one per call, when capture stops; NT-3 is not held, because it reports the capture itself (PM-44).
-- Waits while Noter is hidden for presenting, and delivers what was held, combined per call, when Noter is shown again (D84).
+- Waits while a call is being recorded, and delivers what was held, one per call, when capture stops; NT-3 is not held, because it reports the capture itself, and is sent at once (PM-44, PM-67).
+- Waits while Noter is hidden for presenting, and delivers what was held, combined per call, when Noter is shown again; NT-3 is not sent then at all, and the menu bar's degraded line shows the problem instead (D84, PM-67).
 - Starts only after the user allows notifications from the Call page of the first recorded call (D68).
 
 ##### Responsibility boundaries
@@ -2289,7 +2298,7 @@ Notifications tell the user that outputs are ready or failed, or that capture ha
 - Carries no action buttons, transcript quotes or names of what was said (D67).
 - Does not ask for the permission at first run or during a call; the Call page asks (D68, PM-23).
 - Is never the only place for a state: the Call page and the menu bar show ready, failed and capture states too, so Noter works fully with notifications denied; Settings › General then says **Notifications are off for Noter** (PM-31).
-- Is not sent while the main window is frontmost on that call, or for NT-3, while the call window is visible.
+- Is not sent for the call the frontmost main window shows, or for NT-3, while a call surface is visible.
 
 ##### Related components (by ID)
 
@@ -2322,7 +2331,7 @@ Notifications tell the user that outputs are ready or failed, or that capture ha
 | --- | --- | --- |
 | NT-1 **Summary ready** | native control (notification) | Sent when the outputs are written, cloud or local, also after an automatic stop (D81); body **Planning: VHI 8.0 drawer redesign · 4 action items, 2 decisions**; a click opens the main window at Call page › **Summary**; not sent while the main window is frontmost on that call; held while another call is being recorded (PM-44) |
 | NT-2 **Couldn't write the summary** | native control (notification) | Sent when the outputs fail; body **Planning: VHI 8.0 drawer redesign · open the call to try again**; a click opens the Call page; not sent while the main window is frontmost on that call |
-| NT-3 **System audio lost** | native control (notification) | Sent when capture has a problem and the call window is hidden; body **Recording continues with your microphone.**; a click shows the call window; not sent while the call window is visible |
+| NT-3 **System audio silent**, **Microphone off** or **Not recording · engine stopped** | native control (notification) | Sent at once when capture has a problem and no call surface is visible; bodies **Recording continues with your microphone.**, **Recording continues with the other side only.** and **Open the call window to try again.**; a click shows the call window; not sent while a call surface is visible or Noter is hidden for presenting (PM-60, PM-67) |
 | NT-4 **In 5 min: 1:1 with Anna K.** (v1.x) | native control (notification) | Five minutes before a calendar call; body **3 open items · last time: conference budget**; a click opens Today with that call expanded |
 | **Notify Me When Summaries Are Ready** | `cpt-noter-component-ui-inline-banner` on the Call page | An info banner **Get a notification when a summary is ready.** with this button and a close ×; the button brings up the macOS prompt **“Noter” would like to send you notifications.** with **Don't Allow** and **Allow** (D68, PM-59) |
 
@@ -2344,9 +2353,9 @@ Notifications tell the user that outputs are ready or failed, or that capture ha
 | Outputs ready | NT banner | NT-1 | D67 | `cpt-noter-seq-notifications-open-outputs` (Happy path) |
 | Outputs failed | NT banner | NT-2; the Call page shows the failed section with **Try Again** | D67 | `cpt-noter-seq-notifications-open-outputs` (Error — Outputs failed) |
 | Main window already shows the call | None | No notification; the page announces **Summary ready** politely | D67 | `cpt-noter-seq-notifications-open-outputs` (Empty — Main window already shows the call) |
-| Capture problem, call window hidden | NT banner | NT-3; the menu bar shows the same degraded line | D67 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
-| Hidden for presenting | None, then NT banner | Nothing while hidden; on **Show Noter** the held notifications arrive, combined per call | D84 | `cpt-noter-seq-call-screen-hide-for-presenting` (Error — Notification while hidden) |
-| Next call already recording | None, then NT banner | No **Summary ready** while a call records; after the stop, the held notifications arrive, one per call | PM-44 | `cpt-noter-seq-notifications-open-outputs` (Empty — Next call already recording) |
+| Capture problem, call window hidden | NT banner | NT-3 at once, never held; the menu bar shows the same degraded line | D67, PM-67 | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
+| Hidden for presenting | None, then NT banner | Nothing while hidden, not even NT-3, which only the menu bar's degraded line shows; on **Show Noter** the held notifications arrive, combined per call | D84, PM-67 | `cpt-noter-seq-call-screen-hide-for-presenting` (Error — Notification while hidden) |
+| Next call already recording | None, then NT banner | The previous call's outputs are written during the call (PM-62), but no **Summary ready** arrives while a call records; after the stop, the held notifications arrive, one per call | PM-44, PM-62 | `cpt-noter-seq-notifications-open-outputs` (Empty — Next call already recording) |
 | Several calls in a row | NT banner | One thread per call, each with its own title | D67 | `cpt-noter-seq-notifications-open-outputs` (Empty — Next call already recording) |
 | Pre-call brief (v1.x) | None | Not sent in v1 | PM-01 | `cpt-noter-seq-today-review-before-call` (Happy path) |
 
@@ -2455,7 +2464,7 @@ Some actions need the user's decision before anything can go on: an irreversible
 | **Export Improvement Brief…** | sheet, 640 wide, `cpt-noter-component-ui-primitives` | **Period** pop-up, **Metrics** checkboxes (**Card latency**, **Retrieval stage**, **Model stage**), read-only Markdown preview in the prompt editor; footer **Cancel** at the leading edge, then **Copy as Prompt**, **Save as Markdown…**, **Open in Codex** and **Open in Claude Code** (primary); from Performance (PRD › Feature specification › 12) |
 | **Export Log…** | sheet, 480 wide, `cpt-noter-component-ui-primitives` | Subtitle **Changes of** the scope; **Period** pop-up (**Today**, **Last 7 days**, **Last 30 days**, **Custom…**; only **Whole call** for one call); **Format** radio group **Markdown** (**One line per change, for reading**) or **JSON** (**Every field, for scripts**); **Cancel** · **Export…**, then **Exported log to Downloads/Noter log 16 Oct.md**; from Activity for a period, and from a call's **History** view for that call (PRD › Feature specification › 11) |
 | **Screen Share Test…** | sheet, 640 wide, in the Settings window | The table **What a share would show**; **Run Capture Test** with **On your screen** and **What the share sees**; one result row per surface; the limits line; **Done** (default); the rows are described in `cpt-noter-component-screen-settings` (D96) |
-| **Add MCP Server…** and source details | sheet, 560 wide, `cpt-noter-component-ui-primitives` | **Server** pop-up, **Mode** **Live** (**Looked up during calls and in Ask; nothing is copied**) or **Indexed** (**Copied into the local index; sign-in opens in your browser**), **Schedule**, **Privacy class** with the note **Sensitive sources are answered by the local model only**, **Scope**; **Cancel** · **Add Source**; details add **Re-index**, **Revoke Token…**, **Remove Source…**; from Settings › Knowledge Sources |
+| **Add MCP Server…** and source details | sheet, 560 wide, `cpt-noter-component-ui-primitives` | **Server** pop-up, **Mode** **Live** (**Looked up after calls and in Ask; nothing is copied. Runs only in Cloud allowed, and each lookup is logged in Privacy**, PM-68) or **Indexed** (**Copied into the local index; sign-in opens in your browser**), **Schedule**, **Privacy class** with the note **Sensitive sources are answered by the local model only**, **Scope**; **Cancel** · **Add Source**; details add **Re-index**, **Revoke Token…**, **Remove Source…**; from Settings › Knowledge Sources |
 | **Add Mapping…** and **Edit Mapping** | sheet, 520 wide, `cpt-noter-component-ui-primitives` | **Jira project or component**, **Folder** with **Choose…** (system open panel), **Default tool** segmented **Claude Code** · **Codex**; **Cancel** · **Add Mapping**; from Settings › Repositories and the Handoff drawer, where the subtitle reads **From the Handoff drawer** and the key is filled in |
 | **Add…** and **Replace…** for an API key | sheet, 480 wide, `cpt-noter-component-ui-primitives` | Title **Replace Anthropic API Key** (or **Add …**); secure field with the note **Paste works; the key goes to the Keychain only**; **Verify**, then **Verified · Claude Code can use this key**; **Cancel** · **Save**, enabled once verified; afterwards the row shows **••••••••  Stored in the Keychain**; from Settings › Models & Runtimes and the sign-in sheet's **Use an API Key Instead** |
 | **Run Audio Self-Test…** | sheet, 560 wide, `cpt-noter-component-ui-self-test-panel` | Subtitle **Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.**; the self-test with **Play Test Clip**, **Run Test** and the four result lines (D99); **Cancel** · **Done**; from Settings › Audio & Transcription and **Run Audio Self-Test…** on Today |
@@ -3037,7 +3046,7 @@ Person page, Overview:
 | Wrong person chosen | PL-R3, History view | **Undo** on the strip, or on the History entry after it has gone | PRD › Feature specification › 11 | `cpt-noter-seq-people-name-unnamed-speaker` (Error — Wrong person chosen) |
 | Loading | PE-R2 to PE-R6 | Skeleton rows after 300 ms | UX B.0 | Transient; no path |
 | No calls with this person yet | PE-R2 to PE-R6 | **No calls with Anna K. yet** · **Their commitments, questions and topics appear after your first call together.** | UX B.10; PM-59 |
-| Empty blocks | PE-R2, PE-R3, PE-R4 | **Nothing open**, **Nothing they are waiting for**, **No recurring topics yet** in place of the empty block's rows | PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Happy path) | `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
+|  Empty blocks | PE-R2, PE-R3, PE-R4 | **Nothing open**, **Nothing they are waiting for**, **No recurring topics yet** in place of the empty block's rows | PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Happy path); `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
 | Voice profile off | PE-R5 | **Off** · **Set Up Voice Profile…** | D48 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Happy path) |
 | Voice profile on | PE-R5 | **On since 3 Oct · 2 profiles matched in 28 calls** · **Delete Profile…** | UX B.10 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Other — Delete the profile) |
 | No history | History view | **No changes yet** · **Changes to Anna K.'s items, names and voice profile appear here, each with Undo.** | UX C.2; PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
@@ -3191,7 +3200,7 @@ Agents keeps the council useful and affordable: which role agents run in which c
 ##### Responsibility boundaries
 
 - Does not run agents or rank cards; the core's council does.
-- Does not switch an agent off for a call type; the core does after ten calls of dismissals, and the row says so (PRD › Feature specification › 8).
+- Does not switch an agent off for a call type; the core does when 80 % or more of its cards there were dismissed over the last 10 calls of that type, logs it in History with **Undo**, and the row says so; the Agents page announces it once in AG-R0 (PRD › Feature specification › 8; PM-64).
 - Does not compute hit rates; it shows the rates the core sends.
 - Does not store keys, sign in to accounts or install runtimes; Settings › Models & Runtimes and the sign-in sheet do (`cpt-noter-component-screen-settings`, `cpt-noter-component-screen-dialogs`, PM-58).
 - Does not show the cards of a call; the Call page's **Agent Reviews** view does (`cpt-noter-component-screen-call-page`).
@@ -3226,7 +3235,7 @@ Agents keeps the council useful and affordable: which role agents run in which c
 | AG-R2 List | 300 pt, leading pane of a split view | **Council** row with **Mode per call type**; while the council table filters the list, the line **Agents on Planning calls** · **Show All**; group **Built in** with the caption **Order breaks ties in ranking**; group **Added by you**, not drawn while empty; `cpt-noter-component-ui-agent-list-row` with `cpt-noter-component-ui-agent-badge` | D25 |
 | AG-R3 Editor | Trailing pane, at most 760 pt | Header with name, **Built in** or **Added by you** tag, view switch **Settings** · **Skill** and **Remove Agent…**; **Settings** view: `cpt-noter-component-ui-agent-editor`; **Skill** view: `cpt-noter-component-ui-prompt-editor` on the skill file, `cpt-noter-component-ui-version-switcher`, `cpt-noter-component-ui-diff-view` against the built-in, **Reset to Built-In**; `cpt-noter-component-ui-inline-banner` at the top | D25, D45 |
 | AG-R3 Council | Trailing pane, while the **Council** row is selected | Header **Council** · **Mode per call type, live and after the call**; `cpt-noter-component-ui-council-mode-table`; **Budget per call** currency field with **The copilot pauses at the cap and says so on the call screen.**; the line **In parallel mode a slow agent misses the tick, so the tick is never delayed.** | PRD › Feature specification › 8 |
-| AG-R4 List footnote | Bottom of AG-R2 | **Percentages: cards rated useful or used over the last 20 calls. An agent dismissed in a call type for ten calls switches itself off there.** | PRD › Feature specification › 8 |
+| AG-R4 List footnote | Bottom of AG-R2 | **Percentages: cards rated useful or used over the last 20 calls. An agent switches itself off for a call type when 80 % of its cards there were dismissed over the last 10 calls.** | PRD › Feature specification › 8 |
 
 **Wireframe**
 
@@ -3310,7 +3319,7 @@ Agent selected, **Settings** view:
 | Both accounts signed in | AG-R3 | Every runtime available in the pop-up; the line **Your Claude and ChatGPT accounts are connected. Pick either one above.** | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Other — Add the second account) |
 | Account session ended | AG-R2 rows | **Claude signed you out** · **Open Settings** on each agent that runs on that account; those agents pause until the user signs in again | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Error — Session ended by Claude) |
 | Runtime changed | AG-R0 | **Architect now runs on Claude Code · your Claude account** · **Undo** | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Other — Choose the account for one agent) |
-| Agent switched itself off | AG-R2 row | **Switched itself off for 1:1 calls** · **Turn On**; after **Turn On**, **Turned on for 1:1 calls** under the list for 2.5 s | PRD › Feature specification › 8 | `cpt-noter-seq-agents-tune-council` (Error — Agent switched itself off) |
+| Agent switched itself off | AG-R0; AG-R2 row | Once, the first time Agents opens afterwards: **Designer switched itself off for 1:1 calls** with the context **82 % of its cards in the last 10 1:1 calls were dismissed** · **Undo** in AG-R0; the row keeps **Switched itself off for 1:1 calls** · **Turn On**; after **Turn On** or **Undo**, **Turned on for 1:1 calls** under the list for 2.5 s; History has the change (PM-64) | PRD › Feature specification › 8 | `cpt-noter-seq-agents-tune-council` (Error — Agent switched itself off) |
 | Skill file missing | AG-R3 banner | `cpt-noter-component-ui-inline-banner`, error: **The skill file is missing** · **Restore from Built-In** · **Choose File…** | UX B.12 | `cpt-noter-seq-agents-tune-council` (Error — Skill file missing) |
 | During a live call | AG-R3 banner | **Changes apply within a minute** | UX B.12 | `cpt-noter-seq-agents-tune-council` (Other — During a live call) |
 | Skill reset | AG-R3 banner | **Architect skill reset to built-in** · **Undo** | `cpt-noter-principle-undo-over-confirm` | `cpt-noter-seq-agents-tune-council` (Error — Skill file missing) |
@@ -3395,7 +3404,8 @@ The **Privacy** pane:
 │ Privacy                   │                       this Mac                                             │
 │ Call Screen & Menu Bar    │                     ○ Cloud allowed · text goes as is                      │
 │ Hotkeys                   │                     ○ Local only · every task runs on the local runtime    │
-│ Repositories              │ Audio retention     [30 days ▾]                                            │
+│ Repositories              │ Audio retention     [30 days ▾]  The next nightly run deletes the audio of │
+│                           │                     2 calls.                                               │
 │ Knowledge Sources         │ Calendar            ! not allowed yet          [Allow Calendar Access]     │
 │ Maintenance               │ Show talk-time share and “who was silent”                       [off]      │
 │ Performance               │ Voice profiles      2 people              [Manage on Person Pages]         │
@@ -3462,10 +3472,10 @@ The **Hotkeys** pane:
 | General › **Apps Noter doesn't ask about** | List with **Remove** per app | Apps added with **Don't Ask for Safari…** in the record prompt's **Not Now** pull-down; **Remove** lets the prompt appear for that app again; with no app left the group reads **Noter offers to record calls in every app.** |
 | General › **Summary language** | Pop-up: **English**, **Russian**, **German**, **Language of the call** | Its line reads **Applies to outputs written from now on.** |
 | General › **Storage location** with **Change…** | Path and push button | System open panel; a folder in iCloud Drive or Dropbox gets the warning line **This folder is in iCloud Drive, so your recordings sync off this Mac. Choose a local folder.** (PRD › Feature specification › 14) |
-| General › **Calendars shown**, **Horizon** (**Today** · **This Week**), **Ranking** | Checkbox list, segmented control, pop-up | In the group **Today**; **Ranking** offers **Due date, then owed to you** (default), **Owed to you first** and **Call order only**; the Today dashboard (PRD › Feature specification › 13); the Calendar permission itself is on Privacy (PM-34) |
+| General › **Calendars shown**, **Horizon** (**Today** · **This Week**), **Ranking** | Checkbox list, segmented control, pop-up | In the group **Today**; **Ranking** offers **Owed to today's people, then due date** (default: items owed to people on today's calls first, then due date, then age) and **Due date, then owed to you** (PM-63); the Today dashboard (PRD › Feature specification › 13); the Calendar permission itself is on Privacy (PM-34) |
 | General › **Run Setup Again…** | Push button | Opens the first-run wizard; its line reads **Opens the first-run wizard. Your library and settings stay.** |
 | Audio & Transcription › **Microphone** | Pop-up with a level meter | — |
-| Audio & Transcription › **Output**: **Detect automatically**, **Headphones**, **Speakers, with echo cancellation**; **Exclude Noter's own sounds** | Radio group, checkbox | Replay during capture needs a headphone route and the checkbox on (D85) |
+| Audio & Transcription › **Output devices**: one row per output device with the route Noter detects (**Headphones**, **Speakers** or **Not identified**), and **Treat as headphones** on each row that is not identified; **Exclude Noter's own sounds** | List with a checkbox per row, checkbox | Replay during capture is headphones-only: it needs a headphone route, detected or marked here, and the checkbox on. Marking a device lifts only **Not identified**; a device detected as speakers has no checkbox and never replays while recording. The footnote reads **Replay while recording works only on headphones. Speakers never replay while you record.** There is no speakers-with-echo-cancellation option (D85, PM-67) |
 | Audio & Transcription › **Live transcription**, **Archive pass**, **Languages** | Pop-ups, checkboxes | **WhisperKit Large v3 Turbo**, **Parakeet TDT v3**, **WhisperKit Pro (licensed)**; **Large v3** or **Off**; **English**, **Russian**, **German**; apply from the next call |
 | Audio & Transcription › **Glossary** | Table with + and − | **Term**, **Latin variants**, **Cyrillic variants**, **Spoken forms**; a new term leads to proposals in Activity (PRD › Feature specification › 10) |
 | Audio & Transcription › **Microphone** and **System audio recording** permissions | `cpt-noter-component-ui-permission-check-row`, status only | **Open System Settings…** when denied |
@@ -3477,9 +3487,9 @@ The **Hotkeys** pane:
 | Models & Runtimes › **Runtime per task** | Table with a pop-up per row | **Live copilot**, **Post-call analysis** and **Search answers**; each pop-up lists the runtimes in the agent editor's order, **Claude Code · your Claude account**, **Codex · your ChatGPT account**, **Claude Code · Anthropic API key**, **Codex · Codex API key**, **Local model · Ollama**; a runtime that is not connected stays in the list, disabled, with **— not connected** (PM-58) |
 | Models & Runtimes › **Spend this week** | Read-only figures per runtime, and the link **Show in Performance** | **Claude Code**, **Codex** and **Local share**; PRD › LLM orchestration › Cost and observability; the same figures as Performance › **Cost · 7 days**; runs on a signed-in account count against that plan's usage limits rather than a cost (PM-58) |
 | Privacy › **Privacy mode** | Radio group with one consequence line per option, and `cpt-noter-component-ui-mode-indicator` showing the mode in force | **Cloud with redaction** (default), **Cloud allowed**, **Local only** (PRD › Security, privacy and permissions › Privacy modes) |
-| Privacy › **Audio retention** | Pop-up | **7 days**, **30 days**, **90 days**, **Forever**, **Never store audio** |
+| Privacy › **Audio retention** | Pop-up with a line under it | **7 days**, **30 days**, **90 days**, **Forever**, **Never store audio**; a change applies to existing calls at the next nightly run, and the line says how many calls' audio that run deletes: **The next nightly run deletes the audio of 14 calls.**, or **No audio is due for deletion.** (PM-67) |
 | Privacy › **Calendar** permission row | `cpt-noter-component-ui-permission-check-row` | **Allow Calendar Access**, the same button as on Today, brings up the macOS prompt; after a denial the row shows **Open System Settings…**; never asked automatically or during capture (PM-18, PM-34) |
-| Privacy › **Show talk-time share and “who was silent”** | Toggle, off by default | Their rows exist only while it is on (D47) |
+| Privacy › **Show talk-time share and “who was silent”** | Toggle, off by default | Their rows exist only while it is on (D47); the footnote reads **Off by default. These rows don't exist anywhere until you turn this on. They count only calls from the moment you turn it on.** (PM-65) |
 | Privacy › **Voice profiles** with **Manage on Person Pages** | Count and push button | Opens People in the main window, filtered to people with a voice profile |
 | Privacy › **What left this Mac** | Table with a call filter and **Export…** | **Time**, **What**, **Size**, **Destination**; Call info on the Call page opens it filtered to that call |
 | Privacy › **Screen Share Test…** | Push button and a sheet, 640 wide (`cpt-noter-component-screen-dialogs`) | The table **What a share would show**, one row per Noter surface and one column per share type, each cell **Hidden**, **Visible** or **May be visible**; **Run Capture Test**, which asks once for **Screen Recording · needed for this test only** · **Continue**, shows **On your screen** beside **What the share sees**, never saves the capture and lists one result row per surface (`cpt-noter-component-ui-status-row`); the limits line, which ends **Share a window, not a display, or press** ⌃⌥⌘0 **to hide Noter.**; **Done** (D50, D96) |
@@ -3491,7 +3501,7 @@ The **Hotkeys** pane:
 | Hotkeys › **Restore Defaults** | Push button | Under **Card keys during calls**, beside the footnote **Pin and undo stay on when dismiss keys are off.**; restores every hotkey and checks the set again |
 | Repositories › mapping table with + and − | Table with a **Default tool** pop-up | **Project or component**, **Local path**, **Default tool** (**Claude Code** or **Codex**); **Add Mapping…** and **Edit Mapping…** open sheets; the Handoff drawer's **Add Mapping…** opens this pane with the sheet open and the project key filled in |
 | Repositories › launch line | Text | **Launch handlers found: claude-cli://, claude://, codex:// · terminal fallback: iTerm** |
-| Knowledge Sources › source table with a + menu | `cpt-noter-component-ui-status-row`, source | **Add Folder…** (system open panel, then the source sheet), **Add MCP Server…** (sheet); each row has **Details…**; the tag shows the privacy class **Normal** or **Sensitive**, or the mode **Live** or **Indexed**; a new source shows its progress, such as **Indexing 9 of 24 files**; Activity's **Open Settings** selects the failed source; an expired sign-in offers **Sign In Again…** |
+| Knowledge Sources › source table with a + menu | `cpt-noter-component-ui-status-row`, source | **Add Folder…** (system open panel, then the source sheet), **Add MCP Server…** (sheet); each row has **Details…**; the tag shows the privacy class **Normal** or **Sensitive**, or the mode **Live** or **Indexed**; a Live source reads **Live lookups paused · they run only in Cloud allowed** while the privacy mode is stricter (PM-68); a new source shows its progress, such as **Indexing 9 of 24 files**; Activity's **Open Settings** selects the failed source; an expired sign-in offers **Sign In Again…** |
 | Knowledge Sources › source sheet | Sheet, 520 pt (`cpt-noter-component-screen-dialogs`) | Title **Add Folder** with the path and file count, or the source name; **Mode** **Live** (**Read when asked; nothing is copied**) or **Indexed** (**Copied into the local index for fast search**); **Schedule** **On change**, **Every hour**, **Every 6 hours** or **Only by hand**; **Privacy class** **Normal** or **Sensitive**, with **Sensitive sources are answered by the local model only.**; **Scope**; for an existing source **Re-index**, **Revoke Token…** and **Remove Source…**, which open alerts; **Cancel** with **Add Source** or **Done** |
 | Maintenance › **Nightly window**, **Allow on battery**, **Backups kept** | Time range, toggle, number field with a stepper from 1 to 30 | Defaults 02:00 to 05:00, off and 7 (PRD › Feature specification › 14) |
 | Maintenance › **Jobs** | `cpt-noter-component-ui-status-row`, job | Switch, trigger, last run, counts, error, **Run Now** |
@@ -3548,7 +3558,7 @@ The **Hotkeys** pane:
 | Remembered display not connected | Call Screen & Menu Bar | **LG UltraFine (not connected)** in the display picker | UX C.2 | `cpt-noter-seq-floating-panel-display-unplugged` (Error — Chosen display not connected) |
 | One display | Call Screen & Menu Bar | One display in the picker, with a line about the floating layout | UX B.13 | `cpt-noter-seq-floating-panel-display-unplugged` (Error — Chosen display not connected) |
 | Job failed | Maintenance, **Jobs** | The error in the row with **Run Now**; the same failure in Activity › **Needs attention** | PRD › Feature specification › 10 | `cpt-noter-seq-activity-review-proposals` (Error — Job failed) |
-| Job running, or a call is live | Maintenance, **Jobs** | Progress in the row; **Jobs wait until the call ends** during a call | UX B.13 | Transient; no path |
+| Job running, or a call is live | Maintenance, **Jobs** | Progress in the row; **Jobs wait until the call ends** during a call, except the previous call's **Post-call analysis**, which keeps running at low priority and can be run now (PM-62) | UX B.13; PM-62 | Transient; no path |
 | Evidence tool missing | Maintenance, **Evidence sources** | **Not configured · install bkt** beside **Bitbucket (bkt)** | PRD › Maintenance jobs, evidence collection and history | `cpt-noter-seq-activity-review-proposals` (Error — Evidence tool missing) |
 | Update ready | Updates | **Version 1.2 installs on next launch** · **Restart Now** | UX B.13 | `cpt-noter-seq-settings-check-privacy` (Other — Install an update) |
 | Storage folder in iCloud or Dropbox | General, **Storage location** | Warning line under the path: **This folder is in iCloud Drive, so your recordings sync off this Mac. Choose a local folder.** | PRD › Feature specification › 14 | `cpt-noter-seq-settings-check-privacy` (Error — Storage folder in iCloud Drive) |
@@ -3918,7 +3928,7 @@ Every in-app shortcut also appears in a menu (D51). App-menu shortcuts never rea
 | --- | --- | --- | --- | --- |
 | Record prompt appears | Record prompt | Polite | "Noter: Record this call? Press Control-Option-Command-R to record." | Native announcement |
 | Recording started, paused, resumed or stopped | Call window, record prompt | Polite | "Recording started", "Paused", "Resumed", "Recording stopped, saved 48 minutes" | Native announcement |
-| Capture failure | Call window, menu bar extra | Assertive | "System audio lost. Recording continues with your microphone." | Native announcement; notification NT-3 when no Noter surface is visible |
+| Capture failure | Call window, menu bar extra | Assertive | "System audio silent. Recording continues with your microphone.", "Microphone off." or "Not recording. The audio engine stopped." | Native announcement; notification NT-3 when no Noter surface is visible |
 | A new meeting may have started | Call window or record prompt | Assertive | "A new meeting may have started: 1:1 with Anna K." | Native announcement (PM-39) |
 | Call seems to have ended | Call window or record prompt | Assertive | "The call seems to have ended. Noter stops recording in 10 seconds. Press Control-Option-Command-N, then Return, to keep recording." | Native announcement (D80); the seconds are not announced |
 | New copilot card | Call window | Polite | Type, agent and first sentence up to 100 characters: "Context from Architect: On 2 Oct you and Dmitri agreed…" | Live region while the panel is key, native otherwise |
@@ -4000,10 +4010,11 @@ The panel is 360 pt wide, grows up to 440 pt for longer strings, and its height 
 | Variant | Used where | Difference |
 | --- | --- | --- |
 | Default | A call is detected or a calendar event matches | Title, source line, **Not Now**, **Record as Sensitive** and **Record** with ⌃⌥⌘R |
-| Disk low | Less than 500 MB free | Reason **Not enough disk space to record (420 MB free)**; **Not Now**, **Delete Old Audio…** and **Record** disabled, without **Record as Sensitive**; **Delete Old Audio…** opens, in the main window, the sheet **Delete audio older than 30 days? Frees 6.2 GB. Transcripts and summaries stay.** with **Cancel** and **Delete Audio** |
-| System audio off | Access revoked after setup (PM-30) | Reason **System audio access is off**; **Not Now** and **Open System Settings…** (primary), which replaces **Record**; macOS then asks **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen**, a prompt that is macOS's own |
+| Disk full | Less than 500 MB free | Reason **Not enough disk space to record (420 MB free)**; **Not Now**, **Delete Old Audio…** and **Record** disabled, without **Record as Sensitive**; **Delete Old Audio…** opens, in the main window, the sheet **Delete audio older than 30 days? Frees 6.2 GB. Transcripts and summaries stay.** with **Cancel** and **Delete Audio** |
+| Speech model not downloaded | The live speech model is still downloading (PM-60) | Reason **The speech model is still downloading (62 %)**; **Not Now** and **Record** disabled, without **Record as Sensitive**; the only setup item that refuses a start |
+| System audio off | Access known to be off (PM-30, PM-60) | Reason **System audio access is off · only your side will be recorded**; **Not Now**, **Open System Settings…** and **Record** (primary), which still starts capture; macOS then asks **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen**, a prompt that is macOS's own |
 | Call ended | Call window hidden or closed, not hidden for presenting (D80) | Title **The call seems to have ended**; body **Microsoft Teams stopped using audio and the microphone 20 s ago. Stopping in 10 s.**; **Keep Recording** (primary, default) and **Stop Now**; countdown bar |
-| New meeting | Call window hidden or closed while recording, when the next calendar event starts or the meeting app's meeting changes (PM-39) | Title **A new meeting may have started: 1:1 with Anna K.**; body **Planning: VHI 8.0 drawer redesign is still recording.** (PM-59); **Start as New Call** (primary, default) saves this call and starts the new one, so each call keeps its own title, attendees and outputs; **Keep in This Call**; no countdown |
+| New meeting | Call window hidden or closed while recording, when the next calendar event starts or the meeting app's meeting changes (PM-39) | Title **A new meeting may have started: 1:1 with Anna K.**; body **Planning: VHI 8.0 drawer redesign is still recording.** (PM-59); **Start as New Call** (primary, default) saves this call and starts the new one, so each call keeps its own title, attendees and outputs; **Keep in This Call**; no visible countdown: unanswered for 60 s, **Start as New Call** applies (PM-67) |
 
 **States.**
 
@@ -4012,7 +4023,7 @@ The panel is 360 pt wide, grows up to 440 pt for longer strings, and its height 
 - Focus (reached with VoiceOver window navigation): focus ring on the control; the timer pauses.
 - Pressed: the button darkens; after **Record** or **Record as Sensitive** the panel closes and the call window opens.
 - Disabled: **Record** in the disabled label colour, without hover, with its reason beside it.
-- Error: a refused start shows the Disk low or System audio off variant.
+- Error: a refused start shows the Disk full or Speech model not downloaded variant; the System audio off variant only warns, and **Record** works (PM-60).
 - Not a call: after **Don't Ask for Safari…**, the inline confirmation with **Back** and **Don't Ask** takes the place of the actions; **Back** returns to them (PM-55, PM-59).
 - Countdown running (call-ended variant): a thin bar drains over 10 s and the seconds in the body update once a second.
 - Countdown paused (call-ended variant): hovered or focused; the body reads **Paused while you're here**.
@@ -4064,7 +4075,7 @@ Decisions about the recording itself must be seen at a glance and made without a
 - The countdown belongs to the core; the notice reports hover and focus so that the core pauses it.
 - It processes and deletes nothing; **Discard Recording** and **Continue Recording** are core commands.
 - The closing state around a stopped variant (10 s, then the window closes) belongs to `cpt-noter-component-shell-call-window`; the notice shows only its line and actions.
-- Informational states (transcription stalled, system audio lost, disk warning) belong to `cpt-noter-component-ui-inline-banner` in CS-R3, CS-R4d and FP-R3.
+- Informational states (transcription stalled, system audio silent, microphone off, engine stopped, disk warning) belong to `cpt-noter-component-ui-inline-banner` in CS-R3, CS-R4d and FP-R3.
 
 ##### Related components (by ID)
 
@@ -4095,7 +4106,7 @@ The call-ended variant of `cpt-noter-component-ui-record-prompt` repeats this no
 | Variant | Used where | Difference |
 | --- | --- | --- |
 | Call ended | The meeting app released audio and microphone for 20 s (D80) | Title **The call seems to have ended**; body **Microsoft Teams stopped using audio and the microphone 20 s ago. Stopping in 10 s.**; **Keep Recording** (primary, default) and **Stop Now**; countdown bar |
-| New meeting | While recording, the next calendar event starts or the meeting app's meeting changes (PM-39) | Title **A new meeting may have started: 1:1 with Anna K.**; body **Microsoft Teams joined a new meeting at 14:30.**; **Start as New Call** (primary, default) saves this call, then starts the new one, so each call keeps its own title, attendees and outputs; **Keep in This Call**; no countdown |
+| New meeting | While recording, the next calendar event starts or the meeting app's meeting changes (PM-39) | Title **A new meeting may have started: 1:1 with Anna K.**; body **Microsoft Teams joined a new meeting at 14:30.**; **Start as New Call** (primary, default) saves this call, then starts the new one, so each call keeps its own title, attendees and outputs; **Keep in This Call**; no visible countdown: unanswered for 60 s, **Start as New Call** applies (PM-67) |
 | Stopped automatically | Closing state after the countdown ends (D80, D81) | Title **Stopped at 11:02 · the call had ended · 48 min saved**; **Continue Recording** and **Open in Noter** (primary, default) (PM-59) |
 | Stopped by you | Closing state after a manual stop (PM-43) | Title **Saved · 48 min · Summary in about 2 minutes**; **Continue Recording**, **Open in Noter** (primary, default) and **Close** (PM-59) |
 | Nothing heard | No speech for 5 minutes after start | Title **Nothing heard yet**; body holds the level meters **You** and **Others**; **Discard Recording** with the inline confirmation, and **Keep Recording** (quiet) which closes the notice and keeps recording (PM-59) |
@@ -4149,7 +4160,7 @@ The recording indicator shows the capture state in colour and words inside Noter
 ##### Responsibility scope
 
 - Shows a dot and a state word, optionally with the elapsed time.
-- Shows recording, paused, microphone only and stopped.
+- Shows recording, paused, microphone only, no microphone, not recording and stopped.
 - In its button variant, brings the call window forward from the main window.
 
 ##### Responsibility boundaries
@@ -4175,7 +4186,7 @@ The recording indicator shows the capture state in colour and words inside Noter
 **Anatomy.**
 
 1. Dot in the Recording colour, sized to the cap height of the text next to it.
-2. State word: **Recording**, **Paused**, **Recording · mic only** or **Stopped**.
+2. State word: **Recording**, **Paused**, **Recording · mic only**, **Recording · no mic**, **Not recording** or **Stopped**.
 3. Optional elapsed time in tabular figures.
 
 **Variants.**
@@ -4191,7 +4202,9 @@ The recording indicator shows the capture state in colour and words inside Noter
 
 - Recording: solid static dot and **Recording**.
 - Paused: hollow ring and **Paused**; in the collapsed strip, **Paused 3 min**.
-- Microphone only: dot with a warning glyph and **Recording · mic only**, after system audio is lost.
+- Microphone only: dot with a warning glyph and **Recording · mic only**, while system audio is silent.
+- No microphone: dot with a warning glyph and **Recording · no mic**, while microphone access is off (PM-60).
+- Not recording: no dot and **Not recording**, after the audio engine stopped and could not be restarted (PM-67).
 - Stopped: no dot and **Stopped**, during the call window's closing state.
 - Hover, focus, pressed: button variant only, with push-button feedback.
 - Disabled, loading, error: not used; capture errors belong to the capture notice and the banners.
@@ -4360,7 +4373,9 @@ The call status strip puts the call's state and its controls in one line at the 
 
 - Recording: solid indicator; **Pause** is secondary.
 - Paused: **Resume** becomes the primary button; hollow indicator.
-- Microphone only: the indicator reads **Recording · mic only** with a warning glyph in the dot while system audio is lost.
+- Microphone only: the indicator reads **Recording · mic only** with a warning glyph in the dot while system audio is silent.
+- No microphone: the indicator reads **Recording · no mic** with a warning glyph while microphone access is off (PM-60).
+- Engine stopped: the indicator reads **Not recording**; **Pause** and **Stop Recording** give way to **Try Again** (PM-67).
 - Budget near the cap: Warning colour and icon, **Budget $0.92 of $1.00**.
 - Cap reached: **Budget $1.00 of $1.00** in the Warning colour with its icon; the copilot banner carries **Copilot paused: budget** with **Raise Cap to $2**.
 - Mark feedback: the **Mark Moment** button itself reads ✓ **Marked 00:21:08** for 2 s (PM-59).
@@ -4548,7 +4563,9 @@ Separators divide the groups. The menu and the **Mute Copilot** submenu use the 
 - For 5 minutes after any stop, the closing line (**Saved · 48 min · Summary in about 2 minutes**, or **Stopped at 11:02 · the call had ended · 48 min saved**) with **Continue Recording** (PM-43).
 - **Switched to local**, as an extra line while degraded.
 - **Hidden for presenting**, while recording: **Hide for Presenting** becomes **Show Noter**; the title is cleared. While not recording, only **Show Noter** and, for a detected call, **Call Detected · Start Recording** mark hidden mode, besides the glyph (PM-59).
-- **Setup incomplete · call detection off**, with **Finish Setup…**. **Start Recording** still works when microphone and system-audio access are granted, and reads **Finish Setup…** when they were never granted (PM-30).
+- **Setup incomplete · call detection off**, with the **Finish Setup…** link. **Start Recording** works in every setup state and never reads **Finish Setup…** (PM-30, PM-60).
+- **System audio silent** or **Microphone off**, as the degraded line while recording (PM-60).
+- **Not recording · engine stopped**, with **Try Again** in the capture group (PM-67).
 
 **Content rules.**
 
@@ -4594,7 +4611,7 @@ The transcript view shows a call's transcript as a virtualised log: during the c
 
 - The view owns no segments; it renders the transcript stream that the window store buffers and draws every 100 ms. Confirmed rows never move or change.
 - It never announces lines (PRD › Live copilot › Guardrails).
-- Capture problems are not drawn in the log as they happen: **Transcription stalled** and **System audio lost** are inline banners in CS-R3, and **Nothing heard yet** is a capture notice in CS-R0. The log keeps only gap rows for the time lost.
+- Capture problems are not drawn in the log as they happen: **Transcription stalled**, **System audio silent**, **Microphone off** and **Not recording · engine stopped** are inline banners in CS-R3, and **Nothing heard yet** is a capture notice in CS-R0. The log keeps only gap rows for the time lost.
 
 ##### Related components (by ID)
 
@@ -4614,7 +4631,7 @@ The transcript view shows a call's transcript as a virtualised log: during the c
 
 1. Scroll area with a virtualised list.
 2. Segment rows (`cpt-noter-component-ui-transcript-segment-row`).
-3. Gap rows: **Paused 00:21:08–00:23:40**, **System audio lost 00:30:02–00:30:40**, **Microphone changed · 2 s lost**, **Stopped 11:02–11:04**.
+3. Gap rows: **Paused 00:21:08–00:23:40**, **System audio silent 00:30:02–00:30:40**, **Engine restarted · 2 s lost**, **Microphone changed · 2 s lost**, **Stopped 11:02–11:04**.
 4. Mark rows: ⚑ **Marked 00:21:00**.
 5. Hypothesis row, always last.
 6. **Jump to Live** pill at the bottom centre: a small button with a down chevron, **Jump to Live · 12 new lines**.
@@ -4739,7 +4756,7 @@ The play control follows the output route:
 | --- | --- | --- |
 | Capturing, headphones | Shown on hover or focus; Space plays while the panel is key | **Play this line** |
 | Capturing, speakers | Shown disabled | **Replay is off while recording on speakers: the call would hear it. Use headphones, or replay after the call.** |
-| Capturing, output not identified | Disabled | **Noter can't tell whether this output is headphones. Choose Headphones in Settings › Audio & Transcription to replay while recording.** |
+| Capturing, output not identified | Disabled | **Noter can't tell whether this output is headphones. Mark it as headphones in Settings › Audio & Transcription to replay while recording.** |
 | Capturing, Noter's sounds not excluded | Disabled | **Replay would be recorded. Turn on Exclude Noter's own sounds in Settings › Audio & Transcription.** |
 | Route switches to speakers while playing | Returns to disabled; the bar stops | None |
 | After the call, audio kept | Shown on hover or focus; Space plays | **Play this line** |
@@ -6354,7 +6371,7 @@ Before a call the user needs to see what this person or group agreed last time a
 
 ##### Responsibility boundaries
 
-- Does not rank or choose the items; the core sends them in the PRD order: items owed to people on a call today first, then due date, then age (PRD › Feature specification › 13).
+- Does not rank or choose the items; the core sends them in the PRD order: items owed to people on a call today first, then due date, then age, or by due date first when Settings › General › Today › **Ranking** says so (PRD › Feature specification › 13; PM-63).
 - Does not match calendar events to recordings; the core does, and sends a synthetic event for a live call with no calendar match.
 - Does not tick, accept or edit items; the nested `cpt-noter-component-ui-action-item-row` does.
 - Does not read the calendar or ask for access; Today does, from **Allow Calendar Access** (PM-18, PM-34).
@@ -7560,7 +7577,7 @@ Knowledge sources, maintenance jobs, evidence sources, runtimes and model bundle
 - sign-in expired (indexed source): warning icon, **Sign-in expired** and **Confluence sign-in expired · last sync 3 days ago**, with **Sign In Again…**.
 - not configured: neutral icon and **Not configured** with the fix line.
 - disabled: toggle off, **Off**, text in the secondary token.
-- waiting for a call to end: clock icon, **Waiting**, and job rows show **Jobs wait until the call ends**, because nothing but capture runs during a live call (PRD › Maintenance jobs, evidence collection and history › Scheduler).
+- waiting for a call to end: clock icon, **Waiting**, and job rows show **Jobs wait until the call ends**, because during a live call only capture and the previous call's post-call analysis run; maintenance jobs, the archive pass and regeneration wait (PRD › Maintenance jobs, evidence collection and history › Scheduler; PM-62).
 - share test results: **Hidden** with a success check, or **Visible** with a warning icon.
 - hover and focus: row tint and a ring around the row.
 
@@ -8577,7 +8594,7 @@ Global hotkeys are configurable (PRD › Feature specification › 14. Settings 
 ##### Responsibility boundaries
 
 - The core registers and releases hotkeys and reports conflicts; the recorder shows what the core reports.
-- The recorder edits the chord only; the core decides when card keys are registered: while capture runs with the copilot on and Noter not hidden (D70).
+- The recorder edits the chord only; the core decides when card keys are registered: while capture runs with the copilot on, not muted and Noter not hidden (D70, PM-67).
 - The row list, the **Card keys during calls** group, **Use card keys during calls**, **Dismiss with keys** and **Restore Defaults** belong to the Settings window's Hotkeys pane.
 
 ##### Related components (by ID)
@@ -8795,8 +8812,8 @@ Errors and degraded states appear where the affected function lives, name the ne
 | Variant | Used where | Difference |
 | --- | --- | --- |
 | Info | PC-R2 (**Transcript upgraded** with **Show Diff**); Ask scope notes; FP-R3 the first time the floating layout opens (**Hidden from window shares only. Before sharing your whole screen, press** ⌃⌥⌘0. with **Got It**, PM-49); the Screen Share Test limits | Info icon; dismissible |
-| Warning | TD-R2 (**Calendar access is off** with **Open System Settings…**; **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** with **Open Call** and, while the call app still uses audio, **Resume Recording**, PM-46); disk at 2 GB free with **Delete Old Audio…**; LS-R2 (**Only weak matches for “Übergabe der Schnittstelle”** · **None of these contain your words; they are close in meaning.** with **Clear Filters**, **Search All Languages** and **Ask Instead**, only those that apply, D97); the Ask weak-evidence line (D98) | Warning icon and token; not dismissible |
-| Error | CS-R3 (**System audio lost** with **Open System Settings…**), section failures (**Try Again**, **Use Local Model**), Screen Share Test (**Couldn't capture the display.** with **Try Again**) | Error icon and token; stays until resolved |
+| Warning | TD-R2 (**Calendar access is off** with **Open System Settings…**; **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** with **Open Call** and **Resume Recording**, PM-46); disk at 2 GB free with **Delete Old Audio…**; LS-R2 (**Only weak matches for “Übergabe der Schnittstelle”** · **None of these contain your words; they are close in meaning.** with **Clear Filters**, **Search All Languages** and **Ask Instead**, only those that apply, D97); the Ask weak-evidence line (D98) | Warning icon and token; not dismissible |
+| Error | CS-R3 (**System audio silent** or **Microphone off** with **Open System Settings…**; **Not recording · engine stopped** with **Try Again**), TD-R2 (**Not recording · engine stopped**), section failures (**Try Again**, **Use Local Model**), Screen Share Test (**Couldn't capture the display.** with **Try Again**) | Error icon and token; stays until resolved |
 | Degraded | CS-R4d (**Switched to local · trying Claude again in 10 min**, **Copilot paused: budget** with **Raise Cap to $2**), keyword-only search with progress | Warning icon and the word of the mode; not dismissible |
 | Success | Settings and update notices | Success icon; dismissible |
 | Compact | FP-R3 | Same content in the floating panel's width; actions under the sentence |
@@ -8806,7 +8823,7 @@ Errors and degraded states appear where the affected function lives, name the ne
 - shown; hover and focus on actions.
 - working: an action shows loading while the core retries.
 - stacked: **+2 More** opens the waiting banners as a list in place.
-- dismissed (info and success): gone until the event happens again.
+- dismissed (info and success, and the warning **Noter quit during …**): gone until the event happens again; dismissing the quit banner ends its **Resume Recording** offer (PM-67).
 
 **Content rules**
 
@@ -8827,7 +8844,7 @@ Errors and degraded states appear where the affected function lives, name the ne
 
 - Info, success and degraded banners are status messages, read politely; an error is an alert only when the user's own last action caused it.
 - Banners present when a page loads are read with the page.
-- In the call window, which is usually not key, the core posts a native announcement (D55); capture failures are assertive ("System audio lost. Recording continues with your microphone."), everything else polite.
+- In the call window, which is usually not key, the core posts a native announcement (D55); capture failures are assertive ("System audio silent. Recording continues with your microphone."), everything else polite.
 
 **Motion and appearance**
 
@@ -9027,8 +9044,8 @@ External systems, databases, and third-party services this module interacts with
 
 | Permission | Asked where | On denial |
 |------------|-------------|-----------|
-| Microphone | First-run wizard › Permissions, **Allow…** | The row shows **Open System Settings…**; call detection stays off, and every start control reads **Finish Setup…** (PM-30) |
-| System Audio Recording | First-run wizard › Permissions, **Open System Settings…** with a how-to line | Same; revoked later: the record prompt and the call screen show **Open System Settings…**, then the macOS prompt to quit and reopen Noter when macOS asks for it (PM-30); lost during a call: "System audio lost" with the fix, the microphone keeps recording |
+| Microphone | First-run wizard › Permissions, **Allow…**; if macOS never asked, the first capture brings up its prompt | The row shows **Open System Settings…**; call detection stays off; **Record** still starts capture, and the call window shows **Microphone off** (PM-30, PM-60) |
+| System Audio Recording | First-run wizard › Permissions, **Open System Settings…** with a how-to line | Same; revoked later: the record prompt and the call screen show **Open System Settings…**, then the macOS prompt to quit and reopen Noter when macOS asks for it (PM-30); **Record** still starts capture; silent or lost during a call: "System audio silent" with the fix, the microphone keeps recording (PM-60) |
 | Files and Folders | Settings › Knowledge Sources › **Add Folder…** (the system open panel) | The folder is not added |
 | Notifications | The Call page after the first recorded call, **Notify Me When Summaries Are Ready** (D68) | Ready and failed states stay visible in Noter; Settings › General shows **Notifications are off for Noter** with **Open System Settings…** (PM-31) |
 | Calendar | Today › **Allow Calendar Access**, or the same button on the Settings › Privacy permission row (D63, PM-34) | Today shows "Calendar access is off · **Open System Settings…**" and lists items without calls |
@@ -9088,13 +9105,13 @@ SLA expectations, circuit breakers and rate limiting toward external systems are
 | `cpt-noter-seq-first-run-download-models` | Download the models while finishing setup | First-run wizard | Error: No connection; Error: Not enough disk space; Error: Download failed its check; Error: Speech model not downloaded yet | No | stories-a |
 | `cpt-noter-seq-first-run-connect-assistant` | Connect an assistant or stay local | First-run wizard | Error: API key rejected; Other: Sign in with your own account; Empty: No key and no local runtime | No | stories-a |
 | `cpt-noter-seq-record-prompt-start-recording` | Start recording a detected call | Record prompt | Other: Vendor call recorded as sensitive; Other: Not a call; Error: Not enough disk space; Error: System audio access is off | Yes | stories-a |
-| `cpt-noter-seq-record-prompt-record-after-missed-prompt` | Record after the prompt has closed | Record prompt | Empty: Prompt closed unanswered; Error: Setup incomplete; Error: Audio access never granted; Empty: Hidden for presenting | No | stories-a |
+| `cpt-noter-seq-record-prompt-record-after-missed-prompt` | Record after the prompt has closed | Record prompt | Empty: Prompt closed unanswered; Error: Setup incomplete; Error: Audio access not granted yet; Empty: Hidden for presenting | No | stories-a |
 | `cpt-noter-seq-today-review-before-call` | Review open items before a call | Today | Other: Return to a live call; Empty: Calendar not allowed yet; Error: Calendar access denied; Error: Calendar read failed; Empty: No calls today; Error: Noter quit during a recording | No | stories-a |
 | `cpt-noter-seq-today-tick-item` | Tick an item done | Today | Error: Item has an open handoff; Error: Ticked by mistake; Empty: Nothing open yet | No | stories-a |
 | `cpt-noter-seq-call-screen-pin-card` | Pin a card while the call app keeps focus | Call screen | Error: Card key used by another app; Empty: No card with that number; Other: Check what is pinned | Yes | stories-a |
 | `cpt-noter-seq-call-screen-catch-up` | Catch up after a distraction | Call screen | Error: Catch-up still being written; Other: Ask about this call | No | stories-a |
 | `cpt-noter-seq-call-screen-read-copilot-state` | Tell a quiet copilot from a broken one | Call screen | Empty: No card yet; Error: Card too late; Error: Switched to local; Error: Copilot paused by budget; Error: Copilot off for a sensitive call; Other: Make the call sensitive during the call | No | stories-a |
-| `cpt-noter-seq-call-screen-recover-capture` | Keep recording through capture problems | Call screen | Error: System audio lost; Error: Headphones connected; Error: Transcription stalled; Empty: Nothing heard yet; Error: Disk nearly full | No | stories-a |
+| `cpt-noter-seq-call-screen-recover-capture` | Keep recording through capture problems | Call screen | Error: System audio silent; Error: Microphone off; Error: Engine stopped; Error: Headphones connected; Error: Transcription stalled; Empty: Nothing heard yet; Error: Disk nearly full | No | stories-a |
 | `cpt-noter-seq-call-screen-name-speaker` | Name a speaker during the call | Call screen | Empty: No matching person | No | stories-a |
 | `cpt-noter-seq-call-screen-stop-at-call-end` | Stop recording when the call ends | Call screen | Error: Next meeting starts straight away; Error: Stopped by mistake; Empty: No answer to the notice; Error: Call window hidden; Error: Hidden for presenting | Yes | stories-a |
 | `cpt-noter-seq-call-screen-replay-line` | Reread or replay a line during the call | Call screen | Error: Recording on speakers; Error: Output switches to speakers; Error: Output not identified; Error: Noter's own sounds not excluded | No | stories-a |
@@ -9203,8 +9220,8 @@ User:
 User:
 
 1. Clicks **Skip for Now** on **Microphone and system audio** with both permissions granted, and sees the step marked with a dash in the stepper
-2. Clicks **Finish** on **Assistants** and sees Today with **Call detection is off until the audio self-test passes** and **Run Audio Self-Test…**
-3. Clicks the menu bar icon and sees **Setup incomplete · call detection off** with **Finish Setup…**
+2. Clicks **Finish** on **Assistants** and sees Today with **Call detection is off until the audio self-test passes** and **Run Audio Self-Test…**, and **Record** in the toolbar as always
+3. Clicks the menu bar icon and sees **Setup incomplete · call detection off** with the **Finish Setup…** link above **Start Recording**
 4. Clicks **Run Audio Self-Test…** on Today and sees the self-test sheet with **Run Test**
 5. Clicks **Run Test** and gets **Self-test passed**, with the banner gone and call detection on
 
@@ -9396,12 +9413,12 @@ User:
 
 User:
 
-1. Sees **Record this call?** with **System audio access is off** and **Open System Settings…** in place of **Record**
+1. Sees **Record this call?** with **System audio access is off · only your side will be recorded**, **Open System Settings…** and **Record**, which is still the default
 2. Clicks **Open System Settings…** and sees System Settings open at Privacy & Security
 3. Ticks Noter in the system audio list
 4. Sees the macOS prompt **“Noter” needs to quit and reopen to record system audio.** with **Later** and **Quit & Reopen**, and clicks **Quit & Reopen**
 5. Presses ⌃⌥⌘R once Noter is back
-6. Gets the call screen with **Recording** and both sides of the call in the transcript
+6. Gets the call screen with **Recording** and both sides of the call in the transcript; clicking **Record** at step 1 instead records at once, with **System audio silent** on the call screen (PM-60)
 
 #### Record prompt — Record after the prompt has closed
 
@@ -9440,22 +9457,21 @@ User:
 User:
 
 1. Sees no **Record this call?** when Microsoft Teams starts the call
-2. Clicks the menu bar icon and sees **Setup incomplete · call detection off** with **Finish Setup…**
+2. Clicks the menu bar icon and sees **Setup incomplete · call detection off** with the **Finish Setup…** link
 3. Clicks **Start Recording** and sees the call screen open with **Recording**
 4. Clicks **Finish Setup…** after the call and sees the first-run window at **Permissions**
 5. Clicks **Run Test** and gets **Self-test passed**, with call detection on for the next call
 
-**Error path — Audio access never granted**
+**Error path — Audio access not granted yet**
 
 User:
 
-1. Sees no **Record this call?** when Microsoft Teams starts the call
-2. Clicks the menu bar icon and sees **Finish Setup…** where **Start Recording** usually is
-3. Clicks **Finish Setup…** and sees the first-run window at **Microphone and system audio**
-4. Clicks **Allow…** beside **Microphone** and allows it in the macOS prompt
-5. Clicks **Open System Settings…** beside **System audio recording** and turns Noter on there
-6. Clicks the menu bar icon and sees **Start Recording** back in the menu
-7. Clicks **Start Recording** and gets the call screen with **Recording** in the status strip
+1. Sees no **Record this call?** when Microsoft Teams starts the call, because setup was left before the permissions step
+2. Clicks the menu bar icon and sees **Start Recording**, with **Setup incomplete · call detection off** and the **Finish Setup…** link above it
+3. Clicks **Start Recording** and sees the macOS prompt **“Noter” would like to access the microphone.**, then allows it
+4. Sees the call screen open with **System audio silent** and **Open System Settings…** at the top of the transcript, and **Recording · mic only** in the status strip
+5. Clicks **Finish Setup…** in the menu bar after the call and allows system audio recording on **Microphone and system audio**
+6. Gets this call recorded from the microphone, and both sides from the next call on
 
 **Empty path — Hidden for presenting**
 
@@ -9543,7 +9559,7 @@ User:
 2. Sees **Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12** with **Open Call**, which opens that call's **Transcript**, and **Resume Recording** at the top of Today
 3. Clicks **Resume Recording**, while Microsoft Teams still uses the microphone
 4. Sees the call window with the transcript up to 00:47:12 and **Recording** in the status strip
-5. Gets the same call recording again, with the lost minutes shown as a gap in the transcript
+5. Gets the same call recording again, with the lost minutes shown as a gap in the transcript; × on the banner instead dismisses it and the offer with it
 
 #### Today — Tick an item done
 
@@ -9807,14 +9823,32 @@ User:
 3. Sees the banner close and the transcript carry on without the Slack sound
 4. Gets one clean recording of the call, with nothing lost
 
-**Error path — System audio lost**
+**Error path — System audio silent**
 
 User:
 
-1. Sees **System audio lost** with **Open System Settings…** at the top of the transcript, and **Recording · mic only** in the status strip
+1. Sees **System audio silent** with **Open System Settings…** at the top of the transcript, and **Recording · mic only** in the status strip
 2. Clicks **Open System Settings…** and ticks Noter in the system audio list
 3. Sees the banner close and **Recording** back in the status strip
-4. Gets both sides captured again, with the gap shown as **System audio lost 00:30:02–00:30:40** in the transcript
+4. Gets both sides captured again, with the gap shown as **System audio silent 00:30:02–00:30:40** in the transcript
+
+**Error path — Microphone off**
+
+User:
+
+1. Starts recording with microphone access turned off for Noter, and sees the call window open as usual
+2. Sees **Microphone off** with **Open System Settings…** at the top of the transcript, and **Recording · no mic** in the status strip
+3. Clicks **Open System Settings…** and turns Noter on under Microphone
+4. Gets their own side recorded from then on, while the other side was recorded throughout
+
+**Error path — Engine stopped**
+
+User:
+
+1. Sees **Not recording · engine stopped** with **Try Again** at the top of the transcript, and **Not recording** in the status strip, after the audio engine stopped and could not be restarted
+2. Clicks **Try Again**
+3. Sees **Recording** back in the status strip and the banner close
+4. Gets the same call going on, with the lost time shown as a gap row; with the call window hidden, the notification **Not recording · engine stopped** would have said so
 
 **Error path — Headphones connected**
 
@@ -9941,7 +9975,7 @@ User:
 2. Sees **A new meeting may have started: 1:1 with Anna K.** at the top of the call window, with **Start as New Call** and **Keep in This Call**
 3. Clicks **Start as New Call**
 4. Sees **Saved “Planning: VHI 8.0 drawer redesign” · started “1:1 with Anna K.”** in the status strip, **1:1 with Anna K.** in the transcript header, **Waiting for speech…** in the transcript and the clock at **00:00:12**
-5. Gets two calls, each with its own title, attendees and outputs
+5. Gets two calls, each with its own title, attendees and outputs; the planning call's summary is written while the 1:1 records, and its **Summary ready** arrives after the 1:1 ends (PM-62)
 
 **Error path — Stopped by mistake**
 
@@ -10025,9 +10059,9 @@ User:
 User:
 
 1. Hovers over a line and sees its play control disabled
-2. Hovers over the control and sees **Noter can't tell whether this output is headphones. Choose Headphones in Settings › Audio & Transcription to replay while recording.**
-3. Opens Settings › Audio & Transcription and selects **Headphones** under **Output**
-4. Gets the play controls working on the call screen while the recording runs
+2. Hovers over the control and sees **Noter can't tell whether this output is headphones. Mark it as headphones in Settings › Audio & Transcription to replay while recording.**
+3. Opens Settings › Audio & Transcription and ticks **Treat as headphones** on **Scarlett 2i2 USB** under **Output devices**
+4. Gets the play controls working on the call screen while the recording runs on that device, and only on it
 
 **Error path — Noter's own sounds not excluded**
 
@@ -10248,9 +10282,9 @@ User:
 
 User:
 
-1. Sees the notification **System audio lost** with **Recording continues with your microphone.** while the panel is hidden
+1. Sees the notification **System audio silent** with **Recording continues with your microphone.** while the panel is hidden
 2. Clicks the notification
-3. Sees the call window open with **System audio lost** and **Open System Settings…** at the top of the transcript
+3. Sees the call window open with **System audio silent** and **Open System Settings…** at the top of the transcript
 4. Gets the fix one click away, with the gap marked in the transcript
 
 **Error path — Panel closed by a crash**
@@ -10350,9 +10384,18 @@ User:
 User:
 
 1. Clicks the menu bar icon after skipping the self-test in first run
-2. Sees **Setup incomplete · call detection off** with **Finish Setup…**
+2. Sees **Setup incomplete · call detection off** with the **Finish Setup…** link, and **Start Recording** ready as always
 3. Clicks **Finish Setup…** and sees the first-run window at **Permissions**
 4. Clicks **Run Test** and gets **Self-test passed**, with call detection on
+
+**Other path — New meeting while hidden**
+
+User:
+
+1. Presents with Noter hidden while a call is recording, and the next calendar event starts
+2. Clicks the menu bar icon and sees **A new meeting may have started: 1:1 with Anna K.** with **Start as New Call** and **Keep in This Call**
+3. Clicks **Start as New Call**, or leaves it for 60 s, which applies the same
+4. Gets the first call saved and the new one recording under its own title, with nothing shown on the shared screen
 
 #### Menu bar extra — Mute the copilot for a while
 
@@ -11701,8 +11744,8 @@ User:
 
 User:
 
-1. Opens **Agents** and sees **Switched itself off for 1:1 calls** with **Turn On** on Designer's row
-2. Sees under the list **Percentages: cards rated useful or used over the last 20 calls. An agent dismissed in a call type for ten calls switches itself off there.**
+1. Opens **Agents** and sees, once, **Designer switched itself off for 1:1 calls** with **Undo** at the top, and **Switched itself off for 1:1 calls** with **Turn On** on Designer's row
+2. Sees under the list **Percentages: cards rated useful or used over the last 20 calls. An agent switches itself off for a call type when 80 % of its cards there were dismissed over the last 10 calls.**
 3. Clicks **Turn On**
 4. Gets Designer back on for 1:1 calls, with **Turned on for 1:1 calls** under the list and **1:1** ticked again under **Runs on**
 
@@ -12253,7 +12296,7 @@ The UI ships inside the signed, notarised app bundle; its topology is the set of
 | Call window, floating layout | The same window | Beside the call app on the remaining display; 340 to 600 wide; default height the smaller of 760 and 60 % of the visible height, minimum 300; collapses to a 56-high strip; snaps to screen edges and to the main window; position remembered per display | Floating level, joins all Spaces | On |
 | Record prompt panel | WebView in a non-activating panel | Top right of the main display, 12 under the menu bar and 12 from the right edge, and below the call app's meeting toolbar when the call app's window covers that corner (PM-45, to verify with Microsoft Teams); 360 wide, up to 440; also shows the call-ended notice and the new-meeting notice when the call window is hidden (PM-39) | Floating level | On |
 | Menu bar extra | Native status item and menu | The menu bar of every display | System | Not applicable; its title is cleared while hidden for presenting |
-| Notifications | Native | Notification Centre | System | Not applicable; held while hidden for presenting and while a call is being recorded, then delivered one per call (PM-44) |
+| Notifications | Native | Notification Centre | System | Not applicable; held while hidden for presenting and while a call is being recorded, then delivered one per call (PM-44); NT-3 is never held, and is not sent while hidden for presenting (PM-67) |
 | Alerts | Native | Attached to their window as a sheet where the plugin allows, otherwise app-modal | System | Not applicable |
 | Sheets and popovers | WebView, inside the parent window | Attached to the parent window or control | The parent's level | As the parent |
 
@@ -12287,7 +12330,7 @@ flowchart LR
 
 ### 4.1 UX decision log
 
-Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is listed here, except the rows that PM-56 withdraws, with its outcome, a one-line reason, the IDs it affects and its status. **Accepted** means the decision stands; **Accepted (owner, 17 Oct)** marks the rows the product owner confirmed on 17 October 2026, when every remaining proposal was accepted as built in the clickable prototype and synced into the PRD. **Proposal (verify)** means the decision holds once it is checked on the owner's setup (4.3). **Changed by** names the decision that replaced or widened it. How the design relates to the clickable prototype, the UI prototype of record, is in 5.3 (PM-59).
+Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-68) is listed here, except the rows that PM-56 withdraws, with its outcome, a one-line reason, the IDs it affects and its status. **Accepted** means the decision stands; **Accepted (owner, 17 Oct)** marks the rows the product owner confirmed on 17 October 2026, when every remaining proposal was accepted as built in the clickable prototype and synced into the PRD. **Proposal (verify)** means the decision holds once it is checked on the owner's setup (4.3). **Changed by** names the decision that replaced or widened it. How the design relates to the clickable prototype, the UI prototype of record, is in 5.3 (PM-59). PM-60 to PM-68 record the owner decisions and the UI-visible resolutions of the backend design review of 17 October 2026 (`docs/REVIEW-2026-10-17-design-core.md`), applied in version 1.1.
 
 | Label | Decision | Rationale | Affects | Status |
 | --- | --- | --- | --- | --- |
@@ -12298,7 +12341,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 | D5 | The record prompt waits 15 s, pauses while hovered or focused, and shows no countdown graphic. | WCAG 2.2.1 Timing Adjustable, and a countdown pulls the eye during a call. | `cpt-noter-component-ui-record-prompt` | Accepted |
 | D7 | The dedicated layout fills the display's visible frame without native full screen; the council column takes 34 % of the width, clamped to 420–720; portrait displays stack cards above the transcript. | Cards stay readable on any second display (REVIEW › F2). | `cpt-noter-component-screen-call-screen` | Accepted |
 | D8 | The floating layout sits at the floating window level, is resizable from 340 to 600 wide, and snaps to screen edges and to the main window's edge. | The PRD asks for a panel that docks to the main window or floats beside the call app. | `cpt-noter-component-screen-floating-panel` | Accepted |
-| D9 | With the copilot flag off, the council column disappears and the transcript fills the screen; with one agent, badges are hidden and the column is titled **Copilot**. | The copilot ships behind a flag, and the review proposes a single-agent scope cut. | `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-screen-call-screen`, `cpt-noter-constraint-copilot-flag` | Accepted |
+| D9 | With the copilot flag off, the council column disappears and the transcript fills the screen; with one agent, badges are hidden and the column is titled **Copilot**. | The copilot ships behind a flag until the M4 latency gate; full v1 is kept (PM-67). | `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-screen-call-screen`, `cpt-noter-constraint-copilot-flag` | Accepted |
 | D10 | Menu bar title options are **None** (default), **Elapsed Time** and **Newest Card** (24 characters; pop-up menu items, so title case under PM-03). | The PRD keeps the strip off by default, and a ticking title widens and narrows the menu bar. | `cpt-noter-component-ui-status-item`, `cpt-noter-component-screen-settings` | Accepted |
 | D11 | One **Mute Copilot ▸** submenu offers **For 10 Minutes**, **For This Call** and **For All Planning Calls** (named after the current call type). | The PRD mutes per call or per call type, and one control is easier to learn. | `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-screen-call-screen` | Accepted |
 | D12 | The status strip's last button is **Stop Recording**. | Noter never acts on the call itself (PRD › Live copilot). | `cpt-noter-component-ui-call-status-strip` | Accepted |
@@ -12359,7 +12402,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 | D67 | Notifications carry titles and counts only, never transcript text; no action buttons; no sound by default. | Privacy on shared and locked screens (REVIEW › F5). | `cpt-noter-component-screen-notifications`, `cpt-noter-constraint-notification-limits` | Accepted |
 | D68 | The Notifications permission is asked after the first recorded call ends, from an inline **Notify Me When Summaries Are Ready** button on that call's page. | The record prompt no longer needs notifications, and no prompt appears mid-meeting. | `cpt-noter-component-screen-notifications`, `cpt-noter-component-screen-call-page` | Accepted; the off state follows PM-31 |
 | D69 | No all-caps labels or letter-spaced headers; sidebar and section headers are sentence case, 11–13 pt semibold. | Capitals hurt long German words and widen Cyrillic. | `cpt-noter-component-ui-primitives` | Accepted |
-| D70 | Global card keys: ⌃⌥⌘1–3 pin and ⌃⌥⌘Z undoes the last card action; ⌃⌥⌘⇧1–3 dismiss only while Settings › Hotkeys › **Dismiss with keys** is on (off by default); the keys are registered only while capture runs with the copilot on and Noter not hidden, with a registration check at capture start and in Settings. | The non-activating panel never gets keys while the call app has focus. | `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-ui-hotkey-recorder`, `cpt-noter-component-app-core-bridge` | Accepted |
+| D70 | Global card keys: ⌃⌥⌘1–3 pin and ⌃⌥⌘Z undoes the last card action; ⌃⌥⌘⇧1–3 dismiss only while Settings › Hotkeys › **Dismiss with keys** is on (off by default); the keys are registered only while capture runs with the copilot on, not muted and Noter not hidden, with a registration check at capture start and in Settings. | The non-activating panel never gets keys while the call app has focus. | `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-ui-hotkey-recorder`, `cpt-noter-component-app-core-bridge` | Accepted |
 | D71 | A card keeps a stable number while it is visible; a new card takes the lowest free number. | A late card cannot shift the target of a key press. | `cpt-noter-component-ui-copilot-card-stack`, `cpt-noter-component-ui-copilot-card` | Accepted |
 | D72 | A card key action gives text feedback in the status strip with an undo hint, plus a native announcement; no sound. | The user is not looking at the panel. | `cpt-noter-component-ui-call-status-strip` | Accepted |
 | D73 | Extracted items arrive **Suggested**, with **Accept**, **Edit**, **Reject** and **Accept All** and the keys A, E, R and ⇧A; Today's review line counts what waits; a tick accepts and marks done. | PM-20, and the "accepted without edit" metric. | `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-output-item-row`, `cpt-noter-component-ui-output-section`, `cpt-noter-component-screen-today` | Accepted |
@@ -12372,7 +12415,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 | D82 | The floating panel's default height is the smaller of 760 and 60 % of the visible height, minimum 300; the number of cards follows the height; the panel never grows when a card arrives. | 13-inch laptop screens (Advanced User FP-02). | `cpt-noter-component-screen-floating-panel` | Accepted |
 | D83 | A 56-high collapsed strip shows state, the newest card's line and the card count; it expands on its own only for catch-up, solicited answers and capture notices; the snapped edge stays fixed. | One line beside a full-screen call app. | `cpt-noter-component-ui-collapsed-call-strip` | Accepted |
 | D84 | **Hide for Presenting** (⌃⌥⌘0, a toggle) hides the call window, the record prompt, the main and Settings windows and the menu bar title, defers notifications and releases the card keys; the status item shows an eye-slash mark; any explicit show action ends it. | A whole-display share shows every window, and 0 avoids Zoom's ⌃⌥⌘H. | `cpt-noter-component-app-window-store`, `cpt-noter-component-ui-status-item`, `cpt-noter-component-screen-call-screen` | Accepted (owner, 17 Oct) (PM-51); extends PM-28 to the main and Settings windows (PM-35) |
-| D85 | Replay during capture needs a headphone route (detected or set) and Noter's own sounds excluded; otherwise the control is disabled with its reason; playback stops when the route changes; after the call it plays on any output and is hidden when the audio is gone. | Headphone playback cannot leak into the call, and a disabled control with its reason shows how to make it work. | `cpt-noter-component-ui-transcript-segment-row`, `cpt-noter-component-ui-playback-bar` | Accepted (owner, 17 Oct) |
+| D85 | Replay during capture needs a headphone route (detected, or a not-identified output device the user marked as headphones, PM-67) and Noter's own sounds excluded; otherwise the control is disabled with its reason; playback stops when the route changes; after the call it plays on any output and is hidden when the audio is gone. | Headphone playback cannot leak into the call, and a disabled control with its reason shows how to make it work. | `cpt-noter-component-ui-transcript-segment-row`, `cpt-noter-component-ui-playback-bar` | Accepted (owner, 17 Oct) |
 | D86 | A **Share** pull-down offers **Copy for Slack** (⌘⇧C), **Copy for Jira** (⌥⌘C), **Copy as Markdown** (⌥⇧⌘C) and **Export…** (⌘E), always with a visible scope line; section and row entry points use the same menu. | PM-26: sharing is the main post-call job, and the scope line removes guessing. | `cpt-noter-component-ui-share-menu` | Accepted |
 | D87 | **Export…** opens a sheet (**Summary and items**, **Transcript**, **Audio**), then the save panel, and writes the PRD export folder. | PRD › Data model and storage › Export and portability. | `cpt-noter-component-ui-share-menu`, `cpt-noter-component-screen-dialogs` | Accepted |
 | D88 | A speaker naming panel sits at the top of Summary and Transcript while speakers are unnamed; naming in one step updates labels, owners, per-participant output and prose by substitution; regenerating is optional. | PM-27: owners must be right before sharing. | `cpt-noter-component-ui-speaker-naming-panel` | Accepted |
@@ -12387,7 +12430,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 | D97 | Weak search results are marked: a warning banner when every result is weak, a **Weaker matches** divider when results are mixed, **Weak match** tags, the actions **Clear Filters**, **Search All Languages** and **Ask Instead**, and **Show How Noter Searched** with the normalised search terms. | Trust in Russian and German search. | `cpt-noter-component-screen-library`, `cpt-noter-component-ui-search-result-row`, `cpt-noter-component-ui-inline-banner` | Accepted |
 | D98 | An answer that rests only on weak matches shows a warning line above it, **weak matches only** in its meta line, **Weak match** on each weak citation, and **Widen Scope** and **Search by Keyword**. | The user must know when an answer rests on weak evidence. | `cpt-noter-component-screen-ask`, `cpt-noter-component-ui-cited-answer`, `cpt-noter-component-ui-inline-banner` | Accepted |
 | D99 | With **Exclude Noter's own sounds** on, the self-test lets its own clip into the capture for the test only and then checks that Noter's sounds stay out; the result lists four lines, and call detection needs only the first three. | One click still runs the test, and it proves the exclusion that replay during capture relies on (D85). | `cpt-noter-component-ui-self-test-panel`, `cpt-noter-component-screen-first-run`, `cpt-noter-component-screen-settings` | Accepted |
-| PM-01 | v1 is designed as the PRD specifies; v1.x items appear only where they shape a v1 layout, marked "(v1.x)"; the scope-cut variants (single-agent copilot, copilot off) are component variants. | The design stays valid whichever way the open scope-cut decision goes. | `cpt-noter-constraint-copilot-flag`, `cpt-noter-component-ui-copilot-card-stack` | Accepted |
+| PM-01 | v1 is designed as the PRD specifies; v1.x items appear only where they shape a v1 layout, marked "(v1.x)"; the single-agent copilot and copilot-off layouts are component variants. | Full v1 is kept (owner decision, 17 Oct); the copilot ships behind a flag until the M4 latency gate, so the copilot-off layout must work (PM-67). | `cpt-noter-constraint-copilot-flag`, `cpt-noter-component-ui-copilot-card-stack` | Accepted |
 | PM-02 | The interface is English in v1 and built ready for translation; transcripts, summaries and search are English, Russian and German; Russian and German interface translation is v1.x. | Content is trilingual from day one; the PRD now states the interface rule too (Scope, synced 17 October 2026). | `cpt-noter-constraint-three-languages` | Accepted (owner, 17 Oct) |
 | PM-03 | Buttons and menu items use title case and everything else uses sentence case, for every bold label in this document. | One label style that matches the HIG (D58). | `cpt-noter-component-ui-primitives` | Accepted |
 | PM-04 | User paths are in scope by the owner's request, at the level of what the user opens, sees, does and gets (the ARCH-DESIGN-NO-001 exception in 3.6); each is a "User:" line followed by a numbered list with bold labels, under the owner's user-path wording rules. | Bold labels render in a list, and the steps follow the owner's format. | Every story entry in 3.6 | Accepted |
@@ -12414,7 +12457,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 | PM-27 | Unnamed speakers are surfaced on the Call page with a one-step naming flow that feeds the summary and items. | Owners on action items are right only once speakers are named. | `cpt-noter-component-ui-speaker-naming-panel` | Accepted |
 | PM-28 | One global hotkey hides every Noter surface that could appear on a share until it is pressed again; the menu bar icon shows the hidden state. | Content protection cannot cover a whole-display share. | `cpt-noter-component-app-window-store`, `cpt-noter-component-ui-status-item` | Accepted (owner, 17 Oct) (PM-51); extended by D84 and PM-35 |
 | PM-29 | All other UX decisions D1 to D69 are accepted as written unless changed above or in round 2. | Records the PM's acceptance of the round-1 UX design. | D1 to D69 | Accepted |
-| PM-30 | Manual start works when microphone and system-audio access are granted, even if the self-test was skipped. If access was never granted, every start control reads **Finish Setup…** and opens the first-run wizard at the permissions step. If system-audio access was revoked later, the record prompt and the call screen show **Open System Settings…**; when macOS asks to quit and reopen Noter, the path shows that macOS prompt. No permission prompt appears during a meeting from Noter's side. | Starting a call never waits on a test, and a missing permission always names its fix. | `cpt-noter-component-screen-record-prompt`, `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-screen-today`, `cpt-noter-component-screen-call-screen`, `cpt-noter-component-screen-first-run`, `cpt-noter-constraint-no-dialog-after-setup` | Accepted (owner, 17 Oct) |
+| PM-30 | Manual start works whatever the setup state, even if the self-test was skipped (changed by PM-60: no start control reads **Finish Setup…**, and missing audio access no longer blocks a start). If system-audio access was revoked later, the record prompt and the call screen show **Open System Settings…**; when macOS asks to quit and reopen Noter, the path shows that macOS prompt. No permission prompt appears during a meeting from Noter's side, except macOS's own prompt at the first capture when macOS never asked (PM-60). | Starting a call never waits on a test, and a missing permission always names its fix. | `cpt-noter-component-screen-record-prompt`, `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-screen-today`, `cpt-noter-component-screen-call-screen`, `cpt-noter-component-screen-first-run`, `cpt-noter-constraint-no-dialog-after-setup` | Accepted (owner, 17 Oct); changed by PM-60 |
 | PM-31 | When macOS Notifications are off for Noter, nothing else changes: the Call page still loads without focus and the menu bar offers **Open Last Summary**; Settings › General shows **Notifications are off for Noter** with **Open System Settings…**. | The outputs stay one click away without notifications. | `cpt-noter-component-screen-notifications`, `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-menu-bar` | Accepted |
 | PM-32 | A proposal decided on Today shows the undo strip; a proposal decided on Activity shows its inline outcome with **Undo**. | Each page confirms where the eye already is (D36). | `cpt-noter-component-ui-proposal-row`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-screen-today`, `cpt-noter-component-screen-activity` | Accepted |
 | PM-33 | Quotation marks follow the interface language; v1 is English, so “…” everywhere, including around Russian and German quotes. | One quotation style per interface language. | `cpt-noter-constraint-three-languages`, `cpt-noter-component-ui-primitives` | Accepted |
@@ -12441,6 +12484,15 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 | PM-57 | The UI follows the macOS 27 design language (Liquid Glass): Apple's macOS system colours by default, glass materials for the sidebar, toolbar groups, menus, popovers, panels and alerts, an edge-to-edge sidebar with coloured icons, a unified toolbar with grouped glass capsules, capsule push buttons at 20, 24 and 28 pt (32 in the toolbar), concentric corner radii (window 26, panel 20, sheet 22, card 14, row 9, control 8, tag 6) and left-aligned alerts with side-by-side buttons. When macOS **Increase Contrast** is on, the colour tokens switch to the WCAG 2.2 AA values of v0.5, with thicker focus rings, solid tag outlines and stronger separators. | The owner chose Apple's macOS 27 UI Kit as the visual reference, with its values winning over the v0.5 token table; acceptance criterion AC5 is met through Increase Contrast. | `cpt-noter-component-ui-primitives`, `cpt-noter-component-shell-main-window`, `cpt-noter-principle-native-macos`, `cpt-noter-principle-accessible-multilingual`, `cpt-noter-constraint-accessibility-baseline` | Accepted (owner, 17 Oct); changes D60 and D61 |
 | PM-58 | The user's own Claude account and own ChatGPT account are added separately, as two account rows in Settings › Models & Runtimes › **Your own accounts** and in the first-run **Assistants** step. Each signs in through a sheet with **Prepare**, **Sign in**, **Check** and **Use** steps, handles a cancelled, timed-out, unpaid or offline sign-in, reuses a session the tool already has, and offers to switch agents to the account. Claude Code and Codex keep the sign-in in the Keychain; Noter never holds the token. The agent editor's **Runtime** pop-up groups **Your accounts**, **API keys** and **On this Mac**, so either account can be chosen per agent when both are signed in, and an agent whose runtime is down gets a one-click fix. This replaces the single "Use my own Claude or ChatGPT login" switch and its alert. | The owner asked for separate, complete sign-ins with smooth binding and a per-agent choice between the two accounts. | `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-first-run`, `cpt-noter-component-screen-dialogs`, `cpt-noter-component-screen-agents`, `cpt-noter-component-ui-credential-row`, `cpt-noter-component-ui-agent-editor`, `cpt-noter-component-ui-agent-list-row`, `cpt-noter-seq-settings-sign-in-account` | Accepted (owner, 17 Oct) |
 | PM-59 | The clickable prototype in `docs/prototype/clickable/` is the UI prototype of record. Where it differed from version 0.5 of this design, this design was changed to describe the prototype; the raw boards of 16 October remain as history only. Prototype limitations listed in its README (**Not built, or simplified**) are not design changes. | The owner's decision: the prototype wins, and design, PRD and prototype must not contradict each other. | Every shell, screen and component entry; 5.3 | Accepted (owner, 17 Oct) |
+| PM-60 | Permissions are granted by default and no consent is required (owner decision O1, 17 Oct). Noter never gates a start on setup state, audio permissions or the self-test: **Record**, **Start Recording**, ⌃⌥⌘R and the record prompt always start capture, and no start control reads **Finish Setup…**; only a disk below 500 MB or a speech model that is not downloaded yet keeps **Record** dimmed. If macOS never asked, the first capture brings up its prompt; if access is off, capture still runs and the call surfaces say which channel is silent: **Microphone off** (indicator **Recording · no mic**) or **System audio silent** (indicator **Recording · mic only**). An unfinished self-test only keeps call detection off. **Finish Setup…** stays only as a link on Today's setup banner and in the menu bar, where it reopens the first-run window. | If Noter is started, everything is agreed between the people on the call; a blocked start only loses the call. | `cpt-noter-component-screen-today`, `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-screen-record-prompt`, `cpt-noter-component-screen-first-run`, `cpt-noter-component-screen-call-screen`, `cpt-noter-component-screen-floating-panel`, `cpt-noter-component-screen-notifications`, `cpt-noter-component-ui-status-item`, `cpt-noter-component-ui-record-prompt`, `cpt-noter-component-ui-recording-indicator`, `cpt-noter-component-ui-call-status-strip`, `cpt-noter-constraint-no-dialog-after-setup` | Accepted (owner, 17 Oct); changes PM-30 |
+| PM-61 | noter-mcp runs only on this Mac and is never exposed to the network (owner decision O2, 17 Oct): it runs for one command-line run, talks to the core over a local socket, and every tool result of a run on a cloud runtime is redacted and logged before it is returned. Those results appear in Settings › Privacy › **What left this Mac** like any other cloud request; nothing else in the UI changes. | Tool results are a second way text can leave the Mac, so they pass the same gate and the same audit log. | `cpt-noter-component-screen-settings`, `cpt-noter-constraint-local-only-ui` | Accepted (owner, 17 Oct) |
+| PM-62 | The previous call's post-call analysis runs during a live call, at low priority after live transcription (owner decision D2, 17 Oct); only the archive pass, regeneration and maintenance jobs wait for the call to end. In back-to-back calls the first call's outputs are written while the next one records; its **Summary ready** still waits until capture stops (PM-44). | Outputs stay ready within minutes on a day of back-to-back calls. | `cpt-noter-component-screen-call-page`, `cpt-noter-component-screen-notifications`, `cpt-noter-component-ui-status-row`, `cpt-noter-seq-call-screen-stop-at-call-end` | Accepted (owner, 17 Oct) |
+| PM-63 | Today ranks items owed to people on today's calls first, then by due date, then by age, as the PRD says (owner decision D3, 17 Oct). Settings › General › Today › **Ranking** offers **Owed to today's people, then due date** (default) and **Due date, then owed to you**. | What matters for the next call comes first; the alternative suits a week driven by deadlines. | `cpt-noter-component-screen-today`, `cpt-noter-component-screen-settings`, `cpt-noter-component-ui-upcoming-call-card` | Accepted (owner, 17 Oct) |
+| PM-64 | An agent switches itself off for a call type when 80 % or more of its cards there were dismissed over the last 10 calls of that type (owner decision D4, 17 Oct). The change is logged in History and can be undone; the Agents page announces it once in AG-R0 with **Undo**, and the agent's row keeps **Switched itself off for 1:1 calls** · **Turn On**. The AG-R4 footnote states the rule. | A rule the user can read, and an agent never goes quiet without a trace. | `cpt-noter-component-screen-agents`, `cpt-noter-component-ui-agent-list-row`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-seq-agents-tune-council` | Accepted (owner, 17 Oct) |
+| PM-65 | Behaviour metrics (talk-time share and "who was silent") count only calls from the moment the user switches them on (owner decision D5, 17 Oct); past calls are never computed back. The setting's footnote says so. | Switching the setting on is not consent for calls already recorded. | `cpt-noter-constraint-behaviour-metrics-off`, `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-people` | Accepted (owner, 17 Oct) |
+| PM-66 | The audio engine plays replay audio, and both Noter and its engine are kept out of the capture (owner decision D6, 17 Oct). The UI does not change: replay while recording stays headphones-only (D85), with the same play control and playback bar states. | The engine owns the audio files and is already kept out of the capture. | `cpt-noter-component-ui-playback-bar`, `cpt-noter-component-ui-transcript-segment-row` | Accepted (owner, 17 Oct) |
+| PM-67 | Resolutions of the backend design review that change the UI (`docs/REVIEW-2026-10-17-design-core.md`): **Not recording · engine stopped** with **Try Again** on the call surfaces, Today and the menu bar, and NT-3 sent (R11); headphones are marked per output device with **Treat as headphones**, which lifts only **Not identified** and never a detected speaker route, and the speakers-with-echo-cancellation option is gone (R12); NT-3 is never held, but is not sent while Noter is hidden for presenting (R17); the quit banner on Today gets a close ×, and **Resume Recording** works until it is dismissed or another capture starts (R7); a changed audio retention applies to existing calls at the next nightly run, and the row says how many calls' audio that run deletes (R35); full v1 is kept, and the copilot ships behind a flag until the M4 latency gate (R37). | The core now models these states and settings, and the UI names each one where it happens. | `cpt-noter-component-screen-call-screen`, `cpt-noter-component-screen-floating-panel`, `cpt-noter-component-screen-today`, `cpt-noter-component-screen-menu-bar`, `cpt-noter-component-screen-notifications`, `cpt-noter-component-screen-settings`, `cpt-noter-component-ui-playback-bar`, `cpt-noter-component-ui-transcript-segment-row`, `cpt-noter-component-ui-inline-banner`, `cpt-noter-constraint-copilot-flag` | Accepted (owner, 17 Oct) |
+| PM-68 | Live MCP sources are looked up only when the privacy mode is **Cloud allowed**, and only after calls and in Ask, never during a live call (owner decision D1, 17 Oct); in the other modes a Live source shows **Live lookups paused · they run only in Cloud allowed**, and each lookup is logged in Privacy. | A live lookup sends call context to a third-party server that the redaction cannot follow. | `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-dialogs` | Accepted (owner, 17 Oct) |
 ### 4.2 Accepted consequences and assumptions
 
 **Accepted consequences.** These follow from PRD trade-offs or from decisions in 4.1, and the UI makes each of them visible.
@@ -12451,7 +12503,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 - ⌃⌥⌘N and **Open Call Screen** show the call window without making it key, so typing into it needs a click in a field or a second ⌃⌥⌘N (PM-40).
 - Replay during capture works only on headphones, and only while the self-test shows that Noter's own sounds stay out of the recording (D85, D99, PM-25).
 - Deleting a call, a person, a voice profile or audio is final; v1 has no grace period (PM-22).
-- Notifications cannot carry buttons, so every decision happens inside Noter (`cpt-noter-constraint-notification-limits`). While a call is being recorded they wait, so the notice for one call can arrive after the next call ends (PM-44).
+- Notifications cannot carry buttons, so every decision happens inside Noter (`cpt-noter-constraint-notification-limits`). While a call is being recorded they wait, so the notice for one call can arrive after the next call ends, although its outputs were written during that call (PM-44, PM-62).
 - With the copilot flag off, the call screen is a transcript with a status strip (D9).
 - Every extracted item needs one review step after the call; a tick on a suggested item accepts it and marks it done (D73).
 - At call end Noter stops after a visible 10-second notice, and **Continue Recording** stays available for 5 minutes after any stop, manual or automatic (D80, PM-43). The one exception to the on-screen notice is a call that ends while Noter is hidden for presenting: no countdown appears, the menu bar menu reads **Call seems to have ended**, and Noter stops after 10 minutes, with **Stopped at 11:12 · the call had ended** in the menu and **Summary ready** delivered once Noter is shown again (D80).
@@ -12463,7 +12515,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 
 **Assumptions.**
 
-- v1 is designed as specified while the PRD's scope-cut decision is open (PM-01); the single-agent and copilot-off variants keep the design valid either way.
+- Full v1 is kept (owner decision, 17 Oct); the copilot ships behind a flag until the M4 latency gate, and the copilot-off variant keeps every call surface usable until then (PM-01, PM-67).
 - The product owner accepted every former proposal on 17 October 2026 (D76, D80, D81, D84, D85, D90, D91, D96, PM-02, PM-09, PM-16, PM-25, PM-28, PM-30, PM-35, PM-39, PM-50, PM-51 and PM-55), as built in the clickable prototype (PM-59).
 - The macOS 27 values (colours, materials, radii, control heights) follow Apple's published macOS system colours and the published macOS 27 changes; they are checked against Apple's macOS 27 UI Kit when it can be opened in Figma or Sketch (4.3).
 - The row marked **Proposal (verify)** in 4.1, PM-45, holds once the record prompt's position is checked with Microsoft Teams on the owner's setup; the macOS prompt to quit and reopen Noter after system audio access is turned on (PM-30) is checked in the same session (4.3).
@@ -12527,12 +12579,14 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-59) is
 
 **Test approach.**
 
-- Unit: component tests (PRD › Repository layout, build, packaging and developer workflow › Testing).
+- Unit: component tests (PRD › Repository layout, build, packaging and developer workflow › Testing), with at least 80 % line coverage of the UI and of the lines a PR changes.
 - Integration: screens against the bridge fake.
-- End to end: the three PRD flows (start a call, review outputs, ask the library) through Tauri WebDriver, plus the five critical stories in 3.6.
+- End to end: the three PRD flows (start a call, review outputs, ask the library) and the five critical stories in 3.6, in Playwright against the real core through `noter-core-harness` from M0; each test names the story ID it covers, and at least 60 % of the frozen commands and of the stories the current milestone delivers (`harness/milestones.toml`) must be exercised this way; runs against the fake core do not count. The real-app flows run through the WebdriverIO embedded driver on the Mac runner, because `tauri-driver` does not support WKWebView; native surfaces (menu bar, panels, notifications, hotkeys, Liquid Glass materials) are checked by hand on the macOS checklist in `docs/HARNESS.md` (ADR-0003, DESIGN-core 4.4).
+- Screenshots: every screen and state of this document, rendered with the fake core in the pinned Linux Playwright container, matches its baseline in at least 98 % of pixels; a changed baseline needs the owner's label.
 - Performance: scrolling a three-hour transcript, the card stack under steady arrivals, memory over a 90-minute replay.
 - Security: hostile strings (markup, very long lines, mixed scripts) render as plain text.
-- Contract: the bridge fake is checked against the core's command list.
+- Contract: the bridge fake is checked against the core's command list and passes the same conformance suite as the real core; `bindings.ts` is generated (`just contract-regen`) and never edited by hand.
+- Gates: `just gate` is the exit criteria of every FEATURE and pull request, and CI reports it as the single required check `gate` (ADR-0003, `docs/HARNESS.md`).
 - Accessibility: automated checks in component tests, the token contrast check, and a manual VoiceOver and keyboard-only pass on every screen.
 - Localisation: a pseudo-localisation run (+40 %, Cyrillic) and a German string pass on every screen (REVIEW › F12), with every quotation mark set as “…” (PM-33).
 
@@ -12616,8 +12670,8 @@ Every MUST HAVE item of the DESIGN checklist is listed once. "Not applicable bec
 
 | Checklist ID | Disposition | Where, or why not applicable |
 | --- | --- | --- |
-| ARCH-DESIGN-001 | Addressed | Purpose and approach in 1.1; drivers and requirement mapping in 1.2; context diagram and external boundaries in 1.3 and 3.5; ADR references not applicable (1.2, **ADRs** line) |
-| ARCH-DESIGN-002 | Addressed | 2.1: unique IDs, actionable wording, priority order with "the one listed first wins", a **Source** line per principle; ADRs not applicable (2.1, **ADRs** line) |
+| ARCH-DESIGN-001 | Addressed | Purpose and approach in 1.1; drivers and requirement mapping in 1.2; context diagram and external boundaries in 1.3 and 3.5; ADR references in 1.2 (**ADRs** line) |
+| ARCH-DESIGN-002 | Addressed | 2.1: unique IDs, actionable wording, priority order with "the one listed first wins", a **Source** line per principle; no ADR decides a UI principle (2.1, **ADRs** line) |
 | ARCH-DESIGN-003 | Addressed | 2.2: platform, product, technology and licensing, data residency, language, quality, resource and scope constraints; legacy integration not applicable (2.2 intro) |
 | ARCH-DESIGN-004 | Addressed | 3.2: screen map, index tables A to C, the composition and flow paragraph (components raise navigation requests that the shell carries out), and one entry per component with scope, boundaries and relationships by ID |
 | ARCH-DESIGN-005 | Addressed | 3.1: entities, value objects, relationships, invariants, format and planned location; machine-readable schema links not applicable yet (3.1, **Location**) |
@@ -12628,8 +12682,8 @@ Every MUST HAVE item of the DESIGN checklist is listed once. "Not applicable bec
 | ARCH-DESIGN-010 | Partly addressed | Data-volume capacity in 1.2 (NFR Allocation); cost shown on the Performance screen and as **Copilot paused: budget**. Server capacity planning, cost estimation and budget allocation for infrastructure are not applicable to the UI because it runs on one Mac and spends no money by itself; the model budget belongs to the core (PRD › Live copilot loop) |
 | SEM-DESIGN-001 | Addressed | 1.2 and 5.1 cover every PRD feature area with a UI, including the tag filter (PM-50), and 5.1 gives each PRD interface detail its home; actors are the PRD's primary user (3.6); PRD non-goals respected (4.2) |
 | SEM-DESIGN-002 | Addressed | v1.x items are marked "(v1.x)"; additions beyond the PRD cite a decision row (4.1), and new behaviour was confirmed by the owner on 17 October 2026 and synced into the PRD: call-end handling (PM-16), hide for presenting (PM-51), call tags (PM-50), the back-to-back split (PM-39), the app exclusion list (PM-55), the macOS 27 look (PM-57) and the own-account sign-ins (PM-58); owner decision PM-56, which takes out features the PRD names, was synced on 17 October (4.2); no performance target appears unless the PRD states it (PM-52); PRD trade-offs appear as accepted consequences and sync items (4.2) |
-| SEM-DESIGN-003 | Not applicable | Not applicable because no ADR artifacts exist for Noter; the PRD decision log is the decision record this design follows |
-| SEM-DESIGN-004 | Not applicable | Not applicable because no ADR artifacts exist for Noter, so there are no ADR links to check; this design links to PRD sections by name (5) |
+| SEM-DESIGN-003 | Addressed | The design follows ADR-0001 and ADR-0002 in the core bridge and the generated types (3.3) and ADR-0003 in its test approach (4.3); other decisions follow the PRD decision log |
+| SEM-DESIGN-004 | Addressed | ADR links in 1.2 and 5; this design links to PRD sections by name (5) |
 | PERF-DESIGN-001 | Partly addressed | In-memory store per window, streams drawn every 100 ms, memory bounds (1.2, 3.3); database access, N+1 prevention, batching and pooling not applicable (3.4) |
 | PERF-DESIGN-002 | Not applicable | Scalability architecture (horizontal and vertical scaling, stateless services, session management, load balancing, database scaling and message brokers) is not applicable because Noter is a single-user desktop app; the UI scales with the amount of data, not with users, and virtualised lists and paged results handle that |
 | PERF-DESIGN-003 | Partly addressed | The critical-path latency and the UI's share of it (render on arrival, partial first line, 100 ms draw interval) in 1.2; CDN, edge and network hops not applicable (1.2, under the NFR table) |
@@ -12671,9 +12725,11 @@ Every MUST HAVE item of the DESIGN checklist is listed once. "Not applicable bec
 ## 5. Traceability
 
 - **PRD**: [PRD.md](./PRD.md), referenced by section name because it is not a registered kit artifact.
-- **ADRs**: none exist; decisions are recorded in PRD › Decision log and in 4.1 (see 4.5, SEM-DESIGN-003).
+- **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`; other decisions are recorded in PRD › Decision log and in 4.1 (see 4.5, SEM-DESIGN-003).
+- **Code**: traceability is FULL. `@cpt-*` markers in `apps/desktop/src` are validated against the IDs of this document by `cfs validate`, and `just trace` fails a PR that lowers the share of component, interface and seq IDs with a marker (ADR-0003).
 - **Features**: Not applicable yet because no FEATURE specs exist; they will reference the component and sequence IDs in this document.
 - **Review**: [REVIEW-2026-10-16.md](./REVIEW-2026-10-16.md), cited as "REVIEW › finding".
+- **Backend design review**: [REVIEW-2026-10-17-design-core.md](./REVIEW-2026-10-17-design-core.md); its owner decisions and UI-visible resolutions are PM-60 to PM-68.
 - **UI prototype of record**: [prototype/clickable/README.md](./prototype/clickable/README.md), the clickable prototype (PM-59); every element carries `data-component` with the IDs of 3.2.
 - **Raw prototype boards**: [prototype/raw-2026-10-16/README.md](./prototype/raw-2026-10-16/README.md), history only.
 
@@ -12742,11 +12798,11 @@ Every MUST HAVE item of the DESIGN checklist is listed once. "Not applicable bec
 | REVIEW › B9 Normalised keyword search for Russian and German | `cpt-noter-component-ui-search-result-row`; `cpt-noter-seq-library-search-calls`; D97, D98 |
 | REVIEW › B11 Strict evidence auto-close | `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-proposal-row`; PM-17 |
 | REVIEW › B12 Propose-only propagation in v1 | `cpt-noter-component-screen-activity`; `cpt-noter-seq-activity-review-proposals` |
-| REVIEW › Decisions left to the owner | Scope cut: PM-01 and `cpt-noter-constraint-copilot-flag`; council gating: `cpt-noter-component-ui-council-mode-table`; handoff deferral: **Copy Prompt** in `cpt-noter-seq-call-page-hand-off-item`; voice profiles: `cpt-noter-seq-dialogs-set-up-voice-profile` |
+| REVIEW › Decisions left to the owner | Scope: full v1 kept (owner decision, 17 Oct), copilot behind a flag until the M4 latency gate, PM-01, PM-67 and `cpt-noter-constraint-copilot-flag`; council gating: `cpt-noter-component-ui-council-mode-table`; handoff deferral: **Copy Prompt** in `cpt-noter-seq-call-page-hand-off-item`; voice profiles: `cpt-noter-seq-dialogs-set-up-voice-profile` |
 
 ### 5.3 UI prototype
 
-**Clickable prototype (record).** `docs/prototype/clickable/noter-prototype.html` is the UI prototype of record (PM-59). It draws every shell, screen and complex component of 3.2 in the macOS 27 look (PM-57), with the own-account sign-ins (PM-58), and every element carries `data-component`, `data-primitive`, `data-variant`, `data-state` and `data-region` with the IDs and region codes of this document. On 17 October 2026 this design was changed wherever version 0.5 differed from the prototype: strings, menus, states, paths and layouts. The entries cite PM-59 where that happened. What the prototype does not build, or builds in a simpler way, is listed in its README under **Not built, or simplified**; those items keep the behaviour this design describes.
+**Clickable prototype (record).** `docs/prototype/clickable/noter-prototype.html` is the UI prototype of record (PM-59). It draws every shell, screen and complex component of 3.2 in the macOS 27 look (PM-57), with the own-account sign-ins (PM-58), and every element carries `data-component`, `data-primitive`, `data-variant`, `data-state` and `data-region` with the IDs and region codes of this document. On 17 October 2026 this design was changed wherever version 0.5 differed from the prototype: strings, menus, states, paths and layouts. The entries cite PM-59 where that happened. What the prototype does not build, or builds in a simpler way, is listed in its README under **Not built, or simplified**; those items keep the behaviour this design describes. For version 1.1 (PM-60 to PM-68) the prototype and this design were changed together: always-on **Record**, the **Microphone off**, **System audio silent** and **Not recording · engine stopped** states, the Today ranking pop-up, the agent switch-off announcement, per-device headphones, and the retention and talk-time lines.
 
 | Surface in the prototype | Entries | What changed in this design to match |
 | --- | --- | --- |

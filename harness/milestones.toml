@@ -1,5 +1,6 @@
 # What each milestone delivers, for the E2E coverage gate (docs/ADR/0003).
-# Source: DESIGN-core 4.1 "Core implementation order" and PRD › Roadmap.
+# Source: PRD › Roadmap and milestones (DESIGN-core 4.1 points here; its old
+# "Core implementation order" table was moved out of the design on 17 Oct).
 #
 # Every IPC command in contracts/ipc.manifest.json and every story
 # (`cpt-noter-seq-*`) in docs/DESIGN.md is listed exactly once; the harness
@@ -9,10 +10,10 @@
 [M0]
 why = "IPC host, app snapshot, settings, first run and permissions"
 commands = [
-  "app_snapshot", "stream_unsubscribe", "log_ui",
+  "app_snapshot", "stream_unsubscribe", "stream_ack", "banner_dismiss", "log_ui",
   "setup_status", "models_download", "permission_request", "self_test_run",
   "setup_set_call_display", "setup_set_audio_storage", "setup_set_step",
-  "settings_get", "settings_update", "settings_unignore_app", "hotkeys_list", "hotkey_set",
+  "settings_get", "settings_update", "settings_unignore_app", "hotkeys_list", "hotkey_set", "hotkeys_reset",
   "glossary_list", "glossary_upsert", "glossary_remove", "update_install",
 ]
 stories = [
@@ -27,9 +28,10 @@ commands = [
   "capture_start", "capture_stop", "capture_set_paused", "capture_mark_moment",
   "capture_answer_call_end", "capture_continue", "capture_answer_new_meeting", "capture_discard",
   "capture_set_sensitive", "capture_exclude_source", "capture_dismiss_detection", "capture_ignore_app",
+  "capture_hold_notice", "capture_keep_recording", "capture_keep_source", "capture_resume_interrupted",
   "transcript_subscribe", "levels_subscribe", "transcript_span", "audio_play", "audio_stop",
   "window_show_call", "window_hide_call", "window_call_state", "window_set_call_layout",
-  "window_set_collapsed", "app_set_hidden_for_presenting", "window_navigate", "window_announce", "open_external",
+  "window_set_collapsed", "app_set_hidden_for_presenting", "window_navigate", "window_announce", "window_report_view", "open_external",
   "calls_list", "call_get", "call_update", "call_types_list", "calls_delete",
 ]
 stories = [
@@ -58,7 +60,7 @@ commands = [
   "today_get",
   "outputs_get", "output_edit", "outputs_regenerate", "output_versions", "output_version_get",
   "share_copy", "calls_export",
-  "handoff_get", "handoff_generate", "handoff_edit", "handoff_set_target", "handoff_open", "handoff_copy",
+  "handoff_get", "handoff_generate", "handoff_edit", "handoff_set_target", "handoff_open", "handoff_copy", "handoff_cancel",
   "history_list", "change_undo", "change_redo", "history_export",
   "call_tags_set", "tags_list",
   "repos_list", "repo_upsert", "repo_remove", "share_test_run",
@@ -109,7 +111,7 @@ stories = [
 [M4]
 why = "Copilot loop and council (draft surfaces become frozen at the M4 gate)"
 commands = [
-  "cards_subscribe", "card_pin", "card_dismiss", "card_undo_last", "card_set_held", "card_rate",
+  "cards_subscribe", "card_pin", "card_dismiss", "card_unpin", "card_undo_last", "card_set_held", "card_rate",
   "card_shown", "copilot_catch_up", "copilot_ask_about_call", "copilot_mute", "copilot_mute_agent",
   "copilot_raise_budget", "context_chip_set",
   "agents_get", "agent_create", "agent_update", "agents_reorder", "agent_remove",
@@ -128,7 +130,7 @@ stories = [
 why = "Jobs and evidence, proposals, Activity, metrics and Performance"
 commands = [
   "proposals_list", "proposal_decide", "proposal_always_for_term", "activity_get",
-  "jobs_list", "job_run_now", "job_update",
+  "jobs_list", "job_run_now", "job_cancel", "job_update",
   "perf_overview", "perf_call", "perf_brief",
 ]
 stories = [

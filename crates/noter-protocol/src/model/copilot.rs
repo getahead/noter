@@ -21,14 +21,37 @@ pub enum CardKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum CardState {
-    /// First line arrived; provenance still streaming.
+    /// Waiting while the visible stack is held; shown when the hold ends.
+    Queued,
+    /// First line arrived; provenance still streaming. Removed if it would complete too late.
     Streaming,
     Shown,
-    /// Hovered, focused or expanded: never removed while held.
+    /// Hovered, focused or expanded: never removed while held; pin or dismiss still apply.
     Held,
     Pinned,
     Dismissed,
+    /// Timed out or the topic moved on (`CardEvent::Expired`).
     Expired,
+}
+
+/// What a card key press did (`CardEvent::KeyFeedback`), for the call surface's flash
+/// and announcement ("No card 3").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyOutcome {
+    Pinned,
+    Dismissed,
+    /// No visible card has that number.
+    NoCard,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpiryReason {
+    /// Its display time ran out.
+    Timeout,
+    /// The conversation moved to another topic.
+    TopicChanged,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -76,6 +99,9 @@ pub struct CardView {
     pub expires_at: Option<TimestampMs>,
     pub rating: Option<Rating>,
     pub carry_forward: Option<CarryForward>,
+    /// The user's microphone transcript matched the card's question or answer within
+    /// 2 minutes ("used"); thresholds are tuned from ratings.
+    pub used: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -134,7 +160,9 @@ pub struct AgentLiveState {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CardKeysState {
-    /// ⌃⌥⌘1–3 and ⌃⌥⌘Z are registered right now (only during capture with the copilot on and not hidden).
+    /// Card keys (pin 1–3, dismiss ⇧1–3, undo ⌃⌥⌘Z) are registered right now. They are
+    /// registered only while capture runs, the copilot is on, not muted and Noter is not
+    /// hidden for presenting; app hotkeys stay registered from launch.
     pub registered: bool,
     /// Dismiss with keys (⌃⌥⌘⇧1–3) is on.
     pub dismiss_keys: bool,
@@ -145,6 +173,7 @@ pub struct CardKeysState {
 /// Copilot status for the call surfaces (`copilot:status` and inside the card stream).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CopilotStatus {
+    pub version: StateVersion,
     pub call_id: Option<CallId>,
     pub flag_on: bool,
     pub single_agent: bool,
@@ -193,17 +222,29 @@ pub enum CardEvent {
     Updated {
         card: CardView,
     },
-    /// Remove from the visible stack (expired, dismissed, topic moved on); moves to `earlier`.
+    /// Remove from the visible stack (dismissed, or a streaming card dropped late); moves to `earlier`.
     Removed {
         card_id: CardId,
         state: CardState,
+    },
+    /// The card expired (timeout or topic change); moves to `earlier`.
+    Expired {
+        card_id: CardId,
+        reason: ExpiryReason,
+    },
+    /// A card key was pressed: `key` is 1–3; `card_id` is `null` when no card has that number.
+    KeyFeedback {
+        key: u8,
+        outcome: KeyOutcome,
+        card_id: Option<CardId>,
     },
     /// A card from another agent merged into this one.
     Merged {
         card_id: CardId,
         merged_agents: Vec<AgentRef>,
     },
-    /// A card that would arrive after its 12 s window was dropped (metrics, "Card too late").
+    /// An unsolicited card whose first line would arrive after its 12 s window was dropped
+    /// (metrics, "Card too late"). Solicited cards are never dropped.
     DroppedLate {
         agent: AgentRef,
         trigger_at_ms: OffsetMs,
@@ -232,6 +273,7 @@ pub struct CardHeldArgs {
 pub struct CardRateArgs {
     pub card_id: CardId,
     /// `null` clears the rating.
+    #[serde(default)]
     pub rating: Option<Rating>,
 }
 
@@ -258,6 +300,7 @@ pub struct AskAboutCallArgs {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct MuteArgs {
+    #[serde(default)]
     pub call_id: Option<CallId>,
     pub scope: MuteScope,
 }
@@ -283,7 +326,7 @@ pub enum ContextChipAction {
     Drop,
 }
 
-/// v1.x screen context chips.
+/// v1.x screen context chips (`context_chip_set` returns `feature_disabled` in v1).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ContextChipArgs {
     pub context_item_id: ContextItemId,

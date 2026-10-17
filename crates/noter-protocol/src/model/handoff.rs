@@ -50,9 +50,12 @@ pub enum HandoffAction {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum PromptState {
     NotGenerated,
+    /// Being written; `handoff_cancel` stops it and returns to the previous state.
     Generating,
     Ready,
-    Failed { code: crate::error::ErrorCode },
+    Failed {
+        code: crate::error::ErrorCode,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -75,6 +78,8 @@ pub struct HandoffView {
     pub last: Option<HandoffSummary>,
 }
 
+/// `handoff_generate` returns at once with `state: generating`; the finished view arrives
+/// through `entity:changed` (`handoff`). `handoff_cancel` stops it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HandoffGenerateArgs {
     pub item_id: ItemId,

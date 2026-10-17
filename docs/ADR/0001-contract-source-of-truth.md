@@ -31,7 +31,7 @@ status-history:
 
 ## Context and Problem Statement
 
-Noter is developed UI-first: the frontend team builds every screen of `docs/DESIGN.md` while the Rust core is written in parallel by a smaller team. DESIGN.md 3.3 names operation groups but leaves exact command, event and stream names to the core, and PM-09 says UI types are generated from the core's types. The UI cannot wait for the core to exist before it has types, and the two sides must not drift. Where does the contract live, and how does each side consume it?
+Noter is developed UI-first: the frontend team builds every screen of `docs/DESIGN.md` while the Rust core is written in parallel by one part-time builder. DESIGN.md 3.3 names operation groups but leaves exact command, event and stream names to the core, and PM-09 says UI types are generated from the core's types. The UI cannot wait for the core to exist before it has types, and the two sides must not drift. Where does the contract live, and how does each side consume it?
 
 ## Decision Drivers
 

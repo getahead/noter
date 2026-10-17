@@ -77,36 +77,34 @@ pub enum SelfTestFailure {
     OneStreamSilent {
         channel: AudioChannel,
     },
-    /// System audio permission granted but buffers are zero (missing usage key, PRD).
+    /// System audio buffers are exact digital zeros. The System Audio Recording permission cannot be
+    /// queried, so this is how a denied permission (or a missing usage key) shows; the self-test
+    /// requires non-zero buffers.
     ZeroBuffers,
     OwnSoundsLeak,
     TimedOut,
     PermissionMissing {
         kind: PermissionKind,
     },
-    ModelNotReady,
+    /// The live speech model is not downloaded.
+    ModelMissing,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum StartControl {
-    Record,
-    /// While audio access or the self-test is missing (PM-30).
-    FinishSetup,
-}
-
-/// `setup_status` and event `setup:changed`.
+/// `setup_status` and event `setup:changed`. Setup state never gates a manual start (O1):
+/// start controls always read **Record**; **Finish Setup…** is only a Today and menu-bar
+/// link to the first-run window.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SetupStatus {
+    pub version: StateVersion,
     pub complete: bool,
     pub steps: Vec<StepRow>,
     pub models: ModelsStatus,
     pub permissions: Vec<PermissionRow>,
     pub self_test: SelfTestState,
     pub call_display: Option<DisplayId>,
-    /// Call detection stays off until the self-test passes.
+    /// Automatic call detection: on when General › **Offer to record when a call starts** is on
+    /// and the self-test passed. An unfinished self-test only keeps detection off.
     pub detection_enabled: bool,
-    pub start_control: StartControl,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -130,6 +128,7 @@ pub struct PermissionArgs {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CallDisplayArgs {
+    #[serde(default)]
     pub display_id: Option<DisplayId>,
 }
 

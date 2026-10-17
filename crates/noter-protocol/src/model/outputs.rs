@@ -113,9 +113,12 @@ pub struct RegenerateArgs {
     pub call_id: CallId,
     /// Summary; decisions, action items and open questions; role reviews.
     pub sections: Vec<SectionKind>,
+    #[serde(default)]
     pub runtime: Option<RuntimeChoice>,
+    #[serde(default)]
     pub model: Option<String>,
     /// Skill (call type) to use instead of the call's own.
+    #[serde(default)]
     pub skill: Option<CallTypeId>,
     /// Let the local model rewrite a failed section.
     pub local: bool,
@@ -190,7 +193,9 @@ pub struct ShareCopyArgs {
     pub format: ShareFormat,
 }
 
-/// The core puts the text on the clipboard and returns a copy for the scope line.
+/// The core puts the text on the clipboard in rich and plain formats and returns a copy for
+/// the scope line. (Plain-text copies such as Copy with Citations, Copy Code, Copy Link and
+/// Copy as Prompt are written by the UI itself.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ShareResult {
     pub text: String,
@@ -212,6 +217,10 @@ pub struct ExportInclude {
 pub struct ExportCallsArgs {
     pub call_ids: Vec<CallId>,
     pub include: ExportInclude,
+    /// Export only these sections or items (Export Section…, Export Selection…);
+    /// `null` exports whole calls.
+    #[serde(default)]
+    pub scope: Option<ShareScope>,
 }
 
 /// The core shows the save panel; `Cancelled` comes back as `ErrorCode::Cancelled`.

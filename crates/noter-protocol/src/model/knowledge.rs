@@ -73,6 +73,7 @@ pub struct SourceList {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SourceAddFolderArgs {
     /// `null` = the core shows the open panel (grants a security-scoped bookmark).
+    #[serde(default)]
     pub path: Option<String>,
     pub privacy: PrivacyClass,
     pub scope: SourceScope,
@@ -82,6 +83,7 @@ pub struct SourceAddFolderArgs {
 pub struct SourceAddMcpArgs {
     pub server: String,
     pub mode: SourceMode,
+    #[serde(default)]
     pub schedule: Option<String>,
     pub privacy: PrivacyClass,
     pub scope: SourceScope,
@@ -91,9 +93,13 @@ pub struct SourceAddMcpArgs {
 pub struct SourceUpdateArgs {
     pub source_id: SourceId,
     pub rev: Rev,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub schedule: Option<String>,
+    #[serde(default)]
     pub privacy: Option<PrivacyClass>,
+    #[serde(default)]
     pub scope: Option<SourceScope>,
 }
 

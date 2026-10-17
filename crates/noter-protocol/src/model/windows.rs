@@ -47,6 +47,7 @@ pub enum CallLayout {
 /// Event `window:call` and the result of call-window commands.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CallWindowState {
+    pub version: StateVersion,
     pub visible: bool,
     pub key: bool,
     pub layout: CallLayout,
@@ -107,6 +108,7 @@ pub enum NavTarget {
     CallPage {
         call_id: CallId,
         tab: CallPageTab,
+        #[serde(default)]
         span: Option<TimeSpan>,
     },
     Item {
@@ -119,25 +121,30 @@ pub enum NavTarget {
         topic_id: TopicId,
     },
     Ask {
+        #[serde(default)]
         thread_id: Option<AskThreadId>,
     },
     Activity,
     Agents {
+        #[serde(default)]
         agent_id: Option<AgentId>,
     },
     Performance {
+        #[serde(default)]
         call_id: Option<CallId>,
     },
     Settings {
         pane: SettingsPane,
     },
     FirstRun {
+        #[serde(default)]
         step: Option<SetupStep>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct NavigateArgs {
+    #[serde(default)]
     pub target: Option<NavTarget>,
 }
 
@@ -164,6 +171,7 @@ pub enum ExternalTarget {
     },
     Document {
         document_id: DocumentId,
+        #[serde(default)]
         chunk_id: Option<ChunkId>,
     },
     SystemSettings {
@@ -184,6 +192,7 @@ pub struct OpenExternalArgs {
 pub struct UiLogArgs {
     pub level: UiLogLevel,
     pub screen: String,
+    #[serde(default)]
     pub code: Option<crate::error::ErrorCode>,
     pub message: String,
 }

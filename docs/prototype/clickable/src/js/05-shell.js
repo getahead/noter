@@ -151,7 +151,7 @@
   const bannerSlot = (def, ctx) => {
     let list = (def && def.banners ? def.banners(ctx) : []) || [];
     list = list.filter((b) => b && !(state.dismissed && b.id && state.dismissed[b.id]));
-    if (state.setup.selfTestPassed === false && ctx.key !== 'today') list.push({ id: 'selftest', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }] });
+    if (state.setup.selfTestPassed === false && ctx.key !== 'today') list.push({ id: 'selftest', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }, { label: 'Finish Setup…', link: true, action: ['today.finishSetup'] }] });
     if (!list.length) return '';
     const order = { error: 0, warning: 1, degraded: 2, info: 3, success: 4 };
     list.sort((a, b) => (order[a.severity] || 9) - (order[b.severity] || 9));
@@ -236,8 +236,9 @@
       { label: 'Recording', checked: state.rec.status === 'recording', action: ['proto.rec', { status: 'recording' }] },
       { label: 'Paused', checked: state.rec.status === 'paused', action: ['proto.rec', { status: 'paused' }] },
       { divider: true },
-      { label: 'Audio access never granted', checked: !state.setup.audioGranted, action: ['proto.setup', { k: 'audioGranted' }] },
-      { label: 'Self-test not passed', checked: !state.setup.selfTestPassed, action: ['proto.setup', { k: 'selfTestPassed' }] },
+      { label: 'Microphone access off (Record still works)', checked: !state.setup.micGranted, action: ['proto.setup', { k: 'micGranted' }] },
+      { label: 'System audio access off (Record still works)', checked: !state.setup.sysGranted, action: ['proto.setup', { k: 'sysGranted' }] },
+      { label: 'Self-test not passed (call detection off)', checked: !state.setup.selfTestPassed, action: ['proto.setup', { k: 'selfTestPassed' }] },
       { label: 'No assistant configured', checked: state.setup.assistant === 'none', action: ['proto.setup', { k: 'assistant' }] },
       { label: 'Increase contrast (macOS accessibility)', checked: state.contrast === 'more', action: ['proto.contrast'] },
       { divider: true },

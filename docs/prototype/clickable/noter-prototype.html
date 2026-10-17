@@ -1857,6 +1857,11 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .st-group__box > [data-component="cpt-noter-component-ui-hotkey-recorder"] { padding: 7px 12px; }
 .np-sheet .st-row { padding: 6px 0; }
 @media (max-width: 760px) { .st-body { flex-direction: column; height: auto; } .st-panes { width: 100%; border-right: 0; border-bottom: 1px solid var(--sep); } .st-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+/* Audio & Transcription › Output devices (PM-67): headphones marked per device */
+.st-devlist { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.st-dev { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-dev__name { font-weight: 600; }
+.st-dev__route { color: var(--label-2); font-size: 12px; }
 
 /* Group F — your own Claude and ChatGPT accounts */
 .f-acct { align-items: center; }
@@ -2015,7 +2020,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     demo: {},                                    // screen/surface key -> demo state id
     local: {},                                   // screen key -> local state object
     banners: [],                                 // app-level banners for MW-R5 (set by screens' demo states)
-    setup: { audioGranted: true, selfTestPassed: true, assistant: 'api-key' },
+    setup: { micGranted: true, sysGranted: true, selfTestPassed: true, assistant: 'api-key' },   // PM-60: no flag here ever blocks a start
     rec: {                                       // live capture scenario
       status: 'idle',                            // idle | recording | paused | closing
       callId: 'c-live',
@@ -2889,12 +2894,12 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   const C = NP.C;
 
   /* ---------- 3. Recording indicator ----------
-     variant: dot-text | dot | button | live-row ; status: recording | paused | mic-only | stopped */
+     variant: dot-text | dot | button | live-row ; status: recording | paused | mic-only | no-mic | not-recording | stopped */
   C.recordingIndicator = (o) => {
     o = o || {};
     const st = o.status || (NP.state.rec.status === 'paused' ? 'paused' : 'recording');
-    const word = { recording: 'Recording', paused: 'Paused', 'mic-only': 'Recording · mic only', stopped: 'Stopped' }[st];
-    const dot = st === 'stopped' ? '' : html`<span class="np-recdot${st === 'paused' ? ' is-paused' : ''}" aria-hidden="true">${st === 'mic-only' ? icon('warning', { size: 9 }) : ''}</span>`;
+    const word = { recording: 'Recording', paused: 'Paused', 'mic-only': 'Recording · mic only', 'no-mic': 'Recording · no mic', 'not-recording': 'Not recording', stopped: 'Stopped' }[st];
+    const dot = st === 'stopped' || st === 'not-recording' ? '' : html`<span class="np-recdot${st === 'paused' ? ' is-paused' : ''}" aria-hidden="true">${st === 'mic-only' || st === 'no-mic' ? icon('warning', { size: 9 }) : ''}</span>`;
     const variant = o.variant || 'dot-text';
     if (variant === 'button') {
       return comp('recording-indicator', { variant, state: st, tag: 'button', cls: 'np-btn np-btn--secondary np-btn--regular np-recind np-recind--button', attrs: { type: 'button', 'aria-label': word + ', show the call window', title: 'Show the call window (⌃⌥⌘N)', 'data-proto-action': (o.action && o.action[0]) || 'call.show', 'data-proto-args': o.action && o.action[1] ? JSON.stringify(o.action[1]) : null } }, html`${dot}${NP.clock(true)}`);
@@ -2907,7 +2912,25 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
         html`${dot}<span class="np-recind__title">${o.title || D.call(NP.state.rec.callId).title.split(':')[0]}</span><span class="np-recind__sep">·</span>${st === 'paused' ? html`<span>Paused</span>` : NP.clock(true)}`);
     }
     return comp('recording-indicator', { variant, state: st, tag: 'span', cls: 'np-recind np-recind--text' },
-      html`${dot}<span class="np-recind__word${st === 'stopped' ? '' : ' is-rec'}">${word}</span>${o.clock === false || st === 'stopped' ? '' : html` ${NP.clock(false)}`}`);
+      html`${dot}<span class="np-recind__word${st === 'stopped' || st === 'not-recording' ? '' : ' is-rec'}">${word}</span>${o.clock === false || st === 'stopped' || st === 'not-recording' ? '' : html` ${NP.clock(false)}`}`);
+  };
+
+  /* Capture health of the live call (PM-60, PM-67): which channel is silent, or the engine stopped.
+     Returns ok | mic-only (system audio silent) | no-mic (microphone off) | engine-stopped */
+  NP.captureHealth = () => {
+    const L = NP.state.local.cw || {};
+    const setup = NP.state.setup;
+    if (L.engineStopped) return 'engine-stopped';
+    if (L.micOnly || setup.sysGranted === false) return 'mic-only';
+    if (L.noMic || setup.micGranted === false) return 'no-mic';
+    return 'ok';
+  };
+  /* Indicator status for the live call: recording | paused | mic-only | no-mic | not-recording */
+  NP.liveStatus = () => {
+    const h = NP.captureHealth();
+    if (h === 'engine-stopped') return 'not-recording';
+    if (NP.state.rec.status === 'paused') return 'paused';
+    return h === 'ok' ? 'recording' : h;
   };
 
   /* ---------- 4. Mode indicator ----------
@@ -3293,7 +3316,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   const bannerSlot = (def, ctx) => {
     let list = (def && def.banners ? def.banners(ctx) : []) || [];
     list = list.filter((b) => b && !(state.dismissed && b.id && state.dismissed[b.id]));
-    if (state.setup.selfTestPassed === false && ctx.key !== 'today') list.push({ id: 'selftest', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }] });
+    if (state.setup.selfTestPassed === false && ctx.key !== 'today') list.push({ id: 'selftest', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }, { label: 'Finish Setup…', link: true, action: ['today.finishSetup'] }] });
     if (!list.length) return '';
     const order = { error: 0, warning: 1, degraded: 2, info: 3, success: 4 };
     list.sort((a, b) => (order[a.severity] || 9) - (order[b.severity] || 9));
@@ -3378,8 +3401,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       { label: 'Recording', checked: state.rec.status === 'recording', action: ['proto.rec', { status: 'recording' }] },
       { label: 'Paused', checked: state.rec.status === 'paused', action: ['proto.rec', { status: 'paused' }] },
       { divider: true },
-      { label: 'Audio access never granted', checked: !state.setup.audioGranted, action: ['proto.setup', { k: 'audioGranted' }] },
-      { label: 'Self-test not passed', checked: !state.setup.selfTestPassed, action: ['proto.setup', { k: 'selfTestPassed' }] },
+      { label: 'Microphone access off (Record still works)', checked: !state.setup.micGranted, action: ['proto.setup', { k: 'micGranted' }] },
+      { label: 'System audio access off (Record still works)', checked: !state.setup.sysGranted, action: ['proto.setup', { k: 'sysGranted' }] },
+      { label: 'Self-test not passed (call detection off)', checked: !state.setup.selfTestPassed, action: ['proto.setup', { k: 'selfTestPassed' }] },
       { label: 'No assistant configured', checked: state.setup.assistant === 'none', action: ['proto.setup', { k: 'assistant' }] },
       { label: 'Increase contrast (macOS accessibility)', checked: state.contrast === 'more', action: ['proto.contrast'] },
       { divider: true },
@@ -3535,7 +3559,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   const C = NP.C;
 
   /* ---------------- 1. Record prompt ----------------
-     recordPrompt({variant: default|disk-low|system-audio-off|call-ended|new-meeting, state, app, key}) */
+     recordPrompt({variant: default|disk-full|model-missing|system-audio-off|call-ended|new-meeting, state, app, key}) */
   C.recordPrompt = (o) => {
     o = o || {};
     const variant = o.variant || 'default';
@@ -3568,16 +3592,21 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       actions = html`<div class="rp-inline" role="group" aria-label="Don't ask for ${app}">
         ${safari ? html`<p>Calls in Safari, such as Google Meet, won't be offered for recording either.</p>` : html`<p>${app} won't be offered for recording again.</p>`}
         <div class="rp-inline__btns">${P.button('Back', { action: ['rp.dontAskBack'] })}${P.button("Don't Ask", { variant: 'primary', action: ['rp.dontAsk'] })}</div></div>`;
-    } else if (variant === 'disk-low') {
+    } else if (variant === 'model-missing') {
+      /* R1/O1: the live speech model is the only setup item that refuses a start */
+      actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>The speech model is still downloading (62 %)</span></div>
+        <div class="rp-btnrow">${notNow}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', disabled: true, kbd: '⌃⌥⌘R' })}</div>`;
+    } else if (variant === 'disk-full') {
       actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>Not enough disk space to record (420 MB free)</span></div>
         <div class="rp-btnrow">${notNow}${P.button('Delete Old Audio…', { action: ['rp.deleteOldAudio'] })}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', disabled: true, kbd: '⌃⌥⌘R' })}</div>`;
     } else if (variant === 'system-audio-off') {
-      actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>System audio access is off</span></div>
-        <div class="rp-btnrow">${notNow}<span class="np-tb__spacer"></span>${P.button('Open System Settings…', { variant: 'primary', action: ['rp.openSysSettings'] })}</div>`;
+      /* PM-60: a warning only; Record stays the primary button and starts capture */
+      actions = html`<div class="rp-reason">${icon('warning', { size: 13 })}<span>System audio access is off · only your side will be recorded</span></div>
+        <div class="rp-btnrow">${notNow}${P.button('Open System Settings…', { action: ['rp.openSysSettings'] })}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', action: ['rp.record', { sysOff: true }], kbd: '⌃⌥⌘R' })}</div>`;
     } else {
       actions = html`<div class="rp-btnrow">${notNow}${P.button('Record as Sensitive', { action: ['rp.record', { sensitive: true }] })}<span class="np-tb__spacer"></span>${P.button('Record', { variant: 'primary', action: ['rp.record'], kbd: '⌃⌥⌘R' })}</div>`;
     }
-    return comp('record-prompt', { variant, state: variant === 'disk-low' || variant === 'system-audio-off' ? 'disabled' : (L.dontAsk ? 'not-a-call' : 'default'), cls: 'rp-panel', attrs: { role: 'dialog', 'aria-label': 'Record this call?' } },
+    return comp('record-prompt', { variant, state: (variant === 'disk-full' || variant === 'model-missing') ? 'disabled' : (L.dontAsk ? 'not-a-call' : 'default'), cls: 'rp-panel', attrs: { role: 'dialog', 'aria-label': 'Record this call?' } },
       html`${NP.region('RP-R1', { tag: 'div', cls: 'rp-r1' }, html`
         <span class="rp-appicon" aria-hidden="true">${icon(safari ? 'globe' : 'people', { size: 20 })}</span>
         <div class="rp-r1__text"><div class="rp-title">Record this call?</div><div class="rp-sub">${o.event ? html`<span lang="en">${o.event}</span>` : `${app} is using the microphone`}</div></div>
@@ -3855,7 +3884,8 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     { id: 'default', label: 'Call detected' },
     { id: 'event', label: 'Matched calendar event' },
     { id: 'not-a-call', label: 'Not a call (Safari)' },
-    { id: 'disk-low', label: 'Disk below 500 MB' },
+    { id: 'disk-full', label: 'Disk below 500 MB' },
+    { id: 'model-missing', label: 'Speech model not downloaded yet' },
     { id: 'system-audio-off', label: 'System audio access off' },
     { id: 'call-ended', label: 'Call ended, call window hidden' },
     { id: 'new-meeting', label: 'New meeting, call window hidden' },
@@ -3876,7 +3906,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       const d = ctx.demo;
       const L = ctx.local;
       const noPrompt = d === 'setup-incomplete' || d === 'hidden' || L.closed;
-      const variant = { 'disk-low': 'disk-low', 'system-audio-off': 'system-audio-off', 'call-ended': 'call-ended', 'new-meeting': 'new-meeting' }[d] || 'default';
+      const variant = { 'disk-full': 'disk-full', 'model-missing': 'model-missing', 'system-audio-off': 'system-audio-off', 'call-ended': 'call-ended', 'new-meeting': 'new-meeting' }[d] || 'default';
       const app = d === 'not-a-call' ? 'Safari' : 'Microsoft Teams';
       let note = '';
       if (noPrompt) {
@@ -3884,7 +3914,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
           : L.closed === 'started' ? 'Recording started; the call window opened without taking focus.'
           : L.closed === 'dont-ask' ? `${app} is now listed in Settings › General › Apps Noter doesn't ask about, with Remove.`
           : L.closed === 'kept' ? 'The prompt closed and recording goes on. The notice comes back after the next 20 s of silence.'
-          : d === 'setup-incomplete' ? 'No prompt: call detection is off until setup is complete. The menu bar shows Setup incomplete · call detection off.'
+          : d === 'setup-incomplete' ? 'No prompt: call detection is off until the self-test passes. The menu bar shows Setup incomplete · call detection off with the Finish Setup… link, and Start Recording works as always.'
           : d === 'hidden' ? 'No prompt while Noter is hidden for presenting. The menu bar offers Call Detected · Start Recording.'
           : 'The prompt closed after 15 s without an answer. The menu bar offers Call Detected · Start Recording for as long as the call runs.';
         note = html`<div class="a-note" data-proto-chrome><p>${why}</p><div class="a-note__btns"><button type="button" class="np-hbar__btn" ${act('rp.openMenu')}>Show the menu bar</button><button type="button" class="np-hbar__btn" ${act('proto.setDemo', { key: 'record', id: 'default' })}>Show the prompt again</button></div></div>`;
@@ -3900,6 +3930,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   NP.onMany({
     'rp.record': (a) => {
       NP.freshCall();
+      if (a && a.sysOff) state.setup.sysGranted = false;
       if (a && a.sensitive) state.rec.mode = 'Sensitive · local'; else if (state.rec.mode === 'Sensitive · local') state.rec.mode = 'Cloud, redacted';
       NP.startRecording({ offsetMs: 12000 });
       NP.local('rp').closed = 'started';
@@ -3955,14 +3986,16 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     { id: 'paused-5', label: 'Paused for 5 minutes' },
     { id: 'switched-local', label: 'Switched to local' },
     { id: 'setup-incomplete', label: 'Setup incomplete' },
-    { id: 'audio-never', label: 'Audio access never granted' },
+    { id: 'audio-not-granted', label: 'Audio access not granted yet' },
     { id: 'muted', label: 'Copilot muted' },
     { id: 'call-detected', label: 'Call detected, not recorded' },
     { id: 'call-ended', label: 'Call seems to have ended' },
     { id: 'hidden', label: 'Hidden for presenting' },
     { id: 'hidden-ended', label: 'Call ended while hidden' },
+    { id: 'hidden-new-meeting', label: 'New meeting while hidden' },
     { id: 'closing', label: 'After a stop (Continue Recording)' },
     { id: 'capture-problem', label: 'Capture problem, no surface visible' },
+    { id: 'engine-stopped', label: 'Not recording · engine stopped' },
     { id: 'no-hotkey', label: 'Hotkey not registered' },
   ];
   const mi = (label, o) => {
@@ -3976,10 +4009,10 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     const d = ctx.demo;
     const L = ctx.local;
     let mode = state.rec.status === 'idle' ? 'idle' : state.rec.status;
-    if (d === 'idle' || d === 'call-detected' || d === 'setup-incomplete' || d === 'audio-never' || d === 'closing') mode = 'idle';
-    if (['recording', 'switched-local', 'muted', 'call-ended', 'hidden', 'hidden-ended', 'capture-problem', 'no-hotkey'].includes(d)) mode = 'recording';
+    if (d === 'idle' || d === 'call-detected' || d === 'setup-incomplete' || d === 'audio-not-granted' || d === 'closing' || d === 'engine-stopped') mode = 'idle';
+    if (['recording', 'switched-local', 'muted', 'call-ended', 'hidden', 'hidden-ended', 'hidden-new-meeting', 'capture-problem', 'no-hotkey'].includes(d)) mode = 'recording';
     if (d === 'paused-5') mode = 'paused';
-    const hidden = d === 'hidden' || d === 'hidden-ended' || !!L.hidden;
+    const hidden = d === 'hidden' || d === 'hidden-ended' || d === 'hidden-new-meeting' || !!L.hidden;
     const muted = d === 'muted' || !!L.muted;
     return { d, L, mode, hidden, muted, glyph: mode === 'idle' ? 'idle' : mode === 'paused' ? 'paused' : muted ? 'muted' : 'recording' };
   };
@@ -3988,30 +4021,40 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     const { d, L, mode, hidden, muted } = m;
     const noKey = d === 'no-hotkey';
     const title = D.call(state.rec.callId).title;
+    const setupIncomplete = d === 'setup-incomplete' || d === 'audio-not-granted' || (d === 'default' && (state.setup.selfTestPassed === false || state.setup.micGranted === false || state.setup.sysGranted === false));
+    const health = NP.captureHealth();
     const r2 = [];
-    if (mode === 'idle') {
+    if (d === 'engine-stopped') {
+      r2.push(mi(html`<span class="mb-warnline">Not recording · engine stopped</span>`, { info: true }));
+      r2.push(mi(html`<span lang="en">${title}</span> · saved up to 00:31:40`, { info: true }));
+    } else if (mode === 'idle') {
       if (d === 'closing' || L.closing) r2.push(mi(state.lastStop && state.lastStop.auto ? 'Stopped at 11:02 · the call had ended · 48 min saved' : 'Saved · 48 min · Summary in about 2 minutes', { info: true }));
       else r2.push(mi('Noter — Not recording', { info: true }));
       if (d === 'call-detected' || (hidden && d !== 'hidden-ended')) r2.push(mi('Call Detected · Start Recording', { action: 'mb.start' }));
-      if (d === 'setup-incomplete') { r2.push(mi('Setup incomplete · call detection off', { info: true })); r2.push(mi('Finish Setup…', { action: 'mb.finishSetup' })); }
+      if (setupIncomplete) { r2.push(mi('Setup incomplete · call detection off', { info: true })); r2.push(mi('Finish Setup…', { action: 'mb.finishSetup' })); }
       r2.push(mi('Next: Stand-up 11:00', { info: true }));
     } else {
       if (d === 'call-ended') r2.push(mi('Call seems to have ended · stopping in 8 s', { info: true }));
       else if (d === 'hidden-ended') r2.push(mi('Call seems to have ended', { info: true }));
+      else if (d === 'hidden-new-meeting') r2.push(mi(html`A new meeting may have started: <span lang="en">1:1 with Anna K.</span>`, { info: true }));
       else if (mode === 'paused') r2.push(mi('Paused for 5 min', { info: true }));
       else r2.push(mi(html`Recording · <span lang="en">${title}</span> · ${NP.clock(true)}`, { info: true }));
       r2.push(mi(html`4 speakers · EN / RU · ${C.modeIndicator({ variant: 'menu-line', mode: d === 'switched-local' ? 'Switched to local' : state.rec.mode })}`, { info: true }));
       if (d === 'switched-local') r2.push(mi('Switched to local', { info: true }));
-      if (d === 'capture-problem') r2.push(mi(html`<span class="mb-warnline">System audio lost</span>`, { info: true }));
+      if (d === 'capture-problem' || health === 'mic-only') r2.push(mi(html`<span class="mb-warnline">System audio silent</span>`, { info: true }));
+      else if (health === 'no-mic') r2.push(mi(html`<span class="mb-warnline">Microphone off</span>`, { info: true }));
       if (hidden) r2.push(mi('Hidden for presenting', { info: true }));
     }
     const r3 = [];
-    if (mode === 'idle') {
+    if (d === 'engine-stopped') {
+      r3.push(mi('Try Again', { action: 'mb.retryEngine' }));
+    } else if (mode === 'idle') {
       if (d === 'closing' || L.closing) r3.push(mi('Continue Recording', { action: 'mb.continue' }));
-      if (d === 'audio-never' || !state.setup.audioGranted) r3.push(mi('Finish Setup…', { action: 'mb.finishSetup' }));
-      else r3.push(mi('Start Recording', { kbd: '⌃⌥⌘R', action: 'mb.start', noKey }));
+      /* PM-60: Start Recording is never replaced by Finish Setup… */
+      r3.push(mi('Start Recording', { kbd: '⌃⌥⌘R', action: 'mb.start', noKey }));
     } else {
       if (d === 'call-ended') { r3.push(mi('Keep Recording', { action: 'mb.keep' })); r3.push(mi('Stop Now', { action: 'mb.stop' })); }
+      if (d === 'hidden-new-meeting') { r3.push(mi('Start as New Call', { action: 'mb.newCall' })); r3.push(mi('Keep in This Call', { action: 'mb.keepInCall' })); }
       r3.push(mi('Stop Recording', { kbd: '⌃⌥⌘R', action: 'mb.stop', noKey }));
       r3.push(mode === 'paused' ? mi('Resume', { kbd: '⌃⌥⌘P', action: 'mb.pause', noKey }) : mi('Pause', { kbd: '⌃⌥⌘P', action: 'mb.pause', noKey }));
     }
@@ -4046,8 +4089,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       const L = NP.local('menubar');
       L.closing = false; L.hidden = false; L.muteOpen = false; L.open = true;
       L.muted = id === 'muted' ? 'call' : null;
-      if (id === 'audio-never') state.setup.audioGranted = false;
-      if (id === 'idle' || id === 'call-detected') state.setup.audioGranted = true;
+      if (id === 'audio-not-granted') state.setup.sysGranted = false;
+      if (id === 'idle' || id === 'call-detected') { state.setup.micGranted = true; state.setup.sysGranted = true; }
+      if (id === 'engine-stopped' && isRec()) state.rec.status = 'idle';
     },
     render: (ctx) => {
       const m = mbModel(ctx);
@@ -4067,6 +4111,8 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   });
 
   NP.onMany({
+    'mb.newCall': () => { state.demo.menubar = 'hidden'; NP.flash('proto', 'Saved the call and started “1:1 with Anna K.” (capture_answer_new_meeting: start_as_new_call)', 4000); },
+    'mb.keepInCall': () => { state.demo.menubar = 'hidden'; NP.flash('proto', 'Kept in this call', 3000); },
     'mb.toggle': () => { const L = NP.local('menubar'); L.open = !L.open; L.muteOpen = false; },
     'mb.start': () => {
       const L = NP.local('menubar');
@@ -4077,6 +4123,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       state.demo.menubar = 'default'; state.surface = 'call';
     },
     'mb.finishSetup': () => { const F = NP.local('firstrun'); F.step = 2; state.surface = 'firstrun'; },
+    'mb.retryEngine': () => { NP.startRecording({ offsetMs: 31 * 60000 + 40000 }); state.demo.menubar = 'default'; NP.flash('proto', 'Recording again in the same call · gap row Engine stopped 00:31:40–00:32:15', 3000); },
     'mb.stop': () => { state.rec.status = 'idle'; const L = NP.local('menubar'); L.closing = true; state.lastStop = { auto: false }; state.demo.menubar = 'default'; },
     'mb.keep': () => { state.demo.menubar = 'recording'; },
     'mb.continue': () => { NP.startRecording({ offsetMs: 48 * 60000 }); NP.local('menubar').closing = false; state.demo.menubar = 'default'; state.surface = 'call'; NP.flash('call-status', 'Continued · gap row Stopped 11:02–11:04', 4000); },
@@ -4265,7 +4312,8 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       const L = F();
       L.marks[5] = 'done';
       const stS = NP.local('selftest-fr').state;
-      state.setup.audioGranted = L.perms.mic === 'granted' && L.perms.sys === 'granted';
+      state.setup.micGranted = L.perms.mic === 'granted';
+      state.setup.sysGranted = L.perms.sys === 'granted';
       state.setup.selfTestPassed = stS === 'passed' || stS === 'exclusion-off' || stS === 'exclusion-failed';
       state.setup.assistant = (L.keyState.anthropic === 'stored' || L.keyState.codex === 'stored' || L.ollama === 'detected' || (NP.auth && (NP.auth.signedIn('claude') || NP.auth.signedIn('chatgpt')))) ? 'api-key' : 'none';
       state.demo.today = 'default';
@@ -4356,7 +4404,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   const NT_STATES = [
     { id: 'default', label: 'Outputs ready (NT-1)' },
     { id: 'failed', label: 'Outputs failed (NT-2)' },
-    { id: 'capture', label: 'Capture problem, call window hidden (NT-3)' },
+    { id: 'capture', label: 'System audio silent, call window hidden (NT-3)' },
+    { id: 'capture-mic', label: 'Microphone off, call window hidden (NT-3)' },
+    { id: 'capture-engine', label: 'Not recording · engine stopped (NT-3)' },
     { id: 'several', label: 'Several calls in a row' },
     { id: 'not-asked', label: 'Permission not asked yet' },
     { id: 'denied', label: 'Permission denied' },
@@ -4367,7 +4417,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     html`<span class="nt-banner__icon" aria-hidden="true">${icon('noter', { size: 22 })}</span><span class="nt-banner__text"><span class="nt-banner__top"><strong>${title}</strong><span class="np-dim">now</span></span><span class="nt-banner__body" lang="en">${body}</span></span>`);
   const NT1 = () => banner('nt-1', 'Summary ready', 'Planning: VHI 8.0 drawer redesign · 4 action items, 2 decisions', 'ntf.open', { callId: 'c-live' }, 'c-live');
   const NT2 = () => banner('nt-2', "Couldn't write the summary", 'Planning: VHI 8.0 drawer redesign · open the call to try again', 'ntf.open', { callId: 'c-live', failed: true }, 'c-live');
-  const NT3 = () => banner('nt-3', 'System audio lost', 'Recording continues with your microphone.', 'ntf.call', {}, 'capture');
+  const NT3 = (k) => k === 'mic' ? banner('nt-3', 'Microphone off', 'Recording continues with the other side only.', 'ntf.call', {}, 'capture')
+    : k === 'engine' ? banner('nt-3', 'Not recording · engine stopped', 'Open the call window to try again.', 'ntf.call', { engine: true }, 'capture')
+    : banner('nt-3', 'System audio silent', 'Recording continues with your microphone.', 'ntf.call', {}, 'capture');
 
   NP.surface('notifications', {
     label: 'Notifications',
@@ -4379,11 +4431,14 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       if (d === 'default') banners = [NT1()];
       if (d === 'failed') banners = [NT2()];
       if (d === 'capture') banners = [NT3()];
+      if (d === 'capture-mic') banners = [NT3('mic')];
+      if (d === 'capture-engine') banners = [NT3('engine')];
+      if (d.startsWith('capture')) note = html`<p>NT-3 is sent at once, never held, while no call surface is visible. It is not sent while Noter is hidden for presenting: then only the menu bar's degraded line shows the problem.</p>`;
       if (d === 'several') banners = [NT1(), banner('nt-1', 'Summary ready', 'Backend sync · 2 action items, 1 decision', 'ntf.open', { callId: 'c-backend' }, 'c-backend')];
       if (d === 'not-asked') note = html`<p>No notification is sent before you allow them. After the first recorded call the Call page shows this banner:</p>${C.inlineBanner({ severity: 'info', text: 'Get a notification when a summary is ready.', actions: [{ label: 'Notify Me When Summaries Are Ready', action: ['ntf.allow'] }], dismissible: true })}`;
       if (d === 'denied') note = html`<p>No notification after the next call. The Call page still loads without taking focus, the menu bar offers <strong>Open Last Summary — Design review · 09:30</strong>, and Settings › General shows:</p>${C.inlineBanner({ severity: 'warning', text: 'Notifications are off for Noter', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Notifications › Noter' }] }] })}`;
       if (d === 'window-front') note = html`<p>No notification: the main window already shows this call. The page announces <strong>Summary ready</strong> politely to VoiceOver.</p>`;
-      if (d === 'held') note = html`<p>Nothing arrives while a call records or while Noter is hidden for presenting. When capture stops or Noter is shown again, the held notifications arrive, one per call.</p><div class="a-note__btns"><button type="button" class="np-hbar__btn" ${act('proto.setDemo', { key: 'notifications', id: 'several' })}>Deliver held notifications</button></div>`;
+      if (d === 'held') note = html`<p>Nothing arrives while a call records or while Noter is hidden for presenting. When capture stops or Noter is shown again, the held notifications arrive, one per call. The previous call's summary is already written during the next call; only its notification waits. NT-3 is never held, and is not sent at all while hidden for presenting.</p><div class="a-note__btns"><button type="button" class="np-hbar__btn" ${act('proto.setDemo', { key: 'notifications', id: 'several' })}>Deliver held notifications</button></div>`;
       const centre = html`<div class="nt-centre" aria-label="Notification Centre"><div class="nt-centre__h">Notification Centre · Noter</div>
         <div class="nt-thread"><div class="nt-thread__h">Planning: VHI 8.0 drawer redesign</div>${NT1()}${d === 'failed' ? NT2() : ''}</div>
         <div class="nt-thread"><div class="nt-thread__h">Backend sync</div>${banner('nt-1', 'Summary ready', 'Backend sync · 2 action items, 1 decision', 'ntf.open', { callId: 'c-backend' }, 'c-backend')}</div></div>`;
@@ -4395,7 +4450,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   });
   NP.onMany({
     'ntf.open': (a) => { NP.go('call-page', { callId: a.callId, view: 'summary', failed: a.failed || null }); return false; },
-    'ntf.call': () => { state.surface = 'call'; if (!isRec()) NP.startRecording(); },
+    'ntf.call': (a) => { state.surface = 'call'; if (!isRec()) NP.startRecording(); if (a && a.engine && NP.surfaces.call.onDemo) { state.demo.call = 'engine-stopped'; NP.surfaces.call.onDemo('engine-stopped'); } },
     'ntf.allow': () => { NP.openAlert({ title: '“Noter” would like to send you notifications.', body: 'Notifications may include alerts and badges.', variant: 'system', buttons: [{ label: "Don't Allow", action: 'ntf.answer', args: { ok: false } }, { label: 'Allow', variant: 'primary', action: 'ntf.answer', args: { ok: true } }] }); },
     'ntf.answer': (a) => { state.alert = null; state.demo.notifications = a.ok ? 'default' : 'denied'; },
   });
@@ -4429,6 +4484,8 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     { id: 'loading', label: 'Loading' },
     { id: 'calendar-failed', label: 'Calendar read failed' },
     { id: 'self-test', label: 'Self-test not passed' },
+    { id: 'model-missing', label: 'Speech model not downloaded yet' },
+    { id: 'engine-stopped', label: 'Not recording · engine stopped' },
     { id: 'quit-recording', label: 'Noter quit during a recording' },
     { id: 'nothing-to-review', label: 'Nothing to review' },
     { id: 'live', label: 'Live call' },
@@ -4531,15 +4588,18 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     states: STATES,
     toolbarActions: () => {
       if (isRec()) return C.recordingIndicator({ variant: 'button', status: state.rec.status === 'paused' ? 'paused' : 'recording' });
-      if (!state.setup.audioGranted) return P.button('Finish Setup…', { action: ['today.finishSetup'], help: 'Microphone or system audio access was never granted' });
+      /* PM-60: Record never reads Finish Setup… and never waits for permissions; only disk or the speech model dim it */
+      if (NP.demo('today') === 'model-missing') return P.button('Record', { icon: 'record', cls: 'td-recbtn', disabled: true, help: 'Waiting for the speech model · 62 %' });
       return P.button('Record', { icon: 'record', cls: 'td-recbtn', action: ['today.record'], help: 'Start recording (⌃⌥⌘R)' });
     },
     banners: (ctx) => {
       const d = ctx.demo;
       const b = [];
       if (d === 'calendar-denied') b.push({ id: 'cal-denied', severity: 'warning', text: 'Calendar access is off', actions: [{ label: 'Open System Settings…', action: ['today.openCalSettings'] }] });
-      if (d === 'self-test' || !state.setup.selfTestPassed) b.push({ id: 'selftest-today', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }] });
-      if (d === 'quit-recording') b.push({ id: 'quit-rec', severity: 'warning', text: 'Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12', actions: [{ label: 'Open Call', action: ['nav.go', { screen: 'call-page', params: { callId: 'c-live', view: 'transcript' } }] }, { label: 'Resume Recording', variant: 'primary', action: ['today.resume'] }] });
+      if (d === 'self-test' || !state.setup.selfTestPassed) b.push({ id: 'selftest-today', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }, { label: 'Finish Setup…', link: true, action: ['today.finishSetup'] }] });
+      if (d === 'engine-stopped') b.push({ id: 'engine-stopped', severity: 'error', text: 'Not recording · engine stopped', actions: [{ label: 'Try Again', variant: 'primary', action: ['today.engineRetry'] }], dismissible: false });
+      /* R7: dismissing the banner ends the Resume Recording offer */
+      if (d === 'quit-recording') b.push({ id: 'quit-rec', severity: 'warning', dismissible: true, text: 'Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12', actions: [{ label: 'Open Call', action: ['nav.go', { screen: 'call-page', params: { callId: 'c-live', view: 'transcript' } }] }, { label: 'Resume Recording', variant: 'primary', action: ['today.resume'] }] });
       return b;
     },
     onDemo: (id, ctx) => {
@@ -4548,6 +4608,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       L.evidenceFailed = id === 'evidence-failed' ? 'i-replay' : null;
       L.loadingItems = false;
       if (id === 'live' || id === 'unmatched-live') { if (!isRec()) NP.startRecording(); }
+      if (id === 'engine-stopped' || id === 'model-missing') state.rec.status = 'idle';
       if (id === 'self-test') state.setup.selfTestPassed = false;
       if (id === 'default') state.setup.selfTestPassed = true;
       if (state.dismissed) { delete state.dismissed['cal-denied']; delete state.dismissed['quit-rec']; }
@@ -4560,6 +4621,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     'today.record': () => { NP.freshCall(); NP.startRecording({ offsetMs: 0 }); state.surface = 'call'; },
     'today.finishSetup': () => { const F = NP.local('firstrun'); F.step = 2; state.surface = 'firstrun'; },
     'today.resume': () => { NP.startRecording({ offsetMs: 47 * 60000 + 12000 }); state.surface = 'call'; },
+    'today.engineRetry': () => { state.demo.today = 'default'; NP.startRecording({ offsetMs: 31 * 60000 + 40000 }); NP.flash('call-status', 'Recording again · same call', 2500); state.surface = 'call'; },
     'today.openCalSettings': () => { NP.flash('proto', 'Opens System Settings › Privacy & Security › Calendars'); },
     'today.allowCalendar': () => { NP.openAlert({ title: '“Noter” would like to access your calendars.', body: 'Noter reads your calendar events to line up open items before each call.', variant: 'system', buttons: [{ label: "Don't Allow", action: 'today.calAnswer', args: { ok: false } }, { label: 'Allow Full Access', variant: 'primary', action: 'today.calAnswer', args: { ok: true } }] }); },
     'today.calAnswer': (a) => { state.alert = null; state.demo.today = a.ok ? 'default' : 'calendar-denied'; },
@@ -4654,7 +4716,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   const routeHelp = {
     headphones: 'Play this line',
     speakers: 'Replay is off while recording on speakers: the call would hear it. Use headphones, or replay after the call.',
-    unknown: "Noter can't tell whether this output is headphones. Choose Headphones in Settings › Audio & Transcription to replay while recording.",
+    unknown: "Noter can't tell whether this output is headphones. Mark it as headphones in Settings › Audio & Transcription to replay while recording.",
     'not-excluded': "Replay would be recorded. Turn on Exclude Noter's own sounds in Settings › Audio & Transcription.",
   };
 
@@ -4905,17 +4967,19 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     const fb = L.keyTaken && !L.keyTakenSeen
       ? C.inlineStatus(raw('Card key ' + P.kbd('⌃⌥⌘3') + ' is used by another app'), { variant: 'notice', actionLabel: 'Change…', action: ['settings.open', { pane: 'hotkeys' }] })
       : feedback ? C.inlineStatus(feedback, { variant: /^No card/.test(feedback) ? 'notice' : 'blind', actionLabel: L.lastCardAction ? 'Undo' : null, action: ['cw.undoCard'], kbd: L.lastCardAction ? '⌃⌥⌘Z' : null }) : '';
-    const recInd = C.recordingIndicator({ variant: 'dot-text', status: stopped ? 'stopped' : paused ? 'paused' : L.micOnly ? 'mic-only' : 'recording', clock: false });
+    const engineStopped = !stopped && !!L.engineStopped;
+    const recInd = C.recordingIndicator({ variant: 'dot-text', status: stopped ? 'stopped' : NP.liveStatus(), clock: false });
     const pinnedBtn = copilotOff ? '' : P.button(L.pinned.length + ' Pinned', { size: 'small', anchor: 'cw-pinned', action: ['cw.pinnedPopover'], icon: 'pin' });
     if (variant === 'compact') {
       const anchor = 'cw-fp-more';
-      NP._menus[anchor] = [
+      NP._menus[anchor] = (engineStopped ? [{ label: 'Try Again', action: ['cw.engineRetry'] }] : [
         paused ? { label: 'Resume', kbd: '⌃⌥⌘P', action: ['cw.pause'] } : { label: 'Pause', kbd: '⌃⌥⌘P', action: ['cw.pause'] },
         { label: 'Stop Recording', kbd: '⌃⌥⌘R', action: ['cw.stop', { how: 'manual' }] },
+      ]).concat([
         { divider: true },
         { label: 'Ask…', kbd: '⌃⌥⌘A', action: ['cw.ask'] },
-      ];
-      return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'compact', state: stopped ? 'stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--compact' },
+      ]);
+      return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'compact', state: stopped ? 'stopped' : engineStopped ? 'engine-stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--compact' },
         html`${fb ? html`<div class="cw-strip__fb">${fb}</div>` : ''}<div class="cw-strip__row">
         ${P.button('Mark Moment', { size: 'small', flashKey: 'cw-mark', action: ['cw.mark'], help: 'Mark Moment (⌃⌥⌘M)' })}
         ${copilotOff ? '' : P.button('Catch Me Up', { size: 'small', action: ['cw.catchUp'], help: 'Catch Me Up (⌃⌥⌘C)' })}
@@ -4924,14 +4988,14 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
         ${copilotOff ? '' : html`<span class="cw-strip__budget np-tnum${budgetWarn ? ' is-warn' : ''}" title="Copilot budget for this call">${budgetWarn ? icon('warning', { size: 11 }) : ''}${budgetText.replace(' of ', ' / ')}</span>`}
         </div>`);
     }
-    return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'dedicated', state: stopped ? 'stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--dedicated', region: 'CS-R5' },
+    return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'dedicated', state: stopped ? 'stopped' : engineStopped ? 'engine-stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--dedicated', region: 'CS-R5' },
       html`<span class="cw-strip__clock t-title2 np-tnum">${NP.clock(false)}</span>
       ${recInd}
       ${copilotOff ? '' : html`<span class="cw-strip__budget np-tnum${budgetWarn ? ' is-warn' : ''}">${budgetWarn ? icon('warning', { size: 12 }) : ''}Budget ${budgetText}</span>`}
       ${pinnedBtn}
       <span class="cw-strip__fb">${fb}</span>
       <span class="np-tb__spacer"></span>
-      ${stopped ? '' : html`${P.button('Mark Moment', { kbd: '⌃⌥⌘M', flashKey: 'cw-mark', action: ['cw.mark'] })}
+      ${stopped ? '' : engineStopped ? P.button('Try Again', { variant: 'primary', action: ['cw.engineRetry'] }) : html`${P.button('Mark Moment', { kbd: '⌃⌥⌘M', flashKey: 'cw-mark', action: ['cw.mark'] })}
       ${copilotOff ? '' : P.button('Catch Me Up', { kbd: '⌃⌥⌘C', action: ['cw.catchUp'] })}
       ${P.button(paused ? 'Resume' : 'Pause', { kbd: '⌃⌥⌘P', variant: paused ? 'primary' : 'secondary', action: ['cw.pause'] })}
       <span class="cw-strip__gap"></span>
@@ -5084,11 +5148,11 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     askOpen: false, askText: '',
     notice: null, discardConfirm: false, countdown: 10, countdownPaused: false,
     closing: null, closed: null, hidden: null,
-    banner: null,               // audio-lost | stalled | disk | second-source
+    banner: null,               // sys-silent | mic-off | engine-stopped | stalled | disk | second-source
     copilotBanner: null,        // switched-local | budget | muted | sensitive-off
     copilot: 'council',         // council | single | off
     muted: false, budget: 'normal', keyTaken: false, keyTakenSeen: false, dismissKeys: false, panelKey: false,
-    micOnly: false,
+    micOnly: false, noMic: false, engineStopped: false,
     route: 'headphones', playback: null,
     detached: false, newLines: 12,
     newCall: false, waiting: false,
@@ -5105,7 +5169,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     const base = D.segments;
     const hyp = base.filter((s) => s.hypothesis);
     const rest = base.filter((s) => !s.hypothesis);
-    return rest.concat(l.extraRows).concat(state.rec.status === 'paused' || l.closing ? [] : hyp);
+    return rest.concat(l.extraRows).concat(state.rec.status === 'paused' || l.closing || l.engineStopped ? [] : hyp);
   };
   const title = () => (L().newCall ? '1:1 with Anna K.' : D.call(state.rec.callId).title);
   const participants = () => (L().newCall ? ['p-anna', 'p-you'] : ['p-anna', 'p-pavel', 'p-dmitri', 'Speaker 3', 'p-you'].filter((p) => !(p === 'Speaker 3' && !D.segments.some((s) => s.speaker === 'Speaker 3'))));
@@ -5134,10 +5198,14 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
   };
 
   const transcriptBanner = (compact) => {
-    const b = L().banner;
+    /* capture health first (PM-60, PM-67): a missing permission never blocks the start, it shows here */
+    const h = NP.captureHealth();
+    const b = L().banner || (h === 'engine-stopped' ? 'engine-stopped' : h === 'mic-only' ? 'sys-silent' : h === 'no-mic' ? 'mic-off' : null);
     if (!b) return '';
     const map = {
-      'audio-lost': { severity: 'error', text: 'System audio lost', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Privacy & Security › Screen & System Audio Recording' }] }] },
+      'sys-silent': { severity: 'error', text: 'System audio silent', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Privacy & Security › Screen & System Audio Recording' }] }] },
+      'mic-off': { severity: 'error', text: 'Microphone off', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Privacy & Security › Microphone' }] }] },
+      'engine-stopped': { severity: 'error', text: 'Not recording · engine stopped', actions: [{ label: 'Try Again', variant: 'primary', action: ['cw.engineRetry'] }] },
       stalled: { severity: 'error', text: 'Transcription stalled · restarting', actions: [] },
       disk: { severity: 'warning', text: '2 GB free on this Mac. Recording continues.', actions: [{ label: 'Delete Old Audio…', action: ['cw.deleteOldAudio'] }] },
       'second-source': { severity: 'warning', text: 'Slack is also playing audio', actions: [{ label: 'Exclude Slack', action: ['cw.bannerClose'] }, { label: 'Keep', action: ['cw.bannerClose'] }] },
@@ -5164,7 +5232,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     const single = l.copilot === 'single';
     const segs = segments();
     const paused = state.rec.status === 'paused';
-    const recStatus = l.closing ? 'stopped' : paused ? 'paused' : l.micOnly ? 'mic-only' : 'recording';
+    const recStatus = l.closing ? 'stopped' : NP.liveStatus();
     const langs = l.newCall ? ['EN'] : ['EN', 'RU', 'DE'];
     const header = region('CS-R1', { cls: 'cs-r1', tag: 'header', label: 'Call header' }, html`
       <div class="cs-r1__line">
@@ -5199,7 +5267,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
         ${comp('copilot-card-stack', { variant: 'earlier-cards', state: l.earlierOpen ? 'expanded' : 'collapsed', cls: 'cs-earlier' }, html`${P.disclosure('Earlier cards (' + l.earlier.length + ')', l.earlierOpen, { action: ['cw.earlier'] })}
           ${l.earlierOpen ? html`<div class="cs-earlier__list">${l.earlier.map((c) => html`<div class="cs-earlier__row">${C.copilotCard(c, { variant: 'read-only', single })}${P.button('Pin', { size: 'small', action: ['cw.pinEarlier', { id: c.id }] })}</div>`)}</div>` : ''}`)}`)}
     </div>`;
-    return comp('cpt-noter-component-screen-call-screen', { cls: 'cs' + (off ? ' is-copilot-off' : ''), state: l.closing ? 'closing' : paused ? 'paused' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council' },
+    return comp('cpt-noter-component-screen-call-screen', { cls: 'cs' + (off ? ' is-copilot-off' : ''), state: l.closing ? 'closing' : l.engineStopped ? 'engine-stopped' : paused ? 'paused' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council' },
       html`${l.notice ? region('CS-R0', { cls: 'cs-r0' }, C.captureNotice({ variant: l.notice, layout: 'dedicated' })) : ''}
       <div class="cs-cols">${transcript}${right}</div>
       ${C.callStatusStrip({ variant: off ? 'copilot-off' : 'dedicated' })}`);
@@ -5215,7 +5283,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     const tail = !off && (h >= 680 || l.showTranscript);
     const paused = state.rec.status === 'paused';
     const header = region('FP-R1', { cls: 'fp-r1', tag: 'header', label: 'Panel header' }, html`
-      ${C.recordingIndicator({ variant: 'dot', status: paused ? 'paused' : l.micOnly ? 'mic-only' : 'recording', clock: false })}
+      ${C.recordingIndicator({ variant: 'dot', status: NP.liveStatus(), clock: false })}
       <span class="fp-title" title="${title()}">${title()}</span>
       <span class="np-tnum fp-clock">${NP.clock(false)}</span>
       ${shareGlyph()}
@@ -5233,7 +5301,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       ${C.copilotCardStack({ variant: single ? 'single-agent' : 'compact', cards: l.muted ? [] : l.cards, held: l.held.length, maxVisible: maxCards, showAll: l.showAllCards, single, muted: l.muted })}`);
     const tailRegion = tail ? region('FP-R5', { cls: 'fp-r5' }, l.playback ? C.playbackBar({ variant: 'live-headphones', at: l.playback.t, speaker: l.playback.speaker, key: 'cw' }) : C.transcriptView({ variant: 'tail', key: 'cw-tail', segments: segments(), tailLines: 3 })) : '';
     const offBody = off ? region('FP-R5', { cls: 'fp-r5 fp-r5--full' }, C.transcriptView({ variant: 'tail', key: 'cw-tail', segments: segments(), tailLines: 8 })) : '';
-    return comp('cpt-noter-component-screen-floating-panel', { cls: 'fp', state: paused ? 'paused' : l.notice ? 'notice' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council', attrs: { style: `height:${h}px` } },
+    return comp('cpt-noter-component-screen-floating-panel', { cls: 'fp', state: l.engineStopped ? 'engine-stopped' : paused ? 'paused' : l.notice ? 'notice' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council', attrs: { style: `height:${h}px` } },
       html`${header}${notice}${modeLine}${banners ? html`<div class="fp-r3" data-region="FP-R3">${banners}</div>` : ''}${cards}${tailRegion}${offBody}
       ${region('FP-R6', { cls: 'fp-r6', tag: 'footer' }, C.callStatusStrip({ variant: off ? 'copilot-off' : 'compact' }))}`);
   };
@@ -5256,7 +5324,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       <span class="cw-proto__lbl">Layout</span>
       ${btn('Call screen · display 2', lay === 'dedicated', 'cw.layout', { layout: 'dedicated' })}${btn('Floating panel', lay === 'floating', 'cw.layout', { layout: 'floating' })}${btn('Collapsed strip', lay === 'collapsed', 'cw.layout', { layout: 'collapsed' })}
       ${lay === 'floating' ? html`<span class="cw-proto__lbl">Panel height</span>${btn('360', l.fpHeight === 360, 'cw.fpHeight', { h: 360 })}${btn('560', l.fpHeight === 560, 'cw.fpHeight', { h: 560 })}${btn('720', l.fpHeight === 720, 'cw.fpHeight', { h: 720 })}` : ''}
-      <span class="cw-proto__lbl">Output</span>${btn('Headphones', l.route === 'headphones', 'cw.route', { route: 'headphones' })}${btn('Speakers', l.route === 'speakers', 'cw.route', { route: 'speakers' })}
+      <span class="cw-proto__lbl">Output</span>${btn('Headphones', l.route === 'headphones', 'cw.route', { route: 'headphones' })}${btn('Speakers', l.route === 'speakers', 'cw.route', { route: 'speakers' })}${btn('Not identified', l.route === 'unknown', 'cw.route', { route: 'unknown' })}
       <span class="cw-proto__lbl">Simulate</span>${btn('New card', false, 'cw.simCard')}${btn('Card keys ⌃⌥⌘1–3', false, 'cw.simKey')}${btn('Panel becomes key', l.panelKey, 'cw.panelKey')}
     </div>`;
   };
@@ -5294,7 +5362,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       { id: 'nothing-heard', label: 'Nothing heard yet' },
       { id: 'closing-manual', label: 'Closing after Stop Recording' },
       { id: 'closing-auto', label: 'Closing after automatic stop' },
-      { id: 'mic-only', label: 'System audio lost (mic only)' },
+      { id: 'mic-only', label: 'System audio silent (mic only)' },
+      { id: 'mic-off', label: 'Microphone off (others only)' },
+      { id: 'engine-stopped', label: 'Not recording · engine stopped' },
       { id: 'stalled', label: 'Transcription stalled' },
       { id: 'disk', label: 'Disk nearly full' },
       { id: 'second-source', label: 'Second audio source' },
@@ -5305,6 +5375,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       { id: 'detached', label: 'Scrolled up (Jump to Live)' },
       { id: 'replay', label: 'Replaying on headphones' },
       { id: 'speakers', label: 'Recording on speakers (replay off)' },
+      { id: 'unknown-route', label: 'Output not identified (replay off)' },
       { id: 'paused', label: 'Paused' },
       { id: 'presenting', label: 'Hidden for presenting' },
       { id: 'unplugged', label: 'Display unplugged → floating' },
@@ -5330,7 +5401,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
         case 'nothing-heard': l.notice = 'nothing-heard'; l.waiting = true; l.cards = []; break;
         case 'closing-manual': l.closing = 'manual'; state.rec.status = 'closing'; break;
         case 'closing-auto': l.closing = 'auto'; state.rec.status = 'closing'; break;
-        case 'mic-only': l.micOnly = true; l.banner = 'audio-lost'; l.extraRows.push({ gap: true, t: '00:30:02', text: 'System audio lost 00:30:02–00:30:40' }); break;
+        case 'mic-only': l.micOnly = true; l.banner = 'sys-silent'; l.extraRows.push({ gap: true, t: '00:30:02', text: 'System audio silent 00:30:02–00:30:40' }); break;
+        case 'mic-off': l.noMic = true; l.banner = 'mic-off'; break;
+        case 'engine-stopped': l.engineStopped = true; l.banner = 'engine-stopped'; break;
         case 'stalled': l.banner = 'stalled'; break;
         case 'disk': l.banner = 'disk'; break;
         case 'second-source': l.banner = 'second-source'; break;
@@ -5341,6 +5414,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
         case 'detached': l.detached = true; break;
         case 'replay': l.playback = { t: '00:19:58', speaker: 'p-anna' }; break;
         case 'speakers': l.route = 'speakers'; break;
+        case 'unknown-route': l.route = 'unknown'; break;
         case 'paused': state.rec.status = 'paused'; state.rec.pausedAt = Date.now(); break;
         case 'presenting': l.hidden = 'presenting'; break;
         case 'unplugged': state.rec.layout = 'floating'; NP.flash('cw-proto', 'Display 2 was unplugged: the same window switched to the floating layout. Cards, pins and the transcript position are kept.', 6000); break;
@@ -5388,6 +5462,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     'cw.fpHeight': (a) => { L().fpHeight = a.h; },
     'cw.route': (a) => { const l = L(); l.route = a.route; if (a.route === 'speakers' && l.playback) { l.playback.stopped = true; setTimeout(() => { L().playback = null; NP.render(); }, 3000); } },
     'cw.panelKey': () => { L().panelKey = !L().panelKey; },
+    'cw.engineRetry': () => { const l = L(); l.engineStopped = false; l.banner = null; pushRow({ gap: true, t: '00:31:40', text: 'Engine stopped 00:31:40–00:32:15' }); NP.flash('call-status', 'Recording again · same call', 2500); },
     'cw.simCard': () => {
       const l = L();
       const pool = clone(D.cwHeldCards).concat([{ id: 'k5', kind: 'Answer', agent: 'Architect', merged: ['QA lead'], age: 'now', text: 'VSTOR-9912 is open and unassigned; the replay buffer has no estimate yet.', prov: { kind: 'jira', label: 'Jira · looked up ' + new Date().toTimeString().slice(0, 5) } }]);
@@ -6773,7 +6848,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     width: 560, title: () => 'Add MCP Server',
     render: () => sheet('add-mcp-server', { title: 'Add MCP Server',
       body: html`${field('Server', P.popup(['Confluence (Atlassian)', 'Google Drive', 'Notion', 'GitHub', 'Custom…'], 'Confluence (Atlassian)', { id: 'mcp-server', label: 'Server' }))}
-        ${field('Mode', P.radioGroup('mcp-mode', [{ value: 'live', label: 'Live', note: 'Looked up during calls and in Ask; nothing is copied' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index; sign-in opens in your browser' }], S().mcpMode || 'indexed', { bind: 'local.c-dialogs.mcpMode', label: 'Mode' }))}
+        ${field('Mode', P.radioGroup('mcp-mode', [{ value: 'live', label: 'Live', note: 'Looked up after calls and in Ask; nothing is copied. Runs only in Cloud allowed, and each lookup is logged in Privacy' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index; sign-in opens in your browser' }], S().mcpMode || 'indexed', { bind: 'local.c-dialogs.mcpMode', label: 'Mode' }))}
         ${field('Schedule', P.popup(['Every 6 hours', 'Every hour', 'Daily', 'Only by hand'], 'Every 6 hours', { id: 'mcp-sched', label: 'Schedule' }))}
         ${field('Privacy class', P.popup(['Normal', 'Sensitive'], 'Normal', { id: 'mcp-priv', label: 'Privacy class' }), 'Sensitive sources are answered by the local model only')}
         ${field('Scope', P.textField({ id: 'mcp-scope', value: 'DEV space', ariaLabel: 'Scope' }))}`,
@@ -8915,7 +8990,11 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       if (id === 'agent' || id === 'budget-over') L.selected = 'ag-architect';
       if (id === 'skill' || id === 'skill-missing') { L.selected = 'ag-architect'; L.view = 'skill'; }
       if (id === 'runtime') L.selected = 'ag-devils';
-      if (id === 'switched-off') L.selected = 'ag-pm';
+      if (id === 'switched-off') {
+        L.selected = 'ag-pm';
+        /* PM-64: announced once in AG-R0, logged in History, undoable */
+        NP.undo(pmAgent.name + ' switched itself off for 1:1 calls', { context: '82 % of its cards in the last 10 1:1 calls were dismissed', where: 'agents', action: 'ag.turnOn', args: { id: 'ag-pm' }, redoMessage: 'Turned on for 1:1 calls', ms: 60000 });
+      }
       if (id === 'live-call') L.selected = 'ag-architect';
       if (id === 'budget-over') { delete L['f-ag-architect']; C.agentEditor(D.agents[0]); L['f-ag-architect'].budget = 37; }
       if (id === 'new-agent' && !L.added.length) NP.actions['ag.add']({ tpl: 'Security reviewer' });
@@ -8936,7 +9015,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
             <div role="listbox" aria-label="Built-in agents">${built.map((a) => C.agentListRow(a))}</div></div>
           ${added.length ? html`<div class="ag-group"><div class="ag-group__h">Added by you</div><div role="listbox" aria-label="Agents added by you">${added.map((a) => C.agentListRow(a))}</div></div>` : ''}
           ${NP.flashed('ag-status') ? C.inlineStatus(NP.flashed('ag-status'), { variant: 'trailing' }) : ''}
-          ${NP.region('AG-R4', { tag: 'p', cls: 'ag-foot', label: 'About the percentages' }, 'Percentages: cards rated useful or used over the last 20 calls. An agent dismissed in a call type for ten calls switches itself off there.')}
+          ${NP.region('AG-R4', { tag: 'p', cls: 'ag-foot', label: 'About the percentages' }, 'Percentages: cards rated useful or used over the last 20 calls. An agent switches itself off for a call type when 80 % of its cards there were dismissed over the last 10 calls.')}
         `)}
         ${NP.region('AG-R3', { cls: 'ag-pane', label: 'Editor' }, sel ? editorPane(ctx, sel) : councilPane(ctx))}
       </div>`;
@@ -8981,7 +9060,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 
   const PANES = [
     { id: 'general', label: 'General', icon: 'gear', keys: 'launch login record notifications apps language storage calendars horizon ranking setup' },
-    { id: 'audio', label: 'Audio & Transcription', icon: 'mic', keys: 'microphone output headphones speakers echo transcription archive languages glossary permission self-test models whisper' },
+    { id: 'audio', label: 'Audio & Transcription', icon: 'mic', keys: 'microphone output devices headphones speakers transcription archive languages glossary permission self-test models whisper' },
     { id: 'models', label: 'Models & Runtimes', icon: 'agent', keys: 'api key anthropic codex claude chatgpt account sign in login ollama local runtime spend' },
     { id: 'privacy', label: 'Privacy', icon: 'lock', keys: 'privacy mode redaction retention audio calendar talk-time silent voice profiles left mac audit share screen test zoom teams' },
     { id: 'callscreen', label: 'Call Screen & Menu Bar', icon: 'display', keys: 'display layout floating automatically latency text size menu bar title quick actions zoom' },
@@ -9022,7 +9101,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       ${group('Today', html`
         ${row('Calendars shown', html`<div class="st-checks">${P.checkbox('Work', true, { id: 'st-cal-work' })}${P.checkbox('Virtuozzo shared', true, { id: 'st-cal-vz' })}${P.checkbox('Family', false, { id: 'st-cal-fam' })}</div>`)}
         ${row('Horizon', P.segmented(['Today', 'This Week'], s.horizon || 'This Week', { variant: 'option', label: 'Horizon', action: ['st.seg', { k: 'horizon' }] }))}
-        ${row('Ranking', P.popup(['Due date, then owed to you', 'Owed to you first', 'Call order only'], 'Due date, then owed to you', { id: 'st-rank', label: 'Ranking' }))}
+        ${row('Ranking', P.popup(['Owed to today’s people, then due date', 'Due date, then owed to you'], 'Owed to today’s people, then due date', { id: 'st-rank', label: 'Ranking' }), 'Default: items owed to people on today’s calls first, then due date, then age.')}
       `)}
       ${group('', row('Setup', P.button('Run Setup Again…', { action: ['st.firstRun'] }), 'Opens the first-run wizard. Your library and settings stay.'))}`;
   };
@@ -9034,7 +9113,11 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     return html`
       ${group('Input and output', html`
         ${row('Microphone', html`<div class="st-inline">${P.popup(['MacBook Pro Microphone', 'AirPods Pro', 'Shure MV7'], 'MacBook Pro Microphone', { id: 'st-mic', label: 'Microphone' })}${P.levelMeter({ level: 5, label: 'Microphone level' })}</div>`)}
-        ${row('Output', P.radioGroup('st-out', [{ value: 'auto', label: 'Detect automatically' }, { value: 'hp', label: 'Headphones' }, { value: 'sp', label: 'Speakers, with echo cancellation' }], s.output || 'auto', { bind: 'local.settings.output', label: 'Output' }))}
+        ${row('Output devices', html`<div class="st-devlist" role="list" aria-label="Output devices">
+          <div class="st-dev" role="listitem"><span class="st-dev__name">MacBook Pro Speakers</span><span class="st-dev__route">Speakers</span></div>
+          <div class="st-dev" role="listitem"><span class="st-dev__name">AirPods Pro</span><span class="st-dev__route">Headphones</span></div>
+          <div class="st-dev" role="listitem"><span class="st-dev__name">Scarlett 2i2 USB</span><span class="st-dev__route">Not identified</span>${P.checkbox('Treat as headphones', !!s.hpScarlett, { id: 'st-hp-scarlett', bind: 'local.settings.hpScarlett' })}</div>
+        </div>`, 'Replay while recording works only on headphones. Speakers never replay while you record.', { stack: true })}
         ${row('', P.checkbox('Exclude Noter’s own sounds', s.exclude !== false, { id: 'st-excl', bind: 'local.settings.exclude' }), 'Replay while recording needs a headphone route and this setting.')}
       `)}
       ${group('Transcription', html`
@@ -9080,10 +9163,10 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     return html`
       ${group('', html`
         ${row('Privacy mode', html`${P.radioGroup('st-pmode', [{ value: 'redacted', label: 'Cloud with redaction', note: 'Names and PII are replaced before anything leaves this Mac' }, { value: 'cloud', label: 'Cloud allowed', note: 'Text goes as is' }, { value: 'local', label: 'Local only', note: 'Every task runs on the local runtime' }], s.privacyMode, { bind: 'local.settings.privacyMode', label: 'Privacy mode' })}<div class="st-modenow">In force: ${C.modeIndicator({ variant: 'settings', mode: modeWord })}</div>`)}
-        ${row('Audio retention', P.popup(['7 days', '30 days', '90 days', 'Forever', 'Never store audio'], s.retention, { id: 'st-ret', label: 'Audio retention', bind: 'local.settings.retention' }))}
+        ${row('Audio retention', P.popup(['7 days', '30 days', '90 days', 'Forever', 'Never store audio'], s.retention, { id: 'st-ret', label: 'Audio retention', bind: 'local.settings.retention' }), (() => { const n = { '7 days': 14, '30 days': 2, '90 days': 0, 'Forever': 0, 'Never store audio': 63 }[s.retention] || 0; return n ? `The next nightly run deletes the audio of ${n} call${n === 1 ? '' : 's'}.` : 'No audio is due for deletion.'; })())}
         ${NP.c('permissionCheckRow', { id: 'cal', label: 'Calendar', status: calStatus, detail: 'Work, Virtuozzo shared' }, { variant: 'status' })}
         ${calStatus === 'not-asked' ? row('', html`${P.button('Allow Calendar Access', { size: 'small', action: ['st.set', { k: 'calAsked', v: true }] })}<span class="np-dim">The macOS prompt follows. Noter never asks during a recording.</span>`) : ''}
-        ${row('Show talk-time share and “who was silent”', P.toggle('', s.talk, { id: 'st-talk', ariaLabel: 'Show talk-time share and who was silent', bind: 'local.settings.talk' }), 'Off by default. These rows don’t exist anywhere until you turn this on.')}
+        ${row('Show talk-time share and “who was silent”', P.toggle('', s.talk, { id: 'st-talk', ariaLabel: 'Show talk-time share and who was silent', bind: 'local.settings.talk' }), 'Off by default. These rows don’t exist anywhere until you turn this on. They count only calls from the moment you turn it on.')}
         ${row('Voice profiles', html`<span>2 people</span>${P.button('Manage on Person Pages', { size: 'small', action: ['st.toMain', { screen: 'people' }] })}`)}
       `)}
       ${group('What left this Mac', html`<div class="st-audit-bar">${P.popup(['All calls', 'Planning: VHI 8.0 drawer redesign', 'Backend sync'], 'All calls', { id: 'st-audit-call', label: 'Call' })}<span class="np-tb__spacer"></span>${P.button('Export…', { size: 'small', action: ['proto.flash', { key: 'proto', text: 'Save panel · “What left this Mac 16 Oct.csv”' }] })}</div>
@@ -9140,7 +9223,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     if (s.sources == null) s.sources = d === 'no-sources' ? [] : null;
     const base = [
       { id: 'src-conf', name: 'Confluence · DEV space', status: d === 'sign-in-expired' ? 'expired' : 'ok', statusWord: d === 'sign-in-expired' ? 'Sign-in expired' : 'Up to date', subtitle: d === 'sign-in-expired' ? 'Confluence sign-in expired · last sync 3 days ago' : '1,180 pages · synced 02:14', tag: 'Indexed', actions: d === 'sign-in-expired' ? [{ label: 'Sign In Again…', action: ['st.retry', { id: 'src-conf' }] }] : [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Confluence · DEV space' }] }] },
-      { id: 'src-jira', name: 'Jira · VSTOR', status: 'ok', subtitle: 'Looked up live · last lookup 10:14', tag: 'Live', actions: [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Jira · VSTOR' }] }] },
+      { id: 'src-jira', name: 'Jira · VSTOR', status: 'ok', subtitle: s.privacyMode === 'cloud' ? 'Looked up live · last lookup 10:14' : 'Live lookups paused · they run only in Cloud allowed', tag: 'Live', actions: [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Jira · VSTOR' }] }] },
       { id: 'src-specs', name: 'Drawer specs', status: d === 'source-failed' ? 'error' : 'ok', statusWord: d === 'source-failed' ? 'Failed' : 'Up to date', subtitle: '~/Documents/Specs · 58 files · synced 08:41', message: 'Drawer specs sync failed · folder not found', tag: 'Sensitive', actions: d === 'source-failed' ? [{ label: 'Locate…', action: ['proto.flash', { key: 'proto', text: 'macOS open panel to find the moved folder' }] }, { label: 'Try Again', action: ['st.retry', { id: 'src-specs' }] }] : [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Drawer specs' }] }] },
     ];
     const list = (s.sources === null ? base : s.sources).concat(s.added || []);
@@ -9294,7 +9377,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
       return html`<div data-component="cpt-noter-component-screen-dialogs" data-variant="sheet" data-state="${add ? 'add-folder' : 'source-details'}">
         <div class="np-sheet__head"><div class="np-sheet__title">${add ? 'Add Folder' : p.name}</div><div class="np-sheet__sub">${add ? html`<span class="np-mono">~/Documents/Release notes</span> · 24 files` : 'Source details'}</div></div>
         <div class="np-sheet__body">
-          ${row('Mode', P.radioGroup('src-mode', [{ value: 'live', label: 'Live', note: 'Read when asked; nothing is copied' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index for fast search' }], f.mode, { bind: 'local.e-source.mode', label: 'Mode' }))}
+          ${row('Mode', P.radioGroup('src-mode', [{ value: 'live', label: 'Live', note: 'Read after calls and in Ask; nothing is copied. Runs only in Cloud allowed, and each lookup is logged in Privacy' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index for fast search' }], f.mode, { bind: 'local.e-source.mode', label: 'Mode' }))}
           ${row('Schedule', P.popup(['On change', 'Every hour', 'Every 6 hours', 'Only by hand'], f.schedule, { id: 'src-sched', label: 'Schedule', bind: 'local.e-source.schedule' }))}
           ${row('Privacy class', P.segmented(['Normal', 'Sensitive'], f.privacy, { variant: 'option', label: 'Privacy class', action: ['st.srcPrivacy'] }), 'Sensitive sources are answered by the local model only.')}
           ${row('Scope', P.textField({ id: 'src-scope', value: add ? 'All files, Markdown and PDF' : '1,180 pages', ariaLabel: 'Scope' }))}

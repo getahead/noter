@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,6 +20,7 @@ import coverage_gate  # noqa: E402
 import e2e_coverage  # noqa: E402
 import lane_guard  # noqa: E402
 import perf_gate  # noqa: E402
+import trace_gate  # noqa: E402
 
 CFG = common.harness_config()
 
@@ -64,10 +67,10 @@ class CoverageGateTests(unittest.TestCase):
         self.assertEqual(list(kept), ["crates/noter-protocol/src/error.rs"])
 
     def test_gate_fails_below_threshold_and_names_the_worst_files(self):
-        sides = {"rust": {"a.rs": coverage_gate.FileCov({i: int(i < 8) for i in range(10)})}, "ui": {}}
+        sides = {"rust": {"a.rs": coverage_gate.FileCov({i: int(i < 7) for i in range(10)})}, "ui": {}}
         errors, report = coverage_gate.evaluate(sides, CFG, None)
         self.assertEqual(len(errors), 1)
-        self.assertIn("80.00%", errors[0])
+        self.assertIn("70.00%", errors[0])
         self.assertIn("a.rs", errors[0])
         self.assertIn("ui unit | 0 | 0 | 100.00%", report)
 
@@ -218,7 +221,7 @@ class LaneGuardTests(unittest.TestCase):
         self.assertEqual(run("echo x > contracts/ipc.manifest.json"), 2)
         self.assertEqual(run("cat contracts/ipc.manifest.json"), 0)
         self.assertEqual(run("just contract-regen"), 0)
-        self.assertEqual(run("sed -i 's/90.0/50.0/' harness/harness.toml", lane="ui"), 2)
+        self.assertEqual(run("sed -i 's/80.0/50.0/' harness/harness.toml", lane="ui"), 2)
         self.assertEqual(run("sed -i 's/a/b/' apps/desktop/src/x.ts", lane="ui"), 0)
 
     def test_lane_from_branch_name(self):
@@ -240,8 +243,8 @@ class ConfigGuardTests(unittest.TestCase):
         tighter["gates"]["perf"]["max_regression_pct"] = 3.0
         self.assertEqual(config_guard.loosened(base, self._files(tighter)), [])
         looser = json.loads(json.dumps(CFG))
-        looser["gates"]["unit"]["rust_min_lines"] = 80.0
-        looser["gates"]["perf"]["max_regression_pct"] = 10.0
+        looser["gates"]["unit"]["rust_min_lines"] = 70.0
+        looser["gates"]["perf"]["max_regression_pct"] = 15.0
         looser["gates"]["visual"]["min_pixel_match"] = 95.0
         looser["coverage"]["exclude"].append({"path": "crates/noter-core/**", "why": "x"})
         found = config_guard.loosened(base, self._files(looser))
@@ -259,6 +262,141 @@ class ConfigGuardTests(unittest.TestCase):
 
     def test_new_harness_has_nothing_to_loosen(self):
         self.assertEqual(config_guard.loosened(self._files({}), self._files(CFG)), [])
+
+    def test_the_owners_bars_of_17_oct_2026(self):
+        gates = CFG["gates"]
+        self.assertEqual([gates["unit"][k] for k in ("rust_min_lines", "ui_min_lines", "changed_min_lines")], [80.0] * 3)
+        self.assertEqual([gates["e2e"]["commands_min"], gates["e2e"]["stories_min"]], [60.0, 60.0])
+        self.assertEqual(gates["visual"]["min_pixel_match"], 98.0)
+        self.assertEqual([gates["perf"]["max_regression_pct"], gates["perf"]["scenario_coverage_min"]], [10.0, 60.0])
+        self.assertTrue(gates["trace"]["ratchet"])
+        self.assertLessEqual({"component", "interface", "seq", "dbtable", "flow", "algo", "state", "dod"}, set(gates["trace"]["kinds"]))
+
+    def test_trace_gate_cannot_be_removed_turned_off_or_narrowed(self):
+        base = self._files(CFG)
+
+        def head(change):
+            cfg = json.loads(json.dumps(CFG))
+            change(cfg["gates"])
+            return config_guard.loosened(base, self._files(cfg))
+
+        self.assertEqual(head(lambda g: g.pop("trace")), ["gates.trace removed (trace-coverage gate)"])
+        self.assertEqual(head(lambda g: g["trace"].update(ratchet=False)), ["gates.trace.ratchet turned off"])
+        found = head(lambda g: g["trace"].update(kinds=[k for k in g["trace"]["kinds"] if k != "seq"]))
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("seq", found[0])
+        self.assertEqual(head(lambda g: g["trace"].update(kinds=g["trace"]["kinds"] + ["topology"])), [])
+        without = json.loads(json.dumps(CFG))
+        without["gates"].pop("trace")
+        self.assertEqual(config_guard.loosened(self._files(without), self._files(CFG)), [])  # adding the gate
+
+
+class TraceGateTests(unittest.TestCase):
+    KINDS = ["component", "interface", "seq", "dbtable", "flow", "algo", "state", "dod"]
+    REGISTRY = """[[systems]]
+name = "Demo"
+slug = "demo"
+kit = "sdlc"
+artifacts = [
+  {{ path = "docs/DESIGN.md", kind = "DESIGN", traceability = "{mode}" }},
+]
+codebase = [{{ name = "code", path = "src", extensions = [".rs", ".ts"] }}]
+children = []
+"""
+    DESIGN = (
+        "# Design\n\n- [ ] `p1` - **ID**: `cpt-demo-component-a`\n\n- [ ] `p1` - **ID**: `cpt-demo-interface-b`\n\n"
+        "- [ ] `p1` - **ID**: `cpt-demo-principle-x`\n\n```md\n**ID**: `cpt-demo-component-example`\n```\n"
+    )
+
+    def _repo(self, mode: str = "FULL") -> Path:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        self._git(root, "init", "-q")
+        self._write(root, ".cf-studio/config/artifacts.toml", self.REGISTRY.format(mode=mode))
+        self._write(root, "docs/DESIGN.md", self.DESIGN)
+        self._write(root, "src/a.rs", "// @cpt-component:cpt-demo-component-a:p1\npub fn a() {}\n")
+        self._write(root, "src/b.ts", "// @cpt-begin:cpt-demo-interface-b:p1:inst-x\nexport const b = 1;\n// @cpt-end:cpt-demo-interface-b:p1:inst-x\n")
+        self._write(root, "src/node_modules/c.ts", "// @cpt-component:cpt-demo-component-c:p1\n")
+        self._write(root, "src/notes.md", "@cpt-component:cpt-demo-component-c:p1\n")
+        self._git(root, "add", "-A")
+        self._git(root, "commit", "-q", "-m", "base")
+        return root
+
+    @staticmethod
+    def _git(root: Path, *args: str) -> None:
+        subprocess.run(["git", "-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", *args],
+                       cwd=root, check=True, capture_output=True)
+
+    @staticmethod
+    def _write(root: Path, rel: str, text: str) -> None:
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
+
+    def test_counts_traced_kinds_of_full_artifacts_and_markers_in_the_codebase(self):
+        root = self._repo()
+        self._write(root, "src/c.ts", "// @cpt-component:cpt-demo-component-c:p1\n")  # an ID the design does not define
+        head = trace_gate.measure(trace_gate.WorkTree(root), self.KINDS)
+        self.assertEqual(head.ids, {"cpt-demo-component-a": "component", "cpt-demo-interface-b": "interface"})
+        self.assertEqual(head.covered, {"cpt-demo-component-a", "cpt-demo-interface-b"})
+        self.assertEqual(head.value, 100.0)
+
+    def test_docs_only_artifacts_are_not_traceable(self):
+        head = trace_gate.measure(trace_gate.WorkTree(self._repo("DOCS-ONLY")), self.KINDS)
+        self.assertEqual((head.ids, head.covered), ({}, set()))
+
+    def test_base_is_read_from_git_without_a_checkout(self):
+        root = self._repo()
+        self._write(root, "src/a.rs", "pub fn a() {}\n")
+        base = trace_gate.measure(trace_gate.GitRef(root, "HEAD"), self.KINDS)
+        head = trace_gate.measure(trace_gate.WorkTree(root), self.KINDS)
+        self.assertEqual(base.covered, {"cpt-demo-component-a", "cpt-demo-interface-b"})
+        self.assertEqual(head.covered, {"cpt-demo-interface-b"})
+
+    def test_a_covered_id_that_loses_its_marker_fails(self):
+        root = self._repo()
+        self._write(root, "src/a.rs", "pub fn a() {}\n")
+        errors, report = trace_gate.run(root, "HEAD", self.KINDS, ratchet=True)
+        self.assertEqual(len(errors), 2, errors)
+        self.assertIn("cpt-demo-component-a", errors[0])
+        self.assertIn("50.00%", report)
+
+    def test_removing_an_implemented_design_id_with_its_marker_fails(self):
+        root = self._repo()
+        self._write(root, "docs/DESIGN.md", self.DESIGN.replace("**ID**: `cpt-demo-component-a`", "removed"))
+        self._write(root, "src/a.rs", "pub fn a() {}\n")
+        errors, _ = trace_gate.run(root, "HEAD", self.KINDS, ratchet=True)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("fell from 100.00% to 50.00%", errors[0])
+
+    def test_new_design_ids_never_fail(self):
+        root = self._repo()
+        self._write(root, "docs/DESIGN.md", self.DESIGN + "\n- [ ] `p1` - **ID**: `cpt-demo-seq-new-story`\n")
+        errors, report = trace_gate.run(root, "HEAD", self.KINDS, ratchet=True)
+        self.assertEqual(errors, [])
+        self.assertIn("| head | 2 | 3 | 66.67% |", report)
+        self.assertIn("New IDs never fail this gate", report)
+
+    def test_more_markers_pass(self):
+        root = self._repo()
+        self._write(root, "src/a.rs", "pub fn a() {}\n")
+        self._git(root, "commit", "-q", "-am", "base without a")
+        self._write(root, "src/a.rs", "// @cpt-component:cpt-demo-component-a:p1\npub fn a() {}\n")
+        self.assertEqual(trace_gate.run(root, "HEAD", self.KINDS, ratchet=True)[0], [])
+
+    def test_missing_base_or_ratchet_off_only_reports(self):
+        root = self._repo()
+        self._write(root, "src/a.rs", "pub fn a() {}\n")
+        errors, report = trace_gate.run(root, "origin/does-not-exist", self.KINDS, ratchet=True)
+        self.assertEqual(errors, [])
+        self.assertIn("not found", report)
+        errors, report = trace_gate.run(root, "HEAD", self.KINDS, ratchet=False)
+        self.assertEqual(errors, [])
+        self.assertIn("reported only", report)
+
+    def test_this_repository_traces_its_contract_crate(self):
+        head = trace_gate.measure(trace_gate.WorkTree(common.ROOT), CFG["gates"]["trace"]["kinds"])
+        self.assertIn("cpt-noter-component-core-protocol", head.covered)
+        self.assertIn("cpt-noter-interface-core-ipc", head.covered)
 
 
 class ArchCheckTests(unittest.TestCase):

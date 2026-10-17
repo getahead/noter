@@ -11,6 +11,7 @@ use specta::Type;
 
 use crate::common::*;
 
+// @cpt-interface:cpt-noter-interface-core-ipc:p1
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CoreError {
     pub code: ErrorCode,
@@ -53,8 +54,8 @@ pub enum ErrorDetail {
     Conflict { current_rev: Rev },
     /// `invalid_input`: which field broke which rule, for the form's inline error.
     Validation { field: String, rule: ValidationRule },
-    /// `disk_low` / `disk_full`.
-    DiskSpace { free_mb: u32 },
+    /// `disk_full`: the free space and the space a start needs (500 MB).
+    DiskSpace { free_mb: u32, needed_mb: u32 },
     /// `permission_missing` / `permission_denied`.
     Permission { kind: PermissionKind },
     /// `runtime_unavailable`: which runtime and the one-step fix the UI may offer.
@@ -65,8 +66,6 @@ pub enum ErrorDetail {
     },
     /// `hotkey_conflict`: the app that owns the shortcut, when macOS says.
     HotkeyOwner { owner: Option<String> },
-    /// `partially_applied`: a batch where some rows were edited later and skipped.
-    Partial { applied: u32, skipped: u32 },
     /// `cli_version_unsupported`.
     CliVersion {
         tool: String,
@@ -125,29 +124,29 @@ pub enum ErrorCode {
     Internal,
 
     // ── setup, permissions, disk ──────────────────────────────
-    /// Audio permissions or the self-test are missing: every start control reads **Finish Setup…** (PM-30).
-    SetupIncomplete,
-    /// A macOS permission is not granted yet.
+    /// A macOS permission is not granted yet. Never raised by `capture_start`:
+    /// capture starts anyway and a degraded state names the silent channel (O1).
     PermissionMissing,
     /// The user denied the permission; the fix is **Open System Settings…**.
     PermissionDenied,
-    /// Under 2 GB free: warning, capture still allowed.
-    DiskLow,
-    /// Under 500 MB free: capture refuses to start.
+    /// Under 500 MB free: capture refuses to start; `ErrorDetail::DiskSpace` says how much is
+    /// free and needed. Low disk (under 2 GB) is never a rejection, only `DegradedState::DiskLow`.
     DiskFull,
     /// A download had no connection.
     Offline,
     /// A downloaded model failed its checksum.
     ChecksumFailed,
-    /// The speech model is not downloaded yet (self-test, start).
-    ModelNotReady,
+    /// The live speech model is not downloaded yet (`capture_start`, self-test).
+    ModelMissing,
 
     // ── capture ───────────────────────────────────────────────
-    /// Start while a capture already runs.
+    /// Start while a capture already runs (recording, paused or starting). A start while
+    /// `stopped` is allowed and closes the stopped call's Continue window.
     AlreadyRecording,
     /// Stop, pause or mark with no capture running for that call.
     NotRecording,
-    /// The call-ended or new-meeting notice the answer refers to is gone.
+    /// The notice the answer refers to is gone (call ended, new meeting, nothing heard,
+    /// second source), or the interrupted recording can no longer be resumed.
     NoticeExpired,
     /// Continue Recording after its 5-minute window.
     ContinueWindowClosed,
@@ -195,6 +194,10 @@ pub enum ErrorCode {
     /// The handoff prompt could not be written.
     PromptNotReady,
 
+    // ── calendar ──────────────────────────────────────────────
+    /// The calendar could not be read (EventKit failed or access was revoked).
+    CalendarUnavailable,
+
     // ── library, search, ask ──────────────────────────────────
     /// Full-text and vector indexes are rebuilding; keyword-only results.
     IndexRebuilding,
@@ -204,18 +207,27 @@ pub enum ErrorCode {
     AnswerStopped,
 
     // ── history and maintenance ───────────────────────────────
-    /// The undo or redo window has passed.
+    /// `card_undo_last` after its 30-second window. Change-log undo and redo never expire.
     UndoExpired,
-    /// Some changes of the batch were edited later; `ErrorDetail::Partial`.
-    PartiallyApplied,
+    /// Undo of a change or batch that is already undone.
+    AlreadyUndone,
+    /// Redo of a change or batch that is not undone.
+    NotUndone,
+    /// The change cannot be undone (a deletion, retention, or an audio delete).
+    NotUndoable,
+    /// Every row of the change or batch was edited later, so nothing was undone or redone.
+    /// When only some rows were, the command succeeds with `UndoResult.skipped_edited_later`.
+    EditedLater,
     /// A proposal could not be applied ("Couldn't apply").
     ProposalNotApplicable,
     /// The change log could not be read.
     ChangeLogUnreadable,
-    /// A job cannot run now (a call is live, or on battery).
+    /// A job cannot run now: a call is live (every job except post-call analysis), or on battery.
     JobBlocked,
     /// Evidence tool (`acli`, `bkt`, `gh`) is not installed or not signed in.
     EvidenceToolMissing,
+    /// The issue tracker (Jira, Bitbucket, GitHub) could not be reached for evidence or a link.
+    TrackerUnreachable,
 
     // ── runtimes, keys and accounts ───────────────────────────
     /// See `ErrorDetail::Runtime`.
@@ -270,6 +282,8 @@ impl ErrorCode {
                 | SourceSyncFailed
                 | KeychainLocked
                 | ChangeLogUnreadable
+                | CalendarUnavailable
+                | TrackerUnreachable
         )
     }
 
@@ -283,14 +297,12 @@ impl ErrorCode {
         ErrorCode::NotReady,
         ErrorCode::NotImplemented,
         ErrorCode::Internal,
-        ErrorCode::SetupIncomplete,
         ErrorCode::PermissionMissing,
         ErrorCode::PermissionDenied,
-        ErrorCode::DiskLow,
         ErrorCode::DiskFull,
         ErrorCode::Offline,
         ErrorCode::ChecksumFailed,
-        ErrorCode::ModelNotReady,
+        ErrorCode::ModelMissing,
         ErrorCode::AlreadyRecording,
         ErrorCode::NotRecording,
         ErrorCode::NoticeExpired,
@@ -313,15 +325,20 @@ impl ErrorCode {
         ErrorCode::NoLinkHandler,
         ErrorCode::AutomationDenied,
         ErrorCode::PromptNotReady,
+        ErrorCode::CalendarUnavailable,
         ErrorCode::IndexRebuilding,
         ErrorCode::SearchFailed,
         ErrorCode::AnswerStopped,
         ErrorCode::UndoExpired,
-        ErrorCode::PartiallyApplied,
+        ErrorCode::AlreadyUndone,
+        ErrorCode::NotUndone,
+        ErrorCode::NotUndoable,
+        ErrorCode::EditedLater,
         ErrorCode::ProposalNotApplicable,
         ErrorCode::ChangeLogUnreadable,
         ErrorCode::JobBlocked,
         ErrorCode::EvidenceToolMissing,
+        ErrorCode::TrackerUnreachable,
         ErrorCode::RuntimeUnavailable,
         ErrorCode::KeyRejected,
         ErrorCode::KeychainLocked,

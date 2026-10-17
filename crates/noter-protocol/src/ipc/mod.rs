@@ -28,7 +28,9 @@ use crate::model::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum Stability {
-    /// Changes only with a contract major version and both teams' sign-off.
+    /// The UI may build on it as final. It changes only additively in a minor contract
+    /// version (a new command, event, optional field or enum variant); anything else needs a
+    /// major version that both the core and the UI team sign off.
     Frozen,
     /// Shape may change in a minor version until the feature's milestone gate (copilot, council, performance, v1.x).
     Draft,
@@ -91,8 +93,32 @@ pub struct EventSpec {
 /// Context the IPC host passes to every handler.
 #[derive(Debug, Clone)]
 pub struct CommandCtx {
-    /// Label of the calling window, already checked against the command's scope.
-    pub window: WindowLabel,
+    pub caller: Caller,
+}
+
+/// Who sent a command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Caller {
+    /// A webview window; its label was already checked against the command's scope.
+    Window { label: WindowLabel },
+    /// A native surface of the core itself. Skips the scope check; the change log records
+    /// the surface as the actor's surface.
+    Native { surface: NativeSurface },
+}
+
+/// Native surfaces that call core commands directly, without a webview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeSurface {
+    /// The app menu.
+    Menu,
+    /// The menu bar extra and its menu.
+    MenuBar,
+    /// A global hotkey.
+    Hotkey,
+    /// A click on a notification or one of its actions.
+    Notification,
 }
 
 /// The sending half of a Channel, abstracted so the core logic does not depend
@@ -150,6 +176,11 @@ macro_rules! commands {
             )*
         }
 
+        /// Registers every argument type (and what it contains), for the contract tests.
+        pub fn register_arg_types(types: Types) -> Types {
+            types $( .register::<$args>() )*
+        }
+
         /// Registers every argument, result and Channel message type for export.
         pub fn register_command_types(types: Types) -> Types {
             types
@@ -190,6 +221,8 @@ macro_rules! events {
     };
 }
 
+// The command registry: the single list of the IPC interface.
+// @cpt-interface:cpt-noter-interface-core-ipc:p1
 // Windows: Main, CallScreen, RecordPrompt, Settings, FirstRun.
 commands! {
     // ── App ───────────────────────────────────────────────────────────────
@@ -197,31 +230,51 @@ commands! {
     app_snapshot(NoArgs) -> AppSnapshot [App, Frozen, Main | CallScreen | RecordPrompt | Settings | FirstRun];
     /// Ends any Channel subscription (transcript, cards, levels, ask, self-test).
     stream_unsubscribe(UnsubscribeArgs) -> Ack [App, Frozen, Main | CallScreen | RecordPrompt | Settings | FirstRun];
+    /// Acknowledges a Channel up to `seq`, every 100 messages or 1 s (the generated client does it).
+    /// At 2 000 unacknowledged messages the core ends the subscription with `lagged`.
+    stream_ack(StreamAckArgs) -> Ack [App, Frozen, Main | CallScreen | RecordPrompt | Settings | FirstRun];
     /// UI errors to the local log, never with transcript text.
     log_ui(UiLogArgs) -> Ack [App, Frozen, Main | CallScreen | RecordPrompt | Settings | FirstRun];
+    /// Dismiss an app banner (for example "Noter quit during a recording").
+    banner_dismiss(BannerDismissArgs) -> BannerSet [App, Frozen, Main];
 
     // ── Capture control ───────────────────────────────────────────────────
-    /// Start capture (Record, Record as Sensitive, hotkey, menu, Today).
+    /// Start capture (Record, Record as Sensitive, hotkey, menu, Today). Never gated on setup or
+    /// permissions; refused only with `already_recording`, `disk_full` or `model_missing`.
+    /// Allowed while `stopped`: closes the stopped call's Continue window.
     capture_start(CaptureStartArgs) -> CaptureState [CaptureControl, Frozen, RecordPrompt | CallScreen | Main];
     /// Stop now. The call window shows its closing state; Continue Recording is offered for 5 minutes.
     capture_stop(CallIdArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | Main];
-    /// Pause or resume (wanted state). Pause drops audio entirely.
+    /// Pause or resume (wanted state). Pause drops audio entirely. Resume of a stopped call is
+    /// refused with `not_recording` (use `capture_continue`).
     capture_set_paused(CapturePauseArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | Main];
     /// Mark a moment.
     capture_mark_moment(MarkMomentArgs) -> MarkView [CaptureControl, Frozen, CallScreen];
     /// Answer the call-ended notice: Keep Recording or Stop Now.
     capture_answer_call_end(CallEndAnswerArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | RecordPrompt];
-    /// Continue Recording after any stop, within 5 minutes; appends with a gap row.
+    /// Hold the call-ended countdown while the pointer or focus is on the notice (wanted state);
+    /// on release the 10-second countdown starts again.
+    capture_hold_notice(NoticeHoldArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | RecordPrompt];
+    /// Continue Recording after any stop, within 5 minutes; appends with a gap row. Cancels the
+    /// queued or running post-call job and queues it again after the next stop (edits are kept).
     capture_continue(CallIdArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | RecordPrompt | Main];
+    /// Resume Recording after Noter quit or crashed mid-call (gap row `interrupted`, allowed while
+    /// the `recording_interrupted_by_quit` banner is shown), or **Try Again** after the engine
+    /// stopped (phase `failed`; gap row `engine_restart`). Continues the same call.
+    capture_resume_interrupted(CallIdArgs) -> CaptureState [CaptureControl, Frozen, Main | CallScreen];
     /// Answer the new-meeting notice: Start as New Call (default) or Keep in This Call.
     capture_answer_new_meeting(NewMeetingAnswerArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | RecordPrompt];
+    /// Keep Recording on the nothing-heard notice; resets the 5-minute timer.
+    capture_keep_recording(CallIdArgs) -> CaptureState [CaptureControl, Frozen, CallScreen];
     /// Discard Recording (nothing heard), after the inline confirmation.
     capture_discard(CallIdArgs) -> CaptureState [CaptureControl, Frozen, CallScreen];
     /// Make This Call Sensitive (during capture), or change it from Call info afterwards.
     capture_set_sensitive(SensitiveArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | Main];
     /// Exclude a second audio source from the tap.
     capture_exclude_source(ExcludeSourceArgs) -> CaptureState [CaptureControl, Frozen, CallScreen];
-    /// Not Now / Not a Call / timed out on the record prompt.
+    /// Keep a second audio source in the tap; its banner is not shown again for that app in this call.
+    capture_keep_source(KeepSourceArgs) -> CaptureState [CaptureControl, Frozen, CallScreen];
+    /// Not Now, × or timed out on the record prompt.
     capture_dismiss_detection(DismissDetectionArgs) -> Ack [CaptureControl, Frozen, RecordPrompt];
     /// Don't Ask for <app>… from the prompt's pull-down.
     capture_ignore_app(IgnoreAppArgs) -> Ack [CaptureControl, Frozen, RecordPrompt];
@@ -239,7 +292,8 @@ commands! {
     transcript_name_speakers(NameSpeakersArgs) -> SpeakerMutation [Transcript, Frozen, Main];
     /// Segments of an evidence span, for the popover and the span preview.
     transcript_span(SpanArgs) -> SpanPreview [Transcript, Frozen, CallScreen | Main];
-    /// Play audio natively (no media in the WebView).
+    /// Play audio natively: the engine plays it (D6; no media in the WebView). During capture,
+    /// headphones only.
     audio_play(PlayAudioArgs) -> PlaybackState [Transcript, Frozen, CallScreen | Main];
     audio_stop(NoArgs) -> PlaybackState [Transcript, Frozen, CallScreen | Main];
     /// Delete the audio of calls (irreversible; native alert first).
@@ -252,7 +306,9 @@ commands! {
     cards_subscribe(CardsSubscribeArgs, channel: CardMsg) -> CardsSnapshot [Copilot, Draft, CallScreen];
     card_pin(CardArgs) -> CardMutation [Copilot, Draft, CallScreen];
     card_dismiss(CardArgs) -> CardMutation [Copilot, Draft, CallScreen];
-    /// Undo the last card action (⌃⌥⌘Z equivalent from the panel).
+    /// Unpin a pinned card; the item the pin created is removed.
+    card_unpin(CardArgs) -> CardMutation [Copilot, Draft, CallScreen];
+    /// Undo the last card action (⌃⌥⌘Z equivalent from the panel), within 30 s; then `undo_expired`.
     card_undo_last(CallIdArgs) -> CardMutation [Copilot, Draft, CallScreen];
     /// Hovered, focused or expanded: the core never expires a held card.
     card_set_held(CardHeldArgs) -> Ack [Copilot, Draft, CallScreen];
@@ -266,7 +322,7 @@ commands! {
     copilot_mute(MuteArgs) -> CopilotStatus [Copilot, Draft, CallScreen | Main];
     copilot_mute_agent(AgentMuteArgs) -> CopilotStatus [Copilot, Draft, CallScreen];
     copilot_raise_budget(RaiseBudgetArgs) -> CopilotStatus [Copilot, Draft, CallScreen];
-    /// v1.x screen context chips.
+    /// v1.x screen context chips: returns `feature_disabled` in v1.
     context_chip_set(ContextChipArgs) -> ContextChipView [Copilot, Draft, CallScreen];
 
     // ── Items ─────────────────────────────────────────────────────────────
@@ -278,9 +334,9 @@ commands! {
     item_review(ItemReviewArgs) -> ItemMutation [Items, Frozen, Main];
     items_review_all(ReviewAllArgs) -> ItemsBatchResult [Items, Frozen, Main];
     item_edit(ItemEditArgs) -> ItemMutation [Items, Frozen, Main | CallScreen];
-    item_reopen(ItemReopenArgs) -> ItemMutation [Items, Frozen, Main];
+    item_reopen(ItemReopenArgs) -> ItemMutation [Items, Frozen, Main | CallScreen];
     item_create(ItemCreateArgs) -> ItemMutation [Items, Frozen, Main | CallScreen];
-    /// Answer the carry-forward "did the handoff land?".
+    /// Answer the carry-forward "Did the handoff land?": Yes, Landed, Done Another Way or Keep Open.
     item_answer_handoff_landed(HandoffLandedArgs) -> ItemMutation [Items, Frozen, Main | CallScreen];
 
     // ── Today ─────────────────────────────────────────────────────────────
@@ -293,19 +349,25 @@ commands! {
     outputs_regenerate(RegenerateArgs) -> JobAccepted [OutputsAndSharing, Frozen, Main];
     output_versions(SummaryIdArgs) -> VersionList [OutputsAndSharing, Frozen, Main];
     output_version_get(VersionGetArgs) -> VersionBody [OutputsAndSharing, Frozen, Main];
-    /// Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard).
+    /// Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard, rich and plain).
     share_copy(ShareCopyArgs) -> ShareResult [OutputsAndSharing, Frozen, Main];
-    /// Export… a folder of Markdown, SRT, JSON and audio; the core shows the save panel.
+    /// Export… a folder of Markdown, SRT, JSON and audio, for whole calls or a section or selection;
+    /// the core shows the save panel.
     calls_export(ExportCallsArgs) -> ExportResult [OutputsAndSharing, Frozen, Main];
 
     // ── Handoff ───────────────────────────────────────────────────────────
     handoff_get(ItemIdArgs) -> HandoffView [Handoff, Frozen, Main];
-    /// Generate on demand (cached); `regenerate` forces a new version.
+    /// Generate on demand (cached); `regenerate` forces a new version. Returns at once with state
+    /// `generating`; the result arrives through `entity:changed`.
     handoff_generate(HandoffGenerateArgs) -> HandoffView [Handoff, Frozen, Main];
+    /// Stop a prompt that is generating.
+    handoff_cancel(ItemIdArgs) -> HandoffView [Handoff, Frozen, Main];
     handoff_edit(HandoffEditArgs) -> HandoffView [Handoff, Frozen, Main];
     handoff_set_target(HandoffTargetArgs) -> HandoffView [Handoff, Frozen, Main];
-    /// Open in Claude Code or Codex through the launch path the drawer showed.
+    /// Open in Claude Code or Codex through the launch path the drawer showed. Accepts a suggested
+    /// item; records the prompt version and whether it was edited.
     handoff_open(ItemIdArgs) -> HandoffOpenResult [Handoff, Frozen, Main];
+    /// Copy Prompt. Accepts a suggested item; records the prompt version and whether it was edited.
     handoff_copy(ItemIdArgs) -> HandoffCopyResult [Handoff, Frozen, Main];
 
     // ── Library and Ask ───────────────────────────────────────────────────
@@ -335,7 +397,9 @@ commands! {
 
     // ── History and undo ──────────────────────────────────────────────────
     history_list(HistoryListArgs) -> Page<ChangeRow> [HistoryAndUndo, Frozen, Main];
+    /// Undo a change or a batch. Never expires; rows edited later are kept and counted.
     change_undo(UndoArgs) -> UndoResult [HistoryAndUndo, Frozen, Main | CallScreen];
+    /// Redo an undone change or batch, at any time while its rows were not edited later.
     change_redo(RedoArgs) -> UndoResult [HistoryAndUndo, Frozen, Main | CallScreen];
     proposals_list(ProposalsListArgs) -> Page<ProposalRow> [HistoryAndUndo, Frozen, Main];
     proposal_decide(ProposalDecideArgs) -> ProposalOutcome [HistoryAndUndo, Frozen, Main];
@@ -373,9 +437,13 @@ commands! {
     /// Replace one section (wanted state).
     settings_update(SettingsUpdateArgs) -> Settings [SettingsAndCredentials, Frozen, Settings | FirstRun];
     settings_unignore_app(AppIdArgs) -> Settings [SettingsAndCredentials, Frozen, Settings];
+    /// Move the storage folder. Draft: available only if the engine ships unsandboxed (open question Q4);
+    /// with a sandboxed engine audio and models stay in the App Group container.
     storage_move(StorageMoveArgs) -> JobAccepted [SettingsAndCredentials, Draft, Settings];
     hotkeys_list(NoArgs) -> HotkeyList [SettingsAndCredentials, Frozen, Settings];
     hotkey_set(HotkeySetArgs) -> HotkeyList [SettingsAndCredentials, Frozen, Settings];
+    /// Restore Defaults: every app hotkey back to its default shortcut.
+    hotkeys_reset(NoArgs) -> HotkeyList [SettingsAndCredentials, Frozen, Settings];
     repos_list(NoArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings | Main];
     /// Add Mapping… from the handoff drawer opens the sheet in the main window.
     repo_upsert(RepoUpsertArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings | Main];
@@ -405,9 +473,9 @@ commands! {
     account_use_existing(AccountProviderArgs) -> AccountsView [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
     /// Step 4 (Use): switch agents to the account, with Undo.
     account_bind_agents(AccountBindArgs) -> AccountBindResult [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
-    account_test(AccountProviderArgs) -> AccountTestResult [SettingsAndCredentials, Frozen, Settings];
+    account_test(AccountProviderArgs) -> AccountTestResult [SettingsAndCredentials, Frozen, Settings | FirstRun | Main];
     /// Sign out in Noter (agents fall back to the API key or pause); optionally in the CLI too.
-    account_sign_out(SignOutArgs) -> AccountsView [SettingsAndCredentials, Frozen, Settings];
+    account_sign_out(SignOutArgs) -> AccountsView [SettingsAndCredentials, Frozen, Settings | FirstRun | Main];
     sources_list(NoArgs) -> SourceList [SettingsAndCredentials, Frozen, Settings];
     source_add_folder(SourceAddFolderArgs) -> SourceRow [SettingsAndCredentials, Frozen, Settings];
     source_add_mcp(SourceAddMcpArgs) -> SourceRow [SettingsAndCredentials, Frozen, Settings];
@@ -416,8 +484,10 @@ commands! {
     source_remove(SourceIdArgs) -> DeleteResult [SettingsAndCredentials, Frozen, Settings];
     source_revoke_token(SourceIdArgs) -> SourceRow [SettingsAndCredentials, Frozen, Settings];
     jobs_list(NoArgs) -> JobList [SettingsAndCredentials, Frozen, Settings | Main];
-    /// Run now (refused with `job_blocked` while a call is live).
+    /// Run now. Refused with `job_blocked` while a call is live, except post-call analysis (D2).
     job_run_now(JobIdArgs) -> JobAccepted [SettingsAndCredentials, Frozen, Settings | Main];
+    /// Cancel a queued or running job run.
+    job_cancel(JobIdArgs) -> JobList [SettingsAndCredentials, Frozen, Settings | Main];
     job_update(JobUpdateArgs) -> JobList [SettingsAndCredentials, Frozen, Settings];
 
     // ── Performance (draft) ───────────────────────────────────────────────
@@ -448,6 +518,9 @@ commands! {
     app_set_hidden_for_presenting(HiddenArgs) -> PresentingState [Windows, Frozen, CallScreen | Main];
     /// Show Noter / Open in Noter at a place (main window or Settings window).
     window_navigate(NavigateArgs) -> Ack [Windows, Frozen, Main | CallScreen | RecordPrompt | Settings | FirstRun];
+    /// The main window reports which call page it shows (`null` = none), so the core sends no
+    /// notification for that call while the window is frontmost.
+    window_report_view(ViewReportArgs) -> Ack [Windows, Frozen, Main];
     /// Native announcement for a panel that is not key (D55).
     window_announce(AnnounceArgs) -> Ack [Windows, Frozen, CallScreen | RecordPrompt];
     /// Open a URL, a document citation, a System Settings pane or a Finder location.

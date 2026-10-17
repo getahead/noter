@@ -6,7 +6,7 @@ use specta::Type;
 
 use crate::common::*;
 use crate::model::{
-    AccountsView, CallDetection, CaptureState, CopilotStatus, ProposalCounts, SetupStatus,
+    AccountsView, CaptureState, CopilotStatus, DetectionChanged, ProposalCounts, SetupStatus,
     WindowLabel,
 };
 
@@ -20,24 +20,30 @@ pub struct AppSnapshot {
     pub app_version: String,
     /// The window that asked; scopes which commands it may call.
     pub window: WindowLabel,
+    // Every slice below that has an event carries that event's `version`, so the
+    // UI can tell whether an event that arrives later is newer than the snapshot.
     pub setup: SetupStatus,
     pub capture: CaptureState,
-    /// The record prompt's pending detection, if any.
-    pub detection: Option<CallDetection>,
+    /// The record prompt's pending detection, if any (as `capture:detected` sends it).
+    pub detection: DetectionChanged,
     pub copilot: Option<CopilotStatus>,
     pub privacy: PrivacyStatus,
-    pub hidden_for_presenting: bool,
-    pub degraded: Vec<DegradedState>,
+    /// Hidden for presenting (as `app:presenting` sends it).
+    pub presenting: PresentingState,
+    /// As `degraded:changed` sends it.
+    pub degraded: DegradedSet,
     pub accounts: AccountsView,
     pub features: FeatureFlags,
     pub prefs: UiPrefs,
     pub proposals: ProposalCounts,
-    pub banners: Vec<AppBanner>,
+    /// As `banners:changed` sends it.
+    pub banners: BannerSet,
     pub environment: EnvironmentState,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct PrivacyStatus {
+    pub version: StateVersion,
     pub mode: PrivacyMode,
     /// What applies right now (sensitive call, switched to local, ...).
     pub effective: EffectiveMode,
@@ -75,10 +81,15 @@ pub enum TimeFormat {
 /// Environment facts the core observes (event `env:changed`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct EnvironmentState {
+    pub version: StateVersion,
     pub displays: Vec<DisplayInfo>,
     pub output_route: OutputRoute,
+    /// The current audio output device, so Settings can offer to mark it as headphones
+    /// (`AudioOutputSettings.headphones_devices`).
+    pub output_device: Option<OutputDeviceInfo>,
     pub permissions: Vec<PermissionRow>,
-    pub notifications_enabled: bool,
+    /// macOS notification authorization, read from `UNUserNotificationCenter` settings.
+    pub notifications: NotificationAuth,
     pub online: bool,
     pub update: Option<UpdateInfo>,
     /// Free space on the storage volume.
@@ -96,13 +107,38 @@ pub struct DisplayInfo {
     pub height_pt: u32,
 }
 
-/// Audio output route; replay during capture needs headphones.
+/// Audio output route; replay during capture needs headphones (owner decision 17 Oct).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputRoute {
+    /// Detected headphones, or an unclassified device the user marked as headphones.
     Headphones,
+    /// Detected speakers; replay during capture is always refused.
     Speakers,
+    /// Could not be classified and not marked as headphones.
     Unknown,
+}
+
+/// An audio output device as Core Audio reports it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct OutputDeviceInfo {
+    /// Core Audio device UID.
+    pub uid: String,
+    pub name: String,
+    /// The user marked this device as headphones.
+    pub marked_headphones: bool,
+}
+
+/// macOS notification authorization (`UNAuthorizationStatus`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationAuth {
+    /// Not asked yet; the first notification Noter wants to send asks.
+    NotDetermined,
+    /// Off in System Settings: "Notifications are off".
+    Denied,
+    /// Allowed (including provisional delivery).
+    Authorized,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -123,7 +159,8 @@ pub struct UpdateInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AppBanner {
-    /// "Noter quit during a recording" (PM-46).
+    /// "Noter quit during a recording" (PM-46). While shown (until dismissed or another
+    /// capture starts), **Resume Recording** is `capture_resume_interrupted`.
     RecordingInterruptedByQuit {
         call: CallRef,
     },
@@ -142,14 +179,12 @@ pub enum AppBanner {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DegradedState {
+    /// Another app plays into the tap. **Keep** is `capture_keep_source`, **Exclude** is
+    /// `capture_exclude_source`. (Nothing heard is `CaptureNotice::NothingHeard`, not a degraded state.)
     SecondAudioSource {
         call_id: CallId,
         app_name: String,
         bundle_id: String,
-        since: TimestampMs,
-    },
-    NothingHeard {
-        call_id: CallId,
         since: TimestampMs,
     },
     BudgetPaused {
@@ -166,7 +201,20 @@ pub enum DegradedState {
         call_id: CallId,
         since: TimestampMs,
     },
-    SystemAudioLost {
+    /// Microphone access is off during capture: only system audio is recorded.
+    MicrophoneOff {
+        call_id: CallId,
+    },
+    /// System audio is exact digital zeros: access is probably off (it cannot be queried) or
+    /// nothing plays. `confidence` 0..1 that access is off. Capture continues with the mic.
+    SystemAudioSilent {
+        call_id: CallId,
+        since: TimestampMs,
+        confidence: f32,
+    },
+    /// The engine stopped and could not be restarted: "Not recording · engine stopped" with
+    /// **Try Again**; the NT-3 notification is sent.
+    CaptureFailed {
         call_id: CallId,
         since: TimestampMs,
     },
@@ -178,9 +226,12 @@ pub enum DegradedState {
     ArchivePending {
         call_id: CallId,
     },
+    /// Under 2 GB free: a warning, never a rejection.
     DiskLow {
         free_mb: u32,
     },
+    /// Under 500 MB free: no new capture; a running capture stops writing audio
+    /// (`CaptureState.audio_writing`) and the transcript continues.
     DiskFull {
         free_mb: u32,
     },
@@ -193,6 +244,7 @@ pub enum DegradedState {
         progress: f32,
     },
     NoAssistant,
+    /// The self-test has not passed: automatic call detection stays off. Manual starts work (O1).
     SetupIncomplete,
     CopilotOff {
         call_id: CallId,
@@ -217,17 +269,52 @@ pub enum CopilotOffReason {
 /// Event `degraded:changed`: the full current set.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct DegradedSet {
+    pub version: StateVersion,
     pub states: Vec<DegradedState>,
 }
 
 /// Event `banners:changed`: the full current set.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct BannerSet {
+    pub version: StateVersion,
     pub banners: Vec<AppBanner>,
+}
+
+/// The kind of an `AppBanner`, for `banner_dismiss`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum BannerKind {
+    RecordingInterruptedByQuit,
+    UpdateReady,
+    RollUpFailed,
+}
+
+impl AppBanner {
+    pub fn kind(&self) -> BannerKind {
+        match self {
+            AppBanner::RecordingInterruptedByQuit { .. } => BannerKind::RecordingInterruptedByQuit,
+            AppBanner::UpdateReady { .. } => BannerKind::UpdateReady,
+            AppBanner::RollUpFailed { .. } => BannerKind::RollUpFailed,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct BannerDismissArgs {
+    pub banner: BannerKind,
 }
 
 /// Event `app:presenting`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct PresentingState {
+    pub version: StateVersion,
     pub hidden: bool,
+}
+
+/// `window_report_view`: which call the main window shows right now, so the core sends
+/// no notification for it while that window is frontmost (`null` = no call page).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ViewReportArgs {
+    #[serde(default)]
+    pub call_id: Option<CallId>,
 }

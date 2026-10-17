@@ -101,13 +101,21 @@ pub enum NamedBy {
 #[serde(rename_all = "snake_case")]
 pub enum GapReason {
     Paused,
+    /// The audio device changed mid-call.
     DeviceChanged,
-    SystemAudioLost,
-    EngineRestarted,
+    SystemAudioSilent,
+    /// The engine crashed and the supervisor restarted it in capture-first mode (expected ≤ 2 s).
+    EngineRestart,
+    /// No audio buffers arrived for a while although capture was running.
+    Stalled,
+    /// Noter quit or crashed during the recording and **Resume Recording** continued the call.
+    Interrupted,
     /// Continue Recording appended to the same call after a stop.
     Continued,
 }
 
+/// A gap in the recording. A dropout (the "99 % of calls without dropouts" metric) is a gap
+/// with reason `interrupted`, `engine_restart`, `device_changed` or `stalled` longer than 2 s.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct GapView {
     pub call_id: CallId,
@@ -175,7 +183,7 @@ pub enum TranscriptEvent {
     SegmentsUpdated {
         segments: Vec<SegmentView>,
     },
-    /// Speaker labels changed (rename, offline relabel: "speakers updated").
+    /// Speaker labels changed (rename, or the archive pass relabelled them: "Transcript upgraded").
     SpeakersUpdated {
         speakers: Vec<SpeakerView>,
         relabelled_by_archive: bool,
@@ -200,7 +208,8 @@ pub enum StreamEndReason {
     Discarded,
     /// The UI called `stream_unsubscribe`.
     Unsubscribed,
-    /// The core dropped the subscriber because it fell too far behind; resubscribe.
+    /// The core dropped the subscriber at 2 000 unacknowledged messages, or the webview
+    /// reloaded or closed; resubscribe.
     Lagged,
     /// The core is shutting down.
     Shutdown,
@@ -219,6 +228,7 @@ pub struct LevelsMsg {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SubscribeLevelsArgs {
     /// `null` for the self-test or the Today self-test sheet (no call yet).
+    #[serde(default)]
     pub call_id: Option<CallId>,
 }
 
@@ -230,6 +240,15 @@ pub struct SubscriptionHandle {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct UnsubscribeArgs {
     pub subscription_id: SubscriptionId,
+}
+
+/// `stream_ack`: the UI has handled every message of the subscription up to `seq`.
+/// Sent every 100 messages or after 1 s; at 2 000 unacknowledged messages the core ends
+/// the subscription with `ended { reason: lagged }`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct StreamAckArgs {
+    pub subscription_id: SubscriptionId,
+    pub seq: Seq,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -276,6 +295,7 @@ pub struct FixTermResult {
 pub struct SpeakerAssignment {
     pub speaker_id: SpeakerId,
     /// `null` = skip this speaker for now.
+    #[serde(default)]
     pub person: Option<PersonRef>,
 }
 
@@ -306,18 +326,37 @@ pub struct PlayAudioArgs {
     pub call_id: CallId,
     pub from_ms: OffsetMs,
     /// `null` plays to the end of the segment that contains `from_ms`.
+    #[serde(default)]
     pub to_ms: Option<OffsetMs>,
+    #[serde(default)]
     pub channel: Option<AudioChannel>,
 }
 
-/// Audio plays natively in the core (no media in the WebView); event `playback:state`.
+/// Replay is played natively by the engine at the core's request (D6; no media in the
+/// WebView). Event `playback:state`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct PlaybackState {
+    pub version: StateVersion,
     pub playing: bool,
     pub call_id: Option<CallId>,
     pub position_ms: OffsetMs,
     pub to_ms: Option<OffsetMs>,
     pub route: OutputRoute,
+    /// Why playback last stopped; `null` while playing or before any playback.
+    pub stopped_reason: Option<PlaybackStopReason>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaybackStopReason {
+    /// Reached `to_ms` or the end of the audio.
+    Ended,
+    /// `audio_stop`, or another replay replaced it.
+    User,
+    /// During capture the output switched to detected speakers.
+    OutputSwitchedToSpeakers,
+    /// A capture started while replay played.
+    CaptureStarted,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

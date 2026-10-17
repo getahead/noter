@@ -15,15 +15,22 @@ pub enum ItemKind {
     Risk,
 }
 
+/// The item machine: `open → done | handed_off | carried | answered_in_call | closed_by_evidence`;
+/// `handed_off → done` (landed, or evidence) and `handed_off → open` (keep open);
+/// `carried → open` after the call; reopen returns any closed status to `open`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemStatus {
     Open,
     Done,
-    /// Carried forward to the next call with the same people.
+    /// Offered in a call with the same people that is running now; back to `open` after it.
     Carried,
     HandedOff,
+    /// Closed by evidence (a linked key moved to Done, a merged PR). Accepted items only;
+    /// a suggested item gets at most a proposal.
     ClosedByEvidence,
+    /// An open question answered in a call; logged, with **Reopen**.
+    AnsweredInCall,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
@@ -242,15 +249,31 @@ pub struct ItemCreateArgs {
     pub call_id: CallId,
     pub kind: ItemKind,
     pub text: String,
+    #[serde(default)]
     pub owner: Option<PersonRef>,
+    #[serde(default)]
     pub due: Option<LocalDate>,
+    #[serde(default)]
     pub span: Option<TimeSpan>,
+}
+
+/// The answer to the carry-forward "Did the handoff land?".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum HandoffLandedAnswer {
+    /// **Yes, Landed**: `handed_off → done`.
+    Landed,
+    /// **Done Another Way**: `handed_off → done`, noted as done another way.
+    DoneAnotherWay,
+    /// **Keep Open** (or Esc): stays handed off; asked again at the next call with the same people.
+    KeepOpen,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HandoffLandedArgs {
     pub item_id: ItemId,
-    pub landed: bool,
+    pub rev: Rev,
+    pub answer: HandoffLandedAnswer,
 }
 
 /// Result of every single-item mutation: the changed record and the change to undo.

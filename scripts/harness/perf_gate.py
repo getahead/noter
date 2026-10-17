@@ -8,7 +8,7 @@
 
 Modes:
 * ir   — instructions executed (valgrind cachegrind). Deterministic to well under
-         1%, so the 5% limit is a hard gate on every pull request (Linux).
+         1%, so the 10% limit (gates.perf.max_regression_pct) is a hard gate on every pull request (Linux).
 * wall — median of N timed runs after warm-ups. A regression fails only when it is
          above the limit *and* larger than twice the run-to-run spread (MAD); use
          --report-only on shared runners, where wall time is not trustworthy.

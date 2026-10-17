@@ -33,6 +33,22 @@
       ]
     },
     {
+      "args": "StreamAckArgs",
+      "channel": null,
+      "doc": "Acknowledges a Channel up to `seq`, every 100 messages or 1 s (the generated client does it).\n At 2 000 unacknowledged messages the core ends the subscription with `lagged`.",
+      "group": "app",
+      "name": "stream_ack",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "record-prompt",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
       "args": "UiLogArgs",
       "channel": null,
       "doc": "UI errors to the local log, never with transcript text.",
@@ -49,9 +65,21 @@
       ]
     },
     {
+      "args": "BannerDismissArgs",
+      "channel": null,
+      "doc": "Dismiss an app banner (for example \"Noter quit during a recording\").",
+      "group": "app",
+      "name": "banner_dismiss",
+      "result": "BannerSet",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
       "args": "CaptureStartArgs",
       "channel": null,
-      "doc": "Start capture (Record, Record as Sensitive, hotkey, menu, Today).",
+      "doc": "Start capture (Record, Record as Sensitive, hotkey, menu, Today). Never gated on setup or\n permissions; refused only with `already_recording`, `disk_full` or `model_missing`.\n Allowed while `stopped`: closes the stopped call's Continue window.",
       "group": "capture_control",
       "name": "capture_start",
       "result": "CaptureState",
@@ -78,7 +106,7 @@
     {
       "args": "CapturePauseArgs",
       "channel": null,
-      "doc": "Pause or resume (wanted state). Pause drops audio entirely.",
+      "doc": "Pause or resume (wanted state). Pause drops audio entirely. Resume of a stopped call is\n refused with `not_recording` (use `capture_continue`).",
       "group": "capture_control",
       "name": "capture_set_paused",
       "result": "CaptureState",
@@ -114,9 +142,22 @@
       ]
     },
     {
+      "args": "NoticeHoldArgs",
+      "channel": null,
+      "doc": "Hold the call-ended countdown while the pointer or focus is on the notice (wanted state);\n on release the 10-second countdown starts again.",
+      "group": "capture_control",
+      "name": "capture_hold_notice",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "record-prompt"
+      ]
+    },
+    {
       "args": "CallIdArgs",
       "channel": null,
-      "doc": "Continue Recording after any stop, within 5 minutes; appends with a gap row.",
+      "doc": "Continue Recording after any stop, within 5 minutes; appends with a gap row. Cancels the\n queued or running post-call job and queues it again after the next stop (edits are kept).",
       "group": "capture_control",
       "name": "capture_continue",
       "result": "CaptureState",
@@ -125,6 +166,19 @@
         "call-screen",
         "record-prompt",
         "main"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Resume Recording after Noter quit or crashed mid-call (gap row `interrupted`, allowed while\n the `recording_interrupted_by_quit` banner is shown), or **Try Again** after the engine\n stopped (phase `failed`; gap row `engine_restart`). Continues the same call.",
+      "group": "capture_control",
+      "name": "capture_resume_interrupted",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
       ]
     },
     {
@@ -138,6 +192,18 @@
       "windows": [
         "call-screen",
         "record-prompt"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Keep Recording on the nothing-heard notice; resets the 5-minute timer.",
+      "group": "capture_control",
+      "name": "capture_keep_recording",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
       ]
     },
     {
@@ -178,9 +244,21 @@
       ]
     },
     {
+      "args": "KeepSourceArgs",
+      "channel": null,
+      "doc": "Keep a second audio source in the tap; its banner is not shown again for that app in this call.",
+      "group": "capture_control",
+      "name": "capture_keep_source",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
       "args": "DismissDetectionArgs",
       "channel": null,
-      "doc": "Not Now / Not a Call / timed out on the record prompt.",
+      "doc": "Not Now, × or timed out on the record prompt.",
       "group": "capture_control",
       "name": "capture_dismiss_detection",
       "result": "Ack",
@@ -283,7 +361,7 @@
     {
       "args": "PlayAudioArgs",
       "channel": null,
-      "doc": "Play audio natively (no media in the WebView).",
+      "doc": "Play audio natively: the engine plays it (D6; no media in the WebView). During capture,\n headphones only.",
       "group": "transcript",
       "name": "audio_play",
       "result": "PlaybackState",
@@ -367,9 +445,21 @@
       ]
     },
     {
+      "args": "CardArgs",
+      "channel": null,
+      "doc": "Unpin a pinned card; the item the pin created is removed.",
+      "group": "copilot",
+      "name": "card_unpin",
+      "result": "CardMutation",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
       "args": "CallIdArgs",
       "channel": null,
-      "doc": "Undo the last card action (⌃⌥⌘Z equivalent from the panel).",
+      "doc": "Undo the last card action (⌃⌥⌘Z equivalent from the panel), within 30 s; then `undo_expired`.",
       "group": "copilot",
       "name": "card_undo_last",
       "result": "CardMutation",
@@ -479,7 +569,7 @@
     {
       "args": "ContextChipArgs",
       "channel": null,
-      "doc": "v1.x screen context chips.",
+      "doc": "v1.x screen context chips: returns `feature_disabled` in v1.",
       "group": "copilot",
       "name": "context_chip_set",
       "result": "ContextChipView",
@@ -572,7 +662,8 @@
       "result": "ItemMutation",
       "stability": "frozen",
       "windows": [
-        "main"
+        "main",
+        "call-screen"
       ]
     },
     {
@@ -591,7 +682,7 @@
     {
       "args": "HandoffLandedArgs",
       "channel": null,
-      "doc": "Answer the carry-forward \"did the handoff land?\".",
+      "doc": "Answer the carry-forward \"Did the handoff land?\": Yes, Landed, Done Another Way or Keep Open.",
       "group": "items",
       "name": "item_answer_handoff_landed",
       "result": "ItemMutation",
@@ -676,7 +767,7 @@
     {
       "args": "ShareCopyArgs",
       "channel": null,
-      "doc": "Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard).",
+      "doc": "Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard, rich and plain).",
       "group": "outputs_and_sharing",
       "name": "share_copy",
       "result": "ShareResult",
@@ -688,7 +779,7 @@
     {
       "args": "ExportCallsArgs",
       "channel": null,
-      "doc": "Export… a folder of Markdown, SRT, JSON and audio; the core shows the save panel.",
+      "doc": "Export… a folder of Markdown, SRT, JSON and audio, for whole calls or a section or selection;\n the core shows the save panel.",
       "group": "outputs_and_sharing",
       "name": "calls_export",
       "result": "ExportResult",
@@ -712,9 +803,21 @@
     {
       "args": "HandoffGenerateArgs",
       "channel": null,
-      "doc": "Generate on demand (cached); `regenerate` forces a new version.",
+      "doc": "Generate on demand (cached); `regenerate` forces a new version. Returns at once with state\n `generating`; the result arrives through `entity:changed`.",
       "group": "handoff",
       "name": "handoff_generate",
+      "result": "HandoffView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemIdArgs",
+      "channel": null,
+      "doc": "Stop a prompt that is generating.",
+      "group": "handoff",
+      "name": "handoff_cancel",
       "result": "HandoffView",
       "stability": "frozen",
       "windows": [
@@ -748,7 +851,7 @@
     {
       "args": "ItemIdArgs",
       "channel": null,
-      "doc": "Open in Claude Code or Codex through the launch path the drawer showed.",
+      "doc": "Open in Claude Code or Codex through the launch path the drawer showed. Accepts a suggested\n item; records the prompt version and whether it was edited.",
       "group": "handoff",
       "name": "handoff_open",
       "result": "HandoffOpenResult",
@@ -760,7 +863,7 @@
     {
       "args": "ItemIdArgs",
       "channel": null,
-      "doc": "",
+      "doc": "Copy Prompt. Accepts a suggested item; records the prompt version and whether it was edited.",
       "group": "handoff",
       "name": "handoff_copy",
       "result": "HandoffCopyResult",
@@ -1015,7 +1118,7 @@
     {
       "args": "UndoArgs",
       "channel": null,
-      "doc": "",
+      "doc": "Undo a change or a batch. Never expires; rows edited later are kept and counted.",
       "group": "history_and_undo",
       "name": "change_undo",
       "result": "UndoResult",
@@ -1028,7 +1131,7 @@
     {
       "args": "RedoArgs",
       "channel": null,
-      "doc": "",
+      "doc": "Redo an undone change or batch, at any time while its rows were not edited later.",
       "group": "history_and_undo",
       "name": "change_redo",
       "result": "UndoResult",
@@ -1348,7 +1451,7 @@
     {
       "args": "StorageMoveArgs",
       "channel": null,
-      "doc": "",
+      "doc": "Move the storage folder. Draft: available only if the engine ships unsandboxed (open question Q4);\n with a sandboxed engine audio and models stay in the App Group container.",
       "group": "settings_and_credentials",
       "name": "storage_move",
       "result": "JobAccepted",
@@ -1375,6 +1478,18 @@
       "doc": "",
       "group": "settings_and_credentials",
       "name": "hotkey_set",
+      "result": "HotkeyList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "Restore Defaults: every app hotkey back to its default shortcut.",
+      "group": "settings_and_credentials",
+      "name": "hotkeys_reset",
       "result": "HotkeyList",
       "stability": "frozen",
       "windows": [
@@ -1638,7 +1753,9 @@
       "result": "AccountTestResult",
       "stability": "frozen",
       "windows": [
-        "settings"
+        "settings",
+        "first-run",
+        "main"
       ]
     },
     {
@@ -1650,7 +1767,9 @@
       "result": "AccountsView",
       "stability": "frozen",
       "windows": [
-        "settings"
+        "settings",
+        "first-run",
+        "main"
       ]
     },
     {
@@ -1754,10 +1873,23 @@
     {
       "args": "JobIdArgs",
       "channel": null,
-      "doc": "Run now (refused with `job_blocked` while a call is live).",
+      "doc": "Run now. Refused with `job_blocked` while a call is live, except post-call analysis (D2).",
       "group": "settings_and_credentials",
       "name": "job_run_now",
       "result": "JobAccepted",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "JobIdArgs",
+      "channel": null,
+      "doc": "Cancel a queued or running job run.",
+      "group": "settings_and_credentials",
+      "name": "job_cancel",
+      "result": "JobList",
       "stability": "frozen",
       "windows": [
         "settings",
@@ -2000,6 +2132,18 @@
       ]
     },
     {
+      "args": "ViewReportArgs",
+      "channel": null,
+      "doc": "The main window reports which call page it shows (`null` = none), so the core sends no\n notification for that call while the window is frontmost.",
+      "group": "windows",
+      "name": "window_report_view",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
       "args": "AnnounceArgs",
       "channel": null,
       "doc": "Native announcement for a panel that is not key (D55).",
@@ -2028,8 +2172,20 @@
       ]
     }
   ],
-  "contract_version": "1.0",
-  "engine_protocol_version": "1.0",
+  "contract_version": "2.0",
+  "default_retryable": [
+    "not_ready",
+    "internal",
+    "offline",
+    "engine_unavailable",
+    "calendar_unavailable",
+    "search_failed",
+    "change_log_unreadable",
+    "tracker_unreachable",
+    "keychain_locked",
+    "source_sync_failed"
+  ],
+  "engine_protocol_version": "2.0",
   "error_codes": [
     "not_found",
     "conflict",
@@ -2039,14 +2195,12 @@
     "not_ready",
     "not_implemented",
     "internal",
-    "setup_incomplete",
     "permission_missing",
     "permission_denied",
-    "disk_low",
     "disk_full",
     "offline",
     "checksum_failed",
-    "model_not_ready",
+    "model_missing",
     "already_recording",
     "not_recording",
     "notice_expired",
@@ -2069,15 +2223,20 @@
     "no_link_handler",
     "automation_denied",
     "prompt_not_ready",
+    "calendar_unavailable",
     "index_rebuilding",
     "search_failed",
     "answer_stopped",
     "undo_expired",
-    "partially_applied",
+    "already_undone",
+    "not_undone",
+    "not_undoable",
+    "edited_later",
     "proposal_not_applicable",
     "change_log_unreadable",
     "job_blocked",
     "evidence_tool_missing",
+    "tracker_unreachable",
     "runtime_unavailable",
     "key_rejected",
     "keychain_locked",

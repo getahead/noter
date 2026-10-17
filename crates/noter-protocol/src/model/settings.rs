@@ -11,6 +11,8 @@ use crate::model::{CouncilMode, HandoffTarget};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Settings {
+    /// Monotonic per `settings:changed`; the UI keeps the highest.
+    pub version: StateVersion,
     pub rev: Rev,
     pub general: GeneralSettings,
     pub audio: AudioSettings,
@@ -19,7 +21,7 @@ pub struct Settings {
     pub copilot: CopilotSettings,
     pub call_screen: CallScreenSettings,
     pub menu_bar: MenuBarSettings,
-    pub dashboard: DashboardSettings,
+    pub today: TodaySettings,
     pub performance: PerformanceSettings,
     pub maintenance: MaintenanceSettings,
     pub evidence: EvidenceSettings,
@@ -50,6 +52,11 @@ pub struct GeneralSettings {
     pub summary_language: SummaryLanguage,
     /// Read-only mirror of macOS notification permission.
     pub notifications_enabled: bool,
+    /// **Launch at login** (registered with `SMAppService`).
+    pub launch_at_login: bool,
+    /// **Offer to record when a call starts**: automatic call detection, which also needs
+    /// a passed self-test.
+    pub offer_to_record: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -61,13 +68,12 @@ pub enum TranscriptionBackend {
     WhisperLargeV3,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-pub enum OutputMode {
-    Auto,
-    Headphones,
-    /// Speakers with LocalVQE echo cancellation.
-    SpeakersWithEchoCancellation,
+/// Replay during capture is headphones-only (owner decision 17 Oct). Devices the user
+/// marked as headphones lift only an `unknown` route; detected speakers always refuse.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct AudioOutputSettings {
+    /// Core Audio UIDs of output devices the user marked as headphones.
+    pub headphones_devices: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -84,10 +90,14 @@ pub enum AudioRetention {
 pub struct AudioSettings {
     pub live_backend: TranscriptionBackend,
     pub offline_backend: TranscriptionBackend,
-    pub output_mode: OutputMode,
+    pub output: AudioOutputSettings,
     pub exclude_own_sounds: bool,
+    /// A changed retention applies to existing calls from the next nightly Retention run.
     pub retention: AudioRetention,
+    /// Read-only: how many calls' audio the next Retention run deletes (ignored on update).
+    pub retention_next_run_deletes: u32,
     /// `null` = system default input.
+    #[serde(default)]
     pub mic_device: Option<String>,
 }
 
@@ -95,7 +105,8 @@ pub struct AudioSettings {
 pub struct PrivacySettings {
     pub mode: PrivacyMode,
     pub pseudonymise_names: bool,
-    /// Talk-time and "who was silent" (off by default, D47).
+    /// Talk-time and "who was silent" (off by default, D47). Computed from the moment they are
+    /// switched on; past calls are not back-computed (D5).
     pub behaviour_metrics: bool,
 }
 
@@ -104,17 +115,37 @@ pub struct RuntimeSettings {
     pub live_copilot: RuntimeChoice,
     pub post_call: RuntimeChoice,
     pub search_answers: RuntimeChoice,
+    #[serde(default)]
     pub local_model: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CopilotSettings {
+    /// Pin and dismiss cards with keys.
+    pub card_keys: CardKeySettings,
+    /// Dismiss with keys (modifiers + ⇧ + 1–3) is on.
     pub dismiss_with_keys: bool,
     pub default_cap_usd: f32,
     /// Call types the copilot is muted for.
     pub muted_call_types: Vec<CallTypeId>,
     pub default_council_live: CouncilMode,
     pub default_council_post_call: CouncilMode,
+}
+
+/// Card keys as one setting: pin = `modifiers` + 1–3, dismiss = `modifiers` + ⇧ + 1–3.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct CardKeySettings {
+    pub enabled: bool,
+    /// Default ⌃⌥⌘. At least one must be on (`invalid_input`, `no_modifier`).
+    pub modifiers: Modifiers,
+}
+
+/// Modifier keys of a key combination. Shift is not offered for card keys: dismiss adds it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct Modifiers {
+    pub control: bool,
+    pub option: bool,
+    pub command: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -127,6 +158,7 @@ pub enum CallLayoutPreference {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CallScreenSettings {
+    #[serde(default)]
     pub display_id: Option<DisplayId>,
     pub layout: CallLayoutPreference,
     pub open_automatically: bool,
@@ -153,11 +185,23 @@ pub enum DashboardHorizon {
     ThisWeek,
 }
 
+/// How Today ranks the items on each call card (D3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum TodayRanking {
+    /// The default (PRD order): owed to people on today's calls, then due date, then age.
+    OwedToTodaysPeople,
+    /// "Due date, then owed to you".
+    DueThenOwedToYou,
+}
+
+/// Settings › General › group **Today**.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
-pub struct DashboardSettings {
+pub struct TodaySettings {
     pub horizon: DashboardHorizon,
     /// Calendar identifiers hidden from Today.
     pub hidden_calendars: Vec<String>,
+    pub ranking: TodayRanking,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -209,7 +253,7 @@ pub enum SettingsSection {
     Copilot(CopilotSettings),
     CallScreen(CallScreenSettings),
     MenuBar(MenuBarSettings),
-    Dashboard(DashboardSettings),
+    Today(TodaySettings),
     Performance(PerformanceSettings),
     Maintenance(MaintenanceSettings),
     Evidence(EvidenceSettings),
@@ -230,6 +274,7 @@ pub struct AppIdArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct StorageMoveArgs {
     /// `null` = the core shows the open panel.
+    #[serde(default)]
     pub path: Option<String>,
 }
 
@@ -245,20 +290,19 @@ pub enum HotkeyAction {
     AskAboutCall,
     OpenCallScreen,
     HideForPresenting,
-    PinCard1,
-    PinCard2,
-    PinCard3,
-    DismissCard1,
-    DismissCard2,
-    DismissCard3,
+    /// ⌃⌥⌘K: mute the copilot; while muted the same key unmutes.
+    MuteCopilot,
+    /// ⌃⌥⌘Z: undo the last card action (a card key; pin and dismiss keys are `CardKeySettings`).
     UndoCardAction,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HotkeyStatus {
+    /// App hotkeys: registered at launch and kept registered.
     Registered,
-    /// Card keys are registered only during capture.
+    /// Card keys: registered only while capture runs, the copilot is on, not muted and not
+    /// hidden for presenting.
     RegisteredDuringCapture,
     Conflict {
         owner: Option<String>,
@@ -278,6 +322,7 @@ pub struct HotkeyBinding {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HotkeyList {
+    pub version: StateVersion,
     pub bindings: Vec<HotkeyBinding>,
 }
 
@@ -285,6 +330,7 @@ pub struct HotkeyList {
 pub struct HotkeySetArgs {
     pub action: HotkeyAction,
     /// `null` clears; the core refuses a shortcut without a modifier.
+    #[serde(default)]
     pub shortcut: Option<String>,
 }
 
@@ -307,9 +353,11 @@ pub struct RepoList {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RepoUpsertArgs {
+    #[serde(default)]
     pub id: Option<RepoMappingId>,
     pub key: String,
     /// `null` = the core shows the open panel.
+    #[serde(default)]
     pub local_path: Option<String>,
     pub default_tool: HandoffTarget,
 }
@@ -342,12 +390,15 @@ pub struct GlossaryList {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct GlossaryUpsertArgs {
+    #[serde(default)]
     pub id: Option<GlossaryTermId>,
+    #[serde(default)]
     pub rev: Option<Rev>,
     pub term: String,
     pub variants_latin: Vec<String>,
     pub variants_cyrillic: Vec<String>,
     pub spoken_forms: Vec<String>,
+    #[serde(default)]
     pub lang: Option<Lang>,
     pub always_apply: bool,
 }
@@ -372,10 +423,26 @@ pub enum AuditWhat {
     HandoffPrompt,
 }
 
+/// One row of `audit_log`: one per LLM run (the packet) plus, for a run on a cloud runtime,
+/// one per noter-mcp tool result, redacted before it left (O2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditKind {
+    /// The packet a run started with.
+    Run,
+    /// A noter-mcp tool result returned to a cloud run.
+    ToolResult,
+    /// A live lookup in one of the user's MCP sources (only in "Cloud allowed", D1).
+    Lookup,
+}
+
 /// "14:32 — 1.8 KB of transcript from the planning call went to Claude".
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AuditEntry {
     pub id: AuditId,
+    pub kind: AuditKind,
+    /// The run this row belongs to; a `tool_result` row links to its run's row through it.
+    pub llm_run_id: Option<LlmRunId>,
     pub at: TimestampMs,
     pub call: Option<CallRef>,
     pub runtime: Option<RuntimeChoice>,
@@ -387,14 +454,18 @@ pub struct AuditEntry {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AuditListArgs {
+    #[serde(default)]
     pub from: Option<TimestampMs>,
+    #[serde(default)]
     pub to: Option<TimestampMs>,
     pub page: PageRequest,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AuditExportArgs {
+    #[serde(default)]
     pub from: Option<TimestampMs>,
+    #[serde(default)]
     pub to: Option<TimestampMs>,
     pub format: crate::model::LogFormat,
 }

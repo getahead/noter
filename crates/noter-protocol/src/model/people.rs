@@ -25,6 +25,7 @@ pub struct PersonRow {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct PeopleListArgs {
+    #[serde(default)]
     pub query: Option<String>,
 }
 
@@ -68,8 +69,11 @@ pub struct PersonIdArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct PersonCreateArgs {
     pub display_name: String,
+    #[serde(default)]
     pub email: Option<String>,
+    #[serde(default)]
     pub role: Option<String>,
+    #[serde(default)]
     pub org: Option<String>,
 }
 
@@ -114,6 +118,7 @@ pub struct PersonMutation {
 pub struct VoiceProfileArgs {
     pub person_id: PersonId,
     /// Seed the profile from a named speaker in a call.
+    #[serde(default)]
     pub from_speaker: Option<SpeakerId>,
 }
 

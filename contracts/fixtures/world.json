@@ -292,12 +292,17 @@
           "qwen3:8b"
         ],
         "running": true
-      }
+      },
+      "version": 1
     },
     "app_version": "0.1.0-dev",
-    "banners": [],
+    "banners": {
+      "banners": [],
+      "version": 1
+    },
     "capture": {
       "audio_not_stored": false,
+      "audio_writing": true,
       "call_id": "call_live",
       "continue_until": null,
       "notice": null,
@@ -308,9 +313,10 @@
       "replay_available": true,
       "sensitive": false,
       "started_at": 1792137600000,
-      "title": "Planning: VHI 8.0 drawer redesign"
+      "title": "Planning: VHI 8.0 drawer redesign",
+      "version": 1
     },
-    "contract_version": "1.0",
+    "contract_version": "2.0",
     "copilot": {
       "agents": [
         {
@@ -349,10 +355,17 @@
       "listening": false,
       "mode": "cloud_redacted",
       "muted": null,
-      "single_agent": false
+      "single_agent": false,
+      "version": 1
     },
-    "degraded": [],
-    "detection": null,
+    "degraded": {
+      "states": [],
+      "version": 1
+    },
+    "detection": {
+      "detection": null,
+      "version": 1
+    },
     "environment": {
       "disk_free_mb": 182000,
       "displays": [
@@ -373,8 +386,13 @@
           "width_pt": 2560
         }
       ],
-      "notifications_enabled": false,
+      "notifications": "not_determined",
       "online": true,
+      "output_device": {
+        "marked_headphones": false,
+        "name": "External Headphones",
+        "uid": "BuiltInHeadphoneOutputDevice"
+      },
       "output_route": "headphones",
       "permissions": [
         {
@@ -406,7 +424,8 @@
           "state": "not_asked"
         }
       ],
-      "update": null
+      "update": null,
+      "version": 1
     },
     "features": {
       "behaviour_metrics": false,
@@ -414,18 +433,23 @@
       "council": true,
       "screen_context": false
     },
-    "hidden_for_presenting": false,
     "prefs": {
       "first_weekday": 1,
       "time_format": "h24",
       "time_zone": "Europe/Berlin"
     },
+    "presenting": {
+      "hidden": false,
+      "version": 1
+    },
     "privacy": {
       "effective": "cloud_redacted",
-      "mode": "cloud_redacted"
+      "mode": "cloud_redacted",
+      "version": 1
     },
     "proposals": {
       "needs_attention": 0,
+      "version": 1,
       "waiting": 2
     },
     "setup": {
@@ -501,7 +525,6 @@
         "at": 1791964800000,
         "type": "passed"
       },
-      "start_control": "record",
       "steps": [
         {
           "state": "done",
@@ -527,10 +550,71 @@
           "state": "done",
           "step": "assistants"
         }
-      ]
+      ],
+      "version": 1
     },
     "window": "main"
   },
+  "ask_threads": [
+    {
+      "id": "ask_notif",
+      "scope": {
+        "call_id": null,
+        "call_types": [],
+        "from": null,
+        "include_documents": true,
+        "people": [],
+        "preset": null,
+        "to": null,
+        "topic_id": null
+      },
+      "title": "What did we decide about drawer notifications?",
+      "turns": [
+        {
+          "answer_md": "Drawer events go through the notification service [1].",
+          "answered_locally": false,
+          "asked_at": 1792051200000,
+          "citations": [
+            {
+              "deleted": false,
+              "n": 1,
+              "provenance": {
+                "call": {
+                  "call_type": "cross_team",
+                  "id": "call_backend",
+                  "started_at": 1790949600000,
+                  "title": "Backend sync"
+                },
+                "span": {
+                  "call_id": "call_backend",
+                  "channel": null,
+                  "t0_ms": 2470000,
+                  "t1_ms": 2482000
+                },
+                "type": "past_call"
+              },
+              "quote": "Websocket notifications go through the notification service.",
+              "speaker": {
+                "display_name": "Dmitri Sokolov",
+                "id": "per_dmitri",
+                "initials": "DS",
+                "is_you": false,
+                "short_name": "Dmitri S."
+              },
+              "strength": "strong"
+            }
+          ],
+          "found": true,
+          "keyword_only": false,
+          "only_weak_evidence": false,
+          "question": "What did we decide about drawer notifications?",
+          "runtime": "claude_api_key",
+          "sensitive_sources_skipped": 0,
+          "turn_id": "turn_notif_1"
+        }
+      ]
+    }
+  ],
   "audit": [
     {
       "at": 1792138440000,
@@ -543,9 +627,28 @@
       },
       "destination": "api.anthropic.com",
       "id": "aud_1",
+      "kind": "run",
+      "llm_run_id": "llm_tick_14",
       "redacted": true,
       "runtime": "claude_api_key",
       "what": "transcript_delta"
+    },
+    {
+      "at": 1792138442000,
+      "bytes_out": 612,
+      "call": {
+        "call_type": "cross_team",
+        "id": "call_backend",
+        "started_at": 1790949600000,
+        "title": "Backend sync"
+      },
+      "destination": "api.anthropic.com",
+      "id": "aud_2",
+      "kind": "tool_result",
+      "llm_run_id": "llm_tick_14",
+      "redacted": true,
+      "runtime": "claude_api_key",
+      "what": "full_transcript"
     }
   ],
   "call_details": [
@@ -800,7 +903,8 @@
       "rating": null,
       "solicited": false,
       "state": "shown",
-      "title": "On 2 Oct you and Dmitri S. agreed drawer events go through the notification service."
+      "title": "On 2 Oct you and Dmitri S. agreed drawer events go through the notification service.",
+      "used": false
     },
     {
       "agent": {
@@ -836,7 +940,8 @@
       "rating": null,
       "solicited": false,
       "state": "shown",
-      "title": "Who owns the acceptance criteria for the reconnect handling?"
+      "title": "Who owns the acceptance criteria for the reconnect handling?",
+      "used": false
     },
     {
       "agent": {
@@ -860,7 +965,39 @@
       "rating": null,
       "solicited": false,
       "state": "shown",
-      "title": "Retention of monitoring data is probably 90 days."
+      "title": "Retention of monitoring data is probably 90 days.",
+      "used": false
+    },
+    {
+      "agent": {
+        "badge": "target",
+        "id": "agt_pm",
+        "name": "Product manager"
+      },
+      "body": null,
+      "call_id": "call_live",
+      "carry_forward": null,
+      "created_at": 1792138740000,
+      "expires_at": 1792138830000,
+      "id": "card_0",
+      "kind": "ask",
+      "lang": "en",
+      "merged_agents": [],
+      "number": null,
+      "provenance": {
+        "span": {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1120000,
+          "t1_ms": 1130000
+        },
+        "type": "this_call"
+      },
+      "rating": null,
+      "solicited": false,
+      "state": "expired",
+      "title": "Is the 480 pt drawer width agreed with design?",
+      "used": true
     }
   ],
   "changes": [
@@ -885,6 +1022,7 @@
       "field": "status",
       "id": "chg_1",
       "reason": "VSTOR-9790 moved to Done",
+      "redoable": false,
       "status": "applied",
       "summary": "Closed “Rotate the staging Jira token”",
       "undoable": true
@@ -910,9 +1048,36 @@
       "field": "text",
       "id": "chg_2",
       "reason": "Always for this term",
+      "redoable": false,
       "status": "applied",
       "summary": "Applied term “shaman” to 37 segments",
       "undoable": true
+    },
+    {
+      "actor": {
+        "job_id": "job_reconcile_people",
+        "name": "Reconcile people",
+        "type": "job"
+      },
+      "after": "Lena Krüger",
+      "at": 1792051200000,
+      "batch_id": "bat_people",
+      "batch_size": 4,
+      "before": null,
+      "confidence": "medium",
+      "entity": {
+        "id": "spk_3",
+        "kind": "speaker",
+        "label": "Speaker 3"
+      },
+      "evidence": [],
+      "field": "person",
+      "id": "chg_3",
+      "reason": "Voice matches Lena K.'s profile",
+      "redoable": true,
+      "status": "undone",
+      "summary": "Named Speaker 3 as Lena K. in 4 calls",
+      "undoable": false
     }
   ],
   "copilot": {
@@ -953,7 +1118,8 @@
     "listening": false,
     "mode": "cloud_redacted",
     "muted": null,
-    "single_agent": false
+    "single_agent": false,
+    "version": 1
   },
   "glossary": {
     "terms": [
@@ -995,6 +1161,39 @@
         }
       },
       {
+        "action": "pause",
+        "default_shortcut": "Ctrl+Alt+Super+P",
+        "shortcut": "Ctrl+Alt+Super+P",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "mark_moment",
+        "default_shortcut": "Ctrl+Alt+Super+M",
+        "shortcut": "Ctrl+Alt+Super+M",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "catch_me_up",
+        "default_shortcut": "Ctrl+Alt+Super+C",
+        "shortcut": "Ctrl+Alt+Super+C",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "ask_about_call",
+        "default_shortcut": "Ctrl+Alt+Super+A",
+        "shortcut": "Ctrl+Alt+Super+A",
+        "status": {
+          "owner": "Raycast",
+          "type": "conflict"
+        }
+      },
+      {
         "action": "hide_for_presenting",
         "default_shortcut": "Ctrl+Alt+Super+0",
         "shortcut": "Ctrl+Alt+Super+0",
@@ -1003,14 +1202,23 @@
         }
       },
       {
-        "action": "pin_card1",
-        "default_shortcut": "Ctrl+Alt+Super+1",
-        "shortcut": "Ctrl+Alt+Super+1",
+        "action": "mute_copilot",
+        "default_shortcut": "Ctrl+Alt+Super+K",
+        "shortcut": "Ctrl+Alt+Super+K",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "undo_card_action",
+        "default_shortcut": "Ctrl+Alt+Super+Z",
+        "shortcut": "Ctrl+Alt+Super+Z",
         "status": {
           "type": "registered_during_capture"
         }
       }
-    ]
+    ],
+    "version": 1
   },
   "items": [
     {
@@ -1330,6 +1538,50 @@
         "id": "top_drawer",
         "name": "Drawer redesign"
       }
+    },
+    {
+      "call": {
+        "call_type": "cross_team",
+        "id": "call_backend",
+        "started_at": 1790949600000,
+        "title": "Backend sync"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": 1790949600000,
+      "due": null,
+      "edited": false,
+      "handoff": null,
+      "id": "itm_retention_q",
+      "is_engineering": false,
+      "kind": "open_question",
+      "lang": "en",
+      "linked_issue": null,
+      "owed": "other",
+      "owner": {
+        "display_name": "Oleg Morozov",
+        "id": "per_oleg",
+        "initials": "OM",
+        "is_you": false,
+        "short_name": "Oleg M."
+      },
+      "rev": 1,
+      "review": "accepted",
+      "spans": [
+        {
+          "call_id": "call_backend",
+          "channel": null,
+          "t0_ms": 3010000,
+          "t1_ms": 3022000
+        }
+      ],
+      "status": "answered_in_call",
+      "text": "How long do we keep monitoring data?",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
     }
   ],
   "jobs": {
@@ -1373,6 +1625,50 @@
         "name": "Evidence collection",
         "running": false,
         "trigger": "Hourly while items are open, after each call"
+      },
+      {
+        "allow_on_battery": false,
+        "blocked_by_call": false,
+        "enabled": true,
+        "id": "job_post_call",
+        "kind": "post_call",
+        "last_run": null,
+        "name": "Post-call analysis",
+        "running": false,
+        "trigger": "After each call"
+      },
+      {
+        "allow_on_battery": false,
+        "blocked_by_call": true,
+        "enabled": true,
+        "id": "job_archive",
+        "kind": "archive_pass",
+        "last_run": null,
+        "name": "Archive transcript",
+        "running": false,
+        "trigger": "After each call"
+      },
+      {
+        "allow_on_battery": false,
+        "blocked_by_call": true,
+        "enabled": true,
+        "id": "job_retention",
+        "kind": "retention",
+        "last_run": null,
+        "name": "Retention",
+        "running": false,
+        "trigger": "Nightly"
+      },
+      {
+        "allow_on_battery": false,
+        "blocked_by_call": true,
+        "enabled": true,
+        "id": "job_backup",
+        "kind": "backup",
+        "last_run": null,
+        "name": "Backup",
+        "running": false,
+        "trigger": "Nightly"
       }
     ]
   },
@@ -1779,6 +2075,7 @@
       "id": "chg_prop_1",
       "kind": "close_item",
       "reason": "PR #448 merged with VSTOR-1234 on 16 Oct",
+      "rev": 1,
       "target": {
         "id": "itm_virt",
         "kind": "item",
@@ -1796,6 +2093,7 @@
       "id": "chg_prop_2",
       "kind": "apply_term",
       "reason": "You corrected “o-store” to “ostor” 3 times",
+      "rev": 1,
       "target": {
         "id": "gls_ostor",
         "kind": "glossary",
@@ -1855,8 +2153,13 @@
       "live_backend": "whisper_turbo_noter_loop",
       "mic_device": null,
       "offline_backend": "whisper_large_v3",
-      "output_mode": "auto",
-      "retention": "days30"
+      "output": {
+        "headphones_devices": [
+          "BuiltInHeadphoneOutputDevice-USB-DAC-4F2A"
+        ]
+      },
+      "retention": "days30",
+      "retention_next_run_deletes": 2
     },
     "call_screen": {
       "display_id": "dsp_studio",
@@ -1864,15 +2167,19 @@
       "open_automatically": true
     },
     "copilot": {
+      "card_keys": {
+        "enabled": true,
+        "modifiers": {
+          "command": true,
+          "control": true,
+          "option": true
+        }
+      },
       "default_cap_usd": 1.0,
       "default_council_live": "fused",
       "default_council_post_call": "parallel",
       "dismiss_with_keys": false,
       "muted_call_types": []
-    },
-    "dashboard": {
-      "hidden_calendars": [],
-      "horizon": "this_week"
     },
     "evidence": {
       "bitbucket": true,
@@ -1887,7 +2194,9 @@
           "bundle_id": "com.spotify.client"
         }
       ],
+      "launch_at_login": true,
       "notifications_enabled": false,
+      "offer_to_record": true,
       "storage_in_cloud_folder": false,
       "storage_path": "~/Library/Application Support/Noter",
       "summary_language": "en"
@@ -1920,10 +2229,16 @@
       "post_call": "claude_api_key",
       "search_answers": "claude_api_key"
     },
+    "today": {
+      "hidden_calendars": [],
+      "horizon": "this_week",
+      "ranking": "owed_to_todays_people"
+    },
     "updates": {
       "channel": "stable",
       "install_automatically": true
-    }
+    },
+    "version": 1
   },
   "sources": {
     "sources": [
@@ -2077,6 +2392,7 @@
         "id": "chg_prop_1",
         "kind": "close_item",
         "reason": "PR #448 merged with VSTOR-1234 on 16 Oct",
+        "rev": 1,
         "target": {
           "id": "itm_virt",
           "kind": "item",
@@ -2094,6 +2410,7 @@
         "id": "chg_prop_2",
         "kind": "apply_term",
         "reason": "You corrected “o-store” to “ostor” 3 times",
+        "rev": 1,
         "target": {
           "id": "gls_ostor",
           "kind": "glossary",
@@ -2104,6 +2421,7 @@
       }
     ],
     "proposals_total": 2,
+    "ranking": "owed_to_todays_people",
     "review_waiting": 3,
     "this_week": [],
     "today": [

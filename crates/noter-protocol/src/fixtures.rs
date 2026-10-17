@@ -48,6 +48,7 @@ pub struct FakeWorld {
     pub glossary: GlossaryList,
     pub call_types: CallTypeList,
     pub scope_presets: ScopePresetList,
+    pub ask_threads: Vec<AskThread>,
     pub audit: Vec<AuditEntry>,
     pub performance: PerfOverview,
 }
@@ -61,6 +62,8 @@ fn s(v: &str) -> String {
 fn ct(v: &str) -> CallTypeId {
     CallTypeId(s(v))
 }
+/// Every whole-state payload of the fixture world starts at version 1.
+const V1: StateVersion = StateVersion(1);
 
 struct P {
     id: &'static str,
@@ -162,6 +165,20 @@ fn person_row(p: &P, open: u32) -> PersonRow {
         voice_profile: p.voice,
         last_call_at: Some(ts(NOW)),
         open_items: open,
+    }
+}
+
+fn job_row(id: &str, kind: JobKind, name: &str, trigger: &str, blocked_by_call: bool) -> JobRow {
+    JobRow {
+        id: JobId(s(id)),
+        kind,
+        name: s(name),
+        enabled: true,
+        trigger: s(trigger),
+        allow_on_battery: false,
+        last_run: None,
+        running: false,
+        blocked_by_call,
     }
 }
 
@@ -307,6 +324,7 @@ fn writer(rt: RuntimeChoice, model: &str) -> WriterInfo {
 
 fn copilot_status() -> CopilotStatus {
     CopilotStatus {
+        version: V1,
         call_id: Some(CallId(s(LIVE))),
         flag_on: true,
         single_agent: false,
@@ -342,6 +360,7 @@ fn copilot_status() -> CopilotStatus {
 
 fn accounts() -> AccountsView {
     AccountsView {
+        version: V1,
         keys: vec![
             KeyView {
                 provider: KeyProvider::Anthropic,
@@ -411,6 +430,7 @@ fn setup_done() -> SetupStatus {
     })
     .collect();
     SetupStatus {
+        version: V1,
         complete: true,
         steps,
         models: ModelsStatus {
@@ -454,7 +474,6 @@ fn setup_done() -> SetupStatus {
         },
         call_display: Some(DisplayId(s("dsp_studio"))),
         detection_enabled: true,
-        start_control: StartControl::Record,
     }
 }
 
@@ -493,6 +512,7 @@ fn permissions() -> Vec<PermissionRow> {
 
 fn capture_recording() -> CaptureState {
     CaptureState {
+        version: V1,
         phase: CapturePhase::Recording,
         call_id: Some(CallId(s(LIVE))),
         title: Some(s("Planning: VHI 8.0 drawer redesign")),
@@ -505,11 +525,13 @@ fn capture_recording() -> CaptureState {
         output_route: OutputRoute::Headphones,
         replay_available: true,
         audio_not_stored: false,
+        audio_writing: true,
     }
 }
 
 fn settings() -> Settings {
     Settings {
+        version: V1,
         rev: Rev(1),
         general: GeneralSettings {
             storage_path: s("~/Library/Application Support/Noter"),
@@ -520,13 +542,18 @@ fn settings() -> Settings {
             }],
             summary_language: SummaryLanguage::En,
             notifications_enabled: false,
+            launch_at_login: true,
+            offer_to_record: true,
         },
         audio: AudioSettings {
             live_backend: TranscriptionBackend::WhisperTurboNoterLoop,
             offline_backend: TranscriptionBackend::WhisperLargeV3,
-            output_mode: OutputMode::Auto,
+            output: AudioOutputSettings {
+                headphones_devices: vec![s("BuiltInHeadphoneOutputDevice-USB-DAC-4F2A")],
+            },
             exclude_own_sounds: true,
             retention: AudioRetention::Days30,
+            retention_next_run_deletes: 2,
             mic_device: None,
         },
         privacy: PrivacySettings {
@@ -541,6 +568,14 @@ fn settings() -> Settings {
             local_model: Some(s("qwen3:8b")),
         },
         copilot: CopilotSettings {
+            card_keys: CardKeySettings {
+                enabled: true,
+                modifiers: Modifiers {
+                    control: true,
+                    option: true,
+                    command: true,
+                },
+            },
             dismiss_with_keys: false,
             default_cap_usd: 1.0,
             muted_call_types: vec![],
@@ -556,9 +591,10 @@ fn settings() -> Settings {
             title: MenuBarTitle::None,
             hidden_actions: vec![],
         },
-        dashboard: DashboardSettings {
+        today: TodaySettings {
             horizon: DashboardHorizon::ThisWeek,
             hidden_calendars: vec![],
+            ranking: TodayRanking::OwedToTodaysPeople,
         },
         performance: PerformanceSettings {
             near_pct: 90,
@@ -1029,6 +1065,22 @@ pub fn world() -> FakeWorld {
             i.done_at = Some(ts(NOW - 4 * 3_600_000));
             i
         },
+        {
+            let mut i = item(
+                "itm_retention_q",
+                ItemKind::OpenQuestion,
+                "How long do we keep monitoring data?",
+                Some("per_oleg"),
+                None,
+                ReviewState::Accepted,
+                ItemStatus::AnsweredInCall,
+                backend.clone(),
+                3010,
+                Owed::Other,
+            );
+            i.done_at = Some(backend.started_at);
+            i
+        },
     ];
 
     let calls = vec![
@@ -1149,6 +1201,7 @@ pub fn world() -> FakeWorld {
             expires_at: Some(ts(NOW + 21 * MIN + 90_000)),
             rating: None,
             carry_forward: None,
+            used: false,
         },
         CardView {
             id: CardId(s("card_2")),
@@ -1167,6 +1220,7 @@ pub fn world() -> FakeWorld {
             expires_at: Some(ts(NOW + 22 * MIN + 90_000)),
             rating: None,
             carry_forward: None,
+            used: false,
         },
         CardView {
             id: CardId(s("card_3")),
@@ -1185,12 +1239,34 @@ pub fn world() -> FakeWorld {
             expires_at: Some(ts(NOW + 23 * MIN + 90_000)),
             rating: None,
             carry_forward: None,
+            used: false,
+        },
+        // An earlier card: expired after the topic moved on; the user asked its question aloud.
+        CardView {
+            id: CardId(s("card_0")),
+            call_id: CallId(s(LIVE)),
+            number: None,
+            kind: CardKind::Ask,
+            agent: agent("agt_pm", "Product manager", "target"),
+            merged_agents: vec![],
+            title: s("Is the 480 pt drawer width agreed with design?"),
+            body: None,
+            provenance: Some(Provenance::ThisCall { span: span(LIVE, 1120, 1130) }),
+            state: CardState::Expired,
+            solicited: false,
+            lang: Lang::En,
+            created_at: ts(NOW + 19 * MIN),
+            expires_at: Some(ts(NOW + 19 * MIN + 90_000)),
+            rating: None,
+            carry_forward: None,
+            used: true,
         },
     ];
 
     let proposals = vec![
         ProposalRow {
             id: ChangeId(s("chg_prop_1")),
+            rev: Rev(1),
             batch_id: None,
             kind: ProposalKind::CloseItem,
             title: s("Close “Virtualise the 10k-row table…”"),
@@ -1208,6 +1284,7 @@ pub fn world() -> FakeWorld {
         },
         ProposalRow {
             id: ChangeId(s("chg_prop_2")),
+            rev: Rev(1),
             batch_id: Some(BatchId(s("bat_ostor"))),
             kind: ProposalKind::ApplyTerm,
             title: s("Apply term “ostor” to 14 transcripts"),
@@ -1249,6 +1326,7 @@ pub fn world() -> FakeWorld {
             confidence: Some(ConfidenceLevel::High),
             status: ChangeStatus::Applied,
             undoable: true,
+            redoable: false,
         },
         ChangeRow {
             id: ChangeId(s("chg_2")),
@@ -1273,6 +1351,33 @@ pub fn world() -> FakeWorld {
             confidence: Some(ConfidenceLevel::High),
             status: ChangeStatus::Applied,
             undoable: true,
+            redoable: false,
+        },
+        // Undone yesterday and not edited since: History offers **Redo**.
+        ChangeRow {
+            id: ChangeId(s("chg_3")),
+            batch_id: Some(BatchId(s("bat_people"))),
+            batch_size: 4,
+            at: ts(NOW - DAY),
+            actor: Actor::Job {
+                job_id: JobId(s("job_reconcile_people")),
+                name: s("Reconcile people"),
+            },
+            entity: EntityRef {
+                kind: EntityKind::Speaker,
+                id: s("spk_3"),
+                label: s("Speaker 3"),
+            },
+            field: Some(s("person")),
+            before: None,
+            after: Some(s("Lena Krüger")),
+            summary: s("Named Speaker 3 as Lena K. in 4 calls"),
+            reason: Some(s("Voice matches Lena K.'s profile")),
+            evidence: vec![],
+            confidence: Some(ConfidenceLevel::Medium),
+            status: ChangeStatus::Undone,
+            undoable: false,
+            redoable: true,
         },
     ];
 
@@ -1317,6 +1422,7 @@ pub fn world() -> FakeWorld {
 
     let today = TodayView {
         date: LocalDate(s("2026-10-16")),
+        ranking: TodayRanking::OwedToTodaysPeople,
         calendar: CalendarAccess::Granted,
         live_call: Some(calls[0].clone()),
         today: vec![UpcomingCall {
@@ -1369,14 +1475,24 @@ pub fn world() -> FakeWorld {
         window: WindowLabel::Main,
         setup: setup_done(),
         capture: capture_recording(),
-        detection: None,
+        detection: DetectionChanged {
+            version: V1,
+            detection: None,
+        },
         copilot: Some(copilot.clone()),
         privacy: PrivacyStatus {
+            version: V1,
             mode: PrivacyMode::CloudRedacted,
             effective: EffectiveMode::CloudRedacted,
         },
-        hidden_for_presenting: false,
-        degraded: vec![],
+        presenting: PresentingState {
+            version: V1,
+            hidden: false,
+        },
+        degraded: DegradedSet {
+            version: V1,
+            states: vec![],
+        },
         accounts: acc,
         features: FeatureFlags {
             copilot: true,
@@ -1390,11 +1506,16 @@ pub fn world() -> FakeWorld {
             time_zone: s("Europe/Berlin"),
         },
         proposals: ProposalCounts {
+            version: V1,
             waiting: 2,
             needs_attention: 0,
         },
-        banners: vec![],
+        banners: BannerSet {
+            version: V1,
+            banners: vec![],
+        },
         environment: EnvironmentState {
+            version: V1,
             displays: vec![
                 DisplayInfo {
                     id: DisplayId(s("dsp_builtin")),
@@ -1414,8 +1535,13 @@ pub fn world() -> FakeWorld {
                 },
             ],
             output_route: OutputRoute::Headphones,
+            output_device: Some(OutputDeviceInfo {
+                uid: s("BuiltInHeadphoneOutputDevice"),
+                name: s("External Headphones"),
+                marked_headphones: false,
+            }),
             permissions: permissions(),
-            notifications_enabled: false,
+            notifications: NotificationAuth::NotDetermined,
             online: true,
             update: None,
             disk_free_mb: 182_000,
@@ -1468,37 +1594,61 @@ pub fn world() -> FakeWorld {
             }],
         },
         jobs: JobList {
-            jobs: vec![JobRow {
-                id: JobId(s("job_evidence")),
-                kind: JobKind::EvidenceCollection,
-                name: s("Evidence collection"),
-                enabled: true,
-                trigger: s("Hourly while items are open, after each call"),
-                allow_on_battery: false,
-                last_run: Some(JobRunRow {
-                    id: JobRunId(s("run_1")),
-                    job_id: JobId(s("job_evidence")),
+            jobs: vec![
+                JobRow {
+                    id: JobId(s("job_evidence")),
                     kind: JobKind::EvidenceCollection,
                     name: s("Evidence collection"),
-                    started_at: ts(NOW - 4 * 3_600_000),
-                    finished_at: Some(ts(NOW - 4 * 3_600_000 + 40_000)),
-                    status: JobRunStatus::Succeeded,
-                    counts: vec![
-                        CountEntry {
-                            label: s("closed"),
-                            n: 1,
-                        },
-                        CountEntry {
-                            label: s("proposed"),
-                            n: 1,
-                        },
-                    ],
-                    error: None,
-                    progress: None,
-                }),
-                running: false,
-                blocked_by_call: true,
-            }],
+                    enabled: true,
+                    trigger: s("Hourly while items are open, after each call"),
+                    allow_on_battery: false,
+                    last_run: Some(JobRunRow {
+                        id: JobRunId(s("run_1")),
+                        job_id: JobId(s("job_evidence")),
+                        kind: JobKind::EvidenceCollection,
+                        name: s("Evidence collection"),
+                        started_at: ts(NOW - 4 * 3_600_000),
+                        finished_at: Some(ts(NOW - 4 * 3_600_000 + 40_000)),
+                        status: JobRunStatus::Succeeded,
+                        counts: vec![
+                            CountEntry {
+                                label: s("closed"),
+                                n: 1,
+                            },
+                            CountEntry {
+                                label: s("proposed"),
+                                n: 1,
+                            },
+                        ],
+                        error: None,
+                        progress: None,
+                    }),
+                    running: false,
+                    blocked_by_call: true,
+                },
+                job_row(
+                    "job_post_call",
+                    JobKind::PostCall,
+                    "Post-call analysis",
+                    "After each call",
+                    false,
+                ),
+                job_row(
+                    "job_archive",
+                    JobKind::ArchivePass,
+                    "Archive transcript",
+                    "After each call",
+                    true,
+                ),
+                job_row(
+                    "job_retention",
+                    JobKind::Retention,
+                    "Retention",
+                    "Nightly",
+                    true,
+                ),
+                job_row("job_backup", JobKind::Backup, "Backup", "Nightly", true),
+            ],
             evidence_tools: vec![CliInfo {
                 tool: CliTool::ClaudeCode,
                 installed: true,
@@ -1508,6 +1658,7 @@ pub fn world() -> FakeWorld {
             }],
         },
         hotkeys: HotkeyList {
+            version: V1,
             bindings: vec![
                 HotkeyBinding {
                     action: HotkeyAction::StartStop,
@@ -1522,15 +1673,47 @@ pub fn world() -> FakeWorld {
                     status: HotkeyStatus::Registered,
                 },
                 HotkeyBinding {
+                    action: HotkeyAction::Pause,
+                    shortcut: Some(s("Ctrl+Alt+Super+P")),
+                    default_shortcut: Some(s("Ctrl+Alt+Super+P")),
+                    status: HotkeyStatus::Registered,
+                },
+                HotkeyBinding {
+                    action: HotkeyAction::MarkMoment,
+                    shortcut: Some(s("Ctrl+Alt+Super+M")),
+                    default_shortcut: Some(s("Ctrl+Alt+Super+M")),
+                    status: HotkeyStatus::Registered,
+                },
+                HotkeyBinding {
+                    action: HotkeyAction::CatchMeUp,
+                    shortcut: Some(s("Ctrl+Alt+Super+C")),
+                    default_shortcut: Some(s("Ctrl+Alt+Super+C")),
+                    status: HotkeyStatus::Registered,
+                },
+                HotkeyBinding {
+                    action: HotkeyAction::AskAboutCall,
+                    shortcut: Some(s("Ctrl+Alt+Super+A")),
+                    default_shortcut: Some(s("Ctrl+Alt+Super+A")),
+                    status: HotkeyStatus::Conflict {
+                        owner: Some(s("Raycast")),
+                    },
+                },
+                HotkeyBinding {
                     action: HotkeyAction::HideForPresenting,
                     shortcut: Some(s("Ctrl+Alt+Super+0")),
                     default_shortcut: Some(s("Ctrl+Alt+Super+0")),
                     status: HotkeyStatus::Registered,
                 },
                 HotkeyBinding {
-                    action: HotkeyAction::PinCard1,
-                    shortcut: Some(s("Ctrl+Alt+Super+1")),
-                    default_shortcut: Some(s("Ctrl+Alt+Super+1")),
+                    action: HotkeyAction::MuteCopilot,
+                    shortcut: Some(s("Ctrl+Alt+Super+K")),
+                    default_shortcut: Some(s("Ctrl+Alt+Super+K")),
+                    status: HotkeyStatus::Registered,
+                },
+                HotkeyBinding {
+                    action: HotkeyAction::UndoCardAction,
+                    shortcut: Some(s("Ctrl+Alt+Super+Z")),
+                    default_shortcut: Some(s("Ctrl+Alt+Super+Z")),
                     status: HotkeyStatus::RegisteredDuringCapture,
                 },
             ],
@@ -1594,16 +1777,63 @@ pub fn world() -> FakeWorld {
                 },
             ],
         },
-        audit: vec![AuditEntry {
-            id: AuditId(s("aud_1")),
-            at: ts(NOW + 14 * MIN),
-            call: Some(live.clone()),
-            runtime: Some(RuntimeChoice::ClaudeApiKey),
-            destination: s("api.anthropic.com"),
-            what: AuditWhat::TranscriptDelta,
-            bytes_out: 1843,
-            redacted: true,
+        ask_threads: vec![AskThread {
+            id: AskThreadId(s("ask_notif")),
+            title: s("What did we decide about drawer notifications?"),
+            scope: AskScope {
+                include_documents: true,
+                ..Default::default()
+            },
+            turns: vec![AskAnswer {
+                turn_id: AskTurnId(s("turn_notif_1")),
+                question: s("What did we decide about drawer notifications?"),
+                answer_md: s("Drawer events go through the notification service [1]."),
+                citations: vec![Citation {
+                    n: 1,
+                    provenance: Provenance::PastCall {
+                        call: backend.clone(),
+                        span: span(BACKEND, 2470, 2482),
+                    },
+                    quote: s("Websocket notifications go through the notification service."),
+                    speaker: Some(chip("per_dmitri")),
+                    strength: MatchStrength::Strong,
+                    deleted: false,
+                }],
+                found: true,
+                runtime: RuntimeChoice::ClaudeApiKey,
+                answered_locally: false,
+                sensitive_sources_skipped: 0,
+                keyword_only: false,
+                only_weak_evidence: false,
+                asked_at: ts(NOW - DAY),
+            }],
         }],
+        audit: vec![
+            AuditEntry {
+                id: AuditId(s("aud_1")),
+                kind: AuditKind::Run,
+                llm_run_id: Some(LlmRunId(s("llm_tick_14"))),
+                at: ts(NOW + 14 * MIN),
+                call: Some(live.clone()),
+                runtime: Some(RuntimeChoice::ClaudeApiKey),
+                destination: s("api.anthropic.com"),
+                what: AuditWhat::TranscriptDelta,
+                bytes_out: 1843,
+                redacted: true,
+            },
+            AuditEntry {
+                id: AuditId(s("aud_2")),
+                kind: AuditKind::ToolResult,
+                llm_run_id: Some(LlmRunId(s("llm_tick_14"))),
+                at: ts(NOW + 14 * MIN + 2_000),
+                call: Some(backend.clone()),
+                runtime: Some(RuntimeChoice::ClaudeApiKey),
+                destination: s("api.anthropic.com"),
+                what: AuditWhat::FullTranscript,
+                bytes_out: 612,
+                redacted: true,
+            },
+        ],
         performance: PerfOverview {
             tiles: vec![MetricTile {
                 metric: s("answer_card"),

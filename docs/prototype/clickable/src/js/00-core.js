@@ -91,7 +91,7 @@
     demo: {},                                    // screen/surface key -> demo state id
     local: {},                                   // screen key -> local state object
     banners: [],                                 // app-level banners for MW-R5 (set by screens' demo states)
-    setup: { audioGranted: true, selfTestPassed: true, assistant: 'api-key' },
+    setup: { micGranted: true, sysGranted: true, selfTestPassed: true, assistant: 'api-key' },   // PM-60: no flag here ever blocks a start
     rec: {                                       // live capture scenario
       status: 'idle',                            // idle | recording | paused | closing
       callId: 'c-live',

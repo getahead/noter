@@ -104,6 +104,7 @@ pub struct LocalRuntimeView {
 /// Assistants step and the agent editor's Runtime pop-up (`accounts:changed`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AccountsView {
+    pub version: StateVersion,
     pub keys: Vec<KeyView>,
     pub accounts: Vec<AccountView>,
     pub local: LocalRuntimeView,

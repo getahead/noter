@@ -43,7 +43,9 @@ pub struct UpcomingCall {
     /// The recording made during this event, once there is one.
     pub call_id: Option<CallId>,
     pub last_time: Option<LastTimeLine>,
-    /// Items you own first, then items you wait on; ranked by the core.
+    /// Open accepted items from the last two calls with the same people, plus suggested ones
+    /// marked "Not reviewed"; ranked by the core per `TodayView.ranking`. The same carry-forward
+    /// query feeds the copilot's initial context when this call starts.
     pub items: Vec<ItemView>,
     pub questions: Vec<ItemView>,
     pub handed_off: Vec<ItemView>,
@@ -61,6 +63,8 @@ pub enum TodayBanner {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct TodayView {
     pub date: LocalDate,
+    /// How the items on each call card are ranked (Settings › General › Today › **Ranking**).
+    pub ranking: crate::model::TodayRanking,
     pub calendar: CalendarAccess,
     pub live_call: Option<CallRow>,
     pub today: Vec<UpcomingCall>,

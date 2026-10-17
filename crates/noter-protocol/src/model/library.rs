@@ -96,7 +96,9 @@ pub struct CallsListArgs {
 pub struct CallUpdateArgs {
     pub call_id: CallId,
     pub rev: Rev,
+    #[serde(default)]
     pub title: Option<String>,
+    #[serde(default)]
     pub call_type: Option<CallTypeId>,
 }
 
@@ -164,6 +166,7 @@ pub struct SearchArgs {
     pub query: String,
     pub filter: CallFilter,
     /// Per section; default 20.
+    #[serde(default)]
     pub limit: Option<u32>,
 }
 
@@ -268,6 +271,7 @@ pub struct ScopePresetList {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AskStartArgs {
     /// Follow-up in an existing thread, or a new thread.
+    #[serde(default)]
     pub thread_id: Option<AskThreadId>,
     pub question: String,
     pub scope: AskScope,

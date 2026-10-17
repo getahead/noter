@@ -1,3 +1,4 @@
+// @cpt-component:cpt-noter-component-core-protocol:p1
 //! # noter-protocol — the Noter contracts
 //!
 //! This crate is the single source of truth for every boundary inside Noter
@@ -30,4 +31,5 @@ pub use error::{CoreError, ErrorCode, ErrorDetail};
 /// Version of the UI ↔ core contract. Bumped on every change to a frozen
 /// command, event or Channel (see DESIGN-core 4.1, Contract governance).
 /// `major.minor`: minor = additive, major = breaking a frozen surface.
-pub const CONTRACT_VERSION: &str = "1.0";
+/// 2.0 applies the 17 Oct 2026 design review (`docs/REVIEW-2026-10-17-design-core.md`).
+pub const CONTRACT_VERSION: &str = "2.0";

@@ -1,7 +1,7 @@
 // Screenshot and UI end-to-end tests (docs/HARNESS.md › Visual, › End to end).
 //
 // Screenshots are compared per pixel against baselines rendered in the pinned
-// Playwright container (WebKit on Linux): at most 1% of pixels may differ
+// Playwright container (WebKit on Linux): at most 2% of pixels may differ
 // (harness.toml gates.visual). Baselines live next to the specs in
 // __screenshots__/ and change only through `just visual-update` or the
 // `update-screenshots` workflow, reviewed by the owner.

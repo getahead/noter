@@ -83,13 +83,29 @@
       "type": "string"
     },
     "Lang": {
-      "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
-      "enum": [
-        "en",
-        "ru",
-        "de"
+      "anyOf": [
+        {
+          "enum": [
+            "en",
+            "ru",
+            "de"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        }
       ],
-      "type": "string"
+      "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
     },
     "SegmentId": {
       "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",

@@ -52,6 +52,7 @@ export type AccountView = {
  *  Assistants step and the agent editor's Runtime pop-up (`accounts:changed`).
  */
 export type AccountsView = {
+	version: StateVersion,
 	keys: KeyView[],
 	accounts: AccountView[],
 	local: LocalRuntimeView,
@@ -62,7 +63,7 @@ export type Ack = Record<string, never>;
 
 export type ActivityArgs = {
 	/**  `null` = today. */
-	day: LocalDate | null,
+	day?: LocalDate | null,
 	actor: ActorFilter,
 };
 
@@ -86,7 +87,7 @@ export type ActorFilter = "all" | "you" | "jobs" | "models";
 
 export type AgentCreateArgs = {
 	template: AgentTemplate,
-	name: string | null,
+	name?: string | null,
 };
 
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
@@ -149,14 +150,18 @@ export type AgentSkillSaveArgs = {
 
 export type AgentStats = {
 	cards_7d: number,
-	/**  0..1 useful or used, over the last 7 days. */
+	/**  0..1 of its cards rated useful or used, over the last 20 calls. */
 	useful_share: number | null,
 };
 
 export type AgentStatus = { type: "ok" } | 
 /**  Runtime unavailable; `fix` is the one-click switch the UI may offer (with Undo). */
 { type: "paused"; reason: RuntimeUnavailableReason; fix: RuntimeChoice | null } | 
-/**  Switched itself off in a call type after ten calls of dismissed cards. */
+/**
+ *  Switched itself off for a call type because at least 80 % of its cards were dismissed
+ *  over the last 10 calls of that type (D4). Logged in History, undoable, announced once
+ *  on the Agents page.
+ */
 { type: "switched_off"; call_type: CallTypeId; after_calls: number } | { type: "disabled" };
 
 export type AgentTemplate = "security_reviewer" | "qa" | "customer" | "finance" | "blank";
@@ -220,7 +225,10 @@ export type ApiKeySetArgs = {
 
 /**  Banners at app level (MW-R5) that are not degraded states of a live function. */
 export type AppBanner = 
-/**  "Noter quit during a recording" (PM-46). */
+/**
+ *  "Noter quit during a recording" (PM-46). While shown (until dismissed or another
+ *  capture starts), **Resume Recording** is `capture_resume_interrupted`.
+ */
 { type: "recording_interrupted_by_quit"; call: CallRef } | { type: "update_ready"; version: string } | 
 /**  Performance roll-up failed. */
 { type: "roll_up_failed"; at: TimestampMs };
@@ -242,17 +250,20 @@ export type AppSnapshot = {
 	window: WindowLabel,
 	setup: SetupStatus,
 	capture: CaptureState,
-	/**  The record prompt's pending detection, if any. */
-	detection: CallDetection | null,
+	/**  The record prompt's pending detection, if any (as `capture:detected` sends it). */
+	detection: DetectionChanged,
 	copilot: CopilotStatus | null,
 	privacy: PrivacyStatus,
-	hidden_for_presenting: boolean,
-	degraded: DegradedState[],
+	/**  Hidden for presenting (as `app:presenting` sends it). */
+	presenting: PresentingState,
+	/**  As `degraded:changed` sends it. */
+	degraded: DegradedSet,
 	accounts: AccountsView,
 	features: FeatureFlags,
 	prefs: UiPrefs,
 	proposals: ProposalCounts,
-	banners: AppBanner[],
+	/**  As `banners:changed` sends it. */
+	banners: BannerSet,
 	environment: EnvironmentState,
 };
 
@@ -311,7 +322,7 @@ export type AskScope = {
 
 export type AskStartArgs = {
 	/**  Follow-up in an existing thread, or a new thread. */
-	thread_id: AskThreadId | null,
+	thread_id?: AskThreadId | null,
 	question: string,
 	scope: AskScope,
 };
@@ -361,16 +372,28 @@ export type AudioChannel =
 /**  System audio: everyone else. */
 "sys";
 
+/**
+ *  Replay during capture is headphones-only (owner decision 17 Oct). Devices the user
+ *  marked as headphones lift only an `unknown` route; detected speakers always refuse.
+ */
+export type AudioOutputSettings = {
+	/**  Core Audio UIDs of output devices the user marked as headphones. */
+	headphones_devices: string[],
+};
+
 export type AudioRetention = "days7" | "days30" | "days90" | "forever" | "never_store";
 
 export type AudioSettings = {
 	live_backend: TranscriptionBackend,
 	offline_backend: TranscriptionBackend,
-	output_mode: OutputMode,
+	output: AudioOutputSettings,
 	exclude_own_sounds: boolean,
+	/**  A changed retention applies to existing calls from the next nightly Retention run. */
 	retention: AudioRetention,
+	/**  Read-only: how many calls' audio the next Retention run deletes (ignored on update). */
+	retention_next_run_deletes: number,
 	/**  `null` = system default input. */
-	mic_device: string | null,
+	mic_device?: string | null,
 };
 
 export type AudioStorageArgs = {
@@ -381,6 +404,9 @@ export type AudioStorageArgs = {
 /**  "14:32 — 1.8 KB of transcript from the planning call went to Claude". */
 export type AuditEntry = {
 	id: AuditId,
+	kind: AuditKind,
+	/**  The run this row belongs to; a `tool_result` row links to its run's row through it. */
+	llm_run_id: LlmRunId | null,
 	at: TimestampMs,
 	call: CallRef | null,
 	runtime: RuntimeChoice | null,
@@ -391,24 +417,44 @@ export type AuditEntry = {
 };
 
 export type AuditExportArgs = {
-	from: TimestampMs | null,
-	to: TimestampMs | null,
+	from?: TimestampMs | null,
+	to?: TimestampMs | null,
 	format: LogFormat,
 };
 
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
 export type AuditId = string;
 
+/**
+ *  One row of `audit_log`: one per LLM run (the packet) plus, for a run on a cloud runtime,
+ *  one per noter-mcp tool result, redacted before it left (O2).
+ */
+export type AuditKind = 
+/**  The packet a run started with. */
+"run" | 
+/**  A noter-mcp tool result returned to a cloud run. */
+"tool_result" | 
+/**  A live lookup in one of the user's MCP sources (only in "Cloud allowed", D1). */
+"lookup";
+
 export type AuditListArgs = {
-	from: TimestampMs | null,
-	to: TimestampMs | null,
+	from?: TimestampMs | null,
+	to?: TimestampMs | null,
 	page: PageRequest,
 };
 
 export type AuditWhat = "transcript_delta" | "full_transcript" | "outputs" | "document_excerpts" | "search_question" | "evidence_lookup" | "live_mcp_query" | "handoff_prompt";
 
+export type BannerDismissArgs = {
+	banner: BannerKind,
+};
+
+/**  The kind of an `AppBanner`, for `banner_dismiss`. */
+export type BannerKind = "recording_interrupted_by_quit" | "update_ready" | "roll_up_failed";
+
 /**  Event `banners:changed`: the full current set. */
 export type BannerSet = {
+	version: StateVersion,
 	banners: AppBanner[],
 };
 
@@ -429,7 +475,7 @@ export type BriefAction = { type: "save_file" } | { type: "open_in"; target: Han
 
 export type BriefArgs = {
 	period: PerfPeriod,
-	call_type: CallTypeId | null,
+	call_type?: CallTypeId | null,
 	action: BriefAction,
 };
 
@@ -497,12 +543,15 @@ export type CallDetection = {
 	 *  **Call Detected · Start Recording** while the call runs.
 	 */
 	prompt_until: TimestampMs,
-	/**  Start is refused below 500 MB (the prompt shows the reason instead of **Record**). */
+	/**
+	 *  Why **Record** would be refused right now, if it would (the prompt shows the reason
+	 *  with a dimmed **Record**). Setup state and audio permissions never block a start (O1).
+	 */
 	blocked: StartBlocked | null,
 };
 
 export type CallDisplayArgs = {
-	display_id: DisplayId | null,
+	display_id?: DisplayId | null,
 };
 
 export type CallEndAnswerArgs = {
@@ -560,6 +609,12 @@ export type CallPageTab = "summary" | "transcript" | "agent_reviews" | "history"
 export type CallPerf = {
 	call: CallRef,
 	ticks: TickTiming[],
+	/**
+	 *  Total length of dropouts (gaps with reason `interrupted`, `engine_restart`,
+	 *  `device_changed` or `stalled` longer than 2 s).
+	 */
+	dropout_ms: DurationMs,
+	/**  Cost of runs on API keys only; runs on the user's own account are not priced. */
 	cost_usd: number | null,
 	tokens_in: number,
 	tokens_out: number,
@@ -596,7 +651,7 @@ export type CallRow = {
 };
 
 export type CallScreenSettings = {
-	display_id: DisplayId | null,
+	display_id?: DisplayId | null,
 	layout: CallLayoutPreference,
 	open_automatically: boolean,
 };
@@ -633,12 +688,13 @@ export type CallTypeList = {
 export type CallUpdateArgs = {
 	call_id: CallId,
 	rev: Rev,
-	title: string | null,
-	call_type: CallTypeId | null,
+	title?: string | null,
+	call_type?: CallTypeId | null,
 };
 
 /**  Event `window:call` and the result of call-window commands. */
 export type CallWindowState = {
+	version: StateVersion,
 	visible: boolean,
 	key: boolean,
 	layout: CallLayout,
@@ -660,15 +716,30 @@ export type CallsListArgs = {
 	page: PageRequest,
 };
 
-/**  Notices shown in the call window's notice slot or, when it is hidden, in the record prompt (PM-39). */
+/**
+ *  Notices shown in the call window's notice slot or, when it is hidden, in the record prompt (PM-39).
+ *  While Noter is hidden for presenting, the menu bar shows the notice as one line instead.
+ */
 export type CaptureNotice = 
-/**  Meeting app released audio and mic for 20 s; stops at `stops_at` unless kept. */
-{ type: "call_ended"; stops_at: TimestampMs } | 
+/**
+ *  The meeting app released audio and mic for 20 s; capture stops at `stops_at` unless kept.
+ *  `stops_at` is `null` while the notice is held (`capture_hold_notice`, pointer or focus on
+ *  it); on release the 10-second countdown starts again.
+ */
+{ type: "call_ended"; stops_at: TimestampMs | null } | 
 /**  While hidden for presenting: no countdown; stops after 10 minutes. */
 { type: "call_seems_ended"; stops_at: TimestampMs } | 
-/**  The next calendar event started, or the meeting app's meeting changed. */
-{ type: "new_meeting"; event: CalendarEventRef | null; app_name: string | null } | 
-/**  Nothing heard for 5 minutes after the start. */
+/**
+ *  The next calendar event started, or the meeting app's meeting changed. Unanswered, it
+ *  applies `default_choice` at `expires_at` (60 s after `detected_at`). Start as New Call
+ *  splits the recording at `detected_at`. While hidden for presenting, the menu bar's start
+ *  item answers `start_as_new_call`.
+ */
+{ type: "new_meeting"; event: CalendarEventRef | null; app_name: string | null; detected_at: TimestampMs; expires_at: TimestampMs; default_choice: NewMeetingChoice } | 
+/**
+ *  Nothing heard for 5 minutes after the start. **Keep Recording** is `capture_keep_recording`
+ *  (resets the 5-minute timer); **Discard Recording** is `capture_discard`.
+ */
 { type: "nothing_heard"; since: TimestampMs } | 
 /**  Stopped automatically; offered until `continue_until`. */
 { type: "stopped_automatically"; call_id: CallId };
@@ -682,21 +753,32 @@ export type CapturePauseArgs = {
 export type CapturePhase = "idle" | 
 /**  Engine starting, aggregate device being built. */
 "starting" | "recording" | "paused" | 
+/**
+ *  The audio engine stopped and could not be restarted (`DegradedState::CaptureFailed`):
+ *  nothing is recorded and the call is not ended. **Try Again** (`capture_resume_interrupted`)
+ *  continues the same call with a gap row `engine_restart`; **Stop Recording** ends it.
+ */
+"failed" | 
 /**  Flushing audio and writing per-call files; the call window shows its closing state. */
 "stopping" | 
-/**  Stopped; `continue_until` may still allow Continue Recording. */
+/**
+ *  Stopped; `continue_until` may still allow Continue Recording. A new `capture_start`
+ *  is allowed and closes that window.
+ */
 "stopped";
 
 export type CaptureStartArgs = {
 	source: StartSource,
 	/**  **Record as Sensitive** (PM-41): local-only processing for this call. */
 	sensitive: boolean,
-	detection_id: DetectionId | null,
-	calendar_event_id: CalendarEventId | null,
+	detection_id?: DetectionId | null,
+	calendar_event_id?: CalendarEventId | null,
 };
 
 /**  The single capture state machine. Sent whole on every change (`capture:state`). */
 export type CaptureState = {
+	/**  Monotonic; the UI keeps the state with the highest version. */
+	version: StateVersion,
 	phase: CapturePhase,
 	call_id: CallId | null,
 	title: string | null,
@@ -707,13 +789,21 @@ export type CaptureState = {
 	pause: PauseInfo | null,
 	/**  The notice the call surfaces must show, if any (call end, new meeting, nothing heard). */
 	notice: CaptureNotice | null,
-	/**  After any stop, **Continue Recording** is offered until this time (PM-43). */
+	/**
+	 *  After any stop, **Continue Recording** is offered until this time (PM-43). The phase
+	 *  stays `stopped` until it passes or another capture starts, then becomes `idle`.
+	 */
 	continue_until: TimestampMs | null,
 	output_route: OutputRoute,
 	/**  Replay of a line is possible right now: headphones and own sounds excluded. */
 	replay_available: boolean,
 	/**  Audio is not stored for this call ("Never store audio"). */
 	audio_not_stored: boolean,
+	/**
+	 *  Audio files are being written. `false` while the disk is full mid-call: Noter stops
+	 *  writing audio first and the transcript continues.
+	 */
+	audio_writing: boolean,
 };
 
 export type CaptureTestOutcome = { type: "not_run" } | { type: "passed"; at: TimestampMs } | { type: "failed"; code: ErrorCode } | 
@@ -729,11 +819,18 @@ export type CardEvent =
 { type: "added"; card: CardView } | 
 /**  Body or provenance filled in, number or state changed: replace by id. */
 { type: "updated"; card: CardView } | 
-/**  Remove from the visible stack (expired, dismissed, topic moved on); moves to `earlier`. */
+/**  Remove from the visible stack (dismissed, or a streaming card dropped late); moves to `earlier`. */
 { type: "removed"; card_id: CardId; state: CardState } | 
+/**  The card expired (timeout or topic change); moves to `earlier`. */
+{ type: "expired"; card_id: CardId; reason: ExpiryReason } | 
+/**  A card key was pressed: `key` is 1–3; `card_id` is `null` when no card has that number. */
+{ type: "key_feedback"; key: number; outcome: KeyOutcome; card_id: CardId | null } | 
 /**  A card from another agent merged into this one. */
 { type: "merged"; card_id: CardId; merged_agents: AgentRef[] } | 
-/**  A card that would arrive after its 12 s window was dropped (metrics, "Card too late"). */
+/**
+ *  An unsolicited card whose first line would arrive after its 12 s window was dropped
+ *  (metrics, "Card too late"). Solicited cards are never dropped.
+ */
 { type: "dropped_late"; agent: AgentRef; trigger_at_ms: OffsetMs } | { type: "status"; status: CopilotStatus } | { type: "ended"; reason: StreamEndReason };
 
 export type CardHeldArgs = {
@@ -745,8 +842,19 @@ export type CardHeldArgs = {
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
 export type CardId = string;
 
+/**  Card keys as one setting: pin = `modifiers` + 1–3, dismiss = `modifiers` + ⇧ + 1–3. */
+export type CardKeySettings = {
+	enabled: boolean,
+	/**  Default ⌃⌥⌘. At least one must be on (`invalid_input`, `no_modifier`). */
+	modifiers: Modifiers,
+};
+
 export type CardKeysState = {
-	/**  ⌃⌥⌘1–3 and ⌃⌥⌘Z are registered right now (only during capture with the copilot on and not hidden). */
+	/**
+	 *  Card keys (pin 1–3, dismiss ⇧1–3, undo ⌃⌥⌘Z) are registered right now. They are
+	 *  registered only while capture runs, the copilot is on, not muted and Noter is not
+	 *  hidden for presenting; app hotkeys stay registered from launch.
+	 */
 	registered: boolean,
 	/**  Dismiss with keys (⌃⌥⌘⇧1–3) is on. */
 	dismiss_keys: boolean,
@@ -773,7 +881,7 @@ export type CardMutation = {
 export type CardRateArgs = {
 	card_id: CardId,
 	/**  `null` clears the rating. */
-	rating: Rating | null,
+	rating?: Rating | null,
 };
 
 export type CardShownArgs = {
@@ -783,10 +891,14 @@ export type CardShownArgs = {
 };
 
 export type CardState = 
-/**  First line arrived; provenance still streaming. */
+/**  Waiting while the visible stack is held; shown when the hold ends. */
+"queued" | 
+/**  First line arrived; provenance still streaming. Removed if it would complete too late. */
 "streaming" | "shown" | 
-/**  Hovered, focused or expanded: never removed while held. */
-"held" | "pinned" | "dismissed" | "expired";
+/**  Hovered, focused or expanded: never removed while held; pin or dismiss still apply. */
+"held" | "pinned" | "dismissed" | 
+/**  Timed out or the topic moved on (`CardEvent::Expired`). */
+"expired";
 
 export type CardView = {
 	id: CardId,
@@ -810,6 +922,11 @@ export type CardView = {
 	expires_at: TimestampMs | null,
 	rating: Rating | null,
 	carry_forward: CarryForward | null,
+	/**
+	 *  The user's microphone transcript matched the card's question or answer within
+	 *  2 minutes ("used"); thresholds are tuned from ratings.
+	 */
+	used: boolean,
 };
 
 export type CardsSnapshot = {
@@ -855,8 +972,14 @@ export type ChangeRow = {
 	confidence: ConfidenceLevel | null,
 	status: ChangeStatus,
 	undoable: boolean,
+	/**  Undone and not edited later since, so **Redo** is offered (any time, `change_redo`). */
+	redoable: boolean,
 };
 
+/**
+ *  The change machine: `proposed → applied | rejected`, `applied → undone` (undo) and
+ *  `undone → applied` (redo, which writes new change rows).
+ */
 export type ChangeStatus = "applied" | "proposed" | "rejected" | "undone";
 
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
@@ -899,7 +1022,7 @@ export type ConfidenceLevel = "high" | "medium" | "low";
 
 export type ContextChipAction = "pin" | "unpin" | "drop";
 
-/**  v1.x screen context chips. */
+/**  v1.x screen context chips (`context_chip_set` returns `feature_disabled` in v1). */
 export type ContextChipArgs = {
 	context_item_id: ContextItemId,
 	action: ContextChipAction,
@@ -922,6 +1045,9 @@ export type CopilotOffReason =
 "sensitive_no_local_model" | "flag_off" | "muted" | "no_runtime";
 
 export type CopilotSettings = {
+	/**  Pin and dismiss cards with keys. */
+	card_keys: CardKeySettings,
+	/**  Dismiss with keys (modifiers + ⇧ + 1–3) is on. */
 	dismiss_with_keys: boolean,
 	default_cap_usd: number | null,
 	/**  Call types the copilot is muted for. */
@@ -932,6 +1058,7 @@ export type CopilotSettings = {
 
 /**  Copilot status for the call surfaces (`copilot:status` and inside the card stream). */
 export type CopilotStatus = {
+	version: StateVersion,
 	call_id: CallId | null,
 	flag_on: boolean,
 	single_agent: boolean,
@@ -986,14 +1113,9 @@ export type Cursor = string;
 
 export type DashboardHorizon = "today" | "this_week";
 
-export type DashboardSettings = {
-	horizon: DashboardHorizon,
-	/**  Calendar identifiers hidden from Today. */
-	hidden_calendars: string[],
-};
-
 /**  Event `degraded:changed`: the full current set. */
 export type DegradedSet = {
+	version: StateVersion,
 	states: DegradedState[],
 };
 
@@ -1002,7 +1124,33 @@ export type DegradedSet = {
  *  degraded conditions. Sent as the full current set (`degraded:changed`), so
  *  a missed event can never leave a stale banner.
  */
-export type DegradedState = { type: "second_audio_source"; call_id: CallId; app_name: string; bundle_id: string; since: TimestampMs } | { type: "nothing_heard"; call_id: CallId; since: TimestampMs } | { type: "budget_paused"; call_id: CallId; spent_usd: number | null; cap_usd: number | null } | { type: "switched_to_local"; call_id: CallId | null; reason: RuntimeUnavailableReason; retry_at: TimestampMs | null } | { type: "transcription_stalled"; call_id: CallId; since: TimestampMs } | { type: "system_audio_lost"; call_id: CallId; since: TimestampMs } | { type: "device_changed"; call_id: CallId; device_name: string; gap_ms: DurationMs } | { type: "archive_pending"; call_id: CallId } | { type: "disk_low"; free_mb: number } | { type: "disk_full"; free_mb: number } | { type: "agent_paused"; agent: AgentRef; reason: RuntimeUnavailableReason; fix: RuntimeChoice | null } | { type: "keyword_only_search"; progress: number | null } | { type: "no_assistant" } | { type: "setup_incomplete" } | { type: "copilot_off"; call_id: CallId; reason: CopilotOffReason } | { type: "hotkey_not_registered"; action: HotkeyAction } | { type: "calendar_access_denied" };
+export type DegradedState = 
+/**
+ *  Another app plays into the tap. **Keep** is `capture_keep_source`, **Exclude** is
+ *  `capture_exclude_source`. (Nothing heard is `CaptureNotice::NothingHeard`, not a degraded state.)
+ */
+{ type: "second_audio_source"; call_id: CallId; app_name: string; bundle_id: string; since: TimestampMs } | { type: "budget_paused"; call_id: CallId; spent_usd: number | null; cap_usd: number | null } | { type: "switched_to_local"; call_id: CallId | null; reason: RuntimeUnavailableReason; retry_at: TimestampMs | null } | { type: "transcription_stalled"; call_id: CallId; since: TimestampMs } | 
+/**  Microphone access is off during capture: only system audio is recorded. */
+{ type: "microphone_off"; call_id: CallId } | 
+/**
+ *  System audio is exact digital zeros: access is probably off (it cannot be queried) or
+ *  nothing plays. `confidence` 0..1 that access is off. Capture continues with the mic.
+ */
+{ type: "system_audio_silent"; call_id: CallId; since: TimestampMs; confidence: number | null } | 
+/**
+ *  The engine stopped and could not be restarted: "Not recording · engine stopped" with
+ *  **Try Again**; the NT-3 notification is sent.
+ */
+{ type: "capture_failed"; call_id: CallId; since: TimestampMs } | { type: "device_changed"; call_id: CallId; device_name: string; gap_ms: DurationMs } | { type: "archive_pending"; call_id: CallId } | 
+/**  Under 2 GB free: a warning, never a rejection. */
+{ type: "disk_low"; free_mb: number } | 
+/**
+ *  Under 500 MB free: no new capture; a running capture stops writing audio
+ *  (`CaptureState.audio_writing`) and the transcript continues.
+ */
+{ type: "disk_full"; free_mb: number } | { type: "agent_paused"; agent: AgentRef; reason: RuntimeUnavailableReason; fix: RuntimeChoice | null } | { type: "keyword_only_search"; progress: number | null } | { type: "no_assistant" } | 
+/**  The self-test has not passed: automatic call detection stays off. Manual starts work (O1). */
+{ type: "setup_incomplete" } | { type: "copilot_off"; call_id: CallId; reason: CopilotOffReason } | { type: "hotkey_not_registered"; action: HotkeyAction } | { type: "calendar_access_denied" };
 
 export type DeleteAudioArgs = {
 	call_ids: CallId[],
@@ -1023,6 +1171,7 @@ export type DeleteResult = {
 
 /**  Event `capture:detected`: the record prompt's current detection (`null` = none). */
 export type DetectionChanged = {
+	version: StateVersion,
 	detection: CallDetection | null,
 };
 
@@ -1034,7 +1183,11 @@ export type DismissDetectionArgs = {
 	reason: DismissReason,
 };
 
-export type DismissReason = "not_now" | "not_a_call" | 
+export type DismissReason = 
+/**  **Not Now**. */
+"not_now" | 
+/**  The prompt's close button (×). */
+"closed" | 
 /**  The 15 s elapsed with no answer. */
 "timed_out";
 
@@ -1087,10 +1240,17 @@ export type EntityRef = {
 
 /**  Environment facts the core observes (event `env:changed`). */
 export type EnvironmentState = {
+	version: StateVersion,
 	displays: DisplayInfo[],
 	output_route: OutputRoute,
+	/**
+	 *  The current audio output device, so Settings can offer to mark it as headphones
+	 *  (`AudioOutputSettings.headphones_devices`).
+	 */
+	output_device: OutputDeviceInfo | null,
 	permissions: PermissionRow[],
-	notifications_enabled: boolean,
+	/**  macOS notification authorization, read from `UNUserNotificationCenter` settings. */
+	notifications: NotificationAuth,
 	online: boolean,
 	update: UpdateInfo | null,
 	/**  Free space on the storage volume. */
@@ -1115,27 +1275,35 @@ export type ErrorCode =
 "not_implemented" | 
 /**  Anything unmapped: the UI shows its section-level error with **Try Again**. */
 "internal" | 
-/**  Audio permissions or the self-test are missing: every start control reads **Finish Setup…** (PM-30). */
-"setup_incomplete" | 
-/**  A macOS permission is not granted yet. */
+/**
+ *  A macOS permission is not granted yet. Never raised by `capture_start`:
+ *  capture starts anyway and a degraded state names the silent channel (O1).
+ */
 "permission_missing" | 
 /**  The user denied the permission; the fix is **Open System Settings…**. */
 "permission_denied" | 
-/**  Under 2 GB free: warning, capture still allowed. */
-"disk_low" | 
-/**  Under 500 MB free: capture refuses to start. */
+/**
+ *  Under 500 MB free: capture refuses to start; `ErrorDetail::DiskSpace` says how much is
+ *  free and needed. Low disk (under 2 GB) is never a rejection, only `DegradedState::DiskLow`.
+ */
 "disk_full" | 
 /**  A download had no connection. */
 "offline" | 
 /**  A downloaded model failed its checksum. */
 "checksum_failed" | 
-/**  The speech model is not downloaded yet (self-test, start). */
-"model_not_ready" | 
-/**  Start while a capture already runs. */
+/**  The live speech model is not downloaded yet (`capture_start`, self-test). */
+"model_missing" | 
+/**
+ *  Start while a capture already runs (recording, paused or starting). A start while
+ *  `stopped` is allowed and closes the stopped call's Continue window.
+ */
 "already_recording" | 
 /**  Stop, pause or mark with no capture running for that call. */
 "not_recording" | 
-/**  The call-ended or new-meeting notice the answer refers to is gone. */
+/**
+ *  The notice the answer refers to is gone (call ended, new meeting, nothing heard,
+ *  second source), or the interrupted recording can no longer be resumed.
+ */
 "notice_expired" | 
 /**  Continue Recording after its 5-minute window. */
 "continue_window_closed" | 
@@ -1178,24 +1346,37 @@ export type ErrorCode =
 "automation_denied" | 
 /**  The handoff prompt could not be written. */
 "prompt_not_ready" | 
+/**  The calendar could not be read (EventKit failed or access was revoked). */
+"calendar_unavailable" | 
 /**  Full-text and vector indexes are rebuilding; keyword-only results. */
 "index_rebuilding" | 
 /**  Search failed. */
 "search_failed" | 
 /**  The answer stream was stopped by the user. */
 "answer_stopped" | 
-/**  The undo or redo window has passed. */
+/**  `card_undo_last` after its 30-second window. Change-log undo and redo never expire. */
 "undo_expired" | 
-/**  Some changes of the batch were edited later; `ErrorDetail::Partial`. */
-"partially_applied" | 
+/**  Undo of a change or batch that is already undone. */
+"already_undone" | 
+/**  Redo of a change or batch that is not undone. */
+"not_undone" | 
+/**  The change cannot be undone (a deletion, retention, or an audio delete). */
+"not_undoable" | 
+/**
+ *  Every row of the change or batch was edited later, so nothing was undone or redone.
+ *  When only some rows were, the command succeeds with `UndoResult.skipped_edited_later`.
+ */
+"edited_later" | 
 /**  A proposal could not be applied ("Couldn't apply"). */
 "proposal_not_applicable" | 
 /**  The change log could not be read. */
 "change_log_unreadable" | 
-/**  A job cannot run now (a call is live, or on battery). */
+/**  A job cannot run now: a call is live (every job except post-call analysis), or on battery. */
 "job_blocked" | 
 /**  Evidence tool (`acli`, `bkt`, `gh`) is not installed or not signed in. */
 "evidence_tool_missing" | 
+/**  The issue tracker (Jira, Bitbucket, GitHub) could not be reached for evidence or a link. */
+"tracker_unreachable" | 
 /**  See `ErrorDetail::Runtime`. */
 "runtime_unavailable" | 
 /**  The API key was rejected by the provider. */
@@ -1235,16 +1416,14 @@ export type ErrorDetail =
 { type: "conflict"; current_rev: Rev } | 
 /**  `invalid_input`: which field broke which rule, for the form's inline error. */
 { type: "validation"; field: string; rule: ValidationRule } | 
-/**  `disk_low` / `disk_full`. */
-{ type: "disk_space"; free_mb: number } | 
+/**  `disk_full`: the free space and the space a start needs (500 MB). */
+{ type: "disk_space"; free_mb: number; needed_mb: number } | 
 /**  `permission_missing` / `permission_denied`. */
 { type: "permission"; kind: PermissionKind } | 
 /**  `runtime_unavailable`: which runtime and the one-step fix the UI may offer. */
 { type: "runtime"; runtime: RuntimeChoice; reason: RuntimeUnavailableReason; fix: RuntimeChoice | null } | 
 /**  `hotkey_conflict`: the app that owns the shortcut, when macOS says. */
 { type: "hotkey_owner"; owner: string | null } | 
-/**  `partially_applied`: a batch where some rows were edited later and skipped. */
-{ type: "partial"; applied: number; skipped: number } | 
 /**  `cli_version_unsupported`. */
 { type: "cli_version"; tool: string; found: string; supported: string };
 
@@ -1281,9 +1460,20 @@ export type ExcludeSourceArgs = {
 	bundle_id: string,
 };
 
+export type ExpiryReason = 
+/**  Its display time ran out. */
+"timeout" | 
+/**  The conversation moved to another topic. */
+"topic_changed";
+
 export type ExportCallsArgs = {
 	call_ids: CallId[],
 	include: ExportInclude,
+	/**
+	 *  Export only these sections or items (Export Section…, Export Selection…);
+	 *  `null` exports whole calls.
+	 */
+	scope?: ShareScope | null,
 };
 
 export type ExportInclude = {
@@ -1301,7 +1491,7 @@ export type ExportResult = {
 
 export type ExternalTarget = 
 /**  http(s) only; opened in the default browser. */
-{ type: "url"; url: string } | { type: "document"; document_id: DocumentId; chunk_id: ChunkId | null } | { type: "system_settings"; permission: PermissionKind } | { type: "reveal_in_finder"; path: string };
+{ type: "url"; url: string } | { type: "document"; document_id: DocumentId; chunk_id?: ChunkId | null } | { type: "system_settings"; permission: PermissionKind } | { type: "reveal_in_finder"; path: string };
 
 /**  Everything the fake core serves. */
 export type FakeWorld = {
@@ -1331,6 +1521,7 @@ export type FakeWorld = {
 	glossary: GlossaryList,
 	call_types: CallTypeList,
 	scope_presets: ScopePresetList,
+	ask_threads: AskThread[],
 	audit: AuditEntry[],
 	performance: PerfOverview,
 };
@@ -1363,10 +1554,22 @@ export type FixTermResult = {
 	proposal_queued: boolean,
 };
 
-export type GapReason = "paused" | "device_changed" | "system_audio_lost" | "engine_restarted" | 
+export type GapReason = "paused" | 
+/**  The audio device changed mid-call. */
+"device_changed" | "system_audio_silent" | 
+/**  The engine crashed and the supervisor restarted it in capture-first mode (expected ≤ 2 s). */
+"engine_restart" | 
+/**  No audio buffers arrived for a while although capture was running. */
+"stalled" | 
+/**  Noter quit or crashed during the recording and **Resume Recording** continued the call. */
+"interrupted" | 
 /**  Continue Recording appended to the same call after a stop. */
 "continued";
 
+/**
+ *  A gap in the recording. A dropout (the "99 % of calls without dropouts" metric) is a gap
+ *  with reason `interrupted`, `engine_restart`, `device_changed` or `stalled` longer than 2 s.
+ */
 export type GapView = {
 	call_id: CallId,
 	t0_ms: OffsetMs,
@@ -1382,6 +1585,13 @@ export type GeneralSettings = {
 	summary_language: SummaryLanguage,
 	/**  Read-only mirror of macOS notification permission. */
 	notifications_enabled: boolean,
+	/**  **Launch at login** (registered with `SMAppService`). */
+	launch_at_login: boolean,
+	/**
+	 *  **Offer to record when a call starts**: automatic call detection, which also needs
+	 *  a passed self-test.
+	 */
+	offer_to_record: boolean,
 };
 
 export type GlossaryIdArgs = {
@@ -1409,13 +1619,13 @@ export type GlossaryTerm = {
 export type GlossaryTermId = string;
 
 export type GlossaryUpsertArgs = {
-	id: GlossaryTermId | null,
-	rev: Rev | null,
+	id?: GlossaryTermId | null,
+	rev?: Rev | null,
 	term: string,
 	variants_latin: string[],
 	variants_cyrillic: string[],
 	spoken_forms: string[],
-	lang: Lang | null,
+	lang?: Lang | null,
 	always_apply: boolean,
 };
 
@@ -1436,15 +1646,29 @@ export type HandoffEditArgs = {
 	prompt_md: string,
 };
 
+/**
+ *  `handoff_generate` returns at once with `state: generating`; the finished view arrives
+ *  through `entity:changed` (`handoff`). `handoff_cancel` stops it.
+ */
 export type HandoffGenerateArgs = {
 	item_id: ItemId,
 	/**  Force a new version even if one is cached. */
 	regenerate: boolean,
 };
 
+/**  The answer to the carry-forward "Did the handoff land?". */
+export type HandoffLandedAnswer = 
+/**  **Yes, Landed**: `handed_off → done`. */
+"landed" | 
+/**  **Done Another Way**: `handed_off → done`, noted as done another way. */
+"done_another_way" | 
+/**  **Keep Open** (or Esc): stays handed off; asked again at the next call with the same people. */
+"keep_open";
+
 export type HandoffLandedArgs = {
 	item_id: ItemId,
-	landed: boolean,
+	rev: Rev,
+	answer: HandoffLandedAnswer,
 };
 
 export type HandoffOpenResult = {
@@ -1500,9 +1724,9 @@ export type HistoryExportArgs = {
 export type HistoryListArgs = {
 	target: HistoryTarget,
 	actor: ActorFilter,
-	job_id: JobId | null,
-	from: TimestampMs | null,
-	to: TimestampMs | null,
+	job_id?: JobId | null,
+	from?: TimestampMs | null,
+	to?: TimestampMs | null,
 	page: PageRequest,
 };
 
@@ -1510,7 +1734,11 @@ export type HistoryTarget = { type: "all" } | { type: "call"; call_id: CallId } 
 
 export type HitTarget = { type: "segment"; span: TimeSpan } | { type: "item"; item_id: ItemId } | { type: "summary"; call_id: CallId; summary_id: SummaryId } | { type: "document"; document_id: DocumentId; chunk_id: ChunkId };
 
-export type HotkeyAction = "start_stop" | "pause" | "mark_moment" | "catch_me_up" | "ask_about_call" | "open_call_screen" | "hide_for_presenting" | "pin_card1" | "pin_card2" | "pin_card3" | "dismiss_card1" | "dismiss_card2" | "dismiss_card3" | "undo_card_action";
+export type HotkeyAction = "start_stop" | "pause" | "mark_moment" | "catch_me_up" | "ask_about_call" | "open_call_screen" | "hide_for_presenting" | 
+/**  ⌃⌥⌘K: mute the copilot; while muted the same key unmutes. */
+"mute_copilot" | 
+/**  ⌃⌥⌘Z: undo the last card action (a card key; pin and dismiss keys are `CardKeySettings`). */
+"undo_card_action";
 
 export type HotkeyBinding = {
 	action: HotkeyAction,
@@ -1521,17 +1749,23 @@ export type HotkeyBinding = {
 };
 
 export type HotkeyList = {
+	version: StateVersion,
 	bindings: HotkeyBinding[],
 };
 
 export type HotkeySetArgs = {
 	action: HotkeyAction,
 	/**  `null` clears; the core refuses a shortcut without a modifier. */
-	shortcut: string | null,
+	shortcut?: string | null,
 };
 
-export type HotkeyStatus = { type: "registered" } | 
-/**  Card keys are registered only during capture. */
+export type HotkeyStatus = 
+/**  App hotkeys: registered at launch and kept registered. */
+{ type: "registered" } | 
+/**
+ *  Card keys: registered only while capture runs, the copilot is on, not muted and not
+ *  hidden for presenting.
+ */
 { type: "registered_during_capture" } | { type: "conflict"; owner: string | null } | { type: "reserved_by_system" } | { type: "not_set" };
 
 export type IgnoreAppArgs = {
@@ -1548,9 +1782,9 @@ export type ItemCreateArgs = {
 	call_id: CallId,
 	kind: ItemKind,
 	text: string,
-	owner: PersonRef | null,
-	due: LocalDate | null,
-	span: TimeSpan | null,
+	owner?: PersonRef | null,
+	due?: LocalDate | null,
+	span?: TimeSpan | null,
 };
 
 /**  Item inspector content. */
@@ -1620,9 +1854,21 @@ export type ItemReviewArgs = {
 	decision: ReviewDecision,
 };
 
+/**
+ *  The item machine: `open → done | handed_off | carried | answered_in_call | closed_by_evidence`;
+ *  `handed_off → done` (landed, or evidence) and `handed_off → open` (keep open);
+ *  `carried → open` after the call; reopen returns any closed status to `open`.
+ */
 export type ItemStatus = "open" | "done" | 
-/**  Carried forward to the next call with the same people. */
-"carried" | "handed_off" | "closed_by_evidence";
+/**  Offered in a call with the same people that is running now; back to `open` after it. */
+"carried" | "handed_off" | 
+/**
+ *  Closed by evidence (a linked key moved to Done, a merged PR). Accepted items only;
+ *  a suggested item gets at most a proposal.
+ */
+"closed_by_evidence" | 
+/**  An open question answered in a call; logged, with **Reopen**. */
+"answered_in_call";
 
 export type ItemView = {
 	id: ItemId,
@@ -1674,8 +1920,20 @@ export type JobIdArgs = {
 };
 
 export type JobKind = "app_update" | "model_update" | "integrity_check" | "index_rebuild" | "re_derive" | "reconcile_terms" | "reconcile_people" | "evidence_collection" | "source_sync" | "metrics_roll_up" | "backup" | 
-/**  Post-call pipeline (offline pass, outputs) and regeneration. */
-"post_call" | "model_download" | "cli_install";
+/**
+ *  Post-call analysis of the live transcript (outputs, items). Runs during a later live
+ *  call at low priority, after live ASR (D2).
+ */
+"post_call" | 
+/**  The offline Large v3 pass that replaces the live transcript; waits for the call to end. */
+"archive_pass" | 
+/**  `outputs_regenerate` runs; wait for the call to end. */
+"regeneration" | 
+/**
+ *  Nightly: deletes audio past its retention date (logged, not undoable), live segments
+ *  after 7 days and metrics after 365 days.
+ */
+"retention" | "model_download" | "cli_install";
 
 export type JobList = {
 	jobs: JobRow[],
@@ -1697,7 +1955,7 @@ export type JobRow = {
 	allow_on_battery: boolean,
 	last_run: JobRunRow | null,
 	running: boolean,
-	/**  Jobs never run during a live call. */
+	/**  Waits while a call is live: every job except post-call analysis (D2). */
 	blocked_by_call: boolean,
 };
 
@@ -1721,9 +1979,23 @@ export type JobRunStatus = "queued" | "running" | "paused" | "succeeded" | "fail
 
 export type JobUpdateArgs = {
 	job_id: JobId,
-	enabled: boolean | null,
-	allow_on_battery: boolean | null,
+	enabled?: boolean | null,
+	allow_on_battery?: boolean | null,
 };
+
+/**  `capture_keep_source`: **Keep** on the second-audio-source banner. */
+export type KeepSourceArgs = {
+	call_id: CallId,
+	bundle_id: string,
+};
+
+/**
+ *  What a card key press did (`CardEvent::KeyFeedback`), for the call surface's flash
+ *  and announcement ("No card 3").
+ */
+export type KeyOutcome = "pinned" | "dismissed" | 
+/**  No visible card has that number. */
+"no_card";
 
 export type KeyProvider = "anthropic" | "codex";
 
@@ -1740,8 +2012,20 @@ export type KeyView = {
 	status: KeyStatus,
 };
 
-/**  Content language. Detection is restricted to these three (PRD › Transcription pipeline). */
-export type Lang = "en" | "ru" | "de";
+/**
+ *  Content language. Detection is restricted to English, Russian and German
+ *  (PRD › Transcription pipeline); any other language is `other` with its code.
+ *  On the wire the three are plain strings (`"en"`) and `other` is an object
+ *  (`{"code": "fr"}`).
+ */
+export type Lang = "en" | "ru" | "de" | 
+/**
+ *  A language outside the three, set by hand on a call or a glossary term.
+ *  `code` is the ISO 639-1 code, lower case (`"fr"`).
+ */
+{
+	code: string,
+};
 
 export type LastTimeLine = {
 	call: CallRef,
@@ -1806,7 +2090,7 @@ export type MarkId = string;
 
 export type MarkMomentArgs = {
 	call_id: CallId,
-	note: string | null,
+	note?: string | null,
 };
 
 export type MarkView = {
@@ -1871,8 +2155,15 @@ export type ModelsStatus = {
 	error: ErrorCode | null,
 };
 
+/**  Modifier keys of a key combination. Shift is not offered for card keys: dismiss adds it. */
+export type Modifiers = {
+	control: boolean,
+	option: boolean,
+	command: boolean,
+};
+
 export type MuteArgs = {
-	call_id: CallId | null,
+	call_id?: CallId | null,
 	scope: MuteScope,
 };
 
@@ -1898,10 +2189,10 @@ export type NamedBy = "you" | "voice_profile" | "calendar";
  *  A place in the main window or the Settings window. The core sends it with
  *  `nav:request` (notification click, Open Last Summary, Open in Noter).
  */
-export type NavTarget = { type: "today" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id: AgentId | null } | { type: "performance"; call_id: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step: SetupStep | null };
+export type NavTarget = { type: "today" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step?: SetupStep | null };
 
 export type NavigateArgs = {
-	target: NavTarget | null,
+	target?: NavTarget | null,
 };
 
 export type NewMeetingAnswerArgs = {
@@ -1910,13 +2201,31 @@ export type NewMeetingAnswerArgs = {
 };
 
 export type NewMeetingChoice = 
-/**  The default: stop this call and start a new one with the new event. */
-"start_new_call" | "keep_in_this_call";
+/**
+ *  The default: split at the notice's `detected_at` and continue as a new call with the
+ *  new event; the saved call is offered Continue for 5 minutes.
+ */
+"start_as_new_call" | "keep_in_this_call";
 
 /**  Arguments of a command that needs none. */
 export type NoArgs = Record<string, never>;
 
 export type NoterSurface = "call_window" | "record_prompt" | "main_window" | "settings_window" | "menu_bar_title";
+
+/**  `capture_hold_notice`: the pointer or focus is on the call-ended notice (wanted state). */
+export type NoticeHoldArgs = {
+	call_id: CallId,
+	held: boolean,
+};
+
+/**  macOS notification authorization (`UNAuthorizationStatus`). */
+export type NotificationAuth = 
+/**  Not asked yet; the first notification Noter wants to send asks. */
+"not_determined" | 
+/**  Off in System Settings: "Notifications are off". */
+"denied" | 
+/**  Allowed (including provisional delivery). */
+"authorized";
 
 /**  Milliseconds from the start of a call (session-relative audio time). */
 export type OffsetMs = number;
@@ -1932,6 +2241,15 @@ export type OptionalPerson = { type: "set"; person: PersonRef } | { type: "clear
 
 export type OptionalText = { type: "set"; text: string } | { type: "clear" };
 
+/**  An audio output device as Core Audio reports it. */
+export type OutputDeviceInfo = {
+	/**  Core Audio device UID. */
+	uid: string,
+	name: string,
+	/**  The user marked this device as headphones. */
+	marked_headphones: boolean,
+};
+
 export type OutputEditArgs = {
 	call_id: CallId,
 	summary_id: SummaryId,
@@ -1939,17 +2257,19 @@ export type OutputEditArgs = {
 	body_md: string,
 };
 
-export type OutputMode = "auto" | "headphones" | 
-/**  Speakers with LocalVQE echo cancellation. */
-"speakers_with_echo_cancellation";
-
 export type OutputMutation = {
 	section: OutputSection,
 	change_id: ChangeId,
 };
 
-/**  Audio output route; replay during capture needs headphones. */
-export type OutputRoute = "headphones" | "speakers" | "unknown";
+/**  Audio output route; replay during capture needs headphones (owner decision 17 Oct). */
+export type OutputRoute = 
+/**  Detected headphones, or an unclassified device the user marked as headphones. */
+"headphones" | 
+/**  Detected speakers; replay during capture is always refused. */
+"speakers" | 
+/**  Could not be classified and not marked as headphones. */
+"unknown";
 
 export type OutputSection = {
 	kind: SectionKind,
@@ -2009,7 +2329,7 @@ export type PeopleList = {
 };
 
 export type PeopleListArgs = {
-	query: string | null,
+	query?: string | null,
 };
 
 export type PeopleMergeArgs = {
@@ -2026,7 +2346,7 @@ export type PerfOverview = {
 
 export type PerfOverviewArgs = {
 	period: PerfPeriod,
-	call_type: CallTypeId | null,
+	call_type?: CallTypeId | null,
 };
 
 export type PerfPeriod = "last_call" | "days7" | "days30";
@@ -2068,9 +2388,9 @@ export type PersonChip = {
 
 export type PersonCreateArgs = {
 	display_name: string,
-	email: string | null,
-	role: string | null,
-	org: string | null,
+	email?: string | null,
+	role?: string | null,
+	org?: string | null,
 };
 
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
@@ -2113,7 +2433,7 @@ export type PersonPatch = {
  *  Reference to an existing person, or a person to create on the fly
  *  (the New person form in the person picker).
  */
-export type PersonRef = { type: "existing"; person_id: PersonId } | { type: "new"; display_name: string; email: string | null };
+export type PersonRef = { type: "existing"; person_id: PersonId } | { type: "new"; display_name: string; email?: string | null };
 
 export type PersonRow = {
 	id: PersonId,
@@ -2141,23 +2461,40 @@ export type PlayAudioArgs = {
 	call_id: CallId,
 	from_ms: OffsetMs,
 	/**  `null` plays to the end of the segment that contains `from_ms`. */
-	to_ms: OffsetMs | null,
-	channel: AudioChannel | null,
+	to_ms?: OffsetMs | null,
+	channel?: AudioChannel | null,
 };
 
-/**  Audio plays natively in the core (no media in the WebView); event `playback:state`. */
+/**
+ *  Replay is played natively by the engine at the core's request (D6; no media in the
+ *  WebView). Event `playback:state`.
+ */
 export type PlaybackState = {
+	version: StateVersion,
 	playing: boolean,
 	call_id: CallId | null,
 	position_ms: OffsetMs,
 	to_ms: OffsetMs | null,
 	route: OutputRoute,
+	/**  Why playback last stopped; `null` while playing or before any playback. */
+	stopped_reason: PlaybackStopReason | null,
 };
+
+export type PlaybackStopReason = 
+/**  Reached `to_ms` or the end of the audio. */
+"ended" | 
+/**  `audio_stop`, or another replay replaced it. */
+"user" | 
+/**  During capture the output switched to detected speakers. */
+"output_switched_to_speakers" | 
+/**  A capture started while replay played. */
+"capture_started";
 
 export type Politeness = "polite" | "assertive";
 
 /**  Event `app:presenting`. */
 export type PresentingState = {
+	version: StateVersion,
 	hidden: boolean,
 };
 
@@ -2170,26 +2507,35 @@ export type PrivacyMode = "cloud_allowed" | "cloud_redacted" | "local_only";
 export type PrivacySettings = {
 	mode: PrivacyMode,
 	pseudonymise_names: boolean,
-	/**  Talk-time and "who was silent" (off by default, D47). */
+	/**
+	 *  Talk-time and "who was silent" (off by default, D47). Computed from the moment they are
+	 *  switched on; past calls are not back-computed (D5).
+	 */
 	behaviour_metrics: boolean,
 };
 
 export type PrivacyStatus = {
+	version: StateVersion,
 	mode: PrivacyMode,
 	/**  What applies right now (sensitive call, switched to local, ...). */
 	effective: EffectiveMode,
 };
 
-export type PromptState = { type: "not_generated" } | { type: "generating" } | { type: "ready" } | { type: "failed"; code: ErrorCode };
+export type PromptState = { type: "not_generated" } | 
+/**  Being written; `handoff_cancel` stops it and returns to the previous state. */
+{ type: "generating" } | { type: "ready" } | { type: "failed"; code: ErrorCode };
 
 /**  Sidebar counts (event `proposals:counts`). */
 export type ProposalCounts = {
+	version: StateVersion,
 	waiting: number,
 	needs_attention: number,
 };
 
 export type ProposalDecideArgs = {
 	proposal_id: ChangeId,
+	/**  The proposal's `rev` as shown; `conflict` if its target changed since. */
+	rev: Rev,
 	decision: ProposalDecision,
 };
 
@@ -2207,6 +2553,8 @@ export type ProposalOutcome = {
 /**  A proposal is a change with status `proposed` (PRD › Data model, `changes`). */
 export type ProposalRow = {
 	id: ChangeId,
+	/**  Sent back with `proposal_decide`; a stale `rev` is a `conflict`. */
+	rev: Rev,
 	batch_id: BatchId | null,
 	kind: ProposalKind,
 	title: string,
@@ -2240,21 +2588,22 @@ export type RaiseBudgetArgs = {
 
 export type Rating = "up" | "down";
 
+/**
+ *  `change_redo`: redo an undone change or batch, at any time while its rows were not
+ *  edited later. Writes new change rows.
+ */
 export type RedoArgs = {
-	token: RedoToken,
+	target: UndoTarget,
 };
-
-/**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
-export type RedoToken = string;
 
 export type RegenerateArgs = {
 	call_id: CallId,
 	/**  Summary; decisions, action items and open questions; role reviews. */
 	sections: SectionKind[],
-	runtime: RuntimeChoice | null,
-	model: string | null,
+	runtime?: RuntimeChoice | null,
+	model?: string | null,
 	/**  Skill (call type) to use instead of the call's own. */
-	skill: CallTypeId | null,
+	skill?: CallTypeId | null,
 	/**  Let the local model rewrite a failed section. */
 	local: boolean,
 };
@@ -2289,10 +2638,10 @@ export type RepoMapping = {
 export type RepoMappingId = string;
 
 export type RepoUpsertArgs = {
-	id: RepoMappingId | null,
+	id?: RepoMappingId | null,
 	key: string,
 	/**  `null` = the core shows the open panel. */
-	local_path: string | null,
+	local_path?: string | null,
 	default_tool: HandoffTarget,
 };
 
@@ -2338,7 +2687,7 @@ export type RuntimeSettings = {
 	live_copilot: RuntimeChoice,
 	post_call: RuntimeChoice,
 	search_answers: RuntimeChoice,
-	local_model: string | null,
+	local_model?: string | null,
 };
 
 export type RuntimeUnavailableReason = "no_key" | "key_rejected" | "rate_limited" | "quota_exhausted" | "account_signed_out" | "cli_missing" | "cli_version_unsupported" | "local_model_not_ready" | "offline" | "sensitive_call_needs_local";
@@ -2357,7 +2706,7 @@ export type SearchArgs = {
 	query: string,
 	filter: CallFilter,
 	/**  Per section; default 20. */
-	limit: number | null,
+	limit?: number | null,
 };
 
 export type SearchExplain = {
@@ -2440,8 +2789,14 @@ export type SelfTestEvent = { type: "levels"; mic_db: number | null; sys_db: num
 { type: "line"; channel: AudioChannel; text: string } | { type: "stream_arrived"; channel: AudioChannel } | { type: "passed" } | { type: "failed"; reason: SelfTestFailure } | { type: "ended"; reason: StreamEndReason };
 
 export type SelfTestFailure = { type: "one_stream_silent"; channel: AudioChannel } | 
-/**  System audio permission granted but buffers are zero (missing usage key, PRD). */
-{ type: "zero_buffers" } | { type: "own_sounds_leak" } | { type: "timed_out" } | { type: "permission_missing"; kind: PermissionKind } | { type: "model_not_ready" };
+/**
+ *  System audio buffers are exact digital zeros. The System Audio Recording permission cannot be
+ *  queried, so this is how a denied permission (or a missing usage key) shows; the self-test
+ *  requires non-zero buffers.
+ */
+{ type: "zero_buffers" } | { type: "own_sounds_leak" } | { type: "timed_out" } | { type: "permission_missing"; kind: PermissionKind } | 
+/**  The live speech model is not downloaded. */
+{ type: "model_missing" };
 
 export type SelfTestMsg = {
 	seq: Seq,
@@ -2453,8 +2808,8 @@ export type SelfTestState = { type: "not_run" } | { type: "running" } | { type: 
 export type SensitiveArgs = {
 	call_id: CallId,
 	/**
-	 *  Only `true` is accepted during capture (**Make This Call Sensitive**); `false`
-	 *  is accepted after the call from Call info.
+	 *  Only `true` is accepted during capture (**Make This Call Sensitive**); `false` during
+	 *  capture is refused with `invalid_input`. Both are accepted after the call from Call info.
 	 */
 	sensitive: boolean,
 };
@@ -2466,6 +2821,8 @@ export type SensitiveArgs = {
 export type Seq = number;
 
 export type Settings = {
+	/**  Monotonic per `settings:changed`; the UI keeps the highest. */
+	version: StateVersion,
 	rev: Rev,
 	general: GeneralSettings,
 	audio: AudioSettings,
@@ -2474,7 +2831,7 @@ export type Settings = {
 	copilot: CopilotSettings,
 	call_screen: CallScreenSettings,
 	menu_bar: MenuBarSettings,
-	dashboard: DashboardSettings,
+	today: TodaySettings,
 	performance: PerformanceSettings,
 	maintenance: MaintenanceSettings,
 	evidence: EvidenceSettings,
@@ -2484,24 +2841,31 @@ export type Settings = {
 export type SettingsPane = "general" | "audio_and_transcription" | "models_and_runtimes" | "privacy" | "call_screen_and_menu_bar" | "hotkeys" | "repositories" | "knowledge_sources" | "maintenance" | "performance" | "updates";
 
 /**  One whole section to replace. */
-export type SettingsSection = { section: "general"; value: GeneralSettings } | { section: "audio"; value: AudioSettings } | { section: "privacy"; value: PrivacySettings } | { section: "runtimes"; value: RuntimeSettings } | { section: "copilot"; value: CopilotSettings } | { section: "call_screen"; value: CallScreenSettings } | { section: "menu_bar"; value: MenuBarSettings } | { section: "dashboard"; value: DashboardSettings } | { section: "performance"; value: PerformanceSettings } | { section: "maintenance"; value: MaintenanceSettings } | { section: "evidence"; value: EvidenceSettings } | { section: "updates"; value: UpdateSettings };
+export type SettingsSection = { section: "general"; value: GeneralSettings } | { section: "audio"; value: AudioSettings } | { section: "privacy"; value: PrivacySettings } | { section: "runtimes"; value: RuntimeSettings } | { section: "copilot"; value: CopilotSettings } | { section: "call_screen"; value: CallScreenSettings } | { section: "menu_bar"; value: MenuBarSettings } | { section: "today"; value: TodaySettings } | { section: "performance"; value: PerformanceSettings } | { section: "maintenance"; value: MaintenanceSettings } | { section: "evidence"; value: EvidenceSettings } | { section: "updates"; value: UpdateSettings };
 
 export type SettingsUpdateArgs = {
 	rev: Rev,
 	section: SettingsSection,
 };
 
-/**  `setup_status` and event `setup:changed`. */
+/**
+ *  `setup_status` and event `setup:changed`. Setup state never gates a manual start (O1):
+ *  start controls always read **Record**; **Finish Setup…** is only a Today and menu-bar
+ *  link to the first-run window.
+ */
 export type SetupStatus = {
+	version: StateVersion,
 	complete: boolean,
 	steps: StepRow[],
 	models: ModelsStatus,
 	permissions: PermissionRow[],
 	self_test: SelfTestState,
 	call_display: DisplayId | null,
-	/**  Call detection stays off until the self-test passes. */
+	/**
+	 *  Automatic call detection: on when General › **Offer to record when a call starts** is on
+	 *  and the self-test passed. An unfinished self-test only keeps detection off.
+	 */
 	detection_enabled: boolean,
-	start_control: StartControl,
 };
 
 export type SetupStep = "welcome" | "models" | "permissions" | "call_display" | "audio_storage" | "assistants";
@@ -2514,7 +2878,11 @@ export type ShareCopyArgs = {
 
 export type ShareFormat = "slack" | "jira" | "markdown";
 
-/**  The core puts the text on the clipboard and returns a copy for the scope line. */
+/**
+ *  The core puts the text on the clipboard in rich and plain formats and returns a copy for
+ *  the scope line. (Plain-text copies such as Copy with Citations, Copy Code, Copy Link and
+ *  Copy as Prompt are written by the UI itself.)
+ */
 export type ShareResult = {
 	text: string,
 	sections: number,
@@ -2603,7 +2971,7 @@ export type SignOutArgs = {
 
 export type SourceAddFolderArgs = {
 	/**  `null` = the core shows the open panel (grants a security-scoped bookmark). */
-	path: string | null,
+	path?: string | null,
 	privacy: PrivacyClass,
 	scope: SourceScope,
 };
@@ -2611,7 +2979,7 @@ export type SourceAddFolderArgs = {
 export type SourceAddMcpArgs = {
 	server: string,
 	mode: SourceMode,
-	schedule: string | null,
+	schedule?: string | null,
 	privacy: PrivacyClass,
 	scope: SourceScope,
 };
@@ -2660,10 +3028,10 @@ export type SourceStatus = { type: "idle" } | { type: "indexing"; done: number; 
 export type SourceUpdateArgs = {
 	source_id: SourceId,
 	rev: Rev,
-	name: string | null,
-	schedule: string | null,
-	privacy: PrivacyClass | null,
-	scope: SourceScope | null,
+	name?: string | null,
+	schedule?: string | null,
+	privacy?: PrivacyClass | null,
+	scope?: SourceScope | null,
 };
 
 export type SpanArgs = {
@@ -2683,7 +3051,7 @@ export type SpanPreview = {
 export type SpeakerAssignment = {
 	speaker_id: SpeakerId,
 	/**  `null` = skip this speaker for now. */
-	person: PersonRef | null,
+	person?: PersonRef | null,
 };
 
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
@@ -2723,7 +3091,11 @@ export type SpeakerView = {
 
 /**  Whether the UI may build on a surface as final. */
 export type Stability = 
-/**  Changes only with a contract major version and both teams' sign-off. */
+/**
+ *  The UI may build on it as final. It changes only additively in a minor contract
+ *  version (a new command, event, optional field or enum variant); anything else needs a
+ *  major version that both the core and the UI team sign off.
+ */
 "frozen" | 
 /**  Shape may change in a minor version until the feature's milestone gate (copilot, council, performance, v1.x). */
 "draft";
@@ -2735,14 +3107,23 @@ export type StageTiming = {
 	state: BudgetLevelState,
 };
 
-export type StartBlocked = "disk_full" | "system_audio_off" | "setup_incomplete";
-
-export type StartControl = "record" | 
-/**  While audio access or the self-test is missing (PM-30). */
-"finish_setup";
+/**  The only reasons a start is refused, mirroring the `capture_start` errors. */
+export type StartBlocked = 
+/**  Under 500 MB free (`disk_full`). */
+"disk_full" | 
+/**  The live speech model is not downloaded (`model_missing`). */
+"model_missing";
 
 /**  Where a start came from, for metrics and the change log. */
 export type StartSource = "record_prompt" | "hotkey" | "menu_bar" | "today" | "call_window";
+
+/**
+ *  Version of a whole-state payload (`capture:state`, `degraded:changed`, …).
+ *  Monotonic per payload kind for the life of the core process; the same
+ *  counter stamps the matching command results and `app_snapshot` slices, so
+ *  the UI keeps the payload with the highest version and drops a late older one.
+ */
+export type StateVersion = number;
 
 export type StepArgs = {
 	step: SetupStep,
@@ -2758,7 +3139,17 @@ export type StepState = "todo" | "done" | "skipped";
 
 export type StorageMoveArgs = {
 	/**  `null` = the core shows the open panel. */
-	path: string | null,
+	path?: string | null,
+};
+
+/**
+ *  `stream_ack`: the UI has handled every message of the subscription up to `seq`.
+ *  Sent every 100 messages or after 1 s; at 2 000 unacknowledged messages the core ends
+ *  the subscription with `ended { reason: lagged }`.
+ */
+export type StreamAckArgs = {
+	subscription_id: SubscriptionId,
+	seq: Seq,
 };
 
 export type StreamEndReason = 
@@ -2766,14 +3157,17 @@ export type StreamEndReason =
 "call_stopped" | "discarded" | 
 /**  The UI called `stream_unsubscribe`. */
 "unsubscribed" | 
-/**  The core dropped the subscriber because it fell too far behind; resubscribe. */
+/**
+ *  The core dropped the subscriber at 2 000 unacknowledged messages, or the webview
+ *  reloaded or closed; resubscribe.
+ */
 "lagged" | 
 /**  The core is shutting down. */
 "shutdown";
 
 export type SubscribeLevelsArgs = {
 	/**  `null` for the self-test or the Today self-test sheet (no call yet). */
-	call_id: CallId | null,
+	call_id?: CallId | null,
 };
 
 export type SubscriptionHandle = {
@@ -2830,6 +3224,8 @@ export type TickId = string;
 
 export type TickTiming = {
 	tick_id: TickId,
+	/**  The LLM run of this tick, when one ran. */
+	llm_run_id: LlmRunId | null,
 	at_ms: OffsetMs,
 	trigger: string,
 	stages: StageTiming[],
@@ -2846,7 +3242,7 @@ export type TimeFormat = "h12" | "h24";
 export type TimeSpan = {
 	call_id: CallId,
 	/**  `null` means both channels. */
-	channel: AudioChannel | null,
+	channel?: AudioChannel | null,
 	t0_ms: OffsetMs,
 	t1_ms: OffsetMs,
 };
@@ -2859,8 +3255,25 @@ export type TimestampMs = number;
 
 export type TodayBanner = { type: "self_test_not_passed" } | { type: "recording_interrupted_by_quit"; call: CallRef } | { type: "audio_access_never_granted" };
 
+/**  How Today ranks the items on each call card (D3). */
+export type TodayRanking = 
+/**  The default (PRD order): owed to people on today's calls, then due date, then age. */
+"owed_to_todays_people" | 
+/**  "Due date, then owed to you". */
+"due_then_owed_to_you";
+
+/**  Settings › General › group **Today**. */
+export type TodaySettings = {
+	horizon: DashboardHorizon,
+	/**  Calendar identifiers hidden from Today. */
+	hidden_calendars: string[],
+	ranking: TodayRanking,
+};
+
 export type TodayView = {
 	date: LocalDate,
+	/**  How the items on each call card are ranked (Settings › General › Today › **Ranking**). */
+	ranking: TodayRanking,
 	calendar: CalendarAccess,
 	live_call: CallRow | null,
 	today: UpcomingCall[],
@@ -2944,7 +3357,7 @@ export type TranscriptEvent =
 { type: "confirmed"; segment: SegmentView } | 
 /**  A correction changed confirmed rows (term fix, rename): replace by id. */
 { type: "segments_updated"; segments: SegmentView[] } | 
-/**  Speaker labels changed (rename, offline relabel: "speakers updated"). */
+/**  Speaker labels changed (rename, or the archive pass relabelled them: "Transcript upgraded"). */
 { type: "speakers_updated"; speakers: SpeakerView[]; relabelled_by_archive: boolean } | { type: "gap"; gap: GapView } | { type: "mark"; mark: MarkView } | 
 /**  The stream ended; the snapshot stays valid. */
 { type: "ended"; reason: StreamEndReason };
@@ -2990,7 +3403,7 @@ export type TranscriptionBackend = "whisper_turbo_noter_loop" | "whisper_pro_str
 export type UiLogArgs = {
 	level: UiLogLevel,
 	screen: string,
-	code: ErrorCode | null,
+	code?: ErrorCode | null,
 	message: string,
 };
 
@@ -3009,13 +3422,15 @@ export type UndoArgs = {
 	target: UndoTarget,
 };
 
-/**  "Undone 37 changes · Redo" for ten seconds. */
+/**
+ *  Result of `change_undo` and `change_redo`: "Undone 37 changes · Redo". A partial undo or
+ *  redo is a success: rows edited later are kept and counted in `skipped_edited_later`.
+ */
 export type UndoResult = {
+	/**  Rows undone (`change_undo`) or applied again (`change_redo`). */
 	undone: number,
 	/**  Changes edited later and therefore kept ("Some changes edited later"). */
 	skipped_edited_later: number,
-	redo: RedoToken | null,
-	redo_until: TimestampMs | null,
 };
 
 export type UndoTarget = { type: "change"; change_id: ChangeId } | 
@@ -3048,7 +3463,11 @@ export type UpcomingCall = {
 	/**  The recording made during this event, once there is one. */
 	call_id: CallId | null,
 	last_time: LastTimeLine | null,
-	/**  Items you own first, then items you wait on; ranked by the core. */
+	/**
+	 *  Open accepted items from the last two calls with the same people, plus suggested ones
+	 *  marked "Not reviewed"; ranked by the core per `TodayView.ranking`. The same carry-forward
+	 *  query feeds the copilot's initial context when this call starts.
+	 */
 	items: ItemView[],
 	questions: ItemView[],
 	handed_off: ItemView[],
@@ -3099,10 +3518,18 @@ export type VersionMeta = {
 	created_at: TimestampMs,
 };
 
+/**
+ *  `window_report_view`: which call the main window shows right now, so the core sends
+ *  no notification for it while that window is frontmost (`null` = no call page).
+ */
+export type ViewReportArgs = {
+	call_id?: CallId | null,
+};
+
 export type VoiceProfileArgs = {
 	person_id: PersonId,
 	/**  Seed the profile from a named speaker in a call. */
-	from_speaker: SpeakerId | null,
+	from_speaker?: SpeakerId | null,
 };
 
 export type VoiceProfileView = {
@@ -3128,7 +3555,8 @@ export type WriterInfo = {
 
 // ───────────────────────── contract surface ─────────────────────────
 
-export const CONTRACT_VERSION = "1.0";
+// @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
+export const CONTRACT_VERSION = "2.0";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3136,17 +3564,23 @@ export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "er
 export const COMMANDS = {
   app_snapshot: { group: "app", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
   stream_unsubscribe: { group: "app", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
+  stream_ack: { group: "app", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
   log_ui: { group: "app", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
+  banner_dismiss: { group: "app", stability: "frozen", windows: ["main"], channel: false },
   capture_start: { group: "capture_control", stability: "frozen", windows: ["record-prompt", "call-screen", "main"], channel: false },
   capture_stop: { group: "capture_control", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   capture_set_paused: { group: "capture_control", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   capture_mark_moment: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
   capture_answer_call_end: { group: "capture_control", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
+  capture_hold_notice: { group: "capture_control", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
   capture_continue: { group: "capture_control", stability: "frozen", windows: ["call-screen", "record-prompt", "main"], channel: false },
+  capture_resume_interrupted: { group: "capture_control", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   capture_answer_new_meeting: { group: "capture_control", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
+  capture_keep_recording: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
   capture_discard: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
   capture_set_sensitive: { group: "capture_control", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   capture_exclude_source: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
+  capture_keep_source: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
   capture_dismiss_detection: { group: "capture_control", stability: "frozen", windows: ["record-prompt"], channel: false },
   capture_ignore_app: { group: "capture_control", stability: "frozen", windows: ["record-prompt"], channel: false },
   transcript_subscribe: { group: "transcript", stability: "frozen", windows: ["call-screen", "main"], channel: true },
@@ -3162,6 +3596,7 @@ export const COMMANDS = {
   cards_subscribe: { group: "copilot", stability: "draft", windows: ["call-screen"], channel: true },
   card_pin: { group: "copilot", stability: "draft", windows: ["call-screen"], channel: false },
   card_dismiss: { group: "copilot", stability: "draft", windows: ["call-screen"], channel: false },
+  card_unpin: { group: "copilot", stability: "draft", windows: ["call-screen"], channel: false },
   card_undo_last: { group: "copilot", stability: "draft", windows: ["call-screen"], channel: false },
   card_set_held: { group: "copilot", stability: "draft", windows: ["call-screen"], channel: false },
   card_rate: { group: "copilot", stability: "draft", windows: ["call-screen", "main"], channel: false },
@@ -3178,7 +3613,7 @@ export const COMMANDS = {
   item_review: { group: "items", stability: "frozen", windows: ["main"], channel: false },
   items_review_all: { group: "items", stability: "frozen", windows: ["main"], channel: false },
   item_edit: { group: "items", stability: "frozen", windows: ["main", "call-screen"], channel: false },
-  item_reopen: { group: "items", stability: "frozen", windows: ["main"], channel: false },
+  item_reopen: { group: "items", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   item_create: { group: "items", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   item_answer_handoff_landed: { group: "items", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   today_get: { group: "today", stability: "frozen", windows: ["main"], channel: false },
@@ -3191,6 +3626,7 @@ export const COMMANDS = {
   calls_export: { group: "outputs_and_sharing", stability: "frozen", windows: ["main"], channel: false },
   handoff_get: { group: "handoff", stability: "frozen", windows: ["main"], channel: false },
   handoff_generate: { group: "handoff", stability: "frozen", windows: ["main"], channel: false },
+  handoff_cancel: { group: "handoff", stability: "frozen", windows: ["main"], channel: false },
   handoff_edit: { group: "handoff", stability: "frozen", windows: ["main"], channel: false },
   handoff_set_target: { group: "handoff", stability: "frozen", windows: ["main"], channel: false },
   handoff_open: { group: "handoff", stability: "frozen", windows: ["main"], channel: false },
@@ -3245,6 +3681,7 @@ export const COMMANDS = {
   storage_move: { group: "settings_and_credentials", stability: "draft", windows: ["settings"], channel: false },
   hotkeys_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   hotkey_set: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
+  hotkeys_reset: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   repos_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   repo_upsert: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   repo_remove: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
@@ -3264,8 +3701,8 @@ export const COMMANDS = {
   account_signin_cancel: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_use_existing: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_bind_agents: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
-  account_test: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
-  account_sign_out: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
+  account_test: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "first-run", "main"], channel: false },
+  account_sign_out: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "first-run", "main"], channel: false },
   sources_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   source_add_folder: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   source_add_mcp: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
@@ -3275,6 +3712,7 @@ export const COMMANDS = {
   source_revoke_token: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   jobs_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   job_run_now: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
+  job_cancel: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   job_update: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   perf_overview: { group: "performance", stability: "draft", windows: ["main"], channel: false },
   perf_call: { group: "performance", stability: "draft", windows: ["main"], channel: false },
@@ -3293,6 +3731,7 @@ export const COMMANDS = {
   window_set_collapsed: { group: "windows", stability: "frozen", windows: ["call-screen"], channel: false },
   app_set_hidden_for_presenting: { group: "windows", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   window_navigate: { group: "windows", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
+  window_report_view: { group: "windows", stability: "frozen", windows: ["main"], channel: false },
   window_announce: { group: "windows", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
   open_external: { group: "windows", stability: "frozen", windows: ["main", "call-screen", "settings", "first-run"], channel: false },
 } as const satisfies Record<string, { group: CommandGroup; stability: Stability; windows: readonly WindowLabel[]; channel: boolean }>;
@@ -3302,17 +3741,23 @@ export type CommandName = keyof typeof COMMANDS;
 export interface CommandArgs {
   app_snapshot: NoArgs;
   stream_unsubscribe: UnsubscribeArgs;
+  stream_ack: StreamAckArgs;
   log_ui: UiLogArgs;
+  banner_dismiss: BannerDismissArgs;
   capture_start: CaptureStartArgs;
   capture_stop: CallIdArgs;
   capture_set_paused: CapturePauseArgs;
   capture_mark_moment: MarkMomentArgs;
   capture_answer_call_end: CallEndAnswerArgs;
+  capture_hold_notice: NoticeHoldArgs;
   capture_continue: CallIdArgs;
+  capture_resume_interrupted: CallIdArgs;
   capture_answer_new_meeting: NewMeetingAnswerArgs;
+  capture_keep_recording: CallIdArgs;
   capture_discard: CallIdArgs;
   capture_set_sensitive: SensitiveArgs;
   capture_exclude_source: ExcludeSourceArgs;
+  capture_keep_source: KeepSourceArgs;
   capture_dismiss_detection: DismissDetectionArgs;
   capture_ignore_app: IgnoreAppArgs;
   transcript_subscribe: TranscriptSubscribeArgs;
@@ -3328,6 +3773,7 @@ export interface CommandArgs {
   cards_subscribe: CardsSubscribeArgs;
   card_pin: CardArgs;
   card_dismiss: CardArgs;
+  card_unpin: CardArgs;
   card_undo_last: CallIdArgs;
   card_set_held: CardHeldArgs;
   card_rate: CardRateArgs;
@@ -3357,6 +3803,7 @@ export interface CommandArgs {
   calls_export: ExportCallsArgs;
   handoff_get: ItemIdArgs;
   handoff_generate: HandoffGenerateArgs;
+  handoff_cancel: ItemIdArgs;
   handoff_edit: HandoffEditArgs;
   handoff_set_target: HandoffTargetArgs;
   handoff_open: ItemIdArgs;
@@ -3411,6 +3858,7 @@ export interface CommandArgs {
   storage_move: StorageMoveArgs;
   hotkeys_list: NoArgs;
   hotkey_set: HotkeySetArgs;
+  hotkeys_reset: NoArgs;
   repos_list: NoArgs;
   repo_upsert: RepoUpsertArgs;
   repo_remove: RepoIdArgs;
@@ -3441,6 +3889,7 @@ export interface CommandArgs {
   source_revoke_token: SourceIdArgs;
   jobs_list: NoArgs;
   job_run_now: JobIdArgs;
+  job_cancel: JobIdArgs;
   job_update: JobUpdateArgs;
   perf_overview: PerfOverviewArgs;
   perf_call: CallIdArgs;
@@ -3459,6 +3908,7 @@ export interface CommandArgs {
   window_set_collapsed: CollapseArgs;
   app_set_hidden_for_presenting: HiddenArgs;
   window_navigate: NavigateArgs;
+  window_report_view: ViewReportArgs;
   window_announce: AnnounceArgs;
   open_external: OpenExternalArgs;
 }
@@ -3466,17 +3916,23 @@ export interface CommandArgs {
 export interface CommandResults {
   app_snapshot: AppSnapshot;
   stream_unsubscribe: Ack;
+  stream_ack: Ack;
   log_ui: Ack;
+  banner_dismiss: BannerSet;
   capture_start: CaptureState;
   capture_stop: CaptureState;
   capture_set_paused: CaptureState;
   capture_mark_moment: MarkView;
   capture_answer_call_end: CaptureState;
+  capture_hold_notice: CaptureState;
   capture_continue: CaptureState;
+  capture_resume_interrupted: CaptureState;
   capture_answer_new_meeting: CaptureState;
+  capture_keep_recording: CaptureState;
   capture_discard: CaptureState;
   capture_set_sensitive: CaptureState;
   capture_exclude_source: CaptureState;
+  capture_keep_source: CaptureState;
   capture_dismiss_detection: Ack;
   capture_ignore_app: Ack;
   transcript_subscribe: TranscriptSnapshot;
@@ -3492,6 +3948,7 @@ export interface CommandResults {
   cards_subscribe: CardsSnapshot;
   card_pin: CardMutation;
   card_dismiss: CardMutation;
+  card_unpin: CardMutation;
   card_undo_last: CardMutation;
   card_set_held: Ack;
   card_rate: CardMutation;
@@ -3521,6 +3978,7 @@ export interface CommandResults {
   calls_export: ExportResult;
   handoff_get: HandoffView;
   handoff_generate: HandoffView;
+  handoff_cancel: HandoffView;
   handoff_edit: HandoffView;
   handoff_set_target: HandoffView;
   handoff_open: HandoffOpenResult;
@@ -3575,6 +4033,7 @@ export interface CommandResults {
   storage_move: JobAccepted;
   hotkeys_list: HotkeyList;
   hotkey_set: HotkeyList;
+  hotkeys_reset: HotkeyList;
   repos_list: RepoList;
   repo_upsert: RepoList;
   repo_remove: RepoList;
@@ -3605,6 +4064,7 @@ export interface CommandResults {
   source_revoke_token: SourceRow;
   jobs_list: JobList;
   job_run_now: JobAccepted;
+  job_cancel: JobList;
   job_update: JobList;
   perf_overview: PerfOverview;
   perf_call: CallPerf;
@@ -3623,6 +4083,7 @@ export interface CommandResults {
   window_set_collapsed: CallWindowState;
   app_set_hidden_for_presenting: PresentingState;
   window_navigate: Ack;
+  window_report_view: Ack;
   window_announce: Ack;
   open_external: Ack;
 }
@@ -3720,7 +4181,10 @@ export const EVENTS = {
   "nav:request": { stability: "frozen" },
 } as const satisfies Record<EventName, { stability: Stability }>;
 
-export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "setup_incomplete", "permission_missing", "permission_denied", "disk_low", "disk_full", "offline", "checksum_failed", "model_not_ready", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "partially_applied", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
+export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "permission_missing", "permission_denied", "disk_full", "offline", "checksum_failed", "model_missing", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "calendar_unavailable", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "already_undone", "not_undone", "not_undoable", "edited_later", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "tracker_unreachable", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
+
+/** Codes for which **Try Again** makes sense by default (`ErrorCode::default_retryable`). */
+export const DEFAULT_RETRYABLE: readonly ErrorCode[] = ["not_ready", "internal", "offline", "engine_unavailable", "calendar_unavailable", "search_failed", "change_log_unreadable", "tracker_unreachable", "keychain_locked", "source_sync_failed"];
 
 /**
  * The bridge's only seam (DESIGN › Core bridge). `tauri-transport.ts` implements it
@@ -3736,11 +4200,85 @@ export function isCoreError(e: unknown): e is CoreError {
   return typeof e === "object" && e !== null && "code" in e && "retryable" in e;
 }
 
-function toCoreError(e: unknown): CoreError {
-  if (isCoreError(e)) return e;
-  return { code: "internal", message: e instanceof Error ? e.message : String(e), retryable: true, detail: null };
+/** Whether **Try Again** makes sense for this code by default. */
+export function isDefaultRetryable(code: ErrorCode): boolean {
+  return DEFAULT_RETRYABLE.includes(code);
 }
 
+/**
+ * Every rejection becomes a `CoreError`. Tauri itself rejects with a plain string when the
+ * window's capability does not grant the command ("… not allowed …") and when it cannot
+ * read the command's arguments ("invalid args …"); those map to `window_not_allowed` and
+ * `invalid_input`. Anything else is `internal`.
+ */
+export function toCoreError(e: unknown): CoreError {
+  if (isCoreError(e)) return e;
+  const message = e instanceof Error ? e.message : String(e);
+  if (/not allowed/i.test(message)) return { code: "window_not_allowed", message, retryable: false, detail: null };
+  if (/invalid args|missing field|unknown variant|invalid type/i.test(message)) {
+    return { code: "invalid_input", message, retryable: false, detail: null };
+  }
+  return { code: "internal", message, retryable: true, detail: null };
+}
+
+type StreamMessage = { seq: number; event?: { type?: string } };
+
+/**
+ * Snapshot, then stream, made safe: Channel messages can reach the page before the `invoke`
+ * that returns the snapshot resolves. The gate buffers them until it does, then drops
+ * `seq <= last_seq` and delivers the rest in `seq` order; later duplicates are dropped too.
+ * It also acknowledges the stream (`stream_ack`) every 100 messages or after 1 s.
+ */
+function channelGate(transport: Transport, onMessage: (message: unknown) => void) {
+  let buffer: StreamMessage[] | null = [];
+  let lastSeq = 0;
+  let subscription: string | null = null;
+  let unacked = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
+  const ack = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!subscription || !unacked) return;
+    unacked = 0;
+    transport.invoke("stream_ack", { subscription_id: subscription, seq: lastSeq }).catch(() => undefined);
+  };
+  const deliver = (m: StreamMessage) => {
+    if (closed || m.seq <= lastSeq) return;
+    lastSeq = m.seq;
+    onMessage(m);
+    if (m.event?.type === "ended") {
+      closed = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      return;
+    }
+    unacked++;
+    if (unacked >= 100) ack();
+    else if (!timer) timer = setTimeout(ack, 1000);
+  };
+  return {
+    push(message: unknown) {
+      const m = message as StreamMessage;
+      if (buffer) buffer.push(m);
+      else deliver(m);
+    },
+    open(result: unknown) {
+      const r = (result ?? {}) as { last_seq?: unknown; subscription_id?: unknown };
+      lastSeq = typeof r.last_seq === "number" ? r.last_seq : 0;
+      subscription = typeof r.subscription_id === "string" ? r.subscription_id : null;
+      const pending = buffer ?? [];
+      buffer = null;
+      pending.sort((a, b) => a.seq - b.seq).forEach(deliver);
+    },
+    close() {
+      buffer = null;
+      closed = true;
+    },
+  };
+}
+
+// @cpt-component:cpt-noter-component-app-core-bridge:p1
 /** Typed client. One method per command; every method resolves to a `Result`, never throws. */
 export function createCore(transport: Transport) {
   async function call<K extends CommandName>(
@@ -3748,10 +4286,13 @@ export function createCore(transport: Transport) {
     args: CommandArgs[K],
     onMessage?: (message: never) => void,
   ): Promise<Result<CommandResults[K]>> {
+    const gate = onMessage ? channelGate(transport, onMessage as (m: unknown) => void) : undefined;
     try {
-      const data = await transport.invoke(cmd, args, onMessage as ((m: unknown) => void) | undefined);
+      const data = await transport.invoke(cmd, args, gate?.push);
+      gate?.open(data);
       return { status: "ok", data: data as CommandResults[K] };
     } catch (e) {
+      gate?.close();
       return { status: "error", error: toCoreError(e) };
     }
   }
@@ -3765,11 +4306,22 @@ export function createCore(transport: Transport) {
      */
     streamUnsubscribe: (args: UnsubscribeArgs) => call("stream_unsubscribe", args),
     /**
+     * Acknowledges a Channel up to `seq`, every 100 messages or 1 s (the generated client does it).
+     * At 2 000 unacknowledged messages the core ends the subscription with `lagged`.
+     */
+    streamAck: (args: StreamAckArgs) => call("stream_ack", args),
+    /**
      * UI errors to the local log, never with transcript text.
      */
     logUi: (args: UiLogArgs) => call("log_ui", args),
     /**
-     * Start capture (Record, Record as Sensitive, hotkey, menu, Today).
+     * Dismiss an app banner (for example "Noter quit during a recording").
+     */
+    bannerDismiss: (args: BannerDismissArgs) => call("banner_dismiss", args),
+    /**
+     * Start capture (Record, Record as Sensitive, hotkey, menu, Today). Never gated on setup or
+     * permissions; refused only with `already_recording`, `disk_full` or `model_missing`.
+     * Allowed while `stopped`: closes the stopped call's Continue window.
      */
     captureStart: (args: CaptureStartArgs) => call("capture_start", args),
     /**
@@ -3777,7 +4329,8 @@ export function createCore(transport: Transport) {
      */
     captureStop: (args: CallIdArgs) => call("capture_stop", args),
     /**
-     * Pause or resume (wanted state). Pause drops audio entirely.
+     * Pause or resume (wanted state). Pause drops audio entirely. Resume of a stopped call is
+     * refused with `not_recording` (use `capture_continue`).
      */
     captureSetPaused: (args: CapturePauseArgs) => call("capture_set_paused", args),
     /**
@@ -3789,13 +4342,29 @@ export function createCore(transport: Transport) {
      */
     captureAnswerCallEnd: (args: CallEndAnswerArgs) => call("capture_answer_call_end", args),
     /**
-     * Continue Recording after any stop, within 5 minutes; appends with a gap row.
+     * Hold the call-ended countdown while the pointer or focus is on the notice (wanted state);
+     * on release the 10-second countdown starts again.
+     */
+    captureHoldNotice: (args: NoticeHoldArgs) => call("capture_hold_notice", args),
+    /**
+     * Continue Recording after any stop, within 5 minutes; appends with a gap row. Cancels the
+     * queued or running post-call job and queues it again after the next stop (edits are kept).
      */
     captureContinue: (args: CallIdArgs) => call("capture_continue", args),
+    /**
+     * Resume Recording after Noter quit or crashed mid-call (gap row `interrupted`, allowed while
+     * the `recording_interrupted_by_quit` banner is shown), or **Try Again** after the engine
+     * stopped (phase `failed`; gap row `engine_restart`). Continues the same call.
+     */
+    captureResumeInterrupted: (args: CallIdArgs) => call("capture_resume_interrupted", args),
     /**
      * Answer the new-meeting notice: Start as New Call (default) or Keep in This Call.
      */
     captureAnswerNewMeeting: (args: NewMeetingAnswerArgs) => call("capture_answer_new_meeting", args),
+    /**
+     * Keep Recording on the nothing-heard notice; resets the 5-minute timer.
+     */
+    captureKeepRecording: (args: CallIdArgs) => call("capture_keep_recording", args),
     /**
      * Discard Recording (nothing heard), after the inline confirmation.
      */
@@ -3809,7 +4378,11 @@ export function createCore(transport: Transport) {
      */
     captureExcludeSource: (args: ExcludeSourceArgs) => call("capture_exclude_source", args),
     /**
-     * Not Now / Not a Call / timed out on the record prompt.
+     * Keep a second audio source in the tap; its banner is not shown again for that app in this call.
+     */
+    captureKeepSource: (args: KeepSourceArgs) => call("capture_keep_source", args),
+    /**
+     * Not Now, × or timed out on the record prompt.
      */
     captureDismissDetection: (args: DismissDetectionArgs) => call("capture_dismiss_detection", args),
     /**
@@ -3841,7 +4414,8 @@ export function createCore(transport: Transport) {
      */
     transcriptSpan: (args: SpanArgs) => call("transcript_span", args),
     /**
-     * Play audio natively (no media in the WebView).
+     * Play audio natively: the engine plays it (D6; no media in the WebView). During capture,
+     * headphones only.
      */
     audioPlay: (args: PlayAudioArgs) => call("audio_play", args),
     audioStop: (args: NoArgs) => call("audio_stop", args),
@@ -3860,7 +4434,11 @@ export function createCore(transport: Transport) {
     cardPin: (args: CardArgs) => call("card_pin", args),
     cardDismiss: (args: CardArgs) => call("card_dismiss", args),
     /**
-     * Undo the last card action (⌃⌥⌘Z equivalent from the panel).
+     * Unpin a pinned card; the item the pin created is removed.
+     */
+    cardUnpin: (args: CardArgs) => call("card_unpin", args),
+    /**
+     * Undo the last card action (⌃⌥⌘Z equivalent from the panel), within 30 s; then `undo_expired`.
      */
     cardUndoLast: (args: CallIdArgs) => call("card_undo_last", args),
     /**
@@ -3884,7 +4462,7 @@ export function createCore(transport: Transport) {
     copilotMuteAgent: (args: AgentMuteArgs) => call("copilot_mute_agent", args),
     copilotRaiseBudget: (args: RaiseBudgetArgs) => call("copilot_raise_budget", args),
     /**
-     * v1.x screen context chips.
+     * v1.x screen context chips: returns `feature_disabled` in v1.
      */
     contextChipSet: (args: ContextChipArgs) => call("context_chip_set", args),
     itemsList: (args: ItemsListArgs) => call("items_list", args),
@@ -3902,7 +4480,7 @@ export function createCore(transport: Transport) {
     itemReopen: (args: ItemReopenArgs) => call("item_reopen", args),
     itemCreate: (args: ItemCreateArgs) => call("item_create", args),
     /**
-     * Answer the carry-forward "did the handoff land?".
+     * Answer the carry-forward "Did the handoff land?": Yes, Landed, Done Another Way or Keep Open.
      */
     itemAnswerHandoffLanded: (args: HandoffLandedArgs) => call("item_answer_handoff_landed", args),
     todayGet: (args: NoArgs) => call("today_get", args),
@@ -3915,24 +4493,34 @@ export function createCore(transport: Transport) {
     outputVersions: (args: SummaryIdArgs) => call("output_versions", args),
     outputVersionGet: (args: VersionGetArgs) => call("output_version_get", args),
     /**
-     * Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard).
+     * Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard, rich and plain).
      */
     shareCopy: (args: ShareCopyArgs) => call("share_copy", args),
     /**
-     * Export… a folder of Markdown, SRT, JSON and audio; the core shows the save panel.
+     * Export… a folder of Markdown, SRT, JSON and audio, for whole calls or a section or selection;
+     * the core shows the save panel.
      */
     callsExport: (args: ExportCallsArgs) => call("calls_export", args),
     handoffGet: (args: ItemIdArgs) => call("handoff_get", args),
     /**
-     * Generate on demand (cached); `regenerate` forces a new version.
+     * Generate on demand (cached); `regenerate` forces a new version. Returns at once with state
+     * `generating`; the result arrives through `entity:changed`.
      */
     handoffGenerate: (args: HandoffGenerateArgs) => call("handoff_generate", args),
+    /**
+     * Stop a prompt that is generating.
+     */
+    handoffCancel: (args: ItemIdArgs) => call("handoff_cancel", args),
     handoffEdit: (args: HandoffEditArgs) => call("handoff_edit", args),
     handoffSetTarget: (args: HandoffTargetArgs) => call("handoff_set_target", args),
     /**
-     * Open in Claude Code or Codex through the launch path the drawer showed.
+     * Open in Claude Code or Codex through the launch path the drawer showed. Accepts a suggested
+     * item; records the prompt version and whether it was edited.
      */
     handoffOpen: (args: ItemIdArgs) => call("handoff_open", args),
+    /**
+     * Copy Prompt. Accepts a suggested item; records the prompt version and whether it was edited.
+     */
     handoffCopy: (args: ItemIdArgs) => call("handoff_copy", args),
     callsList: (args: CallsListArgs) => call("calls_list", args),
     callGet: (args: CallIdArgs) => call("call_get", args),
@@ -3966,7 +4554,13 @@ export function createCore(transport: Transport) {
      */
     topicsKeepSeparate: (args: TopicPairArgs) => call("topics_keep_separate", args),
     historyList: (args: HistoryListArgs) => call("history_list", args),
+    /**
+     * Undo a change or a batch. Never expires; rows edited later are kept and counted.
+     */
     changeUndo: (args: UndoArgs) => call("change_undo", args),
+    /**
+     * Redo an undone change or batch, at any time while its rows were not edited later.
+     */
     changeRedo: (args: RedoArgs) => call("change_redo", args),
     proposalsList: (args: ProposalsListArgs) => call("proposals_list", args),
     proposalDecide: (args: ProposalDecideArgs) => call("proposal_decide", args),
@@ -4008,9 +4602,17 @@ export function createCore(transport: Transport) {
      */
     settingsUpdate: (args: SettingsUpdateArgs) => call("settings_update", args),
     settingsUnignoreApp: (args: AppIdArgs) => call("settings_unignore_app", args),
+    /**
+     * Move the storage folder. Draft: available only if the engine ships unsandboxed (open question Q4);
+     * with a sandboxed engine audio and models stay in the App Group container.
+     */
     storageMove: (args: StorageMoveArgs) => call("storage_move", args),
     hotkeysList: (args: NoArgs) => call("hotkeys_list", args),
     hotkeySet: (args: HotkeySetArgs) => call("hotkey_set", args),
+    /**
+     * Restore Defaults: every app hotkey back to its default shortcut.
+     */
+    hotkeysReset: (args: NoArgs) => call("hotkeys_reset", args),
     reposList: (args: NoArgs) => call("repos_list", args),
     /**
      * Add Mapping… from the handoff drawer opens the sheet in the main window.
@@ -4074,9 +4676,13 @@ export function createCore(transport: Transport) {
     sourceRevokeToken: (args: SourceIdArgs) => call("source_revoke_token", args),
     jobsList: (args: NoArgs) => call("jobs_list", args),
     /**
-     * Run now (refused with `job_blocked` while a call is live).
+     * Run now. Refused with `job_blocked` while a call is live, except post-call analysis (D2).
      */
     jobRunNow: (args: JobIdArgs) => call("job_run_now", args),
+    /**
+     * Cancel a queued or running job run.
+     */
+    jobCancel: (args: JobIdArgs) => call("job_cancel", args),
     jobUpdate: (args: JobUpdateArgs) => call("job_update", args),
     perfOverview: (args: PerfOverviewArgs) => call("perf_overview", args),
     perfCall: (args: CallIdArgs) => call("perf_call", args),
@@ -4113,6 +4719,11 @@ export function createCore(transport: Transport) {
      * Show Noter / Open in Noter at a place (main window or Settings window).
      */
     windowNavigate: (args: NavigateArgs) => call("window_navigate", args),
+    /**
+     * The main window reports which call page it shows (`null` = none), so the core sends no
+     * notification for that call while the window is frontmost.
+     */
+    windowReportView: (args: ViewReportArgs) => call("window_report_view", args),
     /**
      * Native announcement for a panel that is not key (D55).
      */

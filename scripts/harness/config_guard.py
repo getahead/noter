@@ -5,7 +5,8 @@ Compares harness/harness.toml, milestones.toml and perf.toml with the base
 branch. Loosening means: a minimum lowered, a maximum raised, fewer wall-clock
 runs, a coverage exclusion added, the milestone order or the current milestone
 changed backwards, a command, story or perf entry moved to a later milestone
-or removed, a frozen IPC command turned back to draft. Any change to the
+or removed, a frozen IPC command turned back to draft, the trace-coverage gate
+removed, its ratchet turned off or its ID kinds narrowed. Any change to the
 harness itself (gate scripts, CI, hooks, justfile, test configs) counts too,
 because those files decide what the gates measure.
 
@@ -88,14 +89,15 @@ def loosened(base: dict[str, dict], head: dict[str, dict]) -> list[str]:
     for gate, values in bh.get("gates", {}).items():
         for key, old in values.items():
             new = hh.get("gates", {}).get(gate, {}).get(key)
-            if not isinstance(old, (int, float)):
-                continue
+            if isinstance(old, bool) or not isinstance(old, (int, float)):
+                continue  # flags and lists are checked per gate below
             if new is None:
                 found.append(f"gates.{gate}.{key} removed")
             elif key in SMALLER_IS_STRICTER and new > old:
                 found.append(f"gates.{gate}.{key} raised {old} → {new}")
             elif any(k in key for k in BIGGER_IS_STRICTER) and key not in SMALLER_IS_STRICTER and new < old:
                 found.append(f"gates.{gate}.{key} lowered {old} → {new}")
+    found += _trace_loosened(bh.get("gates", {}).get("trace"), hh.get("gates", {}).get("trace"))
     old_ex = {e["path"] for e in bh.get("coverage", {}).get("exclude", [])}
     for e in hh.get("coverage", {}).get("exclude", []):
         if e["path"] not in old_ex:
@@ -126,6 +128,21 @@ def loosened(base: dict[str, dict], head: dict[str, dict]) -> list[str]:
             found.append(f"perf registry entry {rid} removed")
         elif idx.get(n["milestone"], 0) > idx.get(r["milestone"], 0):
             found.append(f"perf registry entry {rid} moved later {r['milestone']} → {n['milestone']}")
+    return found
+
+
+def _trace_loosened(old: dict | None, new: dict | None) -> list[str]:
+    """The trace-coverage ratchet: removing it, turning it off or tracing fewer ID kinds."""
+    if old is None:
+        return []
+    if new is None:
+        return ["gates.trace removed (trace-coverage gate)"]
+    found = []
+    if old.get("ratchet", False) and not new.get("ratchet", False):
+        found.append("gates.trace.ratchet turned off")
+    dropped = sorted(set(old.get("kinds", [])) - set(new.get("kinds", [])))
+    if dropped:
+        found.append(f"gates.trace.kinds narrowed: {', '.join(dropped)} no longer traced")
     return found
 
 

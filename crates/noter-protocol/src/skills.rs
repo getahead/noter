@@ -1,3 +1,4 @@
+// @cpt-interface:cpt-noter-interface-skill-outputs:p1
 //! LLM skill output contracts (`cpt-noter-interface-skill-outputs`).
 //!
 //! "The app owns the contracts, not the prompts" (PRD › Product principles › 5).

@@ -80,7 +80,11 @@
       if (id === 'agent' || id === 'budget-over') L.selected = 'ag-architect';
       if (id === 'skill' || id === 'skill-missing') { L.selected = 'ag-architect'; L.view = 'skill'; }
       if (id === 'runtime') L.selected = 'ag-devils';
-      if (id === 'switched-off') L.selected = 'ag-pm';
+      if (id === 'switched-off') {
+        L.selected = 'ag-pm';
+        /* PM-64: announced once in AG-R0, logged in History, undoable */
+        NP.undo(pmAgent.name + ' switched itself off for 1:1 calls', { context: '82 % of its cards in the last 10 1:1 calls were dismissed', where: 'agents', action: 'ag.turnOn', args: { id: 'ag-pm' }, redoMessage: 'Turned on for 1:1 calls', ms: 60000 });
+      }
       if (id === 'live-call') L.selected = 'ag-architect';
       if (id === 'budget-over') { delete L['f-ag-architect']; C.agentEditor(D.agents[0]); L['f-ag-architect'].budget = 37; }
       if (id === 'new-agent' && !L.added.length) NP.actions['ag.add']({ tpl: 'Security reviewer' });
@@ -101,7 +105,7 @@
             <div role="listbox" aria-label="Built-in agents">${built.map((a) => C.agentListRow(a))}</div></div>
           ${added.length ? html`<div class="ag-group"><div class="ag-group__h">Added by you</div><div role="listbox" aria-label="Agents added by you">${added.map((a) => C.agentListRow(a))}</div></div>` : ''}
           ${NP.flashed('ag-status') ? C.inlineStatus(NP.flashed('ag-status'), { variant: 'trailing' }) : ''}
-          ${NP.region('AG-R4', { tag: 'p', cls: 'ag-foot', label: 'About the percentages' }, 'Percentages: cards rated useful or used over the last 20 calls. An agent dismissed in a call type for ten calls switches itself off there.')}
+          ${NP.region('AG-R4', { tag: 'p', cls: 'ag-foot', label: 'About the percentages' }, 'Percentages: cards rated useful or used over the last 20 calls. An agent switches itself off for a call type when 80 % of its cards there were dismissed over the last 10 calls.')}
         `)}
         ${NP.region('AG-R3', { cls: 'ag-pane', label: 'Editor' }, sel ? editorPane(ctx, sel) : councilPane(ctx))}
       </div>`;

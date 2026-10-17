@@ -10,12 +10,12 @@
   const C = NP.C;
 
   /* ---------- 3. Recording indicator ----------
-     variant: dot-text | dot | button | live-row ; status: recording | paused | mic-only | stopped */
+     variant: dot-text | dot | button | live-row ; status: recording | paused | mic-only | no-mic | not-recording | stopped */
   C.recordingIndicator = (o) => {
     o = o || {};
     const st = o.status || (NP.state.rec.status === 'paused' ? 'paused' : 'recording');
-    const word = { recording: 'Recording', paused: 'Paused', 'mic-only': 'Recording · mic only', stopped: 'Stopped' }[st];
-    const dot = st === 'stopped' ? '' : html`<span class="np-recdot${st === 'paused' ? ' is-paused' : ''}" aria-hidden="true">${st === 'mic-only' ? icon('warning', { size: 9 }) : ''}</span>`;
+    const word = { recording: 'Recording', paused: 'Paused', 'mic-only': 'Recording · mic only', 'no-mic': 'Recording · no mic', 'not-recording': 'Not recording', stopped: 'Stopped' }[st];
+    const dot = st === 'stopped' || st === 'not-recording' ? '' : html`<span class="np-recdot${st === 'paused' ? ' is-paused' : ''}" aria-hidden="true">${st === 'mic-only' || st === 'no-mic' ? icon('warning', { size: 9 }) : ''}</span>`;
     const variant = o.variant || 'dot-text';
     if (variant === 'button') {
       return comp('recording-indicator', { variant, state: st, tag: 'button', cls: 'np-btn np-btn--secondary np-btn--regular np-recind np-recind--button', attrs: { type: 'button', 'aria-label': word + ', show the call window', title: 'Show the call window (⌃⌥⌘N)', 'data-proto-action': (o.action && o.action[0]) || 'call.show', 'data-proto-args': o.action && o.action[1] ? JSON.stringify(o.action[1]) : null } }, html`${dot}${NP.clock(true)}`);
@@ -28,7 +28,25 @@
         html`${dot}<span class="np-recind__title">${o.title || D.call(NP.state.rec.callId).title.split(':')[0]}</span><span class="np-recind__sep">·</span>${st === 'paused' ? html`<span>Paused</span>` : NP.clock(true)}`);
     }
     return comp('recording-indicator', { variant, state: st, tag: 'span', cls: 'np-recind np-recind--text' },
-      html`${dot}<span class="np-recind__word${st === 'stopped' ? '' : ' is-rec'}">${word}</span>${o.clock === false || st === 'stopped' ? '' : html` ${NP.clock(false)}`}`);
+      html`${dot}<span class="np-recind__word${st === 'stopped' || st === 'not-recording' ? '' : ' is-rec'}">${word}</span>${o.clock === false || st === 'stopped' || st === 'not-recording' ? '' : html` ${NP.clock(false)}`}`);
+  };
+
+  /* Capture health of the live call (PM-60, PM-67): which channel is silent, or the engine stopped.
+     Returns ok | mic-only (system audio silent) | no-mic (microphone off) | engine-stopped */
+  NP.captureHealth = () => {
+    const L = NP.state.local.cw || {};
+    const setup = NP.state.setup;
+    if (L.engineStopped) return 'engine-stopped';
+    if (L.micOnly || setup.sysGranted === false) return 'mic-only';
+    if (L.noMic || setup.micGranted === false) return 'no-mic';
+    return 'ok';
+  };
+  /* Indicator status for the live call: recording | paused | mic-only | no-mic | not-recording */
+  NP.liveStatus = () => {
+    const h = NP.captureHealth();
+    if (h === 'engine-stopped') return 'not-recording';
+    if (NP.state.rec.status === 'paused') return 'paused';
+    return h === 'ok' ? 'recording' : h;
   };
 
   /* ---------- 4. Mode indicator ----------

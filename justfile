@@ -1,6 +1,6 @@
 # Noter harness — one command for "is it done?" (docs/HARNESS.md, docs/ADR/0003).
 #
-#   just gate-fast   every agent turn (Claude Code Stop hook): lint, contract, architecture, unit tests
+#   just gate-fast   every agent turn (Claude Code Stop hook): lint, contract, architecture, trace coverage, unit tests
 #   just gate        exit criteria of every FEATURE and what CI runs on every PR
 #
 # CI runs the same recipes job by job (.github/workflows/ci.yml).
@@ -49,12 +49,16 @@ arch:
     python3 scripts/harness/arch_check.py
     python3 -m unittest discover -s scripts/harness/tests -q
 
+# Trace coverage: design elements (FULL-traceability artifacts) with an @cpt marker in code; never lower than on the base
+trace:
+    python3 scripts/harness/trace_gate.py --base {{base}}
+
 # Unit tests, Rust and UI
 test-unit:
     cargo test --quiet --workspace --locked
     pnpm --dir apps/desktop test:unit
 
-# Unit tests with coverage, judged by the unit-coverage gate (90% per side and on changed lines)
+# Unit tests with coverage, judged by the unit-coverage gate (80% per side and on changed lines)
 cov-unit:
     rm -rf coverage/unit apps/desktop/coverage/unit && mkdir -p coverage/unit
     cargo llvm-cov clean --workspace
@@ -64,7 +68,7 @@ cov-unit:
     pnpm --dir apps/desktop test:unit:coverage
     python3 scripts/harness/coverage_gate.py --rust coverage/unit/rust.lcov --ui apps/desktop/coverage/unit/lcov.info --base {{base}}
 
-# End-to-end: conformance suite (+ UI flows), then the E2E coverage gate (80% of what is delivered)
+# End-to-end: conformance suite (+ UI flows), then the E2E coverage gate (60% of what is delivered)
 e2e:
     rm -rf coverage/e2e
     pnpm --dir apps/desktop test:conformance
@@ -72,7 +76,7 @@ e2e:
     pnpm --dir apps/desktop test:e2e
     python3 scripts/harness/e2e_coverage.py
 
-# Screenshot tests (99% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker
+# Screenshot tests (98% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker
 visual:
     if [ "${NOTER_IN_PW_CONTAINER:-}" = "1" ]; then pnpm --dir apps/desktop test:visual; \
     elif command -v docker >/dev/null && docker info >/dev/null 2>&1; then just _in-playwright "pnpm --dir apps/desktop test:visual"; \
@@ -87,7 +91,7 @@ _in-playwright cmd:
     docker run --rm --ipc=host -e NOTER_IN_PW_CONTAINER=1 -e CI -v "$PWD":/work -w /work {{playwright_image}} \
       bash -c 'npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile >/dev/null && {{cmd}}'
 
-# Performance: scenario coverage (80%) and head vs base (<= 5% worse). Instruction counts on Linux, wall time (report only) elsewhere
+# Performance: scenario coverage (60%) and head vs base (<= 10% worse). Instruction counts on Linux, wall time (report only) elsewhere
 perf:
     python3 scripts/harness/perf_gate.py coverage
     if command -v valgrind >/dev/null; then python3 scripts/harness/perf_gate.py ab --base {{base}} --mode ir; \
@@ -106,10 +110,10 @@ config-guard:
     python3 scripts/harness/config_guard.py --base {{base}} --lane-check
 
 # Fast gate: what an agent must keep green while it works
-gate-fast: lint contract arch test-unit
+gate-fast: lint contract arch trace test-unit
 
 # Full gate: the exit criteria of every FEATURE and of every pull request
-gate: lint contract arch cov-unit e2e visual perf docs config-guard
+gate: lint contract arch trace cov-unit e2e visual perf docs config-guard
     @echo "All gates passed."
 
 # Alias used by FEATURE definitions of done

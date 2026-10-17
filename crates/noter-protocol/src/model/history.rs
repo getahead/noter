@@ -21,6 +21,8 @@ pub enum Actor {
     },
 }
 
+/// The change machine: `proposed → applied | rejected`, `applied → undone` (undo) and
+/// `undone → applied` (redo, which writes new change rows).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeStatus {
@@ -75,6 +77,8 @@ pub struct ChangeRow {
     pub confidence: Option<ConfidenceLevel>,
     pub status: ChangeStatus,
     pub undoable: bool,
+    /// Undone and not edited later since, so **Redo** is offered (any time, `change_redo`).
+    pub redoable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -99,8 +103,11 @@ pub enum ActorFilter {
 pub struct HistoryListArgs {
     pub target: HistoryTarget,
     pub actor: ActorFilter,
+    #[serde(default)]
     pub job_id: Option<JobId>,
+    #[serde(default)]
     pub from: Option<TimestampMs>,
+    #[serde(default)]
     pub to: Option<TimestampMs>,
     pub page: PageRequest,
 }
@@ -122,19 +129,21 @@ pub struct UndoArgs {
     pub target: UndoTarget,
 }
 
-/// "Undone 37 changes · Redo" for ten seconds.
+/// Result of `change_undo` and `change_redo`: "Undone 37 changes · Redo". A partial undo or
+/// redo is a success: rows edited later are kept and counted in `skipped_edited_later`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct UndoResult {
+    /// Rows undone (`change_undo`) or applied again (`change_redo`).
     pub undone: u32,
     /// Changes edited later and therefore kept ("Some changes edited later").
     pub skipped_edited_later: u32,
-    pub redo: Option<RedoToken>,
-    pub redo_until: Option<TimestampMs>,
 }
 
+/// `change_redo`: redo an undone change or batch, at any time while its rows were not
+/// edited later. Writes new change rows.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RedoArgs {
-    pub token: RedoToken,
+    pub target: UndoTarget,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -152,6 +161,8 @@ pub enum ProposalKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ProposalRow {
     pub id: ChangeId,
+    /// Sent back with `proposal_decide`; a stale `rev` is a `conflict`.
+    pub rev: Rev,
     pub batch_id: Option<BatchId>,
     pub kind: ProposalKind,
     pub title: String,
@@ -182,6 +193,8 @@ pub enum ProposalDecision {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ProposalDecideArgs {
     pub proposal_id: ChangeId,
+    /// The proposal's `rev` as shown; `conflict` if its target changed since.
+    pub rev: Rev,
     pub decision: ProposalDecision,
 }
 
@@ -226,6 +239,7 @@ pub struct HistoryExportArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ActivityArgs {
     /// `null` = today.
+    #[serde(default)]
     pub day: Option<LocalDate>,
     pub actor: ActorFilter,
 }
@@ -249,6 +263,7 @@ pub struct ActivityView {
 /// Sidebar counts (event `proposals:counts`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct ProposalCounts {
+    pub version: StateVersion,
     pub waiting: u32,
     pub needs_attention: u32,
 }

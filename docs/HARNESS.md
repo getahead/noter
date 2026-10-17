@@ -8,34 +8,50 @@ A FEATURE, a task or a pull request is done when `just gate` passes. CI runs the
 
 | Command | When | What it runs |
 | --- | --- | --- |
-| `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, unit tests |
+| `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, trace coverage, unit tests |
 | `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, E2E and E2E coverage, screenshots, performance, `cfs validate`, the gate-config guard |
 | `just setup` | Once per machine | Git hooks, Rust toolchain (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install` |
 
-Individual gates: `just lint`, `just contract`, `just arch`, `just test-unit`, `just cov-unit`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac: Rust via rustup, Node 22 with pnpm, Python 3.11+, `just` (`brew install just python@3.12`). Docker is optional (screenshots outside CI); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
+Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac: Rust via rustup, Node 22 with pnpm, Python 3.11+, `just` (`brew install just python@3.12`). Docker is optional (screenshots outside CI); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
 
 ## The quality bars
 
-All numbers live in `harness/harness.toml`. A pull request that loosens any of them (a lower minimum, a higher maximum, fewer timed runs, a new coverage exclusion, the milestone moved back, work moved to a later milestone, a frozen command turned back to draft) or changes the harness itself (gate scripts, CI, hooks, `justfile`, test configs) fails the config guard unless the owner adds the `harness-change-approved` label. Coverage pragmas (`v8 ignore`, `istanbul ignore`, `coverage(off)`) and skipped, focused or todo tests are rejected by the architecture checks.
+All numbers live in `harness/harness.toml`. On 17 Oct 2026 the owner set them to realistic goals: unit coverage 80% (was 90%), E2E 60% (was 80%), screenshots 98% (was 99%), performance ≤ 10% regression and 60% scenario coverage (was 5% and 80%), and added the trace-coverage ratchet. A pull request that loosens any of them (a lower minimum, a higher maximum, fewer timed runs, a new coverage exclusion, the milestone moved back, work moved to a later milestone, a frozen command turned back to draft) or changes the harness itself (gate scripts, CI, hooks, `justfile`, test configs) fails the config guard unless the owner adds the `harness-change-approved` label. Coverage pragmas (`v8 ignore`, `istanbul ignore`, `coverage(off)`) and skipped, focused or todo tests are rejected by the architecture checks.
 
 | Bar (owner's wording) | How it is measured | Hard gate |
 | --- | --- | --- |
-| Unit tests, 90% coverage | Line coverage of the Rust unit and integration tests (`cargo llvm-cov`) and of the UI unit tests (Vitest, V8), each side ≥ 90%. In addition, the lines a PR adds or changes must be ≥ 90% covered, so a large covered codebase cannot hide an untested change | Every PR |
-| E2E tests, 80% coverage | Of the **frozen** IPC commands and the DESIGN.md stories that milestones up to the current one deliver (`harness/milestones.toml`), ≥ 80% must be exercised end to end **against the real core**. A command counts when an E2E run called it and it succeeded; a story counts when an E2E test whose title names its ID (`cpt-noter-seq-…`) passed | Every PR |
-| Screenshots, 99% match for untouched functionality | Per-pixel comparison with Playwright in the pinned container `mcr.microsoft.com/playwright:v1.63.0-noble` (WebKit, Linux): each screenshot may differ from its baseline in at most 1% of pixels, a pixel counting as different above a 0.02 colour distance. Untouched screens must therefore match; a screen a PR changes on purpose gets new baselines through the `update-screenshots` workflow, and the PR needs `visual-change-approved` | Every PR |
-| Performance, 80% coverage, < 5% degradation | Coverage: ≥ 80% of the entries in `harness/perf.toml` that are due by the current milestone have a scenario. Degradation: every scenario is measured on the base branch and on the PR **in the same job**, in instructions executed (valgrind cachegrind), and may be at most 5% worse | Every PR (instruction counts) |
+| Unit tests, 80% coverage | Line coverage of the Rust unit and integration tests (`cargo llvm-cov`) and of the UI unit tests (Vitest, V8), each side ≥ 80%. In addition, the lines a PR adds or changes must be ≥ 80% covered, so a large covered codebase cannot hide an untested change | Every PR |
+| E2E tests, 60% coverage | Of the **frozen** IPC commands and the DESIGN.md stories that milestones up to the current one deliver (`harness/milestones.toml`), ≥ 60% must be exercised end to end **against the real core**. A command counts when an E2E run called it and it succeeded; a story counts when an E2E test whose title names its ID (`cpt-noter-seq-…`) passed | Every PR |
+| Screenshots, 98% match for untouched functionality | Per-pixel comparison with Playwright in the pinned container `mcr.microsoft.com/playwright:v1.63.0-noble` (WebKit, Linux): each screenshot may differ from its baseline in at most 2% of pixels, a pixel counting as different above a 0.02 colour distance. Untouched screens must therefore match; a screen a PR changes on purpose gets new baselines through the `update-screenshots` workflow, and the PR needs `visual-change-approved` | Every PR |
+| Performance, 60% coverage, ≤ 10% degradation | Coverage: ≥ 60% of the entries in `harness/perf.toml` that are due by the current milestone have a scenario. Degradation: every scenario is measured on the base branch and on the PR **in the same job**, in instructions executed (valgrind cachegrind), and may be at most 10% worse. Wall-clock time is reported only, until a dedicated Apple Silicon runner exists | Every PR (instruction counts) |
+| Trace coverage, never lower (added 17 Oct 2026) | Of the design elements defined in the artifacts with FULL traceability, the share that an `@cpt-*` marker implements in the code; it may not fall below the base branch's. See *Trace coverage* below | Every PR |
 | All tests pass | Every test suite above, plus lints with warnings as errors, the contract export check, architecture checks and `cfs validate` | Every PR |
 
 ### Where the owner's wording had to become something measurable
 
-* **E2E coverage is not counted in source lines.** End-to-end runs through the macOS WebView cannot be instrumented reliably, and line coverage of E2E runs mostly repeats unit coverage. The same 80% therefore applies to delivered behaviour: commands and stories. Runs against the fake core do not count.
+* **E2E coverage is not counted in source lines.** End-to-end runs through the macOS WebView cannot be instrumented reliably, and line coverage of E2E runs mostly repeats unit coverage. The same 60% therefore applies to delivered behaviour: commands and stories. Runs against the fake core do not count.
 * **Screenshots cannot cover native macOS surfaces.** The container renders the WebView content, not the vibrancy behind Liquid Glass materials, native open and save panels, the menu bar, the tray or notifications. Those stay on the macOS checklist below. Baselines are only valid from the pinned container; screenshots from a Mac never match them.
-* **The 5% limit is enforced on instruction counts, not wall time.** On shared CI machines the same code varies by 5–20% in wall time from run to run (measured while building this harness: −19.7% between two runs of identical code). Instruction counts vary by well under 1%, so a 5% gate on them never flakes. Wall time, live-transcript latency and anything that runs on the Neural Engine need real Apple Silicon: `just perf-wall` runs nightly on a dedicated self-hosted Mac (label `noter`, repository variable `NOTER_MAC_RUNNER=true`) and fails above 5% only when the difference is also larger than twice the run-to-run spread. Until that runner exists, wall time is reported, not gated.
+* **The 10% limit is enforced on instruction counts, not wall time.** On shared CI machines the same code varies by 5–20% in wall time from run to run (measured while building this harness: −19.7% between two runs of identical code). Instruction counts vary by well under 1%, so a 10% gate on them never flakes. Wall time, live-transcript latency and anything that runs on the Neural Engine need real Apple Silicon: `just perf-wall` runs nightly on a dedicated self-hosted Mac (label `noter`, repository variable `NOTER_MAC_RUNNER=true`) and fails above 10% only when the difference is also larger than twice the run-to-run spread. Until that runner exists, wall time is reported, not gated.
 * **Before M0 most bars hold trivially.** Nothing is delivered yet, so the E2E and performance coverage gates count 0 of 0; the UI has no product code yet, so UI unit coverage is 0 of 0 lines. The bars start to bite as each milestone moves `harness.toml [milestone].current` forward.
 
 ### What counts toward unit coverage
 
 Everything except the paths listed under `[[coverage.exclude]]` in `harness/harness.toml`, each with its reason: generated code (`bindings.ts`), typed fixtures, the fake core (a test double, checked by the conformance suite), the only file that touches Tauri IPC, the bootstrap entry, objc2 bindings and the thin Tauri host (both covered by the Mac E2E run and the handler-parity test). Adding to this list is loosening the gate.
+
+### Trace coverage
+
+Every Constructor Studio artifact (`docs/DESIGN.md`, `docs/DESIGN-core.md`, the ADRs) is registered with `traceability = "FULL"` in `.cf-studio/config/artifacts.toml`. `cfs validate` (`just docs`) therefore checks every `@cpt-*` marker in the registered code (`crates/**/*.rs`, `apps/desktop/src/**/*.ts(x)`) against the IDs the artifacts define: a marker that names an unknown ID fails. DESIGN and ADR IDs have `to_code = false`, so no marker is required yet; FEATURE IDs (flow, algo, state, dod) will require them.
+
+Code that implements a design element says so on the line before the module, type or function, in the spec's format (`.cf-studio/.core/architecture/specs/traceability.md`, Part II):
+
+```rust
+// @cpt-interface:cpt-noter-interface-core-ipc:p1
+commands! {
+```
+
+The kind slug matches the ID's kind (`component`, `interface`, `seq`, `dbtable`, …); use only IDs that a DESIGN defines (`**ID**:` lines), never invent one. Generated files get their markers from the generator (`bin/export.rs` writes them into `bindings.ts`).
+
+`just trace` (`scripts/harness/trace_gate.py`) measures how many design elements have a marker. Traceable: the IDs of the kinds in `harness.toml [gates.trace].kinds` (component, interface, seq, dbtable, and flow, algo, state, dod for FEATURE artifacts) defined in the FULL artifacts. Covered: a scope marker (`@cpt-{kind}:{id}:p1`) or block marker (`@cpt-begin:{id}:p1:inst-…`) names the ID in the registered code. It reports total, covered and the percentage, and with `ratchet = true` compares with the base branch (read with `git show`, nothing is checked out). It fails when an element that had a marker on the base loses it, or when the coverage of the base's elements is lower than on the base. Elements a PR adds to the design never fail it: design-first work defines them before the code exists. Without the base ref (a fresh clone with no `origin/main`), it only reports. Removing the gate, turning the ratchet off or dropping a kind is loosening for the config guard.
 
 ## Test layers
 
@@ -100,7 +116,7 @@ Codex has no hooks; it gets the same rules from `AGENTS.md`, the pre-commit hook
 
 ## CI on GitHub
 
-`.github/workflows/ci.yml` runs on every pull request to `main`, on every push to `main` and on demand: `lint`, `contract`, `arch` (with the gate-config guard), `unit`, `e2e`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `gate` job fails if any of them failed or was skipped, and it is the only check branch protection needs. `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
+`.github/workflows/ci.yml` runs on every pull request to `main`, on every push to `main` and on demand: `lint`, `contract`, `arch` (with trace coverage and the gate-config guard), `unit`, `e2e`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `gate` job fails if any of them failed or was skipped, and it is the only check branch protection needs. `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
 
 First-time setup, from the owner's Mac:
 
