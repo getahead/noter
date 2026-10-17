@@ -31,7 +31,8 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           { "context": "gate", "integration_id": 15368 },
-          { "context": "hygiene", "integration_id": 15368 }
+          { "context": "hygiene", "integration_id": 15368 },
+          { "context": "review", "integration_id": 15368 }
         ]
       }
     },

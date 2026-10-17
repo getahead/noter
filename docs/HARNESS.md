@@ -123,7 +123,9 @@ Codex has no hooks; it gets the same rules from `AGENTS.md`, the pre-commit hook
 2. Tests come first: write the failing unit, conformance or E2E test for the behaviour, naming the story ID in E2E tests.
 3. Implement until `just gate-fast` is green. In Claude Code the Stop hook enforces it (it blocks finishing up to three times, then lets the agent stop to report the failure).
 4. Run `just gate` before opening the PR. cf-studio's deterministic gate for code is this command plus `cfs validate`.
-5. Review: a different model reviews the PR (`cf-pr-review`; Claude Code writes and Codex reviews, or the other way round). The owner reviews intent, contract changes, migrations, the egress gate and anything that loosens a gate.
+5. Push, open the PR and review it yourself with Constructor Studio: `/cf-sdlc-pr-review <N>` writes `.prs/<N>/review.md` from the PR's diff, the codebase checklist and any reviewer comments. Publish the verdict with `just review-publish <N>`: it refuses a review of an older diff, posts the review as one PR comment marked with the head commit, and on a passing verdict turns on auto-merge.
+6. Loop until the review passes. `REQUEST CHANGES` means at least one Minimum (blocking) finding: fix it, push, review again, publish again. `.github/workflows/review.yml` turns the comment into the commit status `review` (success only for `APPROVE` or `COMMENT` on exactly the PR head), and the `Default ruleset` requires it, so every push needs a new review and nothing merges on a stale or failed one. In Claude Code the Stop hook keeps the agent in this loop while the branch's open PR has no passing review (up to five rounds, then it stops to report); Codex follows the same rule from `AGENTS.md`. Dependabot and release-please PRs have no delivering agent and pass `review` by themselves; gate, hygiene and CodeQL still apply.
+7. GitHub merges (squash) once `gate`, `hygiene`, CodeQL and `review` pass. The owner reviews intent, contract changes, migrations, the egress gate and anything that loosens a gate; a harness change still waits for `harness-change-approved`.
 
 ## CI on GitHub
 

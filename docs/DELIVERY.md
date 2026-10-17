@@ -6,7 +6,7 @@
 
 1. Work happens on a branch (`lane/<lane>/<topic>` for agents) and goes to `main` only through a pull request.
 2. The PR title is a Conventional Commit (`feat(ui): show the speaker split`). It becomes the squash commit on `main` and the changelog line.
-3. Required to merge: `gate` (the harness, `ci.yml`), `hygiene` (`pr.yml`) and CodeQL with no new error-level or high/critical security alert. The branch must be up to date with `main`, and review threads resolved. No approving review is required: the owner and the agents work under one account. Turn on auto-merge and GitHub merges when everything is green.
+3. Required to merge: `gate` (the harness, `ci.yml`), `hygiene` (`pr.yml`), `review` (the delivering agent's Constructor Studio self-review, `review.yml`) and CodeQL with no new error-level or high/critical security alert. The branch must be up to date with `main`, and review threads resolved. No approving GitHub review is required: the owner and the agents work under one account. The agent self-reviews with `/cf-sdlc-pr-review <N>`, fixes and repeats until the verdict passes, and `just review-publish <N>` turns on auto-merge, so GitHub merges when everything is green (HARNESS.md › The agent loop).
 4. Every commit on `main` builds a preview DMG (`preview.yml`) once the app exists.
 5. release-please keeps a Release PR open with the next version and its changelog. Merging it tags `vX.Y.Z`, creates the GitHub release and attaches the signed (or ad-hoc signed) DMG, the updater archive and `latest.json`, the contracts bundle and an SBOM, each with build provenance.
 
@@ -16,7 +16,7 @@ The rulesets are files in `.github/rulesets/`; `scripts/ci/github-setup.sh` appl
 
 | Ruleset | Applies to | Rules |
 | --- | --- | --- |
-| `Default ruleset` | the default branch (`main`) | no deletion, no force push, linear history; changes only through a pull request, squash merge only, conversations resolved; required checks `gate` and `hygiene` on an up-to-date branch; CodeQL: no new error-level alerts and no new high or critical security alerts. No bypass, admins included |
+| `Default ruleset` | the default branch (`main`) | no deletion, no force push, linear history; changes only through a pull request, squash merge only, conversations resolved; required checks `gate`, `hygiene` and `review` on an up-to-date branch; CodeQL: no new error-level alerts and no new high or critical security alerts. No bypass, admins included |
 | `Release tags` | tags `v*` | a release tag cannot be deleted, moved or force-updated |
 
 The same script sets: squash merge only with the PR title and body as the commit; auto-merge, "update branch" and deleting merged branches on; Dependabot alerts and security updates, secret scanning with push protection, private vulnerability reporting; `GITHUB_TOKEN` read-only by default and every action pinned to a full commit SHA (Actions policy); the labels the workflows read. It removes the classic branch protection that `protect-main.sh` used to create, since the ruleset replaces it.
@@ -28,6 +28,7 @@ The same script sets: squash merge only with the PR title and body as the commit
 | `pr.yml` → `hygiene` | every PR, and when its title changes | PR title is a Conventional Commit; dependency review (fails on a new dependency with a high or critical advisory or a GPL/AGPL/SSPL license); `cargo deny check licenses bans sources` (`deny.toml`); workflow lint with actionlint and zizmor |
 | `codeql.yml` | every PR, `main`, weekly | CodeQL for Rust, TypeScript and the workflows themselves (`security-and-quality` queries) |
 | `security.yml` | nightly, and when a lockfile changes on `main` | known advisories against `Cargo.lock` (cargo-deny) and `pnpm-lock.yaml` (`pnpm audit`, high and above). A failure mails the owner and blocks nothing, so a new advisory never turns an unrelated PR red |
+| `review.yml` → `review` | every push to a PR, and every self-review comment | sets the commit status `review` on the PR head from the delivering agent's published `cf-sdlc-pr-review` verdict: success for `APPROVE` or `COMMENT` on exactly that commit, posted by someone with write access; pending until then; Dependabot and release-please PRs pass by themselves. The evaluator runs from `main`, never from the PR |
 | `scorecard.yml` | weekly and on `main` | OpenSSF Scorecard of the repository's practices, published to code scanning |
 
 Every action in every workflow is pinned to a commit SHA with the version in a comment, checkouts do not keep credentials unless the job pushes, and jobs get only the permissions they use. zizmor enforces this on every PR; `.github/zizmor.yml` lists the one rule switched off and why.

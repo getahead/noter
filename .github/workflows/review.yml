@@ -1,0 +1,56 @@
+# Self-review gate (docs/HARNESS.md › The agent loop, docs/DELIVERY.md).
+# The agent that delivers a PR reviews it with Constructor Studio
+# (/cf-sdlc-pr-review) and publishes the verdict as a PR comment
+# (`just review-publish`). This workflow turns that comment into the commit
+# status `review` on the PR head, which the `Default ruleset` requires:
+# success only for APPROVE or COMMENT on exactly the head commit, posted by
+# someone with write access. A new push resets it to pending.
+name: Review
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Safe here: the job runs main's code only and reads the comment as data through the API.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  status:
+    name: Self-review status
+    # issue_comment: only PR comments that carry the self-review marker
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event.issue.pull_request && contains(github.event.comment.body, 'noter-self-review'))
+    runs-on: ubuntu-24.04
+    permissions:
+      statuses: write
+      pull-requests: read
+      issues: read
+    steps:
+      # The evaluator always comes from main, never from the PR under review.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Set the `review` status from the self-review comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ ! -f scripts/harness/review.py ]; then
+            echo "::notice::scripts/harness/review.py is not on main yet (the PR that adds it); nothing to evaluate."
+            exit 0
+          fi
+          python3 scripts/harness/review.py evaluate "$PR" --set-status

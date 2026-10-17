@@ -20,6 +20,8 @@ import coverage_gate  # noqa: E402
 import e2e_coverage  # noqa: E402
 import lane_guard  # noqa: E402
 import perf_gate  # noqa: E402
+import review  # noqa: E402
+import stop_gate  # noqa: E402
 import trace_gate  # noqa: E402
 
 CFG = common.harness_config()
@@ -505,3 +507,94 @@ class DirectoryNamedLikeSourceTests(unittest.TestCase):
 
     def test_story_scan_skips_directories(self):
         self.assertEqual(e2e_coverage.named_stories(self.root, ["apps/desktop/tests"]), {"cpt-noter-seq-demo"})
+
+
+REVIEW_MD = """# Code Review: PR #7
+
+## Verdict: {icon} {verdict}
+
+Rationale.
+
+## Recommendation
+
+1. **Minimum** (blocking) — must fix before merge
+   - Handle the late result in `item_set_done`.
+2. **Recommended** — should fix
+   - Rename `x`.
+"""
+HEAD = "a" * 40
+OLD = "b" * 40
+
+
+def _pr(author="getahead", ref="feat/x"):
+    return {"number": 7, "head": {"sha": HEAD, "ref": ref}, "user": {"login": author}}
+
+
+def _comment(verdict, head=HEAD, assoc="OWNER", at="2026-10-18T10:00:00Z", body_verdict=None):
+    md = REVIEW_MD.format(icon="✅", verdict=(body_verdict or verdict).replace("_", " "))
+    return {"body": review.comment_body(md, head, verdict), "author_association": assoc, "updated_at": at,
+            "html_url": "https://github.com/o/r/pull/7#issuecomment-1"}
+
+
+class SelfReviewTests(unittest.TestCase):
+    def test_parse_verdict(self):
+        self.assertEqual(review.parse_verdict(REVIEW_MD.format(icon="✅", verdict="APPROVE")), "APPROVE")
+        self.assertEqual(review.parse_verdict(REVIEW_MD.format(icon="⚠️", verdict="REQUEST CHANGES")), "REQUEST_CHANGES")
+        self.assertEqual(review.parse_verdict("## Verdict: COMMENT"), "COMMENT")
+        self.assertIsNone(review.parse_verdict("# no verdict here"))
+
+    def test_missing_review_is_pending(self):
+        self.assertEqual(review.evaluate(_pr(), []).state, "pending")
+
+    def test_passing_verdict_on_head(self):
+        for v in ("APPROVE", "COMMENT"):
+            st = review.evaluate(_pr(), [_comment(v)])
+            self.assertEqual(st.state, "success", v)
+            self.assertTrue(st.target_url)
+
+    def test_request_changes_fails(self):
+        self.assertEqual(review.evaluate(_pr(), [_comment("REQUEST_CHANGES")]).state, "failure")
+
+    def test_review_of_an_older_commit_does_not_count(self):
+        self.assertEqual(review.evaluate(_pr(), [_comment("APPROVE", head=OLD)]).state, "pending")
+
+    def test_comment_without_write_access_is_ignored(self):
+        self.assertEqual(review.evaluate(_pr(), [_comment("APPROVE", assoc="NONE")]).state, "pending")
+        self.assertEqual(review.evaluate(_pr(), [_comment("APPROVE", assoc="CONTRIBUTOR")]).state, "pending")
+
+    def test_latest_review_wins(self):
+        older, newer = _comment("APPROVE", at="2026-10-18T10:00:00Z"), _comment("REQUEST_CHANGES", at="2026-10-18T11:00:00Z")
+        self.assertEqual(review.evaluate(_pr(), [newer, older]).state, "failure")
+        older, newer = _comment("REQUEST_CHANGES", at="2026-10-18T10:00:00Z"), _comment("APPROVE", at="2026-10-18T11:00:00Z")
+        self.assertEqual(review.evaluate(_pr(), [older, newer]).state, "success")
+
+    def test_marker_must_match_the_verdict_line(self):
+        st = review.evaluate(_pr(), [_comment("APPROVE", body_verdict="REQUEST_CHANGES")])
+        self.assertEqual(st.state, "failure")
+
+    def test_bot_prs_pass(self):
+        self.assertEqual(review.evaluate(_pr(author="dependabot[bot]"), []).state, "success")
+        self.assertEqual(review.evaluate(_pr(ref="release-please--branches--main"), []).state, "success")
+
+    def test_blocking_findings(self):
+        found = review.blocking_findings(REVIEW_MD.format(icon="⚠️", verdict="REQUEST CHANGES"))
+        self.assertIn("late result", found)
+        self.assertNotIn("Rename", found)
+
+    def test_long_review_is_truncated(self):
+        body = review.comment_body("## Verdict: ✅ APPROVE\n" + "x" * (review.COMMENT_LIMIT + 10), HEAD, "APPROVE")
+        self.assertLess(len(body), review.COMMENT_LIMIT + 1000)
+        self.assertTrue(review.MARKER_RE.search(body))
+
+    def test_stop_hook_loops_on_review_and_gives_up(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(stop_gate, "state_dir", return_value=Path(d)):
+            with mock.patch.object(review, "stop_check", return_value="review it"):
+                codes = [stop_gate.review_loop() for _ in range(stop_gate.MAX_REVIEW_ROUNDS + 1)]
+            self.assertEqual(codes[:-1], [2] * stop_gate.MAX_REVIEW_ROUNDS)
+            self.assertEqual(codes[-1], 0)
+            with mock.patch.object(review, "stop_check", return_value=None):
+                self.assertEqual(stop_gate.review_loop(), 0)
+
+    def test_stop_check_has_no_opinion_offline(self):
+        with mock.patch.object(review, "_run", side_effect=review.Unavailable("offline")):
+            self.assertIsNone(review.stop_check())
