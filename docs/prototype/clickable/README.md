@@ -1,6 +1,6 @@
 # Noter clickable prototype
 
-**Status: the UI prototype of record (PM-59, 17 October 2026).** It matches `docs/DESIGN.md` v0.6 and `docs/PRD.md` as synced on 17 October 2026. DESIGN describes each screen and component in words; this prototype shows how they look and behave. The raw boards in `docs/prototype/` are kept as history only. If you find a difference between this prototype and DESIGN or the PRD, treat it as a bug in whichever is wrong and fix both in the same change.
+**Status: the UI prototype of record (PM-59, 17 October 2026).** It matches `docs/DESIGN.md` v1.0 (accepted 17 October 2026) and `docs/PRD.md` as synced on 17 October 2026. DESIGN describes each screen and component in words; this prototype shows how they look and behave. The raw boards in `docs/prototype/` are kept as history only. If you find a difference between this prototype and DESIGN or the PRD, treat it as a bug in whichever is wrong and fix both in the same change.
 
 - `noter-prototype.html` is the whole prototype in one file, with no build step and no network access. Open it in any browser.
 - `src/` holds the modules it is assembled from. Run `python3 build.py` to rebuild `dist/noter-prototype.html`.

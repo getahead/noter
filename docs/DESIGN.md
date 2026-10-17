@@ -1,8 +1,8 @@
 ---
 title: "Technical Design — Noter UI"
 description: "Layouts, reusable components, user paths and UX decisions for every surface of the Noter macOS app, designed from the PRD."
-status: PROPOSED
-version: "0.6"
+status: ACCEPTED
+version: "1.0"
 date: "2026-10-17"
 prd: docs/PRD.md
 note: "The PRD is not yet a registered kit artifact, so this design traces to PRD sections by name and uses no PRD IDs."

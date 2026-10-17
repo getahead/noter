@@ -2,7 +2,7 @@
 Source of truth for Noter development.
 Living copy (edit, comment, review tab): https://claude.ai/code/artifact/8f34b45a-2903-468f-98d9-5de89e7163cc
 This file is regenerated from the living copy whenever the PRD, the design or the UI prototype changes.
-Last sync: 2026-10-17 (living copy rev 173). Review findings: docs/REVIEW-2026-10-16.md. UI design: docs/DESIGN.md. Diagrams: docs/diagrams/. UI prototype of record: docs/prototype/clickable/ (raw boards of 16 Oct kept as history in docs/prototype/raw-2026-10-16/).
+Last sync: 2026-10-17 (living copy rev 174). Review findings: docs/REVIEW-2026-10-16.md. UI design: docs/DESIGN.md (v1.0, accepted 2026-10-17). Diagrams: docs/diagrams/. UI prototype of record: docs/prototype/clickable/ (raw boards of 16 Oct kept as history in docs/prototype/raw-2026-10-16/).
 -->
 
 # Noter — PRD & Technical Design
@@ -879,6 +879,7 @@ Choices made so far, newest first. Rows marked "Product owner" are the owner's a
 
 | Date | Decision | Decided by | Rationale |
 | --- | --- | --- | --- |
+| 2026-10-17 | The UI design docs/DESIGN.md is accepted as version 1.0, together with this PRD and the clickable prototype as synced on this date | Product owner | Review of DESIGN v0.6; next step is the decomposition into work items |
 | 2026-10-17 | The clickable prototype in docs/prototype/clickable/ is the UI prototype of record; where it differed from DESIGN v0.5, the design and this PRD follow it; the raw boards of 16 Oct are history | Product owner | Request; design, PRD and prototype must not contradict each other; recorded as PM-59 in docs/DESIGN.md |
 | 2026-10-17 | The user's own Claude account and own ChatGPT account are signed in separately through Claude Code and Codex, which keep the sign-in; either can be chosen per agent when both are signed in; this replaces the single personal-use login switch, and API keys stay the default | Product owner | Request: complete sign-ins and smooth binding to agents; supersedes the switch in the 16 Oct authentication row; recorded as PM-58 |
 | 2026-10-17 | The UI follows the macOS 27 design language (Liquid Glass) with Apple's system colours by default; WCAG 2.2 AA contrast is met with macOS Increase Contrast on, and keyboard, VoiceOver, focus, target size and Reduce motion meet AA in both modes | Product owner | Apple's design kit chosen over the darker AA palette; resolves the contrast clause of acceptance criterion AC5; recorded as PM-57 |
