@@ -10,7 +10,25 @@ artifacts = [
   { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "FULL" },
   { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "FULL" },
   { path = "docs/ADR/0003-harness-and-quality-gates.md", kind = "ADR", traceability = "FULL" },
+  { path = "docs/DECOMPOSITION.md", kind = "DECOMPOSITION", traceability = "FULL" },
+  { path = "docs/features/ui/core-bridge.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/tokens-theming.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/primitives.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/accessibility-l10n.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/main-window-shell.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/first-run.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/settings.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/dialogs-host.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/record-prompt.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/call-window.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/live-transcript.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/menu-bar.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/library-calls.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/call-page-frame.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/ui/notifications.md", kind = "FEATURE", traceability = "FULL" },
 ]
+# The UI DECOMPOSITION and its FEATURE specs (docs/features/ui/) are FULL too: their flow,
+# algo, state and dod IDs have to_code = true, so the code that implements them carries markers.
 # Traceability is FULL for every artifact (owner, 17 Oct 2026): `cfs validate` checks
 # that each @cpt-* marker in the code below names an ID these artifacts define.
 # DESIGN and ADR IDs have to_code = false, so markers are not required yet; FEATURE
