@@ -1,0 +1,9 @@
+# Constructor Studio artifacts registry
+
+[[systems]]
+name = "Noter"
+slug = "noter"
+kit = "sdlc"
+artifacts = [{ path = "docs/DESIGN.md", kind = "DESIGN", traceability = "DOCS-ONLY" }]
+codebase = []
+children = []
