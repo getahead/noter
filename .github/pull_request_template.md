@@ -9,6 +9,7 @@
 `just gate` is the definition of done (docs/HARNESS.md). CI runs it as the `gate` check.
 
 - [ ] `just gate` passes locally (or every CI job is green)
+- [ ] Self-reviewed with `/cf-sdlc-pr-review` and published with `just review-publish` (repeat after every push until it passes)
 - [ ] New behaviour has unit tests; changed lines are ≥ 80% covered
 - [ ] Delivered commands and stories have E2E tests (≥ 60% of the milestone)
 - [ ] Screenshot baselines unchanged — or refreshed with `update-screenshots` and every image reviewed (`visual-change-approved`)

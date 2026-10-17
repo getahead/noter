@@ -139,6 +139,11 @@ docs:
 config-guard:
     python3 scripts/harness/config_guard.py --base {{base}} --lane-check
 
+# Publish your Constructor Studio self-review (/cf-sdlc-pr-review N wrote .prs/N/review.md) for this branch's PR.
+# CI turns it into the required `review` status; a passing verdict also turns on auto-merge.
+review-publish pr="":
+    python3 scripts/harness/review.py publish {{pr}}
+
 # Fast gate: what an agent must keep green while it works
 gate-fast: lint contract arch trace test-unit
 

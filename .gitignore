@@ -554,3 +554,6 @@ __pycache__/
 
 # pnpm store, if pnpm ever puts it inside the checkout (e.g. in a container)
 .pnpm-store/
+
+# Constructor Studio PR review data (cf-sdlc-pr-review); the verdict is published as a PR comment
+.prs/
