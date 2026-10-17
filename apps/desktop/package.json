@@ -14,7 +14,7 @@
     "test:visual:update": "playwright test --project=visual --update-snapshots"
   },
   "dependencies": {
-    "@tauri-apps/api": "2.12.1"
+    "@tauri-apps/api": "2.12.3"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
