@@ -187,16 +187,26 @@ def compare(base: dict, head: dict, max_regression: float, report_only: bool = F
 
 
 def make_base_worktree(base_ref: str, root: Path = ROOT) -> Path:
-    merge_base = subprocess.run(["git", "merge-base", base_ref, "HEAD"], cwd=root, capture_output=True, text=True, check=True).stdout.strip()
+    mb = subprocess.run(["git", "merge-base", base_ref, "HEAD"], cwd=root, capture_output=True, text=True)
+    if mb.returncode != 0:
+        raise HarnessError(f"base ref {base_ref!r} not found (fetch it: git fetch origin main)")
+    merge_base = mb.stdout.strip()
     # Outside the repository: cargo looks for Cargo.toml in parent directories, so a
     # base checkout inside this one would silently build the head's workspace.
-    path = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir())) / f"noter-perf-base-{merge_base[:12]}"
-    if path.exists():
-        subprocess.run(["git", "worktree", "remove", "--force", str(path)], cwd=root, capture_output=True)
-        shutil.rmtree(path, ignore_errors=True)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # A fresh directory per run: several worktrees of the same repository (one per
+    # agent) may measure the same base at once and must not remove each other's checkout.
+    parent = Path(os.environ.get("RUNNER_TEMP", tempfile.gettempdir()))
+    parent.mkdir(parents=True, exist_ok=True)
+    path = Path(tempfile.mkdtemp(prefix=f"noter-perf-base-{merge_base[:12]}-", dir=parent))
     subprocess.run(["git", "worktree", "add", "--detach", str(path), merge_base], cwd=root, check=True, capture_output=True)
     return path
+
+
+def remove_base_worktree(path: Path, root: Path = ROOT) -> None:
+    """Unregister and delete the base checkout, so runs leave no worktree behind in the shared repository."""
+    subprocess.run(["git", "worktree", "remove", "--force", str(path)], cwd=root, capture_output=True)
+    shutil.rmtree(path, ignore_errors=True)
+    subprocess.run(["git", "worktree", "prune"], cwd=root, capture_output=True)
 
 
 # ---------------------------------------------------------------- CLI
@@ -248,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
             finally:
                 if env_target:
                     os.environ["CARGO_TARGET_DIR"] = env_target
+                remove_base_worktree(base_dir)
             dump_json(args.out_dir / f"base-{args.mode}.json", base)
             dump_json(args.out_dir / f"head-{args.mode}.json", head)
             errors, report = compare(base, head, float(gates["max_regression_pct"]), args.report_only)

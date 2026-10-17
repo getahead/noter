@@ -1,6 +1,6 @@
 # Noter harness — how agents build Noter without losing reliability
 
-Decision and rationale: [ADR-0003](ADR/0003-harness-and-quality-gates.md). This page is the working guide for the owner and for every agent (Claude Code, Codex) that writes code here.
+Decision and rationale: [ADR-0003](ADR/0003-harness-and-quality-gates.md). This page is the working guide for the owner and for every agent (Claude Code, Codex) that writes code here. Setting up a machine, the daily loop, branches, labels and where tests live: [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Done means `just gate`
 
@@ -10,9 +10,9 @@ A FEATURE, a task or a pull request is done when `just gate` passes. CI runs the
 | --- | --- | --- |
 | `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, trace coverage, unit tests |
 | `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, native UI tests (XCUITest, macOS only; skipped with a notice on Linux), E2E and E2E coverage, screenshots, performance, `cfs validate`, the gate-config guard |
-| `just setup` | Once per machine | Git hooks, Rust toolchain (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install` |
+| `just setup` | Once per machine (idempotent; `just doctor` only checks) | Git hooks, Rust toolchain and components (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install`, Playwright WebKit, the Constructor Studio core; then verifies and prints every version |
 
-Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac: Rust via rustup, Node 22 with pnpm, Python 3.11+, `just` (`brew install just python@3.12`), and Xcode for `just native`. Docker is optional (screenshots outside CI); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
+Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac, with versions: [DEVELOPMENT.md › Prerequisites](DEVELOPMENT.md#prerequisites). In short: Rust via rustup, Node 22+ with pnpm, Python 3.11+, `just`, and Xcode for `just native`. Docker is optional (screenshots outside CI, rendered in the pinned container as linux/amd64); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
 
 ## The quality bars
 
