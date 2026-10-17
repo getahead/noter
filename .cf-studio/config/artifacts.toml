@@ -10,6 +10,20 @@ artifacts = [
   { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "FULL" },
   { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "FULL" },
   { path = "docs/ADR/0003-harness-and-quality-gates.md", kind = "ADR", traceability = "FULL" },
+  # Backend decomposition of DESIGN-core and its FEATURE specs (one entry per file).
+  { path = "docs/DECOMPOSITION-core.md", kind = "DECOMPOSITION", traceability = "FULL" },
+  { path = "docs/features/core/core-contract.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-storage.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-ipc-host.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-harness.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-settings.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-engine-foundation.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-first-run.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-engine-capture.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-capture-session.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-live-transcript.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-native-surfaces.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/core-library-calls.md", kind = "FEATURE", traceability = "FULL" },
 ]
 # Traceability is FULL for every artifact (owner, 17 Oct 2026): `cfs validate` checks
 # that each @cpt-* marker in the code below names an ID these artifacts define.
