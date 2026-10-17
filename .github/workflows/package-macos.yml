@@ -1,6 +1,9 @@
-# Builds the macOS app (Apple Silicon) as a DMG plus the updater archive, with
-# build provenance. Called by preview.yml (artifact on the run) and release.yml
-# (assets on the GitHub release). docs/DELIVERY.md › Packages.
+# Builds the macOS app (Apple Silicon) as a DMG plus the updater archive of the
+# commit that triggered the caller, attaches them to the run as the artifact
+# named by the `artifact` output, and attests their build provenance. Called
+# by preview.yml and release.yml (which uploads the artifact to the release).
+# The build job is read-only; only the attest job can mint an OIDC token.
+# docs/DELIVERY.md › Packages.
 #
 # Signing is automatic: with the APPLE_* secrets the app is signed with the
 # Developer ID and notarized; without them it is ad-hoc signed (runs after
@@ -11,14 +14,14 @@ name: Package macOS
 on:
   workflow_call:
     inputs:
-      ref:
-        description: Commit or tag to build
-        type: string
-        default: ""
       release-tag:
-        description: Upload the packages to the GitHub release with this tag (empty = workflow artifact only)
+        description: The release being built (no caches, latest.json for the updater); empty for previews
         type: string
         default: ""
+    outputs:
+      artifact:
+        description: Name of the workflow artifact with the packages (empty when there is no app yet)
+        value: ${{ jobs.macos.outputs.artifact }}
     secrets:
       APPLE_CERTIFICATE: { required: false }
       APPLE_CERTIFICATE_PASSWORD: { required: false }
@@ -39,18 +42,20 @@ jobs:
     outputs:
       app: ${{ steps.d.outputs.app }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.ref }}
-          persist-credentials: false
+      # Asks the API instead of checking the code out: this job never runs PR code.
       - id: d
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
         run: |
-          if [ -f apps/desktop/src-tauri/tauri.conf.json ]; then
+          if gh api "repos/$GITHUB_REPOSITORY/contents/apps/desktop/src-tauri/tauri.conf.json?ref=$SHA" --silent 2>/dev/null; then
             echo "app=true" >> "$GITHUB_OUTPUT"
           else
             echo "app=false" >> "$GITHUB_OUTPUT"
-            echo "### No app to package yet" >> "$GITHUB_STEP_SUMMARY"
-            echo "apps/desktop/src-tauri/tauri.conf.json does not exist; the macOS package is built once the Tauri host lands (M0)." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "### No app to package yet"
+              echo "apps/desktop/src-tauri/tauri.conf.json does not exist; the macOS package is built once the Tauri host lands (M0)."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
   macos:
@@ -59,13 +64,12 @@ jobs:
     if: needs.detect.outputs.app == 'true'
     runs-on: macos-15
     permissions:
-      contents: write        # upload release assets (release-tag only)
-      id-token: write        # build provenance
-      attestations: write
+      contents: read
+    outputs:
+      artifact: ${{ steps.collect.outputs.name }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
@@ -151,15 +155,7 @@ jobs:
           pathlib.Path("dist/latest.json").write_text(json.dumps(manifest, indent=2) + "\n")
           PY
 
-      - name: Build provenance
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: |
-            dist/*.dmg
-            dist/*.app.tar.gz
-
       - name: Attach to the workflow run
-        if: inputs.release-tag == ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.collect.outputs.name }}
@@ -167,9 +163,21 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Upload to the release
-        if: inputs.release-tag != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.release-tag }}
-        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+  attest:
+    name: Build provenance
+    needs: macos
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.macos.outputs.artifact }}
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.dmg
+            dist/*.app.tar.gz
