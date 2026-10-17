@@ -1,0 +1,10 @@
+# Review routing. No ruleset requires code-owner approval (the owner cannot
+# approve his own PRs); this file asks for review when someone else opens one.
+*                    @getahead
+# The harness and the delivery pipeline: the owner decides (docs/HARNESS.md).
+/harness/            @getahead
+/scripts/            @getahead
+/.github/            @getahead
+/justfile            @getahead
+/deny.toml           @getahead
+/crates/noter-protocol/ @getahead

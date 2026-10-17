@@ -1,0 +1,38 @@
+# Preview builds (docs/DELIVERY.md › Packages): every commit on main, and any PR
+# labelled `build-preview`, produces an installable DMG attached to the run for
+# 14 days. Until the Tauri host exists the job reports "no app yet" and passes.
+name: Preview build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**/*.md", ".cf-studio/**"]
+  pull_request:
+    branches: [main]
+    types: [labeled, synchronize]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'build-preview') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    uses: ./.github/workflows/package-macos.yml
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    secrets:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

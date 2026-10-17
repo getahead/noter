@@ -1,0 +1,183 @@
+# Builds the macOS app (Apple Silicon) as a DMG plus the updater archive of the
+# commit that triggered the caller, attaches them to the run as the artifact
+# named by the `artifact` output, and attests their build provenance. Called
+# by preview.yml and release.yml (which uploads the artifact to the release).
+# The build job is read-only; only the attest job can mint an OIDC token.
+# docs/DELIVERY.md › Packages.
+#
+# Signing is automatic: with the APPLE_* secrets the app is signed with the
+# Developer ID and notarized; without them it is ad-hoc signed (runs after
+# right-click → Open). With TAURI_SIGNING_PRIVATE_KEY the updater archive is
+# signed and latest.json is produced for the in-app updater.
+name: Package macOS
+
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: The release being built (no caches, latest.json for the updater); empty for previews
+        type: string
+        default: ""
+    outputs:
+      artifact:
+        description: Name of the workflow artifact with the packages (empty when there is no app yet)
+        value: ${{ jobs.macos.outputs.artifact }}
+    secrets:
+      APPLE_CERTIFICATE: { required: false }
+      APPLE_CERTIFICATE_PASSWORD: { required: false }
+      APPLE_SIGNING_IDENTITY: { required: false }
+      APPLE_ID: { required: false }
+      APPLE_PASSWORD: { required: false }
+      APPLE_TEAM_ID: { required: false }
+      TAURI_SIGNING_PRIVATE_KEY: { required: false }
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: { required: false }
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detect the app
+    runs-on: ubuntu-24.04
+    outputs:
+      app: ${{ steps.d.outputs.app }}
+    steps:
+      # Asks the API instead of checking the code out: this job never runs PR code.
+      - id: d
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/contents/apps/desktop/src-tauri/tauri.conf.json?ref=$SHA" --silent 2>/dev/null; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### No app to package yet"
+              echo "apps/desktop/src-tauri/tauri.conf.json does not exist; the macOS package is built once the Tauri host lands (M0)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  macos:
+    name: Build, sign and package (Apple Silicon)
+    needs: detect
+    if: needs.detect.outputs.app == 'true'
+    runs-on: macos-15
+    permissions:
+      contents: read
+    outputs:
+      artifact: ${{ steps.collect.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          # No caches for release builds: what ships is built from source only.
+          cache: ${{ inputs.release-tag == '' && 'true' || 'false' }}
+
+      - name: Signing and notarization (only what the secrets provide)
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          # The Tauri bundler reads these from the environment; an empty variable would make it
+          # try (and fail) to sign or notarize, so only the ones that are set are exported.
+          put() { { echo "$1<<__EOF__"; printf '%s\n' "$2"; echo "__EOF__"; } >> "$GITHUB_ENV"; }
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            put APPLE_CERTIFICATE "$APPLE_CERTIFICATE"
+            put APPLE_CERTIFICATE_PASSWORD "$APPLE_CERTIFICATE_PASSWORD"
+            put APPLE_SIGNING_IDENTITY "$APPLE_SIGNING_IDENTITY"
+            echo "- Signed with the Developer ID" >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              put APPLE_ID "$APPLE_ID"; put APPLE_PASSWORD "$APPLE_PASSWORD"; put APPLE_TEAM_ID "$APPLE_TEAM_ID"
+              echo "- Notarized" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            put APPLE_SIGNING_IDENTITY "-"
+            echo "- Ad-hoc signed (no Developer ID secrets): first launch needs right-click → Open" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            put TAURI_SIGNING_PRIVATE_KEY "$TAURI_SIGNING_PRIVATE_KEY"
+            put TAURI_SIGNING_PRIVATE_KEY_PASSWORD "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+            echo "- Updater archive signed" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Build the app bundle and DMG
+        run: pnpm --dir apps/desktop exec tauri build --target aarch64-apple-darwin --bundles app,dmg
+
+      - name: Collect the packages
+        id: collect
+        env:
+          REF: ${{ inputs.release-tag || github.sha }}
+        run: |
+          mkdir -p dist
+          bundle=$(find target apps/desktop/src-tauri/target -type d -path '*aarch64-apple-darwin/release/bundle' 2>/dev/null | head -1)
+          [ -n "$bundle" ] || { echo "::error::No bundle directory found after tauri build"; exit 1; }
+          version=$(node -p 'require("./apps/desktop/package.json").version')
+          tag=${REF#v}; tag=${tag:0:12}
+          cp "$bundle"/dmg/*.dmg "dist/Noter_${version}_aarch64.dmg"
+          if ls "$bundle"/macos/*.app.tar.gz >/dev/null 2>&1; then
+            cp "$bundle"/macos/*.app.tar.gz "dist/Noter_${version}_aarch64.app.tar.gz"
+            if ls "$bundle"/macos/*.app.tar.gz.sig >/dev/null 2>&1; then
+              cp "$bundle"/macos/*.app.tar.gz.sig "dist/Noter_${version}_aarch64.app.tar.gz.sig"
+            fi
+          fi
+          (cd dist && shasum -a 256 ./* > SHA256SUMS.txt)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "name=noter-macos-${version}-${tag}" >> "$GITHUB_OUTPUT"
+          ls -l dist
+
+      - name: Updater manifest (latest.json)
+        if: inputs.release-tag != '' && hashFiles('dist/*.sig') != ''
+        env:
+          TAG: ${{ inputs.release-tag }}
+          VERSION: ${{ steps.collect.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import datetime, json, os, pathlib
+          v, tag, repo = os.environ["VERSION"], os.environ["TAG"], os.environ["REPO"]
+          name = f"Noter_{v}_aarch64.app.tar.gz"
+          sig = pathlib.Path("dist", name + ".sig").read_text().strip()
+          manifest = {
+              "version": v,
+              "notes": f"https://github.com/{repo}/releases/tag/{tag}",
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": {"darwin-aarch64": {"signature": sig, "url": f"https://github.com/{repo}/releases/download/{tag}/{name}"}},
+          }
+          pathlib.Path("dist/latest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+
+      - name: Attach to the workflow run
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.collect.outputs.name }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+
+  attest:
+    name: Build provenance
+    needs: macos
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.macos.outputs.artifact }}
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.dmg
+            dist/*.app.tar.gz

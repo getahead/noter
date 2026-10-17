@@ -1,0 +1,7 @@
+# zizmor (pr.yml › Workflow lint). Findings are fixed, not silenced; the only
+# rule switched off is one whose fix would make the workflows harder to read.
+rules:
+  self-repository:
+    # Suggests the `$/…` spelling for local actions; `./.github/actions/setup` is clear and
+    # supported everywhere (actionlint, act, the runner).
+    disable: true

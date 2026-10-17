@@ -1,0 +1,30 @@
+name: Bug
+description: Something in Noter does not work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Start a call in …\n2. …"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Noter version and macOS version
+      placeholder: "Noter 0.3.1, macOS 26.1, MacBook Pro M5"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "Help → Copy diagnostics. Logs never contain transcript text."
+      render: text

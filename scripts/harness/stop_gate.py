@@ -5,8 +5,15 @@ When the work differs from what last passed (uncommitted changes, or commits
 not on origin/main), runs `just gate-fast`. On failure it exits 2,
 which keeps the agent working and hands it the failing output. After three
 blocked attempts in a row it lets the agent stop, so it can report the failure
-to the owner instead of looping. Codex has no hook: AGENTS.md tells it to run
-the same command, and CI enforces the full gate either way.
+to the owner instead of looping.
+
+Once the fast gate is green, the self-review loop (review.py): while the
+branch has an open PR without a passing self-review of its head, the agent
+keeps working (push, /cf-sdlc-pr-review, fix, `just review-publish`). After
+MAX_REVIEW_ROUNDS blocked attempts it may stop to report to the owner.
+
+Codex has no hook: AGENTS.md tells it to do the same, and CI enforces the full
+gate and the `review` status either way.
 """
 
 from __future__ import annotations
@@ -19,8 +26,10 @@ import sys
 from pathlib import Path
 
 from common import ROOT
+import review
 
 MAX_BLOCKS = 3
+MAX_REVIEW_ROUNDS = 5
 TIMEOUT_S = 900
 IGNORED_PREFIXES = (".plans/", "docs/", ".claude/", ".idea/")
 
@@ -55,8 +64,8 @@ def fingerprint() -> str:
     return h.hexdigest()
 
 
-def attempts(delta: int | None) -> int:
-    f = state_dir() / "stop-attempts"
+def attempts(delta: int | None, name: str = "stop-attempts") -> int:
+    f = state_dir() / name
     n = int(f.read_text() or 0) if f.exists() else 0
     n = 0 if delta is None else n + delta
     f.write_text(str(n))
@@ -72,7 +81,7 @@ def main() -> int:
     fp = fingerprint()
     if not changed_paths() or (green.exists() and green.read_text() == fp):
         attempts(None)
-        return 0
+        return review_loop()
     if not shutil.which("just"):
         print("The fast gate needs `just` (brew install just). Run `just setup`.", file=sys.stderr)
         return 2
@@ -84,7 +93,7 @@ def main() -> int:
     if proc.returncode == 0:
         attempts(None)
         green.write_text(fp)
-        return 0
+        return review_loop()
     n = attempts(1)
     tail = (proc.stdout + proc.stderr)[-6000:]
     if n > MAX_BLOCKS:
@@ -96,6 +105,22 @@ def main() -> int:
         "(do not weaken tests or thresholds), then finish.\n\n" + tail,
         file=sys.stderr,
     )
+    return 2
+
+
+def review_loop() -> int:
+    """Block while the branch's open PR has no passing self-review of its head."""
+    message = review.stop_check()
+    if message is None:
+        attempts(None, "review-attempts")
+        return 0
+    n = attempts(1, "review-attempts")
+    if n > MAX_REVIEW_ROUNDS:
+        attempts(None, "review-attempts")
+        print(f"Self-review still not passing after {MAX_REVIEW_ROUNDS} rounds; stopping so you can report it to the owner.",
+              file=sys.stderr)
+        return 0
+    print(message, file=sys.stderr)
     return 2
 
 

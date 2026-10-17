@@ -1,0 +1,106 @@
+# Pull request hygiene (docs/DELIVERY.md). Separate from the harness gate in
+# ci.yml: these checks are about the change as a delivery unit, not about the
+# product's quality bars. The `Default ruleset` requires the `hygiene` job.
+name: PR hygiene
+
+on:
+  pull_request:
+    branches: [main]
+    # edited: the title is checked again when it changes
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: PR title (Conventional Commits)
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    steps:
+      # The squash commit takes the PR title, and release-please reads those commits
+      # to choose the next version and write the changelog.
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: >-
+            Start the subject in lower case, for example "feat(ui): add the call list".
+
+  dependencies:
+    name: Dependency review
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Fails only on what this PR adds, so a new advisory against an old dependency
+      # never turns an unrelated PR red (that is the nightly security job's business).
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development
+          deny-licenses: AGPL-1.0-only, AGPL-1.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later, SSPL-1.0
+
+  rust-deps:
+    name: Rust licenses, bans and sources (cargo-deny)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          # Advisories change daily; they are checked nightly (security.yml) and by Dependabot.
+          command: check
+          command-arguments: licenses bans sources
+
+  workflows:
+    name: Workflow lint (actionlint, zizmor)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: zizmor@1.31.0
+      - name: actionlint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+      - run: zizmor --offline --min-severity low --format github .github
+
+  hygiene:
+    name: hygiene
+    if: always()
+    needs: [title, dependencies, rust-deps, workflows]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every hygiene check passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | python3 -c '
+          import json, sys
+          bad = {k: v["result"] for k, v in json.load(sys.stdin).items() if v["result"] != "success"}
+          for k, r in bad.items(): print(f"::error::{k}: {r}")
+          sys.exit(1 if bad else 0)'

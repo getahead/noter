@@ -1,6 +1,6 @@
 # Noter harness — how agents build Noter without losing reliability
 
-Decision and rationale: [ADR-0003](ADR/0003-harness-and-quality-gates.md). This page is the working guide for the owner and for every agent (Claude Code, Codex) that writes code here.
+Decision and rationale: [ADR-0003](ADR/0003-harness-and-quality-gates.md). This page is the working guide for the owner and for every agent (Claude Code, Codex) that writes code here. Setting up a machine, the daily loop, branches, labels and where tests live: [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Done means `just gate`
 
@@ -10,9 +10,9 @@ A FEATURE, a task or a pull request is done when `just gate` passes. CI runs the
 | --- | --- | --- |
 | `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, trace coverage, unit tests |
 | `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, native UI tests (XCUITest, macOS only; skipped with a notice on Linux), E2E and E2E coverage, screenshots, performance, `cfs validate`, the gate-config guard |
-| `just setup` | Once per machine | Git hooks, Rust toolchain (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install` |
+| `just setup` | Once per machine (idempotent; `just doctor` only checks) | Git hooks, Rust toolchain and components (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install`, Playwright WebKit, the Constructor Studio core; then verifies and prints every version |
 
-Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac: Rust via rustup, Node 22 with pnpm, Python 3.11+, `just` (`brew install just python@3.12`), and Xcode for `just native`. Docker is optional (screenshots outside CI); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
+Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac, with versions: [DEVELOPMENT.md › Prerequisites](DEVELOPMENT.md#prerequisites). In short: Rust via rustup, Node 22+ with pnpm, Python 3.11+, `just`, and Xcode for `just native`. Docker is optional (screenshots outside CI, rendered in the pinned container as linux/amd64); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
 
 ## The quality bars
 
@@ -123,16 +123,18 @@ Codex has no hooks; it gets the same rules from `AGENTS.md`, the pre-commit hook
 2. Tests come first: write the failing unit, conformance or E2E test for the behaviour, naming the story ID in E2E tests.
 3. Implement until `just gate-fast` is green. In Claude Code the Stop hook enforces it (it blocks finishing up to three times, then lets the agent stop to report the failure).
 4. Run `just gate` before opening the PR. cf-studio's deterministic gate for code is this command plus `cfs validate`.
-5. Review: a different model reviews the PR (`cf-pr-review`; Claude Code writes and Codex reviews, or the other way round). The owner reviews intent, contract changes, migrations, the egress gate and anything that loosens a gate.
+5. Push, open the PR and review it yourself with Constructor Studio: `/cf-sdlc-pr-review <N>` writes `.prs/<N>/review.md` from the PR's diff, the codebase checklist and any reviewer comments. Publish the verdict with `just review-publish <N>`: it refuses a review of an older diff, posts the review as one PR comment marked with the head commit, and on a passing verdict turns on auto-merge.
+6. Loop until the review passes. `REQUEST CHANGES` means at least one Minimum (blocking) finding: fix it, push, review again, publish again. `.github/workflows/review.yml` turns the comment into the commit status `review` (success only for `APPROVE` or `COMMENT` on exactly the PR head), and the `Default ruleset` requires it, so every push needs a new review and nothing merges on a stale or failed one. In Claude Code the Stop hook keeps the agent in this loop while the branch's open PR has no passing review (up to five rounds, then it stops to report); Codex follows the same rule from `AGENTS.md`. Dependabot and release-please PRs have no delivering agent and pass `review` by themselves; gate, hygiene and CodeQL still apply.
+7. GitHub merges (squash) once `gate`, `hygiene`, CodeQL and `review` pass. The owner reviews intent, contract changes, migrations, the egress gate and anything that loosens a gate; a harness change still waits for `harness-change-approved`. CodeQL posts its alerts as review threads and the ruleset requires every thread resolved: an agent fixes the code; only the owner dismisses an alert, with a reason.
 
 ## CI on GitHub
 
-`.github/workflows/ci.yml` runs on every pull request to `main`, on every push to `main` and on demand: `lint`, `contract`, `arch` (with trace coverage and the gate-config guard), `unit`, `e2e`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. The `e2e` job waits for it (or for it to be skipped), downloads that artifact when the native suite exists and judges E2E coverage over both. The `gate` job fails if any of them failed or was skipped, and it is the only check branch protection needs. `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
+`.github/workflows/ci.yml` runs on every pull request to `main`, on every push to `main` and on demand: `lint`, `contract`, `arch` (with trace coverage and the gate-config guard), `unit`, `e2e`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. The `e2e` job waits for it (or for it to be skipped), downloads that artifact when the native suite exists and judges E2E coverage over both. The `gate` job fails if any of them failed or was skipped, it is the harness's one required check. The `Default ruleset` on `main` also requires `hygiene` (PR title, dependency review, cargo-deny, workflow lint) and CodeQL, which are about the change as a delivery unit rather than the quality bars; builds, releases and the rest of the delivery pipeline are in [DELIVERY.md](DELIVERY.md). `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
 
 First-time setup, from the owner's Mac:
 
 1. Push the branch and open the PR; CI runs.
-2. Run `scripts/ci/protect-main.sh` once. It creates the three labels and requires `gate` on `main` for everyone, admins included. Branch protection on a private repository needs a paid GitHub plan.
+2. Run `scripts/ci/github-setup.sh` once (and again whenever `.github/rulesets/` changes). It creates the labels, applies the rulesets that require `gate` (and the delivery checks) on `main` for everyone, admins included, and sets merging, security and Actions settings; see [DELIVERY.md](DELIVERY.md).
 3. Add the label `update-screenshots` to the PR once: the bot renders the first baselines (the harness self-test screens) in the container and commits them to the branch. Review the images, then add `visual-change-approved`. On this first PR the bot cannot re-run CI by itself (a dispatch needs `ci.yml` on `main`), so pull the branch and push any commit, for example `git commit --allow-empty -m "ci: re-run" && git push`. Later PRs re-run automatically.
 4. If the Constructor Studio repository is private, add a `CF_STUDIO_TOKEN` secret with read access so the `docs` job can fetch the pinned core.
 
