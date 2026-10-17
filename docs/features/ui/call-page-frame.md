@@ -144,7 +144,7 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 3. [ ] - `p1` - User clicks **Notify Me When Summaries Are Ready** - `inst-user-notify`
 4. [ ] - `p1` - API: `permission_request` (notifications); macOS shows its prompt - `inst-api-permission`
 5. [ ] - `p1` - **IF** the user closes the banner with × - `inst-if-close`
-   1. [ ] - `p1` - API: `banner_dismiss` (the banner id); no prompt is shown - `inst-api-dismiss`
+   1. [ ] - `p1` - UI: hide the banner as local view state for this window's lifetime; send no command and show no prompt (`banner_dismiss` has no notification-consent `BannerKind`; persisting the dismissal is a contract gap for the owner) - `inst-local-dismiss`
 6. [ ] - `p1` - **RETURN** the banner gone, notifications allowed or not - `inst-return-banner`
 
 ## 3. Processes / Business Logic (CDSL)
@@ -213,7 +213,7 @@ The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive*
 **Constraints**: `cpt-noter-constraint-notification-limits`
 
 **Touches**:
-- Commands: `call_update`, `call_types_list`, `capture_set_sensitive`, `open_external`, `permission_request`, `banner_dismiss`, `calls_delete`
+- Commands: `call_update`, `call_types_list`, `capture_set_sensitive`, `open_external`, `permission_request`, `calls_delete`
 - Tests: E2E `cpt-noter-seq-dialogs-delete-call` (Happy path from the ⋯ menu); E2E `cpt-noter-seq-notifications-allow-notifications` (Happy path) with XCUITest for the macOS prompt
 
 ## 6. Acceptance Criteria

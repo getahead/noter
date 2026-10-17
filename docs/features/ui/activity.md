@@ -70,7 +70,7 @@ It implements `cpt-noter-component-screen-activity`, `cpt-noter-component-ui-pro
 - **Design elements**: `cpt-noter-component-screen-activity`, `cpt-noter-component-ui-proposal-row`; reuses `cpt-noter-component-ui-change-row`, `cpt-noter-component-ui-history-timeline`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-ui-diff-view`, `cpt-noter-component-ui-item-inspector`, `cpt-noter-component-ui-status-row`, `cpt-noter-component-ui-inline-banner`, `cpt-noter-component-ui-empty-state`
 - **Stories delivered (M5)**: `cpt-noter-seq-activity-review-proposals`, `cpt-noter-seq-activity-undo-batch` (all paths)
 - **Frozen commands delivered (M5)**: `proposals_list`, `proposal_decide`, `proposal_always_for_term`, `activity_get`, `jobs_list`, `job_run_now`, `job_cancel`, `job_update`
-- **Earlier commands reused**: `history_list`, `change_undo`, `change_redo`, `history_export` (M2); `item_get`, `item_reopen` (M2); `settings_get`, `settings_set`, `glossary_list`, `window_navigate` through the existing bridge and Settings features; source repair through `cpt-noter-feature-ui-privacy-sources` (M3)
+- **Earlier commands reused**: `history_list`, `change_undo`, `change_redo`, `history_export` (M2); `item_get`, `item_reopen` (M2); `settings_get`, `settings_update`, `glossary_list`, `window_navigate` through the existing bridge and Settings features; source repair through `cpt-noter-feature-ui-privacy-sources` (M3)
 - **Events**: `proposals:counts`, `jobs:progress`, `entity:changed`, `settings:changed`, `capture:state`; the bridge subscribes before reading
 - **Data**: read through the core only; `cpt-noter-dbtable-jobs` belongs to [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md). Proposal, change batch and job run are generated view records; the UI writes no database
 - **Prototype modules**: `src/js/50-e-2-activity.js`, `src/js/50-e-1-components.js` (`C.proposalRow`, shared proposal actions, `C.statusRow`), `src/js/50-e-5-settings.js` (`maintenance`), `src/css/50-e.css` (`.ac-*`, `.e-prop*`, `.e-status*`, `.st-*`)
@@ -188,7 +188,7 @@ It implements `cpt-noter-component-screen-activity`, `cpt-noter-component-ui-pro
 1. [ ] - `p6` - User chooses **Try Again** on a failed job, or **Open Settings** to its Maintenance row; a failed source opens Knowledge Sources with that source selected - `inst-enter`
 2. [ ] - `p6` - API: `jobs_list`; Settings also reads `settings_get`; display each job's enabled state, trigger, last run, counts, error, running state and call block - `inst-read`
 3. [ ] - `p6` - User edits **Nightly window**, **Allow on battery** or **Backups kept**; validate on blur, with backup count from 1 to 30 and valid clock times - `inst-settings`
-4. [ ] - `p6` - API: `settings_set` for the maintenance section through Settings; a job switch or its battery override calls `job_update` with the wanted value from the Settings window only - `inst-update`
+4. [ ] - `p6` - API: `settings_update { rev, section }` with the current revision and the whole maintenance section, through the Settings window as in `cpt-noter-flow-core-settings-update`; a job switch or its battery override calls `job_update` with the wanted value from the Settings window only - `inst-update`
 5. [ ] - `p6` - User chooses **Run Now** or **Try Again**; API: `job_run_now` with that job id - `inst-run`
 6. [ ] - `p6` - **IF** `blocked_by_call` is set or the command returns `job_blocked` - `inst-if-blocked`
    1. [ ] - `p6` - UI: show **Waiting** and **Jobs wait until the call ends**; let the core pause or resume scheduled work, never start a local timer to bypass the block - `inst-blocked`
@@ -332,7 +332,7 @@ The system **MUST** render Maintenance's schedule, job and evidence sections, pe
 **Constraints**: `cpt-noter-constraint-local-only-ui`, `cpt-noter-constraint-no-dialog-after-setup`
 
 **Touches**:
-- Commands: `jobs_list`, `job_run_now`, `job_cancel`, `job_update`, `settings_get`, `settings_set`
+- Commands: `jobs_list`, `job_run_now`, `job_cancel`, `job_update`, `settings_get`, `settings_update`
 - Tests: unit tests for job-state mapping, settings validation and run-id matching; conformance for window scopes, duplicate Run Now, job_blocked, cancellation and tool detection; E2E `cpt-noter-seq-activity-review-proposals` (job failed and evidence tool missing), plus Maintenance scheduling and cancellation
 - Visual: all Activity states and Maintenance normal, failed, call-blocked and tool-missing states, in light, dark, Increase Contrast, narrow and German layouts, in the pinned screenshot container
 

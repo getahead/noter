@@ -124,12 +124,12 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 4. [ ] - `p1` - **IF** suggested: show **Opening or copying accepts this suggested item.** above the footer - `inst-suggested`
 5. [ ] - `p1` - User invokes a footer action or ⌘Return; flush any prompt draft with handoff_edit, then run the current core default or clicked action once - `inst-invoke`
 6. [ ] - `p1` - **MATCH** action - `inst-action`
-   1. [ ] - `p1` - **CASE** Copy Prompt: `handoff_copy`; show Copied for 2 s and apply returned item acceptance without changing ownership or marking it handed off - `inst-copy`
+   1. [ ] - `p1` - **CASE** Copy Prompt: `handoff_copy`; show Copied for 2 s and apply the returned item as the core sets it: a successful copy marks it `handed_off` and accepts a suggested item (DESIGN-core: handoff opened or copied → handed_off); no tool is launched - `inst-copy`
    2. [ ] - `p1` - **CASE** Open: `handoff_open`; core resolves the launch path and permissions; on success use path_used and the returned item to show Handed off to Claude Code/Codex or Opened in iTerm - `inst-launch`
 7. [ ] - `p1` - **IF** automation_denied, no_link_handler or another launch failure: show the matching reason and Copy Prompt; do not mark success or retry automatically - `inst-failure`
 8. [ ] - `p1` - **IF** repo_not_mapped or repo_path_missing: refresh mapping/launch state, disable Open with its reason and offer Add Mapping… or repair in Settings - `inst-repo-error`
 9. [ ] - `p1` - **IF** prompt_not_ready: return to generation state; copy/open cannot use a stale or absent prompt - `inst-prompt-error`
-10. [ ] - `p1` - **RETURN** copied prompt or core handoff record with time and cwd; only a successful launch marks Handed off - `inst-return`
+10. [ ] - `p1` - **RETURN** copied prompt or core handoff record with time and cwd; a successful copy or open marks Handed off, a failed launch does not - `inst-return`
 
 ### Add, edit or remove a repository mapping
 
@@ -205,7 +205,7 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 
 - [ ] `p3` - **ID**: `cpt-noter-dod-ui-handoff-drawer`
 
-The system **MUST** render HD-R1–HD-R7, generation/cancellation, revision-safe edits, generated/current diff, target choice and the core launch plan. Footer defaults follow the owner; copy accepts suggestions without launching; successful open alone marks Handed off. Failure always leaves a path to Copy Prompt.
+The system **MUST** render HD-R1–HD-R7, generation/cancellation, revision-safe edits, generated/current diff, target choice and the core launch plan. Footer defaults follow the owner; a successful copy or open marks the item Handed off (and accepts a suggested item); copy never launches a tool; a failed launch marks nothing. Failure always leaves a path to Copy Prompt.
 
 **Implements**:
 - `cpt-noter-flow-ui-handoff-prepare`

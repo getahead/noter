@@ -102,7 +102,8 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Error Scenarios**:
 - Below 500 MB free or without the live model: the prompt shows `blocked: disk_full` or `model_missing` with a dimmed **Record**; `capture_start` answers the same code.
 - The prompt timed out before the click: `detection_expired`.
-- The user chose **Not Now**, closed it, or picked **Don't Ask for <app>…**: the detection goes away; the app is ignored from then on in the last case.
+- The user chose **Not Now**, closed it, or let it time out: the prompt closes and is not shown again for this call, but the detection stays while the meeting app holds audio, so the menu bar and the start hotkey still offer **Call Detected · Start Recording** (`cpt-noter-seq-record-prompt-record-after-missed-prompt`).
+- The user picked **Don't Ask for <app>…**: the detection goes away and the app is ignored from then on.
 
 **Steps**:
 1. [ ] - `p1` - Supervisor delivers `call_detected { bundle_id, app_name, pid }` - `inst-detected-fact`
@@ -112,7 +113,9 @@ Capture is the release-blocking function, and its rules must live in one machine
 4. [ ] - `p1` - API: `capture_start { source: record_prompt, detection_id, sensitive }` from the record prompt - `inst-start-from-prompt`
 5. [ ] - `p1` - **IF** the detection's `prompt_until` passed **RETURN** `detection_expired` - `inst-if-expired`
 6. [ ] - `p1` - Run `cpt-noter-flow-core-capture-session-start` - `inst-run-start`
-7. [ ] - `p1` - **IF** instead `capture_dismiss_detection` (with its reason) or `capture_ignore_app` arrives, clear the detection, add the app to the ignored apps for the second one, and emit `capture:detected` with no detection - `inst-dismiss`
+7. [ ] - `p1` - **IF** instead `capture_dismiss_detection` arrives (not now, close or timeout), close the prompt only: set the detection's `prompt_until` to now, never prompt again for this call, keep the detection until `call_audio_released` for its app, and emit `capture:detected` with the kept detection; a start from the menu bar or the start hotkey still succeeds - `inst-dismiss`
+8. [ ] - `p1` - **IF** `capture_ignore_app` arrives, clear the detection, add the app to the ignored apps and emit `capture:detected` with no detection - `inst-ignore`
+9. [ ] - `p1` - **IF** `call_audio_released` arrives for a detection that was never recorded, clear it and emit `capture:detected` with no detection - `inst-detection-ends`
 
 ### Start capture
 
@@ -465,7 +468,7 @@ The system **MUST** expose start, pause, mark and stop to menu items and hotkeys
 ## 6. Acceptance Criteria
 
 - [ ] E2E against the real core with the scripted engine, story `cpt-noter-seq-record-prompt-start-recording`: a detection shows the prompt, `capture_start` from the record prompt starts recording, `capture:state` reaches every window.
-- [ ] Story `cpt-noter-seq-record-prompt-record-after-missed-prompt`: after the prompt timed out, the start hotkey or the menu starts the call.
+- [ ] Story `cpt-noter-seq-record-prompt-record-after-missed-prompt`: after the prompt timed out or was dismissed (`capture_dismiss_detection` with reason timeout), the snapshot and `capture:detected` still carry the detection, no second prompt appears, and the start hotkey or **Call Detected · Start Recording** in the menu starts the call.
 - [ ] Story `cpt-noter-seq-call-screen-recover-capture`: silent system audio, a microphone turned off and an engine restart each show their degraded state while the recording continues; a failed engine offers **Try Again**.
 - [ ] Story `cpt-noter-seq-call-screen-stop-at-call-end`: audio released → notice with countdown; hold pauses it; Keep Recording, Stop Now and Start as New Call behave as specified; Continue Recording works for 5 minutes.
 - [ ] Story `cpt-noter-seq-menu-bar-control-recording` (core half): mark, pause and stop called as `Caller::Native { surface: menu_bar }` take effect at once.

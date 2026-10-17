@@ -127,7 +127,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 1. [ ] - `p1` - User clicks **Not Now** or ×, or leaves the prompt for 15 s - `inst-user-dismiss`
 2. [ ] - `p1` - **WHILE** the pointer or keyboard focus is on the panel - `inst-while-hover`
    1. [ ] - `p1` - UI: the 15-second timer pauses (no visible countdown) - `inst-pause-timer`
-3. [ ] - `p1` - API: `capture_dismiss_detection` (reason: not now, close or timeout) - `inst-api-dismiss`
+3. [ ] - `p1` - API: `capture_dismiss_detection` (reason: not now, close or timeout); the core closes the prompt but keeps the detection, so the menu bar keeps **Call Detected · Start Recording** while the call runs - `inst-api-dismiss`
 4. [ ] - `p1` - UI: the panel fades out in 200 ms - `inst-fade`
 5. [ ] - `p1` - **RETURN** no prompt for this call; the menu bar and ⌃⌥⌘R still start capture - `inst-return-dismiss`
 
