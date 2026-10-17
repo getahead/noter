@@ -53,7 +53,7 @@ path = "crates/noter-protocol/src/fixtures.rs"
 why = "typed example data, not logic"
 [[coverage.exclude]]
 path = "crates/noter-native/**"
-why = "objc2 bindings to AppKit, EventKit and Keychain; covered by the macOS checklist and the Mac E2E run"
+why = "objc2 bindings to AppKit, EventKit and Keychain; covered by the native UI tests (XCUITest) and the Mac E2E run"
 [[coverage.exclude]]
 path = "apps/desktop/src-tauri/**"
 why = "thin IPC host; covered by the handler-parity test and E2E"

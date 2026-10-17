@@ -9,10 +9,10 @@ A FEATURE, a task or a pull request is done when `just gate` passes. CI runs the
 | Command | When | What it runs |
 | --- | --- | --- |
 | `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, trace coverage, unit tests |
-| `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, E2E and E2E coverage, screenshots, performance, `cfs validate`, the gate-config guard |
+| `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, native UI tests (XCUITest, macOS only; skipped with a notice on Linux), E2E and E2E coverage, screenshots, performance, `cfs validate`, the gate-config guard |
 | `just setup` | Once per machine | Git hooks, Rust toolchain (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install` |
 
-Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac: Rust via rustup, Node 22 with pnpm, Python 3.11+, `just` (`brew install just python@3.12`). Docker is optional (screenshots outside CI); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
+Individual gates: `just lint`, `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e`, `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac: Rust via rustup, Node 22 with pnpm, Python 3.11+, `just` (`brew install just python@3.12`), and Xcode for `just native`. Docker is optional (screenshots outside CI); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
 
 ## The quality bars
 
@@ -21,7 +21,8 @@ All numbers live in `harness/harness.toml`. On 17 Oct 2026 the owner set them to
 | Bar (owner's wording) | How it is measured | Hard gate |
 | --- | --- | --- |
 | Unit tests, 80% coverage | Line coverage of the Rust unit and integration tests (`cargo llvm-cov`) and of the UI unit tests (Vitest, V8), each side ≥ 80%. In addition, the lines a PR adds or changes must be ≥ 80% covered, so a large covered codebase cannot hide an untested change | Every PR |
-| E2E tests, 60% coverage | Of the **frozen** IPC commands and the DESIGN.md stories that milestones up to the current one deliver (`harness/milestones.toml`), ≥ 60% must be exercised end to end **against the real core**. A command counts when an E2E run called it and it succeeded; a story counts when an E2E test whose title names its ID (`cpt-noter-seq-…`) passed | Every PR |
+| E2E tests, 60% coverage | Of the **frozen** IPC commands and the DESIGN.md stories that milestones up to the current one deliver (`harness/milestones.toml`), ≥ 60% must be exercised end to end **against the real core**. A command counts when an E2E run called it and it succeeded; a story counts when an E2E test whose title names its ID (`cpt-noter-seq-…`) passed. XCUITest runs against the built app count the same way (see *Native UI tests*) | Every PR |
+| Native UI tests (added 17 Oct 2026) | XCUITest drives the built app on the macOS runner: the menu bar extra and its menu, the tray glyphs, the non-activating panels (call window, floating panel, record prompt), notifications, global hotkeys and card keys. All tests pass; what they prove counts toward the E2E bar | Every PR once the Tauri app exists (Mac runner) |
 | Screenshots, 98% match for untouched functionality | Per-pixel comparison with Playwright in the pinned container `mcr.microsoft.com/playwright:v1.63.0-noble` (WebKit, Linux): each screenshot may differ from its baseline in at most 2% of pixels, a pixel counting as different above a 0.02 colour distance. Untouched screens must therefore match; a screen a PR changes on purpose gets new baselines through the `update-screenshots` workflow, and the PR needs `visual-change-approved` | Every PR |
 | Performance, 60% coverage, ≤ 10% degradation | Coverage: ≥ 60% of the entries in `harness/perf.toml` that are due by the current milestone have a scenario. Degradation: every scenario is measured on the base branch and on the PR **in the same job**, in instructions executed (valgrind cachegrind), and may be at most 10% worse. Wall-clock time is reported only, until a dedicated Apple Silicon runner exists | Every PR (instruction counts) |
 | Trace coverage, never lower (added 17 Oct 2026) | Of the design elements defined in the artifacts with FULL traceability, the share that an `@cpt-*` marker implements in the code; it may not fall below the base branch's. See *Trace coverage* below | Every PR |
@@ -30,7 +31,7 @@ All numbers live in `harness/harness.toml`. On 17 Oct 2026 the owner set them to
 ### Where the owner's wording had to become something measurable
 
 * **E2E coverage is not counted in source lines.** End-to-end runs through the macOS WebView cannot be instrumented reliably, and line coverage of E2E runs mostly repeats unit coverage. The same 60% therefore applies to delivered behaviour: commands and stories. Runs against the fake core do not count.
-* **Screenshots cannot cover native macOS surfaces.** The container renders the WebView content, not the vibrancy behind Liquid Glass materials, native open and save panels, the menu bar, the tray or notifications. Those stay on the macOS checklist below. Baselines are only valid from the pinned container; screenshots from a Mac never match them.
+* **Screenshots cannot cover native macOS surfaces.** The container renders the WebView content, not the vibrancy behind Liquid Glass materials, native open and save panels, the menu bar, the tray or notifications. Screenshots of native surfaces are not part of the 98% gate: their behaviour is tested by XCUITest on the macOS runner (*Native UI tests* below), and only their look stays on the macOS checklist. Baselines are only valid from the pinned container; screenshots from a Mac never match them.
 * **The 10% limit is enforced on instruction counts, not wall time.** On shared CI machines the same code varies by 5–20% in wall time from run to run (measured while building this harness: −19.7% between two runs of identical code). Instruction counts vary by well under 1%, so a 10% gate on them never flakes. Wall time, live-transcript latency and anything that runs on the Neural Engine need real Apple Silicon: `just perf-wall` runs nightly on a dedicated self-hosted Mac (label `noter`, repository variable `NOTER_MAC_RUNNER=true`) and fails above 10% only when the difference is also larger than twice the run-to-run spread. Until that runner exists, wall time is reported, not gated.
 * **Before M0 most bars hold trivially.** Nothing is delivered yet, so the E2E and performance coverage gates count 0 of 0; the UI has no product code yet, so UI unit coverage is 0 of 0 lines. The bars start to bite as each milestone moves `harness.toml [milestone].current` forward.
 
@@ -63,10 +64,20 @@ The kind slug matches the ID's kind (`component`, `interface`, `seq`, `dbtable`,
 | Conformance | `apps/desktop/tests/conformance` | The fake core today; the real core through `noter-core-harness` from M0 (`NOTER_CORE=stdio`) |
 | UI end to end | `apps/desktop/tests/e2e` (Playwright, WebKit) | The UI served by Vite, with the real core behind the harness bridge; flows name their story IDs |
 | Real app | Mac runner, WebdriverIO with its embedded driver (`tauri-driver` does not support WKWebView) | The signed app, from M1 |
+| Native UI | `apps/desktop/tests/native` (XCUITest, `just native`) | The built app on the Mac runner, from M1: menu bar extra, tray, panels, notifications, hotkeys, card keys |
 | Screenshots | `apps/desktop/tests/visual` | Each DESIGN.md screen and state, rendered with the fake core in the pinned container |
 | Performance | `harness/perf.toml` scenarios | Instruction counts per PR; wall time and latency nightly on the Mac |
 | Architecture | `scripts/harness/arch_check.py` | Crate dependencies, UI imports, engine entitlements |
 | Skills | `evals/` (from M2) | Golden calls; schema validity, citations, rubric |
+
+### Native UI tests (XCUITest)
+
+Added 17 Oct 2026 by the owner, as the design documents first planned: native macOS surfaces are tested automatically, not only by hand.
+
+* **What they cover.** The menu bar extra and every item of its menu, the four tray glyphs (idle, recording, paused, copilot muted), the non-activating NSPanel windows (call window, floating panel, record prompt: they take clicks without stealing focus from the call app), notifications posted through `UNUserNotificationCenter` and their actions, global hotkeys and card keys. They are functional tests, not timing, so the hosted `macos-15` runner is enough. What automation cannot judge stays on the macOS checklist: the look of Liquid Glass, system permission dialogs and TCC prompts, real call apps.
+* **Where.** `apps/desktop/tests/native/`: the Xcode project `NoterNativeTests.xcodeproj` with the macOS UI-testing target and scheme `NoterNativeUITests`, sources in `apps/desktop/tests/native/NoterNativeUITests/`. It belongs to the `ui` lane. The tests launch the app at `NOTER_APP_PATH` (`XCUIApplication(url:)`), pass `NOTER_E2E_LOG_DIR` into its launch environment, and use the scripted engine and the fixture world, as the other E2E suites do. `XCTSkip` is rejected by the architecture checks like any other skipped test.
+* **`just native`.** On Linux it says it is skipped. On a Mac without `NoterNativeTests.xcodeproj` it says there are no native tests yet and passes. Otherwise it builds the app (`pnpm --dir apps/desktop tauri build --debug --bundles app`, or takes `NOTER_APP_PATH`), runs `xcodebuild test -scheme NoterNativeUITests -destination 'platform=macOS'` with the result bundle in `coverage/native/NoterNativeUITests.xcresult`, and exports it with `xcrun xcresulttool get test-results tests` to `coverage/native/xcuitest-results.json`. It fails when a test fails, or when the suite exists but there is no app to drive. `just gate` runs it before `just e2e`. The first run on a new Mac asks once for UI-automation access; `sudo automationmodetool enable-automationmode-without-authentication` removes the prompt.
+* **How it counts toward the E2E bar.** A story counts when a test case that passed names its ID. Swift names cannot hold hyphens, so the ID is spelled with underscores and may be followed by a double underscore and a description: `test_cpt_noter_seq_menu_bar_control_recording__pause_and_resume()` proves `cpt-noter-seq-menu-bar-control-recording`. Commands count from the app under test: a debug build launched with `NOTER_E2E_LOG_DIR` writes `commands-native-app-<pid>.json` there on quit, in the same format as the other suites (`{"suite": "native", "target": "app", "commands": [...], "stories": []}`, command names only, no content), listing the commands its core ran successfully, from windows and from native callers (`Caller::Native`). `scripts/harness/e2e_coverage.py` reads `coverage/native/commands-*.json` and `coverage/native/xcuitest-*.json` beside `coverage/e2e/commands-*.json`. The bar itself is unchanged.
 
 The conformance suite is the bridge between the UI-first plan and the core: the fake passes it today, and from M0 the same suite must pass against the real core. A difference is a contract bug, fixed in `noter-protocol` first (DESIGN-core 4.1).
 
@@ -116,7 +127,7 @@ Codex has no hooks; it gets the same rules from `AGENTS.md`, the pre-commit hook
 
 ## CI on GitHub
 
-`.github/workflows/ci.yml` runs on every pull request to `main`, on every push to `main` and on demand: `lint`, `contract`, `arch` (with trace coverage and the gate-config guard), `unit`, `e2e`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `gate` job fails if any of them failed or was skipped, and it is the only check branch protection needs. `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
+`.github/workflows/ci.yml` runs on every pull request to `main`, on every push to `main` and on demand: `lint`, `contract`, `arch` (with trace coverage and the gate-config guard), `unit`, `e2e`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. The `e2e` job waits for it (or for it to be skipped), downloads that artifact when the native suite exists and judges E2E coverage over both. The `gate` job fails if any of them failed or was skipped, and it is the only check branch protection needs. `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
 
 First-time setup, from the owner's Mac:
 
@@ -149,13 +160,13 @@ Rules: `window` is applied exactly as the IPC host applies the calling window's 
 
 ## Not automated: the macOS checklist
 
-Run by hand before each milestone gate and each release, on the development MacBook Pro: permission prompts attributed to Noter (microphone, system audio, Apple Events); capture across AirPods switch, dock and undock, pause and a 90-minute call; Liquid Glass materials and Increase Contrast; native panels, menu bar, tray and notifications; the signed and notarized build launching from the DMG.
+Run by hand before each milestone gate and each release, on the development MacBook Pro. Since 17 Oct 2026 it keeps only what automation cannot judge; the behaviour of the menu bar, tray, panels, notifications, hotkeys and card keys is tested by XCUITest (*Native UI tests* above). The checklist: system permission dialogs and TCC prompts attributed to Noter (microphone, system audio, Apple Events, notifications); capture with real call apps and across AirPods switch, dock and undock, pause and a 90-minute call; the look of Liquid Glass materials (translucency over real content, menu bar and panels included) and Increase Contrast; the signed and notarized build launching from the DMG.
 
 ## What comes next in the harness
 
 | When | Piece |
 | --- | --- |
 | M0 | `noter-core-harness`; conformance against the real core in CI; handler-parity test in `src-tauri`; first core perf scenarios (`core_app_snapshot`, `core_cold_start`); change-log and log-scrubbing tests in `noter-core` |
-| M1 | Fixture-parity test; scripted engine and golden-set replay through file mode; latency and footprint scenarios on the Mac runner; real-app E2E with WebdriverIO |
+| M1 | Fixture-parity test; scripted engine and golden-set replay through file mode; latency and footprint scenarios on the Mac runner; real-app E2E with WebdriverIO; the XCUITest suite in `apps/desktop/tests/native` and the app's E2E command log (`NOTER_E2E_LOG_DIR`) |
 | M2 | Skill evals in `evals/` with schema, citation and rubric scores, run on every skill change |
 | M3–M5 | Retrieval, copilot and maintenance scenarios as listed in `harness/perf.toml`; corruption and disk-full drills nightly |

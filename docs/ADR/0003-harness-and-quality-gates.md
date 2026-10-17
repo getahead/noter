@@ -51,18 +51,23 @@ Chosen option: "One gate command with fixed bars, enforced in CI, in the agent l
 
 **Changed 17 Oct 2026** (owner: only realistic goals, weaker gates): unit coverage 90% → 80% (per side and on changed lines), end-to-end 80% → 60% of delivered frozen commands and stories, screenshots 99% → 98% per-pixel match, performance regression 5% → 10% per scenario in instruction counts and scenario coverage 80% → 60%; wall-clock stays report-only until a dedicated Apple Silicon runner exists. The same day the owner made traceability FULL for every Constructor Studio artifact and added a trace-coverage gate that must never go down. The table below states the bars in force.
 
+**Changed 17 Oct 2026** (owner: native macOS surfaces get automated tests, as the design documents first planned, instead of only a manual checklist): a native UI test layer joins the harness. An XCUITest suite drives the built app on the macOS runner and covers the native surfaces: the menu bar extra and its menu, the tray glyphs, the non-activating panels (call window, floating panel, record prompt), notifications, global hotkeys and card keys. These are functional tests, not timing, so the hosted `macos-15` runner is enough. Their results count toward the end-to-end bar exactly like the real-core runs; no bar changed. The manual macOS checklist keeps only what automation cannot judge: the look of Liquid Glass materials and translucency, system permission dialogs and TCC prompts, and real call apps. Screenshots of native surfaces are not part of the 98% pixel gate.
+
 The bars are defined in `harness/harness.toml` and measured as follows. Where the owner's wording could not be measured reliably as stated, the measure below is the realistic equivalent; `docs/HARNESS.md` explains each.
 
 | Bar | Measure | Where it is a hard gate |
 | --- | --- | --- |
 | Unit tests, 80% | Line coverage of the Rust and UI unit suites, per side, and of the lines a PR changes; generated code, fixtures and thin platform glue are excluded with a written reason | Every PR (Linux) |
-| End-to-end tests, 60% | Share of the frozen IPC commands and of the DESIGN.md stories delivered by the current milestone that the end-to-end suites exercise against the real core | Every PR (Linux); the real-app flows on the Mac runner |
-| Screenshots, 98% | Per-pixel comparison of each screen against its baseline in a pinned Linux WebKit container; at most 2% of pixels may differ. Native macOS surfaces stay on the manual checklist. A changed baseline needs the owner's label | Every PR |
+| End-to-end tests, 60% | Share of the frozen IPC commands and of the DESIGN.md stories delivered by the current milestone that the end-to-end suites exercise against the real core: the conformance suite and the Playwright flows through `noter-core-harness`, and the XCUITest suite against the built app | Every PR (Linux, over the results of both); the real-app flows and the XCUITest suite on the Mac runner |
+| Native UI tests (added 17 Oct 2026) | XCUITest drives the built app: every menu bar item, tray glyph, non-activating panel, notification action, global hotkey and card key does what DESIGN.md says. The look of Liquid Glass, system permission dialogs and real call apps stay on the manual macOS checklist | Every PR once the Tauri app exists (Mac runner, hosted `macos-15`) |
+| Screenshots, 98% | Per-pixel comparison of each screen against its baseline in a pinned Linux WebKit container; at most 2% of pixels may differ. Screenshots of native macOS surfaces are not part of this bar; their behaviour is covered by the native UI tests. A changed baseline needs the owner's label | Every PR |
 | Performance, 60% / 10% | 60% of the performance registry entries due by the milestone have a scenario; each scenario is at most 10% worse than the base branch, measured in instruction counts in the same job | Every PR (instruction counts); wall-clock and latency reported only, gated once a dedicated Apple Silicon runner exists |
 | Trace coverage, never lower | Share of the design elements (component, interface, seq and dbtable IDs; flow, algo, state and dod once FEATURE artifacts exist) defined in the FULL-traceability artifacts that an `@cpt-*` marker implements in the registered codebase; it may not fall below the base branch's | Every PR |
 | All tests pass | Formatting, lints, type checks, contract export, contract and conformance tests, architecture checks, `cfs validate` | Every PR |
 
 Trace coverage closes the loop between the design and the code. With traceability FULL, `cfs validate` already rejects a `@cpt-*` marker that names an ID the design does not define; `scripts/harness/trace_gate.py` measures the other direction: how many traceable design elements have a marker in the code. It is a ratchet, not a target: a pull request fails when an element that had a marker on the base branch loses it, or when the coverage of the base's elements drops. Elements a pull request adds to the design never fail it, because design-first work defines elements before the code exists.
+
+Native UI tests close the gap the screenshot container leaves. The menu bar extra, the tray, the panels, notifications and hotkeys are drawn or delivered by macOS, not by the WebView, so neither Playwright nor the screenshot container can reach them. The XCUITest suite lives in `apps/desktop/tests/native` (an Xcode project with the UI-testing target `NoterNativeUITests`) and launches the built app; `just native` runs it on macOS and says it is skipped elsewhere, and before the suite exists it reports that there are no native tests yet and passes. Each test names the story it covers in its name, with the story ID spelled with underscores because Swift names cannot hold hyphens (`test_cpt_noter_seq_menu_bar_control_recording()`); the app under test writes the commands its core ran in the same log format as the other suites. `scripts/harness/e2e_coverage.py` reads both, so a story or command proven through a native surface counts toward the end-to-end bar the same way as one proven through the WebView.
 
 The same command (`just gate`) is the default exit criteria of every FEATURE, a single required status check (`gate`) protects `main`, a Claude Code Stop hook keeps an agent working while `just gate-fast` is red, and a lane guard stops agents from editing generated files, baselines, the harness itself or files outside their lane.
 
@@ -74,12 +79,14 @@ The same command (`just gate`) is the default exit criteria of every FEATURE, a 
 * Good, because instruction counts make a hard performance limit (5%, 10% since 17 Oct 2026) enforceable on shared runners without flakes.
 * Bad, because the end-to-end and performance bars are relative to the milestone; until M0 delivers code they are trivially met, which is honest but easy to misread.
 * Bad, because wall-clock, latency and Neural Engine measurements need a self-hosted Apple Silicon runner; until it exists they are reported, not enforced.
-* Bad, because screenshots taken in a Linux WebKit container do not show native macOS materials (vibrancy behind Liquid Glass), native panels, the menu bar or the tray; those stay on the macOS checklist.
+* Good, because native surfaces (menu bar, tray, panels, notifications, hotkeys, card keys) are tested on every PR by XCUITest instead of by hand before a milestone (since 17 Oct 2026).
+* Bad, because screenshots taken in a Linux WebKit container do not show native macOS materials (vibrancy behind Liquid Glass), native panels, the menu bar or the tray; their behaviour is covered by XCUITest, their look stays on the macOS checklist.
+* Bad, because the XCUITest run needs a macOS runner, which costs more minutes and is slower, and the end-to-end job waits for it so that it can count both.
 * Neutral, because coverage thresholds are on lines; branch coverage is reported but not gated.
 
 ### Confirmation
 
-The `gate` job in `.github/workflows/ci.yml` is the required status check on `main` (`scripts/ci/protect-main.sh`); `scripts/harness/tests` cover the gate scripts themselves; `config_guard.py` fails a PR that loosens `harness/*.toml` (including removing the trace gate, turning its ratchet off or narrowing its ID kinds) without the `harness-change-approved` label; `trace_gate.py` fails a PR whose trace coverage falls below the base branch's; the lane guard runs as a Claude Code PreToolUse hook and as the git pre-commit hook.
+The `gate` job in `.github/workflows/ci.yml` is the required status check on `main` (`scripts/ci/protect-main.sh`); `scripts/harness/tests` cover the gate scripts themselves; `config_guard.py` fails a PR that loosens `harness/*.toml` (including removing the trace gate, turning its ratchet off or narrowing its ID kinds) without the `harness-change-approved` label; `trace_gate.py` fails a PR whose trace coverage falls below the base branch's; the `macos` job runs `just native` once the Tauri app exists and hands its results to the `e2e` job, which counts them with the other end-to-end runs; the lane guard runs as a Claude Code PreToolUse hook and as the git pre-commit hook.
 
 ## Pros and Cons of the Options
 
@@ -104,7 +111,7 @@ The `gate` job in `.github/workflows/ci.yml` is the required status check on `ma
 
 ## More Information
 
-`docs/HARNESS.md` is the working guide: commands, lanes, how each bar is measured, how baselines are refreshed, and the wire format of `noter-core-harness`, the stdio entry point the core exposes in M0 so the conformance and end-to-end suites run against the real core without Tauri. On macOS, `tauri-driver` does not support WKWebView; real-app flows use the WebdriverIO embedded-driver plugin on the Mac runner.
+`docs/HARNESS.md` is the working guide: commands, lanes, how each bar is measured, how baselines are refreshed, and the wire format of `noter-core-harness`, the stdio entry point the core exposes in M0 so the conformance and end-to-end suites run against the real core without Tauri. On macOS, `tauri-driver` does not support WKWebView; real-app flows use the WebdriverIO embedded-driver plugin on the Mac runner. Native surfaces are driven by XCUITest (`apps/desktop/tests/native`, `just native`); `docs/HARNESS.md` says how its results reach the end-to-end bar.
 
 ## Traceability
 

@@ -2,6 +2,7 @@
 #
 #   just gate-fast   every agent turn (Claude Code Stop hook): lint, contract, architecture, trace coverage, unit tests
 #   just gate        exit criteria of every FEATURE and what CI runs on every PR
+#                    (on macOS it also runs `just native`, the XCUITest suite; on Linux that step says it is skipped)
 #
 # CI runs the same recipes job by job (.github/workflows/ci.yml).
 
@@ -76,6 +77,30 @@ e2e:
     pnpm --dir apps/desktop test:e2e
     python3 scripts/harness/e2e_coverage.py
 
+# Native macOS UI tests (XCUITest): the menu bar extra and its menu, tray glyphs, the non-activating
+# panels (call window, floating panel, record prompt), notifications, global hotkeys and card keys,
+# driven in the built app. macOS only; passes with a notice until apps/desktop/tests/native exists.
+# Results go to coverage/native/ and count toward the E2E bar (`just e2e`), so run this first.
+native:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rm -rf coverage/native
+    project=apps/desktop/tests/native/NoterNativeTests.xcodeproj
+    if [ "$(uname -s)" != "Darwin" ]; then echo "native: skipped, XCUITest needs macOS (CI runs it in the macos job)"; exit 0; fi
+    if [ ! -d "$project" ]; then echo "native: no native UI tests yet ($project does not exist); nothing to run"; exit 0; fi
+    if [ ! -f apps/desktop/src-tauri/Cargo.toml ]; then echo "GATE FAILED: native: $project exists but there is no app (apps/desktop/src-tauri) to drive" >&2; exit 1; fi
+    if [ -z "${NOTER_APP_PATH:-}" ]; then pnpm --dir apps/desktop tauri build --debug --bundles app; fi
+    app="${NOTER_APP_PATH:-$PWD/target/debug/bundle/macos/Noter.app}"
+    [ -d "$app" ] || { echo "GATE FAILED: native: no app bundle at $app (set NOTER_APP_PATH)" >&2; exit 1; }
+    mkdir -p coverage/native
+    status=0
+    TEST_RUNNER_NOTER_APP_PATH="$app" TEST_RUNNER_NOTER_E2E_LOG_DIR="$PWD/coverage/native" \
+      xcodebuild test -project "$project" -scheme NoterNativeUITests -destination 'platform=macOS' \
+      -resultBundlePath coverage/native/NoterNativeUITests.xcresult -quiet || status=$?
+    xcrun xcresulttool get test-results tests --path coverage/native/NoterNativeUITests.xcresult > coverage/native/xcuitest-results.json \
+      || { echo "GATE FAILED: native: could not export the XCUITest results" >&2; status=1; }
+    exit $status
+
 # Screenshot tests (98% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker
 visual:
     if [ "${NOTER_IN_PW_CONTAINER:-}" = "1" ]; then pnpm --dir apps/desktop test:visual; \
@@ -113,7 +138,7 @@ config-guard:
 gate-fast: lint contract arch trace test-unit
 
 # Full gate: the exit criteria of every FEATURE and of every pull request
-gate: lint contract arch trace cov-unit e2e visual perf docs config-guard
+gate: lint contract arch trace cov-unit native e2e visual perf docs config-guard
     @echo "All gates passed."
 
 # Alias used by FEATURE definitions of done

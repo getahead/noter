@@ -119,6 +119,42 @@ class E2eCoverageTests(unittest.TestCase):
             self.assertEqual(e2e_coverage.read_logs([pattern]), ({"log_ui"}, {"s2"}))
             self.assertEqual(e2e_coverage.invoked_commands([pattern], include_fake=True), {"app_snapshot", "log_ui"})
 
+    def test_xcuitest_runs_count_like_real_core_runs(self):
+        results = {"testNodes": [{"nodeType": "Test Plan", "name": "NoterNativeUITests", "result": "Failed", "children": [
+            {"nodeType": "Unit test bundle", "name": "NoterNativeUITests", "children": [
+                {"nodeType": "Test Suite", "name": "MenuBarTests", "children": [
+                    {"nodeType": "Test Case", "name": "test_cpt_noter_seq_menu_bar_control_recording__pause_and_resume()",
+                     "nodeIdentifier": "MenuBarTests/test_cpt_noter_seq_menu_bar_control_recording__pause_and_resume()",
+                     "result": "Passed"},
+                    {"nodeType": "Test Case", "name": "test_cpt_noter_seq_menu_bar_mute_copilot()", "result": "Failed"},
+                    {"nodeType": "Test Case", "name": "test_cpt_noter_seq_menu_bar_check_state()", "result": "Skipped"},
+                ]},
+                {"nodeType": "Test Suite", "name": "NotificationTests", "children": [
+                    {"nodeType": "Test Case", "name": "test_cpt_noter_seq_notifications_open_outputs()", "result": "Passed",
+                     "children": [{"nodeType": "Repetition", "name": "cpt_noter_seq_not_a_story", "result": "Passed"}]},
+                ]},
+            ]},
+        ]}]}
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "xcuitest-results.json").write_text(json.dumps(results))
+            Path(d, "commands-native-app-42.json").write_text(json.dumps(
+                {"suite": "native", "target": "app", "commands": ["capture_set_paused"], "stories": []}))
+            stories = e2e_coverage.xcuitest_stories([str(Path(d, "xcuitest-*.json"))])
+            self.assertEqual(stories, {"cpt-noter-seq-menu-bar-control-recording", "cpt-noter-seq-notifications-open-outputs"})
+            self.assertEqual(e2e_coverage.read_logs([str(Path(d, "commands-*.json"))]), ({"capture_set_paused"}, set()))
+        self.assertIn("coverage/native/commands-*.json", e2e_coverage.DEFAULT_COMMAND_LOGS)
+        self.assertEqual(e2e_coverage.DEFAULT_XCUITEST_RESULTS, ["coverage/native/xcuitest-*.json"])
+        self.assertEqual(e2e_coverage.xcuitest_stories([str(Path(d, "missing-*.json"))]), set())
+
+    def test_story_ids_in_swift_test_names(self):
+        self.assertEqual(e2e_coverage.story_ids("func test_cpt_noter_seq_today_tick_item__undo() {}"), {"cpt-noter-seq-today-tick-item"})
+        self.assertEqual(e2e_coverage.story_ids('test("cpt-noter-seq-today-tick-item: tick")'), {"cpt-noter-seq-today-tick-item"})
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d, "apps", "desktop", "tests", "native", "NoterNativeUITests")
+            p.mkdir(parents=True)
+            (p / "MenuBarTests.swift").write_text("func test_cpt_noter_seq_menu_bar_check_state() {}")
+            self.assertEqual(e2e_coverage.named_stories(Path(d), ["apps/desktop/tests/native"]), {"cpt-noter-seq-menu-bar-check-state"})
+
     def test_story_ids_are_found_in_test_files(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d, "tests", "e2e")
