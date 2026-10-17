@@ -24,20 +24,23 @@ jobs:
       HOME: /root
     steps:
       - run: command -v git >/dev/null || (apt-get update -q && apt-get install -y -q git)
-      - uses: actions/checkout@v4
+      # Keeps the token in .git/config: this job pushes the new baselines. It uploads no artifacts.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
         with:
           ref: ${{ github.event.pull_request.head.ref }}
-      - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile
+      - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile # zizmor: ignore[adhoc-packages]
       - run: pnpm --dir apps/desktop test:visual:update
       - name: Commit changed baselines
         id: commit
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "noter-ci"
           git config user.email "noter-ci@users.noreply.github.com"
           git add -A -- '**/__screenshots__/**'
           if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
-          git commit -m "test(visual): refresh screenshot baselines" -m "Rendered by the update-screenshots workflow in ${{ github.event.pull_request.head.sha }}."
+          git commit -m "test(visual): refresh screenshot baselines" -m "Rendered by the update-screenshots workflow in $HEAD_SHA."
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Remove the label and re-run CI on the new commit
@@ -46,11 +49,12 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           BRANCH: ${{ github.event.pull_request.head.ref }}
+          CHANGED: ${{ steps.commit.outputs.changed }}
         run: |
           api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
           api -X DELETE "https://api.github.com/repos/$REPO/issues/$PR/labels/update-screenshots" >/dev/null || true
           # Pushes made with GITHUB_TOKEN do not start workflows; a dispatch does.
-          if [ "${{ steps.commit.outputs.changed }}" = "true" ]; then
+          if [ "$CHANGED" = "true" ]; then
             api -X POST "https://api.github.com/repos/$REPO/actions/workflows/ci.yml/dispatches" -d "{\"ref\":\"$BRANCH\"}" \
               || echo "::warning::Could not dispatch CI (it must exist on main first). Push any commit to the branch to re-run the checks."
           fi

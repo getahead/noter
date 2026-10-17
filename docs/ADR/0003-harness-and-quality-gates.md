@@ -86,7 +86,7 @@ The same command (`just gate`) is the default exit criteria of every FEATURE, a 
 
 ### Confirmation
 
-The `gate` job in `.github/workflows/ci.yml` is the required status check on `main` (`scripts/ci/protect-main.sh`); `scripts/harness/tests` cover the gate scripts themselves; `config_guard.py` fails a PR that loosens `harness/*.toml` (including removing the trace gate, turning its ratchet off or narrowing its ID kinds) without the `harness-change-approved` label; `trace_gate.py` fails a PR whose trace coverage falls below the base branch's; the `macos` job runs `just native` once the Tauri app exists and hands its results to the `e2e` job, which counts them with the other end-to-end runs; the lane guard runs as a Claude Code PreToolUse hook and as the git pre-commit hook.
+The `gate` job in `.github/workflows/ci.yml` is the required status check on `main` (the `Default ruleset` in `.github/rulesets/`, applied by `scripts/ci/github-setup.sh`); `scripts/harness/tests` cover the gate scripts themselves; `config_guard.py` fails a PR that loosens `harness/*.toml` (including removing the trace gate, turning its ratchet off or narrowing its ID kinds) without the `harness-change-approved` label; `trace_gate.py` fails a PR whose trace coverage falls below the base branch's; the `macos` job runs `just native` once the Tauri app exists and hands its results to the `e2e` job, which counts them with the other end-to-end runs; the lane guard runs as a Claude Code PreToolUse hook and as the git pre-commit hook.
 
 ## Pros and Cons of the Options
 

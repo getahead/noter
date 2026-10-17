@@ -1,0 +1,70 @@
+# Dependency updates (docs/DELIVERY.md). Weekly, grouped, after a 7-day cooldown
+# so a compromised release has time to be yanked before it reaches a PR.
+# Commit prefixes follow Conventional Commits; release-please lists deps under "Dependencies".
+# Updates to .github/** are harness changes: the config guard wants `harness-change-approved`.
+version: 2
+
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "fix(deps)"
+      prefix-development: "chore(deps)"
+    labels: [dependencies]
+    open-pull-requests-limit: 5
+    ignore:
+      # Pinned exactly on purpose: specta 2 RC exporter API moves between RCs (ADR-0001).
+      - dependency-name: "specta*"
+    groups:
+      cargo-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directories: ["/", "/apps/desktop"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
+    versioning-strategy: increase
+    commit-message:
+      prefix: "fix(deps)"
+      prefix-development: "chore(deps)"
+    labels: [dependencies]
+    open-pull-requests-limit: 5
+    ignore:
+      # Moves together with the pinned Playwright container (justfile, ci.yml) and the
+      # screenshot baselines; bump by hand with `just visual-update`.
+      - dependency-name: "@playwright/test"
+      - dependency-name: "playwright*"
+      # Node major follows the runtime on the runners and on the Mac.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci(deps)"
+    labels: [dependencies]
+    groups:
+      actions:
+        patterns: ["*"]
