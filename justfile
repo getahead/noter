@@ -16,14 +16,14 @@ cfs := ".cf-studio/.core/skills/studio/scripts/studio.py"
 default:
     @just --list
 
-# One-time setup on a new machine: git hooks, toolchains, dependencies
+# Set up this machine, idempotently: git hooks, Rust toolchain and components, cargo-llvm-cov,
+# pnpm dependencies, Playwright WebKit, the Constructor Studio core; then verify and print versions
 setup:
-    git config core.hooksPath .githooks
-    python3 -c 'import sys; assert sys.version_info >= (3, 11), "the harness needs Python 3.11+ (brew install python@3.12)"'
-    rustup show active-toolchain
-    command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --locked
-    pnpm install --frozen-lockfile
-    @echo "Done. Optional: Docker (for 'just visual' outside CI), valgrind on Linux (for 'just perf')."
+    scripts/dev/setup.sh
+
+# Verify the toolchain and print versions without installing anything
+doctor:
+    scripts/dev/setup.sh --check
 
 # Format Rust code
 fmt:
@@ -75,6 +75,7 @@ e2e:
     pnpm --dir apps/desktop test:conformance
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance; fi
     pnpm --dir apps/desktop test:e2e
+    if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e; fi
     python3 scripts/harness/e2e_coverage.py
 
 # Native macOS UI tests (XCUITest): the menu bar extra and its menu, tray glyphs, the non-activating
@@ -89,6 +90,7 @@ native:
     if [ "$(uname -s)" != "Darwin" ]; then echo "native: skipped, XCUITest needs macOS (CI runs it in the macos job)"; exit 0; fi
     if [ ! -d "$project" ]; then echo "native: no native UI tests yet ($project does not exist); nothing to run"; exit 0; fi
     if [ ! -f apps/desktop/src-tauri/Cargo.toml ]; then echo "GATE FAILED: native: $project exists but there is no app (apps/desktop/src-tauri) to drive" >&2; exit 1; fi
+    if ! xcodebuild -version >/dev/null 2>&1; then echo "GATE FAILED: native: xcodebuild needs Xcode, not only the Command Line Tools (install Xcode, then: sudo xcode-select -s /Applications/Xcode.app)" >&2; exit 1; fi
     if [ -z "${NOTER_APP_PATH:-}" ]; then pnpm --dir apps/desktop tauri build --debug --bundles app; fi
     app="${NOTER_APP_PATH:-$PWD/target/debug/bundle/macos/Noter.app}"
     [ -d "$app" ] || { echo "GATE FAILED: native: no app bundle at $app (set NOTER_APP_PATH)" >&2; exit 1; }
@@ -112,9 +114,12 @@ visual-update:
     just _in-playwright "pnpm --dir apps/desktop test:visual:update"
     @echo "Baselines updated. Commit them with NOTER_ALLOW_BASELINE=1 git commit … after reviewing every image."
 
+# The pinned container as CI runs it: linux/amd64 (emulated on Apple Silicon, so local renders match
+# the baselines), with its own node_modules and pnpm store so the host's macOS install stays intact
 _in-playwright cmd:
-    docker run --rm --ipc=host -e NOTER_IN_PW_CONTAINER=1 -e CI -v "$PWD":/work -w /work {{playwright_image}} \
-      bash -c 'npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile >/dev/null && {{cmd}}'
+    docker run --rm --platform linux/amd64 --ipc=host -e NOTER_IN_PW_CONTAINER=1 -e CI \
+      -v "$PWD":/work -v /work/node_modules -v /work/apps/desktop/node_modules -w /work {{playwright_image}} \
+      bash -c 'npm install -g --silent pnpm@10.28.0 && { out=$(pnpm install --frozen-lockfile --store-dir /root/.pnpm-store 2>&1) || { echo "$out"; exit 1; }; } && {{cmd}}'
 
 # Performance: scenario coverage (60%) and head vs base (<= 10% worse). Instruction counts on Linux, wall time (report only) elsewhere
 perf:
