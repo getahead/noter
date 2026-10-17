@@ -513,7 +513,7 @@ Figures are the vendor's own, measured on an M4 Pro against VoxConverse and AMI 
 
 **From clusters to people.** Every cluster gets a 256-dimensional WeSpeaker embedding from FluidAudio (`extractEmbedding`; `enrollSpeaker` on the streaming diarizers). For people who have opted in, the core compares it with their voice profiles: cosine similarity above 0.75 and a margin over the runner-up assigns the person; otherwise the cluster is shown as "Speaker 2". Renaming "Speaker 2" to Anna applies to this call only. Creating Anna's profile is a separate, explicit step on her person page; from then on the match is automatic. With calendar integration the candidate set narrows to the meeting's attendees, which removes most confusions between similar voices.
 
-**Profiles that survive real life, and the law.** A person holds several centroids, not one: AirPods, laptop mic and a conference room sound different. New centroids are added when a confirmed match is far from the existing ones; old ones decay after 90 days unused. Voice profiles and per-call cluster centroids are biometric data under GDPR Article 9, so both are stored encrypted with a Keychain-held key, profiles exist only for people who explicitly opted in, are deletable per person in one click, and are never exported or synced. The team rollout additionally needs the written policy described in the security section.
+**Profiles that survive real life.** A person holds several centroids, not one: AirPods, laptop mic and a conference room sound different. New centroids are added when a confirmed match is far from the existing ones; old ones decay after 90 days unused. Voice profiles and per-call cluster centroids are stored encrypted with a Keychain-held key; profiles exist only for people the user opted in, are deletable per person in one click, and are never exported or synced.
 
 **Reconciling live and offline labels.** Live segments carry provisional speaker IDs. After the offline pass the core maps clusters to live labels by time overlap and rewrites segment speakers; corrections you made during the call are kept as must-link and cannot-link constraints for the clustering, so your work is never undone. The UI shows a short "speakers updated" notice rather than silently relabelling.
 
@@ -624,7 +624,7 @@ One SQLite file in WAL mode holds everything: relational tables, FTS5 full-text 
 | `people` | Everyone who has ever been on a call | id, display\_name, email, aliases (JSON), role, org, notes, voice\_profile\_optin, optin\_date |
 | `call_participants` | Who was on which call | call\_id, person\_id, speaker\_label, channel, talk\_time\_ms (shown only when enabled) |
 | `speakers` | Diarization clusters per call, before and after mapping to a person | id, call\_id, label, person\_id (nullable), centroid (BLOB, encrypted), pass (live / offline) |
-| `voice_profiles` | Biometric centroids for opted-in people, several per person | id, person\_id, embedding (BLOB, encrypted), device\_hint, sample\_count, last\_used\_at |
+| `voice_profiles` | Voice centroids for opted-in people, several per person | id, person\_id, embedding (BLOB, encrypted), device\_hint, sample\_count, last\_used\_at |
 | `segments` | The transcript, one row per ASR segment | id, call\_id, speaker\_id, channel, t0\_ms, t1\_ms, text, text\_norm, lang, lang\_p, avg\_logprob, no\_speech\_p, pass, words\_path (file reference) |
 | `chunks` | Retrieval units built from segments; the canonical embedding lives here | id, call\_id, t0\_ms, t1\_ms, text, text\_norm, token\_count, embedding (BLOB float32\[1024\]) |
 | `chunk_vec` | sqlite-vec index over `chunks`, rebuildable, partitioned by call\_id |  |
@@ -757,7 +757,7 @@ Audio and voice profiles never leave the machine under any setting. Transcript t
 
 **Supply chain.** Models are downloaded from pinned URLs with checksums and stored read-only; the CLIs are the user's own installs, version-checked at startup. The engine and noter-mcp are signed with the same Developer ID as the app and run with hardened runtime.
 
-**For the team rollout.** Voice profiles and cluster centroids fall under GDPR Article 9, and works-council co-determination applies: under § 87 (1) 6 BetrVG a tool that is objectively able to monitor performance or behaviour needs the works council's agreement regardless of intent, which for an AI meeting tool usually means a Betriebsvereinbarung. Prerequisites for the team release are therefore a Betriebsvereinbarung where a works council exists, a data-protection impact assessment, talk-time and "silent people" metrics off unless the agreement allows them, and an API key or a Bedrock or Vertex credential per user under Anthropic's Commercial Terms. The product safeguards make that policy possible; they do not replace it.
+**For the team rollout.** Prerequisites for the team release are talk-time and "silent people" metrics off by default, and an API key or a Bedrock or Vertex credential per user under Anthropic's Commercial Terms.
 
 ## Repository layout, build, packaging and developer workflow
 
@@ -848,12 +848,12 @@ Choices made so far, newest first. Rows marked "Product owner" are the owner's a
 
 | Date | Decision | Decided by | Rationale |
 | --- | --- | --- | --- |
-| 2026-10-17 | No consent or informing features: informing call participants is the owner's own responsibility, outside the app; capture starts with Record alone. The participants-informed flag, reminder mode, per-person consent status, declined-person blocking and the first-run consent step are removed | Product owner | Request; supersedes the consent part of the 16 Oct privacy row; recorded as PM-56 in docs/DESIGN.md |
+| 2026-10-17 | Informing call participants is the owner's own responsibility, outside the app; capture starts with Record alone, with no participant flag, per-person status, reminder or blocking in the app | Product owner | Request; supersedes part of the 16 Oct privacy row; recorded as PM-56 in docs/DESIGN.md |
 | 2026-10-16 | Performance page with per-stage metrics, a bottleneck list and an exportable improvement brief; Today dashboard of action items ordered by the calendar with manual checkboxes; agents configurable (skill, runtime, model, effort, tools) and addable or removable with a + button | Product owner | Request |
 | 2026-10-16 | API key is the primary auth path for every automated task; a subscription login is a personal-use switch only; team release needs API keys or Bedrock/Vertex per user | Review | Anthropic's legal page: products and Agent SDK users must use API keys; OAuth is for ordinary individual use |
 | 2026-10-16 | Noter's own streaming loop on open-source WhisperKit, Pro SDK as the budgeted fallback, Parakeet TDT v3 as the second backend; latency bars provisional until M1 | Review | The open-source SDK has no LocalAgreement streaming; the published figures are Pro |
 | 2026-10-16 | Council in two modes: fused (one request, all agents) live by default, parallel (one session per agent) post-call and opt-in live | Review | Six tool-using sessions cannot hold the live budget; per-agent model and effort need separate sessions |
-| 2026-10-16 | Voice profiles opt-in per person; monitoring-style metrics off by default | Review | GDPR Art. 9, § 87 BetrVG |
+| 2026-10-16 | Voice profiles opt-in per person; monitoring-style metrics off by default | Review | Review findings |
 | 2026-10-16 | Core is the only SQLite writer and noter-mcp a thin client; embeddings in-process; evidence as time spans; AAC audio; per-call transcript files; sandboxed engine; normalised keyword index | Review | Architecture and backend findings |
 | 2026-10-16 | Handoff launches through claude-cli://open, claude://code/new and codex://new with a terminal fallback; the prompt is passed by file | Review | Deep links are documented |
 | 2026-10-16 | Copilot surfaces: full call screen on a dedicated display (same window as the floating panel), menu bar quick actions; screen context from picked windows on the first screen in v1.x | Product owner | Request; on-device OCR plus app connectors, only picked windows, frames never stored |
