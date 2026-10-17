@@ -24,10 +24,11 @@ jobs:
       HOME: /root
     steps:
       - run: command -v git >/dev/null || (apt-get update -q && apt-get install -y -q git)
-      # Keeps the token in .git/config: this job pushes the new baselines. It uploads no artifacts.
+      # Checkout the immutable PR head commit; do not persist credentials from checkout.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 # zizmor: ignore[artipacked]
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile # zizmor: ignore[adhoc-packages]
       - run: pnpm --dir apps/desktop test:visual:update
       - name: Commit changed baselines
