@@ -31,7 +31,7 @@
   const routeHelp = {
     headphones: 'Play this line',
     speakers: 'Replay is off while recording on speakers: the call would hear it. Use headphones, or replay after the call.',
-    unknown: "Noter can't tell whether this output is headphones. Choose Headphones in Settings › Audio & Transcription to replay while recording.",
+    unknown: "Noter can't tell whether this output is headphones. Mark it as headphones in Settings › Audio & Transcription to replay while recording.",
     'not-excluded': "Replay would be recorded. Turn on Exclude Noter's own sounds in Settings › Audio & Transcription.",
   };
 
@@ -282,17 +282,19 @@
     const fb = L.keyTaken && !L.keyTakenSeen
       ? C.inlineStatus(raw('Card key ' + P.kbd('⌃⌥⌘3') + ' is used by another app'), { variant: 'notice', actionLabel: 'Change…', action: ['settings.open', { pane: 'hotkeys' }] })
       : feedback ? C.inlineStatus(feedback, { variant: /^No card/.test(feedback) ? 'notice' : 'blind', actionLabel: L.lastCardAction ? 'Undo' : null, action: ['cw.undoCard'], kbd: L.lastCardAction ? '⌃⌥⌘Z' : null }) : '';
-    const recInd = C.recordingIndicator({ variant: 'dot-text', status: stopped ? 'stopped' : paused ? 'paused' : L.micOnly ? 'mic-only' : 'recording', clock: false });
+    const engineStopped = !stopped && !!L.engineStopped;
+    const recInd = C.recordingIndicator({ variant: 'dot-text', status: stopped ? 'stopped' : NP.liveStatus(), clock: false });
     const pinnedBtn = copilotOff ? '' : P.button(L.pinned.length + ' Pinned', { size: 'small', anchor: 'cw-pinned', action: ['cw.pinnedPopover'], icon: 'pin' });
     if (variant === 'compact') {
       const anchor = 'cw-fp-more';
-      NP._menus[anchor] = [
+      NP._menus[anchor] = (engineStopped ? [{ label: 'Try Again', action: ['cw.engineRetry'] }] : [
         paused ? { label: 'Resume', kbd: '⌃⌥⌘P', action: ['cw.pause'] } : { label: 'Pause', kbd: '⌃⌥⌘P', action: ['cw.pause'] },
         { label: 'Stop Recording', kbd: '⌃⌥⌘R', action: ['cw.stop', { how: 'manual' }] },
+      ]).concat([
         { divider: true },
         { label: 'Ask…', kbd: '⌃⌥⌘A', action: ['cw.ask'] },
-      ];
-      return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'compact', state: stopped ? 'stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--compact' },
+      ]);
+      return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'compact', state: stopped ? 'stopped' : engineStopped ? 'engine-stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--compact' },
         html`${fb ? html`<div class="cw-strip__fb">${fb}</div>` : ''}<div class="cw-strip__row">
         ${P.button('Mark Moment', { size: 'small', flashKey: 'cw-mark', action: ['cw.mark'], help: 'Mark Moment (⌃⌥⌘M)' })}
         ${copilotOff ? '' : P.button('Catch Me Up', { size: 'small', action: ['cw.catchUp'], help: 'Catch Me Up (⌃⌥⌘C)' })}
@@ -301,14 +303,14 @@
         ${copilotOff ? '' : html`<span class="cw-strip__budget np-tnum${budgetWarn ? ' is-warn' : ''}" title="Copilot budget for this call">${budgetWarn ? icon('warning', { size: 11 }) : ''}${budgetText.replace(' of ', ' / ')}</span>`}
         </div>`);
     }
-    return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'dedicated', state: stopped ? 'stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--dedicated', region: 'CS-R5' },
+    return comp('call-status-strip', { variant: copilotOff ? 'copilot-off' : 'dedicated', state: stopped ? 'stopped' : engineStopped ? 'engine-stopped' : paused ? 'paused' : budgetWarn ? 'budget-near-cap' : 'recording', cls: 'cw-strip cw-strip--dedicated', region: 'CS-R5' },
       html`<span class="cw-strip__clock t-title2 np-tnum">${NP.clock(false)}</span>
       ${recInd}
       ${copilotOff ? '' : html`<span class="cw-strip__budget np-tnum${budgetWarn ? ' is-warn' : ''}">${budgetWarn ? icon('warning', { size: 12 }) : ''}Budget ${budgetText}</span>`}
       ${pinnedBtn}
       <span class="cw-strip__fb">${fb}</span>
       <span class="np-tb__spacer"></span>
-      ${stopped ? '' : html`${P.button('Mark Moment', { kbd: '⌃⌥⌘M', flashKey: 'cw-mark', action: ['cw.mark'] })}
+      ${stopped ? '' : engineStopped ? P.button('Try Again', { variant: 'primary', action: ['cw.engineRetry'] }) : html`${P.button('Mark Moment', { kbd: '⌃⌥⌘M', flashKey: 'cw-mark', action: ['cw.mark'] })}
       ${copilotOff ? '' : P.button('Catch Me Up', { kbd: '⌃⌥⌘C', action: ['cw.catchUp'] })}
       ${P.button(paused ? 'Resume' : 'Pause', { kbd: '⌃⌥⌘P', variant: paused ? 'primary' : 'secondary', action: ['cw.pause'] })}
       <span class="cw-strip__gap"></span>

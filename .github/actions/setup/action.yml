@@ -1,0 +1,36 @@
+name: Noter toolchains
+description: Rust (pinned by rust-toolchain.toml), just, Node 22 with pnpm, and the workspace dependencies.
+inputs:
+  rust:
+    description: Install the Rust toolchain and cache
+    default: "true"
+  node:
+    description: Install Node, pnpm and the workspace dependencies
+    default: "true"
+  tools:
+    description: Extra cargo tools for taiki-e/install-action (comma separated)
+    default: just
+runs:
+  using: composite
+  steps:
+    - if: inputs.rust == 'true'
+      shell: bash
+      run: rustup show active-toolchain || rustup toolchain install
+    - if: inputs.rust == 'true'
+      uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: noter-${{ runner.os }}
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: ${{ inputs.tools }}
+    - if: inputs.node == 'true'
+      uses: pnpm/action-setup@v4
+    - if: inputs.node == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+    - if: inputs.node == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile

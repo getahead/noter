@@ -1,0 +1,6 @@
+# Pinned so clippy lints, coverage and instruction counts do not change under us
+# (docs/ADR/0003). Bump deliberately, in its own PR.
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy", "llvm-tools-preview"]
+profile = "minimal"

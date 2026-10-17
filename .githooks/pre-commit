@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Noter pre-commit (installed by `just setup`): the lane guard over staged files,
+# for every tool and every agent, plus formatting of staged Rust.
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+python3 "$root/scripts/harness/lane_guard.py" staged
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.rs$'; then
+  cargo fmt --all -- --check >/dev/null 2>&1 || { echo "pre-commit: run 'just fmt' (Rust formatting)"; exit 1; }
+fi

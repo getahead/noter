@@ -1,6 +1,6 @@
 # Noter clickable prototype
 
-**Status: the UI prototype of record (PM-59, 17 October 2026).** It matches `docs/DESIGN.md` v1.0 (accepted 17 October 2026) and `docs/PRD.md` as synced on 17 October 2026. DESIGN describes each screen and component in words; this prototype shows how they look and behave. The raw boards in `docs/prototype/` are kept as history only. If you find a difference between this prototype and DESIGN or the PRD, treat it as a bug in whichever is wrong and fix both in the same change.
+**Status: the UI prototype of record (PM-59, 17 October 2026).** It matches `docs/DESIGN.md` v1.1 (17 October 2026, with the owner decisions of `docs/REVIEW-2026-10-17-design-core.md`) and `docs/PRD.md` as synced on 17 October 2026. DESIGN describes each screen and component in words; this prototype shows how they look and behave. The raw boards in `docs/prototype/` are kept as history only. If you find a difference between this prototype and DESIGN or the PRD, treat it as a bug in whichever is wrong and fix both in the same change.
 
 - `noter-prototype.html` is the whole prototype in one file, with no build step and no network access. Open it in any browser.
 - `src/` holds the modules it is assembled from. Run `python3 build.py` to rebuild `dist/noter-prototype.html`.
@@ -8,7 +8,7 @@
 ## What it covers
 
 - **Surfaces:** the main window with all its pages, the call window in both layouts plus the collapsed strip, the record prompt, the menu bar extra, the first-run wizard, the Settings window (11 panes, using DESIGN's pane list) and notifications. 33 dialogs (sheets, alerts and popovers) open from **Dialogs ▾**.
-- **Screens and states:** all 16 DESIGN screens. Every row of each screen's **States** table that looks different is selectable from **State ▾**, plus seven account states. That makes 333 screen and state combinations, all checked for errors.
+- **Screens and states:** all 16 DESIGN screens. Every row of each screen's **States** table that looks different is selectable from **State ▾**, plus seven account states. That makes 343 screen and state combinations, all checked for errors.
 - **Components:** all 75 component IDs from DESIGN 3.2 (shells, screens and complex components) and 25 of the 26 primitives appear somewhere. Help tags (tooltips) are carried as `title`/`data-help-tag` instead of `data-primitive`.
 - **Clickable paths:** the main user paths of DESIGN 3.6 work end to end. For example: Record → call window → pin and dismiss cards → Stop Recording → closing state → Open in Noter → Call page → review the suggested items → hand off to Claude Code. Others: search → results → Call page at the span; Ask with citations; Person page; Activity proposals with Undo and Redo; Settings › replace a rejected API key.
 
@@ -19,12 +19,24 @@
 | Surface tabs | Switch between the windows and panels |
 | Dialogs ▾ | Open any sheet, alert or popover from Screen — Dialogs |
 | State ▾ | Show the current screen in another state from its DESIGN States table |
-| Capture ▾ | Idle, recording or paused; setup scenarios (audio access missing, self-test not passed, no assistant); **Claude account signed in** and **ChatGPT account signed in**; **Increase contrast** (macOS accessibility) |
+| Capture ▾ | Idle, recording or paused; setup scenarios (microphone access off, system audio access off, self-test not passed, no assistant). None of them blocks **Record**: a capture started with access off shows **Microphone off** or **System audio silent**, and an unpassed self-test only keeps call detection off (PM-60). Also **Claude account signed in** and **ChatGPT account signed in**; **Increase contrast** (macOS accessibility) |
 | Auto / Light / Dark | Appearance |
 | **Inspect** | Hover any element to see its component, primitive, variant, state and region. Click it to pin the details in the panel |
 | **Components** | Lists every component kind on the current view with counts, variants and states. Click a row to highlight it |
 
-The call window adds its own prototype bar: layout, output route, a simulated new card, card keys, and making the panel key.
+The call window adds its own prototype bar: layout, output route (headphones, speakers, not identified), a simulated new card, card keys, and making the panel key.
+
+## Owner decisions of 17 October (DESIGN v1.1)
+
+The backend design review (`docs/REVIEW-2026-10-17-design-core.md`) changed these, as DESIGN's PM-60 to PM-67 describe:
+
+- **Record always works** (PM-60). No start control reads **Finish Setup…**; it stays only as a link on Today's setup banner and in the menu bar. **Record** is dimmed only below 500 MB free (record prompt) or while the speech model downloads (Today › State ▾ › **Speech model not downloaded yet**). New call-window states **Microphone off** and **System audio silent** (renamed from System audio lost), with the indicator **Recording · no mic** or **Recording · mic only**.
+- **Not recording · engine stopped** with **Try Again** (PM-67): call window, Today, menu bar and NT-3.
+- **Notifications** (PM-67): NT-3 now covers system audio silent, microphone off and engine stopped; it is never held and not sent while hidden for presenting.
+- **Today ranking** (PM-63): Settings › General › **Ranking** offers **Owed to today's people, then due date** (default) and **Due date, then owed to you**.
+- **Agents** (PM-64): an agent switches itself off for a call type at 80 % dismissed over the last 10 calls; Agents › State ▾ › **Agent switched itself off** shows the one-time announcement with **Undo**.
+- **Settings** (PM-65, PM-67): **Output devices** with **Treat as headphones** per not-identified device (no speakers-with-echo-cancellation option); the **Audio retention** line says how many calls' audio the next nightly run deletes; the talk-time footnote says the metrics count only from when they are switched on.
+- **Today** quit banner: a close × ends the **Resume Recording** offer (PM-67).
 
 ## Handoff contract: which component to use
 

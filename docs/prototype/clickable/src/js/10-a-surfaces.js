@@ -29,7 +29,8 @@
     { id: 'default', label: 'Call detected' },
     { id: 'event', label: 'Matched calendar event' },
     { id: 'not-a-call', label: 'Not a call (Safari)' },
-    { id: 'disk-low', label: 'Disk below 500 MB' },
+    { id: 'disk-full', label: 'Disk below 500 MB' },
+    { id: 'model-missing', label: 'Speech model not downloaded yet' },
     { id: 'system-audio-off', label: 'System audio access off' },
     { id: 'call-ended', label: 'Call ended, call window hidden' },
     { id: 'new-meeting', label: 'New meeting, call window hidden' },
@@ -50,7 +51,7 @@
       const d = ctx.demo;
       const L = ctx.local;
       const noPrompt = d === 'setup-incomplete' || d === 'hidden' || L.closed;
-      const variant = { 'disk-low': 'disk-low', 'system-audio-off': 'system-audio-off', 'call-ended': 'call-ended', 'new-meeting': 'new-meeting' }[d] || 'default';
+      const variant = { 'disk-full': 'disk-full', 'model-missing': 'model-missing', 'system-audio-off': 'system-audio-off', 'call-ended': 'call-ended', 'new-meeting': 'new-meeting' }[d] || 'default';
       const app = d === 'not-a-call' ? 'Safari' : 'Microsoft Teams';
       let note = '';
       if (noPrompt) {
@@ -58,7 +59,7 @@
           : L.closed === 'started' ? 'Recording started; the call window opened without taking focus.'
           : L.closed === 'dont-ask' ? `${app} is now listed in Settings › General › Apps Noter doesn't ask about, with Remove.`
           : L.closed === 'kept' ? 'The prompt closed and recording goes on. The notice comes back after the next 20 s of silence.'
-          : d === 'setup-incomplete' ? 'No prompt: call detection is off until setup is complete. The menu bar shows Setup incomplete · call detection off.'
+          : d === 'setup-incomplete' ? 'No prompt: call detection is off until the self-test passes. The menu bar shows Setup incomplete · call detection off with the Finish Setup… link, and Start Recording works as always.'
           : d === 'hidden' ? 'No prompt while Noter is hidden for presenting. The menu bar offers Call Detected · Start Recording.'
           : 'The prompt closed after 15 s without an answer. The menu bar offers Call Detected · Start Recording for as long as the call runs.';
         note = html`<div class="a-note" data-proto-chrome><p>${why}</p><div class="a-note__btns"><button type="button" class="np-hbar__btn" ${act('rp.openMenu')}>Show the menu bar</button><button type="button" class="np-hbar__btn" ${act('proto.setDemo', { key: 'record', id: 'default' })}>Show the prompt again</button></div></div>`;
@@ -74,6 +75,7 @@
   NP.onMany({
     'rp.record': (a) => {
       NP.freshCall();
+      if (a && a.sysOff) state.setup.sysGranted = false;
       if (a && a.sensitive) state.rec.mode = 'Sensitive · local'; else if (state.rec.mode === 'Sensitive · local') state.rec.mode = 'Cloud, redacted';
       NP.startRecording({ offsetMs: 12000 });
       NP.local('rp').closed = 'started';
@@ -129,14 +131,16 @@
     { id: 'paused-5', label: 'Paused for 5 minutes' },
     { id: 'switched-local', label: 'Switched to local' },
     { id: 'setup-incomplete', label: 'Setup incomplete' },
-    { id: 'audio-never', label: 'Audio access never granted' },
+    { id: 'audio-not-granted', label: 'Audio access not granted yet' },
     { id: 'muted', label: 'Copilot muted' },
     { id: 'call-detected', label: 'Call detected, not recorded' },
     { id: 'call-ended', label: 'Call seems to have ended' },
     { id: 'hidden', label: 'Hidden for presenting' },
     { id: 'hidden-ended', label: 'Call ended while hidden' },
+    { id: 'hidden-new-meeting', label: 'New meeting while hidden' },
     { id: 'closing', label: 'After a stop (Continue Recording)' },
     { id: 'capture-problem', label: 'Capture problem, no surface visible' },
+    { id: 'engine-stopped', label: 'Not recording · engine stopped' },
     { id: 'no-hotkey', label: 'Hotkey not registered' },
   ];
   const mi = (label, o) => {
@@ -150,10 +154,10 @@
     const d = ctx.demo;
     const L = ctx.local;
     let mode = state.rec.status === 'idle' ? 'idle' : state.rec.status;
-    if (d === 'idle' || d === 'call-detected' || d === 'setup-incomplete' || d === 'audio-never' || d === 'closing') mode = 'idle';
-    if (['recording', 'switched-local', 'muted', 'call-ended', 'hidden', 'hidden-ended', 'capture-problem', 'no-hotkey'].includes(d)) mode = 'recording';
+    if (d === 'idle' || d === 'call-detected' || d === 'setup-incomplete' || d === 'audio-not-granted' || d === 'closing' || d === 'engine-stopped') mode = 'idle';
+    if (['recording', 'switched-local', 'muted', 'call-ended', 'hidden', 'hidden-ended', 'hidden-new-meeting', 'capture-problem', 'no-hotkey'].includes(d)) mode = 'recording';
     if (d === 'paused-5') mode = 'paused';
-    const hidden = d === 'hidden' || d === 'hidden-ended' || !!L.hidden;
+    const hidden = d === 'hidden' || d === 'hidden-ended' || d === 'hidden-new-meeting' || !!L.hidden;
     const muted = d === 'muted' || !!L.muted;
     return { d, L, mode, hidden, muted, glyph: mode === 'idle' ? 'idle' : mode === 'paused' ? 'paused' : muted ? 'muted' : 'recording' };
   };
@@ -162,30 +166,40 @@
     const { d, L, mode, hidden, muted } = m;
     const noKey = d === 'no-hotkey';
     const title = D.call(state.rec.callId).title;
+    const setupIncomplete = d === 'setup-incomplete' || d === 'audio-not-granted' || (d === 'default' && (state.setup.selfTestPassed === false || state.setup.micGranted === false || state.setup.sysGranted === false));
+    const health = NP.captureHealth();
     const r2 = [];
-    if (mode === 'idle') {
+    if (d === 'engine-stopped') {
+      r2.push(mi(html`<span class="mb-warnline">Not recording · engine stopped</span>`, { info: true }));
+      r2.push(mi(html`<span lang="en">${title}</span> · saved up to 00:31:40`, { info: true }));
+    } else if (mode === 'idle') {
       if (d === 'closing' || L.closing) r2.push(mi(state.lastStop && state.lastStop.auto ? 'Stopped at 11:02 · the call had ended · 48 min saved' : 'Saved · 48 min · Summary in about 2 minutes', { info: true }));
       else r2.push(mi('Noter — Not recording', { info: true }));
       if (d === 'call-detected' || (hidden && d !== 'hidden-ended')) r2.push(mi('Call Detected · Start Recording', { action: 'mb.start' }));
-      if (d === 'setup-incomplete') { r2.push(mi('Setup incomplete · call detection off', { info: true })); r2.push(mi('Finish Setup…', { action: 'mb.finishSetup' })); }
+      if (setupIncomplete) { r2.push(mi('Setup incomplete · call detection off', { info: true })); r2.push(mi('Finish Setup…', { action: 'mb.finishSetup' })); }
       r2.push(mi('Next: Stand-up 11:00', { info: true }));
     } else {
       if (d === 'call-ended') r2.push(mi('Call seems to have ended · stopping in 8 s', { info: true }));
       else if (d === 'hidden-ended') r2.push(mi('Call seems to have ended', { info: true }));
+      else if (d === 'hidden-new-meeting') r2.push(mi(html`A new meeting may have started: <span lang="en">1:1 with Anna K.</span>`, { info: true }));
       else if (mode === 'paused') r2.push(mi('Paused for 5 min', { info: true }));
       else r2.push(mi(html`Recording · <span lang="en">${title}</span> · ${NP.clock(true)}`, { info: true }));
       r2.push(mi(html`4 speakers · EN / RU · ${C.modeIndicator({ variant: 'menu-line', mode: d === 'switched-local' ? 'Switched to local' : state.rec.mode })}`, { info: true }));
       if (d === 'switched-local') r2.push(mi('Switched to local', { info: true }));
-      if (d === 'capture-problem') r2.push(mi(html`<span class="mb-warnline">System audio lost</span>`, { info: true }));
+      if (d === 'capture-problem' || health === 'mic-only') r2.push(mi(html`<span class="mb-warnline">System audio silent</span>`, { info: true }));
+      else if (health === 'no-mic') r2.push(mi(html`<span class="mb-warnline">Microphone off</span>`, { info: true }));
       if (hidden) r2.push(mi('Hidden for presenting', { info: true }));
     }
     const r3 = [];
-    if (mode === 'idle') {
+    if (d === 'engine-stopped') {
+      r3.push(mi('Try Again', { action: 'mb.retryEngine' }));
+    } else if (mode === 'idle') {
       if (d === 'closing' || L.closing) r3.push(mi('Continue Recording', { action: 'mb.continue' }));
-      if (d === 'audio-never' || !state.setup.audioGranted) r3.push(mi('Finish Setup…', { action: 'mb.finishSetup' }));
-      else r3.push(mi('Start Recording', { kbd: '⌃⌥⌘R', action: 'mb.start', noKey }));
+      /* PM-60: Start Recording is never replaced by Finish Setup… */
+      r3.push(mi('Start Recording', { kbd: '⌃⌥⌘R', action: 'mb.start', noKey }));
     } else {
       if (d === 'call-ended') { r3.push(mi('Keep Recording', { action: 'mb.keep' })); r3.push(mi('Stop Now', { action: 'mb.stop' })); }
+      if (d === 'hidden-new-meeting') { r3.push(mi('Start as New Call', { action: 'mb.newCall' })); r3.push(mi('Keep in This Call', { action: 'mb.keepInCall' })); }
       r3.push(mi('Stop Recording', { kbd: '⌃⌥⌘R', action: 'mb.stop', noKey }));
       r3.push(mode === 'paused' ? mi('Resume', { kbd: '⌃⌥⌘P', action: 'mb.pause', noKey }) : mi('Pause', { kbd: '⌃⌥⌘P', action: 'mb.pause', noKey }));
     }
@@ -220,8 +234,9 @@
       const L = NP.local('menubar');
       L.closing = false; L.hidden = false; L.muteOpen = false; L.open = true;
       L.muted = id === 'muted' ? 'call' : null;
-      if (id === 'audio-never') state.setup.audioGranted = false;
-      if (id === 'idle' || id === 'call-detected') state.setup.audioGranted = true;
+      if (id === 'audio-not-granted') state.setup.sysGranted = false;
+      if (id === 'idle' || id === 'call-detected') { state.setup.micGranted = true; state.setup.sysGranted = true; }
+      if (id === 'engine-stopped' && isRec()) state.rec.status = 'idle';
     },
     render: (ctx) => {
       const m = mbModel(ctx);
@@ -241,6 +256,8 @@
   });
 
   NP.onMany({
+    'mb.newCall': () => { state.demo.menubar = 'hidden'; NP.flash('proto', 'Saved the call and started “1:1 with Anna K.” (capture_answer_new_meeting: start_as_new_call)', 4000); },
+    'mb.keepInCall': () => { state.demo.menubar = 'hidden'; NP.flash('proto', 'Kept in this call', 3000); },
     'mb.toggle': () => { const L = NP.local('menubar'); L.open = !L.open; L.muteOpen = false; },
     'mb.start': () => {
       const L = NP.local('menubar');
@@ -251,6 +268,7 @@
       state.demo.menubar = 'default'; state.surface = 'call';
     },
     'mb.finishSetup': () => { const F = NP.local('firstrun'); F.step = 2; state.surface = 'firstrun'; },
+    'mb.retryEngine': () => { NP.startRecording({ offsetMs: 31 * 60000 + 40000 }); state.demo.menubar = 'default'; NP.flash('proto', 'Recording again in the same call · gap row Engine stopped 00:31:40–00:32:15', 3000); },
     'mb.stop': () => { state.rec.status = 'idle'; const L = NP.local('menubar'); L.closing = true; state.lastStop = { auto: false }; state.demo.menubar = 'default'; },
     'mb.keep': () => { state.demo.menubar = 'recording'; },
     'mb.continue': () => { NP.startRecording({ offsetMs: 48 * 60000 }); NP.local('menubar').closing = false; state.demo.menubar = 'default'; state.surface = 'call'; NP.flash('call-status', 'Continued · gap row Stopped 11:02–11:04', 4000); },
@@ -439,7 +457,8 @@
       const L = F();
       L.marks[5] = 'done';
       const stS = NP.local('selftest-fr').state;
-      state.setup.audioGranted = L.perms.mic === 'granted' && L.perms.sys === 'granted';
+      state.setup.micGranted = L.perms.mic === 'granted';
+      state.setup.sysGranted = L.perms.sys === 'granted';
       state.setup.selfTestPassed = stS === 'passed' || stS === 'exclusion-off' || stS === 'exclusion-failed';
       state.setup.assistant = (L.keyState.anthropic === 'stored' || L.keyState.codex === 'stored' || L.ollama === 'detected' || (NP.auth && (NP.auth.signedIn('claude') || NP.auth.signedIn('chatgpt')))) ? 'api-key' : 'none';
       state.demo.today = 'default';
@@ -530,7 +549,9 @@
   const NT_STATES = [
     { id: 'default', label: 'Outputs ready (NT-1)' },
     { id: 'failed', label: 'Outputs failed (NT-2)' },
-    { id: 'capture', label: 'Capture problem, call window hidden (NT-3)' },
+    { id: 'capture', label: 'System audio silent, call window hidden (NT-3)' },
+    { id: 'capture-mic', label: 'Microphone off, call window hidden (NT-3)' },
+    { id: 'capture-engine', label: 'Not recording · engine stopped (NT-3)' },
     { id: 'several', label: 'Several calls in a row' },
     { id: 'not-asked', label: 'Permission not asked yet' },
     { id: 'denied', label: 'Permission denied' },
@@ -541,7 +562,9 @@
     html`<span class="nt-banner__icon" aria-hidden="true">${icon('noter', { size: 22 })}</span><span class="nt-banner__text"><span class="nt-banner__top"><strong>${title}</strong><span class="np-dim">now</span></span><span class="nt-banner__body" lang="en">${body}</span></span>`);
   const NT1 = () => banner('nt-1', 'Summary ready', 'Planning: VHI 8.0 drawer redesign · 4 action items, 2 decisions', 'ntf.open', { callId: 'c-live' }, 'c-live');
   const NT2 = () => banner('nt-2', "Couldn't write the summary", 'Planning: VHI 8.0 drawer redesign · open the call to try again', 'ntf.open', { callId: 'c-live', failed: true }, 'c-live');
-  const NT3 = () => banner('nt-3', 'System audio lost', 'Recording continues with your microphone.', 'ntf.call', {}, 'capture');
+  const NT3 = (k) => k === 'mic' ? banner('nt-3', 'Microphone off', 'Recording continues with the other side only.', 'ntf.call', {}, 'capture')
+    : k === 'engine' ? banner('nt-3', 'Not recording · engine stopped', 'Open the call window to try again.', 'ntf.call', { engine: true }, 'capture')
+    : banner('nt-3', 'System audio silent', 'Recording continues with your microphone.', 'ntf.call', {}, 'capture');
 
   NP.surface('notifications', {
     label: 'Notifications',
@@ -553,11 +576,14 @@
       if (d === 'default') banners = [NT1()];
       if (d === 'failed') banners = [NT2()];
       if (d === 'capture') banners = [NT3()];
+      if (d === 'capture-mic') banners = [NT3('mic')];
+      if (d === 'capture-engine') banners = [NT3('engine')];
+      if (d.startsWith('capture')) note = html`<p>NT-3 is sent at once, never held, while no call surface is visible. It is not sent while Noter is hidden for presenting: then only the menu bar's degraded line shows the problem.</p>`;
       if (d === 'several') banners = [NT1(), banner('nt-1', 'Summary ready', 'Backend sync · 2 action items, 1 decision', 'ntf.open', { callId: 'c-backend' }, 'c-backend')];
       if (d === 'not-asked') note = html`<p>No notification is sent before you allow them. After the first recorded call the Call page shows this banner:</p>${C.inlineBanner({ severity: 'info', text: 'Get a notification when a summary is ready.', actions: [{ label: 'Notify Me When Summaries Are Ready', action: ['ntf.allow'] }], dismissible: true })}`;
       if (d === 'denied') note = html`<p>No notification after the next call. The Call page still loads without taking focus, the menu bar offers <strong>Open Last Summary — Design review · 09:30</strong>, and Settings › General shows:</p>${C.inlineBanner({ severity: 'warning', text: 'Notifications are off for Noter', actions: [{ label: 'Open System Settings…', action: ['proto.flash', { key: 'proto', text: 'Opens System Settings › Notifications › Noter' }] }] })}`;
       if (d === 'window-front') note = html`<p>No notification: the main window already shows this call. The page announces <strong>Summary ready</strong> politely to VoiceOver.</p>`;
-      if (d === 'held') note = html`<p>Nothing arrives while a call records or while Noter is hidden for presenting. When capture stops or Noter is shown again, the held notifications arrive, one per call.</p><div class="a-note__btns"><button type="button" class="np-hbar__btn" ${act('proto.setDemo', { key: 'notifications', id: 'several' })}>Deliver held notifications</button></div>`;
+      if (d === 'held') note = html`<p>Nothing arrives while a call records or while Noter is hidden for presenting. When capture stops or Noter is shown again, the held notifications arrive, one per call. The previous call's summary is already written during the next call; only its notification waits. NT-3 is never held, and is not sent at all while hidden for presenting.</p><div class="a-note__btns"><button type="button" class="np-hbar__btn" ${act('proto.setDemo', { key: 'notifications', id: 'several' })}>Deliver held notifications</button></div>`;
       const centre = html`<div class="nt-centre" aria-label="Notification Centre"><div class="nt-centre__h">Notification Centre · Noter</div>
         <div class="nt-thread"><div class="nt-thread__h">Planning: VHI 8.0 drawer redesign</div>${NT1()}${d === 'failed' ? NT2() : ''}</div>
         <div class="nt-thread"><div class="nt-thread__h">Backend sync</div>${banner('nt-1', 'Summary ready', 'Backend sync · 2 action items, 1 decision', 'ntf.open', { callId: 'c-backend' }, 'c-backend')}</div></div>`;
@@ -569,7 +595,7 @@
   });
   NP.onMany({
     'ntf.open': (a) => { NP.go('call-page', { callId: a.callId, view: 'summary', failed: a.failed || null }); return false; },
-    'ntf.call': () => { state.surface = 'call'; if (!isRec()) NP.startRecording(); },
+    'ntf.call': (a) => { state.surface = 'call'; if (!isRec()) NP.startRecording(); if (a && a.engine && NP.surfaces.call.onDemo) { state.demo.call = 'engine-stopped'; NP.surfaces.call.onDemo('engine-stopped'); } },
     'ntf.allow': () => { NP.openAlert({ title: '“Noter” would like to send you notifications.', body: 'Notifications may include alerts and badges.', variant: 'system', buttons: [{ label: "Don't Allow", action: 'ntf.answer', args: { ok: false } }, { label: 'Allow', variant: 'primary', action: 'ntf.answer', args: { ok: true } }] }); },
     'ntf.answer': (a) => { state.alert = null; state.demo.notifications = a.ok ? 'default' : 'denied'; },
   });

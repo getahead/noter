@@ -1,0 +1,18 @@
+{
+  "name": "noter",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "pnpm --dir apps/desktop typecheck",
+    "test:unit": "pnpm --dir apps/desktop test:unit",
+    "test:conformance": "pnpm --dir apps/desktop test:conformance"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

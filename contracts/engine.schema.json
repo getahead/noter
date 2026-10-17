@@ -1,0 +1,1385 @@
+{
+  "command_line": {
+    "$defs": {
+      "AsrBackend": {
+        "enum": [
+          "whisper_turbo",
+          "whisper_large_v3",
+          "parakeet_tdt_v3"
+        ],
+        "type": "string"
+      },
+      "AudioChannel": {
+        "description": "The two capture channels, kept separate end to end.",
+        "oneOf": [
+          {
+            "const": "mic",
+            "description": "The user's microphone (\"you\").",
+            "type": "string"
+          },
+          {
+            "const": "sys",
+            "description": "System audio: everyone else.",
+            "type": "string"
+          }
+        ]
+      },
+      "CallId": {
+        "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+        "type": "string"
+      },
+      "EngineCommand": {
+        "oneOf": [
+          {
+            "properties": {
+              "type": {
+                "const": "ping",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "$ref": "#/$defs/StartSession",
+            "properties": {
+              "type": {
+                "const": "start_session",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "type": {
+                "const": "pause",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "type": {
+                "const": "resume",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Flush, close the files, write `timeline.json`, then `session_stopped`.",
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "type": {
+                "const": "stop",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "entries": {
+                "items": {
+                  "$ref": "#/$defs/GlossaryEntry"
+                },
+                "type": "array"
+              },
+              "type": {
+                "const": "set_glossary",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "entries"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "languages": {
+                "items": {
+                  "$ref": "#/$defs/Lang"
+                },
+                "type": "array"
+              },
+              "type": {
+                "const": "set_languages",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "languages"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "bundle_id": {
+                "type": "string"
+              },
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "type": {
+                "const": "exclude_process",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "bundle_id"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Offline pass: Large v3 + VBx clustering; constraints from the user's corrections.",
+            "properties": {
+              "backend": {
+                "$ref": "#/$defs/AsrBackend"
+              },
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "constraints_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "result_path": {
+                "type": "string"
+              },
+              "session_dir": {
+                "type": "string"
+              },
+              "type": {
+                "const": "offline_pass",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "session_dir",
+              "result_path",
+              "backend"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "256-d WeSpeaker embedding of spans, written to `out_path` (encrypted by the core afterwards).",
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "channel": {
+                "$ref": "#/$defs/AudioChannel"
+              },
+              "out_path": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "spans": {
+                "items": {
+                  "$ref": "#/$defs/EngineSpan"
+                },
+                "type": "array"
+              },
+              "type": {
+                "const": "speaker_embedding",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "request_id",
+              "call_id",
+              "channel",
+              "spans",
+              "out_path"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "bge-m3 embeddings for chunks; `inline` for one query (search latency), a file otherwise.",
+            "properties": {
+              "out_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "texts": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": {
+                "const": "embed_texts",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "request_id",
+              "texts"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Start or stop call detection listeners (off until the self-test passes).",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "known_bundle_ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": {
+                "const": "set_detection",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "enabled",
+              "known_bundle_ids"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "play_clip": {
+                "type": "boolean"
+              },
+              "timeout_ms": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": {
+                "const": "self_test",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "play_clip",
+              "timeout_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Play a span natively (replay); the engine excludes its own process from the tap.",
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "channel": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/AudioChannel"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "from_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "to_ms": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/OffsetMs"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "const": "play",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "from_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "stop_playback",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "shutdown",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "EngineSpan": {
+        "properties": {
+          "t0_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "t1_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          }
+        },
+        "required": [
+          "t0_ms",
+          "t1_ms"
+        ],
+        "type": "object"
+      },
+      "GlossaryEntry": {
+        "properties": {
+          "spoken_forms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "term": {
+            "type": "string"
+          },
+          "variants_cyrillic": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "variants_latin": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "term",
+          "variants_latin",
+          "variants_cyrillic",
+          "spoken_forms"
+        ],
+        "type": "object"
+      },
+      "Lang": {
+        "anyOf": [
+          {
+            "enum": [
+              "en",
+              "ru",
+              "de"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+            "properties": {
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
+      },
+      "OffsetMs": {
+        "description": "Milliseconds from the start of a call (session-relative audio time).",
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "SpeakerPrior": {
+        "properties": {
+          "de": {
+            "format": "float",
+            "type": "number"
+          },
+          "en": {
+            "description": "Share of each language in this speaker's history.",
+            "format": "float",
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "ru": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "en",
+          "ru",
+          "de"
+        ],
+        "type": "object"
+      },
+      "StartSession": {
+        "properties": {
+          "backend": {
+            "$ref": "#/$defs/AsrBackend"
+          },
+          "call_id": {
+            "$ref": "#/$defs/CallId"
+          },
+          "enrolled_embeddings_path": {
+            "description": "Up to four enrolled attendees switch live diarization to Sortformer.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exclude_bundle_ids": {
+            "description": "Processes left out of the system tap, besides the engine and the app themselves.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "glossary": {
+            "items": {
+              "$ref": "#/$defs/GlossaryEntry"
+            },
+            "type": "array"
+          },
+          "languages": {
+            "items": {
+              "$ref": "#/$defs/Lang"
+            },
+            "type": "array"
+          },
+          "mic_device_uid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resume_from_ms": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Resume from the capture ring's write position after an engine restart in the same call."
+          },
+          "session_dir": {
+            "description": "`audio/<call_id>/`, relative to the App Group container.",
+            "type": "string"
+          },
+          "speaker_priors": {
+            "items": {
+              "$ref": "#/$defs/SpeakerPrior"
+            },
+            "type": "array"
+          },
+          "store_audio": {
+            "description": "`false` = \"Never store audio\": nothing is written, ASR still runs.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "call_id",
+          "session_dir",
+          "store_audio",
+          "exclude_bundle_ids",
+          "languages",
+          "backend",
+          "glossary",
+          "speaker_priors"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A line from the core to the engine.",
+    "properties": {
+      "cmd": {
+        "$ref": "#/$defs/EngineCommand"
+      },
+      "id": {
+        "description": "Correlation id, unique per engine process.",
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "cmd"
+    ],
+    "title": "EngineCommandLine",
+    "type": "object"
+  },
+  "event_line": {
+    "$defs": {
+      "AudioChannel": {
+        "description": "The two capture channels, kept separate end to end.",
+        "oneOf": [
+          {
+            "const": "mic",
+            "description": "The user's microphone (\"you\").",
+            "type": "string"
+          },
+          {
+            "const": "sys",
+            "description": "System audio: everyone else.",
+            "type": "string"
+          }
+        ]
+      },
+      "CallId": {
+        "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+        "type": "string"
+      },
+      "EngineCorrection": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "EngineErrorCode": {
+        "enum": [
+          "permission_missing",
+          "zero_buffers",
+          "device_unavailable",
+          "model_missing",
+          "model_load_failed",
+          "disk_full",
+          "bad_command",
+          "no_session",
+          "internal"
+        ],
+        "type": "string"
+      },
+      "EngineEvent": {
+        "oneOf": [
+          {
+            "properties": {
+              "engine_version": {
+                "type": "string"
+              },
+              "models": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "protocol_version": {
+                "type": "string"
+              },
+              "sandboxed": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "ready",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "protocol_version",
+              "engine_version",
+              "models",
+              "sandboxed"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "cmd_id": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": {
+                "const": "ack",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "cmd_id"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "cmd_id": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "code": {
+                "$ref": "#/$defs/EngineErrorCode"
+              },
+              "message": {
+                "type": "string"
+              },
+              "type": {
+                "const": "error",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A known meeting app or a browser plays audio while holding the microphone.",
+            "properties": {
+              "app_name": {
+                "type": "string"
+              },
+              "bundle_id": {
+                "type": "string"
+              },
+              "pid": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "type": {
+                "const": "call_detected",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "bundle_id",
+              "app_name",
+              "pid"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The meeting app released audio and the mic (the core applies the 20 s rule).",
+            "properties": {
+              "bundle_id": {
+                "type": "string"
+              },
+              "type": {
+                "const": "call_audio_released",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "bundle_id"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Another process started playing into the tap.",
+            "properties": {
+              "app_name": {
+                "type": "string"
+              },
+              "bundle_id": {
+                "type": "string"
+              },
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "type": {
+                "const": "audio_source_added",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "bundle_id",
+              "app_name"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "mic_device": {
+                "type": "string"
+              },
+              "output_device": {
+                "type": "string"
+              },
+              "type": {
+                "const": "session_started",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "mic_device",
+              "output_device"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "device_name": {
+                "type": "string"
+              },
+              "gap_from_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "gap_to_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "type": {
+                "const": "device_changed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "device_name",
+              "gap_from_ms",
+              "gap_to_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "System audio has been exact digital zeros since `since_ms`. The System Audio Recording\npermission cannot be queried, so this is the inference: `confidence` 0..1 that access is off\nrather than a silent call.",
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "confidence": {
+                "format": "float",
+                "type": "number"
+              },
+              "since_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "type": {
+                "const": "system_audio_silent",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "since_ms",
+              "confidence"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "segment": {
+                "$ref": "#/$defs/EngineSegment"
+              },
+              "type": {
+                "const": "segment",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "segment"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "at_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "channel": {
+                "$ref": "#/$defs/AudioChannel"
+              },
+              "speaker_label": {
+                "type": "string"
+              },
+              "type": {
+                "const": "speaker_turn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "channel",
+              "speaker_label",
+              "at_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "At most every 100 ms; droppable.",
+            "properties": {
+              "call_id": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/CallId"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "mic_db": {
+                "format": "float",
+                "type": "number"
+              },
+              "sys_db": {
+                "format": "float",
+                "type": "number"
+              },
+              "type": {
+                "const": "levels",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "mic_db",
+              "sys_db"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "No segment for N seconds while audio flows (the core decides on \"stalled\").",
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "since_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "type": {
+                "const": "no_segments",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "since_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "VAD heard nothing on either channel since this offset.",
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "since_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "type": {
+                "const": "silence",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "since_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "mic_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sys_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "timeline_path": {
+                "type": "string"
+              },
+              "type": {
+                "const": "session_stopped",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "timeline_path"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "progress": {
+                "format": "float",
+                "type": "number"
+              },
+              "type": {
+                "const": "offline_progress",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "progress"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "result_path": {
+                "type": "string"
+              },
+              "type": {
+                "const": "offline_done",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "result_path"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "code": {
+                "$ref": "#/$defs/EngineErrorCode"
+              },
+              "type": {
+                "const": "offline_failed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "code"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "out_path": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "type": {
+                "const": "speaker_embedding_done",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "request_id",
+              "out_path"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "One query: inline vector (1024 floats). Batches: `out_path` with float32 little-endian rows.",
+            "properties": {
+              "count": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "inline": {
+                "items": {
+                  "format": "float",
+                  "type": "number"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "out_path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "request_id": {
+                "type": "string"
+              },
+              "type": {
+                "const": "embeddings",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "request_id",
+              "count"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/AudioChannel"
+              },
+              "type": {
+                "const": "self_test_stream",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "channel"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/AudioChannel"
+              },
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "const": "self_test_line",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "channel",
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The self-test passes only with non-zero buffers on both channels.",
+            "properties": {
+              "failure": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/EngineErrorCode"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "own_sounds_leak": {
+                "type": "boolean"
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "self_test_result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "passed",
+              "own_sounds_leak"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "at_ms": {
+                "$ref": "#/$defs/OffsetMs"
+              },
+              "call_id": {
+                "$ref": "#/$defs/CallId"
+              },
+              "playing": {
+                "type": "boolean"
+              },
+              "type": {
+                "const": "playback_position",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "call_id",
+              "at_ms",
+              "playing"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "type": {
+                "const": "pong",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "EngineSegment": {
+        "description": "The PRD segment schema, as the engine emits it.",
+        "properties": {
+          "avg_logprob": {
+            "format": "float",
+            "type": "number"
+          },
+          "call_id": {
+            "$ref": "#/$defs/CallId"
+          },
+          "channel": {
+            "$ref": "#/$defs/AudioChannel"
+          },
+          "corrections": {
+            "items": {
+              "$ref": "#/$defs/EngineCorrection"
+            },
+            "type": "array"
+          },
+          "crosstalk_labels": {
+            "description": "Overlap detected (offline pass); both candidates.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Engine-local id; the core assigns the `seg_` id when it persists a confirmed segment.",
+            "type": "string"
+          },
+          "lang": {
+            "$ref": "#/$defs/Lang"
+          },
+          "lang_p": {
+            "format": "float",
+            "type": "number"
+          },
+          "no_speech_p": {
+            "format": "float",
+            "type": "number"
+          },
+          "speaker_label": {
+            "description": "Provisional live diarization label (\"spk_3\"); `mic` channel is always \"you\".",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/$defs/EngineSegmentState"
+          },
+          "t0_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "t1_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "text": {
+            "type": "string"
+          },
+          "words_path": {
+            "description": "Word timings in a file, for confirmed segments.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "call_id",
+          "channel",
+          "t0_ms",
+          "t1_ms",
+          "state",
+          "lang",
+          "lang_p",
+          "speaker_label",
+          "text",
+          "avg_logprob",
+          "no_speech_p",
+          "corrections",
+          "crosstalk_labels"
+        ],
+        "type": "object"
+      },
+      "EngineSegmentState": {
+        "enum": [
+          "hypothesis",
+          "confirmed"
+        ],
+        "type": "string"
+      },
+      "Lang": {
+        "anyOf": [
+          {
+            "enum": [
+              "en",
+              "ru",
+              "de"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+            "properties": {
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
+      },
+      "OffsetMs": {
+        "description": "Milliseconds from the start of a call (session-relative audio time).",
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "TimestampMs": {
+        "description": "Milliseconds since the Unix epoch (UTC). Exported to TypeScript as `number`\n(exact up to the year 285 616).",
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A line from the engine to the core.",
+    "properties": {
+      "at": {
+        "$ref": "#/$defs/TimestampMs"
+      },
+      "event": {
+        "$ref": "#/$defs/EngineEvent"
+      },
+      "seq": {
+        "format": "uint64",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "seq",
+      "at",
+      "event"
+    ],
+    "title": "EngineEventLine",
+    "type": "object"
+  },
+  "protocol_version": "2.0"
+}

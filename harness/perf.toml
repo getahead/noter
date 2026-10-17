@@ -1,0 +1,103 @@
+# Performance registry and scenarios (docs/ADR/0003).
+#
+# [[registry]] lists what must be performance-tested, by milestone (from the PRD
+# quality bars and DESIGN-core hot paths). An entry is covered when its
+# `scenario` exists under [scenarios]. The perf coverage gate requires
+# gates.perf.scenario_coverage_min percent of the entries due by the current
+# milestone to be covered.
+#
+# Modes: `ir` = instruction count under cachegrind (Linux, deterministic, hard
+# gate on every PR); `wall` = median wall time (hard gate only on the dedicated
+# Apple Silicon runner; report-only on hosted runners); `rss` = peak memory.
+
+[[registry]]
+id = "protocol-fixtures-roundtrip"
+milestone = "pre-M0"
+what = "Serialize and parse the fixture world (large view models over IPC)"
+scenario = "protocol_fixtures_roundtrip"
+
+[[registry]]
+id = "core-app-snapshot"
+milestone = "M0"
+what = "app_snapshot on a fixture database (every window open, reload and crash recovery)"
+scenario = "core_app_snapshot"
+
+[[registry]]
+id = "core-cold-start"
+milestone = "M0"
+what = "Core start: open the database, run migrations, answer app_snapshot"
+scenario = "core_cold_start"
+
+[[registry]]
+id = "live-hypothesis-lag"
+milestone = "M1"
+what = "Hypothesis text lag behind speech, golden-set replay (PRD: <= 2 s)"
+scenario = "engine_replay_lag"
+
+[[registry]]
+id = "live-confirmed-lag"
+milestone = "M1"
+what = "Confirmed text lag, golden-set replay (PRD: <= 4 s)"
+scenario = "engine_replay_lag"
+
+[[registry]]
+id = "stream-hub-fanout"
+milestone = "M1"
+what = "Transcript messages fanned out to three windows at 10 msg/s with persistence"
+scenario = "core_stream_fanout"
+
+[[registry]]
+id = "call-memory-footprint"
+milestone = "M1"
+what = "Extra memory during a 60-minute replayed call (PRD: <= 4 GB without a local LLM)"
+scenario = "engine_replay_footprint"
+
+[[registry]]
+id = "post-call-outputs"
+milestone = "M2"
+what = "Outputs ready after a 60-minute call with the scripted runtime (PRD: <= 2 min cloud)"
+scenario = "core_post_call_scripted"
+
+[[registry]]
+id = "items-list"
+milestone = "M2"
+what = "items_list and today_get on a year of fixture calls"
+scenario = "core_items_today"
+
+[[registry]]
+id = "search-hybrid"
+milestone = "M3"
+what = "Hybrid search (FTS5 + sqlite-vec) on a year of fixture calls, EN/RU/DE queries"
+scenario = "retrieval_search"
+
+[[registry]]
+id = "index-rebuild"
+milestone = "M3"
+what = "Full index rebuild from the canonical rows"
+scenario = "retrieval_rebuild"
+
+[[registry]]
+id = "copilot-tick"
+milestone = "M4"
+what = "One copilot tick end to end with the scripted runtime (stage timeline recorded)"
+scenario = "copilot_tick_scripted"
+
+[[registry]]
+id = "council-merge"
+milestone = "M4"
+what = "Merge and rank cards from six agents"
+scenario = "copilot_merge_rank"
+
+[[registry]]
+id = "integrity-recovery"
+milestone = "M5"
+what = "Corruption drill: integrity check and recovery on a copy of the database (PRD: <= 10 min)"
+scenario = "jobs_integrity_recovery"
+
+# Scenarios: how to build and run each one. Both run from the checkout being
+# measured (the PR head, or the base worktree for the A/B comparison);
+# `{target}` is that checkout's cargo target directory.
+[scenarios.protocol_fixtures_roundtrip]
+build = ["cargo", "build", "--release", "--quiet", "-p", "noter-protocol", "--example", "perf_fixtures_roundtrip"]
+run = ["{target}/release/examples/perf_fixtures_roundtrip"]
+modes = ["ir", "wall"]

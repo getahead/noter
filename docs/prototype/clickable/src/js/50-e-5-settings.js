@@ -9,7 +9,7 @@
 
   const PANES = [
     { id: 'general', label: 'General', icon: 'gear', keys: 'launch login record notifications apps language storage calendars horizon ranking setup' },
-    { id: 'audio', label: 'Audio & Transcription', icon: 'mic', keys: 'microphone output headphones speakers echo transcription archive languages glossary permission self-test models whisper' },
+    { id: 'audio', label: 'Audio & Transcription', icon: 'mic', keys: 'microphone output devices headphones speakers transcription archive languages glossary permission self-test models whisper' },
     { id: 'models', label: 'Models & Runtimes', icon: 'agent', keys: 'api key anthropic codex claude chatgpt account sign in login ollama local runtime spend' },
     { id: 'privacy', label: 'Privacy', icon: 'lock', keys: 'privacy mode redaction retention audio calendar talk-time silent voice profiles left mac audit share screen test zoom teams' },
     { id: 'callscreen', label: 'Call Screen & Menu Bar', icon: 'display', keys: 'display layout floating automatically latency text size menu bar title quick actions zoom' },
@@ -50,7 +50,7 @@
       ${group('Today', html`
         ${row('Calendars shown', html`<div class="st-checks">${P.checkbox('Work', true, { id: 'st-cal-work' })}${P.checkbox('Virtuozzo shared', true, { id: 'st-cal-vz' })}${P.checkbox('Family', false, { id: 'st-cal-fam' })}</div>`)}
         ${row('Horizon', P.segmented(['Today', 'This Week'], s.horizon || 'This Week', { variant: 'option', label: 'Horizon', action: ['st.seg', { k: 'horizon' }] }))}
-        ${row('Ranking', P.popup(['Due date, then owed to you', 'Owed to you first', 'Call order only'], 'Due date, then owed to you', { id: 'st-rank', label: 'Ranking' }))}
+        ${row('Ranking', P.popup(['Owed to today’s people, then due date', 'Due date, then owed to you'], 'Owed to today’s people, then due date', { id: 'st-rank', label: 'Ranking' }), 'Default: items owed to people on today’s calls first, then due date, then age.')}
       `)}
       ${group('', row('Setup', P.button('Run Setup Again…', { action: ['st.firstRun'] }), 'Opens the first-run wizard. Your library and settings stay.'))}`;
   };
@@ -62,7 +62,11 @@
     return html`
       ${group('Input and output', html`
         ${row('Microphone', html`<div class="st-inline">${P.popup(['MacBook Pro Microphone', 'AirPods Pro', 'Shure MV7'], 'MacBook Pro Microphone', { id: 'st-mic', label: 'Microphone' })}${P.levelMeter({ level: 5, label: 'Microphone level' })}</div>`)}
-        ${row('Output', P.radioGroup('st-out', [{ value: 'auto', label: 'Detect automatically' }, { value: 'hp', label: 'Headphones' }, { value: 'sp', label: 'Speakers, with echo cancellation' }], s.output || 'auto', { bind: 'local.settings.output', label: 'Output' }))}
+        ${row('Output devices', html`<div class="st-devlist" role="list" aria-label="Output devices">
+          <div class="st-dev" role="listitem"><span class="st-dev__name">MacBook Pro Speakers</span><span class="st-dev__route">Speakers</span></div>
+          <div class="st-dev" role="listitem"><span class="st-dev__name">AirPods Pro</span><span class="st-dev__route">Headphones</span></div>
+          <div class="st-dev" role="listitem"><span class="st-dev__name">Scarlett 2i2 USB</span><span class="st-dev__route">Not identified</span>${P.checkbox('Treat as headphones', !!s.hpScarlett, { id: 'st-hp-scarlett', bind: 'local.settings.hpScarlett' })}</div>
+        </div>`, 'Replay while recording works only on headphones. Speakers never replay while you record.', { stack: true })}
         ${row('', P.checkbox('Exclude Noter’s own sounds', s.exclude !== false, { id: 'st-excl', bind: 'local.settings.exclude' }), 'Replay while recording needs a headphone route and this setting.')}
       `)}
       ${group('Transcription', html`
@@ -108,10 +112,10 @@
     return html`
       ${group('', html`
         ${row('Privacy mode', html`${P.radioGroup('st-pmode', [{ value: 'redacted', label: 'Cloud with redaction', note: 'Names and PII are replaced before anything leaves this Mac' }, { value: 'cloud', label: 'Cloud allowed', note: 'Text goes as is' }, { value: 'local', label: 'Local only', note: 'Every task runs on the local runtime' }], s.privacyMode, { bind: 'local.settings.privacyMode', label: 'Privacy mode' })}<div class="st-modenow">In force: ${C.modeIndicator({ variant: 'settings', mode: modeWord })}</div>`)}
-        ${row('Audio retention', P.popup(['7 days', '30 days', '90 days', 'Forever', 'Never store audio'], s.retention, { id: 'st-ret', label: 'Audio retention', bind: 'local.settings.retention' }))}
+        ${row('Audio retention', P.popup(['7 days', '30 days', '90 days', 'Forever', 'Never store audio'], s.retention, { id: 'st-ret', label: 'Audio retention', bind: 'local.settings.retention' }), (() => { const n = { '7 days': 14, '30 days': 2, '90 days': 0, 'Forever': 0, 'Never store audio': 63 }[s.retention] || 0; return n ? `The next nightly run deletes the audio of ${n} call${n === 1 ? '' : 's'}.` : 'No audio is due for deletion.'; })())}
         ${NP.c('permissionCheckRow', { id: 'cal', label: 'Calendar', status: calStatus, detail: 'Work, Virtuozzo shared' }, { variant: 'status' })}
         ${calStatus === 'not-asked' ? row('', html`${P.button('Allow Calendar Access', { size: 'small', action: ['st.set', { k: 'calAsked', v: true }] })}<span class="np-dim">The macOS prompt follows. Noter never asks during a recording.</span>`) : ''}
-        ${row('Show talk-time share and “who was silent”', P.toggle('', s.talk, { id: 'st-talk', ariaLabel: 'Show talk-time share and who was silent', bind: 'local.settings.talk' }), 'Off by default. These rows don’t exist anywhere until you turn this on.')}
+        ${row('Show talk-time share and “who was silent”', P.toggle('', s.talk, { id: 'st-talk', ariaLabel: 'Show talk-time share and who was silent', bind: 'local.settings.talk' }), 'Off by default. These rows don’t exist anywhere until you turn this on. They count only calls from the moment you turn it on.')}
         ${row('Voice profiles', html`<span>2 people</span>${P.button('Manage on Person Pages', { size: 'small', action: ['st.toMain', { screen: 'people' }] })}`)}
       `)}
       ${group('What left this Mac', html`<div class="st-audit-bar">${P.popup(['All calls', 'Planning: VHI 8.0 drawer redesign', 'Backend sync'], 'All calls', { id: 'st-audit-call', label: 'Call' })}<span class="np-tb__spacer"></span>${P.button('Export…', { size: 'small', action: ['proto.flash', { key: 'proto', text: 'Save panel · “What left this Mac 16 Oct.csv”' }] })}</div>
@@ -168,7 +172,7 @@
     if (s.sources == null) s.sources = d === 'no-sources' ? [] : null;
     const base = [
       { id: 'src-conf', name: 'Confluence · DEV space', status: d === 'sign-in-expired' ? 'expired' : 'ok', statusWord: d === 'sign-in-expired' ? 'Sign-in expired' : 'Up to date', subtitle: d === 'sign-in-expired' ? 'Confluence sign-in expired · last sync 3 days ago' : '1,180 pages · synced 02:14', tag: 'Indexed', actions: d === 'sign-in-expired' ? [{ label: 'Sign In Again…', action: ['st.retry', { id: 'src-conf' }] }] : [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Confluence · DEV space' }] }] },
-      { id: 'src-jira', name: 'Jira · VSTOR', status: 'ok', subtitle: 'Looked up live · last lookup 10:14', tag: 'Live', actions: [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Jira · VSTOR' }] }] },
+      { id: 'src-jira', name: 'Jira · VSTOR', status: 'ok', subtitle: s.privacyMode === 'cloud' ? 'Looked up live · last lookup 10:14' : 'Live lookups paused · they run only in Cloud allowed', tag: 'Live', actions: [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Jira · VSTOR' }] }] },
       { id: 'src-specs', name: 'Drawer specs', status: d === 'source-failed' ? 'error' : 'ok', statusWord: d === 'source-failed' ? 'Failed' : 'Up to date', subtitle: '~/Documents/Specs · 58 files · synced 08:41', message: 'Drawer specs sync failed · folder not found', tag: 'Sensitive', actions: d === 'source-failed' ? [{ label: 'Locate…', action: ['proto.flash', { key: 'proto', text: 'macOS open panel to find the moved folder' }] }, { label: 'Try Again', action: ['st.retry', { id: 'src-specs' }] }] : [{ label: 'Details…', action: ['st.sourceDetails', { name: 'Drawer specs' }] }] },
     ];
     const list = (s.sources === null ? base : s.sources).concat(s.added || []);
@@ -322,7 +326,7 @@
       return html`<div data-component="cpt-noter-component-screen-dialogs" data-variant="sheet" data-state="${add ? 'add-folder' : 'source-details'}">
         <div class="np-sheet__head"><div class="np-sheet__title">${add ? 'Add Folder' : p.name}</div><div class="np-sheet__sub">${add ? html`<span class="np-mono">~/Documents/Release notes</span> · 24 files` : 'Source details'}</div></div>
         <div class="np-sheet__body">
-          ${row('Mode', P.radioGroup('src-mode', [{ value: 'live', label: 'Live', note: 'Read when asked; nothing is copied' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index for fast search' }], f.mode, { bind: 'local.e-source.mode', label: 'Mode' }))}
+          ${row('Mode', P.radioGroup('src-mode', [{ value: 'live', label: 'Live', note: 'Read after calls and in Ask; nothing is copied. Runs only in Cloud allowed, and each lookup is logged in Privacy' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index for fast search' }], f.mode, { bind: 'local.e-source.mode', label: 'Mode' }))}
           ${row('Schedule', P.popup(['On change', 'Every hour', 'Every 6 hours', 'Only by hand'], f.schedule, { id: 'src-sched', label: 'Schedule', bind: 'local.e-source.schedule' }))}
           ${row('Privacy class', P.segmented(['Normal', 'Sensitive'], f.privacy, { variant: 'option', label: 'Privacy class', action: ['st.srcPrivacy'] }), 'Sensitive sources are answered by the local model only.')}
           ${row('Scope', P.textField({ id: 'src-scope', value: add ? 'All files, Markdown and PDF' : '1,180 pages', ariaLabel: 'Scope' }))}

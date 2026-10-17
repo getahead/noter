@@ -1,0 +1,124 @@
+# Noter quality gates — the default exit criteria of every feature and the
+# checks every pull request must pass (docs/ADR/0003, docs/HARNESS.md).
+#
+# Bars as set by the owner on 17 Oct 2026: realistic goals (unit 80%, E2E 60%,
+# screenshots 98%, performance <= 10% / 60%) plus a trace-coverage ratchet.
+#
+# Lowering a threshold, adding an exclusion, turning off or narrowing the trace
+# ratchet or moving the milestone back is a harness change: CI's config guard
+# fails the PR unless it carries the `harness-change-approved` label, and agents
+# working in a lane cannot edit this file at all (lane guard).
+
+[milestone]
+# Advanced by the owner when a milestone gate passes. The E2E and perf
+# coverage gates count what milestones.toml / perf.toml list up to here.
+current = "pre-M0"
+order = ["pre-M0", "M0", "M1", "M2", "M3", "M4", "M5"]
+
+[gates.unit]
+# Line coverage of the unit test suites, measured per side, plus the lines a PR adds or changes.
+rust_min_lines = 80.0
+ui_min_lines = 80.0
+changed_min_lines = 80.0
+
+[gates.e2e]
+# Share of what has been delivered so far that the end-to-end suites exercise.
+commands_min = 60.0   # frozen IPC commands of delivered milestones invoked by the E2E suites
+stories_min = 60.0    # DESIGN.md stories of delivered milestones that an E2E test names
+
+[gates.visual]
+min_pixel_match = 98.0        # per screenshot: at most 2% of pixels may differ from the baseline
+pixel_color_threshold = 0.02  # per-pixel colour distance (0..1) under which two pixels are equal
+
+[gates.perf]
+max_regression_pct = 10.0     # per scenario: head may be at most 10% worse than base (instruction counts)
+scenario_coverage_min = 60.0  # perf.toml registry entries due by the current milestone that have a scenario
+wall_runs = 10                # wall mode: measured runs per side; medians are compared
+wall_warmups = 2
+
+[gates.trace]
+# Design elements implemented in code (Constructor Studio FULL traceability, `@cpt-*` markers).
+# Traceable: the IDs of these kinds defined in the artifacts registered with
+# traceability = "FULL" in .cf-studio/config/artifacts.toml (DESIGN: component, interface,
+# seq, dbtable; FEATURE: flow, algo, state, dod). Covered: a scope or block marker names the
+# ID in the registered codebase. The ratchet fails a PR whose trace coverage is lower than the
+# base branch's; IDs a PR adds to the design never fail it (design first, code later).
+kinds = ["component", "interface", "seq", "dbtable", "flow", "algo", "state", "dod"]
+ratchet = true
+
+# Code that does not count toward unit coverage, each with its reason.
+# Paths are repo-relative prefixes or globs. Everything else counts.
+[[coverage.exclude]]
+path = "crates/noter-protocol/src/fixtures.rs"
+why = "typed example data, not logic"
+[[coverage.exclude]]
+path = "crates/noter-native/**"
+why = "objc2 bindings to AppKit, EventKit and Keychain; covered by the macOS checklist and the Mac E2E run"
+[[coverage.exclude]]
+path = "apps/desktop/src-tauri/**"
+why = "thin IPC host; covered by the handler-parity test and E2E"
+[[coverage.exclude]]
+path = "apps/desktop/src/core/bindings.ts"
+why = "generated from noter-protocol"
+[[coverage.exclude]]
+path = "apps/desktop/src/core/fake/**"
+why = "test double; its behaviour is checked by the conformance suite the real core must also pass"
+[[coverage.exclude]]
+path = "apps/desktop/src/core/tauri-transport.ts"
+why = "the only file that touches Tauri IPC; exercised by the Mac E2E run"
+[[coverage.exclude]]
+path = "apps/desktop/src/core/contract.smoke.ts"
+why = "a test"
+[[coverage.exclude]]
+path = "apps/desktop/src/main.tsx"
+why = "bootstrap: picks the transport and mounts the app"
+[[coverage.exclude]]
+path = "**/*.test.ts"
+why = "tests"
+[[coverage.exclude]]
+path = "**/*.test.tsx"
+why = "tests"
+[[coverage.exclude]]
+path = "**/*.stories.tsx"
+why = "stories"
+
+[guard]
+# Never edited by hand or by an agent; the tool regenerates them (`just contract-regen`).
+generated = ["contracts/**", "apps/desktop/src/core/bindings.ts"]
+# Reference data the gates compare against; changed only through the workflows in docs/HARNESS.md.
+baselines = ["**/__screenshots__/**", "evals/golden/**"]
+# The harness itself. Only the owner (no lane) edits it.
+harness = [
+  "harness/**", "scripts/harness/**", "scripts/ci/**", ".github/**", ".githooks/**",
+  ".claude/settings.json", "justfile", "rust-toolchain.toml",
+  "apps/desktop/vitest.*.ts", "apps/desktop/playwright.config.ts",
+]
+# Files every lane may touch (plans, FEATURE checkboxes, the decomposition).
+common = [".plans/**", "docs/features/**", "docs/DECOMPOSITION.md"]
+
+# A lane is chosen with NOTER_LANE=<name> or a branch named lane/<name>/<topic>.
+# With no lane the owner rules apply: only `generated` and `baselines` are protected.
+[lanes.contract]
+why = "noter-protocol, the fake core and the conformance suite; every PR needs one core and one UI review"
+paths = [
+  "crates/noter-protocol/**", "apps/desktop/src/core/fake/**", "apps/desktop/tests/conformance/**",
+  "docs/ADR/**", "docs/DESIGN-core.md", "Cargo.lock",
+]
+
+[lanes.ui]
+why = "React UI against the fake core"
+paths = ["apps/desktop/**", "pnpm-lock.yaml"]
+deny = ["apps/desktop/src-tauri/**", "apps/desktop/src/core/fake/**", "apps/desktop/tests/conformance/**"]
+
+[lanes.core]
+why = "Rust core crates and the thin Tauri host"
+paths = ["crates/**", "apps/desktop/src-tauri/**", "Cargo.toml", "Cargo.lock", "perf/**"]
+deny = ["crates/noter-protocol/**", "crates/noter-native/**", "crates/noter-engine-client/**"]
+
+[lanes.engine]
+why = "Swift engine, its Rust client and native bindings (Mac only)"
+paths = ["engine/**", "crates/noter-engine-client/**", "crates/noter-native/**", "scripts/models/**"]
+
+[lanes.skills]
+why = "LLM skills, role prompts and their evals"
+paths = ["skills/**", "evals/**"]

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The handoff skill's fixed schema; the core renders it to Markdown.",
+  "properties": {
+    "acceptance": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "context": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string"
+    },
+    "guardrails": {
+      "type": "string"
+    },
+    "links": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "repo": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "goal",
+    "context",
+    "constraints",
+    "acceptance",
+    "links",
+    "guardrails"
+  ],
+  "title": "HandoffPromptOutput",
+  "type": "object"
+}

@@ -108,7 +108,7 @@
     width: 560, title: () => 'Add MCP Server',
     render: () => sheet('add-mcp-server', { title: 'Add MCP Server',
       body: html`${field('Server', P.popup(['Confluence (Atlassian)', 'Google Drive', 'Notion', 'GitHub', 'Custom…'], 'Confluence (Atlassian)', { id: 'mcp-server', label: 'Server' }))}
-        ${field('Mode', P.radioGroup('mcp-mode', [{ value: 'live', label: 'Live', note: 'Looked up during calls and in Ask; nothing is copied' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index; sign-in opens in your browser' }], S().mcpMode || 'indexed', { bind: 'local.c-dialogs.mcpMode', label: 'Mode' }))}
+        ${field('Mode', P.radioGroup('mcp-mode', [{ value: 'live', label: 'Live', note: 'Looked up after calls and in Ask; nothing is copied. Runs only in Cloud allowed, and each lookup is logged in Privacy' }, { value: 'indexed', label: 'Indexed', note: 'Copied into the local index; sign-in opens in your browser' }], S().mcpMode || 'indexed', { bind: 'local.c-dialogs.mcpMode', label: 'Mode' }))}
         ${field('Schedule', P.popup(['Every 6 hours', 'Every hour', 'Daily', 'Only by hand'], 'Every 6 hours', { id: 'mcp-sched', label: 'Schedule' }))}
         ${field('Privacy class', P.popup(['Normal', 'Sensitive'], 'Normal', { id: 'mcp-priv', label: 'Privacy class' }), 'Sensitive sources are answered by the local model only')}
         ${field('Scope', P.textField({ id: 'mcp-scope', value: 'DEV space', ariaLabel: 'Scope' }))}`,

@@ -1,0 +1,141 @@
+# What each milestone delivers, for the E2E coverage gate (docs/ADR/0003).
+# Source: PRD › Roadmap and milestones (DESIGN-core 4.1 points here; its old
+# "Core implementation order" table was moved out of the design on 17 Oct).
+#
+# Every IPC command in contracts/ipc.manifest.json and every story
+# (`cpt-noter-seq-*`) in docs/DESIGN.md is listed exactly once; the harness
+# self-tests fail otherwise, so a new command or story must be placed here.
+# The gate counts milestones up to and including harness.toml [milestone].current.
+
+[M0]
+why = "IPC host, app snapshot, settings, first run and permissions"
+commands = [
+  "app_snapshot", "stream_unsubscribe", "stream_ack", "banner_dismiss", "log_ui",
+  "setup_status", "models_download", "permission_request", "self_test_run",
+  "setup_set_call_display", "setup_set_audio_storage", "setup_set_step",
+  "settings_get", "settings_update", "settings_unignore_app", "hotkeys_list", "hotkey_set", "hotkeys_reset",
+  "glossary_list", "glossary_upsert", "glossary_remove", "update_install",
+]
+stories = [
+  "cpt-noter-seq-first-run-complete-setup",
+  "cpt-noter-seq-first-run-download-models",
+  "cpt-noter-seq-settings-set-hotkeys",
+]
+
+[M1]
+why = "Capture, live transcript, call window, menu bar, Library list"
+commands = [
+  "capture_start", "capture_stop", "capture_set_paused", "capture_mark_moment",
+  "capture_answer_call_end", "capture_continue", "capture_answer_new_meeting", "capture_discard",
+  "capture_set_sensitive", "capture_exclude_source", "capture_dismiss_detection", "capture_ignore_app",
+  "capture_hold_notice", "capture_keep_recording", "capture_keep_source", "capture_resume_interrupted",
+  "transcript_subscribe", "levels_subscribe", "transcript_span", "audio_play", "audio_stop",
+  "window_show_call", "window_hide_call", "window_call_state", "window_set_call_layout",
+  "window_set_collapsed", "app_set_hidden_for_presenting", "window_navigate", "window_announce", "window_report_view", "open_external",
+  "calls_list", "call_get", "call_update", "call_types_list", "calls_delete",
+]
+stories = [
+  "cpt-noter-seq-record-prompt-start-recording",
+  "cpt-noter-seq-record-prompt-record-after-missed-prompt",
+  "cpt-noter-seq-call-screen-recover-capture",
+  "cpt-noter-seq-call-screen-stop-at-call-end",
+  "cpt-noter-seq-call-screen-replay-line",
+  "cpt-noter-seq-call-screen-hide-for-presenting",
+  "cpt-noter-seq-floating-panel-display-unplugged",
+  "cpt-noter-seq-floating-panel-collapse-strip",
+  "cpt-noter-seq-floating-panel-hide-and-reopen",
+  "cpt-noter-seq-menu-bar-control-recording",
+  "cpt-noter-seq-menu-bar-check-state",
+  "cpt-noter-seq-dialogs-delete-call",
+  "cpt-noter-seq-notifications-allow-notifications",
+]
+
+[M2]
+why = "Speakers, post-call outputs, items, handoff, Today, undo"
+commands = [
+  "transcript_rename_speaker", "transcript_fix_term", "transcript_name_speakers",
+  "audio_delete", "audio_delete_older",
+  "items_list", "item_get", "item_set_done", "item_review", "items_review_all",
+  "item_edit", "item_reopen", "item_create", "item_answer_handoff_landed",
+  "today_get",
+  "outputs_get", "output_edit", "outputs_regenerate", "output_versions", "output_version_get",
+  "share_copy", "calls_export",
+  "handoff_get", "handoff_generate", "handoff_edit", "handoff_set_target", "handoff_open", "handoff_copy", "handoff_cancel",
+  "history_list", "change_undo", "change_redo", "history_export",
+  "call_tags_set", "tags_list",
+  "repos_list", "repo_upsert", "repo_remove", "share_test_run",
+]
+stories = [
+  "cpt-noter-seq-today-review-before-call",
+  "cpt-noter-seq-today-tick-item",
+  "cpt-noter-seq-call-screen-name-speaker",
+  "cpt-noter-seq-call-page-review-outputs",
+  "cpt-noter-seq-call-page-review-suggested-items",
+  "cpt-noter-seq-call-page-name-speakers",
+  "cpt-noter-seq-call-page-share-outputs",
+  "cpt-noter-seq-call-page-hand-off-item",
+  "cpt-noter-seq-call-page-check-evidence",
+  "cpt-noter-seq-notifications-open-outputs",
+]
+
+[M3]
+why = "Search, Ask, topics, people, knowledge sources, credentials and own accounts"
+commands = [
+  "search", "ask_start", "ask_stop", "ask_threads_list", "ask_thread_get", "ask_thread_delete",
+  "ask_scope_presets", "topics_list", "topic_get", "topic_rename", "topics_merge", "topics_keep_separate",
+  "people_list", "person_get", "person_create", "person_update", "people_merge", "person_delete",
+  "voice_profile_create", "voice_profile_delete",
+  "accounts_get", "api_key_set", "api_key_remove", "account_signin_prepare", "cli_install",
+  "account_signin_start", "account_signin_cancel", "account_use_existing", "account_bind_agents",
+  "account_test", "account_sign_out",
+  "sources_list", "source_add_folder", "source_add_mcp", "source_update", "source_reindex",
+  "source_remove", "source_revoke_token",
+  "audit_list", "audit_export", "storage_move",
+]
+stories = [
+  "cpt-noter-seq-first-run-connect-assistant",
+  "cpt-noter-seq-library-search-calls",
+  "cpt-noter-seq-library-filter-calls",
+  "cpt-noter-seq-library-follow-topic",
+  "cpt-noter-seq-ask-cited-answer",
+  "cpt-noter-seq-ask-follow-up-and-copy",
+  "cpt-noter-seq-people-prepare-one-on-one",
+  "cpt-noter-seq-people-name-unnamed-speaker",
+  "cpt-noter-seq-dialogs-set-up-voice-profile",
+  "cpt-noter-seq-settings-replace-api-key",
+  "cpt-noter-seq-settings-sign-in-account",
+  "cpt-noter-seq-settings-check-privacy",
+  "cpt-noter-seq-settings-add-knowledge-source",
+]
+
+[M4]
+why = "Copilot loop and council (draft surfaces become frozen at the M4 gate)"
+commands = [
+  "cards_subscribe", "card_pin", "card_dismiss", "card_unpin", "card_undo_last", "card_set_held", "card_rate",
+  "card_shown", "copilot_catch_up", "copilot_ask_about_call", "copilot_mute", "copilot_mute_agent",
+  "copilot_raise_budget", "context_chip_set",
+  "agents_get", "agent_create", "agent_update", "agents_reorder", "agent_remove",
+  "agent_skill_get", "agent_skill_save", "agent_skill_reset", "council_set_mode",
+]
+stories = [
+  "cpt-noter-seq-call-screen-pin-card",
+  "cpt-noter-seq-call-screen-catch-up",
+  "cpt-noter-seq-call-screen-read-copilot-state",
+  "cpt-noter-seq-menu-bar-mute-copilot",
+  "cpt-noter-seq-agents-add-agent",
+  "cpt-noter-seq-agents-tune-council",
+]
+
+[M5]
+why = "Jobs and evidence, proposals, Activity, metrics and Performance"
+commands = [
+  "proposals_list", "proposal_decide", "proposal_always_for_term", "activity_get",
+  "jobs_list", "job_run_now", "job_cancel", "job_update",
+  "perf_overview", "perf_call", "perf_brief",
+]
+stories = [
+  "cpt-noter-seq-activity-review-proposals",
+  "cpt-noter-seq-activity-undo-batch",
+  "cpt-noter-seq-performance-find-bottleneck",
+  "cpt-noter-seq-performance-export-brief",
+]

@@ -1,0 +1,229 @@
+# Quality gates on every pull request and on main (docs/ADR/0003, docs/HARNESS.md).
+# Branch protection requires the single `gate` job; it fails if any gate fails.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    # labeled/unlabeled: an approval label takes effect without a new push
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+  workflow_call: {}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  NOTER_BASE_REF: origin/main
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+
+jobs:
+  detect:
+    name: Detect parts
+    runs-on: ubuntu-24.04
+    outputs:
+      engine: ${{ steps.d.outputs.engine }}
+      tauri: ${{ steps.d.outputs.tauri }}
+      core_harness: ${{ steps.d.outputs.core_harness }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: d
+        run: |
+          echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  lint:
+    name: Lint and type checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: just lint
+
+  contract:
+    name: Contract
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: just contract
+
+  arch:
+    name: Architecture checks, trace coverage and gate config
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          node: "false"
+      - run: just arch
+      - name: Trace coverage (never lower than main)
+        run: just trace
+      - name: Gate config guard
+        if: github.ref != 'refs/heads/main'
+        env:
+          EVENT_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          GH_TOKEN: ${{ github.token }}
+        run: PR_LABELS="$(scripts/ci/pr-labels.sh)" just config-guard
+
+  unit:
+    name: Unit tests and coverage (80%)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          tools: just,cargo-llvm-cov
+      - run: just cov-unit
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: |
+            coverage/unit
+            apps/desktop/coverage/unit
+          if-no-files-found: ignore
+
+  e2e:
+    name: End-to-end and E2E coverage (60%)
+    needs: detect
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Build the core harness (real core over stdio)
+        if: needs.detect.outputs.core_harness == 'true'
+        run: |
+          cargo build --locked -p noter-core-harness
+          echo "NOTER_CORE_CMD=$PWD/target/debug/noter-core-harness --fixture world" >> "$GITHUB_ENV"
+      - name: Browsers for the UI flows
+        run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
+      - run: just e2e
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-e2e
+          path: |
+            coverage/e2e
+            apps/desktop/playwright-report
+          if-no-files-found: ignore
+
+  visual:
+    name: Screenshots (98% per pixel)
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    env:
+      NOTER_IN_PW_CONTAINER: "1"
+      HOME: /root
+    steps:
+      - run: command -v git >/dev/null || (apt-get update -q && apt-get install -y -q git)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Baselines change only with the owner's approval
+        if: github.ref != 'refs/heads/main'
+        env:
+          EVENT_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          PR_LABELS="$(scripts/ci/pr-labels.sh)"
+          git rev-parse --verify --quiet origin/main >/dev/null || { echo "::error::origin/main not fetched"; exit 1; }
+          changed=$(git diff --name-only "origin/main...HEAD" -- '**/__screenshots__/**')
+          if [ -n "$changed" ] && ! echo ",$PR_LABELS," | grep -q ',visual-change-approved,'; then
+            echo "::error::Screenshot baselines changed without the 'visual-change-approved' label:"; echo "$changed"; exit 1
+          fi
+      - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile
+      - run: pnpm --dir apps/desktop test:visual
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: |
+            apps/desktop/playwright-report
+            apps/desktop/test-results
+          if-no-files-found: ignore
+
+  perf:
+    name: Performance (60% scenarios, <= 10% regression)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          node: "false"
+      - run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
+      - run: just perf
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf
+          path: target/perf
+          if-no-files-found: ignore
+
+  docs:
+    name: Constructor Studio validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch the pinned Constructor Studio core
+        env:
+          CF_STUDIO_TOKEN: ${{ secrets.CF_STUDIO_TOKEN }}
+        run: scripts/ci/fetch-cf-studio.sh
+      - run: python3 .cf-studio/.core/skills/studio/scripts/studio.py validate --local-only
+
+  macos:
+    name: macOS (engine, Tauri host)
+    needs: detect
+    if: needs.detect.outputs.engine == 'true' || needs.detect.outputs.tauri == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          tools: just,cargo-llvm-cov
+      - name: Engine tests (WAV fixtures through the pipeline)
+        if: needs.detect.outputs.engine == 'true'
+        run: swift test --package-path engine --enable-code-coverage
+      - name: Tauri host tests (handler parity, window capabilities)
+        if: needs.detect.outputs.tauri == 'true'
+        run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+  gate:
+    name: gate
+    if: always()
+    needs: [detect, lint, contract, arch, unit, e2e, visual, perf, docs, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every gate passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | python3 -c '
+          import json, sys
+          needs = json.load(sys.stdin)
+          bad = {k: v["result"] for k, v in needs.items() if v["result"] not in ("success", "skipped")}
+          skipped = [k for k, v in needs.items() if v["result"] == "skipped" and k != "macos"]
+          for k, r in bad.items(): print(f"::error::{k}: {r}")
+          for k in skipped: print(f"::error::{k} was skipped")
+          sys.exit(1 if bad or skipped else 0)'

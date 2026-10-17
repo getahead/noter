@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "AnswerCitation": {
+      "properties": {
+        "chunk_ids": {
+          "items": {
+            "$ref": "#/$defs/ChunkId"
+          },
+          "type": "array"
+        },
+        "n": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "quote": {
+          "type": "string"
+        },
+        "segment_ids": {
+          "items": {
+            "$ref": "#/$defs/SegmentId"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "n",
+        "segment_ids",
+        "chunk_ids",
+        "quote"
+      ],
+      "type": "object"
+    },
+    "ChunkId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    },
+    "SegmentId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "answer_md": {
+      "description": "Uses [n] markers that match `citations`.",
+      "type": "string"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/AnswerCitation"
+      },
+      "type": "array"
+    },
+    "found": {
+      "description": "`false` when nothing in the calls answers the question.",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "answer_md",
+    "citations",
+    "found"
+  ],
+  "title": "AskAnswerOutput",
+  "type": "object"
+}

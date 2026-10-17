@@ -1,0 +1,31 @@
+{
+  "$defs": {
+    "SegmentId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "agent": {
+      "type": "string"
+    },
+    "evidence_segment_ids": {
+      "items": {
+        "$ref": "#/$defs/SegmentId"
+      },
+      "type": "array"
+    },
+    "review_md": {
+      "description": "Five sentences from the role's angle.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent",
+    "review_md",
+    "evidence_segment_ids"
+  ],
+  "title": "RoleReviewOutput",
+  "type": "object"
+}

@@ -14,6 +14,8 @@
     { id: 'loading', label: 'Loading' },
     { id: 'calendar-failed', label: 'Calendar read failed' },
     { id: 'self-test', label: 'Self-test not passed' },
+    { id: 'model-missing', label: 'Speech model not downloaded yet' },
+    { id: 'engine-stopped', label: 'Not recording · engine stopped' },
     { id: 'quit-recording', label: 'Noter quit during a recording' },
     { id: 'nothing-to-review', label: 'Nothing to review' },
     { id: 'live', label: 'Live call' },
@@ -116,15 +118,18 @@
     states: STATES,
     toolbarActions: () => {
       if (isRec()) return C.recordingIndicator({ variant: 'button', status: state.rec.status === 'paused' ? 'paused' : 'recording' });
-      if (!state.setup.audioGranted) return P.button('Finish Setup…', { action: ['today.finishSetup'], help: 'Microphone or system audio access was never granted' });
+      /* PM-60: Record never reads Finish Setup… and never waits for permissions; only disk or the speech model dim it */
+      if (NP.demo('today') === 'model-missing') return P.button('Record', { icon: 'record', cls: 'td-recbtn', disabled: true, help: 'Waiting for the speech model · 62 %' });
       return P.button('Record', { icon: 'record', cls: 'td-recbtn', action: ['today.record'], help: 'Start recording (⌃⌥⌘R)' });
     },
     banners: (ctx) => {
       const d = ctx.demo;
       const b = [];
       if (d === 'calendar-denied') b.push({ id: 'cal-denied', severity: 'warning', text: 'Calendar access is off', actions: [{ label: 'Open System Settings…', action: ['today.openCalSettings'] }] });
-      if (d === 'self-test' || !state.setup.selfTestPassed) b.push({ id: 'selftest-today', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }] });
-      if (d === 'quit-recording') b.push({ id: 'quit-rec', severity: 'warning', text: 'Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12', actions: [{ label: 'Open Call', action: ['nav.go', { screen: 'call-page', params: { callId: 'c-live', view: 'transcript' } }] }, { label: 'Resume Recording', variant: 'primary', action: ['today.resume'] }] });
+      if (d === 'self-test' || !state.setup.selfTestPassed) b.push({ id: 'selftest-today', severity: 'warning', text: 'Call detection is off until the audio self-test passes', actions: [{ label: 'Run Audio Self-Test…', action: ['dialogs.selfTest'] }, { label: 'Finish Setup…', link: true, action: ['today.finishSetup'] }] });
+      if (d === 'engine-stopped') b.push({ id: 'engine-stopped', severity: 'error', text: 'Not recording · engine stopped', actions: [{ label: 'Try Again', variant: 'primary', action: ['today.engineRetry'] }], dismissible: false });
+      /* R7: dismissing the banner ends the Resume Recording offer */
+      if (d === 'quit-recording') b.push({ id: 'quit-rec', severity: 'warning', dismissible: true, text: 'Noter quit during “Planning: VHI 8.0 drawer redesign” · saved up to 00:47:12', actions: [{ label: 'Open Call', action: ['nav.go', { screen: 'call-page', params: { callId: 'c-live', view: 'transcript' } }] }, { label: 'Resume Recording', variant: 'primary', action: ['today.resume'] }] });
       return b;
     },
     onDemo: (id, ctx) => {
@@ -133,6 +138,7 @@
       L.evidenceFailed = id === 'evidence-failed' ? 'i-replay' : null;
       L.loadingItems = false;
       if (id === 'live' || id === 'unmatched-live') { if (!isRec()) NP.startRecording(); }
+      if (id === 'engine-stopped' || id === 'model-missing') state.rec.status = 'idle';
       if (id === 'self-test') state.setup.selfTestPassed = false;
       if (id === 'default') state.setup.selfTestPassed = true;
       if (state.dismissed) { delete state.dismissed['cal-denied']; delete state.dismissed['quit-rec']; }
@@ -145,6 +151,7 @@
     'today.record': () => { NP.freshCall(); NP.startRecording({ offsetMs: 0 }); state.surface = 'call'; },
     'today.finishSetup': () => { const F = NP.local('firstrun'); F.step = 2; state.surface = 'firstrun'; },
     'today.resume': () => { NP.startRecording({ offsetMs: 47 * 60000 + 12000 }); state.surface = 'call'; },
+    'today.engineRetry': () => { state.demo.today = 'default'; NP.startRecording({ offsetMs: 31 * 60000 + 40000 }); NP.flash('call-status', 'Recording again · same call', 2500); state.surface = 'call'; },
     'today.openCalSettings': () => { NP.flash('proto', 'Opens System Settings › Privacy & Security › Calendars'); },
     'today.allowCalendar': () => { NP.openAlert({ title: '“Noter” would like to access your calendars.', body: 'Noter reads your calendar events to line up open items before each call.', variant: 'system', buttons: [{ label: "Don't Allow", action: 'today.calAnswer', args: { ok: false } }, { label: 'Allow Full Access', variant: 'primary', action: 'today.calAnswer', args: { ok: true } }] }); },
     'today.calAnswer': (a) => { state.alert = null; state.demo.today = a.ok ? 'default' : 'calendar-denied'; },
