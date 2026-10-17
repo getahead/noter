@@ -545,3 +545,12 @@ apps/desktop/playwright-report/
 apps/desktop/blob-report/
 /.harness-transfer/
 __pycache__/
+
+# Constructor Studio local state (outside its managed block above, which `cfs` may rewrite)
+# .core is a directory in the main checkout and a symlink to it in worktrees; the cache
+# (decisions.jsonl and its lock) changes on every `cfs validate`.
+.cf-studio/.core
+.cf-studio/.cache/
+
+# pnpm store, if pnpm ever puts it inside the checkout (e.g. in a container)
+.pnpm-store/
