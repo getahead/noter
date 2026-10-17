@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "Judgement": {
+      "enum": [
+        "yes",
+        "no",
+        "unsure"
+      ],
+      "type": "string"
+    },
+    "SegmentId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Low-confidence reconciliation and speech-evidence judgements (local model).",
+  "properties": {
+    "confidence": {
+      "format": "float",
+      "type": "number"
+    },
+    "evidence_segment_ids": {
+      "items": {
+        "$ref": "#/$defs/SegmentId"
+      },
+      "type": "array"
+    },
+    "judgement": {
+      "$ref": "#/$defs/Judgement"
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "judgement",
+    "confidence",
+    "reason",
+    "evidence_segment_ids"
+  ],
+  "title": "ReconcileJudgementOutput",
+  "type": "object"
+}

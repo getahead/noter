@@ -1,0 +1,214 @@
+//! Core ↔ engine protocol (`cpt-noter-interface-engine-stdio`).
+//!
+//! JSON Lines over the engine's stdin/stdout, one message per line, UTF-8.
+//! The JSON Schema exported from these types (`contracts/engine.schema.json`)
+//! generates the Swift `Codable` types of the engine (quicktype or
+//! swift-json-schema), so the Rust types here are the source of truth.
+//!
+//! Rules (PRD › Audio capture › Buffers, REVIEW › A6):
+//! * stdout carries protocol messages only; logs go to stderr.
+//! * Every event has a `seq` that increases by 1; a gap means the engine's
+//!   bounded queue dropped something (only `levels` and stale `hypothesis`
+//!   segments may be dropped; anything else is a bug the core logs).
+//! * Bulky payloads (word arrays, offline results, embedding batches) go to
+//!   files referenced by path inside the session or scratch directory.
+//! * Every command has an `id`; the engine answers with `ack` or `error`
+//!   carrying the same id, then emits events.
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use crate::common::{AudioChannel, CallId, Lang, OffsetMs, TimestampMs};
+
+/// Engine protocol version; `ready` reports it and the core refuses a mismatch of the major.
+pub const ENGINE_PROTOCOL_VERSION: &str = "1.0";
+
+/// A line from the core to the engine.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct EngineCommandLine {
+    /// Correlation id, unique per engine process.
+    pub id: u64,
+    pub cmd: EngineCommand,
+}
+
+/// A line from the engine to the core.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct EngineEventLine {
+    pub seq: u64,
+    pub at: TimestampMs,
+    pub event: EngineEvent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EngineOutputMode {
+    Headphones,
+    /// Speakers with LocalVQE echo cancellation, system tap as far-end reference.
+    SpeakersWithEchoCancellation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AsrBackend {
+    WhisperTurbo,
+    WhisperLargeV3,
+    ParakeetTdtV3,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct GlossaryEntry {
+    pub term: String,
+    pub variants_latin: Vec<String>,
+    pub variants_cyrillic: Vec<String>,
+    pub spoken_forms: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SpeakerPrior {
+    pub label: String,
+    /// Share of each language in this speaker's history.
+    pub en: f32,
+    pub ru: f32,
+    pub de: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StartSession {
+    pub call_id: CallId,
+    /// `audio/<call_id>/` inside the sandbox container path the core handed over.
+    pub session_dir: String,
+    /// `false` = "Never store audio": nothing is written, ASR still runs.
+    pub store_audio: bool,
+    pub mic_device_uid: Option<String>,
+    pub output_mode: EngineOutputMode,
+    pub exclude_bundle_ids: Vec<String>,
+    pub languages: Vec<Lang>,
+    pub backend: AsrBackend,
+    pub glossary: Vec<GlossaryEntry>,
+    pub speaker_priors: Vec<SpeakerPrior>,
+    /// Up to four enrolled attendees switch live diarization to Sortformer.
+    pub enrolled_embeddings_path: Option<String>,
+    /// Resume from the ring buffer after an engine restart in the same call.
+    pub resume_from_ms: Option<OffsetMs>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EngineCommand {
+    Ping,
+    StartSession(StartSession),
+    Pause { call_id: CallId },
+    Resume { call_id: CallId },
+    /// Flush, close the files, write `timeline.json`, then `session_stopped`.
+    Stop { call_id: CallId },
+    SetGlossary { entries: Vec<GlossaryEntry> },
+    SetLanguages { languages: Vec<Lang> },
+    ExcludeProcess { call_id: CallId, bundle_id: String },
+    /// Offline pass: Large v3 + VBx clustering; constraints from the user's corrections.
+    OfflinePass { call_id: CallId, session_dir: String, result_path: String, constraints_path: Option<String>, backend: AsrBackend },
+    /// 256-d WeSpeaker embedding of spans, written to `out_path` (encrypted by the core afterwards).
+    SpeakerEmbedding { request_id: String, call_id: CallId, channel: AudioChannel, spans: Vec<EngineSpan>, out_path: String },
+    /// bge-m3 embeddings for chunks; `inline` for one query (search latency), a file otherwise.
+    EmbedTexts { request_id: String, texts: Vec<String>, out_path: Option<String> },
+    /// Start or stop call detection listeners (off until the self-test passes).
+    SetDetection { enabled: bool, known_bundle_ids: Vec<String> },
+    SelfTest { play_clip: bool, timeout_ms: u32 },
+    /// Play a span natively (replay); the engine excludes its own process from the tap.
+    Play { call_id: CallId, from_ms: OffsetMs, to_ms: Option<OffsetMs>, channel: Option<AudioChannel> },
+    StopPlayback,
+    Shutdown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct EngineSpan {
+    pub t0_ms: OffsetMs,
+    pub t1_ms: OffsetMs,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EngineSegmentState {
+    Hypothesis,
+    Confirmed,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct EngineCorrection {
+    pub from: String,
+    pub to: String,
+}
+
+/// The PRD segment schema, as the engine emits it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct EngineSegment {
+    /// Engine-local id; the core assigns the `seg_` id when it persists a confirmed segment.
+    pub id: String,
+    pub call_id: CallId,
+    pub channel: AudioChannel,
+    pub t0_ms: OffsetMs,
+    pub t1_ms: OffsetMs,
+    pub state: EngineSegmentState,
+    pub lang: Lang,
+    pub lang_p: f32,
+    /// Provisional live diarization label ("spk_3"); `mic` channel is always "you".
+    pub speaker_label: String,
+    pub text: String,
+    /// Word timings in a file, for confirmed segments.
+    pub words_path: Option<String>,
+    pub avg_logprob: f32,
+    pub no_speech_p: f32,
+    pub corrections: Vec<EngineCorrection>,
+    /// Overlap detected (offline pass); both candidates.
+    pub crosstalk_labels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EngineErrorCode {
+    PermissionMissing,
+    ZeroBuffers,
+    DeviceUnavailable,
+    ModelMissing,
+    ModelLoadFailed,
+    DiskFull,
+    BadCommand,
+    NoSession,
+    Internal,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EngineEvent {
+    Ready { protocol_version: String, engine_version: String, models: Vec<String>, sandboxed: bool },
+    Ack { cmd_id: u64 },
+    Error { cmd_id: Option<u64>, code: EngineErrorCode, message: String },
+    /// A known meeting app or a browser plays audio while holding the microphone.
+    CallDetected { bundle_id: String, app_name: String, pid: i32 },
+    /// The meeting app released audio and the mic (the core applies the 20 s rule).
+    CallAudioReleased { bundle_id: String },
+    /// Another process started playing into the tap.
+    AudioSourceAdded { call_id: CallId, bundle_id: String, app_name: String },
+    SessionStarted { call_id: CallId, mic_device: String, output_device: String },
+    DeviceChanged { call_id: CallId, device_name: String, gap_from_ms: OffsetMs, gap_to_ms: OffsetMs },
+    PermissionLost { call_id: CallId, channel: AudioChannel },
+    Segment { segment: EngineSegment },
+    SpeakerTurn { call_id: CallId, channel: AudioChannel, speaker_label: String, at_ms: OffsetMs },
+    /// At most every 100 ms; droppable.
+    Levels { call_id: Option<CallId>, mic_db: f32, sys_db: f32 },
+    /// No segment for N seconds while audio flows (the core decides on "stalled").
+    NoSegments { call_id: CallId, since_ms: OffsetMs },
+    /// VAD heard nothing on either channel since this offset.
+    Silence { call_id: CallId, since_ms: OffsetMs },
+    SessionStopped { call_id: CallId, timeline_path: String, mic_path: Option<String>, sys_path: Option<String> },
+    OfflineProgress { call_id: CallId, progress: f32 },
+    OfflineDone { call_id: CallId, result_path: String },
+    OfflineFailed { call_id: CallId, code: EngineErrorCode },
+    SpeakerEmbeddingDone { request_id: String, out_path: String },
+    /// One query: inline vector (1024 floats). Batches: `out_path` with float32 little-endian rows.
+    Embeddings { request_id: String, inline: Option<Vec<f32>>, out_path: Option<String>, count: u32 },
+    SelfTestStream { channel: AudioChannel },
+    SelfTestLine { channel: AudioChannel, text: String },
+    SelfTestResult { passed: bool, failure: Option<EngineErrorCode>, own_sounds_leak: bool },
+    PlaybackPosition { call_id: CallId, at_ms: OffsetMs, playing: bool },
+    Pong,
+}

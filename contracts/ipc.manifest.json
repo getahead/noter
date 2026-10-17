@@ -1,0 +1,2262 @@
+{
+  "commands": [
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "Everything app-level a window renders from. Called on open, reload and after a crash.",
+      "group": "app",
+      "name": "app_snapshot",
+      "result": "AppSnapshot",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "record-prompt",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "UnsubscribeArgs",
+      "channel": null,
+      "doc": "Ends any Channel subscription (transcript, cards, levels, ask, self-test).",
+      "group": "app",
+      "name": "stream_unsubscribe",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "record-prompt",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "UiLogArgs",
+      "channel": null,
+      "doc": "UI errors to the local log, never with transcript text.",
+      "group": "app",
+      "name": "log_ui",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "record-prompt",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "CaptureStartArgs",
+      "channel": null,
+      "doc": "Start capture (Record, Record as Sensitive, hotkey, menu, Today).",
+      "group": "capture_control",
+      "name": "capture_start",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "record-prompt",
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Stop now. The call window shows its closing state; Continue Recording is offered for 5 minutes.",
+      "group": "capture_control",
+      "name": "capture_stop",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "CapturePauseArgs",
+      "channel": null,
+      "doc": "Pause or resume (wanted state). Pause drops audio entirely.",
+      "group": "capture_control",
+      "name": "capture_set_paused",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "MarkMomentArgs",
+      "channel": null,
+      "doc": "Mark a moment.",
+      "group": "capture_control",
+      "name": "capture_mark_moment",
+      "result": "MarkView",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CallEndAnswerArgs",
+      "channel": null,
+      "doc": "Answer the call-ended notice: Keep Recording or Stop Now.",
+      "group": "capture_control",
+      "name": "capture_answer_call_end",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "record-prompt"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Continue Recording after any stop, within 5 minutes; appends with a gap row.",
+      "group": "capture_control",
+      "name": "capture_continue",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "record-prompt",
+        "main"
+      ]
+    },
+    {
+      "args": "NewMeetingAnswerArgs",
+      "channel": null,
+      "doc": "Answer the new-meeting notice: Start as New Call (default) or Keep in This Call.",
+      "group": "capture_control",
+      "name": "capture_answer_new_meeting",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "record-prompt"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Discard Recording (nothing heard), after the inline confirmation.",
+      "group": "capture_control",
+      "name": "capture_discard",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "SensitiveArgs",
+      "channel": null,
+      "doc": "Make This Call Sensitive (during capture), or change it from Call info afterwards.",
+      "group": "capture_control",
+      "name": "capture_set_sensitive",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "ExcludeSourceArgs",
+      "channel": null,
+      "doc": "Exclude a second audio source from the tap.",
+      "group": "capture_control",
+      "name": "capture_exclude_source",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "DismissDetectionArgs",
+      "channel": null,
+      "doc": "Not Now / Not a Call / timed out on the record prompt.",
+      "group": "capture_control",
+      "name": "capture_dismiss_detection",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "record-prompt"
+      ]
+    },
+    {
+      "args": "IgnoreAppArgs",
+      "channel": null,
+      "doc": "Don't Ask for <app>… from the prompt's pull-down.",
+      "group": "capture_control",
+      "name": "capture_ignore_app",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "record-prompt"
+      ]
+    },
+    {
+      "args": "TranscriptSubscribeArgs",
+      "channel": "TranscriptMsg",
+      "doc": "Snapshot of a call's transcript, then the live stream for a live call.",
+      "group": "transcript",
+      "name": "transcript_subscribe",
+      "result": "TranscriptSnapshot",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "SubscribeLevelsArgs",
+      "channel": "LevelsMsg",
+      "doc": "Microphone and system levels, at most every 100 ms.",
+      "group": "transcript",
+      "name": "levels_subscribe",
+      "result": "SubscriptionHandle",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "RenameSpeakerArgs",
+      "channel": null,
+      "doc": "Rename a speaker for the whole call or one line.",
+      "group": "transcript",
+      "name": "transcript_rename_speaker",
+      "result": "SpeakerMutation",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "FixTermArgs",
+      "channel": null,
+      "doc": "Fix a term; optionally add it to the glossary.",
+      "group": "transcript",
+      "name": "transcript_fix_term",
+      "result": "FixTermResult",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "NameSpeakersArgs",
+      "channel": null,
+      "doc": "Name the speakers after the call (speaker naming panel), skip allowed.",
+      "group": "transcript",
+      "name": "transcript_name_speakers",
+      "result": "SpeakerMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "SpanArgs",
+      "channel": null,
+      "doc": "Segments of an evidence span, for the popover and the span preview.",
+      "group": "transcript",
+      "name": "transcript_span",
+      "result": "SpanPreview",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "PlayAudioArgs",
+      "channel": null,
+      "doc": "Play audio natively (no media in the WebView).",
+      "group": "transcript",
+      "name": "audio_play",
+      "result": "PlaybackState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "transcript",
+      "name": "audio_stop",
+      "result": "PlaybackState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "DeleteAudioArgs",
+      "channel": null,
+      "doc": "Delete the audio of calls (irreversible; native alert first).",
+      "group": "transcript",
+      "name": "audio_delete",
+      "result": "DeleteAudioResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "DeleteOldAudioArgs",
+      "channel": null,
+      "doc": "Delete Old Audio… sheet.",
+      "group": "transcript",
+      "name": "audio_delete_older",
+      "result": "DeleteAudioResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CardsSubscribeArgs",
+      "channel": "CardMsg",
+      "doc": "Visible and earlier cards, pinned items and status, then the card stream.",
+      "group": "copilot",
+      "name": "cards_subscribe",
+      "result": "CardsSnapshot",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CardArgs",
+      "channel": null,
+      "doc": "",
+      "group": "copilot",
+      "name": "card_pin",
+      "result": "CardMutation",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CardArgs",
+      "channel": null,
+      "doc": "",
+      "group": "copilot",
+      "name": "card_dismiss",
+      "result": "CardMutation",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Undo the last card action (⌃⌥⌘Z equivalent from the panel).",
+      "group": "copilot",
+      "name": "card_undo_last",
+      "result": "CardMutation",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CardHeldArgs",
+      "channel": null,
+      "doc": "Hovered, focused or expanded: the core never expires a held card.",
+      "group": "copilot",
+      "name": "card_set_held",
+      "result": "Ack",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CardRateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "copilot",
+      "name": "card_rate",
+      "result": "CardMutation",
+      "stability": "draft",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "CardShownArgs",
+      "channel": null,
+      "doc": "The UI reports when a card was painted (completes the latency measurement).",
+      "group": "copilot",
+      "name": "card_shown",
+      "result": "Ack",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "Catch Me Up: a solicited catch-up card arrives on the card stream.",
+      "group": "copilot",
+      "name": "copilot_catch_up",
+      "result": "Ack",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "AskAboutCallArgs",
+      "channel": null,
+      "doc": "Ask About This Call…: the answer arrives as a solicited card.",
+      "group": "copilot",
+      "name": "copilot_ask_about_call",
+      "result": "Ack",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "MuteArgs",
+      "channel": null,
+      "doc": "",
+      "group": "copilot",
+      "name": "copilot_mute",
+      "result": "CopilotStatus",
+      "stability": "draft",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "AgentMuteArgs",
+      "channel": null,
+      "doc": "",
+      "group": "copilot",
+      "name": "copilot_mute_agent",
+      "result": "CopilotStatus",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "RaiseBudgetArgs",
+      "channel": null,
+      "doc": "",
+      "group": "copilot",
+      "name": "copilot_raise_budget",
+      "result": "CopilotStatus",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "ContextChipArgs",
+      "channel": null,
+      "doc": "v1.x screen context chips.",
+      "group": "copilot",
+      "name": "context_chip_set",
+      "result": "ContextChipView",
+      "stability": "draft",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "ItemsListArgs",
+      "channel": null,
+      "doc": "",
+      "group": "items",
+      "name": "items_list",
+      "result": "Page<ItemView>",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemIdArgs",
+      "channel": null,
+      "doc": "Item inspector.",
+      "group": "items",
+      "name": "item_get",
+      "result": "ItemDetail",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "ItemDoneArgs",
+      "channel": null,
+      "doc": "Tick or untick (wanted state). A tick on a suggested item accepts it.",
+      "group": "items",
+      "name": "item_set_done",
+      "result": "ItemMutation",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "ItemReviewArgs",
+      "channel": null,
+      "doc": "",
+      "group": "items",
+      "name": "item_review",
+      "result": "ItemMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ReviewAllArgs",
+      "channel": null,
+      "doc": "",
+      "group": "items",
+      "name": "items_review_all",
+      "result": "ItemsBatchResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemEditArgs",
+      "channel": null,
+      "doc": "",
+      "group": "items",
+      "name": "item_edit",
+      "result": "ItemMutation",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "ItemReopenArgs",
+      "channel": null,
+      "doc": "",
+      "group": "items",
+      "name": "item_reopen",
+      "result": "ItemMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemCreateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "items",
+      "name": "item_create",
+      "result": "ItemMutation",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "HandoffLandedArgs",
+      "channel": null,
+      "doc": "Answer the carry-forward \"did the handoff land?\".",
+      "group": "items",
+      "name": "item_answer_handoff_landed",
+      "result": "ItemMutation",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "today",
+      "name": "today_get",
+      "result": "TodayView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "outputs_and_sharing",
+      "name": "outputs_get",
+      "result": "CallOutputs",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "OutputEditArgs",
+      "channel": null,
+      "doc": "",
+      "group": "outputs_and_sharing",
+      "name": "output_edit",
+      "result": "OutputMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "RegenerateArgs",
+      "channel": null,
+      "doc": "Regenerate sections with another runtime, model or skill; edits are kept and diffed.",
+      "group": "outputs_and_sharing",
+      "name": "outputs_regenerate",
+      "result": "JobAccepted",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "SummaryIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "outputs_and_sharing",
+      "name": "output_versions",
+      "result": "VersionList",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "VersionGetArgs",
+      "channel": null,
+      "doc": "",
+      "group": "outputs_and_sharing",
+      "name": "output_version_get",
+      "result": "VersionBody",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ShareCopyArgs",
+      "channel": null,
+      "doc": "Copy for Slack, Copy for Jira, Copy as Markdown (the core writes the clipboard).",
+      "group": "outputs_and_sharing",
+      "name": "share_copy",
+      "result": "ShareResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ExportCallsArgs",
+      "channel": null,
+      "doc": "Export… a folder of Markdown, SRT, JSON and audio; the core shows the save panel.",
+      "group": "outputs_and_sharing",
+      "name": "calls_export",
+      "result": "ExportResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "handoff",
+      "name": "handoff_get",
+      "result": "HandoffView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "HandoffGenerateArgs",
+      "channel": null,
+      "doc": "Generate on demand (cached); `regenerate` forces a new version.",
+      "group": "handoff",
+      "name": "handoff_generate",
+      "result": "HandoffView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "HandoffEditArgs",
+      "channel": null,
+      "doc": "",
+      "group": "handoff",
+      "name": "handoff_edit",
+      "result": "HandoffView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "HandoffTargetArgs",
+      "channel": null,
+      "doc": "",
+      "group": "handoff",
+      "name": "handoff_set_target",
+      "result": "HandoffView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemIdArgs",
+      "channel": null,
+      "doc": "Open in Claude Code or Codex through the launch path the drawer showed.",
+      "group": "handoff",
+      "name": "handoff_open",
+      "result": "HandoffOpenResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ItemIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "handoff",
+      "name": "handoff_copy",
+      "result": "HandoffCopyResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CallsListArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "calls_list",
+      "result": "Page<CallRow>",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "call_get",
+      "result": "CallDetail",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "CallUpdateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "call_update",
+      "result": "CallMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "TagsSetArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "call_tags_set",
+      "result": "TagsSetResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "tags_list",
+      "result": "TagList",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CallsDeleteArgs",
+      "channel": null,
+      "doc": "Delete calls for good (native alert first).",
+      "group": "library_and_ask",
+      "name": "calls_delete",
+      "result": "DeleteResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "call_types_list",
+      "result": "CallTypeList",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "settings"
+      ]
+    },
+    {
+      "args": "SearchArgs",
+      "channel": null,
+      "doc": "Hybrid search, sectioned, each hit strong or weak.",
+      "group": "library_and_ask",
+      "name": "search",
+      "result": "SearchResults",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AskStartArgs",
+      "channel": "AskMsg",
+      "doc": "Ask with a scope; the answer streams with citations.",
+      "group": "library_and_ask",
+      "name": "ask_start",
+      "result": "AskHandle",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AskTurnArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "ask_stop",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "ask_threads_list",
+      "result": "AskThreadList",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AskThreadArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "ask_thread_get",
+      "result": "AskThread",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AskThreadArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "ask_thread_delete",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "ask_scope_presets",
+      "result": "ScopePresetList",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "topics_list",
+      "result": "TopicList",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "TopicIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "topic_get",
+      "result": "TopicThread",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "TopicRenameArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "topic_rename",
+      "result": "TopicMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "TopicMergeArgs",
+      "channel": null,
+      "doc": "",
+      "group": "library_and_ask",
+      "name": "topics_merge",
+      "result": "TopicMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "TopicPairArgs",
+      "channel": null,
+      "doc": "Keep Separate: never suggest this merge again.",
+      "group": "library_and_ask",
+      "name": "topics_keep_separate",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "HistoryListArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "history_list",
+      "result": "Page<ChangeRow>",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "UndoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "change_undo",
+      "result": "UndoResult",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "RedoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "change_redo",
+      "result": "UndoResult",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "ProposalsListArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "proposals_list",
+      "result": "Page<ProposalRow>",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ProposalDecideArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "proposal_decide",
+      "result": "ProposalOutcome",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AlwaysForTermArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "proposal_always_for_term",
+      "result": "GlossaryTerm",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "HistoryExportArgs",
+      "channel": null,
+      "doc": "Export Log… for one call or a period (Markdown or JSON); the core shows the save panel.",
+      "group": "history_and_undo",
+      "name": "history_export",
+      "result": "ExportResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "ActivityArgs",
+      "channel": null,
+      "doc": "",
+      "group": "history_and_undo",
+      "name": "activity_get",
+      "result": "ActivityView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "PeopleListArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "people_list",
+      "result": "PeopleList",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "PersonIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "person_get",
+      "result": "PersonPage",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "PersonCreateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "person_create",
+      "result": "PersonMutation",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "PersonUpdateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "person_update",
+      "result": "PersonMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "PeopleMergeArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "people_merge",
+      "result": "PersonMutation",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "PersonIdArgs",
+      "channel": null,
+      "doc": "Unnames their speakers everywhere and deletes the voice profile.",
+      "group": "people",
+      "name": "person_delete",
+      "result": "DeleteResult",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "VoiceProfileArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "voice_profile_create",
+      "result": "VoiceProfileView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "PersonIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "voice_profile_delete",
+      "result": "VoiceProfileView",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "agents_get",
+      "result": "AgentsView",
+      "stability": "draft",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "AgentCreateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "agent_create",
+      "result": "AgentMutation",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AgentUpdateArgs",
+      "channel": null,
+      "doc": "Edit an agent, including its runtime choice (PM-58). Takes effect at the next tick.",
+      "group": "agents",
+      "name": "agent_update",
+      "result": "AgentMutation",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AgentsReorderArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "agents_reorder",
+      "result": "AgentsView",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AgentIdArgs",
+      "channel": null,
+      "doc": "Only added agents; built-in ones can be disabled, not removed.",
+      "group": "agents",
+      "name": "agent_remove",
+      "result": "DeleteResult",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AgentIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "agent_skill_get",
+      "result": "AgentSkill",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AgentSkillSaveArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "agent_skill_save",
+      "result": "AgentSkill",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "AgentIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "agent_skill_reset",
+      "result": "AgentSkill",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CouncilModeArgs",
+      "channel": null,
+      "doc": "",
+      "group": "agents",
+      "name": "council_set_mode",
+      "result": "AgentsView",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "settings_get",
+      "result": "Settings",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "SettingsUpdateArgs",
+      "channel": null,
+      "doc": "Replace one section (wanted state).",
+      "group": "settings_and_credentials",
+      "name": "settings_update",
+      "result": "Settings",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "AppIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "settings_unignore_app",
+      "result": "Settings",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "StorageMoveArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "storage_move",
+      "result": "JobAccepted",
+      "stability": "draft",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "hotkeys_list",
+      "result": "HotkeyList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "HotkeySetArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "hotkey_set",
+      "result": "HotkeyList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "repos_list",
+      "result": "RepoList",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "RepoUpsertArgs",
+      "channel": null,
+      "doc": "Add Mapping… from the handoff drawer opens the sheet in the main window.",
+      "group": "settings_and_credentials",
+      "name": "repo_upsert",
+      "result": "RepoList",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "RepoIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "repo_remove",
+      "result": "RepoList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "glossary_list",
+      "result": "GlossaryList",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "GlossaryUpsertArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "glossary_upsert",
+      "result": "GlossaryList",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "GlossaryIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "glossary_remove",
+      "result": "GlossaryList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "AuditListArgs",
+      "channel": null,
+      "doc": "Privacy pane: what left this Mac, in plain words.",
+      "group": "settings_and_credentials",
+      "name": "audit_list",
+      "result": "Page<AuditEntry>",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "AuditExportArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "audit_export",
+      "result": "ExportResult",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "ShareTestArgs",
+      "channel": null,
+      "doc": "Screen Share Test…, with the optional capture test (refused during a call).",
+      "group": "settings_and_credentials",
+      "name": "share_test_run",
+      "result": "ShareTestResult",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "Install a downloaded update now (restarts Noter).",
+      "group": "settings_and_credentials",
+      "name": "update_install",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "accounts_get",
+      "result": "AccountsView",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "ApiKeySetArgs",
+      "channel": null,
+      "doc": "Store or replace a key: verified, then kept in the Keychain; never returned.",
+      "group": "settings_and_credentials",
+      "name": "api_key_set",
+      "result": "AccountsView",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "KeyProviderArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "api_key_remove",
+      "result": "AccountsView",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "AccountProviderArgs",
+      "channel": null,
+      "doc": "Sign-in sheet step 1 (Prepare): is the CLI installed, is it already signed in.",
+      "group": "settings_and_credentials",
+      "name": "account_signin_prepare",
+      "result": "SignInPrepare",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "CliInstallArgs",
+      "channel": null,
+      "doc": "Install Claude Code, Codex or Ollama (progress on `jobs:progress`).",
+      "group": "settings_and_credentials",
+      "name": "cli_install",
+      "result": "JobAccepted",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "SignInStartArgs",
+      "channel": null,
+      "doc": "Step 2 (Sign in): the CLI opens the browser; progress on `signin:progress`.",
+      "group": "settings_and_credentials",
+      "name": "account_signin_start",
+      "result": "SignInSession",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "SignInSessionArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "account_signin_cancel",
+      "result": "AccountsView",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "AccountProviderArgs",
+      "channel": null,
+      "doc": "Use This Account: bind the sign-in the CLI already has on this Mac.",
+      "group": "settings_and_credentials",
+      "name": "account_use_existing",
+      "result": "AccountsView",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "AccountBindArgs",
+      "channel": null,
+      "doc": "Step 4 (Use): switch agents to the account, with Undo.",
+      "group": "settings_and_credentials",
+      "name": "account_bind_agents",
+      "result": "AccountBindResult",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "AccountProviderArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "account_test",
+      "result": "AccountTestResult",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "SignOutArgs",
+      "channel": null,
+      "doc": "Sign out in Noter (agents fall back to the API key or pause); optionally in the CLI too.",
+      "group": "settings_and_credentials",
+      "name": "account_sign_out",
+      "result": "AccountsView",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "sources_list",
+      "result": "SourceList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "SourceAddFolderArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "source_add_folder",
+      "result": "SourceRow",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "SourceAddMcpArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "source_add_mcp",
+      "result": "SourceRow",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "SourceUpdateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "source_update",
+      "result": "SourceRow",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "SourceIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "source_reindex",
+      "result": "SourceRow",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "SourceIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "source_remove",
+      "result": "DeleteResult",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "SourceIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "source_revoke_token",
+      "result": "SourceRow",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "jobs_list",
+      "result": "JobList",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "JobIdArgs",
+      "channel": null,
+      "doc": "Run now (refused with `job_blocked` while a call is live).",
+      "group": "settings_and_credentials",
+      "name": "job_run_now",
+      "result": "JobAccepted",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "JobUpdateArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "job_update",
+      "result": "JobList",
+      "stability": "frozen",
+      "windows": [
+        "settings"
+      ]
+    },
+    {
+      "args": "PerfOverviewArgs",
+      "channel": null,
+      "doc": "",
+      "group": "performance",
+      "name": "perf_overview",
+      "result": "PerfOverview",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "CallIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "performance",
+      "name": "perf_call",
+      "result": "CallPerf",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "BriefArgs",
+      "channel": null,
+      "doc": "Export the improvement brief or open it in Claude Code or Codex.",
+      "group": "performance",
+      "name": "perf_brief",
+      "result": "BriefResult",
+      "stability": "draft",
+      "windows": [
+        "main"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "first_run_and_permissions",
+      "name": "setup_status",
+      "result": "SetupStatus",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "record-prompt",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "ModelsDownloadArgs",
+      "channel": null,
+      "doc": "",
+      "group": "first_run_and_permissions",
+      "name": "models_download",
+      "result": "SetupStatus",
+      "stability": "frozen",
+      "windows": [
+        "first-run",
+        "settings"
+      ]
+    },
+    {
+      "args": "PermissionArgs",
+      "channel": null,
+      "doc": "Ask for a permission at the step that needs it (never mid-call).",
+      "group": "first_run_and_permissions",
+      "name": "permission_request",
+      "result": "PermissionRow",
+      "stability": "frozen",
+      "windows": [
+        "first-run",
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "SelfTestArgs",
+      "channel": "SelfTestMsg",
+      "doc": "Self-test: levels and a live line stream until passed or failed (10 s).",
+      "group": "first_run_and_permissions",
+      "name": "self_test_run",
+      "result": "SubscriptionHandle",
+      "stability": "frozen",
+      "windows": [
+        "first-run",
+        "settings",
+        "main"
+      ]
+    },
+    {
+      "args": "CallDisplayArgs",
+      "channel": null,
+      "doc": "",
+      "group": "first_run_and_permissions",
+      "name": "setup_set_call_display",
+      "result": "SetupStatus",
+      "stability": "frozen",
+      "windows": [
+        "first-run",
+        "settings"
+      ]
+    },
+    {
+      "args": "AudioStorageArgs",
+      "channel": null,
+      "doc": "",
+      "group": "first_run_and_permissions",
+      "name": "setup_set_audio_storage",
+      "result": "SetupStatus",
+      "stability": "frozen",
+      "windows": [
+        "first-run"
+      ]
+    },
+    {
+      "args": "StepArgs",
+      "channel": null,
+      "doc": "",
+      "group": "first_run_and_permissions",
+      "name": "setup_set_step",
+      "result": "SetupStatus",
+      "stability": "frozen",
+      "windows": [
+        "first-run"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "Open Call Screen: shows without focus; a second request makes it key (PM-40).",
+      "group": "windows",
+      "name": "window_show_call",
+      "result": "CallWindowState",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "record-prompt",
+        "call-screen"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "windows",
+      "name": "window_hide_call",
+      "result": "CallWindowState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "NoArgs",
+      "channel": null,
+      "doc": "",
+      "group": "windows",
+      "name": "window_call_state",
+      "result": "CallWindowState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "CallLayoutArgs",
+      "channel": null,
+      "doc": "",
+      "group": "windows",
+      "name": "window_set_call_layout",
+      "result": "CallWindowState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "CollapseArgs",
+      "channel": null,
+      "doc": "",
+      "group": "windows",
+      "name": "window_set_collapsed",
+      "result": "CallWindowState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
+      "args": "HiddenArgs",
+      "channel": null,
+      "doc": "Hide for Presenting (wanted state).",
+      "group": "windows",
+      "name": "app_set_hidden_for_presenting",
+      "result": "PresentingState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "main"
+      ]
+    },
+    {
+      "args": "NavigateArgs",
+      "channel": null,
+      "doc": "Show Noter / Open in Noter at a place (main window or Settings window).",
+      "group": "windows",
+      "name": "window_navigate",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "record-prompt",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
+      "args": "AnnounceArgs",
+      "channel": null,
+      "doc": "Native announcement for a panel that is not key (D55).",
+      "group": "windows",
+      "name": "window_announce",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "call-screen",
+        "record-prompt"
+      ]
+    },
+    {
+      "args": "OpenExternalArgs",
+      "channel": null,
+      "doc": "Open a URL, a document citation, a System Settings pane or a Finder location.",
+      "group": "windows",
+      "name": "open_external",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen",
+        "settings",
+        "first-run"
+      ]
+    }
+  ],
+  "contract_version": "1.0",
+  "engine_protocol_version": "1.0",
+  "error_codes": [
+    "not_found",
+    "conflict",
+    "invalid_input",
+    "window_not_allowed",
+    "feature_disabled",
+    "not_ready",
+    "not_implemented",
+    "internal",
+    "setup_incomplete",
+    "permission_missing",
+    "permission_denied",
+    "disk_low",
+    "disk_full",
+    "offline",
+    "checksum_failed",
+    "model_not_ready",
+    "already_recording",
+    "not_recording",
+    "notice_expired",
+    "continue_window_closed",
+    "engine_unavailable",
+    "detection_expired",
+    "audio_deleted",
+    "replay_needs_headphones",
+    "own_sounds_not_excluded",
+    "output_route_unknown",
+    "transcript_upgraded",
+    "no_such_card",
+    "card_gone",
+    "budget_paused",
+    "copilot_off",
+    "outputs_not_ready",
+    "unreviewed_in_scope",
+    "repo_not_mapped",
+    "repo_path_missing",
+    "no_link_handler",
+    "automation_denied",
+    "prompt_not_ready",
+    "index_rebuilding",
+    "search_failed",
+    "answer_stopped",
+    "undo_expired",
+    "partially_applied",
+    "proposal_not_applicable",
+    "change_log_unreadable",
+    "job_blocked",
+    "evidence_tool_missing",
+    "runtime_unavailable",
+    "key_rejected",
+    "keychain_locked",
+    "cli_missing",
+    "cli_version_unsupported",
+    "sign_in_cancelled",
+    "sign_in_timed_out",
+    "plan_not_eligible",
+    "account_signed_out",
+    "personal_use_not_confirmed",
+    "source_sync_failed",
+    "source_sign_in_expired",
+    "hotkey_conflict",
+    "hotkey_reserved",
+    "storage_in_cloud_folder",
+    "cancelled"
+  ],
+  "events": [
+    {
+      "doc": "The capture state machine, whole, on every change.",
+      "name": "capture:state",
+      "payload": "CaptureState",
+      "stability": "frozen"
+    },
+    {
+      "doc": "The record prompt's detection appeared, changed or went away.",
+      "name": "capture:detected",
+      "payload": "DetectionChanged",
+      "stability": "frozen"
+    },
+    {
+      "doc": "Copilot status for every window (menu bar mirrors are native).",
+      "name": "copilot:status",
+      "payload": "CopilotStatus",
+      "stability": "draft"
+    },
+    {
+      "doc": "Full current set of degraded states.",
+      "name": "degraded:changed",
+      "payload": "DegradedSet",
+      "stability": "frozen"
+    },
+    {
+      "doc": "Full current set of app banners.",
+      "name": "banners:changed",
+      "payload": "BannerSet",
+      "stability": "frozen"
+    },
+    {
+      "doc": "A record changed for any reason; replace it by id.",
+      "name": "entity:changed",
+      "payload": "EntityChanged",
+      "stability": "frozen"
+    },
+    {
+      "doc": "A post-call output section changed state.",
+      "name": "outputs:progress",
+      "payload": "OutputsProgress",
+      "stability": "frozen"
+    },
+    {
+      "doc": "A job run started, progressed or finished.",
+      "name": "jobs:progress",
+      "payload": "JobProgress",
+      "stability": "frozen"
+    },
+    {
+      "doc": "Sidebar counts for Activity.",
+      "name": "proposals:counts",
+      "payload": "ProposalCounts",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "setup:changed",
+      "payload": "SetupStatus",
+      "stability": "frozen"
+    },
+    {
+      "doc": "Displays, output route, permissions, notifications, online, update, disk.",
+      "name": "env:changed",
+      "payload": "EnvironmentState",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "settings:changed",
+      "payload": "Settings",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "privacy:changed",
+      "payload": "PrivacyStatus",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "accounts:changed",
+      "payload": "AccountsView",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "signin:progress",
+      "payload": "SignInProgress",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "hotkeys:changed",
+      "payload": "HotkeyList",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "playback:state",
+      "payload": "PlaybackState",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "window:call",
+      "payload": "CallWindowState",
+      "stability": "frozen"
+    },
+    {
+      "doc": "",
+      "name": "app:presenting",
+      "payload": "PresentingState",
+      "stability": "frozen"
+    },
+    {
+      "doc": "The core asks the main or Settings window to navigate (notification click, menu).",
+      "name": "nav:request",
+      "payload": "NavTarget",
+      "stability": "frozen"
+    }
+  ],
+  "mcp_tools": [
+    {
+      "name": "search_calls",
+      "writes": false
+    },
+    {
+      "name": "search_documents",
+      "writes": false
+    },
+    {
+      "name": "get_transcript_span",
+      "writes": false
+    },
+    {
+      "name": "get_person",
+      "writes": false
+    },
+    {
+      "name": "get_decisions",
+      "writes": false
+    },
+    {
+      "name": "get_open_items",
+      "writes": false
+    },
+    {
+      "name": "get_screen_context",
+      "writes": false
+    },
+    {
+      "name": "pin_item",
+      "writes": true
+    },
+    {
+      "name": "propose_correction",
+      "writes": true
+    },
+    {
+      "name": "emit_card",
+      "writes": true
+    }
+  ]
+}

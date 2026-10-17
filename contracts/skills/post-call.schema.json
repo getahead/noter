@@ -1,0 +1,185 @@
+{
+  "$defs": {
+    "ExtractedItem": {
+      "properties": {
+        "due": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_segment_ids": {
+          "items": {
+            "$ref": "#/$defs/SegmentId"
+          },
+          "type": "array"
+        },
+        "is_engineering": {
+          "type": "boolean"
+        },
+        "lang": {
+          "$ref": "#/$defs/Lang"
+        },
+        "linked_issue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner_hint": {
+          "description": "A name as spoken; the core resolves it to a person.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quote": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "topic_hint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "text",
+        "quote",
+        "evidence_segment_ids",
+        "is_engineering",
+        "lang"
+      ],
+      "type": "object"
+    },
+    "Lang": {
+      "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
+      "enum": [
+        "en",
+        "ru",
+        "de"
+      ],
+      "type": "string"
+    },
+    "LocalDate": {
+      "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+      "type": "string"
+    },
+    "ParticipantNotes": {
+      "properties": {
+        "asked_for": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "committed_to": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidence_segment_ids": {
+          "items": {
+            "$ref": "#/$defs/SegmentId"
+          },
+          "type": "array"
+        },
+        "pushed_back_on": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "said": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "speaker_label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "speaker_label",
+        "said",
+        "committed_to",
+        "asked_for",
+        "pushed_back_on",
+        "evidence_segment_ids"
+      ],
+      "type": "object"
+    },
+    "SegmentId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Post-call analysis for one call type skill.",
+  "properties": {
+    "action_items": {
+      "items": {
+        "$ref": "#/$defs/ExtractedItem"
+      },
+      "type": "array"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/ExtractedItem"
+      },
+      "type": "array"
+    },
+    "extras_md": {
+      "description": "Standup blockers, planning Jira-ready items, interview scorecard, incident timeline.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "lang": {
+      "$ref": "#/$defs/Lang"
+    },
+    "open_questions": {
+      "items": {
+        "$ref": "#/$defs/ExtractedItem"
+      },
+      "type": "array"
+    },
+    "per_participant": {
+      "items": {
+        "$ref": "#/$defs/ParticipantNotes"
+      },
+      "type": "array"
+    },
+    "risks": {
+      "items": {
+        "$ref": "#/$defs/ExtractedItem"
+      },
+      "type": "array"
+    },
+    "summary_md": {
+      "description": "5–10 sentences for someone who was not there.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lang",
+    "summary_md",
+    "decisions",
+    "action_items",
+    "open_questions",
+    "risks",
+    "per_participant"
+  ],
+  "title": "PostCallOutput",
+  "type": "object"
+}

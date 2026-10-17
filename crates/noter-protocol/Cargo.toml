@@ -1,0 +1,21 @@
+[package]
+name = "noter-protocol"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The Noter contracts: UI <-> core IPC (commands, events, channels), engine stdio protocol, noter-mcp tools and LLM skill outputs. Types only, no logic."
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Pinned exactly: specta 2 is a release candidate and its exporter API moves between RCs (ADR-0001).
+specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
+specta-typescript = "=0.0.12"
+specta-serde = "=0.0.12"
+schemars = "1"
+
+[[bin]]
+name = "noter-contract-export"
+path = "src/bin/export.rs"

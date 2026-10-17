@@ -2,7 +2,7 @@
 Source of truth for Noter development.
 Living copy (edit, comment, review tab): https://claude.ai/code/artifact/8f34b45a-2903-468f-98d9-5de89e7163cc
 This file is regenerated from the living copy whenever the PRD, the design or the UI prototype changes.
-Last sync: 2026-10-17 (living copy rev 174). Review findings: docs/REVIEW-2026-10-16.md. UI design: docs/DESIGN.md (v1.0, accepted 2026-10-17). Diagrams: docs/diagrams/. UI prototype of record: docs/prototype/clickable/ (raw boards of 16 Oct kept as history in docs/prototype/raw-2026-10-16/).
+Last sync: 2026-10-17 (living copy rev 185; backend design docs/DESIGN-core.md and owner decisions of 17 Oct backported). Review findings: docs/REVIEW-2026-10-16.md. UI design: docs/DESIGN.md (v1.0, accepted 2026-10-17). Diagrams: docs/diagrams/. UI prototype of record: docs/prototype/clickable/ (raw boards of 16 Oct kept as history in docs/prototype/raw-2026-10-16/).
 -->
 
 # Noter — PRD & Technical Design
@@ -138,7 +138,7 @@ Fourteen feature areas; the live copilot and its role council have their own sec
 
 - Two text streams, as the streaming engine produces them: confirmed text in full colour, the current hypothesis in grey. Nothing jumps backwards once confirmed.
 - The transcript arrives over a Tauri Channel and is drawn every 100 ms in a virtualised list, so a three-hour call stays fast; it follows live speech, and Jump to Live returns to it after the user scrolls away.
-- Every segment carries a speaker, a timestamp, a detected language and a confidence. A play control and Space replay a line's audio, and clicking text selects it. During capture, replay works only on headphones and only while Noter's own sounds are excluded from the recording; on speakers the play control is unavailable and says why.
+- Every segment carries a speaker, a timestamp, a detected language and a confidence. A play control and Space replay a line's audio, and clicking text selects it. During capture, replay works only on headphones and only while Noter's own sounds are excluded from the recording; on speakers the play control is unavailable and says why, even with echo cancellation on, because the meeting app captures the microphone itself and would send the replay to the call.
 - Inline corrections: rename a speaker (applies to the whole call and, if you say so, to the person's voice profile), fix a term (added to the custom vocabulary used to bias future transcription).
 - Term glossary: product names, people, acronyms (VHI, VHP, ACI, ostor, shaman) are biased in during decoding so they stop coming out as "V H I" or "a chi".
 - Text is hyphenated by each segment's language, and every screen is tested with German strings about 30 % longer and with Cyrillic.
@@ -254,6 +254,7 @@ The dashboard is the first screen after launch: what matters before the calls yo
 | Authentication | API keys: Anthropic and Codex, in the Keychain. Your own accounts: Your Claude account (Claude Code, Pro or Max plan, personal use only) and Your ChatGPT account (Codex, Plus, Pro, Business or Enterprise plan), each signed in separately in the browser through the CLI, which keeps the sign-in; either, both or neither | API keys; no account signed in |
 | LLM runtime per task | Any connected runtime: Claude Code or Codex on an API key or on your own account, or local (Ollama / MLX) — set separately for live copilot, post-call analysis and search answers | Claude Code; local for live if latency demands it |
 | Agents | Per agent: skill, runtime, model, effort, tools, call types, budget share; + to add from a template, remove added agents; council mode per call type (fused / parallel) | Six built-in agents; fused live, parallel post-call |
+| Call types | Built-in list (1:1, standup, planning, retro, cross-team sync, vendor, interview, incident) plus any call type the user adds as a skill folder under skills/; each type has its own SKILL.md, output schema and examples | Built-in list |
 | Privacy mode | Cloud allowed, cloud with redaction, local only | Cloud with redaction |
 | Sensitive call | Per-call toggle forcing local-only processing | Off |
 | Audio retention | Keep 7 / 30 / 90 days / forever / never store audio | 30 days |
@@ -410,7 +411,7 @@ The three risks that can sink v1 are mixed-language transcription quality, speak
 | Evidence sources are unreachable or their CLIs change | Medium | Low | Jobs degrade to "no evidence found", never to a guess; adapters per source behind one interface |
 | macOS audio APIs shift under us (process taps are 14.4+, ScreenCaptureKit keeps changing) | Medium | Medium | Capture behind an interface with two backends; the engine is the only module that touches Core Audio |
 | Your own voice leaks into system audio when on speakers | Medium | Low | Headphones recommended; LocalVQE echo cancellation with the tap as reference in speakers mode; crosstalk marking |
-| "Super advanced" becomes "never ships": v1 is far more than one part-time person can build in 22 weeks | High | High | Decide the scope cut in the Review tab; milestones with measured gates; copilot and council behind a flag until the latency budget holds |
+| "Super advanced" becomes "never ships": v1 is far more than one part-time person can build in 22 weeks | High | High | Full v1 kept (owner, 17 Oct); the UI is built in parallel against the contract and a fake core; milestones with measured gates; copilot and council behind a flag until the latency budget holds |
 
 **Assumptions**
 
@@ -423,7 +424,7 @@ The three risks that can sink v1 are mixed-language transcription quality, speak
 
 **Open decisions** (recommendation in brackets; tick when decided and move the answer to the decision log)
 
-- [ ] Scope cut: adopt the MVP recommended in the Review tab, or keep v1 as specified and accept a longer schedule? \[Decide before M0; the roadmap stays as drawn until then\]
+- [x] Scope cut: adopt the MVP recommended in the Review tab, or keep v1 as specified and accept a longer schedule? \[Decided 17 Oct by the owner: full v1 as specified; the roadmap stays as drawn\]
 - [ ] Two-pass transcription: Turbo live, full Large v3 re-pass after the call for the archive copy? \[Yes: the live transcript is for the moment, the archive copy is what search uses; summaries are generated from the live transcript and regenerated after\]
 - [ ] Streaming: Noter's own loop on the open-source WhisperKit, or a WhisperKit Pro licence for its streaming? \[Build the loop, measure in M1, license Pro only if the bars fail\]
 - [ ] Council live mode: fused (one request, all agents) or parallel (one session per agent)? \[Fused live, parallel post-call; parallel live once measured\]
@@ -455,6 +456,7 @@ The Rust core is the only hub: it drives the engine over stdio, reads and writes
 | Engine | Audio capture (two channels), VAD, streaming ASR with Noter's own loop, diarization, speaker embeddings, text embeddings (bge-m3 on CoreML), AAC writer, offline re-pass; screen context capture and OCR (v1.x) | Swift 6, App Sandbox, Core Audio process taps, AVAudioEngine, WhisperKit (MIT), FluidAudio (Apache-2.0, CoreML, Neural Engine), ScreenCaptureKit and Vision (v1.x) | Sidecar, spawned by the core, JSON Lines over stdio |
 | LLM runtimes | Analysis, council agents, copilot reasoning, search answers, handoff prompts, improvement briefs, low-confidence reconciliation judgements | `claude -p` with an API key (Agent SDK) or on the user's own Claude account, `codex exec` with a Codex API key or on the user's own ChatGPT account, Ollama HTTP; MLX later | One request per tick in fused mode; one warm session per agent in parallel mode; short-lived processes for other tasks |
 | noter-mcp | Tools the agents call: search\_calls, search\_documents, get\_decisions, get\_person, get\_transcript\_span, get\_screen\_context, pin\_item, emit\_card | Rust binary speaking MCP over stdio to the CLI and a Unix socket to the core; it never opens the database itself | Child of the LLM runtime |
+| noter-protocol | The contracts between all of the above: UI ↔ core commands, events, Channels and error codes with their window scopes; the engine protocol; the noter-mcp tools; the skill output schemas; typed fixtures. Generates the UI's TypeScript, the JSON Schemas and the fake core's data | Rust types (serde, specta, schemars); no Tauri dependency | Library and an export tool, run in development and CI |
 | Knowledge sources | Folders watched for changes; MCP servers queried live by the agents, or synced into the index by the core with a token Noter holds | FSEvents, text extraction (PDF, Word, HTML, Markdown, code), an MCP client with OAuth in Rust | External; the sync job runs inside the core |
 | Evidence sources | Jira, Bitbucket, GitHub and later calls, read by the evidence collector to close action items | `acli` (Jira), `bkt` (Bitbucket), `gh` (GitHub) as subprocesses under the user's logins; the local model for speech evidence | External |
 | Storage | One database, audio and per-call transcript files, models, backups | `~/Library/Application Support/Noter/`: `noter.db`, `audio/<call>/{mic,sys}.m4a` plus `transcript.jsonl`, `items.json`, `summary.md`, `models/`, `backups/`, `handoffs/` | Files |
@@ -464,6 +466,8 @@ The Rust core is the only hub: it drives the engine over stdio, reads and writes
 **Data flow after a call.** The core asks the engine for the offline pass (full diarization with clustering, optional re-transcription with the non-Turbo Large v3), then chunks and embeds the final transcript, and runs the analysis skill for the call type through the router. Outputs are stored with links to transcript spans and shown in the UI for editing.
 
 **Why this split.** Core Audio, CoreML and the Neural Engine are reachable properly only from Swift, so audio and ASR live in a Swift binary. The Rust core keeps storage and orchestration testable without a UI and without audio hardware. React is where you and the team are fastest, and the UI never holds state the core does not have. A crash in the engine restarts the sidecar and resumes capture from its ring buffer; a crash in an LLM runtime loses one task, not the call.
+
+**Contracts and UI-first development.** The UI and the core are built in parallel, so every boundary is written first as Rust types in `crates/noter-protocol`, and everything else is generated from them: the TypeScript bindings the UI imports (`apps/desktop/src/core/bindings.ts`), a manifest of every command, event, Channel and error code (`contracts/ipc.manifest.json`), JSON Schemas for the engine protocol, the noter-mcp tools and the skill outputs, and typed fixtures that drive a fake core the UI runs against before the real core exists. The conventions: every command takes one `args` object and returns a view-ready record or a typed `CoreError` from a closed list of codes; setters send the wanted state, never a toggle; every editable record carries a `rev`, a stale one is refused with `conflict`, and every undoable change returns its `change_id`; streams are a snapshot, then a Channel with consecutive `seq` numbers; events carry whole state; each command lists the windows allowed to call it. Each surface is frozen (it changes only additively, or with a major contract version both sides sign off) or draft (copilot, agents and Performance until their milestone gates). The core also plays audio natively (no media in the WebView), shows the open and save panels and writes the clipboard. Design and full lists: `docs/DESIGN-core.md`, ADR-0001, ADR-0002.
 
 ## Audio capture on macOS
 
@@ -572,7 +576,7 @@ Claude Code details are from the headless reference ([Run Claude Code programmat
 | Knowledge source sync (indexed MCP sources) | The core calls the server directly; no model involved | — | Sync runs; sensitive sources never reach cloud models |
 | Redaction before any cloud call | Local, always | Regex-only | Not needed |
 
-**Skills, not prompts.** Each call type is a directory: `skills/<type>/SKILL.md` (the instructions), `output.schema.json`, `examples/`. The same files drive all three adapters: Claude Code gets them through `--append-system-prompt-file`, Codex through the prompt, the local model through the system message. The app owns the contracts; the skill text is editable by the user in Settings and versioned, so a tweak to how 1:1 summaries read never touches code.
+**Skills, not prompts.** Each call type is a directory: `skills/<type>/SKILL.md` (the instructions), `output.schema.json`, `examples/`. The same files drive all three adapters: Claude Code gets them through `--append-system-prompt-file`, Codex through the prompt, the local model through the system message. The app owns the contracts; the skill text is editable by the user in Settings and versioned, so a tweak to how 1:1 summaries read never touches code. Call types are the built-in list plus any skill folder the user adds; adding a folder adds that call type wherever call types are chosen (owner decision, 17 Oct).
 
 **Agent registry and role skills.** Agents are rows in the `agents` table, not code: name, role skill path, runtime (one of the five choices in Feature specification › 8), model, effort, tools, call types, budget share, order, built-in flag. `skills/roles/<role>/SKILL.md` holds each built-in agent's stance: what it reads for, what counts as worth interrupting for, and what it must not raise (a Designer does not comment on database locks). A shared `skills/roles/council.md` sets the sceptical posture, the card schema with the `agent` field and the merge rules. Adding an agent in Settings writes a new skill directory from a template; removing one deletes the row and archives the directory. The registry is what the router reads to build either one fused prompt (all enabled agents' skills under the council instructions, cards tagged by agent) or one session per agent. Effort maps to each runtime's own control: Claude Code's effort setting, Codex's reasoning-effort configuration, the local runtime's thinking mode.
 
@@ -582,9 +586,13 @@ Claude Code details are from the headless reference ([Run Claude Code programmat
 
 **noter-mcp.** A small Rust binary speaking MCP over stdio to the CLI and a Unix socket to the core; it holds no database connection, so the core stays the single writer and the UI sees every change through the core's own hooks. Read tools: `search_calls`, `search_documents`, `get_transcript_span`, `get_person`, `get_decisions`, `get_open_items`, `get_screen_context`. Write tools only stage changes for the user: `pin_item`, `propose_correction`. `emit_card` delivers a validated card as a tool call, the fallback for per-turn structured output in a long-lived session. Because the CLIs start it themselves, an agent can decide to look up last month's planning call when reviewing today's, instead of the core guessing what to prefetch.
 
+The core accepts a connection on its socket (`run/core.sock`, 0600) only with the per-run token it put in that runtime's `NOTER_MCP_TOKEN`, and every request carries the run's privacy context, so a cloud run never receives sensitive sources or sensitive calls.
+
 **Cost and observability.** Every run is logged in `llm_runs`: adapter, model, skill version, prompt hash, tokens, cost (Claude Code reports `total_cost_usd` in its JSON result), duration, schema validity, session ID. A per-call budget cap stops the copilot before a long meeting becomes expensive, and the Settings page shows spend per week per adapter, with the Claude Code, Codex and local shares. Runs on the user's own account count against that plan's usage limits rather than a per-request cost, so the per-call budget share does not apply to them. Nothing in the logs contains transcript text.
 
 **Redaction.** Before a cloud call in "cloud with redaction" mode, the local model and a regex pass replace emails, phone numbers, credentials and ID-like strings with placeholders, and optionally replace people's names with stable pseudonyms (`Person_A`) that the core maps back on return so attribution survives. The audit log records which placeholders were used, never the originals.
+
+**One way out.** Every request that carries user text off the Mac (model runs, evidence lookups through `acli`, `bkt` and `gh`, indexed MCP syncs) passes one egress gate in the core, which applies the privacy mode and the sensitive flag, redacts, writes the audit row and only then releases it. Each task type has a timeout (live tick 8 s per agent, Ask 60 s, post-call 10 minutes), and two consecutive runtime failures within a call switch that call to local.
 
 ## Live copilot loop
 
@@ -644,7 +652,7 @@ One SQLite file in WAL mode holds everything: relational tables, FTS5 full-text 
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
-| `calls` | One row per captured call | id, started\_at, ended\_at, title, call\_type, platform, calendar\_event\_id, privacy\_class (normal / sensitive), status, audio\_retention\_until, tags (JSON, free text) |
+| `calls` | One row per captured call | id, started\_at, ended\_at, title, call\_type, platform, calendar\_event\_id, privacy\_class (normal / sensitive), status, audio\_retention\_until, rev; tags in call\_tags |
 | `people` | Everyone who has ever been on a call | id, display\_name, email, aliases (JSON), role, org, notes, voice\_profile\_optin, optin\_date |
 | `call_participants` | Who was on which call | call\_id, person\_id, speaker\_label, channel, talk\_time\_ms (shown only when enabled) |
 | `speakers` | Diarization clusters per call, before and after mapping to a person | id, call\_id, label, person\_id (nullable), centroid (BLOB, encrypted), pass (live / offline) |
@@ -676,6 +684,8 @@ One SQLite file in WAL mode holds everything: relational tables, FTS5 full-text 
 | `audit_log` | Everything that left the machine | id, ts, event, adapter, bytes\_out, payload\_hash, redaction\_map\_id |
 | `glossary` | Terms to bias and correct | term, variants\_latin (JSON), variants\_cyrillic (JSON), spoken\_forms (JSON), language, added\_by, added\_from |
 | `settings` | Key-value | key, value (JSON); includes which own accounts are signed in, with the account and plan, never a token |
+
+**Additions from the backend design (17 Oct).** Every editable table (`calls`, `people`, `items`, `summaries`, `topics`, `agents`, `sources`, `glossary`, `settings`) has a `rev` column for optimistic concurrency. JSON arrays become junction tables: `call_tags`, `person_aliases`, `topic_aliases`. New tables: `marks` and `gaps` (moments and audio gaps, mirrored from `timeline.json`), `summary_versions` (every generated version and the user's edit, out of `summaries`), `prompt_versions` (handoff prompts and briefs, replacing `items.handoff_prompt_path`), `suppressions` (Keep Separate, rejected suggestions), `ask_threads` and `ask_turns`, `council_modes` (live and post-call mode per call type), `speaker_constraints` (the user's must-link and cannot-link corrections). `items` gains `generated_text` (for the edit diff) and `carried_from_call_id`; `job_runs` records a typed error code; `llm_runs` and `audit_log` record the runtime choice, the call, the first-token time and the destination. Column-level detail: `docs/DESIGN-core.md` 3.7.
 
 Full-text search uses FTS5 external-content tables over `segments`, `items` and `summaries` with the unicode61 tokenizer (diacritics removed, which handles German umlauts and Russian ё) plus a trigram index for partial matches on names and product terms.
 
@@ -791,27 +801,32 @@ One repository (the empty `~/projects/noter` you already have) with three toolch
 noter/
   apps/desktop/              Tauri 2 app
     src/                     React UI (Vite, TypeScript, Tailwind, Zustand); windows: main, call window (one window, two layouts: call screen and floating panel), record prompt, first-run wizard, Settings
-    src-tauri/               Rust core binary, tauri.conf.json, capabilities/, tray menu
+      core/                  the core bridge: generated bindings.ts, tauri-transport.ts, fake/ (the fake core and its handlers), contract.smoke.ts
+    src-tauri/               thin IPC host over noter-core: one command per contract entry, window scopes, capabilities/, tray menu, native panels
       binaries/              noter-engine-aarch64-apple-darwin, noter-mcp-aarch64-apple-darwin
   crates/
-    noter-protocol/          engine <-> core message types, JSON Schema, fixtures; generated UI types
-    noter-db/                schema, migrations, queries (rusqlite, sqlite-vec, FTS5), change log
-    noter-llm/               LlmRuntime trait, Claude Code / Codex / Ollama adapters
-    noter-retrieval/         chunking, embeddings, hybrid search, topics
+    noter-protocol/          the contracts as Rust types: UI <-> core IPC (commands, events, Channels, error codes, window scopes, CoreApi), engine stdio protocol, noter-mcp tools, skill output schemas, typed fixtures; noter-contract-export generates everything below contracts/ and bindings.ts
+    noter-core/              implements CoreApi: session manager, stream hub, transcript and speakers, items and outputs, people, settings, credentials, change log
+    noter-engine-client/     engine supervision: spawn, JSON Lines codec, seq-gap detection, restart with resume
+    noter-native/            objc2 bindings for AppKit panels, EventKit, Keychain, Launch Services, accessibility announcements
+    noter-db/                schema, migrations, queries (rusqlite, sqlite-vec, FTS5), single writer task, change-log transactions
+    noter-llm/               LlmRuntime trait, Claude Code / Codex / Ollama adapters, egress gate, redaction, audit log
+    noter-retrieval/         chunking, embeddings, hybrid search, Ask, topics
     noter-knowledge/         folder watcher, text extraction, MCP sync, document chunking
     noter-copilot/           signals, topic tracker, tick loop with council fan-out, merge and ranking
     noter-context/           screen-context chips, IDE MCP and browser URL connectors, Jira / PR resolution (v1.x)
     noter-handoff/           handoff prompt rendering, URL-scheme detection, terminal launch
     noter-jobs/              scheduler, updates, integrity and index rebuild, reconciliation, evidence collection
-    noter-mcp/               MCP server binary over the library
+    noter-mcp/               MCP server binary; talks to the core over its Unix socket, never to the database
+  contracts/                 generated, committed: ipc.manifest.json, engine.schema.json, mcp-tools.schema.json, skills/*.schema.json, fixtures/world.json
   engine/                    Swift package: noter-engine executable
     Sources/Capture          process tap, mic, aggregate device, ring buffers, AAC writer
     Sources/ASR              WhisperKit streaming, language ID, glossary, hallucination filter
     Sources/Diarization      FluidAudio streaming and offline, embeddings
     Sources/ScreenContext    window picker, ScreenCaptureKit frames, Vision OCR, de-duplication (v1.x)
-    Sources/Protocol         JSON Lines over stdio, generated Codable types
+    Sources/Protocol         JSON Lines over stdio, Codable types generated from contracts/engine.schema.json
     Tests/                   WAV fixtures, golden transcripts, OCR fixtures
-  skills/                    one directory per call type: SKILL.md, output.schema.json, examples/
+  skills/                    one directory per built-in call type: SKILL.md, output.schema.json, examples/ (user-added call types are copies under Application Support)
     roles/                   council.md plus pm/, designer/, backend/, frontend/, teamlead/, architect/
     handoff/                 the handoff prompt skill and its schema
     reconcile/               judgement prompts for low-confidence term, reference and evidence decisions
@@ -820,7 +835,7 @@ noter/
   CLAUDE.md, AGENTS.md       instructions for the agents that build Noter
 ```
 
-**Engine protocol.** JSON Lines over stdio, one message per line, defined once as JSON Schema in `noter-protocol` and generated into Swift `Codable` and Rust `serde` types. Commands from core to engine: `start_session`, `pause`, `resume`, `stop`, `set_glossary`, `set_languages`, `offline_pass`, `enroll_speaker`. Events from engine to core: `ready`, `call_detected`, `device_changed`, `segment`, `speaker_turn`, `levels`, `offline_progress`, `offline_done`, `error`. The engine also runs in file mode (`noter-engine --mic mic.wav --sys sys.wav`), which is how the golden set is replayed in tests without a live call.
+**Engine protocol.** JSON Lines over stdio, one message per line, defined once as Rust types in `noter-protocol` and exported as JSON Schema (`contracts/engine.schema.json`) for the Swift `Codable` types; the Rust types are the source of truth. Lines are `{id, cmd}` from the core and `{seq, at, event}` from the engine; `ready` reports the protocol version, and the core refuses a different major. Commands from core to engine: `ping`, `start_session`, `pause`, `resume`, `stop`, `set_glossary`, `set_languages`, `exclude_process`, `offline_pass`, `speaker_embedding`, `embed_texts`, `set_detection`, `self_test`, `play`, `stop_playback`, `shutdown`. Events from engine to core: `ready`, `ack`, `error`, `pong`, `call_detected`, `call_audio_released`, `audio_source_added`, `session_started`, `device_changed`, `permission_lost`, `segment`, `speaker_turn`, `levels`, `no_segments`, `silence`, `session_stopped`, `offline_progress`, `offline_done`, `offline_failed`, `speaker_embedding_done`, `embeddings`, `self_test_stream`, `self_test_line`, `self_test_result`, `playback_position`. The engine reports facts (a meeting app released audio, nothing heard since an offset); the core's session manager turns them into notices and decisions. The engine also runs in file mode (`noter-engine --mic mic.wav --sys sys.wav`), which is how the golden set is replayed in tests without a live call.
 
 **Sidecars.** Tauri's `externalBin` expects each binary with a target-triple suffix; a script copies the Swift build product into `binaries/` under that name, and the shell plugin capability grants `shell:allow-spawn` for the two sidecars only ([Tauri sidecar docs](https://v2.tauri.app/develop/sidecar)). The core spawns the engine with `app.shell().sidecar("noter-engine")`, reads its stdout line by line and writes commands to its stdin. Only Apple Silicon is built; an Intel build would need its own CoreML conversions and is out of scope.
 
@@ -840,13 +855,15 @@ noter/
 
 ## Roadmap and milestones
 
-Six milestones of two to four weeks each, about 22 weeks to v1 as specified (the Review tab recommends a smaller MVP; the drawing stays until that is decided), in an order where every milestone leaves something usable: capture and a live transcript first, speakers and post-call outputs second, the library third, the live copilot and council in M4 once the transcript they depend on has held its latency and accuracy targets, and maintenance, performance and hardening in M5. Each gate is a measurement on real calls, not a feature checklist.
+Six milestones of two to four weeks each, about 22 weeks to v1 as specified (the owner kept full v1 on 17 Oct rather than the smaller MVP the Review tab recommended), in an order where every milestone leaves something usable: capture and a live transcript first, speakers and post-call outputs second, the library third, the live copilot and council in M4 once the transcript they depend on has held its latency and accuracy targets, and maintenance, performance and hardening in M5. Each gate is a measurement on real calls, not a feature checklist.
 
 ![Roadmap · six milestones, 22 weeks, a measured gate after each](diagrams/roadmap.png)
 
 Each band is a milestone with its scope; the diamond under it is the gate, and the line beside the diamond is the measurement that has to pass before the next milestone starts.
 
 The copilot sits late on purpose: it is the most distinctive feature and the one most likely to eat the schedule, and it is only as good as the confirmed-text latency and the retrieval quality the earlier milestones establish. Week one of M0 is a throwaway Swift CLI that creates the global tap and the mic stream from a sandboxed helper, confirms the permission prompt and non-zero buffers, runs one WhisperKit Turbo instance over both channels with per-utterance language ID on a real three-language call, and prints hypothesis and confirmed latency; that measurement decides the streaming policy, the sandbox question and whether Parakeet joins as a second backend. v1.x (calendar, screen context from the first screen, Jira and Slack through MCP, the pre-call brief, more skills) starts after M5 ships and after a week of daily use has produced the first list of what actually hurts.
+
+**Parallel UI and core work.** The UI is built against the fake core from the start. At each milestone its screens switch to the real core for the groups that milestone delivers: M0 first run, settings and the app snapshot; M1 capture, the call window's transcript and the menu bar; M2 the Call page, items, handoff and Today; M3 search, Ask, people, knowledge sources and own accounts; M4 cards and agents; M5 Activity, Maintenance and Performance. The same end-to-end flows run against both. CI fails when the generated contract files are stale, when the contract tests break, or when the core's registered commands differ from the contract.
 
 ## UI prototype
 
@@ -879,6 +896,10 @@ Choices made so far, newest first. Rows marked "Product owner" are the owner's a
 
 | Date | Decision | Decided by | Rationale |
 | --- | --- | --- | --- |
+| 2026-10-17 | Scope cut decided: v1 stays as specified (full v1); the Review tab's MVP is not adopted. Copilot, council and Performance stay in v1; their contract surfaces stay draft until the M4 and M5 gates | Product owner | Answer to the open decision; docs/DESIGN-core.md 4.1 |
+| 2026-10-17 | Replay of a line during capture stays headphones-only, with Noter's own sounds excluded. Speakers are refused even with echo cancellation on: Noter's echo cancellation cleans only Noter's own recording, while the meeting app captures the microphone itself and does not cancel Noter's playback, so the call would hear it | Product owner | Answer to DESIGN-core open question Q2, after review; confirms DESIGN D85 and PM-25 |
+| 2026-10-17 | Call types are a built-in list (1:1, standup, planning, retro, cross-team sync, vendor, interview, incident) plus any skill folder the user adds under skills/; each call type is its skill directory | Product owner | Answer to DESIGN-core open question Q5 |
+| 2026-10-17 | Backend design docs/DESIGN-core.md (proposed) with ADR-0001 and ADR-0002: UI-first development, the UI ↔ core contract written first as Rust types in crates/noter-protocol, TypeScript bindings and JSON Schemas generated from it, a fake core for the UI, frozen and draft stability per command | Product owner | Request: agree contracts first so backend and UI are built in parallel |
 | 2026-10-17 | The UI design docs/DESIGN.md is accepted as version 1.0, together with this PRD and the clickable prototype as synced on this date | Product owner | Review of DESIGN v0.6; next step is the decomposition into work items |
 | 2026-10-17 | The clickable prototype in docs/prototype/clickable/ is the UI prototype of record; where it differed from DESIGN v0.5, the design and this PRD follow it; the raw boards of 16 Oct are history | Product owner | Request; design, PRD and prototype must not contradict each other; recorded as PM-59 in docs/DESIGN.md |
 | 2026-10-17 | The user's own Claude account and own ChatGPT account are signed in separately through Claude Code and Codex, which keep the sign-in; either can be chosen per agent when both are signed in; this replaces the single personal-use login switch, and API keys stay the default | Product owner | Request: complete sign-ins and smooth binding to agents; supersedes the switch in the 16 Oct authentication row; recorded as PM-58 |

@@ -1,0 +1,1292 @@
+{
+  "$socket": {
+    "request": {
+      "$defs": {
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "McpRunContext": {
+          "description": "Context the core binds to a runtime it spawned. noter-mcp reads\n`NOTER_MCP_TOKEN` from its environment and sends it with every request;\nthe core rejects any other connection.",
+          "properties": {
+            "call_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CallId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "cloud": {
+              "description": "Cloud runtimes never receive sensitive sources or sensitive calls.",
+              "type": "boolean"
+            },
+            "llm_run_id": {
+              "description": "The `llm_runs` row this session belongs to.",
+              "type": "string"
+            },
+            "token": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "token",
+            "llm_run_id",
+            "cloud"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "JSON-RPC 2.0 request on the Unix socket: `method` is the tool name.",
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/McpRunContext"
+        },
+        "id": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jsonrpc": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": true
+      },
+      "required": [
+        "jsonrpc",
+        "id",
+        "method",
+        "context",
+        "params"
+      ],
+      "title": "CoreSocketRequest",
+      "type": "object"
+    },
+    "response": {
+      "$defs": {
+        "CoreSocketError": {
+          "properties": {
+            "code": {
+              "description": "-32602 invalid params, -32001 not allowed for this runtime, -32002 not found, -32603 internal.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CoreSocketError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jsonrpc": {
+          "type": "string"
+        },
+        "result": true
+      },
+      "required": [
+        "jsonrpc",
+        "id"
+      ],
+      "title": "CoreSocketResponse",
+      "type": "object"
+    }
+  },
+  "emit_card": {
+    "input": {
+      "$defs": {
+        "CandidateKind": {
+          "enum": [
+            "ask",
+            "answer",
+            "context",
+            "pin",
+            "catch_up"
+          ],
+          "type": "string"
+        },
+        "CardCandidate": {
+          "description": "One card a council agent proposes in a tick. The core validates, merges,\nranks and drops; nothing here is shown as is.",
+          "properties": {
+            "agent": {
+              "description": "Agent id from the packet (fused mode returns cards tagged by agent).",
+              "type": "string"
+            },
+            "body": {
+              "description": "At most two sentences.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "confidence": {
+              "description": "0..1; the ranker drops anything below 0.6.",
+              "format": "float",
+              "type": "number"
+            },
+            "evidence_chunk_ids": {
+              "items": {
+                "$ref": "#/$defs/ChunkId"
+              },
+              "type": "array"
+            },
+            "evidence_segment_ids": {
+              "items": {
+                "$ref": "#/$defs/SegmentId"
+              },
+              "type": "array"
+            },
+            "jira_key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "$ref": "#/$defs/CandidateKind"
+            },
+            "lang": {
+              "$ref": "#/$defs/Lang"
+            },
+            "reason": {
+              "description": "Why now, in one line (logged, not shown).",
+              "type": "string"
+            },
+            "source": {
+              "$ref": "#/$defs/SourceKindHint"
+            },
+            "title": {
+              "description": "One line, at most 120 characters; never a script to read aloud.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "agent",
+            "kind",
+            "title",
+            "source",
+            "evidence_segment_ids",
+            "evidence_chunk_ids",
+            "confidence",
+            "reason",
+            "lang"
+          ],
+          "type": "object"
+        },
+        "ChunkId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "Lang": {
+          "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
+          "enum": [
+            "en",
+            "ru",
+            "de"
+          ],
+          "type": "string"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "SourceKindHint": {
+          "enum": [
+            "this_call",
+            "past_call",
+            "jira",
+            "document",
+            "model_guess"
+          ],
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "card": {
+          "$ref": "#/$defs/CardCandidate"
+        }
+      },
+      "required": [
+        "card"
+      ],
+      "title": "EmitCardInput",
+      "type": "object"
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "staged": {
+          "description": "Staged for the user's review; nothing changed yet.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "staged",
+        "reference"
+      ],
+      "title": "StagedOutput",
+      "type": "object"
+    }
+  },
+  "get_decisions": {
+    "input": {
+      "$defs": {
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "PersonId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "TopicId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "people": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PersonId"
+          },
+          "type": "array"
+        },
+        "query": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "topic_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TopicId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "title": "GetDecisionsInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "ItemId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "McpItem": {
+          "properties": {
+            "call_date": {
+              "$ref": "#/$defs/LocalDate"
+            },
+            "call_id": {
+              "$ref": "#/$defs/CallId"
+            },
+            "due": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LocalDate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_segment_ids": {
+              "items": {
+                "$ref": "#/$defs/SegmentId"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "$ref": "#/$defs/ItemId"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "owner": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "kind",
+            "text",
+            "status",
+            "call_id",
+            "call_date",
+            "evidence_segment_ids"
+          ],
+          "type": "object"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/McpItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ItemsOutput",
+      "type": "object"
+    }
+  },
+  "get_open_items": {
+    "input": {
+      "$defs": {
+        "PersonId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "people": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PersonId"
+          },
+          "type": "array"
+        }
+      },
+      "title": "GetOpenItemsInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "ItemId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "McpItem": {
+          "properties": {
+            "call_date": {
+              "$ref": "#/$defs/LocalDate"
+            },
+            "call_id": {
+              "$ref": "#/$defs/CallId"
+            },
+            "due": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LocalDate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_segment_ids": {
+              "items": {
+                "$ref": "#/$defs/SegmentId"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "$ref": "#/$defs/ItemId"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "owner": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "kind",
+            "text",
+            "status",
+            "call_id",
+            "call_date",
+            "evidence_segment_ids"
+          ],
+          "type": "object"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/McpItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "ItemsOutput",
+      "type": "object"
+    }
+  },
+  "get_person": {
+    "input": {
+      "$defs": {
+        "PersonId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "person_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Either an id or a name or alias (\"Аня\" finds Anna)."
+        }
+      },
+      "title": "GetPersonInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "ItemId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "McpItem": {
+          "properties": {
+            "call_date": {
+              "$ref": "#/$defs/LocalDate"
+            },
+            "call_id": {
+              "$ref": "#/$defs/CallId"
+            },
+            "due": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LocalDate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_segment_ids": {
+              "items": {
+                "$ref": "#/$defs/SegmentId"
+              },
+              "type": "array"
+            },
+            "item_id": {
+              "$ref": "#/$defs/ItemId"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "owner": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "item_id",
+            "kind",
+            "text",
+            "status",
+            "call_id",
+            "call_date",
+            "evidence_segment_ids"
+          ],
+          "type": "object"
+        },
+        "PersonId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "open_items": {
+          "items": {
+            "$ref": "#/$defs/McpItem"
+          },
+          "type": "array"
+        },
+        "person_id": {
+          "$ref": "#/$defs/PersonId"
+        },
+        "recent_calls": {
+          "items": {
+            "$ref": "#/$defs/CallId"
+          },
+          "type": "array"
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "person_id",
+        "display_name",
+        "aliases",
+        "recent_calls",
+        "open_items"
+      ],
+      "title": "GetPersonOutput",
+      "type": "object"
+    }
+  },
+  "get_screen_context": {
+    "input": {
+      "$defs": {
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "call_id": {
+          "$ref": "#/$defs/CallId"
+        }
+      },
+      "required": [
+        "call_id"
+      ],
+      "title": "GetScreenContextInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "ScreenChip": {
+          "properties": {
+            "app": {
+              "type": "string"
+            },
+            "at": {
+              "$ref": "#/$defs/TimestampMs"
+            },
+            "label": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "label",
+            "app",
+            "at",
+            "text"
+          ],
+          "type": "object"
+        },
+        "TimestampMs": {
+          "description": "Milliseconds since the Unix epoch (UTC). Exported to TypeScript as `number`\n(exact up to the year 285 616).",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "chips": {
+          "items": {
+            "$ref": "#/$defs/ScreenChip"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "chips"
+      ],
+      "title": "ScreenContextOutput",
+      "type": "object"
+    }
+  },
+  "get_transcript_span": {
+    "input": {
+      "$defs": {
+        "AudioChannel": {
+          "description": "The two capture channels, kept separate end to end.",
+          "oneOf": [
+            {
+              "const": "mic",
+              "description": "The user's microphone (\"you\").",
+              "type": "string"
+            },
+            {
+              "const": "sys",
+              "description": "System audio: everyone else.",
+              "type": "string"
+            }
+          ]
+        },
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "OffsetMs": {
+          "description": "Milliseconds from the start of a call (session-relative audio time).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "call_id": {
+          "$ref": "#/$defs/CallId"
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AudioChannel"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "t0_ms": {
+          "$ref": "#/$defs/OffsetMs"
+        },
+        "t1_ms": {
+          "$ref": "#/$defs/OffsetMs"
+        }
+      },
+      "required": [
+        "call_id",
+        "t0_ms",
+        "t1_ms"
+      ],
+      "title": "GetTranscriptSpanInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "Lang": {
+          "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
+          "enum": [
+            "en",
+            "ru",
+            "de"
+          ],
+          "type": "string"
+        },
+        "OffsetMs": {
+          "description": "Milliseconds from the start of a call (session-relative audio time).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "SpanLine": {
+          "properties": {
+            "lang": {
+              "$ref": "#/$defs/Lang"
+            },
+            "segment_id": {
+              "$ref": "#/$defs/SegmentId"
+            },
+            "speaker": {
+              "type": "string"
+            },
+            "t0_ms": {
+              "$ref": "#/$defs/OffsetMs"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "segment_id",
+            "t0_ms",
+            "speaker",
+            "lang",
+            "text"
+          ],
+          "type": "object"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/SpanLine"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lines"
+      ],
+      "title": "GetTranscriptSpanOutput",
+      "type": "object"
+    }
+  },
+  "pin_item": {
+    "input": {
+      "$defs": {
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "call_id": {
+          "$ref": "#/$defs/CallId"
+        },
+        "due": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalDate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_segment_ids": {
+          "items": {
+            "$ref": "#/$defs/SegmentId"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "decision | action_item | open_question | risk",
+          "type": "string"
+        },
+        "owner_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "kind",
+        "text",
+        "evidence_segment_ids"
+      ],
+      "title": "PinItemInput",
+      "type": "object"
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "staged": {
+          "description": "Staged for the user's review; nothing changed yet.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "staged",
+        "reference"
+      ],
+      "title": "StagedOutput",
+      "type": "object"
+    }
+  },
+  "propose_correction": {
+    "input": {
+      "$defs": {
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "after": {
+          "type": "string"
+        },
+        "before": {
+          "type": "string"
+        },
+        "entity": {
+          "description": "\"segment\" | \"item\" | \"speaker\" | \"glossary\"",
+          "type": "string"
+        },
+        "entity_id": {
+          "type": "string"
+        },
+        "evidence_segment_ids": {
+          "items": {
+            "$ref": "#/$defs/SegmentId"
+          },
+          "type": "array"
+        },
+        "field": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "entity",
+        "entity_id",
+        "field",
+        "before",
+        "after",
+        "reason",
+        "evidence_segment_ids"
+      ],
+      "title": "ProposeCorrectionInput",
+      "type": "object"
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "reference": {
+          "type": "string"
+        },
+        "staged": {
+          "description": "Staged for the user's review; nothing changed yet.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "staged",
+        "reference"
+      ],
+      "title": "StagedOutput",
+      "type": "object"
+    }
+  },
+  "search_calls": {
+    "input": {
+      "$defs": {
+        "CallTypeId": {
+          "description": "A call type, such as `one_on_one`, `planning` or a user-added type.\nCall types are data, not code: each one is a skill directory\n(`skills/<type>/`) and the list comes from `settings_call_types`.",
+          "type": "string"
+        },
+        "Lang": {
+          "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
+          "enum": [
+            "en",
+            "ru",
+            "de"
+          ],
+          "type": "string"
+        },
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "McpCallFilter": {
+          "properties": {
+            "call_types": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/CallTypeId"
+              },
+              "type": "array"
+            },
+            "from": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LocalDate"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "languages": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/Lang"
+              },
+              "type": "array"
+            },
+            "people": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/PersonId"
+              },
+              "type": "array"
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LocalDate"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "type": "object"
+        },
+        "PersonId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "filter": {
+          "$ref": "#/$defs/McpCallFilter",
+          "default": {
+            "call_types": [],
+            "from": null,
+            "languages": [],
+            "people": [],
+            "to": null
+          }
+        },
+        "k": {
+          "description": "Default 8, maximum 30.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "SearchCallsInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "CallHit": {
+          "properties": {
+            "call_date": {
+              "$ref": "#/$defs/LocalDate"
+            },
+            "call_id": {
+              "$ref": "#/$defs/CallId"
+            },
+            "call_title": {
+              "type": "string"
+            },
+            "segment_ids": {
+              "description": "Speaker-prefixed lines (\"Anna: …\"); cite these ids as evidence.",
+              "items": {
+                "$ref": "#/$defs/SegmentId"
+              },
+              "type": "array"
+            },
+            "strong": {
+              "type": "boolean"
+            },
+            "t0_ms": {
+              "$ref": "#/$defs/OffsetMs"
+            },
+            "t1_ms": {
+              "$ref": "#/$defs/OffsetMs"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "call_id",
+            "call_title",
+            "call_date",
+            "t0_ms",
+            "t1_ms",
+            "segment_ids",
+            "text",
+            "strong"
+          ],
+          "type": "object"
+        },
+        "CallId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "LocalDate": {
+          "description": "A calendar date without time zone, `YYYY-MM-DD`, in the user's local calendar.",
+          "type": "string"
+        },
+        "OffsetMs": {
+          "description": "Milliseconds from the start of a call (session-relative audio time).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "SegmentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "hits": {
+          "items": {
+            "$ref": "#/$defs/CallHit"
+          },
+          "type": "array"
+        },
+        "keyword_only": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hits",
+        "keyword_only"
+      ],
+      "title": "SearchCallsOutput",
+      "type": "object"
+    }
+  },
+  "search_documents": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "k": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "SearchDocumentsInput",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "ChunkId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        },
+        "DocumentHit": {
+          "properties": {
+            "chunk_id": {
+              "$ref": "#/$defs/ChunkId"
+            },
+            "document_id": {
+              "$ref": "#/$defs/DocumentId"
+            },
+            "heading_path": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "source_name": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "document_id",
+            "chunk_id",
+            "title",
+            "heading_path",
+            "source_name",
+            "text"
+          ],
+          "type": "object"
+        },
+        "DocumentId": {
+          "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "hits": {
+          "items": {
+            "$ref": "#/$defs/DocumentHit"
+          },
+          "type": "array"
+        },
+        "sensitive_skipped": {
+          "description": "Sensitive sources are never returned to a cloud runtime.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "hits",
+        "sensitive_skipped"
+      ],
+      "title": "SearchDocumentsOutput",
+      "type": "object"
+    }
+  }
+}

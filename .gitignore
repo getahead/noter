@@ -532,3 +532,7 @@
 .windsurf/workflows/cf-write-skills.md
 .windsurf/workflows/cf.md
 # END Constructor Studio
+
+# Rust and Node build output (noter-protocol, apps/desktop)
+/target/
+node_modules/

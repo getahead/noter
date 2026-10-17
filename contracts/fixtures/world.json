@@ -1,0 +1,2652 @@
+{
+  "agents": {
+    "agents": [
+      {
+        "badge": "target",
+        "budget_share": 20,
+        "builtin": true,
+        "call_types": [
+          "planning",
+          "cross_team"
+        ],
+        "effort": "low",
+        "enabled": true,
+        "id": "agt_pm",
+        "model": "claude-haiku",
+        "name": "Product manager",
+        "order": 1,
+        "rev": 1,
+        "runtime": "claude_api_key",
+        "skill_path": "skills/roles/pm/SKILL.md",
+        "stats": {
+          "cards_7d": 20,
+          "useful_share": 0.3400000035762787
+        },
+        "status": {
+          "type": "ok"
+        },
+        "tools": [
+          "mcp__noter__search_calls"
+        ]
+      },
+      {
+        "badge": "building.columns",
+        "budget_share": 20,
+        "builtin": true,
+        "call_types": [
+          "planning",
+          "cross_team"
+        ],
+        "effort": "low",
+        "enabled": true,
+        "id": "agt_architect",
+        "model": "claude-haiku",
+        "name": "Architect",
+        "order": 2,
+        "rev": 1,
+        "runtime": "claude_api_key",
+        "skill_path": "skills/roles/architect/SKILL.md",
+        "stats": {
+          "cards_7d": 20,
+          "useful_share": 0.3400000035762787
+        },
+        "status": {
+          "type": "ok"
+        },
+        "tools": [
+          "mcp__noter__search_calls"
+        ]
+      },
+      {
+        "badge": "paintbrush",
+        "budget_share": 15,
+        "builtin": true,
+        "call_types": [
+          "planning",
+          "cross_team"
+        ],
+        "effort": "low",
+        "enabled": true,
+        "id": "agt_designer",
+        "model": "claude-haiku",
+        "name": "Designer",
+        "order": 3,
+        "rev": 1,
+        "runtime": "codex_api_key",
+        "skill_path": "skills/roles/designer/SKILL.md",
+        "stats": {
+          "cards_7d": 20,
+          "useful_share": 0.3400000035762787
+        },
+        "status": {
+          "fix": null,
+          "reason": "no_key",
+          "type": "paused"
+        },
+        "tools": [
+          "mcp__noter__search_calls"
+        ]
+      },
+      {
+        "badge": "server.rack",
+        "budget_share": 15,
+        "builtin": true,
+        "call_types": [
+          "planning",
+          "cross_team"
+        ],
+        "effort": "low",
+        "enabled": true,
+        "id": "agt_backend",
+        "model": "claude-haiku",
+        "name": "Backend engineer",
+        "order": 4,
+        "rev": 1,
+        "runtime": "claude_api_key",
+        "skill_path": "skills/roles/backend/SKILL.md",
+        "stats": {
+          "cards_7d": 20,
+          "useful_share": 0.3400000035762787
+        },
+        "status": {
+          "type": "ok"
+        },
+        "tools": [
+          "mcp__noter__search_calls"
+        ]
+      },
+      {
+        "badge": "macwindow",
+        "budget_share": 15,
+        "builtin": true,
+        "call_types": [
+          "planning",
+          "cross_team"
+        ],
+        "effort": "low",
+        "enabled": true,
+        "id": "agt_frontend",
+        "model": "claude-haiku",
+        "name": "Frontend engineer",
+        "order": 5,
+        "rev": 1,
+        "runtime": "claude_api_key",
+        "skill_path": "skills/roles/frontend/SKILL.md",
+        "stats": {
+          "cards_7d": 20,
+          "useful_share": 0.3400000035762787
+        },
+        "status": {
+          "type": "ok"
+        },
+        "tools": [
+          "mcp__noter__search_calls"
+        ]
+      },
+      {
+        "badge": "person.2",
+        "budget_share": 15,
+        "builtin": true,
+        "call_types": [
+          "planning",
+          "cross_team"
+        ],
+        "effort": "low",
+        "enabled": true,
+        "id": "agt_teamlead",
+        "model": "claude-haiku",
+        "name": "Teamlead",
+        "order": 6,
+        "rev": 1,
+        "runtime": "claude_api_key",
+        "skill_path": "skills/roles/teamlead/SKILL.md",
+        "stats": {
+          "cards_7d": 20,
+          "useful_share": 0.3400000035762787
+        },
+        "status": {
+          "type": "ok"
+        },
+        "tools": [
+          "mcp__noter__search_calls"
+        ]
+      }
+    ],
+    "budget_total_pct": 100,
+    "council": [
+      {
+        "agents": [],
+        "call_type": "planning",
+        "live": "fused",
+        "post_call": "parallel"
+      }
+    ],
+    "live_call": "call_live",
+    "runtimes": [
+      {
+        "available": true,
+        "models": [
+          {
+            "id": "claude-haiku",
+            "label": "Haiku",
+            "live_ok": true
+          },
+          {
+            "id": "claude-sonnet",
+            "label": "Sonnet",
+            "live_ok": false
+          }
+        ],
+        "reason": null,
+        "runtime": "claude_api_key"
+      },
+      {
+        "available": false,
+        "models": [],
+        "reason": "account_signed_out",
+        "runtime": "claude_account"
+      },
+      {
+        "available": false,
+        "models": [],
+        "reason": "no_key",
+        "runtime": "codex_api_key"
+      },
+      {
+        "available": false,
+        "models": [],
+        "reason": "cli_missing",
+        "runtime": "chatgpt_account"
+      },
+      {
+        "available": true,
+        "models": [
+          {
+            "id": "qwen3:8b",
+            "label": "Qwen3 8B",
+            "live_ok": true
+          }
+        ],
+        "reason": null,
+        "runtime": "local"
+      }
+    ]
+  },
+  "app": {
+    "accounts": {
+      "accounts": [
+        {
+          "agents": [],
+          "cli": {
+            "installed": true,
+            "path": "/opt/homebrew/bin/claude",
+            "supported": true,
+            "tool": "claude_code",
+            "version": "2.4.1"
+          },
+          "provider": "claude",
+          "status": {
+            "type": "not_signed_in"
+          }
+        },
+        {
+          "agents": [],
+          "cli": {
+            "installed": false,
+            "path": null,
+            "supported": false,
+            "tool": "codex",
+            "version": null
+          },
+          "provider": "chatgpt",
+          "status": {
+            "type": "not_signed_in"
+          }
+        }
+      ],
+      "keys": [
+        {
+          "provider": "anthropic",
+          "status": {
+            "type": "configured",
+            "verified_at": 1792051200000
+          }
+        },
+        {
+          "provider": "codex",
+          "status": {
+            "type": "not_set"
+          }
+        }
+      ],
+      "local": {
+        "cli": {
+          "installed": true,
+          "path": "/usr/local/bin/ollama",
+          "supported": true,
+          "tool": "ollama",
+          "version": "0.12.3"
+        },
+        "default_model": "qwen3:8b",
+        "models": [
+          "qwen3:8b"
+        ],
+        "running": true
+      }
+    },
+    "app_version": "0.1.0-dev",
+    "banners": [],
+    "capture": {
+      "audio_not_stored": false,
+      "call_id": "call_live",
+      "continue_until": null,
+      "notice": null,
+      "output_route": "headphones",
+      "pause": null,
+      "phase": "recording",
+      "recorded_ms": 1380000,
+      "replay_available": true,
+      "sensitive": false,
+      "started_at": 1792137600000,
+      "title": "Planning: VHI 8.0 drawer redesign"
+    },
+    "contract_version": "1.0",
+    "copilot": {
+      "agents": [
+        {
+          "agent": {
+            "badge": "building.columns",
+            "id": "agt_architect",
+            "name": "Architect"
+          },
+          "muted": false,
+          "paused_reason": null
+        },
+        {
+          "agent": {
+            "badge": "target",
+            "id": "agt_pm",
+            "name": "Product manager"
+          },
+          "muted": false,
+          "paused_reason": null
+        }
+      ],
+      "budget": {
+        "cap_usd": 1.0,
+        "level": "ok",
+        "on_account": false,
+        "spent_usd": 0.3100000023841858
+      },
+      "call_id": "call_live",
+      "card_keys": {
+        "conflicts": [],
+        "dismiss_keys": false,
+        "registered": true
+      },
+      "council": "fused",
+      "flag_on": true,
+      "listening": false,
+      "mode": "cloud_redacted",
+      "muted": null,
+      "single_agent": false
+    },
+    "degraded": [],
+    "detection": null,
+    "environment": {
+      "disk_free_mb": 182000,
+      "displays": [
+        {
+          "height_pt": 982,
+          "holds_call_app": true,
+          "id": "dsp_builtin",
+          "is_main": true,
+          "name": "Built-in Retina Display",
+          "width_pt": 1512
+        },
+        {
+          "height_pt": 1440,
+          "holds_call_app": false,
+          "id": "dsp_studio",
+          "is_main": false,
+          "name": "Studio Display",
+          "width_pt": 2560
+        }
+      ],
+      "notifications_enabled": false,
+      "online": true,
+      "output_route": "headphones",
+      "permissions": [
+        {
+          "kind": "microphone",
+          "state": "granted"
+        },
+        {
+          "kind": "system_audio",
+          "state": "granted"
+        },
+        {
+          "kind": "calendar",
+          "state": "granted"
+        },
+        {
+          "kind": "notifications",
+          "state": "not_asked"
+        },
+        {
+          "kind": "screen_recording",
+          "state": "not_asked"
+        },
+        {
+          "kind": "automation_terminal",
+          "state": "not_asked"
+        },
+        {
+          "kind": "automation_browser",
+          "state": "not_asked"
+        }
+      ],
+      "update": null
+    },
+    "features": {
+      "behaviour_metrics": false,
+      "copilot": true,
+      "council": true,
+      "screen_context": false
+    },
+    "hidden_for_presenting": false,
+    "prefs": {
+      "first_weekday": 1,
+      "time_format": "h24",
+      "time_zone": "Europe/Berlin"
+    },
+    "privacy": {
+      "effective": "cloud_redacted",
+      "mode": "cloud_redacted"
+    },
+    "proposals": {
+      "needs_attention": 0,
+      "waiting": 2
+    },
+    "setup": {
+      "call_display": "dsp_studio",
+      "complete": true,
+      "detection_enabled": true,
+      "models": {
+        "bundles": [
+          {
+            "done_mb": 950,
+            "name": "WhisperKit Large v3 Turbo",
+            "required_for_capture": true,
+            "size_mb": 950,
+            "state": "ready"
+          },
+          {
+            "done_mb": 1550,
+            "name": "WhisperKit Large v3",
+            "required_for_capture": false,
+            "size_mb": 1550,
+            "state": "ready"
+          },
+          {
+            "done_mb": 120,
+            "name": "FluidAudio VAD and diarization",
+            "required_for_capture": true,
+            "size_mb": 120,
+            "state": "ready"
+          },
+          {
+            "done_mb": 1150,
+            "name": "bge-m3 (CoreML)",
+            "required_for_capture": false,
+            "size_mb": 1150,
+            "state": "ready"
+          }
+        ],
+        "done_mb": 3770,
+        "error": null,
+        "total_mb": 3770
+      },
+      "permissions": [
+        {
+          "kind": "microphone",
+          "state": "granted"
+        },
+        {
+          "kind": "system_audio",
+          "state": "granted"
+        },
+        {
+          "kind": "calendar",
+          "state": "granted"
+        },
+        {
+          "kind": "notifications",
+          "state": "not_asked"
+        },
+        {
+          "kind": "screen_recording",
+          "state": "not_asked"
+        },
+        {
+          "kind": "automation_terminal",
+          "state": "not_asked"
+        },
+        {
+          "kind": "automation_browser",
+          "state": "not_asked"
+        }
+      ],
+      "self_test": {
+        "at": 1791964800000,
+        "type": "passed"
+      },
+      "start_control": "record",
+      "steps": [
+        {
+          "state": "done",
+          "step": "welcome"
+        },
+        {
+          "state": "done",
+          "step": "models"
+        },
+        {
+          "state": "done",
+          "step": "permissions"
+        },
+        {
+          "state": "done",
+          "step": "call_display"
+        },
+        {
+          "state": "done",
+          "step": "audio_storage"
+        },
+        {
+          "state": "done",
+          "step": "assistants"
+        }
+      ]
+    },
+    "window": "main"
+  },
+  "audit": [
+    {
+      "at": 1792138440000,
+      "bytes_out": 1843,
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "destination": "api.anthropic.com",
+      "id": "aud_1",
+      "redacted": true,
+      "runtime": "claude_api_key",
+      "what": "transcript_delta"
+    }
+  ],
+  "call_details": [
+    {
+      "audio_not_stored": false,
+      "calendar_event": null,
+      "call": {
+        "archive": "done",
+        "audio_deleted": false,
+        "audio_kept_until": 1793520000000,
+        "call_type": "cross_team",
+        "duration_ms": 3120000,
+        "id": "call_backend",
+        "languages": [
+          "ru",
+          "en"
+        ],
+        "open_items": 1,
+        "outputs": "ready",
+        "participants": [
+          {
+            "display_name": "Dmitri Sokolov",
+            "id": "per_dmitri",
+            "initials": "DS",
+            "is_you": false,
+            "short_name": "Dmitri S."
+          },
+          {
+            "display_name": "Oleg Morozov",
+            "id": "per_oleg",
+            "initials": "OM",
+            "is_you": false,
+            "short_name": "Oleg M."
+          },
+          {
+            "display_name": "You",
+            "id": "per_you",
+            "initials": "You",
+            "is_you": true,
+            "short_name": "You"
+          }
+        ],
+        "platform": "Zoom",
+        "privacy": "normal",
+        "rev": 5,
+        "review_waiting": 0,
+        "started_at": 1790949600000,
+        "status": "ready",
+        "tags": [
+          "backend"
+        ],
+        "title": "Backend sync",
+        "unnamed_speakers": 0
+      },
+      "first_recorded_call": false,
+      "gaps": [],
+      "marks": [],
+      "mode_used": "cloud_redacted",
+      "speakers": []
+    }
+  ],
+  "call_types": {
+    "call_types": [
+      {
+        "builtin": true,
+        "id": "one_on_one",
+        "label": "one on one",
+        "skill_path": "skills/one_on_one/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "standup",
+        "label": "standup",
+        "skill_path": "skills/standup/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "planning",
+        "label": "planning",
+        "skill_path": "skills/planning/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "retro",
+        "label": "retro",
+        "skill_path": "skills/retro/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "cross_team",
+        "label": "cross team",
+        "skill_path": "skills/cross_team/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "vendor",
+        "label": "vendor",
+        "skill_path": "skills/vendor/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "interview",
+        "label": "interview",
+        "skill_path": "skills/interview/SKILL.md"
+      },
+      {
+        "builtin": true,
+        "id": "incident",
+        "label": "incident",
+        "skill_path": "skills/incident/SKILL.md"
+      }
+    ]
+  },
+  "calls": [
+    {
+      "archive": "not_started",
+      "audio_deleted": false,
+      "audio_kept_until": 1794729600000,
+      "call_type": "planning",
+      "duration_ms": 1380000,
+      "id": "call_live",
+      "languages": [
+        "en",
+        "ru",
+        "de"
+      ],
+      "open_items": 5,
+      "outputs": "not_started",
+      "participants": [
+        {
+          "display_name": "Anna Kuznetsova",
+          "id": "per_anna",
+          "initials": "AK",
+          "is_you": false,
+          "short_name": "Anna K."
+        },
+        {
+          "display_name": "Pavel Romanov",
+          "id": "per_pavel",
+          "initials": "PR",
+          "is_you": false,
+          "short_name": "Pavel"
+        },
+        {
+          "display_name": "Dmitri Sokolov",
+          "id": "per_dmitri",
+          "initials": "DS",
+          "is_you": false,
+          "short_name": "Dmitri S."
+        },
+        {
+          "display_name": "You",
+          "id": "per_you",
+          "initials": "You",
+          "is_you": true,
+          "short_name": "You"
+        }
+      ],
+      "platform": "Microsoft Teams",
+      "privacy": "normal",
+      "rev": 3,
+      "review_waiting": 3,
+      "started_at": 1792137600000,
+      "status": "recording",
+      "tags": [
+        "vhi-8.0"
+      ],
+      "title": "Planning: VHI 8.0 drawer redesign",
+      "unnamed_speakers": 1
+    },
+    {
+      "archive": "done",
+      "audio_deleted": false,
+      "audio_kept_until": 1793520000000,
+      "call_type": "cross_team",
+      "duration_ms": 3120000,
+      "id": "call_backend",
+      "languages": [
+        "ru",
+        "en"
+      ],
+      "open_items": 1,
+      "outputs": "ready",
+      "participants": [
+        {
+          "display_name": "Dmitri Sokolov",
+          "id": "per_dmitri",
+          "initials": "DS",
+          "is_you": false,
+          "short_name": "Dmitri S."
+        },
+        {
+          "display_name": "Oleg Morozov",
+          "id": "per_oleg",
+          "initials": "OM",
+          "is_you": false,
+          "short_name": "Oleg M."
+        },
+        {
+          "display_name": "You",
+          "id": "per_you",
+          "initials": "You",
+          "is_you": true,
+          "short_name": "You"
+        }
+      ],
+      "platform": "Zoom",
+      "privacy": "normal",
+      "rev": 5,
+      "review_waiting": 0,
+      "started_at": 1790949600000,
+      "status": "ready",
+      "tags": [
+        "backend"
+      ],
+      "title": "Backend sync",
+      "unnamed_speakers": 0
+    }
+  ],
+  "cards": [
+    {
+      "agent": {
+        "badge": "building.columns",
+        "id": "agt_architect",
+        "name": "Architect"
+      },
+      "body": null,
+      "call_id": "call_live",
+      "carry_forward": null,
+      "created_at": 1792138860000,
+      "expires_at": 1792138950000,
+      "id": "card_1",
+      "kind": "context",
+      "lang": "en",
+      "merged_agents": [],
+      "number": 1,
+      "provenance": {
+        "call": {
+          "call_type": "cross_team",
+          "id": "call_backend",
+          "started_at": 1790949600000,
+          "title": "Backend sync"
+        },
+        "span": {
+          "call_id": "call_backend",
+          "channel": null,
+          "t0_ms": 2470000,
+          "t1_ms": 2482000
+        },
+        "type": "past_call"
+      },
+      "rating": null,
+      "solicited": false,
+      "state": "shown",
+      "title": "On 2 Oct you and Dmitri S. agreed drawer events go through the notification service."
+    },
+    {
+      "agent": {
+        "badge": "target",
+        "id": "agt_pm",
+        "name": "Product manager"
+      },
+      "body": null,
+      "call_id": "call_live",
+      "carry_forward": null,
+      "created_at": 1792138920000,
+      "expires_at": 1792139010000,
+      "id": "card_2",
+      "kind": "ask",
+      "lang": "en",
+      "merged_agents": [
+        {
+          "badge": "paintbrush",
+          "id": "agt_designer",
+          "name": "Designer"
+        }
+      ],
+      "number": 2,
+      "provenance": {
+        "span": {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1300000,
+          "t1_ms": 1306000
+        },
+        "type": "this_call"
+      },
+      "rating": null,
+      "solicited": false,
+      "state": "shown",
+      "title": "Who owns the acceptance criteria for the reconnect handling?"
+    },
+    {
+      "agent": {
+        "badge": "person.2",
+        "id": "agt_teamlead",
+        "name": "Teamlead"
+      },
+      "body": null,
+      "call_id": "call_live",
+      "carry_forward": null,
+      "created_at": 1792138980000,
+      "expires_at": 1792139070000,
+      "id": "card_3",
+      "kind": "answer",
+      "lang": "en",
+      "merged_agents": [],
+      "number": 3,
+      "provenance": {
+        "type": "model_guess"
+      },
+      "rating": null,
+      "solicited": false,
+      "state": "shown",
+      "title": "Retention of monitoring data is probably 90 days."
+    }
+  ],
+  "changes": [
+    {
+      "actor": {
+        "job_id": "job_evidence",
+        "name": "Evidence collection",
+        "type": "job"
+      },
+      "after": "closed_by_evidence",
+      "at": 1792123200000,
+      "batch_id": null,
+      "batch_size": 1,
+      "before": "open",
+      "confidence": "high",
+      "entity": {
+        "id": "itm_token",
+        "kind": "item",
+        "label": "Rotate the staging Jira token"
+      },
+      "evidence": [],
+      "field": "status",
+      "id": "chg_1",
+      "reason": "VSTOR-9790 moved to Done",
+      "status": "applied",
+      "summary": "Closed “Rotate the staging Jira token”",
+      "undoable": true
+    },
+    {
+      "actor": {
+        "job_id": "job_reconcile",
+        "name": "Reconcile terms and references",
+        "type": "job"
+      },
+      "after": null,
+      "at": 1792119600000,
+      "batch_id": "bat_shaman",
+      "batch_size": 37,
+      "before": null,
+      "confidence": "high",
+      "entity": {
+        "id": "gls_shaman",
+        "kind": "glossary",
+        "label": "shaman"
+      },
+      "evidence": [],
+      "field": "text",
+      "id": "chg_2",
+      "reason": "Always for this term",
+      "status": "applied",
+      "summary": "Applied term “shaman” to 37 segments",
+      "undoable": true
+    }
+  ],
+  "copilot": {
+    "agents": [
+      {
+        "agent": {
+          "badge": "building.columns",
+          "id": "agt_architect",
+          "name": "Architect"
+        },
+        "muted": false,
+        "paused_reason": null
+      },
+      {
+        "agent": {
+          "badge": "target",
+          "id": "agt_pm",
+          "name": "Product manager"
+        },
+        "muted": false,
+        "paused_reason": null
+      }
+    ],
+    "budget": {
+      "cap_usd": 1.0,
+      "level": "ok",
+      "on_account": false,
+      "spent_usd": 0.3100000023841858
+    },
+    "call_id": "call_live",
+    "card_keys": {
+      "conflicts": [],
+      "dismiss_keys": false,
+      "registered": true
+    },
+    "council": "fused",
+    "flag_on": true,
+    "listening": false,
+    "mode": "cloud_redacted",
+    "muted": null,
+    "single_agent": false
+  },
+  "glossary": {
+    "terms": [
+      {
+        "added_from": null,
+        "always_apply": false,
+        "id": "gls_vhi",
+        "lang": null,
+        "rev": 1,
+        "spoken_forms": [
+          "vee aitch eye"
+        ],
+        "term": "VHI",
+        "variants_cyrillic": [
+          "ви-эйч-ай"
+        ],
+        "variants_latin": [
+          "V H I"
+        ]
+      }
+    ]
+  },
+  "hotkeys": {
+    "bindings": [
+      {
+        "action": "start_stop",
+        "default_shortcut": "Ctrl+Alt+Super+R",
+        "shortcut": "Ctrl+Alt+Super+R",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "open_call_screen",
+        "default_shortcut": "Ctrl+Alt+Super+N",
+        "shortcut": "Ctrl+Alt+Super+N",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "hide_for_presenting",
+        "default_shortcut": "Ctrl+Alt+Super+0",
+        "shortcut": "Ctrl+Alt+Super+0",
+        "status": {
+          "type": "registered"
+        }
+      },
+      {
+        "action": "pin_card1",
+        "default_shortcut": "Ctrl+Alt+Super+1",
+        "shortcut": "Ctrl+Alt+Super+1",
+        "status": {
+          "type": "registered_during_capture"
+        }
+      }
+    ]
+  },
+  "items": [
+    {
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": null,
+      "due": "2026-10-17",
+      "edited": false,
+      "handoff": null,
+      "id": "itm_spec",
+      "is_engineering": false,
+      "kind": "action_item",
+      "lang": "en",
+      "linked_issue": null,
+      "owed": "to_you",
+      "owner": {
+        "display_name": "Anna Kuznetsova",
+        "id": "per_anna",
+        "initials": "AK",
+        "is_you": false,
+        "short_name": "Anna K."
+      },
+      "rev": 1,
+      "review": "accepted",
+      "spans": [
+        {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1198000,
+          "t1_ms": 1210000
+        }
+      ],
+      "status": "open",
+      "text": "Drawer redesign spec by Friday",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    },
+    {
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": null,
+      "due": "2026-10-22",
+      "edited": false,
+      "handoff": null,
+      "id": "itm_replay",
+      "is_engineering": true,
+      "kind": "action_item",
+      "lang": "en",
+      "linked_issue": "VSTOR-9912",
+      "owed": "to_you",
+      "owner": {
+        "display_name": "Dmitri Sokolov",
+        "id": "per_dmitri",
+        "initials": "DS",
+        "is_you": false,
+        "short_name": "Dmitri S."
+      },
+      "rev": 1,
+      "review": "suggested",
+      "spans": [
+        {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1361000,
+          "t1_ms": 1373000
+        }
+      ],
+      "status": "open",
+      "text": "Replay buffer for websocket reconnects",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    },
+    {
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": null,
+      "due": "2026-10-16",
+      "edited": false,
+      "handoff": {
+        "at": 1792141500000,
+        "awaiting": true,
+        "cwd": "~/projects/vhp-frontend",
+        "target": "claude_code"
+      },
+      "id": "itm_virt",
+      "is_engineering": true,
+      "kind": "action_item",
+      "lang": "en",
+      "linked_issue": "VSTOR-1234",
+      "owed": "by_you",
+      "owner": {
+        "display_name": "You",
+        "id": "per_you",
+        "initials": "You",
+        "is_you": true,
+        "short_name": "You"
+      },
+      "rev": 1,
+      "review": "accepted",
+      "spans": [
+        {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1400000,
+          "t1_ms": 1412000
+        }
+      ],
+      "status": "handed_off",
+      "text": "Virtualise the 10k-row table in the drawer list",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    },
+    {
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": null,
+      "due": "2026-10-20",
+      "edited": false,
+      "handoff": null,
+      "id": "itm_a11y",
+      "is_engineering": false,
+      "kind": "action_item",
+      "lang": "en",
+      "linked_issue": null,
+      "owed": "to_you",
+      "owner": {
+        "display_name": "Anna Kuznetsova",
+        "id": "per_anna",
+        "initials": "AK",
+        "is_you": false,
+        "short_name": "Anna K."
+      },
+      "rev": 1,
+      "review": "suggested",
+      "spans": [
+        {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1420000,
+          "t1_ms": 1432000
+        }
+      ],
+      "status": "open",
+      "text": "Check drawer focus order with VoiceOver",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    },
+    {
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": null,
+      "due": null,
+      "edited": false,
+      "handoff": null,
+      "id": "itm_notif",
+      "is_engineering": false,
+      "kind": "decision",
+      "lang": "en",
+      "linked_issue": null,
+      "owed": "other",
+      "owner": {
+        "display_name": "Dmitri Sokolov",
+        "id": "per_dmitri",
+        "initials": "DS",
+        "is_you": false,
+        "short_name": "Dmitri S."
+      },
+      "rev": 1,
+      "review": "accepted",
+      "spans": [
+        {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1272000,
+          "t1_ms": 1284000
+        }
+      ],
+      "status": "open",
+      "text": "Drawer events go through the notification service.",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    },
+    {
+      "call": {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      },
+      "carried_from": null,
+      "closed_by": null,
+      "created_by": "llm",
+      "done_at": null,
+      "due": null,
+      "edited": false,
+      "handoff": null,
+      "id": "itm_reconnect_q",
+      "is_engineering": false,
+      "kind": "open_question",
+      "lang": "en",
+      "linked_issue": null,
+      "owed": "other",
+      "owner": null,
+      "rev": 1,
+      "review": "suggested",
+      "spans": [
+        {
+          "call_id": "call_live",
+          "channel": null,
+          "t0_ms": 1300000,
+          "t1_ms": 1312000
+        }
+      ],
+      "status": "open",
+      "text": "Who owns the acceptance criteria for the reconnect?",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    },
+    {
+      "call": {
+        "call_type": "cross_team",
+        "id": "call_backend",
+        "started_at": 1790949600000,
+        "title": "Backend sync"
+      },
+      "carried_from": null,
+      "closed_by": {
+        "closed_item": true,
+        "collected_at": 1792123200000,
+        "confidence": "high",
+        "dated_at": 1792119600000,
+        "id": "evd_1",
+        "reference": "VSTOR-9790",
+        "source": "jira",
+        "span": null,
+        "summary": "VSTOR-9790 moved to Done on 16 Oct",
+        "url": "https://jira.example.com/browse/VSTOR-9790"
+      },
+      "created_by": "llm",
+      "done_at": 1792123200000,
+      "due": "2026-10-15",
+      "edited": false,
+      "handoff": null,
+      "id": "itm_token",
+      "is_engineering": false,
+      "kind": "action_item",
+      "lang": "en",
+      "linked_issue": "VSTOR-9790",
+      "owed": "by_you",
+      "owner": {
+        "display_name": "You",
+        "id": "per_you",
+        "initials": "You",
+        "is_you": true,
+        "short_name": "You"
+      },
+      "rev": 1,
+      "review": "accepted",
+      "spans": [
+        {
+          "call_id": "call_backend",
+          "channel": null,
+          "t0_ms": 2850000,
+          "t1_ms": 2862000
+        }
+      ],
+      "status": "closed_by_evidence",
+      "text": "Rotate the staging Jira token",
+      "topic": {
+        "id": "top_drawer",
+        "name": "Drawer redesign"
+      }
+    }
+  ],
+  "jobs": {
+    "evidence_tools": [
+      {
+        "installed": true,
+        "path": "/opt/homebrew/bin/claude",
+        "supported": true,
+        "tool": "claude_code",
+        "version": "2.4.1"
+      }
+    ],
+    "jobs": [
+      {
+        "allow_on_battery": false,
+        "blocked_by_call": true,
+        "enabled": true,
+        "id": "job_evidence",
+        "kind": "evidence_collection",
+        "last_run": {
+          "counts": [
+            {
+              "label": "closed",
+              "n": 1
+            },
+            {
+              "label": "proposed",
+              "n": 1
+            }
+          ],
+          "error": null,
+          "finished_at": 1792123240000,
+          "id": "run_1",
+          "job_id": "job_evidence",
+          "kind": "evidence_collection",
+          "name": "Evidence collection",
+          "progress": null,
+          "started_at": 1792123200000,
+          "status": "succeeded"
+        },
+        "name": "Evidence collection",
+        "running": false,
+        "trigger": "Hourly while items are open, after each call"
+      }
+    ]
+  },
+  "live_script": [
+    {
+      "segment": {
+        "call_id": "call_live",
+        "channel": "sys",
+        "confidence": 0.699999988079071,
+        "corrections": [],
+        "crosstalk_with": [],
+        "id": "seg_live_009",
+        "lang": "en",
+        "lang_p": 0.9300000071525574,
+        "pass": "live",
+        "speaker": {
+          "label": {
+            "person": {
+              "display_name": "Pavel Romanov",
+              "id": "per_pavel",
+              "initials": "PR",
+              "is_you": false,
+              "short_name": "Pavel"
+            },
+            "type": "person"
+          },
+          "speaker_id": "spk_pavel"
+        },
+        "state": "hypothesis",
+        "t0_ms": 1411000,
+        "t1_ms": 1417000,
+        "text": "I think we should ask the backend team whether…"
+      },
+      "type": "hypothesis"
+    },
+    {
+      "segment": {
+        "call_id": "call_live",
+        "channel": "sys",
+        "confidence": 0.9300000071525574,
+        "corrections": [],
+        "crosstalk_with": [],
+        "id": "seg_live_009",
+        "lang": "en",
+        "lang_p": 0.9300000071525574,
+        "pass": "live",
+        "speaker": {
+          "label": {
+            "person": {
+              "display_name": "Pavel Romanov",
+              "id": "per_pavel",
+              "initials": "PR",
+              "is_you": false,
+              "short_name": "Pavel"
+            },
+            "type": "person"
+          },
+          "speaker_id": "spk_pavel"
+        },
+        "state": "confirmed",
+        "t0_ms": 1411000,
+        "t1_ms": 1417000,
+        "text": "I think we should ask the backend team whether the buffer survives a restart."
+      },
+      "type": "confirmed"
+    },
+    {
+      "segment": {
+        "call_id": "call_live",
+        "channel": "sys",
+        "confidence": 0.6000000238418579,
+        "corrections": [],
+        "crosstalk_with": [],
+        "id": "seg_live_010",
+        "lang": "de",
+        "lang_p": 0.9300000071525574,
+        "pass": "live",
+        "speaker": {
+          "label": {
+            "person": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            },
+            "type": "person"
+          },
+          "speaker_id": "spk_anna"
+        },
+        "state": "hypothesis",
+        "t0_ms": 1420000,
+        "t1_ms": 1426000,
+        "text": "Ja, und"
+      },
+      "type": "hypothesis"
+    },
+    {
+      "segment": {
+        "call_id": "call_live",
+        "channel": "sys",
+        "confidence": 0.8999999761581421,
+        "corrections": [],
+        "crosstalk_with": [],
+        "id": "seg_live_010",
+        "lang": "de",
+        "lang_p": 0.9300000071525574,
+        "pass": "live",
+        "speaker": {
+          "label": {
+            "person": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            },
+            "type": "person"
+          },
+          "speaker_id": "spk_anna"
+        },
+        "state": "confirmed",
+        "t0_ms": 1420000,
+        "t1_ms": 1426000,
+        "text": "Ja, und ich prüfe die Fokusreihenfolge mit VoiceOver."
+      },
+      "type": "confirmed"
+    },
+    {
+      "mark": {
+        "at_ms": 1430000,
+        "call_id": "call_live",
+        "id": "mrk_2",
+        "note": null
+      },
+      "type": "mark"
+    }
+  ],
+  "now": 1792137600000,
+  "outputs": [
+    {
+      "archive": "done",
+      "call_id": "call_backend",
+      "review_waiting": 0,
+      "sections": [
+        {
+          "body_md": "Backend and QA aligned on the websocket notifications. Drawer events will go through the notification service; the reconnect owner is still open.",
+          "items": [],
+          "kind": "summary",
+          "regenerated_with_edits": false,
+          "rev": 2,
+          "reviews": [],
+          "state": {
+            "type": "ready"
+          },
+          "summary_id": "sum_backend",
+          "user_edited": false,
+          "version_count": 2,
+          "writer": {
+            "from_pass": "live",
+            "generated_at": 1792140600000,
+            "model": "claude-sonnet",
+            "runtime": "claude_api_key",
+            "skill": "planning",
+            "skill_version": "1.0.0"
+          }
+        },
+        {
+          "body_md": null,
+          "items": [
+            {
+              "call": {
+                "call_type": "cross_team",
+                "id": "call_backend",
+                "started_at": 1790949600000,
+                "title": "Backend sync"
+              },
+              "carried_from": null,
+              "closed_by": {
+                "closed_item": true,
+                "collected_at": 1792123200000,
+                "confidence": "high",
+                "dated_at": 1792119600000,
+                "id": "evd_1",
+                "reference": "VSTOR-9790",
+                "source": "jira",
+                "span": null,
+                "summary": "VSTOR-9790 moved to Done on 16 Oct",
+                "url": "https://jira.example.com/browse/VSTOR-9790"
+              },
+              "created_by": "llm",
+              "done_at": 1792123200000,
+              "due": "2026-10-15",
+              "edited": false,
+              "handoff": null,
+              "id": "itm_token",
+              "is_engineering": false,
+              "kind": "action_item",
+              "lang": "en",
+              "linked_issue": "VSTOR-9790",
+              "owed": "by_you",
+              "owner": {
+                "display_name": "You",
+                "id": "per_you",
+                "initials": "You",
+                "is_you": true,
+                "short_name": "You"
+              },
+              "rev": 1,
+              "review": "accepted",
+              "spans": [
+                {
+                  "call_id": "call_backend",
+                  "channel": null,
+                  "t0_ms": 2850000,
+                  "t1_ms": 2862000
+                }
+              ],
+              "status": "closed_by_evidence",
+              "text": "Rotate the staging Jira token",
+              "topic": {
+                "id": "top_drawer",
+                "name": "Drawer redesign"
+              }
+            }
+          ],
+          "kind": "action_items",
+          "regenerated_with_edits": false,
+          "rev": null,
+          "reviews": [],
+          "state": {
+            "type": "ready"
+          },
+          "summary_id": null,
+          "user_edited": false,
+          "version_count": 1,
+          "writer": {
+            "from_pass": "live",
+            "generated_at": 1792140600000,
+            "model": "claude-sonnet",
+            "runtime": "claude_api_key",
+            "skill": "planning",
+            "skill_version": "1.0.0"
+          }
+        },
+        {
+          "body_md": null,
+          "items": [],
+          "kind": "role_reviews",
+          "regenerated_with_edits": false,
+          "rev": null,
+          "reviews": [],
+          "state": {
+            "type": "writing"
+          },
+          "summary_id": null,
+          "user_edited": false,
+          "version_count": 0,
+          "writer": null
+        }
+      ],
+      "sensitive": false,
+      "status": "ready",
+      "written_locally": false
+    }
+  ],
+  "people": [
+    {
+      "aliases": [],
+      "display_name": "You",
+      "email": null,
+      "id": "per_you",
+      "initials": "You",
+      "is_you": true,
+      "last_call_at": 1792137600000,
+      "open_items": 1,
+      "org": "Virtuozzo",
+      "rev": 1,
+      "role": "Team lead, frontend",
+      "short_name": "You",
+      "voice_profile": false
+    },
+    {
+      "aliases": [],
+      "display_name": "Anna Kuznetsova",
+      "email": "annak@example.com",
+      "id": "per_anna",
+      "initials": "AK",
+      "is_you": false,
+      "last_call_at": 1792137600000,
+      "open_items": 2,
+      "org": "Virtuozzo",
+      "rev": 1,
+      "role": "Frontend developer",
+      "short_name": "Anna K.",
+      "voice_profile": true
+    },
+    {
+      "aliases": [],
+      "display_name": "Pavel Romanov",
+      "email": "pavel@example.com",
+      "id": "per_pavel",
+      "initials": "PR",
+      "is_you": false,
+      "last_call_at": 1792137600000,
+      "open_items": 2,
+      "org": "Virtuozzo",
+      "rev": 1,
+      "role": "Product manager",
+      "short_name": "Pavel",
+      "voice_profile": false
+    },
+    {
+      "aliases": [],
+      "display_name": "Dmitri Sokolov",
+      "email": "dmitris@example.com",
+      "id": "per_dmitri",
+      "initials": "DS",
+      "is_you": false,
+      "last_call_at": 1792137600000,
+      "open_items": 2,
+      "org": "Virtuozzo",
+      "rev": 1,
+      "role": "Backend lead",
+      "short_name": "Dmitri S.",
+      "voice_profile": true
+    },
+    {
+      "aliases": [],
+      "display_name": "Oleg Morozov",
+      "email": "olegm@example.com",
+      "id": "per_oleg",
+      "initials": "OM",
+      "is_you": false,
+      "last_call_at": 1792137600000,
+      "open_items": 2,
+      "org": "Virtuozzo",
+      "rev": 1,
+      "role": "QA engineer",
+      "short_name": "Oleg M.",
+      "voice_profile": false
+    },
+    {
+      "aliases": [],
+      "display_name": "Lena Krüger",
+      "email": "lenak@example.com",
+      "id": "per_lena",
+      "initials": "LK",
+      "is_you": false,
+      "last_call_at": 1792137600000,
+      "open_items": 2,
+      "org": "Virtuozzo",
+      "rev": 1,
+      "role": "Designer",
+      "short_name": "Lena K.",
+      "voice_profile": false
+    }
+  ],
+  "performance": {
+    "bottlenecks": [
+      {
+        "agent": null,
+        "component": "engine",
+        "example_calls": [
+          {
+            "call_type": "cross_team",
+            "id": "call_backend",
+            "started_at": 1790949600000,
+            "title": "Backend sync"
+          }
+        ],
+        "near": 11,
+        "over": 3,
+        "stage": "confirmed_text"
+      }
+    ],
+    "calls_measured": 18,
+    "roll_up_failed": false,
+    "tiles": [
+      {
+        "blocker": false,
+        "label": "Answer card",
+        "metric": "answer_card",
+        "p95": 8.100000381469727,
+        "state": "near",
+        "target": 9.0,
+        "trend": [
+          7.199999809265137,
+          7.900000095367432,
+          8.399999618530273,
+          8.100000381469727
+        ],
+        "unit": "s"
+      }
+    ]
+  },
+  "proposals": [
+    {
+      "batch_id": null,
+      "confidence": "medium",
+      "count": 1,
+      "created_at": 1792126800000,
+      "evidence": [],
+      "id": "chg_prop_1",
+      "kind": "close_item",
+      "reason": "PR #448 merged with VSTOR-1234 on 16 Oct",
+      "target": {
+        "id": "itm_virt",
+        "kind": "item",
+        "label": "Virtualise the 10k-row table in the drawer list"
+      },
+      "term": null,
+      "title": "Close “Virtualise the 10k-row table…”"
+    },
+    {
+      "batch_id": "bat_ostor",
+      "confidence": "high",
+      "count": 14,
+      "created_at": 1792116000000,
+      "evidence": [],
+      "id": "chg_prop_2",
+      "kind": "apply_term",
+      "reason": "You corrected “o-store” to “ostor” 3 times",
+      "target": {
+        "id": "gls_ostor",
+        "kind": "glossary",
+        "label": "ostor"
+      },
+      "term": "ostor",
+      "title": "Apply term “ostor” to 14 transcripts"
+    }
+  ],
+  "repos": {
+    "mappings": [
+      {
+        "default_tool": "claude_code",
+        "id": "rep_vstor",
+        "key": "VSTOR",
+        "local_path": "~/projects/vhp-frontend",
+        "path_exists": true
+      }
+    ]
+  },
+  "scope_presets": {
+    "presets": [
+      {
+        "id": "all",
+        "label": "All calls and all sources",
+        "scope": {
+          "call_id": null,
+          "call_types": [],
+          "from": null,
+          "include_documents": true,
+          "people": [],
+          "preset": null,
+          "to": null,
+          "topic_id": null
+        }
+      },
+      {
+        "id": "calls_only",
+        "label": "All calls, no documents",
+        "scope": {
+          "call_id": null,
+          "call_types": [],
+          "from": null,
+          "include_documents": false,
+          "people": [],
+          "preset": null,
+          "to": null,
+          "topic_id": null
+        }
+      }
+    ]
+  },
+  "script_interval_ms": 1500,
+  "settings": {
+    "audio": {
+      "exclude_own_sounds": true,
+      "live_backend": "whisper_turbo_noter_loop",
+      "mic_device": null,
+      "offline_backend": "whisper_large_v3",
+      "output_mode": "auto",
+      "retention": "days30"
+    },
+    "call_screen": {
+      "display_id": "dsp_studio",
+      "layout": "auto",
+      "open_automatically": true
+    },
+    "copilot": {
+      "default_cap_usd": 1.0,
+      "default_council_live": "fused",
+      "default_council_post_call": "parallel",
+      "dismiss_with_keys": false,
+      "muted_call_types": []
+    },
+    "dashboard": {
+      "hidden_calendars": [],
+      "horizon": "this_week"
+    },
+    "evidence": {
+      "bitbucket": true,
+      "github": false,
+      "jira": true,
+      "later_calls": true
+    },
+    "general": {
+      "ignored_apps": [
+        {
+          "app_name": "Spotify",
+          "bundle_id": "com.spotify.client"
+        }
+      ],
+      "notifications_enabled": false,
+      "storage_in_cloud_folder": false,
+      "storage_path": "~/Library/Application Support/Noter",
+      "summary_language": "en"
+    },
+    "maintenance": {
+      "allow_on_battery": false,
+      "backups_kept": 7,
+      "window_end": "05:00",
+      "window_start": "02:00"
+    },
+    "menu_bar": {
+      "hidden_actions": [],
+      "title": "none"
+    },
+    "performance": {
+      "near_pct": 90,
+      "over_pct": 105,
+      "retention_days": 365,
+      "sampled_stages": []
+    },
+    "privacy": {
+      "behaviour_metrics": false,
+      "mode": "cloud_redacted",
+      "pseudonymise_names": false
+    },
+    "rev": 1,
+    "runtimes": {
+      "live_copilot": "claude_api_key",
+      "local_model": "qwen3:8b",
+      "post_call": "claude_api_key",
+      "search_answers": "claude_api_key"
+    },
+    "updates": {
+      "channel": "stable",
+      "install_automatically": true
+    }
+  },
+  "sources": {
+    "sources": [
+      {
+        "documents": 128,
+        "has_token": false,
+        "id": "src_specs",
+        "kind": "folder",
+        "last_sync_at": 1792130400000,
+        "location": "~/Documents/specs",
+        "mode": "indexed",
+        "name": "Frontend specs",
+        "privacy": "normal",
+        "rev": 1,
+        "schedule": null,
+        "scope": {
+          "type": "all_calls"
+        },
+        "status": {
+          "type": "idle"
+        }
+      }
+    ]
+  },
+  "today": {
+    "banners": [],
+    "calendar": "granted",
+    "date": "2026-10-16",
+    "done_today": [
+      {
+        "call": {
+          "call_type": "cross_team",
+          "id": "call_backend",
+          "started_at": 1790949600000,
+          "title": "Backend sync"
+        },
+        "carried_from": null,
+        "closed_by": {
+          "closed_item": true,
+          "collected_at": 1792123200000,
+          "confidence": "high",
+          "dated_at": 1792119600000,
+          "id": "evd_1",
+          "reference": "VSTOR-9790",
+          "source": "jira",
+          "span": null,
+          "summary": "VSTOR-9790 moved to Done on 16 Oct",
+          "url": "https://jira.example.com/browse/VSTOR-9790"
+        },
+        "created_by": "llm",
+        "done_at": 1792123200000,
+        "due": "2026-10-15",
+        "edited": false,
+        "handoff": null,
+        "id": "itm_token",
+        "is_engineering": false,
+        "kind": "action_item",
+        "lang": "en",
+        "linked_issue": "VSTOR-9790",
+        "owed": "by_you",
+        "owner": {
+          "display_name": "You",
+          "id": "per_you",
+          "initials": "You",
+          "is_you": true,
+          "short_name": "You"
+        },
+        "rev": 1,
+        "review": "accepted",
+        "spans": [
+          {
+            "call_id": "call_backend",
+            "channel": null,
+            "t0_ms": 2850000,
+            "t1_ms": 2862000
+          }
+        ],
+        "status": "closed_by_evidence",
+        "text": "Rotate the staging Jira token",
+        "topic": {
+          "id": "top_drawer",
+          "name": "Drawer redesign"
+        }
+      }
+    ],
+    "due_without_call": [],
+    "first_use": false,
+    "live_call": {
+      "archive": "not_started",
+      "audio_deleted": false,
+      "audio_kept_until": 1794729600000,
+      "call_type": "planning",
+      "duration_ms": 1380000,
+      "id": "call_live",
+      "languages": [
+        "en",
+        "ru",
+        "de"
+      ],
+      "open_items": 5,
+      "outputs": "not_started",
+      "participants": [
+        {
+          "display_name": "Anna Kuznetsova",
+          "id": "per_anna",
+          "initials": "AK",
+          "is_you": false,
+          "short_name": "Anna K."
+        },
+        {
+          "display_name": "Pavel Romanov",
+          "id": "per_pavel",
+          "initials": "PR",
+          "is_you": false,
+          "short_name": "Pavel"
+        },
+        {
+          "display_name": "Dmitri Sokolov",
+          "id": "per_dmitri",
+          "initials": "DS",
+          "is_you": false,
+          "short_name": "Dmitri S."
+        },
+        {
+          "display_name": "You",
+          "id": "per_you",
+          "initials": "You",
+          "is_you": true,
+          "short_name": "You"
+        }
+      ],
+      "platform": "Microsoft Teams",
+      "privacy": "normal",
+      "rev": 3,
+      "review_waiting": 3,
+      "started_at": 1792137600000,
+      "status": "recording",
+      "tags": [
+        "vhi-8.0"
+      ],
+      "title": "Planning: VHI 8.0 drawer redesign",
+      "unnamed_speakers": 1
+    },
+    "proposals": [
+      {
+        "batch_id": null,
+        "confidence": "medium",
+        "count": 1,
+        "created_at": 1792126800000,
+        "evidence": [],
+        "id": "chg_prop_1",
+        "kind": "close_item",
+        "reason": "PR #448 merged with VSTOR-1234 on 16 Oct",
+        "target": {
+          "id": "itm_virt",
+          "kind": "item",
+          "label": "Virtualise the 10k-row table in the drawer list"
+        },
+        "term": null,
+        "title": "Close “Virtualise the 10k-row table…”"
+      },
+      {
+        "batch_id": "bat_ostor",
+        "confidence": "high",
+        "count": 14,
+        "created_at": 1792116000000,
+        "evidence": [],
+        "id": "chg_prop_2",
+        "kind": "apply_term",
+        "reason": "You corrected “o-store” to “ostor” 3 times",
+        "target": {
+          "id": "gls_ostor",
+          "kind": "glossary",
+          "label": "ostor"
+        },
+        "term": "ostor",
+        "title": "Apply term “ostor” to 14 transcripts"
+      }
+    ],
+    "proposals_total": 2,
+    "review_waiting": 3,
+    "this_week": [],
+    "today": [
+      {
+        "attendees": [
+          {
+            "email": null,
+            "name": "Anna Kuznetsova",
+            "person": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            }
+          }
+        ],
+        "call_id": null,
+        "ends_at": 1792155600000,
+        "event_id": "evt_1on1_anna",
+        "handed_off": [],
+        "items": [
+          {
+            "call": {
+              "call_type": "planning",
+              "id": "call_live",
+              "started_at": 1792137600000,
+              "title": "Planning: VHI 8.0 drawer redesign"
+            },
+            "carried_from": null,
+            "closed_by": null,
+            "created_by": "llm",
+            "done_at": null,
+            "due": "2026-10-17",
+            "edited": false,
+            "handoff": null,
+            "id": "itm_spec",
+            "is_engineering": false,
+            "kind": "action_item",
+            "lang": "en",
+            "linked_issue": null,
+            "owed": "to_you",
+            "owner": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            },
+            "rev": 1,
+            "review": "accepted",
+            "spans": [
+              {
+                "call_id": "call_live",
+                "channel": null,
+                "t0_ms": 1198000,
+                "t1_ms": 1210000
+              }
+            ],
+            "status": "open",
+            "text": "Drawer redesign spec by Friday",
+            "topic": {
+              "id": "top_drawer",
+              "name": "Drawer redesign"
+            }
+          },
+          {
+            "call": {
+              "call_type": "planning",
+              "id": "call_live",
+              "started_at": 1792137600000,
+              "title": "Planning: VHI 8.0 drawer redesign"
+            },
+            "carried_from": null,
+            "closed_by": null,
+            "created_by": "llm",
+            "done_at": null,
+            "due": "2026-10-20",
+            "edited": false,
+            "handoff": null,
+            "id": "itm_a11y",
+            "is_engineering": false,
+            "kind": "action_item",
+            "lang": "en",
+            "linked_issue": null,
+            "owed": "to_you",
+            "owner": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            },
+            "rev": 1,
+            "review": "suggested",
+            "spans": [
+              {
+                "call_id": "call_live",
+                "channel": null,
+                "t0_ms": 1420000,
+                "t1_ms": 1432000
+              }
+            ],
+            "status": "open",
+            "text": "Check drawer focus order with VoiceOver",
+            "topic": {
+              "id": "top_drawer",
+              "name": "Drawer redesign"
+            }
+          }
+        ],
+        "last_time": {
+          "call": {
+            "call_type": "one_on_one",
+            "id": "call_1on1_anna",
+            "started_at": 1791532800000,
+            "title": "1:1 with Anna K."
+          },
+          "line": "Agreed on Friday for the spec"
+        },
+        "open_count": 2,
+        "platform": "Microsoft Teams",
+        "questions": [],
+        "sensitive": false,
+        "starts_at": 1792153800000,
+        "title": "1:1 with Anna K."
+      }
+    ]
+  },
+  "topics": [
+    {
+      "aliases": [],
+      "calls": 6,
+      "decisions": 3,
+      "id": "top_drawer",
+      "last_seen": 1792137600000,
+      "merge_suggestion": null,
+      "name": "Drawer redesign",
+      "open_items": 2,
+      "rev": 1
+    },
+    {
+      "aliases": [],
+      "calls": 4,
+      "decisions": 2,
+      "id": "top_ws",
+      "last_seen": 1792137600000,
+      "merge_suggestion": {
+        "id": "top_notif",
+        "name": "Notification service"
+      },
+      "name": "Websocket notifications",
+      "open_items": 1,
+      "rev": 1
+    },
+    {
+      "aliases": [],
+      "calls": 5,
+      "decisions": 2,
+      "id": "top_notif",
+      "last_seen": 1790949600000,
+      "merge_suggestion": null,
+      "name": "Notification service",
+      "open_items": 1,
+      "rev": 1
+    }
+  ],
+  "transcripts": [
+    {
+      "archive": "not_started",
+      "audio_available": true,
+      "call_id": "call_live",
+      "gaps": [
+        {
+          "call_id": "call_live",
+          "reason": "paused",
+          "t0_ms": 1330000,
+          "t1_ms": 1360000
+        }
+      ],
+      "hypotheses": [
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.699999988079071,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_009",
+          "lang": "en",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Pavel Romanov",
+                "id": "per_pavel",
+                "initials": "PR",
+                "is_you": false,
+                "short_name": "Pavel"
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_pavel"
+          },
+          "state": "hypothesis",
+          "t0_ms": 1411000,
+          "t1_ms": 1417000,
+          "text": "I think we should ask the backend team whether…"
+        }
+      ],
+      "last_seq": 42,
+      "live": true,
+      "marks": [
+        {
+          "at_ms": 1260000,
+          "call_id": "call_live",
+          "id": "mrk_1",
+          "note": null
+        }
+      ],
+      "pass": "live",
+      "segments": [
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.9700000286102295,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_001",
+          "lang": "en",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Pavel Romanov",
+                "id": "per_pavel",
+                "initials": "PR",
+                "is_you": false,
+                "short_name": "Pavel"
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_pavel"
+          },
+          "state": "confirmed",
+          "t0_ms": 1180000,
+          "t1_ms": 1186000,
+          "text": "The empty state for the drawer is still open. Nobody owns the copy."
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.9399999976158142,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_002",
+          "lang": "ru",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Anna Kuznetsova",
+                "id": "per_anna",
+                "initials": "AK",
+                "is_you": false,
+                "short_name": "Anna K."
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_anna"
+          },
+          "state": "confirmed",
+          "t0_ms": 1198000,
+          "t1_ms": 1204000,
+          "text": "Я сделаю drawer redesign до пятницы."
+        },
+        {
+          "call_id": "call_live",
+          "channel": "mic",
+          "confidence": 0.9800000190734863,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_003",
+          "lang": "en",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "type": "you"
+            },
+            "speaker_id": "spk_you"
+          },
+          "state": "confirmed",
+          "t0_ms": 1221000,
+          "t1_ms": 1227000,
+          "text": "We parked that two weeks ago."
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.8100000023841858,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_004",
+          "lang": "de",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "n": 3,
+              "type": "unnamed"
+            },
+            "speaker_id": "spk_3"
+          },
+          "state": "confirmed",
+          "t0_ms": 1235000,
+          "t1_ms": 1241000,
+          "text": "Fast, ja. Der Kanal ist da, aber der Reconnect fehlt noch."
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.9200000166893005,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_005",
+          "lang": "ru",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Dmitri Sokolov",
+                "id": "per_dmitri",
+                "initials": "DS",
+                "is_you": false,
+                "short_name": "Dmitri S."
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_dmitri"
+          },
+          "state": "confirmed",
+          "t0_ms": 1272000,
+          "t1_ms": 1278000,
+          "text": "Websocket уведомления идут через notification service, как решили второго октября."
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.9599999785423279,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_006",
+          "lang": "en",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Pavel Romanov",
+                "id": "per_pavel",
+                "initials": "PR",
+                "is_you": false,
+                "short_name": "Pavel"
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_pavel"
+          },
+          "state": "confirmed",
+          "t0_ms": 1300000,
+          "t1_ms": 1306000,
+          "text": "Then who writes the acceptance criteria for the reconnect handling?"
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "confidence": 0.949999988079071,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_007",
+          "lang": "en",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Dmitri Sokolov",
+                "id": "per_dmitri",
+                "initials": "DS",
+                "is_you": false,
+                "short_name": "Dmitri S."
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_dmitri"
+          },
+          "state": "confirmed",
+          "t0_ms": 1361000,
+          "t1_ms": 1367000,
+          "text": "I will add a replay buffer on the backend, VSTOR-9912."
+        },
+        {
+          "call_id": "call_live",
+          "channel": "mic",
+          "confidence": 0.9900000095367432,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_live_008",
+          "lang": "en",
+          "lang_p": 0.9300000071525574,
+          "pass": "live",
+          "speaker": {
+            "label": {
+              "type": "you"
+            },
+            "speaker_id": "spk_you"
+          },
+          "state": "confirmed",
+          "t0_ms": 1400000,
+          "t1_ms": 1406000,
+          "text": "Agreed. I will hand that off today."
+        }
+      ],
+      "speakers": [
+        {
+          "call_id": "call_live",
+          "channel": "mic",
+          "id": "spk_you",
+          "label": {
+            "type": "you"
+          },
+          "named_by": null,
+          "sample": null,
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_anna",
+          "label": {
+            "person": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            },
+            "type": "person"
+          },
+          "named_by": "voice_profile",
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1198000,
+            "t1_ms": 1204000
+          },
+          "segment_count": 1,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_pavel",
+          "label": {
+            "person": {
+              "display_name": "Pavel Romanov",
+              "id": "per_pavel",
+              "initials": "PR",
+              "is_you": false,
+              "short_name": "Pavel"
+            },
+            "type": "person"
+          },
+          "named_by": "calendar",
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1180000,
+            "t1_ms": 1186000
+          },
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_dmitri",
+          "label": {
+            "person": {
+              "display_name": "Dmitri Sokolov",
+              "id": "per_dmitri",
+              "initials": "DS",
+              "is_you": false,
+              "short_name": "Dmitri S."
+            },
+            "type": "person"
+          },
+          "named_by": "voice_profile",
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1272000,
+            "t1_ms": 1278000
+          },
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_3",
+          "label": {
+            "n": 3,
+            "type": "unnamed"
+          },
+          "named_by": null,
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1235000,
+            "t1_ms": 1241000
+          },
+          "segment_count": 1,
+          "suggestion": {
+            "display_name": "Lena Krüger",
+            "id": "per_lena",
+            "initials": "LK",
+            "is_you": false,
+            "short_name": "Lena K."
+          },
+          "talk_ms": null
+        }
+      ],
+      "subscription_id": null
+    }
+  ]
+}

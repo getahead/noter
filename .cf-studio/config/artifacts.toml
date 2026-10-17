@@ -4,6 +4,11 @@
 name = "Noter"
 slug = "noter"
 kit = "sdlc"
-artifacts = [{ path = "docs/DESIGN.md", kind = "DESIGN", traceability = "DOCS-ONLY" }]
+artifacts = [
+  { path = "docs/DESIGN.md", kind = "DESIGN", traceability = "DOCS-ONLY" },
+  { path = "docs/DESIGN-core.md", kind = "DESIGN", traceability = "DOCS-ONLY" },
+  { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "DOCS-ONLY" },
+  { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "DOCS-ONLY" },
+]
 codebase = []
 children = []

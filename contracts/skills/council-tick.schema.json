@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "CandidateKind": {
+      "enum": [
+        "ask",
+        "answer",
+        "context",
+        "pin",
+        "catch_up"
+      ],
+      "type": "string"
+    },
+    "CardCandidate": {
+      "description": "One card a council agent proposes in a tick. The core validates, merges,\nranks and drops; nothing here is shown as is.",
+      "properties": {
+        "agent": {
+          "description": "Agent id from the packet (fused mode returns cards tagged by agent).",
+          "type": "string"
+        },
+        "body": {
+          "description": "At most two sentences.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "description": "0..1; the ranker drops anything below 0.6.",
+          "format": "float",
+          "type": "number"
+        },
+        "evidence_chunk_ids": {
+          "items": {
+            "$ref": "#/$defs/ChunkId"
+          },
+          "type": "array"
+        },
+        "evidence_segment_ids": {
+          "items": {
+            "$ref": "#/$defs/SegmentId"
+          },
+          "type": "array"
+        },
+        "jira_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/CandidateKind"
+        },
+        "lang": {
+          "$ref": "#/$defs/Lang"
+        },
+        "reason": {
+          "description": "Why now, in one line (logged, not shown).",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceKindHint"
+        },
+        "title": {
+          "description": "One line, at most 120 characters; never a script to read aloud.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "kind",
+        "title",
+        "source",
+        "evidence_segment_ids",
+        "evidence_chunk_ids",
+        "confidence",
+        "reason",
+        "lang"
+      ],
+      "type": "object"
+    },
+    "ChunkId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    },
+    "Lang": {
+      "description": "Content language. Detection is restricted to these three (PRD › Transcription pipeline).",
+      "enum": [
+        "en",
+        "ru",
+        "de"
+      ],
+      "type": "string"
+    },
+    "SegmentId": {
+      "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+      "type": "string"
+    },
+    "SourceKindHint": {
+      "enum": [
+        "this_call",
+        "past_call",
+        "jira",
+        "document",
+        "model_guess"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "cards": {
+      "items": {
+        "$ref": "#/$defs/CardCandidate"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "cards"
+  ],
+  "title": "CouncilTickOutput",
+  "type": "object"
+}
