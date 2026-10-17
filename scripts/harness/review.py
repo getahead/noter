@@ -129,11 +129,20 @@ def _run(cmd: list[str], *, stdin: str | None = None) -> str:
 
 
 def _gh_json(*args: str) -> object:
-    return json.loads(_run(["gh", *args]) or "null")
+    out = _run(["gh", *args])
+    try:
+        return json.loads(out or "null")
+    except ValueError as e:
+        raise Unavailable(f"gh {' '.join(args[:2])}: not JSON ({e})") from e
+
+
+def _gh_text(*args: str) -> str:
+    """A `gh … -q <jq>` answer that is a plain string, not JSON."""
+    return _run(["gh", *args]).strip()
 
 
 def _repo() -> str:
-    return os.environ.get("GITHUB_REPOSITORY") or str(_gh_json("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner") or "")
+    return os.environ.get("GITHUB_REPOSITORY") or _gh_text("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
 
 
 def _issue_comments(repo: str, n: int) -> list[dict]:
@@ -186,7 +195,7 @@ def publish(pr_arg: str | None, auto_merge: bool) -> int:
             print(f".prs/{n}/review.md has no '## Verdict: APPROVE | REQUEST CHANGES | COMMENT' line (PR-CODE-REVIEW-TEMPLATE).", file=sys.stderr)
             return 2
         repo = _repo()
-        me = str(_gh_json("api", "user", "-q", ".login"))
+        me = _gh_text("api", "user", "-q", ".login")
         body = json.dumps({"body": comment_body(review_md, head, verdict)})
         mine = [c for c in _issue_comments(repo, n) if c["user"]["login"] == me and MARKER_RE.search(c.get("body") or "")]
         if mine:
@@ -203,12 +212,23 @@ def publish(pr_arg: str | None, auto_merge: bool) -> int:
             return 1
         print(f"Self-review {verdict} published for PR #{n} at {head[:12]}; CI sets the `review` status.")
         if auto_merge:
-            _run(["gh", "pr", "merge", str(n), "--auto", "--squash"])
-            print("Auto-merge (squash) is on: GitHub merges once gate, hygiene, CodeQL and review pass.")
+            enable_auto_merge(n)
         return 0
     except Unavailable as e:
         print(f"Could not publish the review: {e}", file=sys.stderr)
         return 2
+
+
+def enable_auto_merge(n: int) -> bool:
+    """Best effort: the review is already published, so a refusal (draft PR, auto-merge off) only warns."""
+    try:
+        _run(["gh", "pr", "merge", str(n), "--auto", "--squash"])
+    except Unavailable as e:
+        print(f"Warning: could not turn on auto-merge for PR #{n} ({e}). "
+              f"Run `gh pr merge {n} --auto --squash` once the PR allows it.", file=sys.stderr)
+        return False
+    print("Auto-merge (squash) is on: GitHub merges once gate, hygiene, CodeQL and review pass.")
+    return True
 
 
 def evaluate_cmd(n: int, set_status: bool) -> int:

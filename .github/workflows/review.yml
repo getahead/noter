@@ -26,8 +26,10 @@ jobs:
   status:
     name: Self-review status
     # issue_comment: only PR comments that carry the self-review marker
+    # pull_request: same-repository heads only (a fork's token cannot write statuses; its
+    # status comes from the issue_comment path). issue_comment: PR comments with the marker.
     if: >-
-      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event.issue.pull_request && contains(github.event.comment.body, 'noter-self-review'))
     runs-on: ubuntu-24.04
     permissions:

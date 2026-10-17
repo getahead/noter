@@ -595,6 +595,19 @@ class SelfReviewTests(unittest.TestCase):
             with mock.patch.object(review, "stop_check", return_value=None):
                 self.assertEqual(stop_gate.review_loop(), 0)
 
+    def test_auto_merge_refusal_only_warns(self):
+        with mock.patch.object(review, "_run", side_effect=review.Unavailable("draft")), \
+                mock.patch("sys.stderr", new=__import__("io").StringIO()) as err:
+            self.assertFalse(review.enable_auto_merge(7))
+        self.assertIn("gh pr merge 7 --auto --squash", err.getvalue())
+
+    def test_plain_string_answers_are_not_parsed_as_json(self):
+        with mock.patch.object(review, "_run", return_value="getahead/noter\n"), mock.patch.dict("os.environ", {"GITHUB_REPOSITORY": ""}):
+            self.assertEqual(review._repo(), "getahead/noter")
+        with mock.patch.object(review, "_run", return_value="not json"):
+            with self.assertRaises(review.Unavailable):
+                review._gh_json("api", "x")
+
     def test_stop_check_has_no_opinion_offline(self):
         with mock.patch.object(review, "_run", side_effect=review.Unavailable("offline")):
             self.assertIsNone(review.stop_check())
