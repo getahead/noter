@@ -58,7 +58,7 @@ This decomposition splits `docs/DESIGN.md` (v1.1, the UI design, `cpt-noter-desi
 - Every component, screen and story of DESIGN.md sits in exactly one feature. `cpt-noter-component-ui-primitives` is the one shared entry: its 26 controls belong to `cpt-noter-feature-ui-primitives`, its foundations (tokens, typography, materials, motion) to `cpt-noter-feature-ui-tokens-theming`, and its keyboard, VoiceOver and localisation rules to `cpt-noter-feature-ui-accessibility-l10n`.
 - Each feature carries the milestone that delivers it. The milestone follows `harness/milestones.toml`, which places every IPC command and every story; where it differs from PRD › Roadmap and milestones › Parallel UI and core work, milestones.toml wins and the difference is listed below.
 - The UI is built against the fake core first (`apps/desktop/src/core/fake`), and each feature switches to the real core when its milestone's commands are delivered. Commands placed in a later milestone than the feature are marked with that milestone.
-- FEATURE specs exist for every M0 and M1 feature (15 files in `docs/features/ui/`). M2 to M5 features are listed with **Spec: pending**; their FEATURE specs are written before their milestone starts.
+- FEATURE specs exist for every feature, M0 to M5 (30 files in `docs/features/ui/`); the M2 to M5 specs are revisited before their milestone starts.
 - Status: every feature is **NOT_STARTED**; no checkbox is ticked.
 
 **Milestones.**
@@ -67,10 +67,10 @@ This decomposition splits `docs/DESIGN.md` (v1.1, the UI design, `cpt-noter-desi
 | --- | --- | --- |
 | M0 | `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-tokens-theming`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`, `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-first-run`, `cpt-noter-feature-ui-settings` | written |
 | M1 | `cpt-noter-feature-ui-dialogs-host`, `cpt-noter-feature-ui-record-prompt`, `cpt-noter-feature-ui-call-window`, `cpt-noter-feature-ui-live-transcript`, `cpt-noter-feature-ui-menu-bar`, `cpt-noter-feature-ui-library-calls`, `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-notifications` | written |
-| M2 | `cpt-noter-feature-ui-history-undo`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-page-outputs`, `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-today`, `cpt-noter-feature-ui-handoff` | pending |
-| M3 | `cpt-noter-feature-ui-library-search-topics`, `cpt-noter-feature-ui-ask`, `cpt-noter-feature-ui-people`, `cpt-noter-feature-ui-accounts`, `cpt-noter-feature-ui-privacy-sources` | pending |
-| M4 | `cpt-noter-feature-ui-copilot`, `cpt-noter-feature-ui-agents` | pending |
-| M5 | `cpt-noter-feature-ui-activity`, `cpt-noter-feature-ui-performance` | pending |
+| M2 | `cpt-noter-feature-ui-history-undo`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-page-outputs`, `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-today`, `cpt-noter-feature-ui-handoff` | written |
+| M3 | `cpt-noter-feature-ui-library-search-topics`, `cpt-noter-feature-ui-ask`, `cpt-noter-feature-ui-people`, `cpt-noter-feature-ui-accounts`, `cpt-noter-feature-ui-privacy-sources` | written |
+| M4 | `cpt-noter-feature-ui-copilot`, `cpt-noter-feature-ui-agents` | written |
+| M5 | `cpt-noter-feature-ui-activity`, `cpt-noter-feature-ui-performance` | written |
 
 **Coverage of DESIGN.md.** 77 of 77 components and screens (2 shells, 2 app-layer entries, 16 screens, the primitives inventory and 56 complex components), 49 of 49 stories, 10 of 10 principles and 14 of 14 constraints are assigned; `cpt-noter-interface-ui-core-ipc` and `cpt-noter-tech-ui-stack` sit in `cpt-noter-feature-ui-core-bridge`, and `cpt-noter-topology-ui-windows` is shared by the main-window shell and the call window (one row each). All 172 commands of `contracts/ipc.manifest.json` appear in a feature's API list. The UI owns no tables: the tables of `docs/DESIGN-core.md` appear under **Data** only as what each feature reads through the core; `docs/DECOMPOSITION-core.md` owns them.
 
@@ -1014,7 +1014,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Make every user change undoable from where it happened and from History: the undo strip, change rows, the History timeline per call, person and item, and **Export Log…**.
 
-- **Milestone**: M2. **Spec**: pending (written before M2 starts). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/history-undo.md`](features/ui/history-undo.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1066,7 +1066,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Let the user review suggested items, tick, edit and reopen items, and open each item's evidence in one click, in rows and in the Item inspector.
 
-- **Milestone**: M2. **Spec**: pending (written before M2 starts). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/items.md`](features/ui/items.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-history-undo`
 
@@ -1124,7 +1124,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Show the outputs in PRD order as each is written, keep edits through regeneration with a diff, and share or export the call, a section or a selection in one action.
 
-- **Milestone**: M2. **Spec**: pending (written before M2 starts). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/call-page-outputs.md`](features/ui/call-page-outputs.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-history-undo`
 
@@ -1187,7 +1187,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Let the user name a speaker during or after the call in one step, fix a term with the glossary, and pick or create a person without leaving the surface.
 
-- **Milestone**: M2. **Spec**: pending (written before M2 starts). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/speakers.md`](features/ui/speakers.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-live-transcript`, `cpt-noter-feature-ui-call-page-frame`
 
@@ -1241,7 +1241,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Show today's calls in calendar order with what is owed to each person, let the user tick items with **Undo**, and surface setup, quit and calendar states where the day starts.
 
-- **Milestone**: M2. **Spec**: pending (written before M2 starts). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/today.md`](features/ui/today.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-window`, `cpt-noter-feature-ui-first-run`
 
@@ -1293,7 +1293,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Turn an engineering item into an editable prompt and open it in Claude Code or Codex in the mapped repository, or copy it, with the launch path visible beforehand.
 
-- **Milestone**: M2. **Spec**: pending (written before M2 starts). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/handoff.md`](features/ui/handoff.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-settings`
 
@@ -1350,7 +1350,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Find a call, quote or decision in any language with one filter state, sectioned results marked strong or weak, and follow one topic across calls with rename and merge on request.
 
-- **Milestone**: M3. **Spec**: pending (written before M3 starts). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/library-search-topics.md`](features/ui/library-search-topics.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-library-calls`, `cpt-noter-feature-ui-items`
 
@@ -1408,7 +1408,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Answer questions across calls and documents with citations, follow-ups and copy, never guessing when nothing was found.
 
-- **Milestone**: M3. **Spec**: pending (written before M3 starts). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/ask.md`](features/ui/ask.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-live-transcript`
 
@@ -1462,7 +1462,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Prepare a 1:1 from a Person page, turn unnamed speakers into people, and manage voice profiles, edits and merges with **Undo**.
 
-- **Milestone**: M3. **Spec**: pending (written before M3 starts). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/people.md`](features/ui/people.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-library-calls`
 
@@ -1518,7 +1518,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Store or replace API keys and sign in separately with the user's own Claude and ChatGPT accounts through Claude Code and Codex, then choose which tasks and agents use them.
 
-- **Milestone**: M3. **Spec**: pending (written before M3 starts). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/accounts.md`](features/ui/accounts.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-settings`, `cpt-noter-feature-ui-first-run`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1577,7 +1577,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Show what left this Mac in plain words with export, and add, sync, re-index and remove knowledge sources with their status and fix.
 
-- **Milestone**: M3. **Spec**: pending (written before M3 starts). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/privacy-sources.md`](features/ui/privacy-sources.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-settings`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1634,7 +1634,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Show at most three numbered cards with provenance and agent badges, pinned or dismissed by global card keys while the call app keeps focus, with catch-up, ask-about-this-call, mute and the copilot's degraded states.
 
-- **Milestone**: M4. **Spec**: pending (written before M4 starts). **Status**: NOT_STARTED.
+- **Milestone**: M4. **Spec**: [`docs/features/ui/copilot.md`](features/ui/copilot.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-call-window`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-menu-bar`
 
@@ -1700,7 +1700,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Add, edit, order and switch agents with their skill and runtime, and tune which agents run per call type.
 
-- **Milestone**: M4. **Spec**: pending (written before M4 starts). **Status**: NOT_STARTED.
+- **Milestone**: M4. **Spec**: [`docs/features/ui/agents.md`](features/ui/agents.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-accounts`, `cpt-noter-feature-ui-copilot`
 
@@ -1758,7 +1758,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Let the user decide what Noter proposes, undo a batch of changes, see the day log, and manage maintenance jobs and evidence sources.
 
-- **Milestone**: M5. **Spec**: pending (written before M5 starts). **Status**: NOT_STARTED.
+- **Milestone**: M5. **Spec**: [`docs/features/ui/activity.md`](features/ui/activity.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-history-undo`, `cpt-noter-feature-ui-settings`, `cpt-noter-feature-ui-items`
 
@@ -1814,7 +1814,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Show the targets, the stage timeline and the bottlenecks per period and per call, and turn a bottleneck into an improvement brief for Claude Code or Codex.
 
-- **Milestone**: M5. **Spec**: pending (written before M5 starts). **Status**: NOT_STARTED.
+- **Milestone**: M5. **Spec**: [`docs/features/ui/performance.md`](features/ui/performance.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-handoff`, `cpt-noter-feature-ui-settings`
 
