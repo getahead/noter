@@ -445,3 +445,27 @@ class ArchCheckTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DirectoryNamedLikeSourceTests(unittest.TestCase):
+    """Playwright stores baselines in folders named after the spec file
+    (`__screenshots__/x.spec.ts/`); the scanners must skip directories."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
+        shots = self.root / "apps/desktop/tests/visual/__screenshots__/a.spec.ts"
+        shots.mkdir(parents=True)
+        (shots / "x.png").write_bytes(b"")
+        (self.root / "apps/desktop/tests/a.spec.ts").write_text("// cpt-noter-seq-demo\n", encoding="utf-8")
+        (self.root / "apps/desktop/src/x").mkdir(parents=True)
+        (self.root / "apps/desktop/src/x/dir.ts").mkdir()
+
+    def test_opt_out_scan_skips_directories(self):
+        self.assertEqual(arch_check.check_opt_outs(self.root), [])
+
+    def test_ui_scan_skips_directories(self):
+        self.assertEqual(arch_check.check_ui(self.root), [])
+
+    def test_story_scan_skips_directories(self):
+        self.assertEqual(e2e_coverage.named_stories(self.root, ["apps/desktop/tests"]), {"cpt-noter-seq-demo"})

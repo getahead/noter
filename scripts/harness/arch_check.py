@@ -88,7 +88,7 @@ def check_ui(root: Path) -> list[Violation]:
     if not base.exists():
         return v
     for path in base.rglob("*"):
-        if path.suffix not in (".ts", ".tsx") or "node_modules" in path.parts:
+        if not path.is_file() or path.suffix not in (".ts", ".tsx") or "node_modules" in path.parts:
             continue
         relp = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -135,7 +135,7 @@ def check_opt_outs(root: Path) -> list[Violation]:
         if not base.exists():
             continue
         for path in base.rglob("*"):
-            if path.suffix not in OPT_OUT_SUFFIXES or {"node_modules", "target"} & set(path.parts):
+            if not path.is_file() or path.suffix not in OPT_OUT_SUFFIXES or {"node_modules", "target"} & set(path.parts):
                 continue
             for n, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
                 for rx, what in OPT_OUTS:

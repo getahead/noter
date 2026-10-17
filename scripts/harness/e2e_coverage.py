@@ -87,7 +87,7 @@ def named_stories(root: Path, dirs: list[str]) -> set[str]:
         if not base.exists():
             continue
         for path in base.rglob("*"):
-            if path.suffix in TEST_SUFFIXES and ("tests" in path.parts or "e2e" in path.parts):
+            if path.is_file() and path.suffix in TEST_SUFFIXES and ("tests" in path.parts or "e2e" in path.parts):
                 found.update(STORY_ID.findall(path.read_text(encoding="utf-8", errors="ignore")))
     return found
 
