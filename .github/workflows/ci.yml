@@ -43,10 +43,12 @@ jobs:
           persist-credentials: false
       - id: d
         run: |
-          echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "native_tests=$([ -d apps/desktop/tests/native/NoterNativeTests.xcodeproj ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          {
+            echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)"
+            echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)"
+            echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)"
+            echo "native_tests=$([ -d apps/desktop/tests/native/NoterNativeTests.xcodeproj ] && echo true || echo false)"
+          } >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint and type checks
