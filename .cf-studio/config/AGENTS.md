@@ -8,3 +8,8 @@ These rules are loaded alongside the generated rules in `{cf-studio-path}/.gen/A
 - WHEN implementing or reviewing CODE for a FEATURE (cf-sdlc-implement, cf-coding): ALWAYS use `just gate` as the deterministic gate in addition to `cfs validate`, and treat it as the FEATURE's definition of done (docs/HARNESS.md, ADR-0003).
 - WHEN authoring a FEATURE: ALWAYS list the unit, conformance and E2E tests that prove it, with the DESIGN.md story IDs the E2E tests cover, and end its definition of done with "`just gate` passes".
 - WHEN authoring a DECOMPOSITION: ALWAYS keep each FEATURE inside one milestone of `harness/milestones.toml`.
+
+## Noter: code quality review (ponytail)
+
+- WHEN writing CODE (cf-coding, cf-coding-gen, cf-sdlc-implement): ALWAYS follow the `ponytail` skill (smallest complete change: reuse before adding, no speculative abstractions, never cut validation, error handling, security or accessibility).
+- WHEN reviewing CODE (cf-coding-review, cf-sdlc-pr-review) or closing a FEATURE: ALWAYS also run `/ponytail-review` on the change and merge its findings into the review; a "Must fix" finding blocks the FEATURE's definition of done the same way a failing `just gate` does.
