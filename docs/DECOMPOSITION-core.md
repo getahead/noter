@@ -58,7 +58,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **By milestone first.** Every IPC command and every DESIGN.md story belongs to exactly one feature, and that feature sits in the milestone `harness/milestones.toml` gives the command or story. The E2E gate counts what each milestone delivers, so a feature never spans two milestones. Where PRD › Roadmap and milestones and `milestones.toml` disagree, `milestones.toml` wins and the difference is listed below.
 - **Then by component and lane.** Inside a milestone a feature groups one component (or two that cannot be built apart, such as the IPC host and the stream hub) and stays in one lane of `docs/HARNESS.md` where it can. Features that touch both `apps/desktop/src-tauri` (core lane) and `noter-native` (engine lane) say so; they land as two pull requests.
-- **Not too small.** A feature is a few weeks of work for one builder with agents, not a task. M0 and M1, the next six weeks, have full FEATURE specs under `docs/features/core/`; M2 to M5 are listed here with scope and dependencies, and their specs are written before each milestone starts.
+- **Not too small.** A feature is a few weeks of work for one builder with agents, not a task. Every feature, M0 to M5, has a FEATURE spec under `docs/features/core/`; the M2 to M5 specs are revisited before their milestone starts.
 
 **Status words.** NOT_STARTED: nothing of the feature exists. IN_PROGRESS: part of it exists on `main`. A feature's checkbox is checked only when all its FEATURE items are implemented and `just gate` passes (traceability FULL: a checked flow, algorithm, state or definition of done needs its `@cpt-*` markers in code).
 
@@ -68,11 +68,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 | --- | --- | --- | --- | --- |
 | M0 | 7 | 22 | 3 | written |
 | M1 | 5 | 36 | 13 | written |
-| M2 | 9 | 39 | 10 | pending |
-| M3 | 5 | 41 | 13 | pending |
-| M4 | 2 | 23 | 6 | pending |
-| M5 | 3 | 11 | 4 | pending |
-| Total | 31 | 172 | 49 | 12 written |
+| M2 | 9 | 39 | 10 | written |
+| M3 | 5 | 41 | 13 | written |
+| M4 | 2 | 23 | 6 | written |
+| M5 | 3 | 11 | 4 | written |
+| Total | 31 | 172 | 49 | 31 written |
 
 **Coverage of DESIGN-core.** Every element is assigned to at least one feature: principles 7 of 7, constraints 8 of 8, components 24 of 24, interfaces 5 of 5, sequences 10 of 10, the database (`cpt-noter-db-core-library`) and dbtables 28 of 28, plus the deployment topology. All 172 commands of `contracts/ipc.manifest.json` and all 49 stories of `harness/milestones.toml` are placed once.
 
@@ -772,7 +772,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-speakers-audio`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-speakers-audio.md](features/core/core-speakers-audio.md)
 
 - **Purpose**: Let the user correct the transcript through logged changes (rename a speaker for the call or one line, fix a term and teach the glossary, name speakers after the call) and delete audio for good.
 
@@ -821,7 +821,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-engine-offline`
 
-- **Milestone**: M2 · **Lane**: engine · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: engine · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-engine-offline.md](features/core/core-engine-offline.md)
 
 - **Purpose**: Run the offline Large v3 and VBx pass with the user's corrections as constraints, and serve speaker and text embeddings for identity and retrieval.
 
@@ -870,7 +870,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-llm-gate`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-llm-gate.md](features/core/core-llm-gate.md)
 
 - **Purpose**: Route every model call through one runtime interface, validate output against the app-owned skill schemas, lock every CLI run down, and send nothing off the Mac without the egress gate's redaction and audit row.
 
@@ -925,7 +925,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-jobs-scheduler`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-jobs-scheduler.md](features/core/core-jobs-scheduler.md)
 
 - **Purpose**: Run background work without disturbing a live call: triggers, priorities, the battery rule, the live-call rule (post-call keeps running at low priority, owner decision D2) and the pipeline jobs.
 
@@ -971,7 +971,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-postcall`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-postcall.md](features/core/core-postcall.md)
 
 - **Purpose**: Write the outputs within two minutes from the live transcript, section by section, then improve them after the archive pass without losing an edit; serve and version the output sections.
 
@@ -1028,7 +1028,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-items-today`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-items-today.md](features/core/core-items-today.md)
 
 - **Purpose**: Own the records the user acts on most: item lifecycle and review, evidence spans, the carry-forward query, the Today read model, call tags, share formats and export.
 
@@ -1085,7 +1085,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-handoff`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
 
 - **Purpose**: Generate handoff prompts on demand, keep their versions and edits, resolve the repository, detect the launch path and open the prompt in Claude Code or Codex pre-filled, never sent.
 
@@ -1134,7 +1134,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-history-undo`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-history-undo.md](features/core/core-history-undo.md)
 
 - **Purpose**: Make every logged change readable and reversible: undo and redo by change or batch at any time, skipping rows edited later, and the History read model and export.
 
@@ -1180,7 +1180,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-native-services`
 
-- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
 
 - **Purpose**: Give the M2 commands the macOS services they need from the core: Launch Services and Apple Events for handoff, rich clipboard formats, save panels for export, and the Screen Share Test.
 
@@ -1227,7 +1227,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p4` - **ID**: `cpt-noter-feature-core-retrieval-ask`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-retrieval-ask.md](features/core/core-retrieval-ask.md)
 
 - **Purpose**: One retrieval function behind search, Ask, copilot facts and the pre-call brief: hybrid FTS5 and vector search with filters, cited answers, and topics across calls.
 
@@ -1283,7 +1283,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p4` - **ID**: `cpt-noter-feature-core-people`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-people.md](features/core/core-people.md)
 
 - **Purpose**: Person pages, aliases, merges, one-action deletion and opt-in encrypted voice profiles, with speaker matching against them.
 
@@ -1336,7 +1336,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p4` - **ID**: `cpt-noter-feature-core-knowledge`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-knowledge.md](features/core/core-knowledge.md)
 
 - **Purpose**: Index folder and MCP sources into the same store with privacy class and scope applied before any model sees a chunk.
 
@@ -1385,7 +1385,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p4` - **ID**: `cpt-noter-feature-core-credentials-privacy`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-credentials-privacy.md](features/core/core-credentials-privacy.md)
 
 - **Purpose**: Keys in the Keychain, the own-account sign-in driven through the CLI, CLI install, the Privacy pane over the audit log, and the storage move if the engine ships unsandboxed.
 
@@ -1439,7 +1439,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p4` - **ID**: `cpt-noter-feature-core-mcp`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-mcp.md](features/core/core-mcp.md)
 
 - **Purpose**: Let agents look things up in the library themselves through a local-only tool server whose results pass the egress gate for cloud runs (owner decision O2).
 
@@ -1485,7 +1485,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p5` - **ID**: `cpt-noter-feature-core-agents`
 
-- **Milestone**: M4 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M4 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-agents.md](features/core/core-agents.md)
 
 - **Purpose**: Agents as rows with runtime, model, effort, tools and call types; skills per agent; fused or parallel council mode.
 
@@ -1534,7 +1534,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p5` - **ID**: `cpt-noter-feature-core-copilot`
 
-- **Milestone**: M4 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M4 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-copilot.md](features/core/core-copilot.md)
 
 - **Purpose**: One loop per live call: signals, topic tracker, one tick in flight, council fan-out, merge and rank, degrade rules, the card machine and its stream, behind the flag until the M4 latency gate.
 
@@ -1589,7 +1589,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p6` - **ID**: `cpt-noter-feature-core-maintenance`
 
-- **Milestone**: M5 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M5 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-maintenance.md](features/core/core-maintenance.md)
 
 - **Purpose**: The self-maintenance jobs and their controls: updates, integrity check and repair, index rebuild, re-derive, reconciliation, backups, nightly retention, and recovery from a corrupted database within ten minutes.
 
@@ -1640,7 +1640,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p6` - **ID**: `cpt-noter-feature-core-evidence-proposals`
 
-- **Milestone**: M5 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M5 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-evidence-proposals.md](features/core/core-evidence-proposals.md)
 
 - **Purpose**: Close accepted items on evidence from Jira, Bitbucket, GitHub and later calls, turn weaker matches into proposals, and serve the Activity page.
 
@@ -1692,7 +1692,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p6` - **ID**: `cpt-noter-feature-core-metrics-performance`
 
-- **Milestone**: M5 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec pending (written before the milestone starts)
+- **Milestone**: M5 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-metrics-performance.md](features/core/core-metrics-performance.md)
 
 - **Purpose**: Measure every stage the same way, roll it up nightly and serve the Performance page and the improvement brief.
 
