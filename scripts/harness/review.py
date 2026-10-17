@@ -41,8 +41,9 @@ from pathlib import Path
 from common import ROOT
 
 CONTEXT = "review"
-MARKER_RE = re.compile(
-    r"<!--\s*noter-self-review\s+head=([0-9a-f]{40})(?:\s+diff=([0-9a-f]{64}))?\s+verdict=(APPROVE|COMMENT|REQUEST_CHANGES)\s*-->")
+MARKER_RE = re.compile(r"<!--\s*noter-self-review\s+head=([0-9a-f]{40})\s+verdict=(APPROVE|COMMENT|REQUEST_CHANGES)\s*-->")
+# A separate comment, so an evaluator that predates fingerprints still reads the marker above.
+DIFF_MARKER_RE = re.compile(r"<!--\s*noter-self-review-diff\s+([0-9a-f]{64})\s*-->")
 VERDICT_RE = re.compile(r"^##\s*Verdict:\s*(?:\S+\s+)?(APPROVE|REQUEST CHANGES|COMMENT)\b", re.MULTILINE)
 PASSING = ("APPROVE", "COMMENT")
 WRITERS = ("OWNER", "MEMBER", "COLLABORATOR")
@@ -81,8 +82,8 @@ def diff_fingerprint(diff: str) -> str:
 
 
 def marker(head: str, verdict: str, diff: str = "") -> str:
-    fp = f" diff={diff_fingerprint(diff)}" if diff else ""
-    return f"<!-- noter-self-review head={head}{fp} verdict={verdict} -->"
+    fp = f"\n<!-- noter-self-review-diff {diff_fingerprint(diff)} -->" if diff else ""
+    return f"<!-- noter-self-review head={head} verdict={verdict} -->{fp}"
 
 
 def comment_body(review_md: str, head: str, verdict: str, diff: str = "") -> str:
@@ -114,9 +115,11 @@ def evaluate(pr: dict, comments: list[dict], diff: str = "") -> Status:
     fp = diff_fingerprint(diff) if diff else None
     found = []
     for c in comments:
-        m = MARKER_RE.search(c.get("body") or "")
-        if m and (m.group(1) == head or (fp and m.group(2) == fp)) and c.get("author_association") in WRITERS:
-            found.append((c.get("updated_at") or "", m.group(3), c))
+        body = c.get("body") or ""
+        m, d = MARKER_RE.search(body), DIFF_MARKER_RE.search(body)
+        same_diff = bool(fp and d and d.group(1) == fp)
+        if m and (m.group(1) == head or same_diff) and c.get("author_association") in WRITERS:
+            found.append((c.get("updated_at") or "", m.group(2), c))
     if not found:
         return Status("pending", f"Self-review missing for {short}: /cf-sdlc-pr-review {n}, then just review-publish {n}")
     _, verdict, c = max(found, key=lambda t: t[0])
@@ -174,8 +177,13 @@ def _state_dir() -> Path:
     return d
 
 
-def _norm_diff(text: str) -> str:
-    return "\n".join(line.rstrip() for line in text.strip().splitlines())
+def _pr_diff(repo: str, n: int) -> str:
+    """The PR's diff, or "" when GitHub will not serve it (too large): then only the head counts."""
+    try:
+        return _run(["gh", "api", f"repos/{repo}/pulls/{n}", "-H", "Accept: application/vnd.github.diff"])
+    except Unavailable as e:
+        print(f"PR #{n}: no diff from GitHub ({e}); matching reviews by head commit only.", file=sys.stderr)
+        return ""
 
 
 # ── commands ──────────────────────────────────────────────────────────
@@ -200,7 +208,8 @@ def publish(pr_arg: str | None, auto_merge: bool) -> int:
         if not review_path.exists() or not diff_path.exists():
             print(f"No review yet: run /cf-sdlc-pr-review {n} (it writes .prs/{n}/review.md).", file=sys.stderr)
             return 2
-        if _norm_diff(diff_path.read_text(encoding="utf-8")) != _norm_diff(_run(["gh", "pr", "diff", str(n)])):
+        reviewed = diff_path.read_text(encoding="utf-8")
+        if diff_fingerprint(reviewed) != diff_fingerprint(_run(["gh", "pr", "diff", str(n)])):
             print(f"The review covers an older diff of PR #{n}. Review it again: /cf-sdlc-pr-review {n}.", file=sys.stderr)
             return 2
         if review_path.stat().st_mtime < diff_path.stat().st_mtime:
@@ -213,7 +222,7 @@ def publish(pr_arg: str | None, auto_merge: bool) -> int:
             return 2
         repo = _repo()
         me = _gh_text("api", "user", "-q", ".login")
-        body = json.dumps({"body": comment_body(review_md, head, verdict, diff_path.read_text(encoding="utf-8"))})
+        body = json.dumps({"body": comment_body(review_md, head, verdict, reviewed)})
         mine = [c for c in _issue_comments(repo, n) if c["user"]["login"] == me and MARKER_RE.search(c.get("body") or "")]
         if mine:
             _run(["gh", "api", "-X", "PATCH", f"repos/{repo}/issues/comments/{mine[-1]['id']}", "--input", "-"], stdin=body)
@@ -254,8 +263,7 @@ def evaluate_cmd(n: int, set_status: bool) -> int:
     if pr["state"] != "open":
         print(f"PR #{n} is {pr['state']}; no status set.")
         return 0
-    diff = _run(["gh", "api", f"repos/{repo}/pulls/{n}", "-H", "Accept: application/vnd.github.diff"])
-    status = evaluate(pr, _issue_comments(repo, n), diff)
+    status = evaluate(pr, _issue_comments(repo, n), _pr_diff(repo, n))
     print(json.dumps({"sha": pr["head"]["sha"], **status.__dict__}))
     if set_status:
         target = status.target_url or os.environ.get("RUN_URL", "")

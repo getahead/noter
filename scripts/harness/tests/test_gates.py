@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -583,6 +584,18 @@ class SelfReviewTests(unittest.TestCase):
         body = "<!-- noter-self-review head=" + HEAD + " verdict=APPROVE -->\n## Verdict: ✅ APPROVE"
         c = {"body": body, "author_association": "OWNER", "updated_at": "t", "html_url": "u"}
         self.assertEqual(review.evaluate(_pr(), [c], "any diff").state, "success")
+
+    def test_head_marker_unchanged_for_older_evaluators(self):
+        body = review.comment_body("## Verdict: ✅ APPROVE", HEAD, "APPROVE", "diff --git a/x b/x\n+a\n")
+        old_style = re.compile(r"<!--\s*noter-self-review\s+head=([0-9a-f]{40})\s+verdict=(APPROVE|COMMENT|REQUEST_CHANGES)\s*-->")
+        self.assertEqual(old_style.search(body).group(2), "APPROVE")
+        self.assertTrue(review.DIFF_MARKER_RE.search(body))
+
+    def test_unavailable_diff_falls_back_to_head_matching(self):
+        with mock.patch.object(review, "_run", side_effect=review.Unavailable("too_large")), \
+                mock.patch("sys.stderr", new=__import__("io").StringIO()):
+            self.assertEqual(review._pr_diff("o/r", 7), "")
+        self.assertEqual(review.evaluate(_pr(), [_comment("APPROVE")], "").state, "success")
 
     def test_marker_must_match_the_verdict_line(self):
         st = review.evaluate(_pr(), [_comment("APPROVE", body_verdict="REQUEST_CHANGES")])
