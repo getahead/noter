@@ -1,0 +1,90 @@
+/* =====================================================================
+   Increase Contrast (AC5 resolution, owner decision 17 Oct, PM-57)
+   Default look: Apple system colours (00-base.css). With macOS Increase
+   Contrast on (prefers-contrast: more), or the prototype's "Increase
+   contrast" toggle (data-contrast="more"), the WCAG 2.2 AA-checked values
+   of DESIGN v0.5 apply: tertiary maps to secondary, separators 25 %,
+   control borders 60 %, a solid 3-pt focus ring, solid tag outlines and
+   opaque materials. data-contrast="normal" opts out of the system setting.
+   ===================================================================== */
+:root[data-contrast="more"] {
+    --label: #1D1D1F; --label-2: #616161; --label-3: #616161; --label-dis: rgba(0,0,0,.40);
+    --sep: rgba(0,0,0,.25); --ctrl-border: rgba(0,0,0,.60); --ctrl-border-soft: rgba(0,0,0,.35);
+    --accent: #0064D1; --accent-fill: #0064D1; --accent-text: #0064D1;
+    --sel-accent: rgba(0,100,209,.18);
+    --rec: #C4281C; --error: #C4281C; --warning: #A85A00; --success: #1E7E34;
+    --side-bg: #F3F3F3; --glass-bg: rgba(255,255,255,.94); --glass-bg-strong: #FFFFFF;
+    --focus-ring: 0 0 0 3px #0064D1;
+}
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]) {
+    --label: #1D1D1F; --label-2: #616161; --label-3: #616161; --label-dis: rgba(0,0,0,.40);
+    --sep: rgba(0,0,0,.25); --ctrl-border: rgba(0,0,0,.60); --ctrl-border-soft: rgba(0,0,0,.35);
+    --accent: #0064D1; --accent-fill: #0064D1; --accent-text: #0064D1;
+    --sel-accent: rgba(0,100,209,.18);
+    --rec: #C4281C; --error: #C4281C; --warning: #A85A00; --success: #1E7E34;
+    --side-bg: #F3F3F3; --glass-bg: rgba(255,255,255,.94); --glass-bg-strong: #FFFFFF;
+    --focus-ring: 0 0 0 3px #0064D1;
+  }
+}
+/* dark + increase contrast (higher specificity, so it wins over the light block above) */
+:root[data-contrast="more"][data-theme="dark"] {
+    --label: #F2F2F2; --label-2: #AAAAAA; --label-3: #AAAAAA; --label-dis: rgba(255,255,255,.40);
+    --sep: rgba(255,255,255,.25); --ctrl-border: rgba(255,255,255,.60); --ctrl-border-soft: rgba(255,255,255,.35);
+    --accent: #0A84FF; --accent-fill: #0A6FE0; --accent-text: #4DA3FF;
+    --sel-accent: rgba(10,132,255,.30);
+    --rec: #FF6961; --error: #FF6961; --warning: #FF9F0A; --success: #30D158;
+    --side-bg: #232323; --glass-bg: rgba(38,38,40,.96); --glass-bg-strong: #2A2A2A;
+    --focus-ring: 0 0 0 3px #4DA3FF;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-contrast="more"]:not([data-theme="light"]) {
+    --label: #F2F2F2; --label-2: #AAAAAA; --label-3: #AAAAAA; --label-dis: rgba(255,255,255,.40);
+    --sep: rgba(255,255,255,.25); --ctrl-border: rgba(255,255,255,.60); --ctrl-border-soft: rgba(255,255,255,.35);
+    --accent: #0A84FF; --accent-fill: #0A6FE0; --accent-text: #4DA3FF;
+    --sel-accent: rgba(10,132,255,.30);
+    --rec: #FF6961; --error: #FF6961; --warning: #FF9F0A; --success: #30D158;
+    --side-bg: #232323; --glass-bg: rgba(38,38,40,.96); --glass-bg-strong: #2A2A2A;
+    --focus-ring: 0 0 0 3px #4DA3FF;
+  }
+}
+@media (prefers-contrast: more) {
+  :root[data-theme="dark"]:not([data-contrast="normal"]) {
+    --label: #F2F2F2; --label-2: #AAAAAA; --label-3: #AAAAAA; --label-dis: rgba(255,255,255,.40);
+    --sep: rgba(255,255,255,.25); --ctrl-border: rgba(255,255,255,.60); --ctrl-border-soft: rgba(255,255,255,.35);
+    --accent: #0A84FF; --accent-fill: #0A6FE0; --accent-text: #4DA3FF;
+    --sel-accent: rgba(10,132,255,.30);
+    --rec: #FF6961; --error: #FF6961; --warning: #FF9F0A; --success: #30D158;
+    --side-bg: #232323; --glass-bg: rgba(38,38,40,.96); --glass-bg-strong: #2A2A2A;
+    --focus-ring: 0 0 0 3px #4DA3FF;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-contrast="normal"]):not([data-theme="light"]) {
+    --label: #F2F2F2; --label-2: #AAAAAA; --label-3: #AAAAAA; --label-dis: rgba(255,255,255,.40);
+    --sep: rgba(255,255,255,.25); --ctrl-border: rgba(255,255,255,.60); --ctrl-border-soft: rgba(255,255,255,.35);
+    --accent: #0A84FF; --accent-fill: #0A6FE0; --accent-text: #4DA3FF;
+    --sel-accent: rgba(10,132,255,.30);
+    --rec: #FF6961; --error: #FF6961; --warning: #FF9F0A; --success: #30D158;
+    --side-bg: #232323; --glass-bg: rgba(38,38,40,.96); --glass-bg-strong: #2A2A2A;
+    --focus-ring: 0 0 0 3px #4DA3FF;
+  }
+}
+
+/* component treatments under Increase Contrast */
+:root[data-contrast="more"] .np-badge, :root[data-contrast="more"] .np-lang, :root[data-contrast="more"] .np-agent,
+:root[data-contrast="more"] .np-prov--chip, :root[data-contrast="more"] .np-token { box-shadow: inset 0 0 0 1px currentColor; }
+:root[data-contrast="more"] :focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+:root[data-contrast="more"] .np-btn, :root[data-contrast="more"] .np-popup select,
+:root[data-contrast="more"] .np-field__input, :root[data-contrast="more"] .np-check__box,
+:root[data-contrast="more"] .np-radio__dot, :root[data-contrast="more"] .np-toggle__track { box-shadow: inset 0 0 0 1px var(--ctrl-border); }
+:root[data-contrast="more"] .np-btn--primary { box-shadow: none; }
+:root[data-contrast="more"] .np-sidebar, :root[data-contrast="more"] .np-menu, :root[data-contrast="more"] .np-pop,
+:root[data-contrast="more"] .np-toolbar .np-btn, :root[data-contrast="more"] .np-toolbar__nav,
+:root[data-contrast="more"] .np-toolbar .np-search { -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]) .np-badge, :root:not([data-contrast="normal"]) .np-lang, :root:not([data-contrast="normal"]) .np-agent,
+  :root:not([data-contrast="normal"]) .np-prov--chip, :root:not([data-contrast="normal"]) .np-token { box-shadow: inset 0 0 0 1px currentColor; }
+  :root:not([data-contrast="normal"]) :focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  :root:not([data-contrast="normal"]) .np-sidebar, :root:not([data-contrast="normal"]) .np-menu, :root:not([data-contrast="normal"]) .np-pop { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

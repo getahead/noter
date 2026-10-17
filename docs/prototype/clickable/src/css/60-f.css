@@ -1,0 +1,60 @@
+/* Group F — your own Claude and ChatGPT accounts */
+.f-acct { align-items: center; }
+.f-acct__logo { width: 30px; height: 30px; flex: none; border-radius: var(--r-row); display: inline-flex; align-items: center; justify-content: center; background: var(--sel-unemph); color: var(--label); }
+.f-acct[data-state="signed-in"] .f-acct__logo { background: var(--accent-fill); color: var(--on-accent); }
+.f-acct .e-cred__main { flex: 1 1 260px; min-width: 0; }
+.f-acct__who { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 2px; }
+.f-acct__use { color: var(--label-2); font-size: 12px; margin-top: 2px; }
+.f-accts { margin-top: 4px; }
+.f-acct--wizard { padding: 10px 12px; }
+
+.f-rt select { min-width: 250px; }
+.f-rt__note { display: flex; gap: 6px; align-items: flex-start; max-width: 520px; margin-top: 6px; color: var(--label-2); font-size: 12px; }
+.f-rt__warn { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+
+.f-sheet .np-sheet__head { display: grid; gap: 4px; }
+.f-sheet__brand { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-fill); color: var(--on-accent); margin-bottom: 4px; }
+.f-steps { list-style: none; margin: 10px 0 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.f-steps__i { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--label-2); padding: 3px 10px 3px 4px; border-radius: var(--r-capsule); background: var(--sel-unemph); }
+.f-steps__dot { width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 600 10px/1 var(--font); background: var(--ctrl-bg); box-shadow: inset 0 0 0 .5px var(--ctrl-border); }
+.f-steps__i.is-cur { color: var(--label); font-weight: 500; }
+.f-steps__i.is-cur .f-steps__dot { background: var(--accent-fill); color: var(--on-accent); box-shadow: none; }
+.f-steps__i.is-done .f-steps__dot { background: var(--success); color: #fff; box-shadow: none; }
+.f-steps__i.is-err { color: var(--error); }
+.f-steps__i.is-err .f-steps__dot { background: var(--error); color: #fff; box-shadow: none; }
+
+.f-check { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-card); background: var(--sel-unemph); }
+.f-check > div { flex: 1 1 auto; min-width: 0; }
+.f-check.is-ok > .np-ic { color: var(--success); }
+.f-check.is-warn { background: var(--warning-tint); }
+.f-check.is-warn > .np-ic { color: var(--warning); }
+.f-existing { padding: 10px 12px; border-radius: var(--r-card); box-shadow: inset 0 0 0 .5px var(--sep); }
+.f-facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.f-facts li { display: flex; gap: 8px; align-items: flex-start; color: var(--label); }
+.f-facts .np-ic { color: var(--accent); margin-top: 2px; }
+.f-fine { font-size: 11px; color: var(--label-2); }
+
+.f-wait { display: flex; gap: 8px; align-items: center; }
+.f-code { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--r-card); background: var(--sel-unemph); }
+.f-code__val { font-size: 18px; letter-spacing: .12em; font-weight: 600; color: var(--label); }
+.f-links { display: flex; gap: 16px; }
+.f-sim { border-radius: 12px; overflow: hidden; border: 1px dashed var(--chrome-dim); background: var(--chrome-bg); color: var(--chrome-fg); font-size: 12px; }
+.f-sim__bar { padding: 5px 10px; background: #181A1E; color: var(--chrome-dim); }
+.f-sim__body { padding: 10px; display: grid; gap: 6px; }
+.f-sim__title { font-weight: 600; }
+.f-sim__btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.f-chks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.f-chk { display: flex; gap: 10px; align-items: center; color: var(--label-2); }
+.f-chk.is-done { color: var(--label); }
+.f-chk.is-done .np-ic { color: var(--success); }
+.f-chk.is-run { color: var(--label); }
+.f-chk__dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--ctrl-border); display: inline-block; }
+
+.f-done { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: var(--r-card); background: var(--success-tint); }
+.f-done > .np-ic { color: var(--success); }
+.f-bind { display: grid; gap: 6px; }
+.f-bind__h { font-weight: 600; }
+.f-bind__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
+.f-rt__note > .np-ic { margin-top: 2px; }
+.f-rt__note > span { flex: 1 1 auto; min-width: 0; }
