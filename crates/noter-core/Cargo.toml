@@ -13,6 +13,7 @@ harness = []
 
 [dependencies]
 noter-db = { path = "../noter-db" }
+noter-engine-client = { path = "../noter-engine-client" }
 noter-protocol = { path = "../noter-protocol" }
 serde = "1"
 serde_json = "1"
