@@ -25,6 +25,7 @@ design: docs/DESIGN-core.md
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Run migrations](#run-migrations)
   - [Commit a mutation with its change row](#commit-a-mutation-with-its-change-row)
+  - [Commit a custom write with its change rows](#commit-a-custom-write-with-its-change-rows)
   - [Read for a snapshot](#read-for-a-snapshot)
 - [4. States (CDSL)](#4-states-cdsl)
   - [Store lifecycle](#store-lifecycle)
@@ -156,6 +157,24 @@ Every later feature writes records. If each wrote its own way, "every write is a
 5. [x] - `p1` - DB: INSERT `changes` (id `chg_` ULID, ts, actor, entity, field, before, after or delta for a batch, summary, reason, evidence ids, status `applied`, batch id, undoable) - `inst-insert-change`
 6. [x] - `p1` - Commit; on failure roll back both writes and **RETURN** `internal` - `inst-commit`
 7. [x] - `p1` - **RETURN** the row, its `rev` and the change id - `inst-return-tx`
+
+### Commit a custom write with its change rows
+
+- [x] `p1` - **ID**: `cpt-noter-algo-core-storage-custom-write`
+
+**Input**: A write the mutation shape of `cpt-noter-algo-core-storage-change-tx` does not fit, limited to key/value rows (the `settings` sections and their `rev`) and deletes; actor, reason, summary and optional batch id.
+
+**Output**: The write's own result, its change ids and batch id; or `internal`.
+
+**Steps**:
+1. [x] - `p1` - Begin an immediate transaction on the writer connection - `inst-begin`
+2. [x] - `p1` - Run the caller's write in that transaction; it reports each change it made (entity, id, and field with before and after, or a delta) - `inst-run-write`
+3. [x] - `p1` - **IF** it reports no change - `inst-if-unlogged`
+   1. [x] - `p1` - Roll back; **RETURN** `internal` (every write logs what it changed) - `inst-return-unlogged`
+4. [x] - `p1` - **IF** it reports several changes, give them one batch id (the caller's, or a new `bat_` ULID) - `inst-batch-id`
+5. [x] - `p1` - DB: INSERT one `changes` row per reported change (id `chg_` ULID, ts, actor, entity, field, before, after or delta, summary, reason, evidence ids, status `applied`, batch id, undoable, surface) - `inst-insert-changes`
+6. [x] - `p1` - Commit; on failure roll back the write and its change rows and **RETURN** `internal` - `inst-commit`
+7. [x] - `p1` - **RETURN** the write's result, the change ids and the batch id - `inst-return-custom`
 
 ### Read for a snapshot
 

@@ -95,7 +95,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 **Steps**:
 1. [x] - `p1` - API: `settings_update { rev, section }` - `inst-update-call`
 2. [x] - `p1` - Validate the section with `cpt-noter-algo-core-settings-validate`; a failure **RETURN** `invalid_input` - `inst-validate`
-3. [x] - `p1` - DB: replace the section row and bump the settings `rev` through `cpt-noter-algo-core-storage-change-tx` (actor `you`, before and after the section) - `inst-write-section`
+3. [x] - `p1` - DB: replace the section row and bump the settings `rev` through `cpt-noter-algo-core-storage-custom-write` (actor `you`, before and after the section) - `inst-write-section`
 4. [x] - `p1` - **IF** the write returned `conflict` - `inst-if-conflict`
    1. [x] - `p1` - **RETURN** `conflict` with `detail.current_rev` - `inst-return-conflict`
 5. [x] - `p1` - Call the section-changed hook with the new section; first run subscribes to it and applies `launch_at_login` (native login item) and `offer_to_record` (detection rule), so settings never calls into first-run code - `inst-side-effects`
@@ -125,7 +125,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 3. [x] - `p1` - Run `cpt-noter-algo-core-settings-hotkey-check`; **RETURN** its error if any - `inst-run-check`
 4. [x] - `p1` - Register the new chord with the global-shortcut plugin; on refusal **RETURN** `hotkey_conflict` and keep the old chord registered - `inst-register-new`
 5. [x] - `p1` - Unregister the old chord - `inst-unregister-old`
-6. [x] - `p1` - DB: store the binding through the change-log write path - `inst-store-binding`
+6. [x] - `p1` - DB: store the binding through `cpt-noter-algo-core-storage-custom-write` - `inst-store-binding`
 7. [x] - `p1` - Emit `hotkeys:changed` with the whole `HotkeyList` and a new `version` - `inst-emit-hotkeys`
 8. [x] - `p1` - **RETURN** the `HotkeyList` - `inst-return-hotkeys`
 
@@ -144,7 +144,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 **Steps**:
 1. [x] - `p1` - API: `hotkeys_reset {}` - `inst-reset-call`
 2. [x] - `p1` - Unregister every app hotkey - `inst-unregister-all`
-3. [x] - `p1` - DB: write the default bindings and the default `CardKeySettings` in one batch - `inst-write-defaults`
+3. [x] - `p1` - DB: write the default bindings and the default `CardKeySettings` in one batch through `cpt-noter-algo-core-storage-custom-write` - `inst-write-defaults`
 4. [x] - `p1` - Run `cpt-noter-algo-core-settings-register-hotkeys` - `inst-register-defaults`
 5. [x] - `p1` - **RETURN** the `HotkeyList`; emit `hotkeys:changed` - `inst-return-reset`
 
@@ -165,7 +165,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 **Steps**:
 1. [x] - `p1` - API: `glossary_upsert { id?, rev?, term, variants_latin, variants_cyrillic, spoken_forms, lang?, always_apply }`, `glossary_remove { id }` or `settings_unignore_app { bundle_id }` - `inst-glossary-call`
 2. [x] - `p1` - Validate; an empty term **RETURN** `invalid_input` - `inst-glossary-validate`
-3. [x] - `p1` - DB: write the term (with `rev`) or the ignored-apps list through the change-log write path - `inst-glossary-write`
+3. [x] - `p1` - DB: write the term (with `rev`) through `cpt-noter-algo-core-storage-change-tx`, or the removal of a term or the ignored-apps list through `cpt-noter-algo-core-storage-custom-write` - `inst-glossary-write`
 4. [x] - `p1` - Call the glossary-changed hook with the new list; while a call is captured the capture session sends it to the engine (`set_glossary`, M1) - `inst-glossary-live`
 5. [x] - `p1` - **RETURN** the `GlossaryList`, or the `Settings` for an unignore (with `settings:changed`) - `inst-glossary-return`
 

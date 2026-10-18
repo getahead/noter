@@ -209,33 +209,50 @@ impl Store {
     /// immediate transaction on the writer and reports what it changed; its change rows commit
     /// in the same transaction, and a write that reports nothing is refused. Several changes
     /// share a batch id (the caller's, or a new `bat_` id).
+    // @cpt-algo:cpt-noter-algo-core-storage-custom-write:p1
     pub fn write_with<T: Send + 'static>(
         &self,
         mut meta: ChangeMeta,
         f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
     ) -> Result<Custom<T>, CoreError> {
         self.on_writer(move |conn| {
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-begin
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-begin
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-run-write
             let (value, logged) = f(&tx)?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-run-write
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-if-unlogged
             if logged.is_empty() {
+                // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-return-unlogged
                 return Err(internal("a write must log what it changed"));
+                // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-return-unlogged
             }
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-if-unlogged
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-batch-id
             if logged.len() > 1 {
                 meta.batch_id
                     .get_or_insert_with(|| BatchId::new(format!("bat_{}", ulid::Ulid::generate())));
             }
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-batch-id
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-insert-changes
             let change_ids = logged
                 .iter()
                 .map(|change| insert_change(&tx, &meta, change))
                 .collect::<Result<Vec<_>, _>>()?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-insert-changes
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-commit
             tx.commit().map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-commit
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-return-custom
             Ok(Custom {
                 value,
                 change_ids,
                 batch_id: meta.batch_id,
             })
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-return-custom
         })
     }
 }
