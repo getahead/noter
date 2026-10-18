@@ -1,5 +1,7 @@
 //! Contract tests: rules about the contract itself (DESIGN-core 4.1, Contract governance).
 
+// @cpt-algo:cpt-noter-algo-core-contract-tests:p1
+
 use std::collections::HashSet;
 
 use noter_protocol::engine::{EngineEvent, EngineEventLine};
@@ -93,23 +95,6 @@ fn window_scoping_matches_pm08() {
         );
     }
     assert!(prompt.contains(&"capture_start"));
-}
-
-#[test]
-fn copilot_agents_and_performance_are_draft() {
-    for c in COMMANDS {
-        if matches!(
-            c.group,
-            CommandGroup::Copilot | CommandGroup::Agents | CommandGroup::Performance
-        ) {
-            assert_eq!(
-                c.stability,
-                Stability::Draft,
-                "{} should be draft until its milestone gate",
-                c.name
-            );
-        }
-    }
 }
 
 #[test]
@@ -259,12 +244,14 @@ fn option_fields_without_default(types: &specta::Types) -> Vec<String> {
     out
 }
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-serde-default
 #[test]
 fn every_option_field_of_an_argument_type_has_serde_default() {
     let types = noter_protocol::ipc::register_arg_types(specta::Types::default());
     let missing = option_fields_without_default(&types);
     assert!(missing.is_empty(), "add #[serde(default)] to: {missing:#?}");
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-serde-default
 
 #[test]
 fn option_fields_without_default_parse_when_absent() {
@@ -411,3 +398,129 @@ fn lang_other_round_trips_as_an_object() {
     assert_eq!(serde_json::from_value::<Lang>(v).unwrap(), fr);
     assert_eq!(serde_json::from_str::<Lang>("\"de\"").unwrap(), Lang::De);
 }
+
+fn repo_file(rel: &str) -> String {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(rel);
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+fn code_name(c: &ErrorCode) -> String {
+    serde_json::to_value(c)
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-names
+#[test]
+fn channel_message_types_are_unique() {
+    let mut seen = HashSet::new();
+    for c in COMMANDS {
+        if let Some(chan) = c.channel {
+            assert!(seen.insert(chan), "{} reuses Channel {chan}", c.name);
+        }
+    }
+}
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-names
+
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-stability
+#[test]
+fn draft_surfaces_are_exactly_copilot_agents_performance_and_storage_move() {
+    // Everything not named draft by DESIGN-core 4.1 is frozen.
+    for c in COMMANDS {
+        let draft = matches!(
+            c.group,
+            CommandGroup::Copilot | CommandGroup::Agents | CommandGroup::Performance
+        ) || c.name == "storage_move";
+        let want = if draft {
+            Stability::Draft
+        } else {
+            Stability::Frozen
+        };
+        assert_eq!(c.stability, want, "{}", c.name);
+    }
+    for e in EVENTS {
+        let want = if e.name == "copilot:status" {
+            Stability::Draft
+        } else {
+            Stability::Frozen
+        };
+        assert_eq!(e.stability, want, "{}", e.name);
+    }
+}
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-stability
+
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-scopes
+#[test]
+fn the_call_window_never_deletes() {
+    for c in COMMANDS {
+        let deletes = c.name.ends_with("_delete")
+            || c.name.contains("_delete_")
+            || c.name.ends_with("_remove")
+            || c.result.starts_with("Delete");
+        assert!(
+            !(deletes && c.allows(WindowLabel::CallScreen)),
+            "{} deletes and must not be callable from the call window",
+            c.name
+        );
+    }
+}
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-scopes
+
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-errors
+#[test]
+fn error_codes_are_the_closed_list_of_design_core() {
+    // DESIGN-core 3.3 › Error codes: one table row per code and the retryable-by-default list.
+    let design = repo_file("docs/DESIGN-core.md");
+    let section = design
+        .split("**Error codes.**")
+        .nth(1)
+        .expect("DESIGN-core 3.3 has an Error codes paragraph");
+    let (intro, table) = section.split_once("\n\n").unwrap();
+    let table = table.split("\n\n").next().unwrap();
+    let documented: HashSet<String> = table
+        .lines()
+        .filter_map(|l| l.strip_prefix("| `"))
+        .map(|l| l.split('`').next().unwrap().to_string())
+        .collect();
+    let ours: HashSet<String> = ErrorCode::ALL.iter().map(code_name).collect();
+    assert_eq!(ours.len(), ErrorCode::ALL.len());
+    let missing: Vec<_> = documented.difference(&ours).collect();
+    let extra: Vec<_> = ours.difference(&documented).collect();
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "not in ErrorCode: {missing:?}; not in DESIGN-core 3.3: {extra:?}"
+    );
+
+    let retryable_doc: HashSet<String> = intro
+        .split("`DEFAULT_RETRYABLE` says:")
+        .nth(1)
+        .expect("DESIGN-core 3.3 lists the retryable codes")
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_string)
+        .collect();
+    let retryable: HashSet<String> = ErrorCode::ALL
+        .iter()
+        .filter(|c| c.default_retryable())
+        .map(code_name)
+        .collect();
+    assert_eq!(
+        retryable, retryable_doc,
+        "default_retryable differs from DESIGN-core 3.3"
+    );
+}
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-errors
+
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-roundtrip
+#[test]
+fn the_fixture_file_round_trips_through_the_types() {
+    let file: fixtures::FakeWorld =
+        serde_json::from_str(&repo_file("contracts/fixtures/world.json")).unwrap();
+    assert_eq!(file, fixtures::world());
+}
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-roundtrip
