@@ -42,7 +42,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-The change-log service gains History, undo and redo over the write path built in M0. A change or batch can be reversed at any time while its target rows have not been edited later. Partial reversal keeps later edits and reports them. History lists the actor, reason, evidence and before/after values, and exports Markdown or JSON. Proposals and Activity remain M5.
+The change-log service gains History, undo and redo over the write path built in M0. A change or batch can be reversed at any time while its target rows have not been edited later. Capture data (confirmed segments, live speakers, gaps and marks, including user-pressed marks and pause gaps) is written without change rows (`cpt-noter-principle-core-single-writer`, Backend Teamlead M1 decision, 18 Oct 2026), so it is outside History and undo; PRD › 11 "undo any change" covers logged changes only, and the user's later edits to capture data are logged and undoable. Partial reversal keeps later edits and reports them. History lists the actor, reason, evidence and before/after values, and exports Markdown or JSON. Proposals and Activity remain M5.
 
 ### 1.2 Purpose
 
@@ -112,7 +112,7 @@ The user can inspect and reverse a correction, review or job batch without losin
 - Wrong state: `already_undone`, `not_undone` or `not_undoable`. Every row edited later: `edited_later`. Missing target: `not_found`.
 
 **Steps**:
-1. [ ] - `p1` - API: `change_undo { target }` or `change_redo { target }`, where `UndoTarget` names a change or batch - `inst-reverse-request`
+1. [ ] - `p1` - API: `change_undo { target }` or `change_redo { target }`, where `UndoTarget` names a change or batch; a user-pressed mark or a pause gap has no change row and so no target (it is capture data, not undoable here) - `inst-reverse-request`
 2. [ ] - `p1` - Run `cpt-noter-algo-core-history-undo-replay` on the writer queue - `inst-reverse-apply`
 3. [ ] - `p1` - After commit, publish whole changed entities through `entity:changed` or their owning service's state event; refresh transcript snapshots and per-call files for transcript changes - `inst-reverse-publish`
 4. [ ] - `p1` - **RETURN** `UndoResult` with `undone` and `skipped_edited_later`; no undo or redo expiry is applied - `inst-reverse-return`
