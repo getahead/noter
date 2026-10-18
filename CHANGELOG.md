@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/getahead/noter/compare/v0.3.0...v0.4.0) (2026-10-18)
+
+
+### Features
+
+* **core:** noter-core-harness on the real core ([#26](https://github.com/getahead/noter/issues/26)) ([b37a9b0](https://github.com/getahead/noter/commit/b37a9b0eb6bd3b9b2a032db630d996a0844372da))
+* **ui:** accessibility, keyboard and localisation services ([#63](https://github.com/getahead/noter/issues/63)) ([58349ab](https://github.com/getahead/noter/commit/58349ab5c0bf983231c7697b313a8ce3d768c67c))
+* **ui:** primitives and feedback components ([#64](https://github.com/getahead/noter/issues/64)) ([2a6978a](https://github.com/getahead/noter/commit/2a6978af8d98bc3f83cee390cb5ff72b1492ece3))
+
+
+### Bug fixes
+
+* **contract:** the fake refuses self_test_run until the speech model is ready (D-21) ([#89](https://github.com/getahead/noter/issues/89)) ([41791ad](https://github.com/getahead/noter/commit/41791ad88a25ef858ecfdc734fd58b8ab1820860))
+
+
+### Performance
+
+* **core:** M0 scenarios core_cold_start and core_app_snapshot ([#45](https://github.com/getahead/noter/issues/45)) ([f61e649](https://github.com/getahead/noter/commit/f61e649dde8c3a7467aa700acb8a880b3a292092))
+
 ## [0.3.0](https://github.com/getahead/noter/compare/v0.2.0...v0.3.0) (2026-10-18)
 
 
