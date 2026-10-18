@@ -134,7 +134,7 @@ fn change_tx(
     // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-begin
     let mut out = Vec::with_capacity(mutations.len());
     for m in mutations {
-        check(m)?;
+        check(m.table, &m.values)?;
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
         let before = select_row(&tx, m).map_err(internal)?;
         let stored_rev = before.as_ref().and_then(rev_of);
@@ -205,6 +205,14 @@ pub struct Custom<T> {
     pub batch_id: Option<BatchId>,
 }
 
+/// One row of capture data (a segment, a live speaker, a gap or a mark), stored as it is.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Insert {
+    pub table: &'static str,
+    /// Every column, `id` included: capture assigns its own ids.
+    pub values: Vec<(&'static str, Value)>,
+}
+
 impl Store {
     /// A write the `Mutation` shape does not fit (key/value rows, deletes): `f` runs in one
     /// immediate transaction on the writer and reports what it changed; its change rows commit
@@ -254,6 +262,102 @@ impl Store {
                 batch_id: meta.batch_id,
             })
             // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-return-custom
+        })
+    }
+
+    /// Insert capture data in one transaction without change rows (Backend Teamlead M1-D1, M1-D5:
+    /// the engine is not a user, a job or a model). One bad row fails them all.
+    // @cpt-algo:cpt-noter-algo-core-storage-insert-batch:p1
+    // @cpt-dod:cpt-noter-dod-core-storage-capture-writes:p1
+    pub fn insert_batch(&self, rows: Vec<Insert>) -> Result<(), CoreError> {
+        self.on_writer(move |conn| {
+            // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-begin
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-begin
+            // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-for-row
+            for row in &rows {
+                // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-if-invalid
+                check(row.table, &row.values)?;
+                // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-if-invalid
+                // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-insert-row
+                let names: Vec<&str> = row.values.iter().map(|(c, _)| *c).collect();
+                let sql = format!(
+                    "INSERT INTO {} ({}) VALUES ({})",
+                    row.table,
+                    names.join(", "),
+                    vec!["?"; names.len()].join(", ")
+                );
+                tx.execute(
+                    &sql,
+                    params_from_iter(row.values.iter().map(|(_, v)| to_sql(v))),
+                )
+                .map_err(internal)?;
+                // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-insert-row
+            }
+            // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-for-row
+            // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-commit
+            // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-return-inserted
+            tx.commit().map_err(internal)
+            // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-return-inserted
+            // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-commit
+        })
+    }
+
+    /// Delete records of one entity, with their cascades, in one transaction that writes one
+    /// change row per deleted record: never undoable and without record content (PRD › Deletion).
+    /// Returns each deleted id with its change id; an id that was not stored is skipped.
+    // @cpt-algo:cpt-noter-algo-core-storage-delete:p1
+    // @cpt-dod:cpt-noter-dod-core-storage-capture-writes:p1
+    pub fn delete(
+        &self,
+        entity_type: &'static str,
+        table: &'static str,
+        ids: Vec<String>,
+        mut meta: ChangeMeta,
+    ) -> Result<Vec<(String, ChangeId)>, CoreError> {
+        if !ident(table) {
+            return Err(internal(format!("invalid delete from {table:?}")));
+        }
+        meta.undoable = false;
+        self.on_writer(move |conn| {
+            // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-begin
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-begin
+            let mut deleted = Vec::new();
+            // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-for-id
+            for id in ids {
+                // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-delete-row
+                let sql = format!("DELETE FROM {table} WHERE id = ?1");
+                let removed = tx.execute(&sql, [&id]).map_err(internal)?;
+                // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-delete-row
+                // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-if-deleted
+                if removed > 0 {
+                    // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-insert-change
+                    let tombstone = Logged {
+                        entity_type,
+                        entity_id: id.clone(),
+                        field: None,
+                        before: None,
+                        after: None,
+                        delta: None,
+                    };
+                    let change_id = insert_change(&tx, &meta, &tombstone)?;
+                    // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-insert-change
+                    deleted.push((id, change_id));
+                }
+                // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-if-deleted
+            }
+            // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-for-id
+            // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-commit
+            tx.commit().map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-commit
+            // @cpt-begin:cpt-noter-algo-core-storage-delete:p1:inst-return-deleted
+            Ok(deleted)
+            // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-return-deleted
         })
     }
 }
@@ -387,16 +491,18 @@ fn rev_of(row: &Value) -> Option<Rev> {
 }
 
 /// Table and column names are spliced into SQL, so they must be plain identifiers.
-fn check(m: &Mutation) -> Result<(), CoreError> {
-    let ident = |s: &str| {
-        s.starts_with(|c: char| c.is_ascii_lowercase())
-            && s.bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
-    };
-    if ident(m.table) && !m.values.is_empty() && m.values.iter().all(|(c, _)| ident(c)) {
+fn ident(s: &str) -> bool {
+    s.starts_with(|c: char| c.is_ascii_lowercase())
+        && s.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
+/// A table and at least one column, all plain identifiers.
+fn check(table: &str, values: &[(&'static str, Value)]) -> Result<(), CoreError> {
+    if ident(table) && !values.is_empty() && values.iter().all(|(c, _)| ident(c)) {
         Ok(())
     } else {
-        Err(internal(format!("invalid mutation of {:?}", m.table)))
+        Err(internal(format!("invalid write to {table:?}")))
     }
 }
 

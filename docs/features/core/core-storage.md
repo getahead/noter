@@ -26,6 +26,8 @@ design: docs/DESIGN-core.md
   - [Run migrations](#run-migrations)
   - [Commit a mutation with its change row](#commit-a-mutation-with-its-change-row)
   - [Commit a custom write with its change rows](#commit-a-custom-write-with-its-change-rows)
+  - [Insert capture data](#insert-capture-data)
+  - [Delete records](#delete-records)
   - [Read for a snapshot](#read-for-a-snapshot)
 - [4. States (CDSL)](#4-states-cdsl)
   - [Store lifecycle](#store-lifecycle)
@@ -33,6 +35,7 @@ design: docs/DESIGN-core.md
   - [One writer, one crate](#one-writer-one-crate)
   - [Migrations](#migrations)
   - [Every write has its change row](#every-write-has-its-change-row)
+  - [Capture data and deletions](#capture-data-and-deletions)
   - [Cold start measured](#cold-start-measured)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 
@@ -175,6 +178,38 @@ Every later feature writes records. If each wrote its own way, "every write is a
 5. [x] - `p1` - DB: INSERT one `changes` row per reported change (id `chg_` ULID, ts, actor, entity, field, before, after or delta, summary, reason, evidence ids, status `applied`, batch id, undoable, surface) - `inst-insert-changes`
 6. [x] - `p1` - Commit; on failure roll back the write and its change rows and **RETURN** `internal` - `inst-commit`
 7. [x] - `p1` - **RETURN** the write's result, the change ids and the batch id - `inst-return-custom`
+### Insert capture data
+
+- [x] `p1` - **ID**: `cpt-noter-algo-core-storage-insert-batch`
+
+**Input**: Rows of capture data, each a table and its columns with the id the capture assigned: confirmed segments, live speakers, gaps and marks, including the marks the user pressed and the gaps of a pause (Backend Teamlead M1 decisions M1-D1 and M1-D5).
+
+**Output**: Every row stored, or none.
+
+**Steps**:
+1. [x] - `p1` - Begin an immediate transaction on the writer connection - `inst-begin`
+2. [x] - `p1` - **FOR EACH** row - `inst-for-row`
+   1. [x] - `p1` - **IF** the table or a column is not a plain identifier, or the row has no columns: roll back, **RETURN** `internal` - `inst-if-invalid`
+   2. [x] - `p1` - DB: INSERT the row as given, with no `changes` row: the engine is not a user, a job or a model, and the user's later edits to these rows go through `cpt-noter-algo-core-storage-change-tx` - `inst-insert-row`
+3. [x] - `p1` - Commit; on any failure (a duplicate id, a missing parent row) roll back every row and **RETURN** `internal` - `inst-commit`
+4. [x] - `p1` - **RETURN** ok - `inst-return-inserted`
+
+### Delete records
+
+- [x] `p1` - **ID**: `cpt-noter-algo-core-storage-delete`
+
+**Input**: Entity type and table, the ids to delete (`capture_discard`, `calls_delete`), actor, summary and reason.
+
+**Output**: The deleted ids, each with its change id.
+
+**Steps**:
+1. [x] - `p1` - Begin an immediate transaction on the writer connection - `inst-begin`
+2. [x] - `p1` - **FOR EACH** id - `inst-for-id`
+   1. [x] - `p1` - DB: DELETE the row; the owning crate's cascades and triggers remove what belongs to it in the same transaction (PRD › Deletion: a call's segments, chunks, vectors, items, cards and summaries) - `inst-delete-row`
+   2. [x] - `p1` - **IF** a row was deleted - `inst-if-deleted`
+      1. [x] - `p1` - DB: INSERT `changes` (id `chg_` ULID, ts, actor, entity, summary, reason, status `applied`, batch id, `undoable = 0`) with no field, before, after or delta, so no record content outlives the deletion - `inst-insert-change`
+3. [x] - `p1` - Commit; on failure roll back the deletes and their change rows and **RETURN** `internal` - `inst-commit`
+4. [x] - `p1` - **RETURN** the deleted ids with their change ids; an id that was not stored is skipped - `inst-return-deleted`
 
 ### Read for a snapshot
 
@@ -254,6 +289,20 @@ The system **MUST** commit every mutation and its `changes` row in one transacti
 - DB: `changes`
 - Entities: Change
 
+### Capture data and deletions
+
+- [x] `p1` - **ID**: `cpt-noter-dod-core-storage-capture-writes`
+
+The system **MUST** insert capture data (confirmed segments, live speakers, gaps and marks, including the marks the user pressed and the gaps of a pause) in batches of one transaction without `changes` rows, and **MUST** delete records together with their cascades in one transaction that writes one `changes` row per deleted record, with `undoable = 0` and no field, before, after or delta (Backend Teamlead M1 decisions M1-D1 and M1-D5; PRD › Deletion). Vacuuming after a delete is `cpt-noter-feature-core-maintenance` (M5).
+
+**Implements**:
+- `cpt-noter-algo-core-storage-insert-batch`
+- `cpt-noter-algo-core-storage-delete`
+
+**Touches**:
+- DB: `changes`, the capture tables of the crates that own them
+- Entities: Segment, Speaker, Gap, Mark, Call, Change
+
 ### Cold start measured
 
 - [x] `p2` - **ID**: `cpt-noter-dod-core-storage-cold-start`
@@ -272,5 +321,6 @@ The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (
 - [x] A failed migration leaves the database at the previous version and the core accepts no writes.
 - [x] Every write made through M0 commands produces exactly one `changes` row in the same transaction (each later feature extends the test with its own commands); a forced failure after the row write leaves neither.
 - [x] A write with a stale `rev` returns `conflict` with `detail.current_rev` and changes nothing.
+- [x] A capture batch stores all its rows with no `changes` row, or none of them when one row fails; deleting calls removes their capture rows with them and leaves one `changes` row per call, not undoable and without record content.
 - [x] `just arch` passes: no crate other than `noter-db` depends on an SQLite crate.
 - [x] `just gate` passes, with unit line coverage of `noter-db` at 80 % or more.
