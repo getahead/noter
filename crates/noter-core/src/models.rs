@@ -139,13 +139,14 @@ fn sha256_hex(path: &Path) -> std::io::Result<String> {
 /// How one bundle's download ended.
 enum Outcome {
     Ready,
-    Paused,
+    Paused(u64),
     Stop(BundleState, ErrorCode),
+    /// The network dropped after this many bytes; the partial file stays.
+    Offline(u64),
 }
 
 impl Core {
     // @cpt-flow:cpt-noter-flow-core-first-run-download:p1
-    // @cpt-dod:cpt-noter-dod-core-first-run-models:p1
     pub(crate) fn download_models(
         &self,
         args: ModelsDownloadArgs,
@@ -160,6 +161,8 @@ impl Core {
             return Ok(self.setup_now());
         }
         if d.running {
+            // Resume (or start, retry) before the running task stopped: it keeps going.
+            d.pause.store(false, Ordering::SeqCst);
             drop(d);
             return Ok(self.setup_now());
         }
@@ -209,7 +212,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-return-started
     }
 
-    // @cpt-algo:cpt-noter-algo-core-first-run-download-task:p1
     // @cpt-state:cpt-noter-state-core-first-run-bundle:p1
     async fn run_downloads(self: Arc<Self>) {
         let (specs, dir) = {
@@ -234,8 +236,13 @@ impl Core {
                         d.set(&spec.name, BundleState::Ready, Some(spec.size_bytes));
                         false
                     }
-                    Outcome::Paused => {
-                        d.set(&spec.name, BundleState::Paused, None);
+                    Outcome::Paused(done) => {
+                        d.set(&spec.name, BundleState::Paused, Some(done));
+                        true
+                    }
+                    Outcome::Offline(done) => {
+                        d.set(&spec.name, BundleState::Paused, Some(done));
+                        d.error = Some(ErrorCode::Offline);
                         true
                     }
                     Outcome::Stop(state, error) => {
@@ -274,10 +281,11 @@ impl Core {
         }
         let partial = partial_path(dir, &spec.name);
         let opened = std::fs::create_dir_all(dir).and_then(|_| {
-            std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&partial)
+            let mut options = std::fs::OpenOptions::new();
+            options.create(true).append(true);
+            #[cfg(unix)]
+            std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+            options.open(&partial)
         });
         let Ok(mut file) = opened else {
             // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
@@ -289,7 +297,6 @@ impl Core {
         let mut write_failed = false;
         let mut last = Instant::now();
         let name = spec.name.clone();
-        // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
         let from = done;
         let fetched = {
             let sink = Box::new(|bytes: &[u8]| {
@@ -310,20 +317,17 @@ impl Core {
             });
             self.deps.models.fetch(spec, from, sink).await
         };
-        // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
         if write_failed {
             return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
         }
         match fetched {
             // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
             // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
-            Err(FetchError::Offline) => {
-                return Outcome::Stop(BundleState::Paused, ErrorCode::Offline)
-            }
+            Err(FetchError::Offline) => return Outcome::Offline(done),
             // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
             // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
             Err(_) => return Outcome::Stop(BundleState::Failed, ErrorCode::Internal),
-            Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused,
+            Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused(done),
             Ok(()) => {}
         }
         // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
