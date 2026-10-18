@@ -1,0 +1,18 @@
+[package]
+name = "noter-db"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The Noter database: one SQLite file, one writer task, a read-only pool, numbered migrations and the change-log write path. The only crate that touches SQLite."
+publish = false
+
+[dependencies]
+noter-protocol = { path = "../noter-protocol" }
+rusqlite = { version = "0.40", features = ["bundled"] }
+sqlite-vec = "0.1"
+serde_json = "1"
+ulid = "3"
+
+[dev-dependencies]
+tempfile = "3"
