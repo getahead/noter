@@ -4,6 +4,7 @@
 
 mod app;
 mod glossary;
+mod hotkeys;
 mod hub;
 mod log;
 mod settings;
@@ -18,6 +19,7 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
+pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 use noter_protocol::ipc::Sink;
@@ -59,6 +61,8 @@ pub struct CoreDeps {
     pub events: Arc<dyn EventEmitter>,
     /// The app's version as the host knows it (`app_snapshot.app_version`); `dev` until set.
     pub app_version: String,
+    /// Global shortcuts; accepts every chord until the host sets its own (`with_shortcuts`).
+    pub shortcuts: Arc<dyn ShortcutRegistrar>,
 }
 
 impl CoreDeps {
@@ -67,11 +71,17 @@ impl CoreDeps {
             clock,
             events,
             app_version: "dev".into(),
+            shortcuts: Arc::new(hotkeys::AcceptAll),
         }
     }
 
     pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
         self.app_version = version.into();
+        self
+    }
+
+    pub fn with_shortcuts(mut self, shortcuts: Arc<dyn ShortcutRegistrar>) -> Self {
+        self.shortcuts = shortcuts;
         self
     }
 }
@@ -110,6 +120,8 @@ pub struct Core {
     hubs: Mutex<Vec<Arc<dyn AnyHub>>>,
     /// The settings as stored; writes hold this lock, so they apply one at a time.
     settings: Mutex<Settings>,
+    /// App hotkeys and their registration status; writes hold this lock, then `settings`.
+    hotkeys: Mutex<HotkeyList>,
     settings_hooks: Hooks<SettingsSection>,
     glossary_hooks: Hooks<GlossaryList>,
 }
@@ -145,16 +157,19 @@ impl Core {
         };
         let snapshot = app::fresh_snapshot(&deps.app_version);
         let settings = settings::load(&store).map_err(BootError::Load)?;
-        Ok(Core {
+        let core = Core {
             deps,
             store,
             log,
             app: Mutex::new(snapshot),
             hubs: Mutex::new(vec![]),
             settings: Mutex::new(settings),
+            hotkeys: Mutex::new(hotkeys::fresh_list()),
             settings_hooks: Mutex::new(vec![]),
             glossary_hooks: Mutex::new(vec![]),
-        })
+        };
+        core.start_hotkeys().map_err(BootError::Load)?;
+        Ok(core)
     }
 
     /// Ends the core: every stream ends with `shutdown`, then the writer drains its queue and
@@ -321,6 +336,30 @@ impl CoreApi for Core {
         args: AppIdArgs,
     ) -> Result<Settings, CoreError> {
         self.unignore_app(ctx, args)
+    }
+
+    async fn hotkeys_list(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<HotkeyList, CoreError> {
+        Ok(lock(&self.hotkeys).clone())
+    }
+
+    async fn hotkey_set(
+        &self,
+        ctx: &CommandCtx,
+        args: HotkeySetArgs,
+    ) -> Result<HotkeyList, CoreError> {
+        self.set_hotkey(ctx, args)
+    }
+
+    async fn hotkeys_reset(
+        &self,
+        ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<HotkeyList, CoreError> {
+        self.reset_hotkeys(ctx)
     }
 
     async fn glossary_list(

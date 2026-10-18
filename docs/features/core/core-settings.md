@@ -104,7 +104,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 
 ### Set a global hotkey
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-settings-hotkey-set`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-settings-hotkey-set`
 
 **Actor**: Primary user (Settings › Hotkeys)
 
@@ -119,19 +119,19 @@ Every component reads settings, and two windows (Settings and First run) write t
 - Another Noter action already uses the chord: `hotkey_conflict` naming that action.
 
 **Steps**:
-1. [ ] - `p1` - API: `hotkey_set { action, shortcut }` from the Settings window - `inst-hotkey-call`
-2. [ ] - `p1` - **IF** `shortcut` is null - `inst-if-clear`
-   1. [ ] - `p1` - Unregister the action's chord, store `null`, go to step 6 - `inst-clear`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-settings-hotkey-check`; **RETURN** its error if any - `inst-run-check`
-4. [ ] - `p1` - Register the new chord with the global-shortcut plugin; on refusal **RETURN** `hotkey_conflict` and keep the old chord registered - `inst-register-new`
-5. [ ] - `p1` - Unregister the old chord - `inst-unregister-old`
-6. [ ] - `p1` - DB: store the binding through the change-log write path - `inst-store-binding`
-7. [ ] - `p1` - Emit `hotkeys:changed` with the whole `HotkeyList` and a new `version` - `inst-emit-hotkeys`
-8. [ ] - `p1` - **RETURN** the `HotkeyList` - `inst-return-hotkeys`
+1. [x] - `p1` - API: `hotkey_set { action, shortcut }` from the Settings window - `inst-hotkey-call`
+2. [x] - `p1` - **IF** `shortcut` is null - `inst-if-clear`
+   1. [x] - `p1` - Unregister the action's chord, store `null`, go to step 6 - `inst-clear`
+3. [x] - `p1` - Run `cpt-noter-algo-core-settings-hotkey-check`; **RETURN** its error if any - `inst-run-check`
+4. [x] - `p1` - Register the new chord with the global-shortcut plugin; on refusal **RETURN** `hotkey_conflict` and keep the old chord registered - `inst-register-new`
+5. [x] - `p1` - Unregister the old chord - `inst-unregister-old`
+6. [x] - `p1` - DB: store the binding through the change-log write path - `inst-store-binding`
+7. [x] - `p1` - Emit `hotkeys:changed` with the whole `HotkeyList` and a new `version` - `inst-emit-hotkeys`
+8. [x] - `p1` - **RETURN** the `HotkeyList` - `inst-return-hotkeys`
 
 ### Reset hotkeys and card keys
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-settings-hotkeys-reset`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-settings-hotkeys-reset`
 
 **Actor**: Primary user (Settings › Hotkeys)
 
@@ -142,11 +142,11 @@ Every component reads settings, and two windows (Settings and First run) write t
 - A default chord is now held by another app: that action is listed with status `conflict` and `HotkeyNotRegistered` joins the degraded set; the others register.
 
 **Steps**:
-1. [ ] - `p1` - API: `hotkeys_reset {}` - `inst-reset-call`
-2. [ ] - `p1` - Unregister every app hotkey - `inst-unregister-all`
-3. [ ] - `p1` - DB: write the default bindings and the default `CardKeySettings` in one batch - `inst-write-defaults`
-4. [ ] - `p1` - Run `cpt-noter-algo-core-settings-register-hotkeys` - `inst-register-defaults`
-5. [ ] - `p1` - **RETURN** the `HotkeyList`; emit `hotkeys:changed` - `inst-return-reset`
+1. [x] - `p1` - API: `hotkeys_reset {}` - `inst-reset-call`
+2. [x] - `p1` - Unregister every app hotkey - `inst-unregister-all`
+3. [x] - `p1` - DB: write the default bindings and the default `CardKeySettings` in one batch - `inst-write-defaults`
+4. [x] - `p1` - Run `cpt-noter-algo-core-settings-register-hotkeys` - `inst-register-defaults`
+5. [x] - `p1` - **RETURN** the `HotkeyList`; emit `hotkeys:changed` - `inst-return-reset`
 
 ### Edit the glossary and ignored apps
 
@@ -187,50 +187,51 @@ Every component reads settings, and two windows (Settings and First run) write t
 
 ### Check a hotkey chord
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-settings-hotkey-check`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-settings-hotkey-check`
 
 **Input**: Action and chord in Tauri accelerator syntax.
 
 **Output**: Ok, or `invalid_input`, `hotkey_reserved` or `hotkey_conflict`.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the chord has no modifier **RETURN** `invalid_input` with `rule: no_modifier` - `inst-no-modifier`
-2. [ ] - `p1` - **IF** the chord is on the reserved list (VoiceOver, system chords) **RETURN** `hotkey_reserved` - `inst-reserved`
-3. [ ] - `p1` - **IF** another Noter action or the card-key chords use it **RETURN** `hotkey_conflict` naming that action - `inst-internal-conflict`
-4. [ ] - `p1` - **RETURN** ok - `inst-return-ok`
+1. [x] - `p1` - **IF** the chord has no modifier **RETURN** `invalid_input` with `rule: no_modifier` - `inst-no-modifier`
+2. [x] - `p1` - **IF** the chord is on the reserved list (VoiceOver, system chords) **RETURN** `hotkey_reserved` - `inst-reserved`
+3. [x] - `p1` - **IF** another Noter action or the card-key chords use it **RETURN** `hotkey_conflict` naming that action - `inst-internal-conflict`
+4. [x] - `p1` - **RETURN** ok - `inst-return-ok`
 
 ### Register app hotkeys at launch
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-settings-register-hotkeys`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-settings-register-hotkeys`
 
-**Input**: Stored bindings.
+**Input**: Stored bindings over the defaults (`DEFAULT_HOTKEYS`, PRD › 14: ⌃⌥⌘K mute the copilot, ⌃⌥⌘Z undo the last card action, ⌃⌥⌘0 Hide for Presenting, the others ⌃⌥⌘ + a letter; the fake core's world uses the same).
 
 **Output**: Every bound app hotkey registered, or its status set to `conflict`.
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** app hotkey binding with a chord - `inst-for-bindings`
-   1. [ ] - `p1` - **TRY** register it with the global-shortcut plugin; its press calls `CoreApi` as `Caller::Native { surface: hotkey }` - `inst-try-register`
-   2. [ ] - `p1` - **CATCH** a refusal: status `conflict`; add `HotkeyNotRegistered` to the degraded set - `inst-catch-register`
-2. [ ] - `p1` - Card keys are not registered here; the copilot registers them while capture runs (M4) - `inst-skip-card-keys`
-3. [ ] - `p1` - **RETURN** the `HotkeyList` - `inst-return-registered`
+1. [x] - `p1` - **FOR EACH** app hotkey binding with a chord - `inst-for-bindings`
+   1. [x] - `p1` - **TRY** register it through the host's `ShortcutRegistrar` in `CoreDeps` (the Tauri global-shortcut plugin in the app, a scripted one in the harness), unless the chord is now on the reserved list (status `reserved_by_system`); its press calls `CoreApi` as `Caller::Native { surface: hotkey }` - `inst-try-register`
+   2. [x] - `p1` - **CATCH** a refusal: status `conflict`; add `HotkeyNotRegistered` to the degraded set - `inst-catch-register`
+2. [x] - `p1` - Card keys (`undo_card_action`) are not registered here and are listed as `registered_during_capture`; the copilot registers them while capture runs (M4) - `inst-skip-card-keys`
+3. [x] - `p1` - **RETURN** the `HotkeyList` - `inst-return-registered`
 
 ## 4. States (CDSL)
 
 ### Hotkey binding
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-settings-hotkey`
+- [x] `p1` - **ID**: `cpt-noter-state-core-settings-hotkey`
 
 **States**: not_set, registered, conflict, reserved_by_system, registered_during_capture
 
 **Initial State**: registered for actions with a default chord, not_set otherwise
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** not_set **TO** registered **WHEN** a chord is set and macOS accepts it - `inst-st-register`
-2. [ ] - `p1` - **FROM** registered **TO** registered **WHEN** a new chord is accepted (the old one is released) - `inst-st-rebind`
-3. [ ] - `p1` - **FROM** registered **TO** conflict **WHEN** registration at launch is refused because another app holds the chord - `inst-st-conflict`
-4. [ ] - `p1` - **FROM** conflict **TO** registered **WHEN** a new chord or a reset registers - `inst-st-resolve`
-5. [ ] - `p1` - **FROM** registered **TO** not_set **WHEN** the chord is cleared - `inst-st-clear`
-6. [ ] - `p2` - **FROM** not_set **TO** registered_during_capture **WHEN** card keys are enabled (registration itself belongs to the copilot, M4) - `inst-st-card-keys`
+1. [x] - `p1` - **FROM** not_set **TO** registered **WHEN** a chord is set and macOS accepts it - `inst-st-register`
+2. [x] - `p1` - **FROM** registered **TO** registered **WHEN** a new chord is accepted (the old one is released) - `inst-st-rebind`
+3. [x] - `p1` - **FROM** registered **TO** conflict **WHEN** registration at launch is refused because another app holds the chord - `inst-st-conflict`
+4. [x] - `p1` - **FROM** conflict **TO** registered **WHEN** a new chord or a reset registers - `inst-st-resolve`
+5. [x] - `p1` - **FROM** registered **TO** not_set **WHEN** the chord is cleared - `inst-st-clear`
+6. [x] - `p2` - **FROM** not_set **TO** registered_during_capture **WHEN** card keys are enabled (registration itself belongs to the copilot, M4) - `inst-st-card-keys`
+7. [x] - `p1` - **FROM** registered **TO** reserved_by_system **WHEN** a stored chord is on the reserved list at launch; it is not registered - `inst-st-reserved`
 
 ## 5. Definitions of Done
 
