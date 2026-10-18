@@ -47,7 +47,7 @@ async fn a_paced_self_test_takes_its_time_and_says_a_line_per_stream() {
     let got: Vec<_> = until_result(&mut events)
         .await
         .into_iter()
-        .filter(|e| !matches!(e, EngineEvent::Ack { .. }))
+        .filter(|e| !matches!(e, EngineEvent::Ack { .. } | EngineEvent::Levels { .. }))
         .collect();
     assert_eq!(start.elapsed(), Duration::from_millis(5 * 400));
     let line = |channel| EngineEvent::SelfTestLine {
@@ -127,7 +127,7 @@ async fn system_audio_follows_the_permission_state_the_world_gives() {
         ),
         (
             PermissionState::NotAsked,
-            Some(EngineErrorCode::Internal),
+            Some(EngineErrorCode::DeviceUnavailable),
             1,
         ),
     ] {
@@ -175,4 +175,43 @@ async fn a_new_self_test_cancels_what_is_left_of_the_previous_one() {
             .count(),
         1
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_paced_self_test_sends_levels_at_most_every_100_ms() {
+    let engine = ScriptedEngine::new().with_default(Behaviour {
+        self_test_pace_ms: 300,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    let mut events = c.events();
+    c.ensure_ready().await.unwrap();
+    c.command(SELF_TEST).await.unwrap();
+    let mut at = vec![];
+    loop {
+        let event = events.recv().await.unwrap().event;
+        match event {
+            EngineEvent::Levels { .. } => at.push(Instant::now()),
+            EngineEvent::SelfTestResult { .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(
+        at.len(),
+        8,
+        "a level every 100 ms of the 900 ms test, none at its end"
+    );
+    for pair in at.windows(2) {
+        assert!(pair[1] - pair[0] >= Duration::from_millis(100));
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_unpaced_self_test_sends_no_levels() {
+    let engine = ScriptedEngine::new();
+    let c = client(&engine);
+    let mut events = c.events();
+    c.command(SELF_TEST).await.unwrap();
+    let got = until_result(&mut events).await;
+    assert!(!got.iter().any(|e| matches!(e, EngineEvent::Levels { .. })));
 }

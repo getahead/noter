@@ -17,6 +17,9 @@ use tokio::time::Instant;
 
 use crate::launch::{EngineIo, EngineLauncher, LaunchFuture};
 
+/// The engine sends levels at most this often.
+const LEVELS_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
+
 /// How one launched engine behaves.
 #[derive(Debug, Clone)]
 pub struct Behaviour {
@@ -34,8 +37,8 @@ pub struct Behaviour {
     pub self_test_failure: Option<EngineErrorCode>,
     /// Raw stdout lines sent right after `ready`; a line that parses sets the next `seq`.
     pub raw_after_ready: Vec<String>,
-    /// Milliseconds (tokio time) before each self-test event after the `ack`; 0 sends them
-    /// all at once.
+    /// Milliseconds (tokio time) before each self-test event after the `ack`, with levels every
+    /// 100 ms in between; 0 sends them all at once, without levels.
     pub self_test_pace_ms: u64,
     /// A `self_test_line` with this text follows each stream that arrives.
     pub self_test_line: Option<String>,
@@ -130,7 +133,7 @@ impl ScriptedEngine {
     }
 
     /// What the system-audio tap hears in later self-tests: `Granted` both streams, `Denied`
-    /// only zeros (`zero_buffers`), `NotAsked` nothing decisive (`internal`).
+    /// only zeros (`zero_buffers`), `NotAsked` nothing at all (`device_unavailable`).
     pub fn set_system_audio(&self, state: PermissionState) {
         self.lock().system_audio = state;
     }
@@ -272,7 +275,8 @@ async fn run(
                 let failure = b.self_test_failure.or(match engine.lock().system_audio {
                     PermissionState::Granted => None,
                     PermissionState::Denied => Some(EngineErrorCode::ZeroBuffers),
-                    _ => Some(EngineErrorCode::Internal),
+                    // A channel that delivers nothing, as the engine reports it.
+                    _ => Some(EngineErrorCode::DeviceUnavailable),
                 });
                 let mut events = Vec::new();
                 let channels = [AudioChannel::Mic, AudioChannel::Sys];
@@ -299,12 +303,28 @@ async fn run(
                 } else {
                     let step = std::time::Duration::from_millis(b.self_test_pace_ms);
                     let now = Instant::now();
-                    due.extend(
-                        events
-                            .into_iter()
-                            .enumerate()
-                            .map(|(i, e)| (now + step * (i as u32 + 1), e)),
-                    );
+                    let mut timed: Vec<_> = events
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, e)| (step * (i as u32 + 1), e))
+                        .collect();
+                    // Level meters move while the test runs, at most every 100 ms like the engine's.
+                    let end = timed.last().map_or(step, |(t, _)| *t);
+                    let sys_db = if failure.is_none() { -30.0 } else { -120.0 };
+                    let mut t = LEVELS_EVERY;
+                    while t < end {
+                        timed.push((
+                            t,
+                            EngineEvent::Levels {
+                                call_id: None,
+                                mic_db: -30.0,
+                                sys_db,
+                            },
+                        ));
+                        t += LEVELS_EVERY;
+                    }
+                    timed.sort_by_key(|(t, _)| *t); // stable: a stream comes before a level at its instant
+                    due.extend(timed.into_iter().map(|(t, e)| (now + t, e)));
                 }
             }
             _ => out.emit(ack).await,
