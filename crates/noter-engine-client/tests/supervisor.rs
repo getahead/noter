@@ -355,3 +355,88 @@ fn the_engine_path_comes_from_noter_engine_path_in_development() {
         std::path::PathBuf::from(bundled)
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_command_to_a_hung_engine_ends_unavailable_and_the_engine_restarts() {
+    // No kill: the supervisor itself notices the engine stopped answering.
+    let engine = ScriptedEngine::new().then(Behaviour {
+        hang: true,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    let err = c.command(EngineCommand::StopPlayback).await.unwrap_err();
+    assert_eq!(err, CommandError::Unavailable);
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    settle().await;
+    assert_eq!(c.state(), EngineState::Ready);
+    assert_eq!(engine.launches(), 2);
+    c.command(EngineCommand::StopPlayback).await.unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn liveness_pings_restart_an_idle_hung_engine() {
+    let engine = ScriptedEngine::new().then(Behaviour {
+        hang: true,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    c.ensure_ready().await.unwrap();
+    let cfg = Config::default();
+    tokio::time::sleep(cfg.liveness_interval + cfg.ping_timeout + Duration::from_secs(2)).await;
+    settle().await;
+    assert_eq!(engine.launches(), 2);
+    assert_eq!(c.state(), EngineState::Ready);
+    assert!(engine
+        .commands()
+        .iter()
+        .any(|cmd| matches!(cmd, EngineCommand::Ping)));
+}
+
+#[test]
+fn engine_errors_map_to_the_contract_codes_it_has() {
+    let core = |code| -> noter_protocol::CoreError {
+        CommandError::Engine {
+            code,
+            message: "x".into(),
+        }
+        .into()
+    };
+    assert_eq!(
+        core(EngineErrorCode::PermissionMissing).code,
+        ErrorCode::PermissionMissing
+    );
+    assert_eq!(
+        core(EngineErrorCode::ModelMissing).code,
+        ErrorCode::ModelMissing
+    );
+    assert_eq!(core(EngineErrorCode::DiskFull).code, ErrorCode::DiskFull);
+    assert_eq!(
+        core(EngineErrorCode::DeviceUnavailable).code,
+        ErrorCode::Internal
+    );
+}
+
+#[tokio::test]
+async fn engine_stderr_is_counted_never_kept() {
+    let ready = r#"{"seq":1,"at":0,"event":{"type":"ready","protocol_version":"2.0","engine_version":"sh","models":[],"sandboxed":false}}"#;
+    let launcher = ProcessLauncher::new("/bin/sh").args([
+        "-c",
+        &format!("echo secret words >&2; echo more >&2; echo '{ready}'; cat > /dev/null"),
+    ]);
+    let c = EngineClient::new(
+        launcher.clone(),
+        Config {
+            grace: Duration::from_millis(100),
+            ..Config::default()
+        },
+    );
+    c.ensure_ready().await.unwrap();
+    for _ in 0..100 {
+        if launcher.stderr_lines() == 2 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(launcher.stderr_lines(), 2);
+    c.shutdown().await;
+}
