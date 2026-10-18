@@ -67,3 +67,14 @@ describe("activates", () => {
     expect(["Enter", " ", "Escape", "a"].map((key) => activates({ key }))).toEqual([true, true, false, false]);
   });
 });
+
+describe("moveFocus inside an inner control", () => {
+  it("leaves keys an inner control handled, and keys in text fields and pop-ups", () => {
+    const item = { focus: () => {}, contains: () => false };
+    const event = (target: object, defaultPrevented = false) =>
+      ({ key: "ArrowDown", target, defaultPrevented, preventDefault: () => {}, currentTarget: { querySelectorAll: () => [item, item] } }) as unknown as KeyboardEvent<HTMLElement>;
+    expect(moveFocus(event({ closest: () => null }, true), "tr")).toBe(false);
+    expect(moveFocus(event({ closest: (s: string) => (s.includes("select") ? {} : null) }), "tr")).toBe(false);
+    expect(moveFocus(event({ closest: () => null }), "tr")).toBe(true);
+  });
+});

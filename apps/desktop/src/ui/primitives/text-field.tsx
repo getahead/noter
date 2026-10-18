@@ -55,7 +55,7 @@ export function TextField({ variant: v, multiline, value, placeholder, label, sh
   return (
     <span className={cx("np-field", `np-field--${variant}`, invalid && "is-invalid", o.cls)} {...base("text-field", { ...o, variant, state: invalid ? "invalid" : disabled ? "disabled" : readonly ? "read-only" : undefined })}>
       {label && showLabel && <span className="np-field__label">{label}</span>}
-      {variant === "multi" ? <textarea rows={rows} {...common} /> : <input type={type} {...common} min={min} max={max} step={step} onKeyDown={(e) => e.key === "Enter" && onEnter?.()} />}
+      {variant === "multi" ? <textarea rows={rows} {...common} /> : <input type={type} {...common} min={min} max={max} step={step} onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && onEnter?.()} />}
       {trailing}
       {described && (
         <span className="np-field__msg" id={msgId}>

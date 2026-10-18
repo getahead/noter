@@ -25,6 +25,8 @@ export function nextIndex(key: string, current: number, count: number, wrap = tr
 // @cpt-flow:cpt-noter-flow-ui-primitives-operate-control:p1
 /** Moves focus to the next item matching `selector` inside the composite; true when the key was a list key. */
 export function moveFocus(e: KeyboardEvent<HTMLElement>, selector: string, wrap = true): boolean {
+  // an inner control already used the key (a pull-down opening its menu), or it moves a caret or a pop-up's choice
+  if (e.defaultPrevented || (e.target as Element | null)?.closest?.("input, select, textarea")) return false;
   const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>(selector));
   const current = items.findIndex((el) => el === e.target || el.contains(e.target as Node));
   const next = nextIndex(e.key, current, items.length, wrap);

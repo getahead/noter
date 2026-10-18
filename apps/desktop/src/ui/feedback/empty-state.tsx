@@ -15,13 +15,13 @@ export interface EmptyStateProps {
   onLink?: () => void;
 }
 
-const root = (variant: string) => ({ "data-component": "cpt-noter-component-ui-empty-state", "data-variant": variant, className: `np-empty np-empty--${variant}` });
+const root = (variant: string) => ({ "data-component": "cpt-noter-component-ui-empty-state", "data-variant": variant });
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
 export function EmptyState({ variant = "first-use", title, body, icon = "inbox", actionLabel, onAction, linkLabel, onLink }: EmptyStateProps) {
-  if (variant === "section") return <div {...root(variant)}>{title}</div>;
+  if (variant === "section") return <div {...root(variant)} className="np-empty np-empty--section">{title}</div>;
   return (
-    <div {...root(variant)}>
+    <div {...root(variant)} className={`np-empty np-empty--${variant}`}>
       {variant !== "filtered" && (
         <div className="np-empty__glyph">
           <Icon name={icon} size={28} />

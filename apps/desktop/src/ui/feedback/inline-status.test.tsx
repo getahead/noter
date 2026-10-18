@@ -83,3 +83,23 @@ describe("statusHandlers (cpt-noter-flow-ui-primitives-inline-status)", () => {
     expect(statusHandlers({ current: null }, { hover: false, focus: false }, false)).toEqual({});
   });
 });
+
+describe("startStatusTimer (cpt-noter-state-ui-primitives-inline-status)", () => {
+  it("starts paused while the status is still hovered or focused, and calls the latest callback", async () => {
+    const { startStatusTimer } = await import("./inline-status");
+    let now = 0;
+    const timers: { at: number; fn: () => void }[] = [];
+    const clock = { now: () => now, setTimeout: (fn: () => void, ms: number) => timers.push({ at: now + ms, fn }) - 1, clearTimeout: (h: unknown) => void (timers[h as number].at = Infinity) };
+    const cb = { current: vi.fn() };
+    const timer = startStatusTimer(2000, cb, { hover: true, focus: false }, clock);
+    now = 5000;
+    timers.filter((t) => t.at <= now).forEach((t) => t.fn());
+    expect(cb.current).not.toHaveBeenCalled(); // paused: the pointer is still on Undo
+    const latest = vi.fn();
+    cb.current = latest;
+    timer.resume();
+    now = 7000;
+    timers.filter((t) => t.at <= now).forEach((t) => ((t.at = Infinity), t.fn()));
+    expect(latest).toHaveBeenCalledOnce();
+  });
+});

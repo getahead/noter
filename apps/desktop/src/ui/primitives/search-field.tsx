@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from "react";
 
+import { t } from "../../i18n/format";
 import { Icon } from "../icons";
 import { base, cx, type Common } from "./attrs";
 
@@ -43,10 +44,13 @@ export function searchKey(key: string, f: { value: string; caret: number; tokens
 export function SearchField({ variant: v, state, value = "", tokens = [], placeholder, ariaLabel, onChange, onEnter, onAddToken, onRemoveToken, id, ...o }: SearchFieldProps) {
   const variant = v || (tokens.length ? "tokens" : "plain");
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return; // Return and Esc belong to the input method while it composes
     const input = e.currentTarget;
-    const action = searchKey(e.key, { value: input.value, caret: input.selectionStart ?? 0, tokens: tokens.length, tokenField: variant === "token-field" });
+    // selectionEnd: ⌫ with the typed text selected deletes that text, not a token
+    const action = searchKey(e.key, { value: input.value, caret: input.selectionEnd ?? 0, tokens: tokens.length, tokenField: variant === "token-field" });
     if (!action) return;
-    if (action !== "remove-last-token") e.preventDefault();
+    // leaving lets the Esc go on, so a sheet around the field closes and focus is not stranded
+    if (action !== "remove-last-token" && action !== "leave") e.preventDefault();
     if (action === "run") onEnter?.(input.value);
     else if (action === "add-token") onAddToken?.(input.value.trim());
     else if (action === "remove-last-token") onRemoveToken?.(tokens.length - 1);
@@ -56,10 +60,10 @@ export function SearchField({ variant: v, state, value = "", tokens = [], placeh
   return (
     <label className={cx("np-search", `np-search--${variant}`, o.cls)} {...base("search-field", { ...o, variant, state: state || (value ? "typing" : tokens.length ? "tokens" : "empty") })}>
       {variant !== "token-field" && <Icon name="search" size={13} cls="np-search__icon" />}
-      {tokens.map((t, i) => (
-        <span key={`${i}:${t.label}`} className="np-token" data-token-kind={t.kind || "filter"}>
-          {t.label}
-          <button type="button" className="np-token__x" aria-label={`Remove ${t.label}`} onClick={() => onRemoveToken?.(i)}>
+      {tokens.map((tok, i) => (
+        <span key={`${i}:${tok.label}`} className="np-token" data-token-kind={tok.kind || "filter"}>
+          {tok.label}
+          <button type="button" className="np-token__x" aria-label={t("search.remove_token", { label: tok.label })} onClick={() => onRemoveToken?.(i)}>
             <Icon name="x" size={9} />
           </button>
         </span>

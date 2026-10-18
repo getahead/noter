@@ -40,3 +40,16 @@ describe("text-field", () => {
     expect(ro).toContain('readOnly=""');
   });
 });
+
+describe("text-field Return (cpt-noter-flow-ui-primitives-operate-control)", () => {
+  it("runs onEnter on Return, but not while an input method is composing", async () => {
+    const { vi } = await import("vitest");
+    const onEnter = vi.fn();
+    const { find, rendered } = await import("../testing");
+    const input = find(rendered(TextField, { value: "a", ariaLabel: "Title", onEnter }), (p) => typeof p.onKeyDown === "function");
+    (input.props.onKeyDown as (e: unknown) => void)({ key: "Enter", nativeEvent: { isComposing: true } });
+    expect(onEnter).not.toHaveBeenCalled();
+    (input.props.onKeyDown as (e: unknown) => void)({ key: "Enter", nativeEvent: { isComposing: false } });
+    expect(onEnter).toHaveBeenCalledOnce();
+  });
+});

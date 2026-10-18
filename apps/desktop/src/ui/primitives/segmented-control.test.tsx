@@ -62,3 +62,12 @@ describe("segmented-control", () => {
     expect(labelsFit(240, 200)).toBe(false);
   });
 });
+
+describe("segmented-control tab stop (cpt-noter-flow-ui-primitives-operate-control)", () => {
+  it("keeps a tab stop on the first enabled segment when the value matches none or a disabled one", () => {
+    for (const value of ["x", "a"]) {
+      const html = renderToString(<SegmentTrack items={[{ value: "a", label: "A", disabled: true }, "b"]} value={value} label="View" />);
+      expect(html).toMatch(/<button[^>]*tabindex="0"[^>]*>(<[^>]*>)*b</);
+    }
+  });
+});

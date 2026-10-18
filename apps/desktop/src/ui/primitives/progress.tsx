@@ -1,3 +1,4 @@
+import { t } from "../../i18n/format";
 import { base, cx } from "./attrs";
 
 export interface ProgressProps {
@@ -25,7 +26,7 @@ export function Progress({ variant, value = null, state = "running", label, cls 
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label={label}
-      aria-valuetext={ind ? undefined : `${value} percent`}
+      aria-valuetext={ind ? undefined : t("progress.percent", { value })}
     >
       <span className="np-progress__fill" style={{ width: `${ind ? 40 : Math.max(0, Math.min(100, value))}%` }} />
     </span>

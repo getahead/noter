@@ -72,3 +72,16 @@ describe("Popover behaviour", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("Popover Esc", () => {
+  it("leaves an Esc an inner control already handled (a search field clearing its text)", async () => {
+    const { find, rendered } = await import("../testing");
+    const onClose = vi.fn();
+    const dialog = find(rendered(Popover, { anchor: null, label: "Speakers", onClose }), (p) => p.role === "dialog");
+    const key = (defaultPrevented: boolean) => (dialog.props.onKeyDown as (e: unknown) => void)({ key: "Escape", defaultPrevented, stopPropagation: vi.fn() });
+    key(true);
+    expect(onClose).not.toHaveBeenCalled();
+    key(false);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});

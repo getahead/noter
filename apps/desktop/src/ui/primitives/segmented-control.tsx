@@ -78,7 +78,9 @@ export function SegmentedControl({ items, value, variant = "view", label, onActi
 export function SegmentTrack({ items, value, variant = "view", label, onAction, ref, ...o }: SegmentedControlProps & { ref?: Ref<HTMLDivElement> }) {
   const view = variant === "view";
   const disabled = items.map((s) => typeof s !== "string" && !!s.disabled);
-  const focusable = Math.max(0, items.findIndex((s) => segValue(s) === value));
+  // the selected segment takes the tab stop; with none selected, or a disabled one, the first enabled segment
+  const selected = items.findIndex((s) => segValue(s) === value);
+  const focusable = selected >= 0 && !disabled[selected] ? selected : Math.max(0, disabled.indexOf(false));
   // ←/→ moves between segments; a view switch selects as focus moves, an option waits for Space
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];

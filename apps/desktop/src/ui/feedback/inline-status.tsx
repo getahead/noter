@@ -4,7 +4,7 @@ import { useEffect, useRef, type FocusEvent } from "react";
 import { Icon } from "../icons";
 import { KeyCap } from "../primitives/key-cap";
 import { Link } from "../primitives/link";
-import { STATUS_MS, statusTimer, type StatusTimer, type StatusVariant } from "./status-timer";
+import { STATUS_MS, statusTimer, type Clock, type StatusTimer, type StatusVariant } from "./status-timer";
 
 export interface InlineStatusProps {
   // @cpt-begin:cpt-noter-flow-ui-primitives-inline-status:p1:inst-receive-status
@@ -39,17 +39,27 @@ export function statusHandlers(timer: { current: StatusTimer | null }, held: { h
   // @cpt-end:cpt-noter-flow-ui-primitives-inline-status:p1:inst-while-hover
 }
 
+/** Starts the time of a status: it calls the owner's latest callback, and starts paused when the status is still
+ *  hovered or focused (its text changed under the pointer). */
+export function startStatusTimer(ms: number, cb: { current: () => void }, held: { hover: boolean; focus: boolean }, clock?: Clock) {
+  const timer = statusTimer(ms, () => cb.current(), clock);
+  if (held.hover || held.focus) timer.pause();
+  return timer;
+}
+
 // @cpt-flow:cpt-noter-flow-ui-primitives-inline-status:p1
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
 export function InlineStatus({ text, variant = "trailing", actionLabel, onAction, kbd, onExpire }: InlineStatusProps) {
   const timer = useRef<StatusTimer | null>(null);
   const held = useRef({ hover: false, focus: false });
+  const expire = useRef(onExpire);
+  expire.current = onExpire;
   // @cpt-begin:cpt-noter-state-ui-primitives-inline-status:p1:inst-hidden-shown
   useEffect(() => {
     if (!text) return;
-    timer.current = statusTimer(STATUS_MS[variant], onExpire);
+    timer.current = startStatusTimer(STATUS_MS[variant], expire, held.current);
     return timer.current.cancel;
-  }, [text, variant]); // not onExpire: an owner re-rendering with a new callback must not restart the time
+  }, [text, variant]); // a new onExpire must not restart the time; an owner passes a new key to restart it
   // @cpt-end:cpt-noter-state-ui-primitives-inline-status:p1:inst-hidden-shown
   if (!text) return null;
   // @cpt-begin:cpt-noter-flow-ui-primitives-inline-status:p1:inst-return-label

@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 import { base, type Common } from "./attrs";
 
@@ -24,6 +24,12 @@ export function sliderKey(key: string, shift: boolean, s: { value: number; min: 
   return Math.min(s.max, Math.max(s.min, s.value + dir * s.step * (shift ? 10 : 1)));
 }
 
+/** The value typed text applies: a number clamped to the range, or null for empty or non-numeric text. */
+export function fieldValue(text: string, r: { min: number; max: number }): number | null {
+  const n = Number(text);
+  return text.trim() === "" || Number.isNaN(n) ? null : Math.min(r.max, Math.max(r.min, n));
+}
+
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 /** slider: always paired with a number field for exact input. */
 export function Slider({ value, min = 0, max = 100, step = 1, label, valueText, unit, state, disabled, onAction, id, ...o }: SliderProps) {
@@ -34,11 +40,18 @@ export function Slider({ value, min = 0, max = 100, step = 1, label, valueText, 
     onAction?.(next);
   };
   const change = (e: { target: { value: string } }) => onAction?.(Number(e.target.value));
+  // the field applies what was typed on Return or when it loses focus, so "120" is not sent as 1, 12, 120
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    const next = draft === null ? null : fieldValue(draft, { min, max });
+    if (next !== null) onAction?.(next);
+    setDraft(null);
+  };
   return (
     <span className="np-slider" {...base("slider", { variant: "with-field", ...o, state: disabled ? "disabled" : state })}>
       <input type="range" id={id} min={min} max={max} step={step} value={value} disabled={disabled} aria-label={label} aria-valuetext={valueText || `${value}${unit || ""}`} onChange={change} onKeyDown={onKeyDown} />
       <span className="np-field np-field--number" data-primitive="text-field" data-variant="number">
-        <input className="np-field__input np-tnum" type="number" value={value} min={min} max={max} disabled={disabled} aria-label={label} onChange={change} />
+        <input className="np-field__input np-tnum" type="number" value={draft ?? value} min={min} max={max} step={step} disabled={disabled} aria-label={label} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} />
       </span>
       {unit && <span className="np-slider__unit">{unit}</span>}
     </span>

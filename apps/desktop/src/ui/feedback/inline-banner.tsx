@@ -3,6 +3,7 @@
 // The banners come from the owning screen, which maps them from typed errors and degraded events and runs the
 // commands behind their actions.
 import { useState, type KeyboardEvent } from "react";
+import { t } from "../../i18n/format";
 import { Icon, type IconName } from "../icons";
 import { cx } from "../primitives/attrs";
 import { IconButton } from "../primitives/icon-button";
@@ -52,7 +53,8 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
   const working = b.actions?.some((a) => a.loading);
   const dismissible = b.dismissible ?? (sev === "info" || sev === "success");
   // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-user-banner
-  const onEsc = (e: KeyboardEvent) => e.key === "Escape" && onDismiss?.();
+  // consumed here: Esc on × closes the banner, not the sheet or popover around it
+  const onEsc = (e: KeyboardEvent) => e.key === "Escape" && (e.preventDefault(), e.stopPropagation(), onDismiss?.());
   // @cpt-end:cpt-noter-flow-ui-primitives-banner:p1:inst-user-banner
   // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-show-banner
   return (
@@ -72,7 +74,7 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
         {b.progress != null && (
           <div className="np-banner__prog">
             <Progress value={b.progress} label={b.text} />
-            <span className="np-tnum">{`${Math.max(0, Math.min(100, b.progress))} %`}</span>
+            <span className="np-tnum">{`${Math.round(Math.max(0, Math.min(100, b.progress)))} %`}</span>
           </div>
         )}
       </div>
@@ -80,8 +82,8 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
         {b.actions?.slice(0, 3).map((a) =>
           a.link ? <Link key={a.label} label={a.label} onAction={a.onAction} /> : <PushButton key={a.label} label={a.label} size="small" variant={a.variant} loading={a.loading} onAction={a.onAction} />,
         )}
-        {!!more && <PushButton label={`+${more} More`} size="small" variant="quiet" expanded={!!stacked} onAction={onMore} />}
-        {dismissible && <IconButton icon="x" label="Dismiss" size="inline" onAction={onDismiss} onKeyDown={onEsc} />}
+        {!!more && <PushButton label={t("banner.more", { count: more })} size="small" variant="quiet" expanded={!!stacked} onAction={onMore} />}
+        {dismissible && <IconButton icon="x" label={t("action.dismiss")} size="inline" onAction={onDismiss} onKeyDown={onEsc} />}
       </div>
     </div>
   );

@@ -67,9 +67,6 @@ export function buttonState(o: { loading?: boolean; disabled?: boolean; state?: 
 // @cpt-dod:cpt-noter-dod-ui-primitives-text-only:p1
 /** push-button: Space or Return runs it; the label is plain text and never truncates. */
 export function PushButton({ label, variant = "secondary", size = "regular", icon, kbd, loading, disabled, state, submit, shortcut, ariaLabel, expanded, chevron, flash, attrs, onAction, onKeyDown, ...o }: PushButtonProps) {
-  // @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
-  const className = cx("np-btn", `np-btn--${variant}`, `np-btn--${size}`, o.cls);
-  // @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
   // @cpt-begin:cpt-noter-flow-ui-primitives-operate-control:p1:inst-user-input
   const onClick = (e: MouseEvent) => {
     if (loading) e.preventDefault(); // Space, Return and a click submit a form natively; a busy button must not
@@ -77,10 +74,11 @@ export function PushButton({ label, variant = "secondary", size = "regular", ico
   };
   // @cpt-end:cpt-noter-flow-ui-primitives-operate-control:p1:inst-user-input
   // @cpt-begin:cpt-noter-flow-ui-primitives-operate-control:p1:inst-return-control
+  // @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
   return (
     <button
       type={submit ? "submit" : "button"}
-      className={className}
+      className={cx("np-btn", `np-btn--${variant}`, `np-btn--${size}`, o.cls)}
       {...base("push-button", { ...o, variant, size, state: buttonState({ loading, disabled, state }) })}
       disabled={disabled}
       aria-keyshortcuts={shortcut}
@@ -104,5 +102,6 @@ export function PushButton({ label, variant = "secondary", size = "regular", ico
       {chevron && <Icon name="chevronDown" size={10} cls="np-btn__chev" />}
     </button>
   );
+  // @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
   // @cpt-end:cpt-noter-flow-ui-primitives-operate-control:p1:inst-return-control
 }

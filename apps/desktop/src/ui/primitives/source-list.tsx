@@ -1,6 +1,7 @@
 // source-list of the prototype's sidebar (src/js/05-shell.js): items, group headers, badges and the live row.
 // ⌘1 to ⌘8 are the window's shortcuts; the list itself moves with ↑/↓.
 import type { MouseEvent, ReactNode } from "react";
+import { t } from "../../i18n/format";
 import { Icon, type IconName } from "../icons";
 import { base, cx } from "./attrs";
 import { moveFocus } from "./roving";
@@ -48,7 +49,7 @@ export function SourceListItem({ icon, label, selected, badge, warn, help, onSel
       <span className="np-srclist__label">{label}</span>
       {children}
       {badge ? <span className="np-srclist__badge" data-variant="badge">{badge}</span> : null}
-      {warn ? <span className="np-srclist__warn" title="Needs attention"><Icon name="warning" size={12} label="problem" /></span> : null}
+      {warn ? <span className="np-srclist__warn" title={t("source_list.needs_attention")}><Icon name="warning" size={12} label={t("source_list.problem")} /></span> : null}
     </a>
   );
 }

@@ -33,6 +33,7 @@ describe("InlineBanner (cpt-noter-dod-ui-primitives-feedback)", () => {
 
   it("shows progress text within 0 to 100", () => {
     expect(renderToString(<InlineBanner banner={b("dl", "info", { progress: 140 })} />)).toContain("100 %");
+    expect(renderToString(<InlineBanner banner={b("dl", "info", { progress: 33.3333 })} />)).toContain(">33 %<");
   });
 
   it("a link action renders as a link", () => {
@@ -69,8 +70,10 @@ describe("InlineBanner actions", () => {
     const tree = rendered(InlineBanner, { banner: b("i", "info", { actions: [{ label: "Retry", onAction }] }), more: 1, onDismiss, onMore });
     const x = find(tree, (p) => p.label === "Dismiss");
     call(x, "onAction");
-    call(x, "onKeyDown", { key: "Escape" });
-    call(x, "onKeyDown", { key: "a" });
+    const esc = { key: "Escape", preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    call(x, "onKeyDown", esc);
+    expect(esc.stopPropagation).toHaveBeenCalled(); // only the banner goes, not the sheet around it
+    call(x, "onKeyDown", { key: "a", preventDefault: vi.fn(), stopPropagation: vi.fn() });
     expect(onDismiss).toHaveBeenCalledTimes(2);
     call(find(tree, (p) => p.label === "+1 More"), "onAction");
     expect(onMore).toHaveBeenCalledOnce();

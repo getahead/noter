@@ -42,10 +42,10 @@ describe("search-field", () => {
   it("hands each key action to the owner", () => {
     const h = { onChange: vi.fn(), onEnter: vi.fn(), onAddToken: vi.fn(), onRemoveToken: vi.fn() };
     const key = (variant: "plain" | "token-field", k: string, value: string, caret = value.length) => {
-      const input = { value, selectionStart: caret, blur: vi.fn() };
+      const input = { value, selectionStart: caret, selectionEnd: caret, blur: vi.fn() };
       const preventDefault = vi.fn();
       const el = SearchField({ variant, tokens: [{ label: "Anna" }], value, ...h });
-      el.props.children[2].props.onKeyDown({ key: k, currentTarget: input, preventDefault });
+      el.props.children[2].props.onKeyDown({ key: k, currentTarget: input, preventDefault, nativeEvent: { isComposing: false } });
       return { input, preventDefault };
     };
     key("plain", "Enter", "retro");
@@ -63,5 +63,31 @@ describe("search-field", () => {
     expect(h.onRemoveToken).toHaveBeenCalledTimes(2);
     el.props.children[2].props.onChange({ target: { value: "an" } });
     expect(h.onChange).toHaveBeenCalledWith("an");
+  });
+});
+
+describe("search-field keys (cpt-noter-flow-ui-primitives-operate-control)", () => {
+  const press = (key: string, input: object, o: { composing?: boolean; variant?: "token-field" } = {}) => {
+    const h = { onChange: vi.fn(), onEnter: vi.fn(), onAddToken: vi.fn(), onRemoveToken: vi.fn() };
+    const e = { key, currentTarget: { blur: vi.fn(), ...input }, preventDefault: vi.fn(), nativeEvent: { isComposing: !!o.composing } };
+    SearchField({ variant: o.variant ?? "token-field", tokens: [{ label: "release" }], ...h }).props.children[2].props.onKeyDown(e);
+    return { ...h, e };
+  };
+
+  it("⌫ with all the text selected deletes the text, not the last token", () => {
+    expect(press("Backspace", { value: "rel", selectionStart: 0, selectionEnd: 3 }).onRemoveToken).not.toHaveBeenCalled();
+    expect(press("Backspace", { value: "", selectionStart: 0, selectionEnd: 0 }).onRemoveToken).toHaveBeenCalledWith(0);
+  });
+
+  it("the second Esc leaves the field and lets the sheet around it close", () => {
+    const { e } = press("Escape", { value: "", selectionStart: 0, selectionEnd: 0 });
+    expect(e.currentTarget.blur).toHaveBeenCalled();
+    expect(e.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("ignores Return and Esc while an input method is composing", () => {
+    const r = press("Enter", { value: "にほ", selectionStart: 2, selectionEnd: 2 }, { composing: true });
+    expect(r.onAddToken).not.toHaveBeenCalled();
+    expect(press("Escape", { value: "にほ", selectionStart: 2, selectionEnd: 2 }, { composing: true }).onChange).not.toHaveBeenCalled();
   });
 });

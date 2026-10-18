@@ -2,6 +2,8 @@
 // what DESIGN asks of the WebView side: variants and the macOS 26 button order, buttons side by side with the
 // default button trailing (as the prototype's src/js/05-shell.js lays them out).
 
+import { t } from "../../i18n/format";
+
 export type AlertVariant = "informational" | "warning" | "destructive";
 export interface AlertButton {
   label: string;
@@ -11,6 +13,6 @@ export interface AlertButton {
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 export function alertButtons<B extends AlertButton>(buttons: B[]): (B | AlertButton)[] {
-  if (!buttons.length) return [{ label: "OK", variant: "primary" }];
+  if (!buttons.length) return [{ label: t("action.ok"), variant: "primary" }];
   return [...buttons.filter((b) => b.variant !== "primary"), ...buttons.filter((b) => b.variant === "primary")];
 }

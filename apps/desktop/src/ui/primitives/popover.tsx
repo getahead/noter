@@ -52,7 +52,12 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
   useLayoutEffect(() => setPlace(measure(ref.current, anchor, align)), [anchor, align]);
   // focus moves in once it is placed: a hidden element takes no focus
   const placed = place !== null;
-  useEffect(() => (placed ? focusInside(ref.current) : undefined), [placed]);
+  useEffect(() => {
+    if (!placed) return;
+    const restore = focusInside(ref.current);
+    // focus goes back to the anchor: after a click WebKit leaves no focused element to go back to
+    return () => (anchor ? anchor.focus() : restore());
+  }, [placed]); // once per opening
   useEffect(() => closeOnOutside(ref, anchor, onClose), [anchor, onClose]);
   return (
     <div
@@ -64,7 +69,7 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
       tabIndex={-1}
       // .np-pop is hidden until placed, as in the prototype
       style={{ width, ...(place && { position: "fixed", ...place, visibility: "visible" }) }}
-      onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onClose())}
+      onKeyDown={(e) => e.key === "Escape" && !e.defaultPrevented && (e.stopPropagation(), onClose())}
     >
       {children}
     </div>
