@@ -185,6 +185,10 @@ impl Core {
             drop(d);
             return Ok(self.setup_now());
         }
+        // No connection: `offline` (retryable) at once, nothing is fetched (the fake core too).
+        if !self.deps.native.environment().online {
+            return Err(CoreError::new(ErrorCode::Offline, "no connection"));
+        }
         if d.running {
             // Resume (or start, retry) before the running task stopped: it keeps going.
             d.pause.store(false, Ordering::SeqCst);
