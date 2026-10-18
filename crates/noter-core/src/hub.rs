@@ -43,7 +43,6 @@ struct Sub<M> {
     window: Option<WindowLabel>,
     sink: Sink<M>,
     acked: u64,
-    last_sent_ms: Option<i64>,
     state: SubState,
 }
 
@@ -79,6 +78,8 @@ struct Stream<M> {
     seq: u64,
     replay: VecDeque<(u64, M)>,
     subs: Vec<Sub<M>>,
+    /// When the last message went out, for a coalesced stream (levels).
+    last_sent_ms: Option<i64>,
 }
 
 impl<M: StreamMsg> Stream<M> {
@@ -87,6 +88,7 @@ impl<M: StreamMsg> Stream<M> {
             seq: 0,
             replay: VecDeque::new(),
             subs: Vec::new(),
+            last_sent_ms: None,
         }
     }
 
@@ -109,7 +111,7 @@ static NEXT_SUBSCRIPTION: AtomicU64 = AtomicU64::new(1);
 pub struct StreamHub<M: StreamMsg> {
     streams: Mutex<HashMap<String, Stream<M>>>,
     clock: Arc<dyn Clock>,
-    /// At most one message per this many ms per subscription (levels); `None` sends every one.
+    /// At most one message per this many ms per stream (levels); `None` sends every one.
     coalesce_ms: Option<i64>,
 }
 
@@ -159,7 +161,6 @@ impl<M: StreamMsg> StreamHub<M> {
             window,
             sink,
             acked: last_seq,
-            last_sent_ms: None,
             state: SubState::Registering,
         };
         // @cpt-begin:cpt-noter-state-core-ipc-host-subscription:p1:inst-st-streaming
@@ -179,13 +180,25 @@ impl<M: StreamMsg> StreamHub<M> {
         // @cpt-end:cpt-noter-algo-core-ipc-host-subscribe:p1:inst-return-subscribe
     }
 
-    /// Sends the next message of a stream to every subscription; returns its `seq`.
+    /// Sends the next message of a stream to every subscription; returns its `seq` (on a
+    /// coalesced stream, a message within the interval is dropped and the last `seq` returned).
+    ///
+    /// Services publish only after their write returned, so a reload never misses a committed
+    /// record. Sinks run under the hub lock: they must not call back into the core or the hub.
     // @cpt-algo:cpt-noter-algo-core-ipc-host-ack:p1
     pub fn publish(&self, key: &str, mut msg: M) -> Seq {
         let now = self.coalesce_ms.map(|_| self.clock.now().0);
         // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-publish
         let mut streams = self.lock();
         let stream = streams.entry(key.to_owned()).or_insert_with(Stream::new);
+        // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-coalesce
+        if let (Some(gap), Some(now), Some(last)) = (self.coalesce_ms, now, stream.last_sent_ms) {
+            if now - last < gap {
+                return Seq(stream.seq); // before a seq is taken: every subscriber stays gapless
+            }
+        }
+        stream.last_sent_ms = now;
+        // @cpt-end:cpt-noter-algo-core-ipc-host-ack:p1:inst-coalesce
         stream.seq += 1;
         let seq = stream.seq;
         msg.set_seq(Seq(seq));
@@ -196,21 +209,12 @@ impl<M: StreamMsg> StreamHub<M> {
         // @cpt-end:cpt-noter-algo-core-ipc-host-ack:p1:inst-publish
         // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-for-subs
         stream.subs.retain_mut(|sub| {
-            // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-coalesce
-            let due = match (self.coalesce_ms, now, sub.last_sent_ms) {
-                (Some(gap), Some(now), Some(last)) => now - last >= gap,
-                _ => true,
-            };
-            // @cpt-end:cpt-noter-algo-core-ipc-host-ack:p1:inst-coalesce
-            if due {
-                // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-deliver
-                if !sub.sink.send(msg.clone()) {
-                    sub.advance(SubState::Ended);
-                    return false;
-                }
-                sub.last_sent_ms = now;
-                // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-deliver
+            // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-deliver
+            if !sub.sink.send(msg.clone()) {
+                sub.advance(SubState::Ended);
+                return false;
             }
+            // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-deliver
             // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-end-lagged
             if seq - sub.acked >= LAG_LIMIT {
                 sub.end(StreamEndReason::Lagged, seq);
