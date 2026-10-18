@@ -117,18 +117,18 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
 
 ### Check contrast
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-tokens-theming-check-contrast`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-tokens-theming-check-contrast`
 
 **Input**: the Increase Contrast token values, light and dark, and the pairs of DESIGN's colour table (text on content, card, tints; non-text on its neighbour)
 
 **Output**: pass, or the list of pairs below the target
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** text token and each background it is used on - `inst-for-each-text`
-   1. [ ] - `p1` - Compute the contrast ratio; record a failure below 4.5:1 - `inst-text-ratio`
-2. [ ] - `p1` - **FOR EACH** non-text token (control border, focus ring, meter fill, status icon) and its neighbour - `inst-for-each-nontext`
-   1. [ ] - `p1` - Compute the ratio; record a failure below 3:1 - `inst-nontext-ratio`
-3. [ ] - `p1` - **RETURN** pass when no failure was recorded; the build fails otherwise - `inst-return-check`
+1. [x] - `p1` - **FOR EACH** text token and each background it is used on - `inst-for-each-text`
+   1. [x] - `p1` - Compute the contrast ratio; record a failure below 4.5:1 - `inst-text-ratio`
+2. [x] - `p1` - **FOR EACH** non-text token (control border, focus ring, meter fill, status icon) and its neighbour - `inst-for-each-nontext`
+   1. [x] - `p1` - Compute the ratio; record a failure below 3:1 - `inst-nontext-ratio`
+3. [x] - `p1` - **RETURN** pass when no failure was recorded; the build fails otherwise - `inst-return-check`
 
 ## 4. States (CDSL)
 
@@ -171,7 +171,7 @@ The system **MUST** ship one token stylesheet with the prototype's custom-proper
 
 ### Automated contrast check
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-tokens-theming-contrast-check`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-tokens-theming-contrast-check`
 
 The system **MUST** run a unit test that reads the Increase Contrast values of the token stylesheet in light and dark and fails when a text pair is below 4.5:1 or a non-text pair below 3:1.
 
@@ -189,7 +189,7 @@ The system **MUST** run a unit test that reads the Increase Contrast values of t
 - [ ] The four appearance states render the primitives page identically to the prototype's light, dark and Increase Contrast renderings (screenshot match ≥ 98 % in the pinned container)
 - [ ] With Reduce transparency or Increase Contrast on, no element uses `backdrop-filter`
 - [ ] With Reduce motion on, no transition or animation runs except row spinners and level meters
-- [ ] The contrast test passes for light and dark Increase Contrast values
+- [x] The contrast test passes for light and dark Increase Contrast values
 
 ## 7. Additional Context
 
