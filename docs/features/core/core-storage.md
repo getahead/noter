@@ -106,7 +106,7 @@ Every later feature writes records. If each wrote its own way, "every write is a
 **Actor**: Core service (on behalf of the user, a job or a model run)
 
 **Success Scenarios**:
-- A settings section, a call or a segment batch is written; the change row with actor, before, after and reason commits in the same transaction; the new `rev` is returned with the change id.
+- A settings section or a call is written; the change row with actor, before, after and reason commits in the same transaction; the new `rev` is returned with the change id.
 
 **Error Scenarios**:
 - The caller sent a stale `rev`: nothing is written, the caller gets `conflict` with `detail.current_rev`.
@@ -225,7 +225,7 @@ The system **MUST** apply numbered migrations in order, each in its own transact
 
 - [ ] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
 
-The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test.
+The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test. Capture data the engine produces (confirmed segments, live speakers, gaps and marks written by capture) is the exception: it is inserted in batches through `insert_batch` without change rows, and a delete (`capture_discard`, `calls_delete`) writes one change row per deletion, not undoable (Backend Teamlead M1 decision, 18 Oct 2026).
 
 **Implements**:
 - `cpt-noter-flow-core-storage-write`
