@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
@@ -75,7 +76,10 @@ impl Harness {
         } else {
             Arc::new(SystemClock)
         };
-        let deps = CoreDeps::new(clock, Arc::new(EventLines(lines)))
+        // Boot and seeding go through the core's commands; a window's snapshot already holds their
+        // result, so their events stay off the wire (`seeding` is cleared before `Ok`).
+        let seeding = Arc::new(AtomicBool::new(true));
+        let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
             .with_native(native.clone())
             .with_models(models)
             .with_updater(updater.clone());
@@ -102,6 +106,7 @@ impl Harness {
         }
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-seed
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
+        seeding.store(false, Ordering::SeqCst);
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
         eprintln!("noter-core-harness: core open in {}", harness.dir.display());
         Ok(harness)
@@ -364,11 +369,13 @@ impl Clock for Fixed {
 }
 
 /// Core events as event lines.
-struct EventLines(Lines);
+struct EventLines(Lines, Arc<AtomicBool>);
 
 impl EventEmitter for EventLines {
     fn emit(&self, event: &'static str, payload: Value) {
-        self.0.event(event, payload);
+        if !self.1.load(Ordering::SeqCst) {
+            self.0.event(event, payload);
+        }
     }
 }
 

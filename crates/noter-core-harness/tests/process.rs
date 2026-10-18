@@ -97,3 +97,11 @@ fn unknown_flag_exits_nonzero_before_reading() {
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8(out.stderr).unwrap().contains("--fast"));
 }
+
+// W10: the fixture is seeded through the core's commands; its events are not the test's to see
+#[test]
+fn fixture_seeding_emits_no_events() {
+    let out = run(&["--fixture", "world"], "");
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8(out.stdout).unwrap(), "");
+}
