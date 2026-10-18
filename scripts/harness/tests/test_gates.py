@@ -269,6 +269,8 @@ class LaneGuardTests(unittest.TestCase):
             self.assertEqual(config_guard.lane_check([shot], CFG), [])
             self.assertEqual(len(config_guard.lane_check(["evals/golden/a.json"], CFG)), 1)
             self.assertEqual(len(config_guard.lane_check(["crates/noter-core/__screenshots__/a.png"], CFG)), 1)
+        with mock.patch.dict("os.environ", {"GITHUB_HEAD_REF": "lane/skills/evals", "NOTER_LANE": "", "NOTER_ALLOW_BASELINE": ""}):
+            self.assertEqual(len(config_guard.lane_check(["evals/golden/__screenshots__/a.json"], CFG)), 1)  # golden stays blocked
         self.assertIsNotNone(lane_guard.verdict(shot, "ui", CFG, committing=True))  # hand edits stay blocked
 
     def test_lane_from_branch_name(self):
