@@ -85,7 +85,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Download the models
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-first-run-download`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-first-run-download`
 
 **Actor**: Primary user (First run › Models, or Settings › Models and Runtimes)
 
@@ -99,11 +99,11 @@ The user should finish setup in one sitting before the first real call, and call
 - Not enough disk for the remaining size: `disk_full` with `detail.needed_mb`.
 
 **Steps**:
-1. [ ] - `p1` - API: `models_download { action: start }` from the First run or Settings window - `inst-download-call`
-2. [ ] - `p1` - **IF** free disk is below the remaining size plus a margin, **RETURN** `disk_full` with `detail.needed_mb` - `inst-check-disk`
-3. [ ] - `p1` - Start `cpt-noter-algo-core-first-run-download-task` in the background (a setup task in M0; moved onto the job scheduler in M2) - `inst-start-task`
-4. [ ] - `p1` - **RETURN** `SetupStatus` with the bundles `downloading` at once - `inst-return-started`
-5. [ ] - `p1` - **IF** `action` is `pause`, `resume` or `retry`, apply it to the task and **RETURN** the new `SetupStatus` - `inst-other-actions`
+1. [x] - `p1` - API: `models_download { action: start }` from the First run or Settings window - `inst-download-call`
+2. [x] - `p1` - **IF** free disk is below the remaining size plus a margin, **RETURN** `disk_full` with `detail.needed_mb` - `inst-check-disk`
+3. [x] - `p1` - Start `cpt-noter-algo-core-first-run-download-task` in the background (a setup task in M0; moved onto the job scheduler in M2) - `inst-start-task`
+4. [x] - `p1` - **RETURN** `SetupStatus` with the bundles `downloading` at once - `inst-return-started`
+5. [x] - `p1` - **IF** `action` is `pause`, `resume` or `retry`, apply it to the task and **RETURN** the new `SetupStatus` - `inst-other-actions`
 
 ### Grant a permission
 
@@ -194,20 +194,20 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Download task
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-first-run-download-task`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-first-run-download-task`
 
 **Input**: The pinned model manifest (bundle name, URL, size, checksum), compiled into the app; hosts listed in `contracts/egress-hosts.json`.
 
 **Output**: Each bundle `ready` in `models/`, or its failure state.
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** bundle not `ready`, required-for-capture bundles first - `inst-for-bundles`
-   1. [ ] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second - `inst-try-download`
-   2. [ ] - `p1` - **CATCH** a network failure: state `paused`, error `offline` - `inst-catch-offline`
-   3. [ ] - `p1` - Verify the checksum (`verifying`); on mismatch delete the partial file, state `checksum_failed` - `inst-verify`
-   4. [ ] - `p1` - Move the verified file into `models/` (0600) and mark the bundle `ready` - `inst-move-ready`
-2. [ ] - `p1` - Emit `setup:changed` after each state change - `inst-emit-progress`
-3. [ ] - `p1` - **RETURN** when every bundle is `ready` or a failure stops the task - `inst-return-task`
+1. [x] - `p1` - **FOR EACH** bundle not `ready`, required-for-capture bundles first - `inst-for-bundles`
+   1. [x] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second - `inst-try-download`
+   2. [x] - `p1` - **CATCH** a network failure: state `paused`, error `offline` - `inst-catch-offline`
+   3. [x] - `p1` - Verify the checksum (`verifying`); on mismatch delete the partial file, state `checksum_failed` - `inst-verify`
+   4. [x] - `p1` - Move the verified file into `models/` (0600) and mark the bundle `ready` - `inst-move-ready`
+2. [x] - `p1` - Emit `setup:changed` after each state change - `inst-emit-progress`
+3. [x] - `p1` - **RETURN** when every bundle is `ready` or a failure stops the task - `inst-return-task`
 
 ### Detection rule
 
@@ -254,21 +254,21 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Model bundle
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-first-run-bundle`
+- [x] `p1` - **ID**: `cpt-noter-state-core-first-run-bundle`
 
 **States**: pending, downloading, paused, verifying, ready, checksum_failed, failed
 
 **Initial State**: pending
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** pending **TO** downloading **WHEN** the user starts the download - `inst-st-download`
-2. [ ] - `p1` - **FROM** downloading **TO** paused **WHEN** the user pauses or the network drops - `inst-st-pause`
-3. [ ] - `p1` - **FROM** paused **TO** downloading **WHEN** the user resumes or retries - `inst-st-resume`
-4. [ ] - `p1` - **FROM** downloading **TO** verifying **WHEN** the last byte arrived - `inst-st-verify`
-5. [ ] - `p1` - **FROM** verifying **TO** ready **WHEN** the checksum matches - `inst-st-ready`
-6. [ ] - `p1` - **FROM** verifying **TO** checksum_failed **WHEN** the checksum differs - `inst-st-checksum`
-7. [ ] - `p1` - **FROM** checksum_failed **TO** downloading **WHEN** the user retries - `inst-st-retry`
-8. [ ] - `p1` - **FROM** downloading **TO** failed **WHEN** the disk fills or the file cannot be written - `inst-st-failed`
+1. [x] - `p1` - **FROM** pending **TO** downloading **WHEN** the user starts the download - `inst-st-download`
+2. [x] - `p1` - **FROM** downloading **TO** paused **WHEN** the user pauses or the network drops - `inst-st-pause`
+3. [x] - `p1` - **FROM** paused **TO** downloading **WHEN** the user resumes or retries - `inst-st-resume`
+4. [x] - `p1` - **FROM** downloading **TO** verifying **WHEN** the last byte arrived - `inst-st-verify`
+5. [x] - `p1` - **FROM** verifying **TO** ready **WHEN** the checksum matches - `inst-st-ready`
+6. [x] - `p1` - **FROM** verifying **TO** checksum_failed **WHEN** the checksum differs - `inst-st-checksum`
+7. [x] - `p1` - **FROM** checksum_failed **TO** downloading **WHEN** the user retries - `inst-st-retry`
+8. [x] - `p1` - **FROM** downloading **TO** failed **WHEN** the disk fills or the file cannot be written - `inst-st-failed`
 
 ### Self-test
 
@@ -304,7 +304,7 @@ The system **MUST** answer `setup_status`, `setup_set_call_display`, `setup_set_
 
 ### Resumable, verified model downloads
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-first-run-models`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-models`
 
 The system **MUST** download the pinned bundles with range resume, verify each checksum before use, report `offline`, `checksum_failed` and `disk_full` as typed errors and bundle states, and reach only hosts listed in `contracts/egress-hosts.json`.
 
