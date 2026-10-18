@@ -628,3 +628,39 @@ async fn setup_and_environment_events_continue_the_snapshot_version() {
         assert_eq!(v, expected, "{name}: snapshot {before}, then events");
     }
 }
+
+/// The change row names the native surface that sent a setup write; a window sends none.
+#[tokio::test]
+async fn setup_writes_record_the_callers_surface() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    let menu_bar = CommandCtx {
+        caller: Caller::Native {
+            surface: noter_protocol::ipc::NativeSurface::MenuBar,
+        },
+    };
+    for (ctx, step) in [
+        (&first_run(), SetupStep::Welcome),
+        (&menu_bar, SetupStep::Models),
+    ] {
+        s.core
+            .setup_set_step(
+                ctx,
+                StepArgs {
+                    step,
+                    state: StepState::Skipped,
+                },
+            )
+            .await
+            .unwrap();
+    }
+    let c = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+    let surfaces: Vec<Option<String>> = c
+        .prepare("SELECT surface FROM changes WHERE reason = 'setup_set_step' ORDER BY rowid")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(surfaces, vec![None, Some("menu_bar".to_string())]);
+}
