@@ -9,7 +9,7 @@ public enum Arguments: Equatable {
     case file(mic: URL, sys: URL, realtime: Bool)
     case invalid(String)
 
-    // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-args
+    // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-args
     public static func parse(_ args: [String]) -> Arguments {
         var mic: URL?
         var sys: URL?
@@ -29,7 +29,7 @@ public enum Arguments: Equatable {
         default: return .invalid("file mode needs both --mic and --sys")
         }
     }
-    // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-args
+    // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-args
 }
 
 // @cpt-flow:cpt-noter-flow-core-engine-foundation-file-mode:p2
@@ -61,7 +61,7 @@ public struct FileMode {
             writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: "\(error)"))
             return 1
         }
-        // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-events
+        // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
         writer.emit(
             .ready(protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: models, sandboxed: sandboxed))
         afterReady()
@@ -69,11 +69,11 @@ public struct FileMode {
             writer.emit(.levels(callId: FileMode.callId, micDb: Levels.db(m), sysDb: Levels.db(s)))
             if realtime { Thread.sleep(forTimeInterval: 0.1) }
         }
-        // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-events
-        // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-return
+        // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
+        // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-return
         writer.emit(.sessionStopped(callId: FileMode.callId, timelinePath: "", micPath: mic.path, sysPath: sys.path))
         return 0
-        // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-return
+        // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-return
     }
 }
 
