@@ -35,6 +35,7 @@ async fn main() -> ExitCode {
     };
     let output = Output::new(tokio::io::stdout());
     // @cpt-begin:cpt-noter-state-core-harness-process:p1:inst-st-boot-fail
+    // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-boot
     let harness = match Harness::start(options, output.lines()).await {
         Ok(h) => h,
         Err(reason) => {
@@ -43,6 +44,7 @@ async fn main() -> ExitCode {
         }
     };
     // @cpt-end:cpt-noter-state-core-harness-process:p1:inst-st-boot-fail
+    // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-boot
     // @cpt-begin:cpt-noter-state-core-harness-process:p1:inst-st-serving
     eprintln!("noter-core-harness: serving on stdin/stdout");
     let served = serve_with(harness.core(), harness, tokio::io::stdin(), output).await;
