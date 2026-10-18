@@ -9,6 +9,7 @@ let version = "0.1.0"
 let environment = ProcessInfo.processInfo.environment
 let sandboxed = environment["APP_SANDBOX_CONTAINER_ID"] != nil
 let writer = EventWriter.stdout()
+let models = Models.installed(container: Models.container(environment: environment))
 
 /// Answers commands from stdin until `shutdown`; end of input also ends live mode, while a
 /// file replay runs to its end.
@@ -24,17 +25,16 @@ case let .invalid(why):
     FileHandle.standardError.write(Data("noter-engine: \(why)\n".utf8))
     exit(2)
 case let .file(mic, sys, realtime):
-    let engine = EngineLoop(writer: writer, engineVersion: version, models: [], sandboxed: sandboxed) {
+    let engine = EngineLoop(writer: writer, engineVersion: version, models: models, sandboxed: sandboxed) {
         guard let m = try? WAV.read(mic), let s = try? WAV.read(sys) else { return nil }
         return FileAudioSource(mic: m, sys: s, realtime: realtime)
     }
     let replay = FileMode(mic: mic, sys: sys, realtime: realtime)
     exit(
-        replay.run(writer: writer, engineVersion: version, sandboxed: sandboxed) {
+        replay.run(writer: writer, engineVersion: version, sandboxed: sandboxed, models: models) {
             Thread.detachNewThread { serve(engine, exitAtEndOfInput: false) }
         })
 case .live:
-    let models = Models.installed(container: Models.container(environment: environment))
     let engine = EngineLoop(writer: writer, engineVersion: version, models: models, sandboxed: sandboxed) {
         LiveAudioSource()
     }
