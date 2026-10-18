@@ -23,6 +23,17 @@ import { SegmentTrack } from "./segmented-control";
 import { Slider } from "./slider";
 import { TextField } from "./text-field";
 import { Toggle } from "./toggle";
+import { EmptyState } from "../feedback/empty-state";
+import { InlineBanner } from "../feedback/inline-banner";
+import { InlineStatus } from "../feedback/inline-status";
+import { Menu } from "./menu";
+import { Popover } from "./popover";
+import { Sheet, SheetFooter } from "./sheet";
+import { SourceList, SourceListItem } from "./source-list";
+import { SplitDivider } from "./split-divider";
+import { Table, TextCell, Th } from "./table";
+import { Toolbar } from "./toolbar";
+import { Tooltip } from "./tooltip";
 
 const MARKUP = `<img src=x onerror="alert(1)"><script>alert(2)</script>`;
 const LONG = "Sprint42retro".repeat(400);
@@ -47,6 +58,22 @@ const renders: Record<string, (t: string) => ReactElement> = {
   disclosure: (t) => <Disclosure label={t} open={false} />,
   link: (t) => <Link label={t} ariaLabel={t} />,
   "key-cap": (t) => <KeyCap keys={t} />,
+  table: (t) => (
+    <Table label={t}>
+      <thead><tr><Th label={t} /></tr></thead>
+      <tbody><tr><TextCell text={t} /></tr></tbody>
+    </Table>
+  ),
+  "source-list": (t) => <SourceList label={t}><SourceListItem icon="inbox" label={t} badge={t} help={t} /></SourceList>,
+  toolbar: (t) => <Toolbar label={t}>{t}</Toolbar>,
+  sheet: (t) => <Sheet title={t} onCancel={() => {}}><SheetFooter defaultButton={<PushButton label={t} />}>{t}</SheetFooter></Sheet>,
+  popover: (t) => <Popover anchor={null} label={t} onClose={() => {}}>{t}</Popover>,
+  tooltip: (t) => <Tooltip text={t}><button type="button">{t}</button></Tooltip>,
+  menu: (t) => <Menu label={t} items={[{ header: t }, { label: t, kbd: t }]} />,
+  "split-divider": (t) => <SplitDivider label={t} onChange={() => {}} />,
+  "empty-state": (t) => <EmptyState title={t} body={t} actionLabel={t} linkLabel={t} />,
+  "inline-banner": (t) => <InlineBanner banner={{ id: t, severity: "info", title: t, text: t, progress: 5, actions: [{ label: t }, { label: `${t}2`, link: true }] }} />,
+  "inline-status": (t) => <InlineStatus text={t} actionLabel={t} kbd={t} onExpire={() => {}} />,
 };
 
 describe("cpt-noter-dod-ui-primitives-text-only", () => {
@@ -64,9 +91,9 @@ describe("cpt-noter-dod-ui-primitives-text-only", () => {
   }
 
   it("no primitive writes raw HTML", () => {
-    const dir = fileURLToPath(new URL(".", import.meta.url));
-    const sources = readdirSync(dir).filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"));
-    expect(sources.length).toBeGreaterThanOrEqual(17);
-    for (const f of sources) expect(readFileSync(dir + f, "utf8"), f).not.toContain("dangerouslySetInnerHTML");
+    const dirs = [".", "../feedback/"].map((d) => fileURLToPath(new URL(d, import.meta.url)));
+    const sources = dirs.flatMap((dir) => readdirSync(dir).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f)).map((f) => dir + f));
+    expect(sources.length).toBeGreaterThanOrEqual(31);
+    for (const f of sources) expect(readFileSync(f, "utf8"), f).not.toContain("dangerouslySetInnerHTML");
   });
 });

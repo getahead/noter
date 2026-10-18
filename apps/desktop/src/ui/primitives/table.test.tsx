@@ -50,3 +50,12 @@ describe("Table and Th keys", () => {
     expect(onSort).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("TextCell (cpt-noter-algo-ui-primitives-fit-labels)", () => {
+  it("tail-truncates and keeps the full text in a help tag and for VoiceOver", async () => {
+    const { TextCell } = await import("./table");
+    const long = "Quarterly planning with the platform team and Anna";
+    const html = renderToString(<table><tbody><tr><TextCell text={long} /></tr></tbody></table>);
+    expect(html).toContain(`<td class="np-td--trunc" title="${long}">${long}</td>`);
+  });
+});

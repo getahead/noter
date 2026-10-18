@@ -67,3 +67,16 @@ export function Sheet({ title, width, busy, onCancel, onDefault, children }: She
     </div>
   );
 }
+
+// @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-if-footer
+// @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-stack
+/** Footer of a sheet: .np-sheet__foot wraps the buttons onto lines when they do not fit side by side, and the
+ *  default button comes last, so it stays last when they stack. */
+export const SheetFooter = ({ defaultButton, children }: { defaultButton?: ReactNode; children?: ReactNode }) => (
+  <div className="np-sheet__foot">
+    {children}
+    {defaultButton}
+  </div>
+);
+// @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-stack
+// @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-if-footer

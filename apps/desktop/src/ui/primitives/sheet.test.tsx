@@ -79,3 +79,11 @@ describe("focusInside", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 });
+
+describe("SheetFooter (cpt-noter-algo-ui-primitives-fit-labels)", () => {
+  it("puts the default button last, so it stays last when the buttons stack", async () => {
+    const { SheetFooter } = await import("./sheet");
+    const html = renderToString(<SheetFooter defaultButton={<button>Export</button>}><button>Cancel</button></SheetFooter>);
+    expect(html).toBe('<div class="np-sheet__foot"><button>Cancel</button><button>Export</button></div>');
+  });
+});

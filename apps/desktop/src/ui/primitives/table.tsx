@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Icon } from "../icons";
 import { base, cx, type Common } from "./attrs";
 import { activates, moveFocus } from "./roving";
+import "./table.css";
 
 export interface TableProps extends Common {
   /** sortable (default) | multi-select | outline | grouped | virtualised */
@@ -52,3 +53,12 @@ export function Th({ label, sort, width, cls, onSort }: ThProps) {
     </th>
   );
 }
+
+// @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-tail-truncate
+/** A text cell: tail-truncates, with the full text in a help tag; VoiceOver reads the whole text. */
+export const TextCell = ({ text, cls }: { text: string; cls?: string }) => (
+  <td className={cx("np-td--trunc", cls)} title={text}>
+    {text}
+  </td>
+);
+// @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-tail-truncate

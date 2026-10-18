@@ -25,9 +25,13 @@ export interface PopupButtonProps extends Common {
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 /** popup-button: a native select, so Space or ↓ opens it, type-ahead works and Return chooses. */
 export function PopupButton({ options, value, variant = "form", label, disabled, onAction, id, ref, ...o }: PopupButtonProps) {
+  // @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-tail-truncate
+  const current = options.find((c) => choiceValue(c) === value);
+  // @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-tail-truncate
   return (
     <span ref={ref} className={cx("np-popup", `np-popup--${variant}`, o.cls)} {...base("popup-button", { ...o, variant })}>
-      <select id={id} aria-label={label} disabled={disabled} value={value} onChange={(e) => onAction?.(e.target.value)}>
+      {/* a long value tail-truncates; the help tag keeps its full text (fit labels › inst-tail-truncate) */}
+      <select id={id} aria-label={label} title={current && choiceLabel(current)} disabled={disabled} value={value} onChange={(e) => onAction?.(e.target.value)}>
         {options.map((c) => (
           <option key={choiceValue(c)} value={choiceValue(c)} disabled={typeof c !== "string" && c.disabled}>
             {choiceLabel(c)}

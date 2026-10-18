@@ -2,7 +2,7 @@
 // state of DESIGN's inventory table and the prototype, rendered by the app over the fake core through
 // the bridge. Pointer and keyboard states (hover, pressed, focus) are CSS; the screenshot spec drives
 // them on the cells named by data-cell. Served by the Vite dev server at /tests/visual/pages/primitives.html.
-import { StrictMode, type ReactNode } from "react";
+import { StrictMode, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { createBridge } from "../../../src/app/bridge/bridge";
@@ -24,6 +24,17 @@ import { SegmentedControl } from "../../../src/ui/primitives/segmented-control";
 import { Slider } from "../../../src/ui/primitives/slider";
 import { TextField } from "../../../src/ui/primitives/text-field";
 import { Toggle } from "../../../src/ui/primitives/toggle";
+import { Menu } from "../../../src/ui/primitives/menu";
+import { Popover } from "../../../src/ui/primitives/popover";
+import { Sheet, SheetFooter } from "../../../src/ui/primitives/sheet";
+import { SourceList, SourceListGroup, SourceListItem } from "../../../src/ui/primitives/source-list";
+import { SplitDivider } from "../../../src/ui/primitives/split-divider";
+import { Table, TextCell, Th } from "../../../src/ui/primitives/table";
+import { Toolbar, ToolbarSpacer } from "../../../src/ui/primitives/toolbar";
+import { Tooltip } from "../../../src/ui/primitives/tooltip";
+import { EmptyState } from "../../../src/ui/feedback/empty-state";
+import { BannerSlot, InlineBanner } from "../../../src/ui/feedback/inline-banner";
+import { InlineStatus } from "../../../src/ui/feedback/inline-status";
 
 const bridge = createBridge("main", new FakeCore({ window: "main" }));
 
@@ -36,6 +47,9 @@ const page = `
   .pg .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 8px; }
   .pg .glass { padding: 8px; border-radius: var(--r-card); background: linear-gradient(90deg, var(--accent), var(--success)); }
   .pg .narrow { width: 140px; }
+  .pg .stage { position: relative; height: 240px; overflow: hidden; border-radius: var(--r-card); }
+  .pg .split { display: flex; height: 48px; gap: 0 12px; }
+  .pg .stack { display: grid; gap: 8px; }
 `;
 
 const Section = ({ name, children }: { name: string; children: ReactNode }) => (
@@ -52,11 +66,39 @@ const views = [
   { value: "month", label: "Month", disabled: true },
 ];
 const options = ["English", "Deutsch", { value: "ja", label: "日本語", disabled: true }];
+const none = () => {};
+
+/** A popover that opens under its anchor on a click, as a screen opens it (the screenshot spec opens it). */
+function PopoverDemo() {
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button id="popover-anchor" ref={setAnchor} type="button" className="np-btn np-btn--secondary np-btn--regular" onClick={() => setOpen(!open)}>
+        Speakers
+      </button>
+      {open && (
+        <Popover anchor={anchor} label="Speakers" width={280} onClose={() => setOpen(false)}>
+          <div style={{ padding: 12 }}>Anna, Ben and 2 others</div>
+        </Popover>
+      )}
+    </>
+  );
+}
 
 function Gallery() {
   return (
     <div className="pg" data-region="window" data-window={bridge.label}>
       <style>{page}</style>
+            <Section name="tooltip">
+        <Row>
+          <Tooltip text="Copy the transcript">
+            <button id="tooltip-target" type="button" className="np-btn np-btn--secondary np-btn--regular">Copy</button>
+          </Tooltip>
+          <PopoverDemo />
+        </Row>
+      </Section>
+
       <Section name="push-button">
         {(["primary", "secondary", "quiet", "destructive"] as const).map((variant) => (
           <Row key={variant}>
@@ -234,6 +276,112 @@ function Gallery() {
         <Row>
           <Link id="link-inline" label="Privacy settings" />
           <Link label="Open in Calendar" external ariaLabel="Open in Calendar, opens in Calendar" />
+        </Row>
+      </Section>
+
+      <Section name="table">
+        <Table label="Calls">
+          <thead>
+            <tr>
+              <Th label="Title" sort="desc" width="200px" onSort={none} />
+              <Th label="Date" width="90px" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr tabIndex={0}>
+              <TextCell text="Sprint 42 retro with the platform team, Anna and Ben" />
+              <td>18 Oct</td>
+            </tr>
+            <tr tabIndex={-1} className="is-sel" aria-selected="true">
+              <TextCell text="Budget review" />
+              <td>17 Oct</td>
+            </tr>
+          </tbody>
+        </Table>
+      </Section>
+
+      <Section name="source-list">
+        <SourceList>
+          <SourceListItem icon="sun" label="Today" selected />
+          <SourceListItem icon="inbox" label="Library" badge={4} />
+          <SourceListGroup>Agents</SourceListGroup>
+          <SourceListItem icon="agent" label="Release notes" warn />
+        </SourceList>
+      </Section>
+
+      <Section name="toolbar">
+        <Toolbar label="Today">
+          <span className="np-toolbar__title">Today</span>
+          <ToolbarSpacer />
+          <span className="glass">
+            <IconButton icon="search" label="Search" />
+          </span>
+        </Toolbar>
+      </Section>
+
+      <Section name="split-divider">
+        <div className="split">
+          <span>Sidebar</span>
+          <SplitDivider value={220} label="Sidebar width" onChange={none} />
+          <span>Content</span>
+        </div>
+      </Section>
+
+      <Section name="menu">
+        <Row>
+          <Menu
+            label="Call"
+            items={[
+              { label: "Open" },
+              { label: "Copy Link", kbd: "⌘L" },
+              { label: "Starred", checked: true },
+              { divider: true },
+              { label: "Export", disabled: true },
+              { label: "Delete Call…", destructive: true },
+            ]}
+          />
+          <Menu variant="context-menu" label="Transcript" items={[{ header: "Speaker" }, { label: "Rename…" }, { label: "Merge With", submenu: true }]} />
+        </Row>
+      </Section>
+
+      <Section name="sheet">
+        <div className="stage">
+          <Sheet title="Export" onCancel={none}>
+            <div style={{ padding: 20 }}>Export the transcript as Markdown.</div>
+            <SheetFooter defaultButton={<PushButton label="Export" variant="primary" />}>
+              <PushButton label="Cancel" />
+            </SheetFooter>
+          </Sheet>
+        </div>
+      </Section>
+
+      <Section name="empty-state">
+        <Row>
+          <EmptyState title="No calls yet" body="Calls you record show here." actionLabel="Record a Call" />
+          <EmptyState variant="filtered" title="No calls match" actionLabel="Clear Filters" />
+        </Row>
+        <EmptyState variant="section" title="No open items" />
+        <EmptyState variant="large" icon="people" title="No people yet" body="People appear after your first call." linkLabel="Learn More" />
+      </Section>
+
+      <Section name="inline-banner">
+        <div className="stack">
+          <InlineBanner banner={{ id: "e", severity: "error", title: "No microphone", text: "Noter can't hear you. Allow microphone access in System Settings.", actions: [{ label: "Open Settings…" }] }} />
+          <InlineBanner banner={{ id: "w", severity: "warning", text: "Disk almost full: 400 MB left.", actions: [{ label: "Free Up Space…" }] }} more={2} />
+          <InlineBanner banner={{ id: "d", severity: "degraded", text: "Live transcript paused while the Mac catches up.", actions: [{ label: "Retry", loading: true }] }} />
+          <InlineBanner banner={{ id: "i", severity: "info", text: "Downloading the speech model.", progress: 64 }} />
+          <InlineBanner banner={{ id: "s", severity: "success", text: "Calendar connected.", compact: true, actions: [{ label: "Learn More", link: true }] }} />
+          <BannerSlot region="MW-R5" banners={[{ id: "a", severity: "info", text: "A new version is ready." }, { id: "b", severity: "warning", text: "Teams is not allowed to share audio." }]} />
+        </div>
+      </Section>
+
+      <Section name="inline-status">
+        <Row>
+          <InlineStatus variant="on-label" text="Copied" onExpire={none} />
+          <InlineStatus text="Saved" onExpire={none} />
+          <InlineStatus variant="blind" text="Moment marked" kbd="⌘M" onExpire={none} />
+          <InlineStatus variant="row-outcome" text="Moved to Done" actionLabel="Undo" onExpire={none} />
+          <InlineStatus variant="notice" text="Saved as draft" onExpire={none} />
         </Row>
       </Section>
 
