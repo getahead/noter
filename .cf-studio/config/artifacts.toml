@@ -85,7 +85,7 @@ artifacts = [
 # reports how many design elements have a marker and fails if that ever goes down.
 codebase = [
   { name = "Rust crates", path = "crates", extensions = [".rs"] },
-  { name = "Desktop UI", path = "apps/desktop/src", extensions = [".ts", ".tsx"] },
+  { name = "Desktop UI", path = "apps/desktop/src", extensions = [".ts", ".tsx", ".css"] },
   { name = "Conformance suite", path = "apps/desktop/tests/conformance", extensions = [".ts"] },
   { name = "Tauri host", path = "apps/desktop/src-tauri/src", extensions = [".rs"] },
 ]
