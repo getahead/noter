@@ -362,6 +362,7 @@ async fn world_set_models_ignore_sizes_and_progress_the_core_derives() {
         b["size_mb"] = json!(2100); // a preset's real sizes: the harness serves tiny bundles
         b["done_mb"] = json!(0);
     }
+    world["app"]["environment"]["online"] = json!(false);
     world["app"]["setup"]["models"]["total_mb"] = json!(8400);
     world["app"]["setup"]["models"]["done_mb"] = json!(0);
     let set = r
@@ -374,6 +375,36 @@ async fn world_set_models_ignore_sizes_and_progress_the_core_derives() {
         .unwrap()
         .iter()
         .all(|b| b["state"] == "pending"));
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_download_that_resumes_online_is_not_world_set_drift() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for b in world["app"]["setup"]["models"]["bundles"]
+        .as_array_mut()
+        .unwrap()
+    {
+        b["state"] = json!("pending");
+    }
+    world["app"]["environment"]["online"] = json!(false);
+    r.ok(
+        "main",
+        "harness.world_set",
+        json!({ "world": world.clone() }),
+    )
+    .await;
+    let code = r
+        .code("first-run", "models_download", json!({ "action": "start" }))
+        .await;
+    assert_eq!(code, "offline");
+    // back online: the core starts the download itself, the world still says pending
+    world["app"]["environment"]["online"] = json!(true);
+    let set = r
+        .ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(set, json!({}));
     r.finish().await;
 }
 
