@@ -10,7 +10,9 @@
 //                     this test starts, as the Tauri host would (docs/HARNESS.md).
 import type { Page } from "@playwright/test";
 
-import { COMMANDS, type CommandName, type ErrorCode, type WindowLabel } from "../../../src/core/bindings";
+import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type WindowLabel } from "../../../src/core/bindings";
+import type { ChannelBody } from "../../../src/core/fake/fake-core";
+import type { World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
 
 export interface CorePlan {
@@ -20,6 +22,15 @@ export interface CorePlan {
   contractVersion?: string;
   /** Artificial latency per command, in ms. */
   latency?: number;
+  /** The story's starting state (tests/support/world-presets.ts), applied before the window's first command. */
+  world?: (world: World) => void;
+}
+
+/** What the outside world does to the core behind an open window, as the scenario controls do. */
+export interface Steer {
+  change(mutate: (world: World) => void): Promise<void>;
+  failNext(cmd: CommandName, code: ErrorCode, detail?: ErrorDetail | null): Promise<void>;
+  push(cmd: ChannelCommand, body: ChannelBody): Promise<void>;
 }
 
 export interface Call {
@@ -34,17 +45,21 @@ const HOOK = `
   const listen = FakeCore.prototype.listen;
   const calls = (globalThis.__noterCalls ??= []);
   FakeCore.prototype.invoke = function (cmd, args, onMessage) {
+    globalThis.__noterFake = this;
     const plan = globalThis.__noterPlan;
     if (plan && !this.__noterPlanned) {
-      this.__noterPlanned = true;
-      (plan.fail ?? []).forEach((f) => this.failNext(f.cmd, f.code));
-      if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
-      if (plan.latency) this.latency = plan.latency;
+      this.__noterPlanned = (async () => {
+        if (globalThis.__noterSeed) this.world = await globalThis.__noterSeed(this.world);
+        (plan.fail ?? []).forEach((f) => this.failNext(f.cmd, f.code));
+        if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
+        if (plan.latency) this.latency = plan.latency;
+      })();
     }
     calls.push({ kind: "invoke", name: cmd, args: structuredClone(args) });
-    return invoke.call(this, cmd, args, onMessage);
+    return Promise.resolve(this.__noterPlanned).then(() => invoke.call(this, cmd, args, onMessage));
   };
   FakeCore.prototype.listen = function (event, handler) {
+    globalThis.__noterFake = this;
     calls.push({ kind: "listen", name: event });
     return listen.call(this, event, handler);
   };
@@ -99,15 +114,25 @@ function tauriIpcStandIn(): void {
 const WINDOWS = COMMANDS.app_snapshot.windows as readonly string[];
 
 /** Node side of the stdio target: one core process per page, closed with the page. */
-async function connectRealCore(page: Page, label: string, plan: CorePlan): Promise<void> {
+async function connectRealCore(page: Page, label: string, plan: CorePlan): Promise<Steer> {
   const command = process.env.NOTER_CORE_CMD;
   if (!command) throw new Error("NOTER_CORE=stdio needs NOTER_CORE_CMD (path to noter-core-harness and its flags)");
   const core = new StdioCore({ command });
   page.once("close", () => void core.close());
   const win = (WINDOWS.includes(label) ? label : "main") as WindowLabel; // as main.tsx reads it
-  for (const f of plan.fail ?? []) {
-    await core.invoke("main", "harness.fail_next" as CommandName, { window: win, cmd: f.cmd, code: f.code, detail: null });
-  }
+  // Harness control requests (tests/support/scenario.ts › HARNESS_CONTROLS), not contract commands.
+  const control = (name: string, args: unknown) => core.invoke("main", name as CommandName, args);
+  const steer: Steer = {
+    async change(mutate) {
+      const world = (await control("harness.world_get", {})) as World;
+      mutate(world);
+      await control("harness.world_set", { world });
+    },
+    failNext: async (cmd, code, detail = null) => void (await control("harness.fail_next", { window: win, cmd, code, detail })),
+    push: async (cmd, body) => void (await control("harness.push", { cmd, body })),
+  };
+  if (plan.world) await steer.change(plan.world);
+  for (const f of plan.fail ?? []) await steer.failNext(f.cmd, f.code);
   // A delivery may race a reload or the page closing; the new document ignores it anyway.
   const deliver = (doc: string, id: number, x: unknown) =>
     page.evaluate(([d, i, v]) => (globalThis as unknown as PageIpc).__noterDeliver?.(d, i, v), [doc, id, x] as const).catch(() => {});
@@ -132,20 +157,47 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     }
   });
   await page.addInitScript(tauriIpcStandIn);
+  return steer;
 }
 
-/** Open `index.html?window=<label>` with the selected core (NOTER_CORE) steered by `plan`. */
-export async function openWindow(page: Page, label: WindowLabel | string, plan: CorePlan = {}): Promise<void> {
+interface PageFake {
+  __noterFake: { world: World; setWorld(w: World): void; failNext(c: string, k: string, d: unknown): void; push(c: string, b: unknown): void };
+}
+
+/** The fake target's controls: the FakeCore the page built, reached through the hook. */
+function fakeSteer(page: Page): Steer {
+  return {
+    async change(mutate) {
+      const world = await page.evaluate(() => (globalThis as unknown as PageFake).__noterFake.world);
+      mutate(world);
+      await page.evaluate((w) => (globalThis as unknown as PageFake).__noterFake.setWorld(w), world);
+    },
+    failNext: (cmd, code, detail = null) =>
+      page.evaluate(([c, k, d]) => void (globalThis as unknown as PageFake).__noterFake.failNext(c, k, d), [cmd, code, detail] as const),
+    push: (cmd, body) => page.evaluate(([c, b]) => void (globalThis as unknown as PageFake).__noterFake.push(c, b), [cmd, body] as const),
+  };
+}
+
+/**
+ * Open `index.html?window=<label>` with the selected core (NOTER_CORE) steered by `plan`, and
+ * return the controls a story uses while the window is open.
+ */
+export async function openWindow(page: Page, label: WindowLabel | string, plan: CorePlan = {}): Promise<Steer> {
+  let steer: Steer;
   if (process.env.NOTER_CORE === "stdio") {
-    await connectRealCore(page, label, plan);
+    steer = await connectRealCore(page, label, plan);
   } else {
-    await page.addInitScript((p) => Object.assign(globalThis, { __noterPlan: p }), plan);
+    const { world, ...wire } = plan;
+    if (world) await page.exposeFunction("__noterSeed", (w: World) => (world(w), w));
+    await page.addInitScript((p) => Object.assign(globalThis, { __noterPlan: p }), wire);
     await page.route(/\/src\/core\/fake\/fake-core\.ts(\?.*)?$/, async (route) => {
       const response = await route.fetch();
       await route.fulfill({ response, body: (await response.text()) + HOOK });
     });
+    steer = fakeSteer(page);
   }
   await page.goto(`/?window=${label}`);
+  return steer;
 }
 
 /** Every command and event subscription the window made, in order. */
