@@ -88,7 +88,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 - Error — Shortcut used by VoiceOver: **Used by VoiceOver** under the row; a different chord clears it
 - Error — Card key used by another app: **Card key** ⌃⌥⌘3 **is used by another app** under **Pin a card**; reopening **Hotkeys** after freeing it clears it
 - Error — Shortcut without a modifier: **Add Command, Option or Control**; the old chord stays
-- Empty — No setting matches the search: the search field's empty state in place of the pane list
+- Empty — No setting matches the search: “zoom calls”, which matches no pane name or keyword (HoD decision D-2; plain “zoom” finds Privacy and Call Screen & Menu Bar), shows the search field's empty state **No settings match “zoom calls”** in place of the pane list; the E2E test types the same words
 
 **Steps**:
 1. [ ] - `p1` - User opens Settings and selects **Hotkeys** - `inst-open-hotkeys`
