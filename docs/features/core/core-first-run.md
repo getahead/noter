@@ -194,7 +194,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Download task
 
-- [x] `p1` - **ID**: `cpt-noter-algo-core-first-run-download-task`
+- [ ] `p1` - **ID**: `cpt-noter-algo-core-first-run-download-task`
 
 **Input**: The pinned model manifest (bundle name, URL, size, checksum), compiled into the app; hosts listed in `contracts/egress-hosts.json`.
 
@@ -202,7 +202,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 **Steps**:
 1. [x] - `p1` - **FOR EACH** bundle not `ready`, required-for-capture bundles first - `inst-for-bundles`
-   1. [x] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second; the HTTP fetcher is noter-llm's `RangeFetcher`, the egress gate, since noter-core opens no connection (backend decision D11) - `inst-try-download`
+   1. [ ] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second; the HTTP fetcher is noter-llm's `RangeFetcher`, the egress gate, since noter-core opens no connection (backend decision D11) - `inst-try-download`
    2. [x] - `p1` - **CATCH** a network failure: state `paused`, error `offline` - `inst-catch-offline`
    3. [x] - `p1` - Verify the checksum (`verifying`); on mismatch delete the partial file, state `checksum_failed` - `inst-verify`
    4. [x] - `p1` - Move the verified file into `models/` (0600) and mark the bundle `ready` - `inst-move-ready`
@@ -304,7 +304,7 @@ The system **MUST** answer `setup_status`, `setup_set_call_display`, `setup_set_
 
 ### Resumable, verified model downloads
 
-- [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-models`
+- [ ] `p1` - **ID**: `cpt-noter-dod-core-first-run-models`
 
 The system **MUST** download the pinned bundles with range resume, verify each checksum before use, report `offline`, `checksum_failed` and `disk_full` as typed errors and bundle states, and reach only hosts listed in `contracts/egress-hosts.json`.
 
