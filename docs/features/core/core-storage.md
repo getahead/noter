@@ -225,7 +225,7 @@ The system **MUST** apply numbered migrations in order, each in its own transact
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
 
-The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and M1 and finds one change row per write.
+The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test.
 
 **Implements**:
 - `cpt-noter-flow-core-storage-write`
@@ -251,7 +251,7 @@ The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (
 
 - [x] A fresh start creates `noter.db` with mode 0600 and the schema at the newest version; a second start runs no migration.
 - [x] A failed migration leaves the database at the previous version and the core accepts no writes.
-- [ ] Every write made through M0 and M1 commands produces exactly one `changes` row in the same transaction; a forced failure after the row write leaves neither.
+- [ ] Every write made through M0 commands produces exactly one `changes` row in the same transaction (each later feature extends the test with its own commands); a forced failure after the row write leaves neither.
 - [x] A write with a stale `rev` returns `conflict` with `detail.current_rev` and changes nothing.
 - [x] `just arch` passes: no crate other than `noter-db` depends on an SQLite crate.
 - [ ] `just gate` passes, with unit line coverage of `noter-db` at 80 % or more.

@@ -1,5 +1,6 @@
 //! The one write path: a mutation and its `changes` row commit in one transaction.
 
+use noter_protocol::ipc::NativeSurface;
 use noter_protocol::model::Actor;
 use noter_protocol::{BatchId, ChangeId, CoreError, ErrorCode, ErrorDetail, EvidenceId, Rev};
 use rusqlite::types::{Value as Sql, ValueRef};
@@ -17,6 +18,8 @@ pub struct Mutation {
     pub id: String,
     /// The `rev` the caller last saw, for user-editable records; `None` skips the check.
     pub base_rev: Option<Rev>,
+    /// Whether the write moves the row's `rev`; `false` leaves it alone (or the table has none).
+    pub bump_rev: bool,
     pub values: Vec<(&'static str, Value)>,
 }
 
@@ -29,6 +32,8 @@ pub struct ChangeMeta {
     pub evidence_ids: Vec<EvidenceId>,
     pub batch_id: Option<BatchId>,
     pub undoable: bool,
+    /// The native surface (menu, menu bar, hotkey, notification) that sent the command, if any.
+    pub surface: Option<NativeSurface>,
 }
 
 /// A committed write: the stored row, its new `rev` and its change row.
@@ -131,10 +136,7 @@ fn change_tx(
         check(m)?;
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
         let before = select_row(&tx, m).map_err(internal)?;
-        let stored_rev = before
-            .as_ref()
-            .and_then(|r| r["rev"].as_u64())
-            .map(|r| Rev(r as u32));
+        let stored_rev = before.as_ref().and_then(rev_of);
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
         if m.base_rev.is_some_and(|base| Some(base) != stored_rev) {
@@ -150,9 +152,10 @@ fn change_tx(
         }
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
-        let rev = Rev(stored_rev.map_or(1, |r| r.0 + 1));
-        write_row(&tx, m, rev, before.is_some()).map_err(internal)?;
+        let new_rev = m.bump_rev.then(|| Rev(stored_rev.map_or(1, |r| r.0 + 1)));
+        write_row(&tx, m, new_rev, before.is_some()).map_err(internal)?;
         let after = select_row(&tx, m).map_err(internal)?.unwrap_or(Value::Null);
+        let rev = rev_of(&after).unwrap_or(Rev(0));
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
         let change_id = ChangeId::new(format!("chg_{}", ulid::Ulid::generate()));
@@ -162,8 +165,8 @@ fn change_tx(
         };
         tx.execute(
             "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, summary, reason,
-                                  evidence_ids, status, batch_id, undoable)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'applied', ?12, ?13)",
+                                  evidence_ids, status, batch_id, undoable, surface)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'applied', ?12, ?13, ?14)",
             params![
                 change_id.as_str(),
                 now_ms(),
@@ -178,6 +181,7 @@ fn change_tx(
                 serde_json::to_string(&meta.evidence_ids).map_err(internal)?,
                 meta.batch_id.as_ref().map(BatchId::as_str),
                 meta.undoable,
+                meta.surface.map(surface_column),
             ],
         )
         .map_err(internal)?;
@@ -203,6 +207,19 @@ fn actor_column(actor: &Actor) -> String {
         Actor::Job { job_id, .. } => format!("job:{job_id}"),
         Actor::Model { llm_run_id, .. } => format!("llm_run:{llm_run_id}"),
     }
+}
+
+fn surface_column(surface: NativeSurface) -> &'static str {
+    match surface {
+        NativeSurface::Menu => "menu",
+        NativeSurface::MenuBar => "menu_bar",
+        NativeSurface::Hotkey => "hotkey",
+        NativeSurface::Notification => "notification",
+    }
+}
+
+fn rev_of(row: &Value) -> Option<Rev> {
+    row["rev"].as_u64().map(|r| Rev(r as u32))
 }
 
 /// Table and column names are spliced into SQL, so they must be plain identifiers.
@@ -232,25 +249,33 @@ fn select_row(tx: &Transaction, m: &Mutation) -> rusqlite::Result<Option<Value>>
     .optional()
 }
 
-fn write_row(tx: &Transaction, m: &Mutation, rev: Rev, exists: bool) -> rusqlite::Result<usize> {
-    let values: Vec<_> = m
-        .values
-        .iter()
-        .filter(|(c, _)| !matches!(*c, "id" | "rev"))
-        .collect();
-    let columns: Vec<&str> = values.iter().map(|(c, _)| *c).collect();
-    let mut args: Vec<Sql> = values.iter().map(|(_, v)| to_sql(v)).collect();
-    args.push(Sql::Integer(rev.0.into()));
+/// Sets the given columns, and `rev` when one is given; `id` and `rev` from the caller are ignored.
+fn write_row(
+    tx: &Transaction,
+    m: &Mutation,
+    rev: Option<Rev>,
+    exists: bool,
+) -> rusqlite::Result<usize> {
+    let mut columns: Vec<&str> = Vec::new();
+    let mut args: Vec<Sql> = Vec::new();
+    for (column, value) in m.values.iter().filter(|(c, _)| !matches!(*c, "id" | "rev")) {
+        columns.push(column);
+        args.push(to_sql(value));
+    }
+    if let Some(rev) = rev {
+        columns.push("rev");
+        args.push(Sql::Integer(rev.0.into()));
+    }
     args.push(Sql::Text(m.id.clone()));
     let sql = if exists {
-        let sets: String = columns.iter().map(|c| format!("{c} = ?, ")).collect();
-        format!("UPDATE {} SET {sets}rev = ? WHERE id = ?", m.table)
+        let sets: Vec<String> = columns.iter().map(|c| format!("{c} = ?")).collect();
+        format!("UPDATE {} SET {} WHERE id = ?", m.table, sets.join(", "))
     } else {
-        let marks = "?, ".repeat(columns.len());
         let names: String = columns.iter().map(|c| format!("{c}, ")).collect();
         format!(
-            "INSERT INTO {} ({names}rev, id) VALUES ({marks}?, ?)",
-            m.table
+            "INSERT INTO {} ({names}id) VALUES ({}?)",
+            m.table,
+            "?, ".repeat(columns.len())
         )
     };
     tx.execute(&sql, params_from_iter(args))
