@@ -1269,6 +1269,10 @@ export const defaultHandlers: Handlers = {
       b.shortcut = b.default_shortcut;
       b.status = b.action === "undo_card_action" ? { type: "registered_during_capture" } : { type: "registered" };
     });
+    // Restore Defaults covers the card keys too, which live in the copilot settings section.
+    world.settings.copilot.card_keys = { enabled: true, modifiers: { control: true, option: true, command: true } };
+    world.settings.rev += 1;
+    publish("settings:changed");
     publish("hotkeys:changed");
     return world.hotkeys;
   },
@@ -1589,6 +1593,9 @@ export const defaultHandlers: Handlers = {
   setup_set_call_display: (a, { world, publish }) => {
     if (a.display_id && !world.app.environment.displays.some((d) => d.id === a.display_id)) throw coreError("not_found", `display ${a.display_id}`);
     world.app.setup.call_display = a.display_id ?? null;
+    world.settings.call_screen.display_id = a.display_id ?? null;
+    world.settings.rev += 1;
+    publish("settings:changed");
     publish("setup:changed");
     return world.app.setup;
   },
