@@ -8,6 +8,7 @@ use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::{serve_with, Output};
 
 /// The command line: `--fixture world` (the fixture world of noter-protocol) and `--clock fixed`.
+// @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-start
 fn parse_args(args: &[String]) -> Result<Options, String> {
     let mut options = Options::default();
     let mut rest = args.iter();
@@ -21,6 +22,7 @@ fn parse_args(args: &[String]) -> Result<Options, String> {
     }
     Ok(options)
 }
+// @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-start
 
 // @cpt-state:cpt-noter-state-core-harness-process:p1
 #[tokio::main]

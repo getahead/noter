@@ -472,6 +472,24 @@ async fn hold_next_download_stops_at_the_fraction_until_released() {
 }
 
 #[tokio::test]
+async fn a_release_before_the_fetch_starts_is_not_lost() {
+    let mut r = start().await;
+    pending_models(&mut r).await;
+    r.ok(
+        "main",
+        "harness.hold_next_download",
+        json!({ "at_percent": 50 }),
+    )
+    .await;
+    r.ok("main", "harness.release_download", json!({})).await;
+    r.ok("first-run", "models_download", json!({ "action": "start" }))
+        .await;
+    let done = until_speech(&mut r, |m| m["state"] == "ready").await;
+    assert_eq!(done["done_mb"], done["size_mb"]);
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn pausing_a_held_download_leaves_it_paused_with_its_progress() {
     let mut r = start().await;
     pending_models(&mut r).await;
