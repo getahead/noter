@@ -13,8 +13,8 @@ export type AnnounceKind =
 export interface AnnounceEvent {
   kind: AnnounceKind;
   text: string;
-  /** Identifies this occurrence for the once-per-event rule (default: kind + text). */
-  key?: string;
+  /** Names this occurrence for the once-per-event rule, e.g. `saved:<rev>`: a later event with the same text is spoken again. */
+  key: string;
 }
 
 const SILENT: ReadonlySet<AnnounceKind> = new Set(["transcript_line", "level_meter", "clock_tick", "countdown_second"]);
@@ -36,7 +36,7 @@ export function routeAnnouncement(event: AnnounceEvent, win: { label: WindowLabe
   // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-route-announcement:p1:inst-politeness
   const politeness: Politeness = ASSERTIVE.has(event.kind) ? "assertive" : "polite";
   // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-route-announcement:p1:inst-politeness
-  const key = event.key ?? `${event.kind}\u0000${event.text}`;
+  const key = `${event.kind}\u0000${event.key}`;
   // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-route-announcement:p1:inst-if-repeat
   if (announced.has(key)) {
     // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-route-announcement:p1:inst-return-once
@@ -97,13 +97,13 @@ export function createAnnouncer(env: AnnouncerEnv) {
   };
 }
 
-/** Writes into the window's live region; clearing first makes a repeated identical text a change. */
+/** Writes into the window's live region: cleared now, filled a moment later, so a repeated identical text is still a change. */
 export function writeLive(doc: Pick<Document, "querySelector">) {
   return (politeness: Politeness, text: string): void => {
     const el = doc.querySelector(`[data-live="${politeness}"]`);
     if (!el) return;
     el.textContent = "";
-    el.textContent = text;
+    setTimeout(() => (el.textContent = text), 50);
   };
 }
 

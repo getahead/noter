@@ -115,11 +115,12 @@ describe("unobscuredScrollTop", () => {
 describe("installUnobscure", () => {
   const rect = (r: object) => () => r;
   it("sets the scroll container's scrollTop on focusin", () => {
-    const sticky = { getBoundingClientRect: rect({ height: 40 }) };
+    const sticky = { getBoundingClientRect: rect({ top: 100, bottom: 140 }) };
+    const groupHeaderBelow = { getBoundingClientRect: rect({ top: 300, bottom: 330 }) }; // sticky, but not stuck now
     const container = {
       overflow: "auto", scrollTop: 200, parentElement: null,
       getBoundingClientRect: rect({ top: 100, bottom: 500 }),
-      querySelectorAll: (s: string) => (s.includes("top") ? [sticky] : []),
+      querySelectorAll: (s: string) => (s.includes("top") ? [groupHeaderBelow, sticky] : []),
     };
     const target = { parentElement: { overflow: "visible", parentElement: container }, getBoundingClientRect: rect({ top: 110, bottom: 130 }) };
     const { doc, l } = fakeDoc({ page: [] });

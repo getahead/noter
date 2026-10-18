@@ -76,7 +76,17 @@ export function unobscuredScrollTop(scrollTop: number, el: Box, container: Box, 
   // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-unobscure
 }
 
-const sumHeights = (c: Element, side: "top" | "bottom") => [...c.querySelectorAll(`[data-sticky="${side}"]`)].reduce((n, s) => n + s.getBoundingClientRect().height, 0);
+/** How far the parts stuck to one edge of the container reach in (group headers further down are not stuck yet). */
+function stuckInset(c: Element, side: "top" | "bottom"): number {
+  const box = c.getBoundingClientRect();
+  const sign = side === "top" ? 1 : -1;
+  const near = (r: Box) => (side === "top" ? r.top : r.bottom);
+  const far = (r: Box) => (side === "top" ? r.bottom : r.top);
+  let edge = near(box);
+  const parts = [...c.querySelectorAll(`[data-sticky="${side}"]`)].map((s) => s.getBoundingClientRect()).sort((a, b) => sign * (near(a) - near(b)));
+  for (const r of parts) if (sign * (near(r) - edge) <= 1 && sign * (far(r) - edge) > 0) edge = far(r);
+  return sign * (edge - near(box));
+}
 
 export function installUnobscure(root: Document): () => void {
   const on = (e: Event) => {
@@ -84,7 +94,7 @@ export function installUnobscure(root: Document): () => void {
     if (!el?.getBoundingClientRect) return;
     let c = el.parentElement;
     while (c && !/auto|scroll/.test(root.defaultView!.getComputedStyle(c).overflowY)) c = c.parentElement;
-    if (c) c.scrollTop = unobscuredScrollTop(c.scrollTop, el.getBoundingClientRect(), c.getBoundingClientRect(), sumHeights(c, "top"), sumHeights(c, "bottom"));
+    if (c) c.scrollTop = unobscuredScrollTop(c.scrollTop, el.getBoundingClientRect(), c.getBoundingClientRect(), stuckInset(c, "top"), stuckInset(c, "bottom"));
   };
   root.addEventListener("focusin", on);
   return () => root.removeEventListener("focusin", on);
