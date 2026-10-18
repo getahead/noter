@@ -120,11 +120,13 @@ describe("settings with revisions and whole-state events (R25)", () => {
     expect(ok(await settings.hotkeysList({}))).toEqual(reset);
   });
 
-  it("setup_set_step marks a step done; setup:changed grows", async () => {
+  // The fixture has every step done (D10 lets the real core hold Assistants done too), so the
+  // test moves one to skipped: a change on every core, never a no-op that leaves versions alone.
+  it("setup_set_step changes a step's state; setup:changed grows", async () => {
     const changes = await s.events("setup:changed");
     const before = ok(await s.core("first-run").setupStatus({}));
-    const after = ok(await s.core("first-run").setupSetStep({ step: "assistants", state: "done" }));
-    expect(after.steps.find((r) => r.step === "assistants")?.state).toBe("done");
+    const after = ok(await s.core("first-run").setupSetStep({ step: "assistants", state: "skipped" }));
+    expect(after.steps.find((r) => r.step === "assistants")?.state).toBe("skipped");
     expect(after.version).toBeGreaterThan(before.version);
     await until(() => changes.latest(), "setup:changed");
     expect(changes.latest()!.version).toBe(after.version);

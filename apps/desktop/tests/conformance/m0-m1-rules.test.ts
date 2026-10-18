@@ -305,7 +305,7 @@ describe("whole-state events carry growing versions (R25)", () => {
     ok(await settings.hotkeysReset({}));
     const current = ok(await settings.settingsGet({}));
     ok(await settings.settingsUpdate({ rev: current.rev, section: { section: "menu_bar", value: current.menu_bar } }));
-    ok(await s.core("first-run").setupSetStep({ step: "assistants", state: "done" }));
+    ok(await s.core("first-run").setupSetStep({ step: "assistants", state: "skipped" })); // a change: the fixture has it done
 
     const ran = { capture: paused !== null, setup: true, settings: true, hotkeys: true, window: collapsed !== null, presenting: hidden !== null };
     await until(
