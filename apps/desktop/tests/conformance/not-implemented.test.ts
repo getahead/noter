@@ -9,12 +9,16 @@
 // for arguments the fake accepts therefore fails too: against the fake it means the table is
 // wrong, against the real core that the core differs from the fake on that command. The rest of
 // "differs from the fake" (scope, typed errors, streams, revisions, versions) is checked by the
-// other files of this suite against the same fixtures.
+// other files of this suite against the same fixtures. Each command runs in its own scenario (a
+// fresh core on the fixture world), so a destructive command cannot change what the next one sees.
+// The table is complete by construction (its type requires every command, and the first test below
+// fails on a missing or extra entry), so every command is judged; none is left "not judged".
 // @cpt-flow:cpt-noter-flow-core-contract-conformance:p1
 import { afterAll, describe, expect, it } from "vitest";
 
 import { COMMANDS, type CommandName, type WindowLabel } from "../../src/core/bindings";
-import { target, transportFor } from "../support/core";
+import { exercised, target } from "../support/core";
+import { openScenario } from "../support/scenario";
 import { EXAMPLE_ARGS } from "./example-args";
 import { CURRENT, isLater, milestoneOf, ORDER, summary } from "./milestones";
 
@@ -37,11 +41,11 @@ describe("commands the core does not answer yet", () => {
   });
 
   it.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
-    const t = transportFor(COMMANDS[name].windows[0] as WindowLabel);
-    const code = await t.invoke(name, EXAMPLE_ARGS[name], COMMANDS[name].channel ? () => {} : undefined).then(
-      () => null,
-      (e) => (e as { code?: string } | null)?.code,
-    );
+    const s = openScenario({ alsoRecord: exercised });
+    const client = s.core(COMMANDS[name].windows[0] as WindowLabel) as unknown as Record<string, (a: unknown, m?: unknown) => Promise<{ status: string; error?: { code: string } }>>;
+    const method = name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+    const res = await client[method](EXAMPLE_ARGS[name], COMMANDS[name].channel ? () => {} : undefined).finally(() => s.dispose());
+    const code = res.status === "error" ? res.error?.code : null;
     // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-if-differs
     // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
     expect(code, target === "fake" ? `the fake refuses the example arguments of ${name}: fix example-args.ts` : `${name} refuses arguments the fake accepts`).not.toBe("invalid_input");
