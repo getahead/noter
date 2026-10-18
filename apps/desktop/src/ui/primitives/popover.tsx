@@ -2,7 +2,7 @@
 // opens under its anchor, Esc or a click outside closes it, focus moves in and returns to the anchor.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { base } from "./attrs";
-import { useFocusInside } from "./sheet";
+import { focusInside } from "./sheet";
 
 type Rect = { left: number; right: number; top: number; bottom: number };
 type Size = { width: number; height: number };
@@ -49,8 +49,10 @@ export interface PopoverProps {
 export function Popover({ variant, anchor, align, width, label, onClose, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [place, setPlace] = useState<{ left: number; top: number } | null>(null);
-  useFocusInside(ref);
   useLayoutEffect(() => setPlace(measure(ref.current, anchor, align)), [anchor, align]);
+  // focus moves in once it is placed: a hidden element takes no focus
+  const placed = place !== null;
+  useEffect(() => (placed ? focusInside(ref.current) : undefined), [placed]);
   useEffect(() => closeOnOutside(ref, anchor, onClose), [anchor, onClose]);
   return (
     <div
