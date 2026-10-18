@@ -223,7 +223,12 @@ pub fn hotkey_pressed<R: Runtime>(
     let core = app.try_state::<Booted>()?.0.clone().ok()?;
     let chord = chord.to_string();
     Some(tauri::async_runtime::spawn(async move {
-        core.hotkey_pressed(&chord).await
+        let answer = core.hotkey_pressed(&chord).await;
+        // Refusals (not_recording, not_implemented) are expected; a failure leaves a trace without content.
+        if matches!(&answer, Err(e) if e.code == ErrorCode::Internal) {
+            eprintln!("noter: the hotkey {chord} failed (internal)");
+        }
+        answer
     }))
 }
 
