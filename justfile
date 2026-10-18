@@ -70,12 +70,18 @@ cov-unit:
     python3 scripts/harness/coverage_gate.py --rust coverage/unit/rust.lcov --ui apps/desktop/coverage/unit/lcov.info --base {{base}}
 
 # End-to-end: conformance suite (+ UI flows), then the E2E coverage gate (60% of what is delivered)
-e2e:
+e2e: e2e-run e2e-coverage
+
+# The E2E suites alone, logging to coverage/e2e (CI runs them alongside the macos job)
+e2e-run:
     rm -rf coverage/e2e
     pnpm --dir apps/desktop test:conformance
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance; fi
     pnpm --dir apps/desktop test:e2e
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e; fi
+
+# The E2E coverage gate over coverage/e2e and coverage/native (`just native`)
+e2e-coverage:
     python3 scripts/harness/e2e_coverage.py
 
 # Native macOS UI tests (XCUITest): the menu bar extra and its menu, tray glyphs, the non-activating
