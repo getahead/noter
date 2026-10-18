@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -86,7 +87,11 @@ def main() -> int:
         print("The fast gate needs `just` (brew install just). Run `just setup`.", file=sys.stderr)
         return 2
     try:
-        proc = subprocess.run(["just", "gate-fast"], cwd=ROOT, capture_output=True, text=True, timeout=TIMEOUT_S)
+        env = dict(os.environ)
+        if sys.platform == "darwin":
+            # Terminals launched by Orca put the CommandLineTools `ld` (cannot read the Xcode SDK) and Python 3.9 first.
+            env["PATH"] = "/opt/homebrew/bin:/usr/bin:" + env.get("PATH", "")
+        proc = subprocess.run(["just", "gate-fast"], cwd=ROOT, capture_output=True, text=True, timeout=TIMEOUT_S, env=env)
     except subprocess.TimeoutExpired:
         print(f"`just gate-fast` took longer than {TIMEOUT_S}s; run it yourself and fix what is slow.", file=sys.stderr)
         return 2
