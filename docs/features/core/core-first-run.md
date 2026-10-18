@@ -107,7 +107,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Grant a permission
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-first-run-permission`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-first-run-permission`
 
 **Actor**: Primary user (at the step that needs the permission)
 
