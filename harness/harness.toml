@@ -146,7 +146,9 @@ inert = [
 
 [ci.areas]
 rust = ["crates/**", "Cargo.toml", "Cargo.lock", "perf/**"]
-protocol = ["crates/noter-protocol/**", "contracts/**", "apps/desktop/src/core/**", "Cargo.lock", "pnpm-lock.yaml"]
+protocol = [
+  "crates/noter-protocol/**", "contracts/**", "apps/desktop/src/core/**", "apps/desktop/package.json", "Cargo.lock", "pnpm-lock.yaml",
+]
 ui = ["apps/desktop/**", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]
 tauri = ["apps/desktop/src-tauri/**"]
 native = ["apps/desktop/tests/native/**"]
@@ -179,7 +181,7 @@ unit = ["rust", "ui", "protocol"]
 e2e = ["rust", "ui", "protocol", "stories"]
 e2e-coverage = ["rust", "ui", "protocol", "stories"]
 visual = ["ui", "protocol"]
-perf = ["rust", "protocol"]
+perf = ["rust", "ui", "protocol"]   # perf.toml has Rust and UI scenarios
 docs = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
 macos = ["rust", "tauri", "native", "engine"]
 

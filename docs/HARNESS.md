@@ -137,7 +137,7 @@ On a pull request each job runs only if the change can affect what it checks (ow
 
 | A PR that changes only | runs |
 | --- | --- |
-| UI code (`apps/desktop/**` outside `src-tauri` and `tests/native`) | `lint-ui`, `arch`, `unit`, `e2e`, `e2e-coverage`, `visual`, `docs` |
+| UI code (`apps/desktop/**` outside `src-tauri` and `tests/native`) | `lint-ui`, `arch`, `unit`, `e2e`, `e2e-coverage`, `visual`, `perf` (UI scenarios), `docs` |
 | Rust crates, `Cargo.*` | `lint-rust`, `arch`, `unit`, `e2e`, `e2e-coverage`, `perf`, `docs`, `macos` |
 | the contract (`noter-protocol`, `contracts/`, `apps/desktop/src/core/`) | the above for its side, plus `contract` |
 | the Tauri host or the engine | `arch`, `docs`, `macos` |

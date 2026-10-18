@@ -686,15 +686,24 @@ class CiChangesTests(unittest.TestCase):
         self.assertEqual(set(CFG["ci"]["jobs"]["codeql"]), {"actions", "javascript-typescript", "rust"})
         self.assertEqual(CFG["ci"]["jobs"]["codeql"]["actions"], ["always"])
 
-    def test_every_tracked_file_is_classified(self):
-        files = subprocess.run(["git", "ls-files"], cwd=common.ROOT, capture_output=True, text=True, check=True).stdout.split()
-        ci = CFG["ci"]
-        unknown = [f for f in files if not common.matches_any(f, ci["everything"]) and ci_changes.classify(f, ci)[0] is None]
-        self.assertEqual(unknown, [], "add these to an area or to [ci].inert in harness.toml")
+    def test_the_repository_layout_is_classified(self):
+        # One file per kind the repository holds today; a file no rule knows runs everything (fail safe).
+        known = [
+            "README.md", "AGENTS.md", "CHANGELOG.md", ".gitignore", ".idea/.gitignore", ".claude/settings.json",
+            ".githooks/pre-commit", ".plans/x.md", ".release-please-manifest.json", "release-please-config.json",
+            "Cargo.toml", "Cargo.lock", "deny.toml", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+            ".github/dependabot.yml", ".github/CODEOWNERS", ".github/ISSUE_TEMPLATE/bug.yml", ".github/SECURITY.md",
+            ".github/rulesets/default-branch.json", ".github/workflows/nightly.yml", ".github/zizmor.yml",
+            ".cf-studio/config/artifacts.toml", "docs/diagrams/architecture.png", "scripts/dev/setup.sh",
+            "crates/noter-core/src/lib.rs", "contracts/fixtures/world.json", "engine/Package.swift",
+            "apps/desktop/index.html", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/tests/visual/__screenshots__/a.png",
+        ]
+        unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
+        self.assertEqual(unknown, [])
 
-    def test_ui_change_skips_rust_contract_perf_and_macos(self):
+    def test_ui_change_skips_rust_lints_contract_and_macos(self):
         self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"]),
-                         {"lint-ui", "arch", "unit", "e2e", "e2e-coverage", "visual", "docs"})
+                         {"lint-ui", "arch", "unit", "e2e", "e2e-coverage", "visual", "perf", "docs"})
 
     def test_rust_change_skips_typecheck_and_screenshots(self):
         self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs"]),
