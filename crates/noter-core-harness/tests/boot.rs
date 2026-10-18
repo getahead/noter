@@ -221,6 +221,38 @@ async fn world_set_refuses_a_slice_no_service_owns_yet() {
 }
 
 #[tokio::test]
+async fn world_set_refuses_derived_setup_fields_the_core_would_compute_otherwise() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let complete = world["app"]["setup"]["complete"].as_bool().unwrap();
+    world["app"]["setup"]["complete"] = json!(!complete);
+    let (set, _) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(set["error"]["code"], "invalid_input", "{set}");
+    assert!(
+        set["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("app.setup.complete"),
+        "{set}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_fixture_seeds_every_setup_step_including_assistants() {
+    let mut r = start().await;
+    let setup = r.ok("first-run", "setup_status", json!({})).await;
+    let fixture = serde_json::to_value(noter_protocol::fixtures::world().app.setup.steps).unwrap();
+    assert_eq!(
+        setup["steps"], fixture,
+        "D10: the core accepts every fixture step"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn update_install_answers_and_the_harness_keeps_serving() {
     let mut r = start().await;
     assert_eq!(
