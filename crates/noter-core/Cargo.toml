@@ -16,6 +16,7 @@ noter-db = { path = "../noter-db" }
 noter-protocol = { path = "../noter-protocol" }
 serde = "1"
 serde_json = "1"
+ulid = "3"
 
 [dev-dependencies]
 tempfile = "3"

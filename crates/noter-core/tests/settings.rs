@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use noter_core::{Clock, Core, CoreDeps, EventEmitter};
 use noter_db::rusqlite::Connection;
+use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -562,4 +563,22 @@ async fn every_settings_write_leaves_one_change_row() {
     assert_eq!(all.len(), 4);
     let entities: Vec<&str> = all.iter().map(|c| c.1.as_str()).collect();
     assert_eq!(entities, ["setting", "setting", "glossary", "glossary"]);
+}
+
+#[tokio::test]
+async fn an_unreadable_settings_revision_stops_the_boot() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    core.shutdown().await;
+    drop(core);
+    let c = Connection::open(dir.path().join("noter.db")).unwrap();
+    c.execute(
+        "INSERT INTO settings (key, value) VALUES ('rev', 'not a number')",
+        [],
+    )
+    .unwrap();
+    drop(c);
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let err = Core::open(dir.path(), deps).err().expect("boot fails");
+    assert!(err.to_string().contains("stored settings"));
 }
