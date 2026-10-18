@@ -199,6 +199,10 @@ def make_base_worktree(base_ref: str, root: Path = ROOT) -> Path:
     parent.mkdir(parents=True, exist_ok=True)
     path = Path(tempfile.mkdtemp(prefix=f"noter-perf-base-{merge_base[:12]}-", dir=parent))
     subprocess.run(["git", "worktree", "add", "--detach", str(path), merge_base], cwd=root, check=True, capture_output=True)
+    # Node scenarios build with the base's own dependencies (the pnpm store is warm from the head's install);
+    # without them a scenario that exists on the base would count as "failed on base" on every PR.
+    if (path / "pnpm-lock.yaml").exists():
+        subprocess.run(["pnpm", "install", "--frozen-lockfile", "--prefer-offline"], cwd=path, check=True, capture_output=True)
     return path
 
 

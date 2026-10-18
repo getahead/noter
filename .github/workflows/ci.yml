@@ -195,9 +195,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: ./.github/actions/setup
-        with:
-          node: "false"
+      - uses: ./.github/actions/setup # Node too: ui_stream_flush builds with vite and runs under node
       - run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
       - run: just perf
       - if: always()

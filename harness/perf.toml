@@ -29,6 +29,12 @@ what = "Core start: open the database, run migrations, answer app_snapshot"
 scenario = "core_cold_start"
 
 [[registry]]
+id = "ui-stream-flush"
+milestone = "M0"
+what = "Window store 100 ms Channel flush over a 60-minute live call (transcript, levels, cards)"
+scenario = "ui_stream_flush"
+
+[[registry]]
 id = "live-hypothesis-lag"
 milestone = "M1"
 what = "Hypothesis text lag behind speech, golden-set replay (PRD: <= 2 s)"
@@ -100,4 +106,9 @@ scenario = "jobs_integrity_recovery"
 [scenarios.protocol_fixtures_roundtrip]
 build = ["cargo", "build", "--release", "--quiet", "-p", "noter-protocol", "--example", "perf_fixtures_roundtrip"]
 run = ["{target}/release/examples/perf_fixtures_roundtrip"]
+modes = ["ir", "wall"]
+
+[scenarios.ui_stream_flush]
+build = ["pnpm", "--dir", "apps/desktop", "exec", "vite", "build", "--ssr", "tests/perf/stream-flush.ts", "--outDir", "../../target/perf-ui", "--emptyOutDir"]
+run = ["node", "--jitless", "target/perf-ui/stream-flush.js"]
 modes = ["ir", "wall"]

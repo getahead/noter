@@ -213,6 +213,20 @@ class PerfGateTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)  # 1 of 2 due = 50%
         self.assertIn("b (M0", report)
 
+    def test_base_checkout_gets_its_node_dependencies(self):
+        calls = []
+
+        def run(cmd, cwd=None, **_):
+            calls.append(cmd)
+            if cmd[:3] == ["git", "worktree", "add"]:
+                Path(cmd[4], "pnpm-lock.yaml").touch()
+            return subprocess.CompletedProcess(cmd, 0, stdout="abc123\n", stderr="")
+
+        with mock.patch.object(perf_gate.subprocess, "run", side_effect=run):
+            path = perf_gate.make_base_worktree("origin/main")
+        shutil.rmtree(path, ignore_errors=True)
+        self.assertEqual(calls[-1][:3], ["pnpm", "install", "--frozen-lockfile"])
+
     def test_registry_scenarios_exist_for_the_current_milestone(self):
         errors, _ = perf_gate.coverage(CFG, perf_gate.perf_config())
         self.assertEqual(errors, [])
