@@ -67,7 +67,8 @@ final class ModelsTests: XCTestCase {
         let container = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let models = container.appendingPathComponent("models")
         try FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
-        for name in ["whisper-turbo", "bge-m3", ".partial-junk"] {
+        // A download in progress (the core writes <name>.partial) is not an installed model.
+        for name in ["whisper-turbo", "bge-m3", ".partial-junk", "fluid-audio.partial"] {
             FileManager.default.createFile(atPath: models.appendingPathComponent(name).path, contents: Data())
         }
         let env = ["NOTER_APP_GROUP_DIR": container.path]
