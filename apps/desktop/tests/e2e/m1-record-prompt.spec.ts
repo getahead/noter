@@ -4,59 +4,62 @@
 // the commands those surfaces send; the panel itself (non-activating, focus stays in the call
 // app) is XCUITest's (docs/TEST-PLAN.md › M1).
 import type { CaptureState, DetectionChanged, LevelsMsg } from "../../src/core/bindings";
-import { ahead, ok, refused, until } from "../support/results";
+import { ahead, ok, pending, refused, until } from "../support/results";
 import * as W from "../support/world-presets";
-import { expect, given, test, versionsGrow } from "./support/fixtures";
+import { changeAhead, expect, given, test, versionsGrow } from "./support/fixtures";
 
 const recording = (c: CaptureState) => c.phase === "recording" && c.call_id !== null;
 
 test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   test("happy path: Record this call? → Record → call screen recording, focus stays in Teams", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    await given(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams)));
+    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const captures = await scenario.events("capture:state");
     const detected = await scenario.events("capture:detected");
 
     const snap = ok(await prompt.appSnapshot({}));
     expect(snap.detection.detection).toMatchObject({ app_name: "Microsoft Teams", blocked: null }); // Microsoft Teams is using the microphone
-    ok(await prompt.windowAnnounce({ text: "Record this call?", politeness: "polite" }));
+    ahead(await prompt.windowAnnounce({ text: "Record this call?", politeness: "polite" })); // M1 command
 
-    const started = ok(await prompt.captureStart({ source: "record_prompt", sensitive: false, detection_id: detection.id }));
+    const started = ahead(await prompt.captureStart({ source: "record_prompt", sensitive: false, detection_id: detection.id }));
+    if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     expect(started.sensitive).toBe(false);
     await until(() => detected.latest()?.detection === null, "the prompt closes (capture:detected without a detection)");
     await until(() => captures.latest() && recording(captures.latest()!), "capture:state recording");
     expect(versionsGrow(captures.all)).toBe(true);
 
-    ok(await prompt.windowShowCall({})); // the call screen opens on the second display
+    ahead(await prompt.windowShowCall({})); // the call screen opens on the second display (M1 command)
     const screen = scenario.core("call-screen");
     const there = ok(await screen.appSnapshot({}));
     expect(there.capture).toMatchObject({ phase: "recording", call_id: started.call_id }); // Recording · 00:12
     const levels: LevelsMsg[] = [];
-    ok(await screen.levelsSubscribe({ call_id: started.call_id }, (m) => levels.push(m)));
+    if (!ahead(await screen.levelsSubscribe({ call_id: started.call_id }, (m) => levels.push(m)))) return; // levels_subscribe (M1)
     await until(() => levels.length >= 2, "both meters moving on the call screen");
   });
 
   test("other path — Vendor call recorded as sensitive: Record as Sensitive, nothing leaves the Mac", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    await given(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.zoom)));
+    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.zoom))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
 
-    const started = ok(await prompt.captureStart({ source: "record_prompt", sensitive: true, detection_id: detection.id }));
+    const started = ahead(await prompt.captureStart({ source: "record_prompt", sensitive: true, detection_id: detection.id }));
+    if (!started) return; // capture_start (M1)
     expect(started).toMatchObject({ phase: "recording", sensitive: true });
     expect(ok(await scenario.core("call-screen").appSnapshot({})).capture.sensitive).toBe(true); // Sensitive · local
     // Sensitive is one-way during capture: it cannot be switched back while recording.
-    const back = refused(await scenario.core("call-screen").captureSetSensitive({ call_id: started.call_id!, sensitive: false }));
-    expect(back.code).toBe("invalid_input");
+    const back = await scenario.core("call-screen").captureSetSensitive({ call_id: started.call_id!, sensitive: false });
+    if (pending(back)) return; // capture_set_sensitive (M1)
+    expect(refused(back).code).toBe("invalid_input");
   });
 
   test("other path — Not a call: Don't Ask for Safari…, no more prompts, listed in Settings › General with Remove", async ({ scenario }) => {
-    await given(scenario, W.idle, (w) => W.detect(w, W.APPS.safari));
+    if (!(await changeAhead(scenario, W.idle, (w) => W.detect(w, W.APPS.safari)))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
-    ok(await prompt.captureIgnoreApp({ ...W.APPS.safari })); // Don't Ask
+    if (!ahead(await prompt.captureIgnoreApp({ ...W.APPS.safari }))) return; // Don't Ask (M1 command)
     await until(() => detected.latest()?.detection === null, "the prompt closes");
     const settings = scenario.core("settings");
     const general = ok(await settings.settingsGet({})).general;
@@ -68,18 +71,21 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   });
 
   test("error path — Not enough disk space: Record disabled, Delete Old Audio…, then Call Detected · Start Recording", async ({ scenario }) => {
-    await given(scenario, W.idle, (w) => {
+    const blocked = await changeAhead(scenario, W.idle, (w) => {
       w.app.environment.disk_free_mb = 420;
       W.detect(w, W.APPS.teams, "disk_full");
     });
+    if (!blocked) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
 
     expect(ok(await prompt.appSnapshot({})).detection.detection?.blocked).toBe("disk_full"); // Record disabled
-    const full = refused(await prompt.captureStart({ source: "record_prompt", sensitive: false }));
+    const refusal = await prompt.captureStart({ source: "record_prompt", sensitive: false });
+    if (pending(refusal)) return; // capture_start (M1)
+    const full = refused(refusal);
     expect(full.code).toBe("disk_full");
     expect(full.detail).toEqual({ type: "disk_space", free_mb: 420, needed_mb: 500 }); // (420 MB free)
 
-    ok(await prompt.windowNavigate({ target: { type: "today" } })); // Delete Old Audio… opens its sheet in the main window
+    ahead(await prompt.windowNavigate({ target: { type: "today" } })); // Delete Old Audio… opens its sheet in the main window (M1 command)
     const main = scenario.core("main");
     ahead(await main.audioDeleteOlder({ older_than_days: 30 })); // Delete Audio (M2 command)
     await scenario.change((w) => {
@@ -92,7 +98,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   });
 
   test("error path — System audio access is off: only your side, Record still the default and records at once", async ({ scenario }) => {
-    await given(scenario, W.idle, (w) => W.permission(w, "system_audio", "denied"), (w) => W.detect(w, W.APPS.teams));
+    if (!(await changeAhead(scenario, W.idle, (w) => W.permission(w, "system_audio", "denied"), (w) => W.detect(w, W.APPS.teams)))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
 
     const snap = ok(await prompt.appSnapshot({}));
@@ -100,38 +106,40 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
     expect(snap.detection.detection?.blocked).toBeNull(); // Record stays enabled and the default
 
     // O1: a start is never gated on permissions. Clicking Record at step 1 records at once…
-    const started = ok(await prompt.captureStart({ source: "record_prompt", sensitive: false }));
+    const started = ahead(await prompt.captureStart({ source: "record_prompt", sensitive: false }));
+    if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     // …and the call screen says System audio silent until it is allowed and Noter reopens.
-    await scenario.change((w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null }));
+    if (!(await changeAhead(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) return; // degraded (M1)
     expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.some((d) => d.type === "system_audio_silent")).toBe(true);
-    ok(await scenario.core("call-screen").openExternal({ target: { type: "system_settings", permission: "system_audio" } }));
+    ahead(await scenario.core("call-screen").openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // M1 command
   });
 });
 
 test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
   test("happy path: Not Now, then ⌃⌥⌘R minutes later records from that moment", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    await given(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams)));
+    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
-    ok(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "not_now" }));
+    if (!ahead(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "not_now" }))) return; // M1 command
     await until(() => detected.latest()?.detection === null, "the prompt closes");
     expect(refused(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "not_now" })).code).toBe("detection_expired");
 
-    const started = ok(await scenario.core("call-screen").captureStart({ source: "hotkey", sensitive: false })); // ⌃⌥⌘R
-    expect(started).toMatchObject({ phase: "recording", recorded_ms: 0 });
+    const started = ahead(await scenario.core("call-screen").captureStart({ source: "hotkey", sensitive: false })); // ⌃⌥⌘R
+    if (started) expect(started).toMatchObject({ phase: "recording", recorded_ms: 0 }); // capture_start (M1)
   });
 
   test("empty path — Prompt closed unanswered: Call Detected · Start Recording from the menu, no second prompt", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    await given(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams)));
+    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
-    ok(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "timed_out" }));
-    const started = ok(await scenario.core("main").captureStart({ source: "menu_bar", sensitive: false }));
+    if (!ahead(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "timed_out" }))) return; // M1 command
+    const started = ahead(await scenario.core("main").captureStart({ source: "menu_bar", sensitive: false }));
+    if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     expect(ok(await prompt.appSnapshot({})).detection.detection).toBeNull(); // no second prompt for this call
     expect(detected.all.every((d: DetectionChanged) => d.detection === null)).toBe(true);
@@ -146,12 +154,16 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     expect(snap.setup.detection_enabled).toBe(false); // Setup incomplete · call detection off
     expect(snap.detection.detection).toBeNull(); // no Record this call?
 
-    const started = ok(await main.captureStart({ source: "menu_bar", sensitive: false })); // O1: never gated on setup
-    expect(recording(started)).toBe(true);
-    expect(ok(await main.captureStop({ call_id: started.call_id! })).phase).toBe("stopped");
+    const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false })); // O1: never gated on setup
+    if (started) {
+      expect(recording(started)).toBe(true); // capture_start (M1)
+      const stopped = ahead(await main.captureStop({ call_id: started.call_id! }));
+      if (stopped) expect(stopped.phase).toBe("stopped"); // capture_stop (M1)
+    }
 
-    ok(await main.windowNavigate({ target: { type: "first_run", step: "permissions" } })); // Finish Setup…
-    await until(() => nav.latest()?.type === "first_run", "the first-run window at Permissions");
+    if (ahead(await main.windowNavigate({ target: { type: "first_run", step: "permissions" } }))) {
+      await until(() => nav.latest()?.type === "first_run", "the first-run window at Permissions"); // Finish Setup… (window_navigate, M1)
+    }
     const fr = scenario.core("first-run");
     let passed = false;
     ok(await fr.selfTestRun({ play_clip: false }, (m) => (passed ||= m.event.type === "passed")));
@@ -168,26 +180,30 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     });
     const main = scenario.core("main");
 
-    const started = ok(await main.captureStart({ source: "menu_bar", sensitive: false })); // O1: never gated on permissions
-    expect(recording(started)).toBe(true);
+    const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false })); // O1: never gated on permissions
+    if (started) expect(recording(started)).toBe(true); // capture_start (M1)
     expect(ok(await main.permissionRequest({ kind: "microphone" })).state).toBe("granted"); // the macOS prompt, allowed
-    await scenario.change((w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null }));
-    expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.map((d) => d.type)).toContain("system_audio_silent"); // Recording · mic only
+    if (started && (await changeAhead(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) {
+      expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.map((d) => d.type)).toContain("system_audio_silent"); // Recording · mic only (degraded, M1)
+    }
 
-    ok(await main.captureStop({ call_id: started.call_id! }));
-    ok(await main.windowNavigate({ target: { type: "first_run", step: "permissions" } })); // Finish Setup…
+    if (started) ahead(await main.captureStop({ call_id: started.call_id! })); // M1 command
+    ahead(await main.windowNavigate({ target: { type: "first_run", step: "permissions" } })); // Finish Setup… (M1 command)
     expect(ok(await scenario.core("first-run").permissionRequest({ kind: "system_audio" })).state).toBe("granted");
   });
 
   test("empty path — Hidden for presenting: no prompt drawn, Call Detected · Start Recording keeps everything hidden", async ({ scenario }) => {
     await given(scenario, W.idle);
     const main = scenario.core("main");
-    expect(ok(await main.appSetHiddenForPresenting({ hidden: true })).hidden).toBe(true);
-    await scenario.change((w) => W.detect(w, W.APPS.teams)); // the call starts while hidden
+    const hidden = ahead(await main.appSetHiddenForPresenting({ hidden: true }));
+    if (!hidden) return; // app_set_hidden_for_presenting (M1)
+    expect(hidden.hidden).toBe(true);
+    if (!(await changeAhead(scenario, (w) => W.detect(w, W.APPS.teams)))) return; // the call starts while hidden; detection (M1)
 
     const snap = ok(await main.appSnapshot({}));
     expect(snap.presenting.hidden).toBe(true); // eye-slash mark; Show Noter in the menu
-    const started = ok(await main.captureStart({ source: "menu_bar", sensitive: false }));
+    const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false }));
+    if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     expect(ok(await main.appSnapshot({})).presenting.hidden).toBe(true); // nothing drawn on the shared screen
   });

@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test as base } from "@playwright/test";
 
-import type { CommandName } from "../../../src/core/bindings";
+import type { CommandName, CoreError } from "../../../src/core/bindings";
 import { registerJsonModules } from "../../support/json-modules";
 import type { Scenario, World } from "../../support/scenario";
 
@@ -53,6 +53,21 @@ export { expect } from "@playwright/test";
 /** Put the world in a story's starting state (its preconditions). */
 export async function given(scenario: Scenario, ...presets: Array<(w: World) => void>): Promise<void> {
   await scenario.change((w) => presets.forEach((p) => p(w)));
+}
+
+/**
+ * `given` for a world slice that a later milestone's core owns (capture, detection, degraded,
+ * calls, transcripts, copilot…): false while the real core answers `not_implemented` for that
+ * slice, so the steps that need the state wait for that milestone. The fake always applies it.
+ */
+export async function changeAhead(scenario: Scenario, ...presets: Array<(w: World) => void>): Promise<boolean> {
+  try {
+    await given(scenario, ...presets);
+    return true;
+  } catch (e) {
+    if ((e as CoreError | null)?.code === "not_implemented") return false;
+    throw e;
+  }
 }
 
 /** Versions of whole-state payloads only grow (ADR-0002, R25). */

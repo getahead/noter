@@ -31,6 +31,10 @@ export async function until<T>(probe: () => T | undefined | false | Promise<T | 
  * command, so on the fake the step always runs; any other error fails the test.
  */
 export function ahead<T>(res: Result<T>): T | null {
-  if (res.status === "error" && res.error.code === "not_implemented") return null;
-  return ok(res);
+  return pending(res) ? null : ok(res);
+}
+
+/** True while the real core answers `not_implemented` for a later milestone's command (a refusal step then waits for it). */
+export function pending<T>(res: Result<T>): boolean {
+  return res.status === "error" && res.error.code === "not_implemented";
 }
