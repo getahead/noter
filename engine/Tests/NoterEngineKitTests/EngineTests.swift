@@ -212,6 +212,16 @@ final class FileModeTests: XCTestCase {
         XCTAssertEqual(levels["mic_db"] as? Double ?? 0, -13.5, accuracy: 0.5)
     }
 
+    func testCommandsAreServedOnlyAfterReady() throws {
+        let lines = Lines()
+        let mic = try wav("mic", seconds: 0.3, amplitude: 0.3)
+        let sys = try wav("sys", seconds: 0.3, amplitude: 0.1)
+        var servedAfter: [String] = []
+        _ = FileMode(mic: mic, sys: sys, realtime: false)
+            .run(writer: writer(lines), engineVersion: "test") { servedAfter = lines.types }
+        XCTAssertEqual(servedAfter, ["ready"])
+    }
+
     func testAMissingFileIsDeviceUnavailable() throws {
         let lines = Lines()
         let sys = try wav("sys", seconds: 0.2, amplitude: 0.1)

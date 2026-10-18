@@ -10,7 +10,12 @@ let package = Package(
     products: [.executable(name: "noter-engine", targets: ["noter-engine"])],
     targets: [
         .target(name: "NoterEngineKit"),
-        .executableTarget(name: "noter-engine", dependencies: ["NoterEngineKit"]),
+        .executableTarget(
+            name: "noter-engine", dependencies: ["NoterEngineKit"],
+            // The Info.plist goes inside the binary, so TCC prompts name the engine.
+            linkerSettings: [
+                .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "Resources/Info.plist"])
+            ]),
         .testTarget(name: "NoterEngineKitTests", dependencies: ["NoterEngineKit"]),
     ]
 )
