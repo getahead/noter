@@ -123,7 +123,7 @@ The user should finish setup in one sitting before the first real call, and call
 1. [ ] - `p1` - API: `permission_request { kind }` from the First run, Settings or main window - `inst-permission-call`
 2. [ ] - `p1` - **IF** `kind` is `system_audio` - `inst-if-system-audio`
    1. [ ] - `p1` - Ask the engine to open the tap briefly so macOS shows its prompt; the state comes from the next self-test - `inst-system-audio`
-3. [ ] - `p1` - **ELSE** ask through `noter-native` (AVCaptureDevice for the microphone, EventKit for the calendar, `UNUserNotificationCenter` for notifications, the screen-capture check, Apple Events for automation) - `inst-native-ask`
+3. [x] - `p1` - **ELSE** ask through `noter-native` (AVCaptureDevice for the microphone, EventKit for the calendar, `UNUserNotificationCenter` for notifications, the screen-capture check, Apple Events for automation) - `inst-native-ask`
 4. [ ] - `p1` - Update the permission row and emit `env:changed` and `setup:changed` with new versions - `inst-emit-permission`
 5. [ ] - `p1` - **IF** the result is denied **RETURN** `permission_denied` - `inst-if-denied`
 6. [ ] - `p1` - **RETURN** the `PermissionRow` - `inst-return-permission`
@@ -246,7 +246,7 @@ The user should finish setup in one sitting before the first real call, and call
 **Output**: The login item registered or unregistered with SMAppService.
 
 **Steps**:
-1. [ ] - `p1` - **IF** on, register the main app with SMAppService; **ELSE** unregister it - `inst-login-apply`
+1. [x] - `p1` - **IF** on, register the main app with SMAppService; **ELSE** unregister it - `inst-login-apply`
 2. [ ] - `p1` - **IF** macOS needs approval in System Settings, keep the setting on and report it in `EnvironmentState` - `inst-login-approval`
 3. [ ] - `p1` - **RETURN** - `inst-login-return`
 

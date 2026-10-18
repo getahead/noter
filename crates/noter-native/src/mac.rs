@@ -71,10 +71,14 @@ pub fn request_permission(kind: PermissionKind) -> PermissionState {
                 });
             }
         }
-        PermissionKind::Calendar => wait_for(|done| unsafe {
-            let block = RcBlock::new(move |_: Bool, _: *mut NSError| done());
-            EKEventStore::new().requestFullAccessToEventsWithCompletion(RcBlock::as_ptr(&block))
-        }),
+        PermissionKind::Calendar => {
+            // The store must outlive the request: it is kept until the answer arrived.
+            let store = unsafe { EKEventStore::new() };
+            wait_for(|done| unsafe {
+                let block = RcBlock::new(move |_: Bool, _: *mut NSError| done());
+                store.requestFullAccessToEventsWithCompletion(RcBlock::as_ptr(&block))
+            });
+        }
         PermissionKind::Notifications => {
             if let Some(center) = notification_center() {
                 let options = UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound;
@@ -321,14 +325,12 @@ pub fn set_login_item(on: bool) -> Result<LoginItem, String> {
     } else {
         unsafe { service.unregisterAndReturnError() }
     };
-    // @cpt-begin:cpt-noter-algo-core-first-run-login-item:p2:inst-login-approval
     // Registered but awaiting approval in System Settings is not a failure: the setting stays on.
     match (result, login_item()) {
         (_, LoginItem::RequiresApproval) => Ok(LoginItem::RequiresApproval),
         (Ok(()), state) => Ok(state),
         (Err(e), _) => Err(e.localizedDescription().to_string()),
     }
-    // @cpt-end:cpt-noter-algo-core-first-run-login-item:p2:inst-login-approval
 }
 
 pub fn login_item() -> LoginItem {
