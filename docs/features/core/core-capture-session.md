@@ -142,7 +142,8 @@ Capture is the release-blocking function, and its rules must live in one machine
 5. [ ] - `p1` - Phase `starting`; emit `capture:state` - `inst-phase-starting`
 6. [ ] - `p1` - Ask the supervisor to start the engine session (`cpt-noter-flow-core-engine-capture-session`) with audio storage from settings and the glossary - `inst-start-engine`
 7. [ ] - `p1` - On `session_started`, phase `recording`; ask the native layer to open the call window on the call display without focus - `inst-phase-recording`
-8. [ ] - `p1` - **RETURN** `CaptureState` with its `version` - `inst-return-started`
+8. [ ] - `p1` - While the phase is `recording` or `paused`, subscribe to settings' glossary-changed hook and send `set_glossary` to the engine on each change, so a glossary edit reaches the live call (this meets the settings glossary DoD in M1); unsubscribe when the call stops - `inst-live-glossary`
+9. [ ] - `p1` - **RETURN** `CaptureState` with its `version` - `inst-return-started`
 
 ### Pause, resume and mark
 
