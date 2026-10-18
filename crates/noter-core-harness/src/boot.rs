@@ -259,9 +259,6 @@ impl Harness {
                 refused.push(format!("app.{key}"));
             }
         }
-        if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
-            refused.push("app.setup.self_test".to_string());
-        }
         if !refused.is_empty() {
             return Err(CoreError::new(
                 ErrorCode::NotImplemented,
@@ -273,13 +270,17 @@ impl Harness {
         }
         self.write_settings(&wanted["settings"]).await?;
         self.write_setup(&wanted["app"]["setup"]).await?;
+        if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
+            noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());
+        }
         let env = &parsed.app.environment;
         if current["app"]["environment"] != wanted["app"]["environment"]
             || current["app"]["setup"]["permissions"] != wanted["app"]["setup"]["permissions"]
         {
             self.native.set(env, &parsed.app.setup.permissions);
             *lock(&self.updater.0) = env.update.clone();
-            self.core.environment_changed(self.native.environment());
+            // The Mac says it changed: the core re-reads what was granted outside it.
+            self.native.changed();
         }
         if current["app"]["setup"]["models"] != wanted["app"]["setup"]["models"] {
             self.models
@@ -332,6 +333,11 @@ impl Controls for Harness {
                     ErrorCode::NotImplemented,
                     "harness.push: no scripted stream in the M0 core yet",
                 )),
+                // `{}`: the next model download delivers bytes that fail their checksum.
+                "corrupt_next_download" => {
+                    self.models.corrupt_next.store(true, Ordering::SeqCst);
+                    Ok(json!({}))
+                }
                 _ => Err(CoreError::new(
                     ErrorCode::InvalidInput,
                     format!("no control harness.{name}"),
@@ -388,13 +394,26 @@ impl EventEmitter for EventLines {
 }
 
 /// The Mac, as the world says: permission states, displays, output, reachability and disk.
-struct ScriptedNative(Mutex<(HashMap<PermissionKind, PermissionState>, EnvironmentReading)>);
+struct ScriptedNative(
+    Mutex<(HashMap<PermissionKind, PermissionState>, EnvironmentReading)>,
+    Mutex<Option<Box<dyn Fn(EnvironmentReading) + Send + Sync>>>,
+);
 
 impl ScriptedNative {
     fn new(env: &EnvironmentState) -> Self {
-        let native = ScriptedNative(Mutex::new((HashMap::new(), EnvironmentReading::default())));
+        let native = ScriptedNative(
+            Mutex::new((HashMap::new(), EnvironmentReading::default())),
+            Mutex::new(None),
+        );
         native.set(env, &env.permissions);
         native
+    }
+
+    /// Calls the core's listener with the current reading, as the Mac's change notices do.
+    fn changed(&self) {
+        if let Some(on_change) = lock(&self.1).as_ref() {
+            on_change(self.environment());
+        }
     }
 
     fn set(&self, env: &EnvironmentState, setup_rows: &[PermissionRow]) {
@@ -441,6 +460,10 @@ impl NativeServices for ScriptedNative {
         lock(&self.0).1.clone()
     }
 
+    fn on_change(&self, on_change: Box<dyn Fn(EnvironmentReading) + Send + Sync>) {
+        *lock(&self.1) = Some(on_change);
+    }
+
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
     }
@@ -450,6 +473,8 @@ impl NativeServices for ScriptedNative {
 struct TinyModels {
     specs: Vec<(BundleSpec, Vec<u8>)>,
     native: Arc<ScriptedNative>,
+    /// `harness.corrupt_next_download`: the next fetch serves wrong bytes, once.
+    corrupt_next: AtomicBool,
 }
 
 impl TinyModels {
@@ -474,7 +499,11 @@ impl TinyModels {
                 (spec, bytes)
             })
             .collect();
-        TinyModels { specs, native }
+        TinyModels {
+            specs,
+            native,
+            corrupt_next: AtomicBool::new(false),
+        }
     }
 
     /// Makes `models/` hold exactly the bundles the world shows as ready.
@@ -517,6 +546,10 @@ impl ModelSource for TinyModels {
                 .find(|(s, _)| s.name == bundle.name)
                 .ok_or(FetchError::Http(404))?
                 .1;
+            let mut bytes = bytes.clone();
+            if self.corrupt_next.swap(false, Ordering::SeqCst) {
+                bytes.iter_mut().for_each(|b| *b ^= 0xff);
+            }
             for part in bytes[(from_byte as usize).min(bytes.len())..].chunks(256) {
                 if !chunk(part) {
                     break;

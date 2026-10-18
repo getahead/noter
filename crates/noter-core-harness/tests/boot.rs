@@ -266,6 +266,70 @@ async fn the_scripted_engine_lets_the_self_test_pass() {
 }
 
 #[tokio::test]
+async fn world_set_seeds_the_self_test_state() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["setup"]["self_test"] = json!({ "type": "passed", "at": 1_700_000_000_000_u64 });
+    world["app"]["setup"]["detection_enabled"] = json!(true); // the detection rule follows a pass
+    let set = r
+        .ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(set, json!({}));
+    let setup = r.ok("first-run", "setup_status", json!({})).await;
+    assert_eq!(setup["self_test"]["type"], "passed");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn corrupt_next_download_fails_one_check_then_the_retry_passes() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for b in world["app"]["setup"]["models"]["bundles"]
+        .as_array_mut()
+        .unwrap()
+    {
+        b["state"] = json!("pending");
+        b["done_mb"] = json!(0);
+    }
+    world["app"]["setup"]["models"]["done_mb"] = json!(0);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    r.ok("main", "harness.corrupt_next_download", json!({}))
+        .await;
+    r.ok("first-run", "models_download", json!({ "action": "start" }))
+        .await;
+    let required_state = |setup: &Value| {
+        setup["models"]["bundles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|b| b["required_for_capture"] == true)
+            .unwrap()["state"]
+            .clone()
+    };
+    let mut setup = json!({});
+    for _ in 0..100 {
+        setup = r.ok("first-run", "setup_status", json!({})).await;
+        if required_state(&setup) == "checksum_failed" {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(required_state(&setup), "checksum_failed", "{setup}");
+    r.ok("first-run", "models_download", json!({ "action": "retry" }))
+        .await;
+    for _ in 0..100 {
+        setup = r.ok("first-run", "setup_status", json!({})).await;
+        if required_state(&setup) == "ready" {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(required_state(&setup), "ready", "{setup}");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_refuses_derived_setup_fields_the_core_would_compute_otherwise() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;

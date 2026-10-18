@@ -741,6 +741,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "noter-core-harness"
+version = "0.1.0"
+dependencies = [
+ "noter-core",
+ "noter-engine-client",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+]
+
+[[package]]
 name = "noter-db"
 version = "0.1.0"
 dependencies = [
