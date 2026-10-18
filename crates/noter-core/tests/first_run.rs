@@ -569,3 +569,62 @@ async fn update_install_needs_a_ready_update() {
         "relaunched after the in-order shutdown"
     );
 }
+
+/// R25: a whole-state kind has one version, shared by its snapshot slice and its events.
+#[tokio::test]
+async fn setup_and_environment_events_continue_the_snapshot_version() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    let snap = s.core.app_snapshot(&first_run(), NoArgs {}).await.unwrap();
+    s.events.0.lock().unwrap().clear();
+
+    s.core
+        .setup_set_step(
+            &first_run(),
+            StepArgs {
+                step: SetupStep::Welcome,
+                state: StepState::Done,
+            },
+        )
+        .await
+        .unwrap();
+    s.core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::Microphone,
+            },
+        )
+        .await
+        .unwrap();
+    let mut changed = reading();
+    changed.displays.pop();
+    s.core.environment_changed(changed);
+
+    let events = std::mem::take(&mut *s.events.0.lock().unwrap());
+    let versions = |name: &str| -> Vec<u64> {
+        events
+            .iter()
+            .filter(|(n, _)| *n == name)
+            .map(|(_, p)| p["version"].as_u64().unwrap())
+            .collect()
+    };
+    let after = s.core.app_snapshot(&first_run(), NoArgs {}).await.unwrap();
+    for (name, before, now) in [
+        (
+            event_names::SETUP_CHANGED,
+            snap.setup.version.0,
+            after.setup.version.0,
+        ),
+        (
+            event_names::ENV_CHANGED,
+            snap.environment.version.0,
+            after.environment.version.0,
+        ),
+    ] {
+        let v = versions(name);
+        let expected: Vec<u64> = (before + 1..=now).collect();
+        assert_eq!(v, expected, "{name}: snapshot {before}, then events");
+    }
+}
