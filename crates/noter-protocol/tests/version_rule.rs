@@ -257,6 +257,29 @@ fn the_rule_asks_minor_for_draft_or_additive_changes_and_major_otherwise() {
     let mut retry = same.clone();
     retry["default_retryable"] = json!(["internal", "not_found"]);
     assert_eq!(required_bump(&base, &retry), Bump::Minor);
+    let mut no_longer_retryable = same.clone();
+    no_longer_retryable["default_retryable"] = json!([]);
+    assert_eq!(
+        required_bump(&base, &no_longer_retryable),
+        Bump::Major,
+        "a code leaving default_retryable changes what the UI offers"
+    );
+}
+
+#[test]
+fn a_missing_base_is_reported_locally_and_in_a_shallow_checkout() {
+    assert_eq!(base_or_report(None, "origin/main", false, false), None);
+    assert_eq!(base_or_report(None, "origin/main", true, true), None);
+    assert_eq!(
+        base_or_report(Some("{}".into()), "origin/main", true, false),
+        Some("{}".into())
+    );
+}
+
+#[test]
+#[should_panic(expected = "origin/main")]
+fn a_missing_base_fails_in_ci_with_the_full_history() {
+    base_or_report(None, "origin/main", true, false);
 }
 
 #[test]
