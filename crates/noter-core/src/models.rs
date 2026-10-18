@@ -154,6 +154,21 @@ enum Outcome {
 }
 
 impl Core {
+    /// Re-reads the models folder, so bundle states follow its files again after it changed
+    /// outside the core (a restore, the harness's `world_set`). A running download keeps its
+    /// own states; the setup status follows.
+    pub fn refresh_models(&self) {
+        {
+            let mut d = lock(&self.downloads);
+            if d.running {
+                return;
+            }
+            let (specs, dir) = (d.specs.clone(), d.dir.clone());
+            *d = Downloads::load(specs, dir);
+        }
+        self.refresh_setup();
+    }
+
     // @cpt-flow:cpt-noter-flow-core-first-run-download:p1
     pub(crate) fn download_models(
         &self,
