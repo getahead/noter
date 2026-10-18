@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-setup-set-call-display"
+description = "Enables the setup_set_call_display command without any pre-configured scope."
+commands.allow = ["setup_set_call_display"]
+
+[[permission]]
+identifier = "deny-setup-set-call-display"
+description = "Denies the setup_set_call_display command without any pre-configured scope."
+commands.deny = ["setup_set_call_display"]

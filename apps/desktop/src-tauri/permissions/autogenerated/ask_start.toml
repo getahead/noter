@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ask-start"
+description = "Enables the ask_start command without any pre-configured scope."
+commands.allow = ["ask_start"]
+
+[[permission]]
+identifier = "deny-ask-start"
+description = "Denies the ask_start command without any pre-configured scope."
+commands.deny = ["ask_start"]

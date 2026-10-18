@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-api-key-set"
+description = "Enables the api_key_set command without any pre-configured scope."
+commands.allow = ["api_key_set"]
+
+[[permission]]
+identifier = "deny-api-key-set"
+description = "Denies the api_key_set command without any pre-configured scope."
+commands.deny = ["api_key_set"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-window-show-call"
+description = "Enables the window_show_call command without any pre-configured scope."
+commands.allow = ["window_show_call"]
+
+[[permission]]
+identifier = "deny-window-show-call"
+description = "Denies the window_show_call command without any pre-configured scope."
+commands.deny = ["window_show_call"]
