@@ -106,7 +106,7 @@ Agents work in lanes. Choose one with `NOTER_LANE=<lane>` or a branch named `lan
 | `engine` | `engine/`, `noter-engine-client`, `noter-native`, the root `Cargo.toml` and `Cargo.lock` | Mac only |
 | `skills` | `skills/`, `evals/` (not `evals/golden`) | |
 
-Every lane may also touch `.plans/`, `docs/features/` and `docs/DECOMPOSITION.md`. With no lane set, the owner rules apply.
+Every lane may also touch `.plans/`, `.prs/` (PR reviews), `docs/features/` and `docs/DECOMPOSITION.md`. With no lane set, the owner rules apply.
 
 The lane guard (`scripts/harness/lane_guard.py`) runs as a Claude Code PreToolUse hook on every edit (and on shell commands that write to a guarded path), as the git pre-commit hook for every tool, and in CI over the files of a `lane/<lane>/…` branch. It blocks:
 
