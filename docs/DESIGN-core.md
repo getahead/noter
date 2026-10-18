@@ -96,7 +96,7 @@ The PRD has no requirement IDs, so the first column names the PRD section, as in
 | PRD › Feature specification › 8. Role council; LLM orchestration | Agents are rows; the router builds fused or per-agent sessions from them over three adapters and five runtime choices. `cpt-noter-component-core-llm-router`, `cpt-noter-component-core-credentials` |
 | PRD › Feature specification › 9. Handoff | Prompt generation on demand, launch-path detection and launch, all in the core; the UI only shows the path. `cpt-noter-component-core-handoff` |
 | PRD › Feature specification › 10. Self-maintenance | A scheduler that runs maintenance, the archive pass and regeneration only outside a live call (the previous call's post-call analysis runs at low priority during one, owner decision D2), jobs in batches of at most 200 rows, evidence collection with the auto-close rule for accepted items, a nightly retention job. `cpt-noter-component-core-jobs` |
-| PRD › Feature specification › 11. History and change log | Every write goes through the change log, which undoes and redoes any change or batch whose rows were not edited later, at any time, and turns proposals into changes. `cpt-noter-component-core-changelog` |
+| PRD › Feature specification › 11. History and change log | Every write except capture data (confirmed segments, live speakers, gaps and marks, including user-pressed marks and pause gaps, which are inserted without change rows) goes through the change log, which undoes and redoes any change or batch whose rows were not edited later, at any time, and turns proposals into changes. `cpt-noter-component-core-changelog` |
 | PRD › Feature specification › 12. Performance | Every stage records its timing; nightly roll-ups; the Performance read model. `cpt-noter-component-core-metrics` |
 | PRD › Feature specification › 13. Today dashboard | A Today read model that ranks items by the ranking setting (default: owed to people on today's calls, then due date, then age; owner decision D3); EventKit read only after the user allowed it. `cpt-noter-component-core-items`, `cpt-noter-component-core-native` |
 | PRD › Feature specification › 14. Settings; Security › Credentials | Typed settings replaced per section with a revision; API keys in the Keychain; own accounts held by the CLIs. `cpt-noter-component-core-settings`, `cpt-noter-component-core-credentials` |
@@ -199,7 +199,7 @@ Every boundary (UI ↔ core, core ↔ engine, runtime ↔ noter-mcp, core ↔ sk
 
 - [ ] `p1` - **ID**: `cpt-noter-principle-core-single-writer`
 
-The core is the only process that writes the database, and every write that a user, a job or a model makes is a change-log row in the same transaction, with actor, before, after, reason and evidence. Undo is the change log played backwards; there is no second history. Capture data the engine produces (confirmed segments, live speakers, gaps and marks written by capture) is inserted in batches without change rows, because the engine is none of those actors; the user's edits to it are logged. Deleting calls (`capture_discard`, `calls_delete`) writes one change row per deletion, not undoable (Backend Teamlead M1 decision, 18 Oct 2026).
+The core is the only process that writes the database, and every write that a user, a job or a model makes is a change-log row in the same transaction, with actor, before, after, reason and evidence. Undo is the change log played backwards; there is no second history. Capture data (confirmed segments, live speakers, gaps and marks written by capture, including user-pressed marks and pause gaps) is inserted in batches without change rows, because capture writes it as it happens, not as an edit of a record; the user's later edits to it are logged. Deleting calls (`capture_discard`, `calls_delete`) writes one change row per deleted call, not undoable, and that row carries no record content (PRD › Deletion) (Backend Teamlead M1 decision, 18 Oct 2026).
 
 **ADRs**: PRD › Decision log (core is the only SQLite writer; change log with undo).
 
@@ -597,7 +597,7 @@ Several windows subscribe to the same live data, can reload at any moment and mu
 
 ##### Responsibility scope
 
-Keeps, per live call, a sequence counter and a bounded replay buffer for each stream kind (transcript, cards, levels), and per subscription the `Sink` and the last acknowledged `seq`. A subscribe call takes a consistent snapshot from the owning service and the current `seq` under one lock, so the Channel starts at `last_seq + 1`; snapshot reads use the writer connection under the hub lock. Confirmed segments are published only after their batch commits (batches of at most 250 ms), so a reload never misses a committed segment and the confirmed-lag budget holds. Coalesces levels to at most one message per 100 ms. Expects `stream_ack` every 100 messages or 1 s and ends a subscription with `ended { reason: lagged }` at 2 000 unacknowledged messages; the UI resubscribes. Ends every subscription of a webview when it loads a page or is destroyed, and ends streams with a reason on stop, discard, unsubscribe and shutdown. Stamps the `version` of whole-state events and of the matching snapshot slices. Also serves one-off streams (Ask answers, self-test).
+Keeps, per live call, a sequence counter and a bounded replay buffer for each stream kind (transcript, cards, levels), and per subscription the `Sink` and the last acknowledged `seq`. A subscribe call takes a consistent snapshot from the owning service and the current `seq` under one lock, so the Channel starts at `last_seq + 1`; snapshot reads use the writer connection under the hub lock. Confirmed segments are published only after their batch commits (batches of at most 250 ms), so a reload never misses a committed segment and the confirmed-lag budget holds. Coalesces levels per stream, before a `seq` is assigned, to at most one message per 100 ms. Expects `stream_ack` every 100 messages or 1 s and ends a subscription with `ended { reason: lagged }` at 2 000 unacknowledged messages; the UI resubscribes. Ends every subscription of a webview when it loads a page or is destroyed, and ends streams with a reason on stop, discard, unsubscribe and shutdown. Stamps the `version` of whole-state events and of the matching snapshot slices. Also serves one-off streams (Ask answers, self-test).
 
 ##### Responsibility boundaries
 
@@ -731,7 +731,7 @@ Does not collect evidence (jobs) or generate prompts (handoff). Calendar access 
 
 ##### Related components (by ID)
 
-- `cpt-noter-component-core-changelog` — every write
+- `cpt-noter-component-core-changelog` — every write except capture data, which is inserted without change rows (`cpt-noter-principle-core-single-writer`)
 - `cpt-noter-component-core-native` — EventKit, clipboard, save panel
 - `cpt-noter-component-core-handoff` — handoff status
 - `cpt-noter-component-core-retrieval` — item embeddings and topics

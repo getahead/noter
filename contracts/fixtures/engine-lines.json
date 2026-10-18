@@ -1,0 +1,459 @@
+{
+  "commands": [
+    {
+      "cmd": {
+        "type": "ping"
+      },
+      "id": 1
+    },
+    {
+      "cmd": {
+        "backend": "parakeet_tdt_v3",
+        "call_id": "call_1",
+        "enrolled_embeddings_path": "engine-io/enrolled.f32",
+        "exclude_bundle_ids": [
+          "com.apple.Music"
+        ],
+        "glossary": [
+          {
+            "spoken_forms": [
+              "no-ter"
+            ],
+            "term": "Noter",
+            "variants_cyrillic": [
+              "Ноутер"
+            ],
+            "variants_latin": [
+              "Notter"
+            ]
+          }
+        ],
+        "languages": [
+          "en",
+          {
+            "code": "fr"
+          }
+        ],
+        "mic_device_uid": "BuiltInMicrophoneDevice",
+        "resume_from_ms": 9000,
+        "session_dir": "audio/call_1",
+        "speaker_priors": [
+          {
+            "de": 0.25,
+            "en": 0.5,
+            "label": "spk_1",
+            "ru": 0.25
+          }
+        ],
+        "store_audio": true,
+        "type": "start_session"
+      },
+      "id": 2
+    },
+    {
+      "cmd": {
+        "call_id": "call_1",
+        "type": "pause"
+      },
+      "id": 3
+    },
+    {
+      "cmd": {
+        "call_id": "call_1",
+        "type": "resume"
+      },
+      "id": 4
+    },
+    {
+      "cmd": {
+        "call_id": "call_1",
+        "type": "stop"
+      },
+      "id": 5
+    },
+    {
+      "cmd": {
+        "entries": [
+          {
+            "spoken_forms": [
+              "no-ter"
+            ],
+            "term": "Noter",
+            "variants_cyrillic": [
+              "Ноутер"
+            ],
+            "variants_latin": [
+              "Notter"
+            ]
+          }
+        ],
+        "type": "set_glossary"
+      },
+      "id": 6
+    },
+    {
+      "cmd": {
+        "languages": [
+          "ru",
+          "de"
+        ],
+        "type": "set_languages"
+      },
+      "id": 7
+    },
+    {
+      "cmd": {
+        "bundle_id": "us.zoom.xos",
+        "call_id": "call_1",
+        "type": "exclude_process"
+      },
+      "id": 8
+    },
+    {
+      "cmd": {
+        "backend": "whisper_large_v3",
+        "call_id": "call_1",
+        "constraints_path": null,
+        "result_path": "audio/call_1/offline.json",
+        "session_dir": "audio/call_1",
+        "type": "offline_pass"
+      },
+      "id": 9
+    },
+    {
+      "cmd": {
+        "call_id": "call_1",
+        "channel": "sys",
+        "out_path": "engine-io/emb.f32",
+        "request_id": "req_1",
+        "spans": [
+          {
+            "t0_ms": 1000,
+            "t1_ms": 2500
+          }
+        ],
+        "type": "speaker_embedding"
+      },
+      "id": 10
+    },
+    {
+      "cmd": {
+        "out_path": null,
+        "request_id": "req_2",
+        "texts": [
+          "hello"
+        ],
+        "type": "embed_texts"
+      },
+      "id": 11
+    },
+    {
+      "cmd": {
+        "enabled": true,
+        "known_bundle_ids": [
+          "us.zoom.xos"
+        ],
+        "type": "set_detection"
+      },
+      "id": 12
+    },
+    {
+      "cmd": {
+        "play_clip": false,
+        "timeout_ms": 10000,
+        "type": "self_test"
+      },
+      "id": 13
+    },
+    {
+      "cmd": {
+        "call_id": "call_1",
+        "channel": "mic",
+        "from_ms": 0,
+        "to_ms": 5000,
+        "type": "play"
+      },
+      "id": 14
+    },
+    {
+      "cmd": {
+        "type": "stop_playback"
+      },
+      "id": 15
+    },
+    {
+      "cmd": {
+        "type": "shutdown"
+      },
+      "id": 16
+    }
+  ],
+  "events": [
+    {
+      "at": 1790000000000,
+      "event": {
+        "engine_version": "0.1.0",
+        "models": [
+          "whisper-turbo"
+        ],
+        "protocol_version": "2.0",
+        "sandboxed": true,
+        "type": "ready"
+      },
+      "seq": 1
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "cmd_id": 2,
+        "type": "ack"
+      },
+      "seq": 2
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "cmd_id": null,
+        "code": "device_unavailable",
+        "message": "mic.wav",
+        "type": "error"
+      },
+      "seq": 3
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "app_name": "zoom.us",
+        "bundle_id": "us.zoom.xos",
+        "pid": 4242,
+        "type": "call_detected"
+      },
+      "seq": 4
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "bundle_id": "us.zoom.xos",
+        "type": "call_audio_released"
+      },
+      "seq": 5
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "app_name": "Safari",
+        "bundle_id": "com.apple.Safari",
+        "call_id": "call_1",
+        "type": "audio_source_added"
+      },
+      "seq": 6
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "mic_device": "MacBook Microphone",
+        "output_device": "MacBook Speakers",
+        "type": "session_started"
+      },
+      "seq": 7
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "device_name": "AirPods",
+        "gap_from_ms": 100,
+        "gap_to_ms": 900,
+        "type": "device_changed"
+      },
+      "seq": 8
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "confidence": 0.75,
+        "since_ms": 3000,
+        "type": "system_audio_silent"
+      },
+      "seq": 9
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "segment": {
+          "avg_logprob": -0.25,
+          "call_id": "call_1",
+          "channel": "mic",
+          "corrections": [
+            {
+              "from": "notter",
+              "to": "Noter"
+            }
+          ],
+          "crosstalk_labels": [
+            "spk_1",
+            "spk_2"
+          ],
+          "id": "eseg_1",
+          "lang": "en",
+          "lang_p": 0.5,
+          "no_speech_p": 0.125,
+          "speaker_label": "you",
+          "state": "confirmed",
+          "t0_ms": 1000,
+          "t1_ms": 2500,
+          "text": "hello",
+          "words_path": "audio/call_1/words/eseg_1.json"
+        },
+        "type": "segment"
+      },
+      "seq": 10
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "at_ms": 4000,
+        "call_id": "call_1",
+        "channel": "sys",
+        "speaker_label": "spk_3",
+        "type": "speaker_turn"
+      },
+      "seq": 11
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": null,
+        "mic_db": -20.5,
+        "sys_db": -160.0,
+        "type": "levels"
+      },
+      "seq": 12
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "since_ms": 8000,
+        "type": "no_segments"
+      },
+      "seq": 13
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "since_ms": 12000,
+        "type": "silence"
+      },
+      "seq": 14
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "mic_path": "audio/call_1/mic.wav",
+        "sys_path": null,
+        "timeline_path": "audio/call_1/timeline.json",
+        "type": "session_stopped"
+      },
+      "seq": 15
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "progress": 0.5,
+        "type": "offline_progress"
+      },
+      "seq": 16
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "result_path": "audio/call_1/offline.json",
+        "type": "offline_done"
+      },
+      "seq": 17
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "call_id": "call_1",
+        "code": "model_load_failed",
+        "type": "offline_failed"
+      },
+      "seq": 18
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "out_path": "engine-io/emb.f32",
+        "request_id": "req_1",
+        "type": "speaker_embedding_done"
+      },
+      "seq": 19
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "count": 1,
+        "inline": [
+          0.5,
+          -0.25
+        ],
+        "out_path": null,
+        "request_id": "req_2",
+        "type": "embeddings"
+      },
+      "seq": 20
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "channel": "sys",
+        "type": "self_test_stream"
+      },
+      "seq": 21
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "channel": "mic",
+        "text": "one two three",
+        "type": "self_test_line"
+      },
+      "seq": 22
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "failure": "zero_buffers",
+        "own_sounds_leak": false,
+        "passed": false,
+        "type": "self_test_result"
+      },
+      "seq": 23
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "at_ms": 1500,
+        "call_id": "call_1",
+        "playing": true,
+        "type": "playback_position"
+      },
+      "seq": 24
+    },
+    {
+      "at": 1790000000000,
+      "event": {
+        "type": "pong"
+      },
+      "seq": 25
+    }
+  ]
+}
