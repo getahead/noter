@@ -100,10 +100,10 @@ Agents work in lanes. Choose one with `NOTER_LANE=<lane>` or a branch named `lan
 
 | Lane | May change | Notes |
 | --- | --- | --- |
-| `contract` | `crates/noter-protocol`, the fake core, the conformance suite, ADRs, DESIGN-core | Every PR needs one core and one UI review |
+| `contract` | `crates/noter-protocol` and the output `just contract-regen` writes (`contracts/`, `bindings.ts`), the fake core, the conformance suite, ADRs, DESIGN-core | One core review; a UI review too when the wire changes (a generated file or `CONTRACT_VERSION`) |
 | `ui` | `apps/desktop` except `src-tauri`, the fake and the conformance suite | Builds against the fake core |
 | `core` | `crates/*` except the protocol, native and engine-client crates; `src-tauri`; `perf/` | |
-| `engine` | `engine/`, `noter-engine-client`, `noter-native` | Mac only |
+| `engine` | `engine/`, `noter-engine-client`, `noter-native`, the root `Cargo.toml` and `Cargo.lock` | Mac only |
 | `skills` | `skills/`, `evals/` (not `evals/golden`) | |
 
 Every lane may also touch `.plans/`, `docs/features/` and `docs/DECOMPOSITION.md`. With no lane set, the owner rules apply.
