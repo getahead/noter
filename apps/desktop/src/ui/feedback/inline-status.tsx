@@ -1,6 +1,6 @@
 // Inline status of the prototype's src/js/04-shared.js (C.inlineStatus): the confirmation where the eye is, on the
 // label, trailing, blind feedback, row outcome or notice. It never takes focus; failures use the inline banner.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type FocusEvent } from "react";
 import { Icon } from "../icons";
 import { KeyCap } from "../primitives/key-cap";
 import { Link } from "../primitives/link";
@@ -19,13 +19,23 @@ export interface InlineStatusProps {
   onExpire: () => void;
 }
 
-/** Pointer and focus handlers that pause the timer of a status with an action. */
-export function statusHandlers(timer: { current: StatusTimer | null }, hasAction: boolean) {
+/** Pointer and focus handlers that pause the timer of a status with an action while it is hovered or focused;
+ *  it runs on only when both have left. `held` lives as long as the status. */
+export function statusHandlers(timer: { current: StatusTimer | null }, held: { hover: boolean; focus: boolean }, hasAction: boolean) {
   if (!hasAction) return {};
   // @cpt-begin:cpt-noter-flow-ui-primitives-inline-status:p1:inst-while-hover
-  const pause = () => timer.current?.pause();
-  const resume = () => timer.current?.resume();
-  return { onPointerEnter: pause, onFocus: pause, onPointerLeave: resume, onBlur: resume };
+  const set = (k: "hover" | "focus", on: boolean) => {
+    held[k] = on;
+    if (held.hover || held.focus) timer.current?.pause();
+    else timer.current?.resume();
+  };
+  return {
+    onPointerEnter: () => set("hover", true),
+    onPointerLeave: () => set("hover", false),
+    onFocus: () => set("focus", true),
+    // focus moving between elements of the status keeps it focused
+    onBlur: (e: FocusEvent) => !e.currentTarget.contains(e.relatedTarget as Node | null) && set("focus", false),
+  };
   // @cpt-end:cpt-noter-flow-ui-primitives-inline-status:p1:inst-while-hover
 }
 
@@ -33,6 +43,7 @@ export function statusHandlers(timer: { current: StatusTimer | null }, hasAction
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
 export function InlineStatus({ text, variant = "trailing", actionLabel, onAction, kbd, onExpire }: InlineStatusProps) {
   const timer = useRef<StatusTimer | null>(null);
+  const held = useRef({ hover: false, focus: false });
   // @cpt-begin:cpt-noter-state-ui-primitives-inline-status:p1:inst-hidden-shown
   useEffect(() => {
     if (!text) return;
@@ -52,7 +63,7 @@ export function InlineStatus({ text, variant = "trailing", actionLabel, onAction
       data-state="shown"
       className={`np-istatus np-istatus--${variant}`}
       role="status"
-      {...statusHandlers(timer, !!actionLabel)}
+      {...statusHandlers(timer, held.current, !!actionLabel)}
     >
       <Icon name={variant === "notice" ? "info" : "check"} size={12} />
       <span className="np-istatus__text">{text}</span>

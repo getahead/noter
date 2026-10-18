@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../testing";
 import { InlineStatus, statusHandlers } from "./inline-status";
-import type { StatusTimer } from "./status-timer";
+import { statusTimer } from "./status-timer";
 
 const none = () => {};
 
@@ -33,21 +33,53 @@ describe("InlineStatus (cpt-noter-dod-ui-primitives-feedback)", () => {
 });
 
 describe("statusHandlers (cpt-noter-flow-ui-primitives-inline-status)", () => {
-  const timer = () => ({ pause: vi.fn(), resume: vi.fn(), cancel: vi.fn() }) satisfies StatusTimer;
+  /** The real timer on a clock the test moves by hand. */
+  function setup() {
+    let now = 0;
+    const timers = new Map<number, { at: number; fn: () => void }>();
+    let next = 0;
+    const clock = {
+      now: () => now,
+      setTimeout: (fn: () => void, ms: number) => (timers.set(++next, { at: now + ms, fn }), next),
+      clearTimeout: (h: unknown) => void timers.delete(h as number),
+    };
+    const advance = (ms: number) => {
+      now += ms;
+      for (const [h, t] of [...timers]) if (t.at <= now) (timers.delete(h), t.fn());
+    };
+    const expired = vi.fn();
+    const timer = { current: statusTimer(10000, expired, clock) };
+    const h = statusHandlers(timer, { hover: false, focus: false }, true);
+    const inside = { contains: (n: unknown) => n === "child" };
+    return { h, advance, expired, blur: (to: unknown) => h.onBlur?.({ currentTarget: inside, relatedTarget: to } as never) };
+  }
 
-  it("pauses the timer while a status with an action is hovered or focused", () => {
-    const t = timer();
-    const h = statusHandlers({ current: t }, true);
+  it("stays paused while focus remains after the pointer leaves", () => {
+    const { h, advance, expired, blur } = setup();
     h.onPointerEnter?.();
     h.onFocus?.();
-    expect(t.pause).toHaveBeenCalledTimes(2);
     h.onPointerLeave?.();
-    h.onBlur?.();
-    expect(t.resume).toHaveBeenCalledTimes(2);
-    statusHandlers({ current: null }, true).onPointerEnter?.(); // not started yet: nothing to pause
+    advance(20000);
+    expect(expired).not.toHaveBeenCalled();
+    blur(null); // focus leaves too: the time runs on
+    advance(10000);
+    expect(expired).toHaveBeenCalledOnce();
+  });
+
+  it("stays paused while hovered after focus leaves, and ignores focus moving inside the status", () => {
+    const { h, advance, expired, blur } = setup();
+    h.onFocus?.();
+    h.onPointerEnter?.();
+    blur("child");
+    blur(null);
+    advance(20000);
+    expect(expired).not.toHaveBeenCalled();
+    h.onPointerLeave?.();
+    advance(10000);
+    expect(expired).toHaveBeenCalledOnce();
   });
 
   it("a status without an action never pauses", () => {
-    expect(statusHandlers({ current: timer() }, false)).toEqual({});
+    expect(statusHandlers({ current: null }, { hover: false, focus: false }, false)).toEqual({});
   });
 });

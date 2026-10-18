@@ -52,4 +52,27 @@ test.describe("cpt-noter-dod-ui-primitives-controls primitives page", () => {
     await page.keyboard.press("Escape");
     await expect(popover).toHaveCount(0);
   });
+
+  test("every control keeps a 24 by 24 pt hit area, including checkboxes, switches and radios", async ({ page }) => {
+    await open(page);
+    // the visible control of each, and the label that a press on its hit area must reach
+    const controls = [
+      ['.np-check[data-variant="group"] .np-check__box', ".np-check"], // label-less checkbox (Select row)
+      [".np-toggle--small .np-toggle__track", ".np-toggle"],
+      [".np-radio .np-radio__dot", ".np-radio"],
+      [".np-btn--small", ".np-btn"],
+      [".np-ibtn--inline", ".np-ibtn"],
+      [".np-disc", ".np-disc"],
+    ];
+    for (const [visible, target] of controls) {
+      const hits = await page.locator(visible).first().evaluate((el, sel) => {
+        el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect();
+        const [cx, cy] = [r.left + r.width / 2, r.top + r.height / 2];
+        const own = el.closest(sel);
+        // the edges of a 24 by 24 box centred on the control, half a point inside
+        return [[cx - 11.5, cy], [cx + 11.5, cy], [cx, cy - 11.5], [cx, cy + 11.5]].map(([x, y]) => document.elementFromPoint(x, y)?.closest(sel) === own);
+      }, target);
+      expect(hits, visible).toEqual([true, true, true, true]);
+    }
+  });
 });

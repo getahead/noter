@@ -8,6 +8,7 @@ const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:n
 
 /** Keys of a modal surface: Esc, Return to the default button, and Tab kept inside. */
 export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, onDefault?: () => void) {
+  if (e.defaultPrevented) return; // an inner control handled it: a search field's Esc clears, a menu's Esc closes the menu
   const tag = (e.target as HTMLElement).tagName;
   if (e.key === "Escape") onCancel();
   else if (e.key === "Enter" && onDefault && (tag === "TEXTAREA" ? e.metaKey : tag !== "BUTTON" && tag !== "A")) {

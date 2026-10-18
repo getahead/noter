@@ -14,7 +14,12 @@ export type MenuItem =
 const ITEM = '[role^="menuitem"]:not(:disabled)';
 
 export function menuKey(e: KeyboardEvent<HTMLElement>, onClose?: () => void) {
-  if (e.key === "Escape") onClose?.();
+  if (e.key === "Escape") {
+    // consumed here, so a sheet or popover around the menu stays open
+    e.preventDefault();
+    e.stopPropagation();
+    onClose?.();
+  }
   else moveFocus(e, ITEM);
 }
 

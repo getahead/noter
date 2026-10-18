@@ -23,6 +23,12 @@ function key(k: string, target: object, o: { shiftKey?: boolean; metaKey?: boole
 const el = (tagName: string) => ({ tagName, focus: vi.fn() });
 
 describe("sheetKey", () => {
+  it("leaves a key an inner control already handled (search field Esc, menu Esc)", () => {
+    const onCancel = vi.fn();
+    sheetKey({ ...key("Escape", el("INPUT")), defaultPrevented: true } as unknown as KeyboardEvent<HTMLElement>, onCancel);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it("cancels on Esc", () => {
     const onCancel = vi.fn();
     sheetKey(key("Escape", el("INPUT")), onCancel);

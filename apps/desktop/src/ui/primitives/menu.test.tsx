@@ -30,7 +30,7 @@ describe("Menu (cpt-noter-dod-ui-primitives-controls)", () => {
 });
 
 describe("menuKey", () => {
-  const event = (key: string) => ({ key, target: null, preventDefault: vi.fn(), currentTarget: { querySelectorAll: () => [] } }) as unknown as KeyboardEvent<HTMLElement>;
+  const event = (key: string) => ({ key, target: null, preventDefault: vi.fn(), stopPropagation: vi.fn(), currentTarget: { querySelectorAll: () => [] } }) as unknown as KeyboardEvent<HTMLElement>;
   it("closes on Esc and lets arrows move between items", () => {
     const onClose = vi.fn();
     menuKey(event("Escape"), onClose);
@@ -48,10 +48,23 @@ describe("Menu items", () => {
     const onClose = vi.fn();
     const tree = rendered(Menu, { items: [{ label: "Copy", onSelect }, { label: "Plain" }], onClose });
     (find(tree, (p) => p.role === "menuitem").props.onClick as () => void)();
-    (tree.props.onKeyDown as (e: unknown) => void)({ key: "Escape" });
+    (tree.props.onKeyDown as (e: unknown) => void)({ key: "Escape", preventDefault: vi.fn(), stopPropagation: vi.fn() });
     expect(onSelect).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledTimes(2);
     const plain = rendered(Menu, { items: [{ label: "Plain" }] });
     (find(plain, (p) => p.role === "menuitem").props.onClick as () => void)();
+  });
+});
+
+describe("Escape inside a sheet (cpt-noter-flow-ui-primitives-operate-control)", () => {
+  it("closes only the menu, not the sheet around it", async () => {
+    const { sheetKey } = await import("./sheet");
+    const e = { key: "Escape", target: { tagName: "BUTTON" }, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation: vi.fn() };
+    const [closeMenu, cancelSheet] = [vi.fn(), vi.fn()];
+    menuKey(e as unknown as KeyboardEvent<HTMLElement>, closeMenu);
+    sheetKey(e as unknown as KeyboardEvent<HTMLElement>, cancelSheet); // the same event bubbling up
+    expect(closeMenu).toHaveBeenCalledOnce();
+    expect(e.stopPropagation).toHaveBeenCalled();
+    expect(cancelSheet).not.toHaveBeenCalled();
   });
 });
