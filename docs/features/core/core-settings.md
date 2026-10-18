@@ -80,7 +80,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 
 ### Change a settings section
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-settings-update`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-settings-update`
 
 **Actor**: Primary user (Settings or First run window)
 
@@ -93,14 +93,14 @@ Every component reads settings, and two windows (Settings and First run) write t
 - The call is made from a window outside the scope (only Settings and First run may write): `window_not_allowed`.
 
 **Steps**:
-1. [ ] - `p1` - API: `settings_update { rev, section }` - `inst-update-call`
-2. [ ] - `p1` - Validate the section with `cpt-noter-algo-core-settings-validate`; a failure **RETURN** `invalid_input` - `inst-validate`
-3. [ ] - `p1` - DB: replace the section row and bump the settings `rev` through `cpt-noter-algo-core-storage-change-tx` (actor `you`, before and after the section) - `inst-write-section`
-4. [ ] - `p1` - **IF** the write returned `conflict` - `inst-if-conflict`
-   1. [ ] - `p1` - **RETURN** `conflict` with `detail.current_rev` - `inst-return-conflict`
-5. [ ] - `p1` - Apply side effects of the section (for example `launch_at_login` through the native login item, `offer_to_record` to the detection rule) - `inst-side-effects`
-6. [ ] - `p1` - Emit `settings:changed` with the whole `Settings` and a new `version` - `inst-emit-settings`
-7. [ ] - `p1` - **RETURN** the whole `Settings` - `inst-return-settings`
+1. [x] - `p1` - API: `settings_update { rev, section }` - `inst-update-call`
+2. [x] - `p1` - Validate the section with `cpt-noter-algo-core-settings-validate`; a failure **RETURN** `invalid_input` - `inst-validate`
+3. [x] - `p1` - DB: replace the section row and bump the settings `rev` through `cpt-noter-algo-core-storage-change-tx` (actor `you`, before and after the section) - `inst-write-section`
+4. [x] - `p1` - **IF** the write returned `conflict` - `inst-if-conflict`
+   1. [x] - `p1` - **RETURN** `conflict` with `detail.current_rev` - `inst-return-conflict`
+5. [x] - `p1` - Call the section-changed hook with the new section; first run subscribes to it and applies `launch_at_login` (native login item) and `offer_to_record` (detection rule), so settings never calls into first-run code - `inst-side-effects`
+6. [x] - `p1` - Emit `settings:changed` with the whole `Settings` and a new `version` - `inst-emit-settings`
+7. [x] - `p1` - **RETURN** the whole `Settings` - `inst-return-settings`
 
 ### Set a global hotkey
 
@@ -150,7 +150,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 
 ### Edit the glossary and ignored apps
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-settings-glossary`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-settings-glossary`
 
 **Actor**: Primary user (Settings, or the main window when fixing a term)
 
@@ -163,27 +163,27 @@ Every component reads settings, and two windows (Settings and First run) write t
 - An empty term: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `glossary_upsert { id?, rev?, term, variants, spoken_forms }`, `glossary_remove { id }` or `settings_unignore_app { bundle_id }` - `inst-glossary-call`
-2. [ ] - `p1` - Validate; an empty term **RETURN** `invalid_input` - `inst-glossary-validate`
-3. [ ] - `p1` - DB: write the term (with `rev`) or the ignored-apps list through the change-log write path - `inst-glossary-write`
-4. [ ] - `p1` - **IF** a call is being captured, send the new glossary to the engine (`set_glossary`, once capture exists in M1) - `inst-glossary-live`
-5. [ ] - `p1` - **RETURN** the `GlossaryList`, or the `Settings` for an unignore (with `settings:changed`) - `inst-glossary-return`
+1. [x] - `p1` - API: `glossary_upsert { id?, rev?, term, variants_latin, variants_cyrillic, spoken_forms, lang?, always_apply }`, `glossary_remove { id }` or `settings_unignore_app { bundle_id }` - `inst-glossary-call`
+2. [x] - `p1` - Validate; an empty term **RETURN** `invalid_input` - `inst-glossary-validate`
+3. [x] - `p1` - DB: write the term (with `rev`) or the ignored-apps list through the change-log write path - `inst-glossary-write`
+4. [x] - `p1` - Call the glossary-changed hook with the new list; while a call is captured the capture session sends it to the engine (`set_glossary`, M1) - `inst-glossary-live`
+5. [x] - `p1` - **RETURN** the `GlossaryList`, or the `Settings` for an unignore (with `settings:changed`) - `inst-glossary-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Load and validate sections
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-settings-validate`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-settings-validate`
 
 **Input**: A stored or submitted section.
 
 **Output**: A valid section of the current shape, or `invalid_input` for a submitted one.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the section is missing (fresh install), **RETURN** its defaults - `inst-defaults`
-2. [ ] - `p1` - **IF** a stored section has an older shape, migrate it to the current shape and keep unknown fields out - `inst-migrate-shape`
-3. [ ] - `p1` - Check every value against its type's range and enum - `inst-check-values`
-4. [ ] - `p1` - **RETURN** the section, or `invalid_input` naming the field - `inst-return-section`
+1. [x] - `p1` - **IF** the section is missing (fresh install), **RETURN** its defaults - `inst-defaults`
+2. [x] - `p1` - **IF** a stored section has an older shape, migrate it to the current shape and keep unknown fields out - `inst-migrate-shape`
+3. [x] - `p1` - Check every value against its type's range and enum - `inst-check-values`
+4. [x] - `p1` - **RETURN** the section, or `invalid_input` naming the field - `inst-return-section`
 
 ### Check a hotkey chord
 
@@ -236,7 +236,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 
 ### Typed sections with one revision
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-settings-sections`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-settings-sections`
 
 The system **MUST** store each `Settings` section in `settings`, serve defaults on a fresh install, migrate older shapes, replace a whole section per `settings_update` guarded by the settings `rev`, log every change, and emit `settings:changed` with the whole state and a new `version`.
 
@@ -269,7 +269,7 @@ The system **MUST** register app hotkeys at launch and keep them registered, ref
 
 ### Glossary
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-settings-glossary`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-settings-glossary`
 
 The system **MUST** keep glossary terms with `rev`, variants and spoken forms, refuse empty terms and stale revisions, and hand the glossary to a live engine session when one exists.
 
@@ -278,13 +278,13 @@ The system **MUST** keep glossary terms with `rev`, variants and spoken forms, r
 
 **Touches**:
 - API: `glossary_list`, `glossary_upsert`, `glossary_remove`
-- DB: glossary (PRD table, with `rev`)
+- DB: `glossary` (PRD table, with `rev`; its migration belongs to this feature in M0)
 - Entities: `GlossaryTerm`
 
 ## 6. Acceptance Criteria
 
 - [ ] E2E against the real core, story `cpt-noter-seq-settings-set-hotkeys`: setting a chord without a modifier shows "Shortcut without a modifier", a VoiceOver chord shows "Shortcut used by VoiceOver", a valid chord is listed as registered.
-- [ ] Two windows editing settings: the second write with the old `rev` gets `conflict` and nothing is lost.
+- [x] Two windows editing settings: the second write with the old `rev` gets `conflict` and nothing is lost.
 - [ ] Every M0 settings command succeeds at least once in E2E runs against the real core.
-- [ ] A fresh install answers `settings_get` with every section at its default.
+- [x] A fresh install answers `settings_get` with every section at its default.
 - [ ] `just gate` passes.
