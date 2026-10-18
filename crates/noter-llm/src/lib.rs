@@ -8,8 +8,9 @@
 //! The caller (noter-core's download task) verifies each bundle's sha256.
 
 use std::sync::OnceLock;
+use std::time::Duration;
 
-use reqwest::header::RANGE;
+use reqwest::header::{CONTENT_RANGE, RANGE};
 use reqwest::redirect::Policy;
 use reqwest::{StatusCode, Url};
 
@@ -87,15 +88,19 @@ impl Default for RangeFetcher {
 impl RangeFetcher {
     /// The real fetcher: the model-download allow-list, for the URL and every redirect.
     pub fn new() -> Self {
-        Self::with_allow(allowed)
+        Self::with_allow(allowed, Duration::from_secs(30))
     }
 
     #[cfg(test)]
     pub(crate) fn for_local_tests() -> Self {
-        Self::with_allow(|u| u.host_str() == Some("127.0.0.1"))
+        Self::with_allow(
+            |u| u.host_str() == Some("127.0.0.1"),
+            Duration::from_millis(500),
+        )
     }
 
-    fn with_allow(allow: fn(&Url) -> bool) -> Self {
+    /// `stall`: how long a connection may send nothing before the fetch ends offline.
+    fn with_allow(allow: fn(&Url) -> bool, stall: Duration) -> Self {
         let policy = Policy::custom(move |attempt| {
             if attempt.previous().len() >= 10 {
                 attempt.error("too many redirects")
@@ -105,16 +110,21 @@ impl RangeFetcher {
                 attempt.error("redirect off the model-download allow-list")
             }
         });
+        // No proxy: a system proxy would be a host off the allow-list (the network-monitor gate).
         let client = reqwest::Client::builder()
             .redirect(policy)
+            .no_proxy()
+            .connect_timeout(Duration::from_secs(10))
+            .read_timeout(stall)
             .build()
-            .unwrap_or_default();
+            .expect("a client with rustls and a redirect policy always builds");
         Self { client, allow }
     }
 
     /// Streams `url` from `from_byte` into `chunk`, which returns false to stop. A server that
-    /// ignores the range is handled by skipping the bytes already held; 416 means the file is
-    /// already complete.
+    /// ignores the range, or answers from an earlier byte, is handled by skipping the bytes
+    /// already held; 416 means the file is already complete. A connection that stalls ends
+    /// offline.
     pub async fn fetch(
         &self,
         url: &str,
@@ -137,10 +147,18 @@ impl RangeFetcher {
         if !status.is_success() {
             return Err(FetchError::Http(status.as_u16()));
         }
-        let mut skip = if status == StatusCode::PARTIAL_CONTENT {
-            0
+        let start = if status == StatusCode::PARTIAL_CONTENT {
+            range_start(&response)
         } else {
-            from_byte
+            Some(0)
+        };
+        let mut skip = match start {
+            Some(start) if start <= from_byte => from_byte - start,
+            _ => {
+                return Err(FetchError::Io(format!(
+                    "206 does not cover byte {from_byte}"
+                )))
+            }
         };
         while let Some(bytes) = response.chunk().await.map_err(transport)? {
             let held = usize::try_from(skip).unwrap_or(usize::MAX).min(bytes.len());
@@ -152,6 +170,17 @@ impl RangeFetcher {
         }
         Ok(())
     }
+}
+
+/// The first byte of a 206, from `Content-Range: bytes START-END/TOTAL`.
+fn range_start(response: &reqwest::Response) -> Option<u64> {
+    let value = response.headers().get(CONTENT_RANGE)?.to_str().ok()?;
+    value
+        .strip_prefix("bytes ")?
+        .split('-')
+        .next()?
+        .parse()
+        .ok()
 }
 
 fn transport(e: reqwest::Error) -> FetchError {
