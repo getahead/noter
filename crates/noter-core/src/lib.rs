@@ -3,6 +3,7 @@
 //! Every later feature plugs its service in through [`CoreDeps`] and this crate.
 
 mod app;
+mod hub;
 mod log;
 
 use std::path::Path;
@@ -15,6 +16,9 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
+use hub::AnyHub;
+pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
+use noter_protocol::ipc::Sink;
 
 /// Time as the core sees it (a fixed clock in tests and the harness).
 pub trait Clock: Send + Sync {
@@ -91,6 +95,8 @@ pub struct Core {
     log: log::Logger,
     /// The app snapshot's slices, kept whole; a window's snapshot is a copy.
     app: Mutex<AppSnapshot>,
+    /// One stream hub per Channel message type, for routing acks, reloads and shutdown.
+    hubs: Mutex<Vec<Arc<dyn AnyHub>>>,
 }
 
 impl Core {
@@ -113,12 +119,71 @@ impl Core {
             store,
             log,
             app: Mutex::new(snapshot),
+            hubs: Mutex::new(vec![]),
         })
     }
 
-    /// Ends the core: the writer drains its queue and checkpoints. Idempotent.
+    /// Ends the core: every stream ends with `shutdown`, then the writer drains its queue and
+    /// checkpoints. Idempotent.
     pub async fn shutdown(&self) {
+        for hub in self.hubs() {
+            hub.end_all(StreamEndReason::Shutdown);
+        }
         self.store.close();
+    }
+
+    /// The store, for the services the core composes.
+    pub fn store(&self) -> &Store {
+        &self.store
+    }
+
+    /// A stream hub for one Channel message type; the core routes `stream_ack`,
+    /// `stream_unsubscribe`, webview reloads and shutdown to it.
+    pub fn stream_hub<M: StreamMsg>(&self, coalesce_ms: Option<i64>) -> Arc<StreamHub<M>> {
+        let hub = Arc::new(StreamHub::new(self.deps.clock.clone(), coalesce_ms));
+        self.hubs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(hub.clone());
+        hub
+    }
+
+    /// A subscribing command: the caller's window owns the subscription (a native surface owns
+    /// none), and the snapshot and the Channel start come from the hub under its lock.
+    // @cpt-flow:cpt-noter-flow-core-ipc-host-window-open:p1
+    // @cpt-dod:cpt-noter-dod-core-ipc-host-stream-hub:p1
+    pub fn subscribe<M: StreamMsg, S>(
+        &self,
+        hub: &StreamHub<M>,
+        key: &str,
+        ctx: &CommandCtx,
+        channel: Sink<M>,
+        snapshot: impl FnOnce() -> Result<S, CoreError>,
+    ) -> Result<Subscribed<S>, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-subscribe
+        let window = match ctx.caller {
+            Caller::Window { label } => Some(label),
+            Caller::Native { .. } => None,
+        };
+        // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-subscribe
+        // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-run-subscribe
+        hub.subscribe(key, window, channel, snapshot)
+        // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-run-subscribe
+    }
+
+    /// A webview loaded a page or was destroyed (the IPC host tells the core): its
+    /// subscriptions end, and the page subscribes again.
+    pub fn webview_reset(&self, label: WindowLabel) {
+        for hub in self.hubs() {
+            hub.end_webview(label);
+        }
+    }
+
+    fn hubs(&self) -> Vec<Arc<dyn AnyHub>> {
+        self.hubs
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     /// Replaces the app banners (update ready, interrupted recording, roll-up failed) and
@@ -181,12 +246,41 @@ impl CoreApi for Core {
         ctx: &CommandCtx,
         _args: NoArgs,
     ) -> Result<AppSnapshot, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
         let mut snapshot = self.app().clone();
         snapshot.window = match ctx.caller {
             Caller::Window { label } => label,
             Caller::Native { .. } => WindowLabel::Main,
         };
+        // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
         Ok(snapshot)
+    }
+
+    async fn stream_ack(&self, _ctx: &CommandCtx, args: StreamAckArgs) -> Result<Ack, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-ack
+        // A late ack for an ended subscription is normal: nothing to do.
+        let _ = self
+            .hubs()
+            .iter()
+            .any(|hub| hub.ack(&args.subscription_id, args.seq));
+        // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-ack
+        Ok(Ack {})
+    }
+
+    async fn stream_unsubscribe(
+        &self,
+        _ctx: &CommandCtx,
+        args: UnsubscribeArgs,
+    ) -> Result<Ack, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-if-unsubscribe
+        let _ = self
+            .hubs()
+            .iter()
+            .any(|hub| hub.unsubscribe(&args.subscription_id));
+        // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-if-unsubscribe
+        // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-return-unsubscribed
+        Ok(Ack {})
+        // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-return-unsubscribed
     }
 
     // @cpt-flow:cpt-noter-flow-core-ipc-host-banner-dismiss:p1
