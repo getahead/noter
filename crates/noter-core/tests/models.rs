@@ -458,6 +458,62 @@ async fn refresh_models_rereads_the_models_folder() {
     assert_eq!(state(&st, "whisper-turbo"), BundleState::Ready);
 }
 
+/// The harness's `world_set` seeds states the files cannot say (`checksum_failed`,
+/// `downloading` part-way): the status shows them and the download task moves on from them.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn seed_models_sets_the_states_the_files_cannot_say() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    let mut wanted = s
+        .core
+        .setup_status(&first_run(), NoArgs {})
+        .await
+        .unwrap()
+        .models;
+    let speech = wanted
+        .bundles
+        .iter_mut()
+        .find(|b| b.name == "whisper-turbo")
+        .unwrap();
+    speech.state = BundleState::ChecksumFailed;
+    wanted.error = Some(ErrorCode::ChecksumFailed);
+    noter_core::testing::seed_models(&s.core, &wanted);
+    let st = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert_eq!(state(&st, "whisper-turbo"), BundleState::ChecksumFailed);
+    assert_eq!(st.models.error, Some(ErrorCode::ChecksumFailed));
+    assert_eq!(state(&st, "bge-m3"), BundleState::Pending);
+    // Try Again downloads the bundle again and it checks out.
+    let again = download(&s.core, DownloadAction::Retry).await.unwrap();
+    assert_eq!(state(&again, "whisper-turbo"), BundleState::Downloading);
+    assert_eq!(again.models.error, None);
+    until(&s.core, "ready", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
+
+    // A download part-way: the status shows the progress the world says.
+    let speech = wanted
+        .bundles
+        .iter_mut()
+        .find(|b| b.name == "whisper-turbo")
+        .unwrap();
+    speech.state = BundleState::Downloading;
+    speech.done_mb = 1;
+    wanted.error = None;
+    noter_core::testing::seed_models(&s.core, &wanted);
+    let st = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert_eq!(state(&st, "whisper-turbo"), BundleState::Downloading);
+    assert_eq!(
+        st.models
+            .bundles
+            .iter()
+            .find(|b| b.name == "whisper-turbo")
+            .unwrap()
+            .done_mb,
+        1
+    );
+}
+
 /// A Mac with plenty of disk whose network comes and goes.
 struct Network(
     std::sync::atomic::AtomicBool,
