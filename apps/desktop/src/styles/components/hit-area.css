@@ -1,0 +1,9 @@
+/* Hit targets (DESIGN 3.2 › Primitives inventory): every primitive keeps a hit area of at least
+   24 by 24 pt even where the visible control is smaller (20-pt buttons, 22-pt inline icon buttons,
+   disclosure triangles). An invisible box centred on the control; it changes no layout.
+   The focus ring shows for keyboard focus only: the sheets above draw it on :focus-visible. */
+.np-btn--small, .np-ibtn--inline, .np-disc { position: relative; }
+.np-btn--small::after, .np-ibtn--inline::after, .np-disc::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: max(100%, 24px); height: max(100%, 24px);
+}
