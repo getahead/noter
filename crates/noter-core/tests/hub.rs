@@ -327,3 +327,42 @@ async fn the_core_routes_acks_unsubscribes_reloads_and_shutdown_to_its_hubs() {
     core.shutdown().await;
     assert_eq!(c.ended(), Some(StreamEndReason::Shutdown));
 }
+
+#[tokio::test]
+async fn a_subscribing_command_belongs_to_the_calling_window() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = core(dir.path());
+    let hub = core.stream_hub::<TestMsg>(None);
+    let (window, native) = (Window::default(), Window::default());
+    let store = core.store();
+    let snapshot = || {
+        store.read_snapshot(|c| {
+            c.query_row("SELECT count(*) FROM changes", [], |r| r.get::<_, i64>(0))
+        })
+    };
+    let from_call = core
+        .subscribe(
+            &hub,
+            "call_1",
+            &from(WindowLabel::CallScreen),
+            window.sink(),
+            snapshot,
+        )
+        .unwrap();
+    assert_eq!((from_call.snapshot, from_call.last_seq), (0, Seq(0)));
+    let menu = CommandCtx {
+        caller: Caller::Native {
+            surface: noter_protocol::ipc::NativeSurface::MenuBar,
+        },
+    };
+    core.subscribe(&hub, "call_1", &menu, native.sink(), || Ok(()))
+        .unwrap();
+    core.webview_reset(WindowLabel::CallScreen);
+    hub.publish("call_1", value(1));
+    assert_eq!(window.ended(), Some(StreamEndReason::Unsubscribed));
+    assert_eq!(
+        native.seqs(),
+        [1],
+        "a native surface has no webview to reload"
+    );
+}

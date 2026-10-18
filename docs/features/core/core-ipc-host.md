@@ -111,7 +111,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Open or reload a window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-window-open`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-window-open`
 
 **Actor**: UI window (WebView)
 
@@ -123,13 +123,13 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The webview reloads: every subscription it held ends; the reloaded page subscribes again.
 
 **Steps**:
-1. [ ] - `p1` - API: `app_snapshot {}` returns `AppSnapshot` with each slice carrying its `version` - `inst-app-snapshot`
-2. [ ] - `p1` - Window calls a subscribing command (for example `transcript_subscribe`) with a Channel - `inst-subscribe`
-3. [ ] - `p1` - Hub runs `cpt-noter-algo-core-ipc-host-subscribe` and returns the snapshot with `last_seq` - `inst-run-subscribe`
-4. [ ] - `p1` - Hub delivers messages with `seq = last_seq + 1, + 2, …`; the generated transport buffers any that arrive before the snapshot and drops `seq ≤ last_seq` - `inst-deliver`
-5. [ ] - `p1` - API: window sends `stream_ack { subscription_id, seq }` every 100 messages or 1 s; hub runs `cpt-noter-algo-core-ipc-host-ack` - `inst-ack`
-6. [ ] - `p1` - **IF** the window calls `stream_unsubscribe` - `inst-if-unsubscribe`
-   1. [ ] - `p1` - Hub ends the subscription with `ended { unsubscribed }` and **RETURN** `Ack` - `inst-return-unsubscribed`
+1. [x] - `p1` - API: `app_snapshot {}` returns `AppSnapshot` with each slice carrying its `version` - `inst-app-snapshot`
+2. [x] - `p1` - Window calls a subscribing command (for example `transcript_subscribe`) with a Channel - `inst-subscribe`
+3. [x] - `p1` - Hub runs `cpt-noter-algo-core-ipc-host-subscribe` and returns the snapshot with `last_seq` - `inst-run-subscribe`
+4. [x] - `p1` - Hub delivers messages with `seq = last_seq + 1, + 2, …`; the generated transport buffers any that arrive before the snapshot and drops `seq ≤ last_seq` - `inst-deliver`
+5. [x] - `p1` - API: window sends `stream_ack { subscription_id, seq }` every 100 messages or 1 s; hub runs `cpt-noter-algo-core-ipc-host-ack` - `inst-ack`
+6. [x] - `p1` - **IF** the window calls `stream_unsubscribe` - `inst-if-unsubscribe`
+   1. [x] - `p1` - Hub ends the subscription with `ended { unsubscribed }` and **RETURN** `Ack` - `inst-return-unsubscribed`
 
 ### Dismiss an app banner
 
@@ -186,50 +186,50 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Subscribe with a snapshot
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-subscribe`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-subscribe`
 
 **Input**: Stream kind and key (for example transcript of a call), the window label, the `Sink`.
 
 **Output**: The snapshot with `last_seq` and a subscription id.
 
 **Steps**:
-1. [ ] - `p1` - Take the hub lock for the stream key - `inst-lock`
-2. [ ] - `p1` - Ask the owning service for its snapshot, read through the writer connection (`cpt-noter-algo-core-storage-snapshot-read`) - `inst-snapshot`
-3. [ ] - `p1` - Read the stream's current `seq` as `last_seq` - `inst-read-seq`
-4. [ ] - `p1` - Register the subscription: id, window label, `Sink`, last acknowledged `seq = last_seq` - `inst-register`
-5. [ ] - `p1` - Release the lock - `inst-unlock`
-6. [ ] - `p1` - **RETURN** the snapshot, `last_seq` and the subscription id - `inst-return-subscribe`
+1. [x] - `p1` - Take the hub lock for the stream key - `inst-lock`
+2. [x] - `p1` - Ask the owning service for its snapshot, read through the writer connection (`cpt-noter-algo-core-storage-snapshot-read`) - `inst-snapshot`
+3. [x] - `p1` - Read the stream's current `seq` as `last_seq` - `inst-read-seq`
+4. [x] - `p1` - Register the subscription: id, window label, `Sink`, last acknowledged `seq = last_seq` - `inst-register`
+5. [x] - `p1` - Release the lock - `inst-unlock`
+6. [x] - `p1` - **RETURN** the snapshot, `last_seq` and the subscription id - `inst-return-subscribe`
 
 ### Publish and acknowledge
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-ack`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-ack`
 
 **Input**: A stream message from a service, or a `stream_ack` from a window.
 
 **Output**: Messages delivered in order; lagging subscriptions ended.
 
 **Steps**:
-1. [ ] - `p1` - On publish, take the hub lock, assign `seq + 1`, append to the bounded replay buffer, send to every subscription of the stream - `inst-publish`
-2. [ ] - `p1` - **FOR EACH** subscription after a send - `inst-for-subs`
-   1. [ ] - `p1` - **IF** unacknowledged messages reach 2 000, end it with `ended { lagged }` and drop it - `inst-end-lagged`
-3. [ ] - `p1` - On `stream_ack`, set the subscription's last acknowledged `seq` (never lower than before) - `inst-ack-update`
-4. [ ] - `p1` - Levels are coalesced to at most one message per 100 ms per subscription; cards are never batched or delayed - `inst-coalesce`
-5. [ ] - `p1` - **RETURN** - `inst-return-publish`
+1. [x] - `p1` - On publish, take the hub lock, assign `seq + 1`, append to the replay buffer (bounded at 2 000 messages, the lag limit), send to every subscription of the stream - `inst-publish`
+2. [x] - `p1` - **FOR EACH** subscription after a send - `inst-for-subs`
+   1. [x] - `p1` - **IF** unacknowledged messages reach 2 000, end it with `ended { lagged }` and drop it - `inst-end-lagged`
+3. [x] - `p1` - On `stream_ack`, set the subscription's last acknowledged `seq` (never lower than before) - `inst-ack-update`
+4. [x] - `p1` - Levels are coalesced to at most one message per 100 ms per subscription; cards are never batched or delayed - `inst-coalesce`
+5. [x] - `p1` - **RETURN** - `inst-return-publish`
 
 ### End subscriptions of a webview
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-webview-reset`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-webview-reset`
 
 **Input**: A page-load or destroy notice for a webview label, or a stream end (stop, discard, shutdown).
 
 **Output**: Every affected subscription ended with a reason.
 
 **Steps**:
-1. [ ] - `p1` - **IF** a webview loaded a page or was destroyed - `inst-if-webview`
-   1. [ ] - `p1` - End every subscription of that label with `ended { unsubscribed }` - `inst-end-webview`
-2. [ ] - `p1` - **IF** a stream ended (call stopped, discarded, shutdown) - `inst-if-stream-end`
-   1. [ ] - `p1` - End every subscription of the stream with that reason (`call_stopped`, `discarded`, `shutdown`) - `inst-end-stream`
-3. [ ] - `p1` - **RETURN** - `inst-return-reset`
+1. [x] - `p1` - **IF** a webview loaded a page or was destroyed - `inst-if-webview`
+   1. [x] - `p1` - End every subscription of that label with `ended { unsubscribed }` - `inst-end-webview`
+2. [x] - `p1` - **IF** a stream ended (call stopped, discarded, shutdown) - `inst-if-stream-end`
+   1. [x] - `p1` - End every subscription of the stream with that reason (`call_stopped`, `discarded`, `shutdown`) - `inst-end-stream`
+3. [x] - `p1` - **RETURN** - `inst-return-reset`
 
 ### Stamp whole-state versions
 
@@ -262,15 +262,15 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Subscription lifecycle
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-ipc-host-subscription`
+- [x] `p1` - **ID**: `cpt-noter-state-core-ipc-host-subscription`
 
 **States**: registering, streaming, ended
 
 **Initial State**: registering
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** registering **TO** streaming **WHEN** the snapshot was taken and the subscription registered under the hub lock - `inst-st-streaming`
-2. [ ] - `p1` - **FROM** streaming **TO** ended **WHEN** the window unsubscribes, its webview reloads or is destroyed, it falls 2 000 messages behind, or the stream ends (call stopped, discarded, shutdown) - `inst-st-ended`
+1. [x] - `p1` - **FROM** registering **TO** streaming **WHEN** the snapshot was taken and the subscription registered under the hub lock - `inst-st-streaming`
+2. [x] - `p1` - **FROM** streaming **TO** ended **WHEN** the window unsubscribes, its webview reloads or is destroyed, it falls 2 000 messages behind, or the stream ends (call stopped, discarded, shutdown) - `inst-st-ended`
 
 ## 5. Definitions of Done
 
@@ -292,7 +292,7 @@ The system **MUST** register one handler per entry of `COMMANDS` in `src-tauri`,
 
 ### Stream hub
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-stream-hub`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-stream-hub`
 
 The system **MUST** start every Channel at `last_seq + 1` after a snapshot taken under the hub lock, keep consecutive `seq` numbers, accept `stream_ack`, end a subscription at 2 000 unacknowledged messages with `lagged`, end every subscription of a webview on page load or destroy, and end streams with their reason.
 
@@ -336,7 +336,7 @@ The system **MUST** never write transcript, document or model text to `logs/`; a
 
 - [ ] The handler-parity test passes: registered handlers equal `COMMANDS`, and every command from every window is answered or refused with `window_not_allowed`.
 - [ ] A Channel message published before the subscribing `invoke` resolves is delivered after the snapshot, and none with `seq ≤ last_seq` is delivered (conformance, against the real core).
-- [ ] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
+- [x] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
 - [ ] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
 - [x] No log file contains transcript text after the log-scrubbing test.
 - [ ] `just gate` passes.
