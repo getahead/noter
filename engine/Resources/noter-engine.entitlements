@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The engine's own entitlements (cpt-noter-constraint-core-engine-offline): App Sandbox,
+     audio input and the App Group it shares with the app. No network entitlement, ever;
+     `just arch` fails on one. TEAMID is replaced by engine/scripts/sign.sh. -->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>TEAMID.ai.noter</string>
+    </array>
+</dict>
+</plist>

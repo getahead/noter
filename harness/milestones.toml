@@ -64,6 +64,8 @@ commands = [
   "history_list", "change_undo", "change_redo", "history_export",
   "call_tags_set", "tags_list",
   "repos_list", "repo_upsert", "repo_remove", "share_test_run",
+  # Moved from M3 by the owner on 18 Oct: post-call outputs need a key (DECOMPOSITION-core §1 item 1).
+  "accounts_get", "api_key_set",
 ]
 stories = [
   "cpt-noter-seq-today-review-before-call",
@@ -85,7 +87,7 @@ commands = [
   "ask_scope_presets", "topics_list", "topic_get", "topic_rename", "topics_merge", "topics_keep_separate",
   "people_list", "person_get", "person_create", "person_update", "people_merge", "person_delete",
   "voice_profile_create", "voice_profile_delete",
-  "accounts_get", "api_key_set", "api_key_remove", "account_signin_prepare", "cli_install",
+  "api_key_remove", "account_signin_prepare", "cli_install",
   "account_signin_start", "account_signin_cancel", "account_use_existing", "account_bind_agents",
   "account_test", "account_sign_out",
   "sources_list", "source_add_folder", "source_add_mcp", "source_update", "source_reindex",

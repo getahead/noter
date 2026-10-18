@@ -1,7 +1,7 @@
 ---
 title: "Feature — Core bridge and window stores"
 description: "How every Noter WebView window talks to the Rust core through the generated contract and renders from its own in-memory store: snapshot then stream, wanted state, typed errors to named states, no retries."
-status: DRAFT
+status: IN_PROGRESS
 version: "1.0"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-core-bridge
@@ -98,18 +98,18 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 - The contract major version differs: the bridge refuses to start and logs the mismatch
 
 **Steps**:
-1. [ ] - `p1` - User opens, reloads or reopens a window; the window reads its label (`main`, `call-screen`, `record-prompt`, `settings`, `first-run`) - `inst-read-label`
-2. [ ] - `p1` - UI: build the bridge for that label over the Tauri transport, or over `FakeCore` when `VITE_FAKE_CORE` is set or in tests and stories - `inst-build-bridge`
-3. [ ] - `p1` - UI: create an empty store for the window; view state starts from defaults (no browser storage) - `inst-create-store`
-4. [ ] - `p1` - UI: subscribe to the 20 events of the contract before asking for the snapshot, so no change between the two is lost - `inst-subscribe-events`
-5. [ ] - `p1` - API: `app_snapshot` (no arguments; returns `AppSnapshot` with setup, capture, detection, copilot, privacy, presenting, degraded, accounts, features, prefs, proposals, banners, environment) - `inst-api-snapshot`
-6. [ ] - `p1` - **IF** the snapshot's `contract_version` major differs from the bindings' `CONTRACT_VERSION` - `inst-if-version`
-   1. [ ] - `p1` - API: `log_ui` with the mismatch, no content; the window shows the section-level error and stops - `inst-version-stop`
-7. [ ] - `p1` - Algorithm: apply each slice with `cpt-noter-algo-ui-core-bridge-apply-whole-state` - `inst-apply-snapshot`
-8. [ ] - `p1` - UI: the screen the window shows calls its own read commands and Channels through `cpt-noter-algo-ui-core-bridge-snapshot-then-stream` - `inst-screen-reads`
-9. [ ] - `p1` - **IF** a read takes longer than 300 ms - `inst-if-slow`
+1. [x] - `p1` - User opens, reloads or reopens a window; the window reads its label (`main`, `call-screen`, `record-prompt`, `settings`, `first-run`) - `inst-read-label`
+2. [x] - `p1` - UI: build the bridge for that label over the Tauri transport, or over `FakeCore` when `VITE_FAKE_CORE` is set or in tests and stories - `inst-build-bridge`
+3. [x] - `p1` - UI: create an empty store for the window; view state starts from defaults (no browser storage) - `inst-create-store`
+4. [x] - `p1` - UI: subscribe to the 20 events of the contract before asking for the snapshot, so no change between the two is lost - `inst-subscribe-events`
+5. [x] - `p1` - API: `app_snapshot` (no arguments; returns `AppSnapshot` with setup, capture, detection, copilot, privacy, presenting, degraded, accounts, features, prefs, proposals, banners, environment) - `inst-api-snapshot`
+6. [x] - `p1` - **IF** the snapshot's `contract_version` major differs from the bindings' `CONTRACT_VERSION` - `inst-if-version`
+   1. [x] - `p1` - API: `log_ui` with the mismatch, no content; the window shows the section-level error and stops - `inst-version-stop`
+7. [x] - `p1` - Algorithm: apply each slice with `cpt-noter-algo-ui-core-bridge-apply-whole-state` - `inst-apply-snapshot`
+8. [x] - `p1` - UI: the screen the window shows calls its own read commands and Channels through `cpt-noter-algo-ui-core-bridge-snapshot-then-stream` - `inst-screen-reads`
+9. [x] - `p1` - **IF** a read takes longer than 300 ms - `inst-if-slow`
    1. [ ] - `p1` - UI: the region shows skeleton rows until the data arrives (DESIGN state "Window reloaded") - `inst-skeleton`
-10. [ ] - `p1` - **RETURN** a window rendering only what the core sent - `inst-return-window`
+10. [x] - `p1` - **RETURN** a window rendering only what the core sent - `inst-return-window`
 
 ### Act on a record
 
@@ -127,19 +127,19 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 
 **Steps**:
 1. [ ] - `p1` - User acts on a control (click, key, menu item) - `inst-user-acts`
-2. [ ] - `p1` - UI: the control enters its loading state; nothing in the store changes yet (no optimistic writes) - `inst-loading`
-3. [ ] - `p1` - API: the screen calls the bridge method for the command with the wanted state (never a toggle) and the record's `rev` for edits - `inst-api-command`
-4. [ ] - `p1` - **IF** the result is `ok` - `inst-if-ok`
-   1. [ ] - `p1` - Store: write the returned record or whole-state slice, keeping the higher `version` - `inst-write-result`
-   2. [ ] - `p1` - UI: the control leaves its loading state and the screen re-renders from the store - `inst-render-result`
-5. [ ] - `p1` - **ELSE** - `inst-else-error`
-   1. [ ] - `p1` - Algorithm: map the error with `cpt-noter-algo-ui-core-bridge-map-error` - `inst-map-error`
-   2. [ ] - `p1` - UI: the screen shows the named state, with **Try Again** only where the error is retryable; the bridge never retries by itself - `inst-show-error`
-6. [ ] - `p1` - **RETURN** the screen in its new state - `inst-return-act`
+2. [x] - `p1` - UI: the control enters its loading state; nothing in the store changes yet (no optimistic writes) - `inst-loading`
+3. [x] - `p1` - API: the screen calls the bridge method for the command with the wanted state (never a toggle) and the record's `rev` for edits - `inst-api-command`
+4. [x] - `p1` - **IF** the result is `ok` - `inst-if-ok`
+   1. [x] - `p1` - Store: write the returned record or whole-state slice, keeping the higher `version` - `inst-write-result`
+   2. [x] - `p1` - UI: the control leaves its loading state and the screen re-renders from the store - `inst-render-result`
+5. [x] - `p1` - **ELSE** - `inst-else-error`
+   1. [x] - `p1` - Algorithm: map the error with `cpt-noter-algo-ui-core-bridge-map-error` - `inst-map-error`
+   2. [x] - `p1` - UI: the screen shows the named state, with **Try Again** only where the error is retryable; the bridge never retries by itself - `inst-show-error`
+6. [x] - `p1` - **RETURN** the screen in its new state - `inst-return-act`
 
 ### Close a window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-close-window`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-close-window`
 
 **Actor**: Primary user
 
@@ -150,124 +150,124 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 - The unsubscribe fails because the core already ended the Channel: ignored
 
 **Steps**:
-1. [ ] - `p1` - User closes the window (⌘W, ×, **Hide**) - `inst-user-closes`
-2. [ ] - `p1` - **FOR EACH** open Channel subscription of the window - `inst-for-each-sub`
-   1. [ ] - `p1` - API: `stream_unsubscribe` with its `subscription_id` - `inst-api-unsubscribe`
-3. [ ] - `p1` - UI: drop the store; nothing is persisted in the WebView - `inst-drop-store`
-4. [ ] - `p1` - **RETURN** closed - `inst-return-closed`
+1. [x] - `p1` - User closes the window (⌘W, ×, **Hide**) - `inst-user-closes`
+2. [x] - `p1` - **FOR EACH** open Channel subscription of the window - `inst-for-each-sub`
+   1. [x] - `p1` - API: `stream_unsubscribe` with its `subscription_id` - `inst-api-unsubscribe`
+3. [x] - `p1` - UI: drop the store; nothing is persisted in the WebView - `inst-drop-store`
+4. [x] - `p1` - **RETURN** closed - `inst-return-closed`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Snapshot, then stream
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-snapshot-then-stream`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-snapshot-then-stream`
 
 **Input**: a subscribing command (`transcript_subscribe`, `levels_subscribe`, `cards_subscribe`, `ask_start`, `self_test_run`) with its arguments, and the store slice it fills
 
 **Output**: the slice filled from the snapshot and kept current by the Channel, or a named error state
 
 **Steps**:
-1. [ ] - `p1` - Call the command with a message handler; the generated client buffers Channel messages that arrive before the result - `inst-call-subscribing`
-2. [ ] - `p1` - **IF** the result is an error - `inst-if-sub-error`
-   1. [ ] - `p1` - **RETURN** the mapped error state (`cpt-noter-algo-ui-core-bridge-map-error`) - `inst-return-sub-error`
-3. [ ] - `p1` - Store the snapshot part of the result in the slice and remember `subscription_id` and `last_seq` - `inst-store-snapshot`
-4. [ ] - `p1` - **FOR EACH** delivered message, in `seq` order (the client already drops `seq <= last_seq` and duplicates and sends `stream_ack` every 100 messages or 1 s) - `inst-for-each-msg`
-   1. [ ] - `p1` - **IF** `seq` is not `last_seq + 1` - `inst-if-gap`
-      1. [ ] - `p1` - Close the subscription and run this algorithm again from step 1 (resubscribe); the screen keeps showing what it has - `inst-resubscribe`
-   2. [ ] - `p1` - Append the message to the slice's buffer - `inst-buffer`
-   3. [ ] - `p1` - **IF** the message is `ended` with a reason - `inst-if-ended`
-      1. [ ] - `p1` - Map the reason to the screen's named state (for example `lagged` to resubscribe, `call_deleted` to the page's empty state) - `inst-map-ended`
-5. [ ] - `p1` - Every 100 ms, flush the buffer into the slice in one store update (`cpt-noter-algo-ui-core-bridge-flush-buffer`) - `inst-flush`
-6. [ ] - `p1` - **RETURN** the live slice - `inst-return-live`
+1. [x] - `p1` - Call the command with a message handler; the generated client buffers Channel messages that arrive before the result - `inst-call-subscribing`
+2. [x] - `p1` - **IF** the result is an error - `inst-if-sub-error`
+   1. [x] - `p1` - **RETURN** the mapped error state (`cpt-noter-algo-ui-core-bridge-map-error`) - `inst-return-sub-error`
+3. [x] - `p1` - Store the snapshot part of the result in the slice and remember `subscription_id` and `last_seq` - `inst-store-snapshot`
+4. [x] - `p1` - **FOR EACH** delivered message, in `seq` order (the client already drops `seq <= last_seq` and duplicates and sends `stream_ack` every 100 messages or 1 s) - `inst-for-each-msg`
+   1. [x] - `p1` - **IF** `seq` is not `last_seq + 1` - `inst-if-gap`
+      1. [x] - `p1` - Close the subscription and run this algorithm again from step 1 (resubscribe); the screen keeps showing what it has - `inst-resubscribe`
+   2. [x] - `p1` - Append the message to the slice's buffer - `inst-buffer`
+   3. [x] - `p1` - **IF** the message is `ended` with a reason - `inst-if-ended`
+      1. [x] - `p1` - Map the reason to the screen's named state (for example `lagged` to resubscribe, `call_deleted` to the page's empty state) - `inst-map-ended`
+5. [x] - `p1` - Every 100 ms, flush the buffer into the slice in one store update (`cpt-noter-algo-ui-core-bridge-flush-buffer`) - `inst-flush`
+6. [x] - `p1` - **RETURN** the live slice - `inst-return-live`
 
 ### Apply whole state
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-apply-whole-state`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-apply-whole-state`
 
 **Input**: a whole-state payload (from `app_snapshot`, an event or a command result) for a slice such as capture, degraded, banners, presenting, privacy, setup, settings, accounts, environment, window:call
 
 **Output**: the store slice holding the newest state
 
 **Steps**:
-1. [ ] - `p1` - Read the payload's `version` - `inst-read-version`
-2. [ ] - `p1` - **IF** the store already holds the same slice with a higher or equal `version` - `inst-if-older`
-   1. [ ] - `p1` - **RETURN** unchanged (a late payload is dropped) - `inst-return-unchanged`
-3. [ ] - `p1` - Replace the whole slice with the payload; never merge a partial change into it - `inst-replace`
-4. [ ] - `p1` - **RETURN** the updated slice - `inst-return-updated`
+1. [x] - `p1` - Read the payload's `version` - `inst-read-version`
+2. [x] - `p1` - **IF** the store already holds the same slice with a higher or equal `version` - `inst-if-older`
+   1. [x] - `p1` - **RETURN** unchanged (a late payload is dropped) - `inst-return-unchanged`
+3. [x] - `p1` - Replace the whole slice with the payload; never merge a partial change into it - `inst-replace`
+4. [x] - `p1` - **RETURN** the updated slice - `inst-return-updated`
 
 ### Flush stream buffers
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-flush-buffer`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-flush-buffer`
 
 **Input**: the buffered transcript, levels or card messages of the last 100 ms
 
 **Output**: one store update per slice
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** buffered transcript message - `inst-for-each-tr`
-   1. [ ] - `p1` - **MATCH** its type - `inst-match-tr`
-      - [ ] - `p1` - **CASE** `confirmed`: append the segment; confirmed segments never move or change position - `inst-case-confirmed`
-      - [ ] - `p1` - **CASE** `hypothesis`: replace the one hypothesis row - `inst-case-hypothesis`
-      - [ ] - `p1` - **CASE** `segments_updated` or `speakers_updated`: replace those records by identity - `inst-case-updated`
-      - [ ] - `p1` - **CASE** `gap` or `mark`: insert the row at its time - `inst-case-gap-mark`
-2. [ ] - `p1` - **FOR EACH** buffered levels message: keep only the newest per channel (meters update at most every 100 ms) - `inst-levels-newest`
-3. [ ] - `p1` - **FOR EACH** buffered card message: apply it to the card slice as the core sent it; numbers, expiry and ranking come from the core (M4) - `inst-cards`
-4. [ ] - `p1` - Commit one store update so screens re-render once - `inst-commit`
-5. [ ] - `p1` - **RETURN** the updated slices - `inst-return-flush`
+1. [x] - `p1` - **FOR EACH** buffered transcript message - `inst-for-each-tr`
+   1. [x] - `p1` - **MATCH** its type - `inst-match-tr`
+      - [x] - `p1` - **CASE** `confirmed`: append the segment; confirmed segments never move or change position - `inst-case-confirmed`
+      - [x] - `p1` - **CASE** `hypothesis`: replace the one hypothesis row - `inst-case-hypothesis`
+      - [x] - `p1` - **CASE** `segments_updated` or `speakers_updated`: replace those records by identity - `inst-case-updated`
+      - [x] - `p1` - **CASE** `gap` or `mark`: insert the row at its time - `inst-case-gap-mark`
+2. [x] - `p1` - **FOR EACH** buffered levels message: keep only the newest per channel (meters update at most every 100 ms) - `inst-levels-newest`
+3. [x] - `p1` - **FOR EACH** buffered card message: apply it to the card slice as the core sent it; numbers, expiry and ranking come from the core (M4) - `inst-cards`
+4. [x] - `p1` - Commit one store update so screens re-render once - `inst-commit`
+5. [x] - `p1` - **RETURN** the updated slices - `inst-return-flush`
 
 ### Map a typed error to a named state
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-map-error`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-map-error`
 
 **Input**: a `CoreError` (`code`, `message`, `retryable`, `detail`) and the calling screen's error table
 
 **Output**: the named state the screen shows
 
 **Steps**:
-1. [ ] - `p1` - **IF** the screen's States table names a state for `code` - `inst-if-named`
-   1. [ ] - `p1` - **RETURN** that state with its words and next action; offer **Try Again** only when `retryable` is true - `inst-return-named`
-2. [ ] - `p1` - **IF** `code` is `window_not_allowed` or `invalid_input` - `inst-if-bug`
-   1. [ ] - `p1` - API: `log_ui` with the command name and code, never with transcript, document or model text - `inst-log-bug`
-3. [ ] - `p1` - **RETURN** the screen's section-level error with **Try Again** when `retryable`, and log it through `log_ui` - `inst-return-generic`
+1. [x] - `p1` - **IF** the screen's States table names a state for `code` - `inst-if-named`
+   1. [x] - `p1` - **RETURN** that state with its words and next action; offer **Try Again** only when `retryable` is true - `inst-return-named`
+2. [x] - `p1` - **IF** `code` is `window_not_allowed` or `invalid_input` - `inst-if-bug`
+   1. [x] - `p1` - API: `log_ui` with the command name and code, never with transcript, document or model text - `inst-log-bug`
+3. [x] - `p1` - **RETURN** the screen's section-level error with **Try Again** when `retryable`, and log it through `log_ui` - `inst-return-generic`
 
 ## 4. States (CDSL)
 
 ### Window store lifecycle
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-core-bridge-window-store`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-core-bridge-window-store`
 
 **States**: EMPTY, LOADING, READY, RESYNCING, FAILED, CLOSED
 
 **Initial State**: EMPTY
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** EMPTY **TO** LOADING **WHEN** the window has subscribed to events and called `app_snapshot` - `inst-empty-loading`
-2. [ ] - `p1` - **FROM** LOADING **TO** READY **WHEN** the snapshot resolves and its slices are applied - `inst-loading-ready`
-3. [ ] - `p1` - **FROM** LOADING **TO** FAILED **WHEN** the snapshot returns an error or the contract major version differs - `inst-loading-failed`
-4. [ ] - `p1` - **FROM** FAILED **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-failed-loading`
-5. [ ] - `p1` - **FROM** READY **TO** RESYNCING **WHEN** a Channel shows a `seq` gap or ends with `lagged` - `inst-ready-resync`
-6. [ ] - `p1` - **FROM** RESYNCING **TO** READY **WHEN** the resubscription's snapshot is applied - `inst-resync-ready`
-7. [ ] - `p1` - **FROM** READY **TO** CLOSED **WHEN** the window closes and its Channels are unsubscribed - `inst-ready-closed`
+1. [x] - `p1` - **FROM** EMPTY **TO** LOADING **WHEN** the window has subscribed to events and called `app_snapshot` - `inst-empty-loading`
+2. [x] - `p1` - **FROM** LOADING **TO** READY **WHEN** the snapshot resolves and its slices are applied - `inst-loading-ready`
+3. [x] - `p1` - **FROM** LOADING **TO** FAILED **WHEN** the snapshot returns an error or the contract major version differs - `inst-loading-failed`
+4. [x] - `p1` - **FROM** FAILED **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-failed-loading`
+5. [x] - `p1` - **FROM** READY **TO** RESYNCING **WHEN** a Channel shows a `seq` gap or ends with `lagged` - `inst-ready-resync`
+6. [x] - `p1` - **FROM** RESYNCING **TO** READY **WHEN** the resubscription's snapshot is applied - `inst-resync-ready`
+7. [x] - `p1` - **FROM** READY **TO** CLOSED **WHEN** the window closes and its Channels are unsubscribed - `inst-ready-closed`
 
 ### Command call
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-core-bridge-command`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-core-bridge-command`
 
 **States**: IDLE, WAITING, DONE, ERROR
 
 **Initial State**: IDLE
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** IDLE **TO** WAITING **WHEN** a screen calls a command; the control shows loading - `inst-idle-waiting`
-2. [ ] - `p1` - **FROM** WAITING **TO** DONE **WHEN** the result is `ok` and the record is written to the store - `inst-waiting-done`
-3. [ ] - `p1` - **FROM** WAITING **TO** ERROR **WHEN** the result is an error; the screen shows the mapped state - `inst-waiting-error`
-4. [ ] - `p1` - **FROM** ERROR **TO** WAITING **WHEN** the user chooses **Try Again** on a retryable state; never automatically - `inst-error-waiting`
+1. [x] - `p1` - **FROM** IDLE **TO** WAITING **WHEN** a screen calls a command; the control shows loading - `inst-idle-waiting`
+2. [x] - `p1` - **FROM** WAITING **TO** DONE **WHEN** the result is `ok` and the record is written to the store - `inst-waiting-done`
+3. [x] - `p1` - **FROM** WAITING **TO** ERROR **WHEN** the result is an error; the screen shows the mapped state - `inst-waiting-error`
+4. [x] - `p1` - **FROM** ERROR **TO** WAITING **WHEN** the user chooses **Try Again** on a retryable state; never automatically - `inst-error-waiting`
 
 ## 5. Definitions of Done
 
 ### One bridge per window over the generated client
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-core-bridge-bridge`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-core-bridge-bridge`
 
 The system **MUST** give each window one bridge built on `createCore()` with the Tauri transport in the app and `FakeCore` in tests, stories and the browser dev loop; only `apps/desktop/src/core/tauri-transport.ts` imports `@tauri-apps/*`, and only `main.tsx`, tests and stories import the fake core (`just arch`).
 
@@ -285,7 +285,7 @@ The system **MUST** give each window one bridge built on `createCore()` with the
 
 ### Store with whole state, versions and stream buffers
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-core-bridge-store`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-core-bridge-store`
 
 The system **MUST** keep one in-memory store per window with entity slices keyed by identity, whole-state slices kept by highest `version`, a 100 ms flush of the transcript, levels and card Channels, and no persistent browser storage.
 
@@ -303,7 +303,7 @@ The system **MUST** keep one in-memory store per window with entity slices keyed
 
 ### Typed errors to named states, no retries
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-core-bridge-errors`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-core-bridge-errors`
 
 The system **MUST** map every `ErrorCode` of the contract to the calling screen's named state or to its section-level error with **Try Again** when retryable, never retry on its own, send wanted state and `rev` with every edit, and log UI errors through `log_ui` without transcript text.
 
