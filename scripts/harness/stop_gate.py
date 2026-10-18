@@ -90,6 +90,7 @@ def main() -> int:
         env = dict(os.environ)
         if sys.platform == "darwin":
             # Terminals launched by Orca put the CommandLineTools `ld` (cannot read the Xcode SDK) and Python 3.9 first.
+            # shortcut: Apple Silicon Homebrew only; add /usr/local/bin before /usr/bin if an Intel Mac joins.
             env["PATH"] = "/opt/homebrew/bin:/usr/bin:" + env.get("PATH", "")
         proc = subprocess.run(["just", "gate-fast"], cwd=ROOT, capture_output=True, text=True, timeout=TIMEOUT_S, env=env)
     except subprocess.TimeoutExpired:
