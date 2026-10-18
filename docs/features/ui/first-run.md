@@ -191,7 +191,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
    - [x] - `p1` - **CASE** `line`: show the live transcript line with each part's language attribute; never announce it - `inst-case-line`
    - [x] - `p1` - **CASE** `stream_arrived`: tick **System audio arrives** or **Your microphone arrives** - `inst-case-arrived`
    - [x] - `p1` - **CASE** `passed`: tick **Both streams line up**; show the fourth line as passed, as **Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.** (exclusion off) or as **Noter's own sounds reached the recording. Replay while recording stays off until this passes.** (exclusion failed) - `inst-case-passed`
-   - [x] - `p1` - **CASE** `failed`: show **We hear your microphone but not system audio. Play any sound in another app and try again.** or its mirror for the microphone - `inst-case-failed`
+   - [x] - `p1` - **CASE** `failed`: show **We hear your microphone but not system audio. Play any sound in another app and try again.** or its mirror for the microphone; **zero buffers** counts as system audio recording not allowed: **System audio recording is not allowed yet.** with **Open System Settings…** and the **System audio recording** row back to its missing state; **timed out** fails with **The test didn't finish. Check that sound is playing, then try again.** and **Run Test** enabled (HoD decision D-14) - `inst-case-failed`
    - [x] - `p1` - **CASE** `ended`: stop the running state; **Run Test** is enabled again - `inst-case-ended`
 2. [x] - `p1` - **RETURN** the panel state - `inst-return-panel`
 
