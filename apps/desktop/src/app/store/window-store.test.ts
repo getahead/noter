@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AppSnapshot, CardView, EventPayloads, SegmentView, TranscriptSnapshot } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
-import { applyEvent, applySnapshot, applyWhole, createWindowStore, initialState, reduceStream } from "./window-store";
+import { applyEvent, applyRecord, applySnapshot, applyWhole, createWindowStore, initialState, reduceStream } from "./window-store";
 
 const world = new FakeCore({ window: "main" }).world;
 const snapshot = (): AppSnapshot => ({
@@ -83,6 +83,21 @@ describe("window store", () => {
     s = applyEvent(s, { event: "entity:changed", payload: { type: "removed", kind: "call", id: "call_1" } });
     expect(s.entities.call.call_1).toBeUndefined();
     expect(applyEvent(s, { event: "entity:changed", payload: { type: "removed", kind: "glossary", id: "g" } })).toBe(s);
+  });
+
+  it("writes a command's returned record by identity, keeping the higher rev", () => {
+    const item = { id: "it1", rev: 2, text: "A" };
+    let s = applyRecord(initialState("main"), "item", { item, change_id: "ch1" }); // a *Mutation wraps its record
+    expect(s.entities.item.it1).toEqual(item);
+    expect(applyRecord(s, "item", { item: { ...item, rev: 1, text: "old" }, change_id: "ch0" })).toBe(s); // stale answer
+    s = applyRecord(s, "item", { item: { ...item, rev: 3, text: "B" }, change_id: "ch2" });
+    expect(s.entities.item.it1?.text).toBe("B");
+    s = applyRecord(s, "source", { id: "so1", rev: 1 }); // a bare record
+    expect(s.entities.source.so1).toBeDefined();
+    s = applyRecord(s, "handoff", { item: { id: "i1", rev: 1 }, rev: null }); // keyed by its item
+    expect(s.entities.handoff.i1).toBeDefined();
+    s = applyRecord(s, "speaker", { speakers: [{ id: "sp1" }, { id: "sp2" }], change_id: "ch3" });
+    expect(Object.keys(s.entities.speaker)).toEqual(["sp1", "sp2"]);
   });
 
   it("keeps outputs, jobs, sign-ins and the last navigation request", () => {

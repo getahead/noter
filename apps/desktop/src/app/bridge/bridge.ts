@@ -22,6 +22,7 @@ import {
 } from "../../core/bindings";
 import {
   applyEvent,
+  applyRecord,
   applySnapshot,
   applyWhole,
   createWindowStore,
@@ -29,6 +30,7 @@ import {
   reduceStream,
   type AnyEvent,
   type CommandState,
+  type Entities,
   type ErrorState,
   type Stream,
   type StreamData,
@@ -48,6 +50,8 @@ export interface ActOptions {
   screen?: string;
   /** Write the returned whole-state payload into this slice (highest `version` wins). */
   slice?: WholeName;
+  /** Write the returned record into this entity slice, by identity (highest `rev` wins). */
+  entity?: keyof Entities;
 }
 
 type StreamMsg = { seq: number; event?: { type: string; reason?: StreamEndReason } };
@@ -311,6 +315,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     if (res.status === "ok") {
       // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-write-result
       if (opts.slice) set((s) => applyWhole(s, opts.slice!, res.data as never));
+      if (opts.entity) set((s) => applyRecord(s, opts.entity!, res.data));
       // @cpt-end:cpt-noter-flow-ui-core-bridge-act:p1:inst-write-result
       // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-render-result
       // @cpt-begin:cpt-noter-state-ui-core-bridge-command:p1:inst-waiting-done

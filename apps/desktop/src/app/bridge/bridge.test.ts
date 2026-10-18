@@ -251,6 +251,18 @@ describe("act on a record (typed errors to named states, no retries)", () => {
     expect(state().whole.banners).toEqual(fake.world.app.banners);
   });
 
+  it("writes the returned record into the window store", async () => {
+    // The answer differs from the entity:changed event, so only the act's own write can explain it.
+    const answer = (cmd: CommandName, r: unknown) =>
+      cmd === "item_set_done" ? { ...(r as object), item: { ...(r as { item: object }).item, rev: 99, text: "from the answer" } } : r;
+    const { b, fake, state } = setup("main", {}, answer);
+    await b.open();
+    const item = fake.world.items.find((i) => i.status === "open")!;
+    const res = await b.act("tick", "item_set_done", () => b.core.itemSetDone({ item_id: item.id, rev: item.rev, done: true }), { entity: "item" });
+    expect(res.status).toBe("ok");
+    expect(state().entities.item[item.id]).toMatchObject({ id: item.id, rev: 99, text: "from the answer", status: "done" });
+  });
+
   it.each(ERROR_CODES)("maps %s to the section-level error, Try Again only when retryable, and logs it", async (code) => {
     const { b, fake, logs, state } = setup();
     fake.failNext("banner_dismiss", code);

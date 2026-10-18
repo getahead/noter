@@ -189,6 +189,21 @@ function setEntity<K extends keyof Entities>(s: WindowState, kind: K, id: string
   return { ...s, entities: { ...s.entities, [kind]: { ...s.entities[kind], [id]: record } } };
 }
 
+/**
+ * Write the record a command returned (`{<kind>: record, change_id}`, a bare record, or a
+ * speakers list), keyed like its entity:changed event; an answer older than the held `rev` is dropped.
+ */
+export function applyRecord(s: WindowState, kind: keyof Entities, data: unknown): WindowState {
+  const d = data as Record<string, unknown>;
+  const records = (kind === "speaker" ? (d.speakers ?? [d]) : [d[kind] ?? d]) as Array<{ id?: string; rev?: number | null; item?: { id: string } }>;
+  return records.reduce((acc, r) => {
+    const id = kind === "handoff" ? r.item!.id : r.id!;
+    const held = acc.entities[kind][id] as { rev?: number | null } | undefined;
+    if (held?.rev != null && r.rev != null && held.rev > r.rev) return acc;
+    return setEntity(acc, kind, id, r as never);
+  }, s);
+}
+
 /** Apply one of the 20 events: whole state by version, records by identity, the rest as sent. */
 export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
   switch (e.event) {
