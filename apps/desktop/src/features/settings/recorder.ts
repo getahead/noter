@@ -32,7 +32,7 @@ export function recorderReduce(s: RecorderState, e: RecorderEvent): RecorderStat
       if (r.type === "cancel") return { type: s.from };
       if (r.type === "clear") return { type: "CLEARED" };
       if (r.type === "keep") return { type: r.reason === "no_modifier" ? "INVALID" : "CONFLICT", message: r.message };
-      return s; // accepted: wait for the core's answer
+      return s; // accepted: wait for the core's answer; `wait`: the chord is not complete yet
     }
     case "registered":
       return recording ? { type: "IDLE" } : s;
