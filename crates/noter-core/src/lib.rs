@@ -143,7 +143,7 @@ impl Core {
             .emit(event_names::ENTITY_CHANGED, to_json(change));
     }
 
-    /// Writes a core log record; it keeps only allow-listed fields (see `LOG_MESSAGE_MAX`).
+    /// Writes a core log record; it keeps only allow-listed fields with identifiers and numbers.
     pub fn log(&self, record: Map<String, Value>) {
         let _ = self.log.write(record, self.deps.clock.now().0);
     }
