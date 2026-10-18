@@ -221,6 +221,24 @@ async fn world_set_refuses_a_slice_no_service_owns_yet() {
 }
 
 #[tokio::test]
+async fn world_set_rereads_the_models_folder_for_the_bundles_it_changes() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let bundles = &mut world["app"]["setup"]["models"]["bundles"];
+    bundles[0]["state"] = json!("pending");
+    bundles[0]["done_mb"] = json!(0);
+    world["app"]["setup"]["models"]["done_mb"] = json!(3);
+    let set = r
+        .ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(set, json!({}));
+    let setup = r.ok("first-run", "setup_status", json!({})).await;
+    assert_eq!(setup["models"]["bundles"][0]["state"], "pending");
+    assert_eq!(setup["models"]["bundles"][1]["state"], "ready");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_refuses_derived_setup_fields_the_core_would_compute_otherwise() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
