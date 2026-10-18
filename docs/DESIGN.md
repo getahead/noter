@@ -12586,7 +12586,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-68) is
 - Performance: scrolling a three-hour transcript, the card stack under steady arrivals, memory over a 90-minute replay.
 - Security: hostile strings (markup, very long lines, mixed scripts) render as plain text.
 - Contract: the bridge fake is checked against the core's command list and passes the same conformance suite as the real core; `bindings.ts` is generated (`just contract-regen`) and never edited by hand.
-- Gates: `just gate` is the exit criteria of every FEATURE and pull request, and CI reports it as the single required check `gate` (ADR-0003, `docs/HARNESS.md`).
+- Gates: `just gate` is the exit criteria of every FEATURE and pull request, and CI reports it as the required check `gate`, next to `hygiene`, CodeQL and `review`, the delivering agent's own Constructor Studio and ponytail review, run locally and published before the PR merges (ADR-0003, `docs/HARNESS.md`).
 - Accessibility: automated checks in component tests, the token contrast check, and a manual VoiceOver and keyboard-only pass on every screen.
 - Localisation: a pseudo-localisation run (+40 %, Cyrillic) and a German string pass on every screen (REVIEW › F12), with every quotation mark set as “…” (PM-33).
 
