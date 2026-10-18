@@ -188,6 +188,9 @@ pub struct Core {
     downloads: Mutex<models::Downloads>,
     /// This core, for the tasks first run spawns (set by `start_first_run`).
     this: std::sync::OnceLock<std::sync::Weak<Core>>,
+    /// The async runtime first run started on, for work that macOS notices start on its own
+    /// threads.
+    runtime: std::sync::OnceLock<tokio::runtime::Handle>,
     /// The engine supervisor; the engine starts on first need.
     engine: self_test::Engine,
     /// The self-test's Channel messages.
@@ -246,6 +249,7 @@ impl Core {
             first_run: Mutex::new(first_run),
             downloads: Mutex::new(downloads),
             this: std::sync::OnceLock::new(),
+            runtime: std::sync::OnceLock::new(),
             engine,
             self_test_hub: std::sync::OnceLock::new(),
         };
@@ -342,6 +346,19 @@ impl Core {
     /// Writes a core log record; it keeps only allow-listed fields with identifiers and numbers.
     pub fn log(&self, record: Map<String, Value>) {
         let _ = self.log.write(record, self.deps.clock.now().0);
+    }
+
+    /// Spawns on the caller's runtime, or on the one first run started on (macOS notices
+    /// arrive on threads outside it); with neither, the work is dropped.
+    pub(crate) fn spawn(&self, work: impl std::future::Future<Output = ()> + Send + 'static) {
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => drop(runtime.spawn(work)),
+            Err(_) => {
+                if let Some(runtime) = self.runtime.get() {
+                    drop(runtime.spawn(work));
+                }
+            }
+        }
     }
 
     fn app(&self) -> MutexGuard<'_, AppSnapshot> {

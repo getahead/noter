@@ -49,6 +49,8 @@ const WINDOW_MS: u32 = 10_000;
 /// The short test that brings up the System Audio Recording prompt.
 const PROMPT_MS: u32 = 3_000;
 const MARGIN: Duration = Duration::from_secs(2);
+/// One system-audio re-check per activation: notices within this window ask once (D-19).
+const RECHECK_EVERY: Duration = Duration::from_secs(5);
 static NEXT_RUN: AtomicU64 = AtomicU64::new(1);
 
 /// The channel that delivered nothing, or `TimedOut` when none or both arrived.
@@ -222,6 +224,8 @@ impl Core {
             fr.self_test_running = false;
             let mut stored = fr.stored.clone();
             stored.self_test = state.clone();
+            // The newest finding wins: this self-test, not an earlier probe.
+            stored.system_audio = None;
             if self
                 .store_setup(ctx, &fr.stored, &stored, "self_test_run")
                 .is_ok()
@@ -238,6 +242,64 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-first-run-self-test:p1:inst-emit-setup
         self.environment_changed(self.deps.native.environment());
         // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-emit-setup
+    }
+
+    /// The app became active (the host calls it): re-check a denied system-audio row (D-19).
+    pub fn app_activated(&self) {
+        self.recheck_system_audio();
+    }
+
+    /// Decision D-19: macOS cannot be asked whether System Audio Recording is on, so while
+    /// first run shows the row denied (never during a capture), one short engine test plays
+    /// the test clip so a granted tap hears something; the row turns granted or stays denied,
+    /// and `setup:changed` ends the check either way. Settings leaves it to Run Test.
+    pub(crate) fn recheck_system_audio(&self) {
+        let Some(core) = self.this() else { return };
+        {
+            let mut fr = lock(&self.first_run);
+            let first_run = !fr
+                .stored
+                .steps
+                .iter()
+                .all(|r| matches!(r.state, StepState::Done | StepState::Skipped));
+            let recent = fr.last_probe.is_some_and(|t| t.elapsed() < RECHECK_EVERY);
+            if fr.probing
+                || recent
+                || fr.self_test_running
+                || !first_run
+                || crate::first_run::system_audio(&fr.stored) != PermissionState::Denied
+                || self.app().capture.phase != CapturePhase::Idle
+            {
+                return;
+            }
+            fr.probing = true;
+        }
+        self.spawn(async move {
+            // Own-sound leak detection does not apply: the clip is the signal here.
+            let heard = core.short_engine_test(true).await;
+            {
+                let mut fr = lock(&core.first_run);
+                if heard == PermissionState::Granted {
+                    let mut stored = fr.stored.clone();
+                    stored.system_audio = Some(PermissionState::Granted);
+                    let ctx = CommandCtx {
+                        caller: noter_protocol::ipc::Caller::Window {
+                            label: WindowLabel::FirstRun,
+                        },
+                    };
+                    if core
+                        .store_setup(&ctx, &fr.stored, &stored, "system_audio_recheck")
+                        .is_ok()
+                    {
+                        fr.stored = stored;
+                    }
+                }
+                fr.probing = false;
+                fr.last_probe = Some(std::time::Instant::now());
+            }
+            core.refresh_environment_now();
+            core.refresh_setup_with(true);
+        });
     }
 
     /// Tells a running engine the detection rule; a stopped engine gets it after its `ready`.
@@ -258,9 +320,14 @@ impl Core {
     /// in a short self-test (no clip). What arrives is the inference: system audio heard →
     /// granted, only zeros → denied, otherwise not asked.
     pub(crate) async fn prompt_system_audio(&self) -> PermissionState {
+        self.short_engine_test(false).await
+    }
+
+    /// A short engine self-test (about 3 s): what the tap heard of system audio.
+    async fn short_engine_test(&self, play_clip: bool) -> PermissionState {
         let mut events = self.engine.events();
         let short = EngineCommand::SelfTest {
-            play_clip: false,
+            play_clip,
             timeout_ms: PROMPT_MS,
         };
         if self.engine.command(short).await.is_err() {

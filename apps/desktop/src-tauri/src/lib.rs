@@ -38,10 +38,17 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 reset(webview.label(), webview.try_state::<Booted>().as_deref());
             }
         })
-        .on_window_event(|window, event| {
-            if let WindowEvent::Destroyed = event {
-                reset(window.label(), window.try_state::<Booted>().as_deref());
+        .on_window_event(|window, event| match event {
+            WindowEvent::Destroyed => {
+                reset(window.label(), window.try_state::<Booted>().as_deref())
             }
+            // Noter became active: the core re-checks what macOS cannot report (D-19).
+            WindowEvent::Focused(true) => {
+                if let Some(Ok(core)) = window.try_state::<Booted>().map(|b| b.0.clone()) {
+                    core.app_activated();
+                }
+            }
+            _ => {}
         })
 }
 
@@ -87,7 +94,8 @@ fn boot(events: Arc<dyn EventEmitter>, shortcuts: Arc<dyn ShortcutRegistrar>) ->
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
-            core.start_first_run();
+            // On the async runtime, which first run keeps for macOS's notices (other threads).
+            tauri::async_runtime::block_on(async { core.start_first_run() });
             Booted(Ok(core))
         }
         Err(e) => {

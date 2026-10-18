@@ -184,11 +184,11 @@ const SETUP_KEY: &str = "setup";
 /// The setup state as stored under `setup`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Stored {
-    steps: Vec<StepRow>,
+    pub(crate) steps: Vec<StepRow>,
     pub(crate) self_test: SelfTestState,
     /// System Audio Recording as the last short engine test (F1) inferred it.
     #[serde(default)]
-    system_audio: Option<PermissionState>,
+    pub(crate) system_audio: Option<PermissionState>,
 }
 
 impl Default for Stored {
@@ -217,6 +217,9 @@ pub(crate) struct State {
     call_display: Option<DisplayId>,
     /// An install waits for the capture to stop.
     install_pending: bool,
+    /// A system-audio re-check (D-19) runs, or when the last one ended.
+    pub(crate) probing: bool,
+    pub(crate) last_probe: Option<std::time::Instant>,
 }
 
 pub(crate) fn load(store: &Store, settings: &Settings) -> Result<State, CoreError> {
@@ -241,6 +244,8 @@ pub(crate) fn load(store: &Store, settings: &Settings) -> Result<State, CoreErro
         offer_to_record: settings.general.offer_to_record,
         call_display: settings.call_screen.display_id.clone(),
         install_pending: false,
+        probing: false,
+        last_probe: None,
     })
 }
 
@@ -265,13 +270,17 @@ pub fn detection(offer_to_record: bool, self_test: &SelfTestState) -> (bool, boo
 
 /// System Audio Recording cannot be queried: a passed self-test means granted, only zeros
 /// means off; otherwise the short engine test's inference (F1), if any.
-fn system_audio(stored: &Stored) -> PermissionState {
+pub(crate) fn system_audio(stored: &Stored) -> PermissionState {
+    // The newest finding wins: a probe or prompt after the self-test, until the next self-test.
+    if let Some(heard) = stored.system_audio {
+        return heard;
+    }
     match &stored.self_test {
         SelfTestState::Passed { .. } => PermissionState::Granted,
         SelfTestState::Failed {
             reason: SelfTestFailure::ZeroBuffers,
         } => PermissionState::Denied,
-        _ => stored.system_audio.unwrap_or(PermissionState::NotAsked),
+        _ => PermissionState::NotAsked,
     }
 }
 
@@ -280,6 +289,9 @@ impl Core {
     /// (decision D7), environment changes are broadcast. The host calls it once after `open`.
     pub fn start_first_run(self: &Arc<Self>) {
         let _ = self.this.set(Arc::downgrade(self));
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            let _ = self.runtime.set(runtime);
+        }
         let weak: Weak<Core> = Arc::downgrade(self);
         self.on_settings_changed(move |section| {
             if let Some(core) = weak.upgrade() {
@@ -289,7 +301,7 @@ impl Core {
         let weak = Arc::downgrade(self);
         self.deps.native.on_change(Box::new(move |reading| {
             if let Some(core) = weak.upgrade() {
-                core.environment_changed(reading);
+                core.native_changed(reading);
             }
         }));
         let launch = lock(&self.settings).general.launch_at_login;
@@ -323,7 +335,7 @@ impl Core {
                 // The engine hears the new detection rule (settings never calls first run back).
                 let (on, _) = detection(g.offer_to_record, &self_test);
                 if let Some(core) = self.this() {
-                    tokio::spawn(async move { core.send_detection(on).await });
+                    self.spawn(async move { core.send_detection(on).await });
                 }
             }
             SettingsSection::CallScreen(c) => {
@@ -339,6 +351,19 @@ impl Core {
     pub fn environment_changed(&self, reading: EnvironmentReading) {
         self.refresh_environment(reading);
         self.refresh_setup();
+    }
+
+    /// Re-reads the environment (permission rows included) from the Mac.
+    pub(crate) fn refresh_environment_now(&self) {
+        self.refresh_environment(self.deps.native.environment());
+    }
+
+    /// A change notice from macOS: the new reading, a system-audio re-check (D-19) and, back
+    /// online, the downloads the network stopped.
+    pub(crate) fn native_changed(&self, reading: EnvironmentReading) {
+        self.environment_changed(reading.clone());
+        self.recheck_system_audio();
+        self.resume_downloads_online(&reading);
     }
 
     fn permission_rows(&self, stored: &Stored) -> Vec<PermissionRow> {
@@ -390,6 +415,11 @@ impl Core {
 
     /// Recomputes the setup status and the degraded set; sends `setup:changed` when it changed.
     pub(crate) fn refresh_setup(&self) {
+        self.refresh_setup_with(false);
+    }
+
+    /// `announce`: send `setup:changed` even when nothing changed (a re-check ended).
+    pub(crate) fn refresh_setup_with(&self, announce: bool) {
         let (stored, offer, call_display) = {
             let s = lock(&self.first_run);
             let mut stored = s.stored.clone();
@@ -418,7 +448,7 @@ impl Core {
             detection_enabled,
         };
         // @cpt-end:cpt-noter-algo-core-first-run-status:p1:inst-build-setup
-        if next != app.setup {
+        if announce || next != app.setup {
             app.setup = next;
             self.publish(event_names::SETUP_CHANGED, &mut app.setup);
         }
@@ -442,7 +472,10 @@ impl Core {
     /// shortcut: in memory only, not stored under `setup`; store it if a harness restart needs it.
     #[cfg(feature = "harness")]
     pub(crate) fn seed_self_test(&self, state: SelfTestState) {
-        lock(&self.first_run).stored.self_test = state;
+        let mut fr = lock(&self.first_run);
+        fr.stored.self_test = state;
+        fr.stored.system_audio = None;
+        drop(fr);
         self.refresh_environment(self.deps.native.environment());
         self.refresh_setup();
     }
@@ -604,7 +637,9 @@ impl Core {
         } else {
             self.deps.native.permission(kind)
         };
-        let state = if current == PermissionState::Denied {
+        let state = if current == PermissionState::Denied
+            || (kind == PermissionKind::SystemAudio && current == PermissionState::Granted)
+        {
             current
         } else if kind == PermissionKind::SystemAudio {
             // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio

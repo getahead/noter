@@ -263,7 +263,7 @@ The user should finish setup in one sitting before the first real call, and call
 **Transitions**:
 1. [x] - `p1` - **FROM** pending **TO** downloading **WHEN** the user starts the download - `inst-st-download`
 2. [x] - `p1` - **FROM** downloading **TO** paused **WHEN** the user pauses or the network drops - `inst-st-pause`
-3. [x] - `p1` - **FROM** paused **TO** downloading **WHEN** the user resumes or retries - `inst-st-resume`
+3. [x] - `p1` - **FROM** paused **TO** downloading **WHEN** the user resumes or retries, or macOS reports the network back after it stopped the download - `inst-st-resume`
 4. [x] - `p1` - **FROM** downloading **TO** verifying **WHEN** the last byte arrived - `inst-st-verify`
 5. [x] - `p1` - **FROM** verifying **TO** ready **WHEN** the checksum matches - `inst-st-ready`
 6. [x] - `p1` - **FROM** verifying **TO** checksum_failed **WHEN** the checksum differs - `inst-st-checksum`

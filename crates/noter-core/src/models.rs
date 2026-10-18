@@ -51,6 +51,8 @@ pub(crate) struct Downloads {
     running: bool,
     pause: Arc<AtomicBool>,
     dir: PathBuf,
+    /// The network stopped a download (or refused one): start again once it is back.
+    resume_online: bool,
 }
 
 impl Downloads {
@@ -88,6 +90,7 @@ impl Downloads {
             running: false,
             pause: Arc::new(AtomicBool::new(false)),
             dir,
+            resume_online: false,
         }
     }
 
@@ -174,12 +177,14 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-download-call
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-other-actions
         if args.action == DownloadAction::Pause {
+            d.resume_online = false;
             d.pause.store(true, Ordering::SeqCst);
             drop(d);
             return Ok(self.setup_now());
         }
         // No connection: `offline` (retryable) at once, nothing is fetched (the fake core too).
         if !self.deps.native.environment().online {
+            d.resume_online = true;
             return Err(CoreError::new(ErrorCode::Offline, "no connection"));
         }
         if d.running {
@@ -224,16 +229,31 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-resume
         // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-download
         d.error = None;
+        d.resume_online = false;
         d.running = true;
         d.pause.store(false, Ordering::SeqCst);
         drop(d);
         // The answer shows the bundles `downloading` before the task can move them on.
         let started = self.setup_now();
-        tokio::spawn(async move { core.run_downloads().await });
+        self.spawn(async move { core.run_downloads().await });
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-start-task
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-return-started
         Ok(started)
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-return-started
+    }
+
+    /// Back online after the network stopped or refused a download: start it again (the user's
+    /// own pause stays paused).
+    pub(crate) fn resume_downloads_online(&self, reading: &crate::EnvironmentReading) {
+        let resume = {
+            let d = lock(&self.downloads);
+            reading.online && d.resume_online && !d.running
+        };
+        if resume {
+            let _ = self.download_models(ModelsDownloadArgs {
+                action: DownloadAction::Resume,
+            });
+        }
     }
 
     // @cpt-state:cpt-noter-state-core-first-run-bundle:p1
@@ -267,6 +287,7 @@ impl Core {
                     Outcome::Offline(done) => {
                         d.set(&spec.name, BundleState::Paused, Some(done));
                         d.error = Some(ErrorCode::Offline);
+                        d.resume_online = true;
                         true
                     }
                     Outcome::Stop(state, error) => {
@@ -276,11 +297,13 @@ impl Core {
                     }
                 }
             };
-            self.refresh_setup();
-            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-emit-progress
+            // A stop is announced once the task has stopped (below), so a back-online
+            // notice that follows it can start the download again.
             if stop {
                 break;
             }
+            self.refresh_setup();
+            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-emit-progress
         }
         // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-for-bundles
         // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-return-task
