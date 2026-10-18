@@ -17,9 +17,9 @@ base with main. If the changed files cannot be read, every job runs.
   ci_changes.py --workflow ci --event workflow_dispatch --ref lane/ui/x   # HEAD against its merge base with origin/main
   ci_changes.py --workflow ci --files a.ts b.rs             # explain a list of files
 
-With GITHUB_OUTPUT set it writes `jobs` (JSON object job -> bool), for codeql
-`languages` (JSON list, the analysis matrix), and for ci the facts the macOS
-and E2E jobs need (`engine`, `tauri`, `core_harness`, `native_tests`).
+With GITHUB_OUTPUT set it writes `jobs` (JSON object job -> bool; for codeql,
+language -> analyse it rather than carry main's result forward), and for ci the
+facts the macOS and E2E jobs need (`engine`, `tauri`, `core_harness`, `native_tests`).
 
   ci_changes.py verdict    # in an aggregator: RESULTS=toJSON(needs), EXPECTED=the jobs output
 
@@ -216,8 +216,6 @@ def main(argv: list[str] | None = None) -> int:
     if out:
         with open(out, "a", encoding="utf-8") as f:
             f.write(f"jobs={json.dumps(p.jobs, separators=(',', ':'))}\n")
-            if args.workflow == "codeql":
-                f.write(f"languages={json.dumps([j for j, run in p.jobs.items() if run])}\n")
             if args.workflow == "ci":
                 for k, v in vars(repo).items():
                     f.write(f"{k}={'true' if v else 'false'}\n")

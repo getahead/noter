@@ -193,7 +193,7 @@ rust-deps = ["cargo"]
 workflows = ["workflows"]
 
 [ci.jobs.codeql]
-# `actions` always runs, so every PR has a CodeQL result for the code-scanning merge rule.
-actions = ["always"]
+# A language no changed file belongs to is not analysed: codeql.yml carries main's result forward.
+actions = ["workflows"]
 javascript-typescript = ["js-source"]
 rust = ["rust-source"]
