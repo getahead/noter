@@ -167,6 +167,29 @@ impl Core {
         self.refresh_setup();
     }
 
+    /// Sets the bundle states and error the harness's world asks for (states the files cannot
+    /// say); nothing while a download runs. Only `noter_core::testing` calls it.
+    #[cfg(feature = "harness")]
+    pub(crate) fn seed_models(&self, wanted: &ModelsStatus) {
+        {
+            let mut d = lock(&self.downloads);
+            if d.running {
+                return;
+            }
+            for b in &wanted.bundles {
+                // Only a download part-way has progress; a world that held the bundle ready still
+                // carries its full `done_mb`, which a pending or failed bundle must not show.
+                let done = match b.state {
+                    BundleState::Downloading | BundleState::Paused => u64::from(b.done_mb) * MB,
+                    _ => 0,
+                };
+                d.set(&b.name, b.state, Some(done));
+            }
+            d.error = wanted.error;
+        }
+        self.refresh_setup();
+    }
+
     // @cpt-flow:cpt-noter-flow-core-first-run-download:p1
     pub(crate) fn download_models(
         &self,
