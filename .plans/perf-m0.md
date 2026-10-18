@@ -144,9 +144,12 @@ modes = ["ir", "wall"]
 
 1. Now: this plan; Teamlead passes §5 to be-eng-1.
 2. When `noter-db` `Store::open` + migrations and the `noter-core` root with `app_snapshot`
-   land: PR `perf(core): core_cold_start scenario` on `lane/core/perf-cold-start` (example
-   + a unit test that it runs one round; markers only where the spec DoD allows), then ask
-   the Teamlead for the `[scenarios.core_cold_start]` block.
-3. When `seed_world` lands: same for `core_app_snapshot`.
+   land: PR `perf(core): core_cold_start scenario` (#45, `lane/core/perf-m0`: example + a
+   unit test that it runs one round, no marker), then ask the Teamlead for the
+   `[scenarios.core_cold_start]` block. The `cpt-noter-dod-core-storage-cold-start` marker
+   comes with ticking that DoD, once the block is on `main` and measured (a scope marker on
+   an unticked ID fails `cfs validate`).
+3. When `noter_core::testing::apply_world` (`harness` feature) lands: same for
+   `core_app_snapshot`.
 4. Before the owner moves `[milestone].current` to M0: confirm coverage 3/3 with
    `perf_gate.py coverage`.
