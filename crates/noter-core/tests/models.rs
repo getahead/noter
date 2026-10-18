@@ -437,3 +437,23 @@ async fn resume_right_after_pause_keeps_the_running_download_going() {
     })
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn refresh_models_rereads_the_models_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    until(&s.core, "ready", |st| {
+        st.models
+            .bundles
+            .iter()
+            .all(|b| b.state == BundleState::Ready)
+    })
+    .await;
+    // The folder changed outside the core (a restore, the harness's world_set).
+    std::fs::remove_file(dir.path().join("models").join("bge-m3")).unwrap();
+    s.core.refresh_models();
+    let st = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert_eq!(state(&st, "bge-m3"), BundleState::Pending);
+    assert_eq!(state(&st, "whisper-turbo"), BundleState::Ready);
+}
