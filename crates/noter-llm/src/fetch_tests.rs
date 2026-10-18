@@ -217,6 +217,16 @@ async fn a_transfer_that_stalls_mid_body_ends_offline() {
 }
 
 #[test]
+fn the_model_download_hosts_are_the_typed_protocol_list() {
+    let group = noter_protocol::egress::ALLOW_WITHOUT_AUDIT
+        .iter()
+        .find(|g| g.name == "model_downloads")
+        .unwrap();
+    assert!(!group.hosts.is_empty());
+    assert_eq!(crate::model_hosts(), group.hosts);
+}
+
+#[test]
 fn the_fetcher_reaches_only_the_model_download_hosts() {
     let list: serde_json::Value =
         serde_json::from_str(include_str!("../../../contracts/egress-hosts.json")).unwrap();
