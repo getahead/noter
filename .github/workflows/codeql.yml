@@ -1,8 +1,11 @@
 # Static analysis with CodeQL (docs/DELIVERY.md). The `Default ruleset` blocks a
 # merge that introduces an error-level alert or a high/critical security alert.
 #
-# A pull request analyses only the languages it changes (`changes`, harness.toml [ci]);
-# `actions` always runs, so every PR has a CodeQL result for that rule. main and the
+# A pull request analyses only the languages it changes (`changes`, harness.toml [ci]).
+# The merge rule needs a result for every language main has (otherwise the PR waits
+# with "1 configuration not found"), so for a language the PR does not touch the same
+# job uploads main's latest result for it instead: its code is main's, so are its
+# alerts. That takes seconds where the Rust analysis takes minutes. main and the
 # weekly run analyse everything, which keeps the base the PR results are compared with.
 name: CodeQL
 
@@ -27,7 +30,7 @@ jobs:
     name: What this change runs
     runs-on: ubuntu-24.04
     outputs:
-      languages: ${{ steps.c.outputs.languages }}
+      jobs: ${{ steps.c.outputs.jobs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,17 +49,45 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # No build needed: Rust and TypeScript are analysed from source.
-        language: ${{ fromJSON(needs.changes.outputs.languages) }}
+        # One job per language main is analysed for, always: the merge rule matches results by
+        # workflow, job and language, so a carried-forward result must come from this same job.
+        language: [actions, javascript-typescript, rust]
+    env:
+      ANALYSE: ${{ fromJSON(needs.changes.outputs.jobs)[matrix.language] }}
+      CATEGORY: /language:${{ matrix.language }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - name: main's latest result for this language (nothing of it changed)
+        id: base
+        if: ${{ !fromJSON(needs.changes.outputs.jobs)[matrix.language] }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL&per_page=100" \
+                 -q "[.[] | select(.category == \"$CATEGORY\")][0].id // empty" || true)
+          if [ -n "$id" ] && gh api -H "Accept: application/sarif+json" "repos/$GITHUB_REPOSITORY/code-scanning/analyses/$id" \
+               > "$RUNNER_TEMP/base.sarif"; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Carried forward main's analysis $id for $CATEGORY: this change touches none of its files." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No result of main for $CATEGORY to carry forward; analysing instead."
+          fi
+      # No build needed: Rust and TypeScript are analysed from source.
+      - if: env.ANALYSE == 'true' || steps.base.outputs.found != 'true'
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-and-quality
-      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      - if: env.ANALYSE == 'true' || steps.base.outputs.found != 'true'
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
-          category: /language:${{ matrix.language }}
+          category: ${{ env.CATEGORY }}
+      - if: env.ANALYSE != 'true' && steps.base.outputs.found == 'true'
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: ${{ runner.temp }}/base.sarif
+          category: ${{ env.CATEGORY }}
