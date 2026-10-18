@@ -1,0 +1,180 @@
+/* Ported as-is from docs/prototype/clickable/src/css/01-macos27.css
+   (docs/features/ui/primitives.md). Left out: the prototype desk wallpaper,
+   captions (.np-cap) and the desk menu-bar rule. */
+/* =====================================================================
+   macOS 27 UI Kit layer (Liquid Glass)
+   Applied on top of the foundations. Source: Apple's macOS 27 design
+   language as published (Liquid Glass materials, edge-to-edge sidebar,
+   unified toolbar with grouped glass controls, capsule push buttons,
+   concentric corner radii, colour-tinted sidebar icons, glass menus,
+   left-aligned alerts). Numbers are the prototype's best match; the
+   Apple Figma/Sketch kit could not be read directly.
+   Nothing here changes data-* attributes or behaviour.
+   ===================================================================== */
+
+/* ---------- focus ring: macOS accent halo ---------- */
+:focus-visible { outline: 3.5px solid var(--sel-accent); outline-offset: 0; }
+.np-btn:focus-visible, .np-ibtn:focus-visible, .np-seg__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* ---------- glass material helper ---------- */
+.np-glass { background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
+
+/* ---------- windows: concentric corners, soft macOS 27 shadow ---------- */
+.np-win { border-radius: var(--r-panel); box-shadow: var(--shadow-win); }
+.np-win--main { border-radius: var(--r-window); background: transparent; }
+.np-win__titlebar { height: 40px; background: var(--win-bg); border-bottom: 1px solid var(--sep); padding: 0 16px; }
+.np-win__title { font-weight: 600; }
+.np-lights { gap: 9px; }
+.np-light { width: 13px; height: 13px; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.18); }
+
+/* ---------- Shell — Main window: edge-to-edge glass sidebar (macOS 27) ---------- */
+.np-sidebar { background: var(--side-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-right: 0; }
+.np-sidebar__top { height: 52px; padding: 0 12px 0 20px; }
+.np-split { background: var(--sep); }
+.np-srclist { padding: 2px 10px 10px; gap: 2px; }
+.np-srclist__group { font: 600 11px/14px var(--font); color: var(--label-2); padding: 14px 10px 5px; }
+.np-srclist__item { height: 30px; padding: 0 10px; border-radius: var(--r-row); color: var(--label); font-weight: 400; }
+.np-srclist__item .np-ic { color: var(--accent); }
+.np-srclist__item:hover { background: var(--sel-unemph); }
+.np-srclist__item.is-sel { background: var(--sel-unemph); font-weight: 500; box-shadow: inset 0 0 0 .5px var(--ctrl-border-soft); }
+.np-srclist__badge { background: transparent; color: var(--label-2); font-weight: 500; }
+.np-srclist__live { margin: 0 0 10px; }
+.np-recind--row { border-radius: var(--r-capsule); height: 30px; padding: 0 12px; background: var(--error-tint); }
+.np-sidebar__footer { border-top: 0; padding: 10px 12px 14px; }
+.np-main { background: var(--content-bg); }
+
+/* unified toolbar: content-coloured bar with a hairline, controls grouped in glass capsules */
+.np-toolbar { height: 56px; background: var(--content-bg); border-bottom: 1px solid var(--sep); padding: 0 14px 0 12px; gap: 10px; }
+.np-toolbar__nav { display: inline-flex; gap: 0; padding: 2px; border-radius: var(--r-capsule); background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
+.np-toolbar__nav .np-ibtn { width: 32px; height: 30px; border-radius: var(--r-capsule); }
+.np-toolbar__title { font: 600 15px/20px var(--font-display); }
+.np-toolbar__sub { font-size: 11px; color: var(--label-2); }
+.np-toolbar .np-btn { height: 32px; padding: 0 14px; background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); border: 0; }
+.np-toolbar .np-btn--primary { background: var(--accent-fill); color: var(--on-accent); }
+.np-toolbar .np-btn--quiet { background: transparent; box-shadow: none; }
+.np-toolbar .np-ibtn--toolbar { width: 32px; height: 32px; border-radius: var(--r-capsule); background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
+.np-toolbar .np-ibtn--toolbar[aria-pressed="true"], .np-toolbar .np-ibtn--toolbar.is-on { background: var(--accent-fill); color: var(--on-accent); }
+.np-toolbar .np-seg { height: 32px; align-items: center; background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); padding: 3px; }
+.np-toolbar .np-seg__item { height: 26px; }
+.np-toolbar .np-search { height: 32px; background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
+.np-toolbar .np-popup select { height: 32px; border-radius: var(--r-capsule); background: var(--glass-bg); box-shadow: var(--glass-edge); padding: 0 30px 0 14px; }
+.np-sidebar .np-ibtn { border-radius: var(--r-capsule); }
+.np-bannerslot { border-bottom: 1px solid var(--sep); background: var(--content-bg); }
+.np-inspector { background: var(--content-bg); border-left: 1px solid var(--sep); }
+
+/* ---------- push buttons: capsules; mini 16 · small 20 · regular 24 · large 28 ---------- */
+.np-btn { border-radius: var(--r-capsule); border: 0; background: var(--ctrl-bg); color: var(--label); box-shadow: 0 0 0 .5px var(--ctrl-border), 0 1px 1.5px rgba(0,0,0,.07); font-weight: 400; padding: 0 12px; min-width: 56px; }
+.np-btn:hover { filter: none; background-image: linear-gradient(var(--sel-unemph), var(--sel-unemph)); }
+.np-btn:active { filter: brightness(.94); }
+.np-btn--small { height: 20px; font-size: 11px; padding: 0 9px; }
+.np-btn--regular { height: 24px; }
+.np-btn--large { height: 28px; padding: 0 16px; }
+.np-btn--primary { background: var(--accent-fill); color: var(--on-accent); box-shadow: 0 1px 2px rgba(0,0,0,.14), inset 0 .5px 0 rgba(255,255,255,.25); }
+.np-btn--primary:hover { background-image: linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)); }
+.np-btn--quiet { background: transparent; box-shadow: none; color: var(--accent-text); }
+.np-btn--quiet:hover { background-image: none; background-color: var(--sel-unemph); }
+.np-btn--destructive { color: var(--error); }
+.np-btn--destructive.np-btn--primary { background: var(--error); color: #fff; }
+.np-btn .np-kbd { border: 0; background: var(--sel-unemph); }
+.np-btn--primary .np-kbd { background: rgba(255,255,255,.2); }
+
+/* icon buttons */
+.np-ibtn { border-radius: var(--r-capsule); color: var(--label-2); }
+.np-ibtn--toolbar { width: 30px; height: 30px; }
+.np-ibtn--inline { width: 22px; height: 22px; }
+.np-ibtn:hover { background: var(--sel-unemph); }
+
+/* key caps */
+.np-kbd { border: 0; background: var(--sel-unemph); border-radius: 5px; color: var(--label-2); }
+
+/* segmented control: capsule track, glass thumb */
+.np-seg { border-radius: var(--r-capsule); background: var(--sel-unemph); padding: 2px; gap: 0; }
+.np-seg__item { height: 22px; padding: 0 12px; border-radius: var(--r-capsule); }
+.np-seg__item.is-sel { background: var(--thumb-bg); box-shadow: var(--thumb-shadow); font-weight: 500; }
+
+/* pop-up button */
+.np-popup select { height: 24px; border: 0; border-radius: var(--r-control); background: var(--ctrl-bg); box-shadow: 0 0 0 .5px var(--ctrl-border), 0 1px 1.5px rgba(0,0,0,.07); padding: 0 26px 0 10px; }
+.np-popup--inline select { box-shadow: none; background: transparent; }
+
+/* text fields and search */
+.np-field__input { height: 26px; border: 0; border-radius: var(--r-control); background: var(--ctrl-bg); box-shadow: inset 0 0 0 .5px var(--ctrl-border), inset 0 1px 1px rgba(0,0,0,.04); padding: 0 9px; }
+textarea.np-field__input { border-radius: var(--r-row); padding: 7px 9px; }
+.np-field__input:focus { outline: none; box-shadow: inset 0 0 0 .5px var(--accent), var(--focus-ring); }
+.np-field.is-invalid .np-field__input { box-shadow: inset 0 0 0 1px var(--error); }
+.np-search { height: 28px; border-radius: var(--r-capsule); background: var(--sel-unemph); padding: 0 10px; }
+.np-search:focus-within { outline: none; box-shadow: var(--focus-ring); }
+.np-search--token-field { border: 0; border-radius: var(--r-control); background: var(--ctrl-bg); box-shadow: inset 0 0 0 .5px var(--ctrl-border); }
+.np-token { border-radius: var(--r-capsule); padding: 0 4px 0 9px; }
+
+/* checkbox, radio, switch */
+.np-check__box { width: 14px; height: 14px; border: 0; border-radius: 4px; background: var(--ctrl-bg); box-shadow: inset 0 0 0 .5px var(--ctrl-border), 0 .5px 1px rgba(0,0,0,.08); }
+.np-check input:checked + .np-check__box, .np-check[data-state="mixed"] .np-check__box { background: var(--accent-fill); box-shadow: none; }
+.np-check input:focus-visible + .np-check__box { outline: none; box-shadow: var(--focus-ring); }
+.np-radio__dot { width: 14px; height: 14px; border: 0; background: var(--ctrl-bg); box-shadow: inset 0 0 0 .5px var(--ctrl-border), 0 .5px 1px rgba(0,0,0,.08); }
+.np-radio input:checked + .np-radio__dot { border: 0; background: radial-gradient(circle, #fff 0 3px, var(--accent-fill) 3.5px); box-shadow: none; }
+.np-toggle__track { width: 34px; height: 20px; border: 0; border-radius: var(--r-capsule); background: var(--sel-unemph); box-shadow: inset 0 0 0 .5px var(--ctrl-border-soft); }
+.np-toggle__thumb { top: 2px; left: 2px; width: 20px; height: 16px; border-radius: var(--r-capsule); background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25), 0 0 0 .5px rgba(0,0,0,.06); transition: left 160ms cubic-bezier(.3,1.4,.5,1); }
+.np-toggle input:checked + .np-toggle__track { background: var(--accent-fill); box-shadow: none; }
+.np-toggle input:checked + .np-toggle__track .np-toggle__thumb { left: 12px; }
+.np-toggle--small .np-toggle__track { width: 28px; height: 16px; }
+.np-toggle--small .np-toggle__thumb { width: 16px; height: 12px; }
+.np-toggle--small input:checked + .np-toggle__track .np-toggle__thumb { left: 10px; }
+.np-toggle input:focus-visible + .np-toggle__track { outline: none; box-shadow: var(--focus-ring); }
+
+/* progress, meter, badges, disclosure */
+.np-progress { height: 5px; border-radius: var(--r-capsule); }
+.np-progress__fill { border-radius: var(--r-capsule); background: var(--accent-fill); }
+.np-meter__seg { border-radius: 2px; }
+.np-badge { border-radius: var(--r-tag); border: 0; font-weight: 500; }
+.np-badge--count { border-radius: var(--r-capsule); }
+.np-badge--kind { box-shadow: inset 0 0 0 .5px var(--ctrl-border); }
+
+/* tables: inset list style */
+.np-table-wrap { border: 0; border-radius: var(--r-card); box-shadow: 0 0 0 .5px var(--sep); }
+.np-table th { font-weight: 500; color: var(--label-2); border-bottom: 1px solid var(--sep); }
+.np-table td { border-bottom: 0; }
+.np-table tbody tr:nth-child(even) td { background: rgba(127,127,127,.04); }
+.np-table tbody tr.is-sel td { background: var(--accent-fill); color: var(--on-accent); }
+.np-table tbody tr.is-sel td * { color: inherit; }
+
+/* menus, popovers: Liquid Glass */
+.np-menu, .np-pop, .mb-menu { background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow-pop), inset 0 .5px 0 rgba(255,255,255,.35); }
+.np-menu { border-radius: 12px; padding: 5px; }
+.np-menu__item { height: 24px; padding: 0 10px 0 6px; border-radius: 7px; }
+.np-menu__item:hover:not([disabled]) { background: var(--accent-fill); }
+.np-menu__sep { margin: 4px 10px; }
+.np-pop { border-radius: 18px; }
+.np-pop__body { padding: 14px 16px; }
+
+/* sheets and alerts */
+.np-sheet-layer, .np-alert-layer { background: rgba(0,0,0,.12); }
+.np-sheet { border-radius: var(--r-sheet); background: var(--win-bg); box-shadow: var(--shadow-win); }
+.np-sheet__head { padding: 20px 22px 6px; }
+.np-sheet__body { padding: 10px 22px 16px; }
+.np-sheet__foot { border-top: 0; padding: 6px 22px 20px; }
+.np-alert { width: 268px; border-radius: var(--r-sheet); background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow-win); padding: 20px 18px 16px; text-align: left; justify-items: start; gap: 6px; }
+.np-alert__icon { margin-bottom: 4px; }
+.np-alert__title { font-weight: 700; font-size: 13px; }
+.np-alert__body { font-size: 11px; line-height: 15px; color: var(--label); }
+.np-alert__btns { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.np-alert__btns .np-btn { flex: 1 1 0; width: auto; height: 28px; min-width: 0; }
+
+/* shared content components */
+.np-card { border: 0; border-radius: var(--r-card); box-shadow: 0 0 0 .5px var(--sep), 0 1px 2px rgba(0,0,0,.04); }
+.np-banner { border: 0; border-radius: var(--r-card); }
+.np-bannerslot > .np-banner { border-radius: 0; }
+.np-undo { border: 0; border-radius: var(--r-card); background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow-pop); }
+.np-lang { border: 0; box-shadow: inset 0 0 0 .5px var(--ctrl-border); border-radius: 5px; }
+.np-agent { border: 0; box-shadow: inset 0 0 0 .5px var(--ctrl-border); border-radius: var(--r-capsule); padding: 0 9px; }
+.np-prov--chip { border: 0; box-shadow: inset 0 0 0 .5px var(--sep); border-radius: var(--r-capsule); padding: 1px 8px; }
+.np-prov--guess { border-radius: var(--r-capsule); padding: 1px 8px; }
+.np-person--picker { border: 0; border-radius: var(--r-capsule); box-shadow: 0 0 0 .5px var(--ctrl-border); padding: 2px 8px 2px 3px; }
+.np-mode { border-radius: var(--r-capsule); }
+.np-empty__glyph { color: var(--label-3); }
+.np-recdot { box-shadow: 0 0 0 2px var(--error-tint); }
+
+/* ---------- group surfaces that draw their own panels: Liquid Glass panels ---------- */
+.rp-panel, .nt-banner { background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--shadow-pop); }
+.cw-win--floating { background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
+
+.a-mbar__app { font-weight: 600; }
