@@ -1,0 +1,41 @@
+// Run conformance against a core (docs/features/core/core-contract.md): a command may answer
+// `not_implemented` only while the milestone that delivers it is later than the current one
+// (harness/harness.toml); such commands are listed as pending in the run summary, by milestone,
+// with the count of commands the core answers. Any other `not_implemented` fails, naming it.
+import { afterAll, describe, expect, it } from "vitest";
+
+import { COMMANDS, type CommandName, type WindowLabel } from "../../src/core/bindings";
+import { target, transportFor } from "../support/core";
+import { CURRENT, isLater, milestoneOf, ORDER, summary } from "./milestones";
+
+const names = Object.keys(COMMANDS) as CommandName[];
+const pending = new Map<string, CommandName[]>();
+
+describe("commands the core does not answer yet", () => {
+  it("every command is placed in a milestone the harness orders, and the current one is among them", () => {
+    expect(ORDER).toContain(CURRENT);
+    for (const name of names) expect(ORDER, `milestone of ${name}`).toContain(milestoneOf(name));
+  });
+
+  it("not_implemented is pending only for a command delivered after the current milestone", () => {
+    expect([isLater("app_snapshot", "pre-M0"), isLater("app_snapshot", "M0"), isLater("capture_start", "M0"), isLater("capture_start", "M1")]).toEqual([true, false, true, false]);
+    expect(isLater("no_such_command", "pre-M0")).toBe(false);
+  });
+
+  it.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
+    const t = transportFor(COMMANDS[name].windows[0] as WindowLabel);
+    const code = await t.invoke(name, {}, COMMANDS[name].channel ? () => {} : undefined).then(
+      () => null,
+      (e) => (e as { code?: string } | null)?.code,
+    );
+    if (code !== "not_implemented") return;
+    expect(isLater(name), `${name} answers not_implemented, but ${milestoneOf(name)} is not after the current ${CURRENT}`).toBe(true);
+    const m = milestoneOf(name)!;
+    pending.set(m, [...(pending.get(m) ?? []), name]);
+  });
+
+  afterAll(() => {
+    const unanswered = [...pending.values()].reduce((n, cmds) => n + cmds.length, 0);
+    summary(target, names.length - unanswered, names.length, pending);
+  });
+});
