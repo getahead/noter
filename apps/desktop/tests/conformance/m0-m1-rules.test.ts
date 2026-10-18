@@ -158,8 +158,7 @@ describe("O1: capture_start is never gated on setup, permissions or the self-tes
 
   it("is refused only with disk_full (with the space needed) and model_missing", async () => {
     await s.change((w) => {
-      W.idle(w);
-      w.app.setup.complete = false;
+      W.firstRun(w); // setup incomplete through its steps, not a bare flag the real core derives
       w.app.environment.disk_free_mb = 300;
     });
     const refusal = await s.core("main").captureStart({ source: "hotkey", sensitive: false });

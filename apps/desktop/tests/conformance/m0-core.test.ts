@@ -63,6 +63,11 @@ describe("self-test stream (R23/R24)", () => {
     await s.change(W.idle);
     const settings = s.core("settings");
     const got: SelfTestMsg[] = [];
+    // D6 ordering (Channel messages only after the subscribing command's result) is proven on the
+    // wire, where it can be observed: crates/noter-core-harness/tests/wire.rs
+    // `channel_messages_follow_result_in_seq_order` (PR #26). Here StdioCore hands lines over in order, but
+    // readline emits a chunk's lines before the result's promise continuation runs, so the client
+    // cannot tell the two apart.
     const sub = ok(await settings.selfTestRun({ play_clip: false }, (m) => got.push(m)));
     await until(() => got.length >= 1, "the first self-test message");
     expect(got[0].seq).toBe(1);
