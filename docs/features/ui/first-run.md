@@ -179,108 +179,108 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 
 ### Render a self-test message
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-first-run-self-test-result`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-first-run-self-test-result`
 
 **Input**: one `SelfTestEvent`
 
 **Output**: the self-test panel's new state
 
 **Steps**:
-1. [ ] - `p1` - **MATCH** the event type - `inst-match-event`
-   - [ ] - `p1` - **CASE** `levels`: update the **You** and **Others** meters (at most every 100 ms; peak hold off under Reduce motion) - `inst-case-levels`
-   - [ ] - `p1` - **CASE** `line`: show the live transcript line with each part's language attribute; never announce it - `inst-case-line`
-   - [ ] - `p1` - **CASE** `stream_arrived`: tick **System audio arrives** or **Your microphone arrives** - `inst-case-arrived`
-   - [ ] - `p1` - **CASE** `passed`: tick **Both streams line up**; show the fourth line as passed, as **Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.** (exclusion off) or as **Noter's own sounds reached the recording. Replay while recording stays off until this passes.** (exclusion failed) - `inst-case-passed`
-   - [ ] - `p1` - **CASE** `failed`: show **We hear your microphone but not system audio. Play any sound in another app and try again.** or its mirror for the microphone - `inst-case-failed`
-   - [ ] - `p1` - **CASE** `ended`: stop the running state; **Run Test** is enabled again - `inst-case-ended`
-2. [ ] - `p1` - **RETURN** the panel state - `inst-return-panel`
+1. [x] - `p1` - **MATCH** the event type - `inst-match-event`
+   - [x] - `p1` - **CASE** `levels`: update the **You** and **Others** meters (at most every 100 ms; peak hold off under Reduce motion) - `inst-case-levels`
+   - [x] - `p1` - **CASE** `line`: show the live transcript line with each part's language attribute; never announce it - `inst-case-line`
+   - [x] - `p1` - **CASE** `stream_arrived`: tick **System audio arrives** or **Your microphone arrives** - `inst-case-arrived`
+   - [x] - `p1` - **CASE** `passed`: tick **Both streams line up**; show the fourth line as passed, as **Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.** (exclusion off) or as **Noter's own sounds reached the recording. Replay while recording stays off until this passes.** (exclusion failed) - `inst-case-passed`
+   - [x] - `p1` - **CASE** `failed`: show **We hear your microphone but not system audio. Play any sound in another app and try again.** or its mirror for the microphone; **zero buffers** counts as system audio recording not allowed: **System audio recording is not allowed yet.** with **Open System Settings…** and the **System audio recording** row back to its missing state; **timed out** fails with **The test didn't finish. Check that sound is playing, then try again.** and **Run Test** enabled (HoD decision D-14) - `inst-case-failed`
+   - [x] - `p1` - **CASE** `ended`: stop the running state; **Run Test** is enabled again - `inst-case-ended`
+2. [x] - `p1` - **RETURN** the panel state - `inst-return-panel`
 
 ### Choose the default call display
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-first-run-default-display`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-first-run-default-display`
 
 **Input**: the display list from the core (identity, name, resolution, arrangement, whether the call app is there) and the remembered choice
 
 **Output**: the picker's options and selection
 
 **Steps**:
-1. [ ] - `p1` - **IF** one display is connected - `inst-if-one`
-   1. [ ] - `p1` - **RETURN** the one-display variant: one rectangle, the floating-layout note and drawing, only the default option - `inst-return-one`
-2. [ ] - `p1` - Options: **The display without the call app** (default, **Recommended**), then each display by name with **· Call app is here** where it applies - `inst-options`
-3. [ ] - `p1` - **IF** a remembered display is not connected: list it as **LG UltraFine 5K (not connected)** in secondary text, still selectable - `inst-absent`
-4. [ ] - `p1` - Select the remembered choice, or the default - `inst-select`
-5. [ ] - `p1` - **RETURN** the options and selection; the list redraws in place when `env:changed` reports a display added or removed - `inst-return-display`
+1. [x] - `p1` - **IF** one display is connected - `inst-if-one`
+   1. [x] - `p1` - **RETURN** the one-display variant: one rectangle, the floating-layout note and drawing, only the default option - `inst-return-one`
+2. [x] - `p1` - Options: **The display without the call app** (default, **Recommended**), then each display by name with **· Call app is here** where it applies - `inst-options`
+3. [x] - `p1` - **IF** a remembered display is not connected: list it as **LG UltraFine 5K (not connected)** in secondary text, still selectable - `inst-absent`
+4. [x] - `p1` - Select the remembered choice, or the default - `inst-select`
+5. [x] - `p1` - **RETURN** the options and selection; the list redraws in place when `env:changed` reports a display added or removed - `inst-return-display`
 
 ## 4. States (CDSL)
 
 ### Setup steps
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-first-run-steps`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-first-run-steps`
 
 **States**: WELCOME, MODELS, PERMISSIONS, CALL_DISPLAY, AUDIO_STORAGE, ASSISTANTS, DONE
 
 **Initial State**: WELCOME
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** WELCOME **TO** MODELS **WHEN** the user clicks **Continue** - `inst-welcome-models`
-2. [ ] - `p1` - **FROM** MODELS **TO** PERMISSIONS **WHEN** the user clicks **Continue** (downloads go on) - `inst-models-permissions`
-3. [ ] - `p1` - **FROM** PERMISSIONS **TO** CALL_DISPLAY **WHEN** the user clicks **Continue** or **Skip for Now** - `inst-permissions-display`
-4. [ ] - `p1` - **FROM** CALL_DISPLAY **TO** AUDIO_STORAGE **WHEN** the user clicks **Continue** or **Skip for Now** - `inst-display-storage`
-5. [ ] - `p1` - **FROM** AUDIO_STORAGE **TO** ASSISTANTS **WHEN** the user clicks **Continue** - `inst-storage-assistants`
-6. [ ] - `p1` - **FROM** ASSISTANTS **TO** DONE **WHEN** the user clicks **Finish** - `inst-assistants-done`
-7. [ ] - `p1` - **FROM** CALL_DISPLAY **TO** PERMISSIONS **WHEN** the user clicks **Back** or a done, skipped or failed step in the stepper (the same for every later step and its earlier steps) - `inst-back`
+1. [x] - `p1` - **FROM** WELCOME **TO** MODELS **WHEN** the user clicks **Continue** - `inst-welcome-models`
+2. [x] - `p1` - **FROM** MODELS **TO** PERMISSIONS **WHEN** the user clicks **Continue** (downloads go on) - `inst-models-permissions`
+3. [x] - `p1` - **FROM** PERMISSIONS **TO** CALL_DISPLAY **WHEN** the user clicks **Continue** or **Skip for Now** - `inst-permissions-display`
+4. [x] - `p1` - **FROM** CALL_DISPLAY **TO** AUDIO_STORAGE **WHEN** the user clicks **Continue** or **Skip for Now** - `inst-display-storage`
+5. [x] - `p1` - **FROM** AUDIO_STORAGE **TO** ASSISTANTS **WHEN** the user clicks **Continue** - `inst-storage-assistants`
+6. [x] - `p1` - **FROM** ASSISTANTS **TO** DONE **WHEN** the user clicks **Finish** - `inst-assistants-done`
+7. [x] - `p1` - **FROM** CALL_DISPLAY **TO** PERMISSIONS **WHEN** the user clicks **Back** or a done, skipped or failed step in the stepper (the same for every later step and its earlier steps) - `inst-back`
 
 ### Stepper item
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-first-run-stepper-item`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-first-run-stepper-item`
 
 **States**: UPCOMING, CURRENT, DONE, SKIPPED, ERROR, RUNNING_IN_BACKGROUND
 
 **Initial State**: UPCOMING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** UPCOMING **TO** CURRENT **WHEN** the wizard reaches the step - `inst-upcoming-current`
-2. [ ] - `p1` - **FROM** CURRENT **TO** DONE **WHEN** the user continues and the step's work is complete - `inst-current-done`
-3. [ ] - `p1` - **FROM** CURRENT **TO** SKIPPED **WHEN** the user clicks **Skip for Now** - `inst-current-skipped`
-4. [ ] - `p1` - **FROM** CURRENT **TO** RUNNING_IN_BACKGROUND **WHEN** the user leaves **Models** while downloads continue - `inst-current-running`
-5. [ ] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** DONE **WHEN** every bundle is in - `inst-running-done`
-6. [ ] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check - `inst-running-error`
-7. [ ] - `p1` - **FROM** SKIPPED **TO** CURRENT **WHEN** the user clicks it - `inst-skipped-current`
-8. [ ] - `p1` - **FROM** ERROR **TO** CURRENT **WHEN** the user clicks it - `inst-error-current`
+1. [x] - `p1` - **FROM** UPCOMING **TO** CURRENT **WHEN** the wizard reaches the step - `inst-upcoming-current`
+2. [x] - `p1` - **FROM** CURRENT **TO** DONE **WHEN** the user continues and the step's work is complete - `inst-current-done`
+3. [x] - `p1` - **FROM** CURRENT **TO** SKIPPED **WHEN** the user clicks **Skip for Now** - `inst-current-skipped`
+4. [x] - `p1` - **FROM** CURRENT **TO** RUNNING_IN_BACKGROUND **WHEN** the user leaves **Models** while downloads continue - `inst-current-running`
+5. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** DONE **WHEN** every bundle is in - `inst-running-done`
+6. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check - `inst-running-error`
+7. [x] - `p1` - **FROM** SKIPPED **TO** CURRENT **WHEN** the user clicks it - `inst-skipped-current`
+8. [x] - `p1` - **FROM** ERROR **TO** CURRENT **WHEN** the user clicks it - `inst-error-current`
 
 ### Permission row
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-first-run-permission-row`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-first-run-permission-row`
 
 **States**: NOT_ASKED, MISSING, CHECKING, GRANTED, DENIED
 
 **Initial State**: NOT_ASKED
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** NOT_ASKED **TO** GRANTED **WHEN** the user allows the macOS prompt after **Allow…** - `inst-notasked-granted`
-2. [ ] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the user clicks **Don't Allow** - `inst-notasked-denied`
-3. [ ] - `p1` - **FROM** MISSING **TO** CHECKING **WHEN** the user returns from System Settings after **Open System Settings…** (system audio starts in MISSING because macOS has no prompt for it) - `inst-missing-checking`
-4. [ ] - `p1` - **FROM** DENIED **TO** CHECKING **WHEN** the user returns from System Settings - `inst-denied-checking`
-5. [ ] - `p1` - **FROM** CHECKING **TO** GRANTED **WHEN** the core reads the permission as granted - `inst-checking-granted`
-6. [ ] - `p1` - **FROM** CHECKING **TO** MISSING **WHEN** the core still reads it as not granted - `inst-checking-missing`
+1. [x] - `p1` - **FROM** NOT_ASKED **TO** GRANTED **WHEN** the user allows the macOS prompt after **Allow…** - `inst-notasked-granted`
+2. [x] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the user clicks **Don't Allow** - `inst-notasked-denied`
+3. [x] - `p1` - **FROM** MISSING **TO** CHECKING **WHEN** the user returns from System Settings after **Open System Settings…** (system audio starts in MISSING because macOS has no prompt for it) - `inst-missing-checking`
+4. [x] - `p1` - **FROM** DENIED **TO** CHECKING **WHEN** the user returns from System Settings - `inst-denied-checking`
+5. [x] - `p1` - **FROM** CHECKING **TO** GRANTED **WHEN** the core reads the permission as granted - `inst-checking-granted`
+6. [x] - `p1` - **FROM** CHECKING **TO** MISSING **WHEN** the core still reads it as not granted - `inst-checking-missing`
 
 ### Self-test panel
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-first-run-self-test`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-first-run-self-test`
 
 **States**: IDLE, WAITING_FOR_MODEL, PERMISSION_MISSING, RUNNING, PASSED, FAILED
 
 **Initial State**: IDLE
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** IDLE **TO** WAITING_FOR_MODEL **WHEN** the user runs the test before the speech model is in - `inst-idle-waiting`
-2. [ ] - `p1` - **FROM** WAITING_FOR_MODEL **TO** RUNNING **WHEN** the speech model arrives - `inst-waiting-running`
-3. [ ] - `p1` - **FROM** IDLE **TO** PERMISSION_MISSING **WHEN** system audio recording is not allowed - `inst-idle-missing`
-4. [ ] - `p1` - **FROM** PERMISSION_MISSING **TO** IDLE **WHEN** the permission is granted - `inst-missing-idle`
-5. [ ] - `p1` - **FROM** IDLE **TO** RUNNING **WHEN** the user clicks **Run Test** or **Play Test Clip** - `inst-idle-running`
-6. [ ] - `p1` - **FROM** RUNNING **TO** PASSED **WHEN** the first three result lines pass within 10 s - `inst-running-passed`
-7. [ ] - `p1` - **FROM** RUNNING **TO** FAILED **WHEN** a stream stays silent - `inst-running-failed`
-8. [ ] - `p1` - **FROM** FAILED **TO** RUNNING **WHEN** the user clicks **Run Test** again - `inst-failed-running`
+1. [x] - `p1` - **FROM** IDLE **TO** WAITING_FOR_MODEL **WHEN** the user runs the test before the speech model is in - `inst-idle-waiting`
+2. [x] - `p1` - **FROM** WAITING_FOR_MODEL **TO** RUNNING **WHEN** the speech model arrives - `inst-waiting-running`
+3. [x] - `p1` - **FROM** IDLE **TO** PERMISSION_MISSING **WHEN** system audio recording is not allowed - `inst-idle-missing`
+4. [x] - `p1` - **FROM** PERMISSION_MISSING **TO** IDLE **WHEN** the permission is granted - `inst-missing-idle`
+5. [x] - `p1` - **FROM** IDLE **TO** RUNNING **WHEN** the user clicks **Run Test** or **Play Test Clip** - `inst-idle-running`
+6. [x] - `p1` - **FROM** RUNNING **TO** PASSED **WHEN** the first three result lines pass within 10 s - `inst-running-passed`
+7. [x] - `p1` - **FROM** RUNNING **TO** FAILED **WHEN** a stream stays silent - `inst-running-failed`
+8. [x] - `p1` - **FROM** FAILED **TO** RUNNING **WHEN** the user clicks **Run Test** again - `inst-failed-running`
 
 ## 5. Definitions of Done
 
