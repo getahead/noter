@@ -8,6 +8,7 @@ mod glossary;
 mod hotkeys;
 mod hub;
 mod log;
+mod models;
 mod settings;
 
 use std::path::Path;
@@ -27,6 +28,7 @@ pub use first_run::{
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
+pub use models::allowed_download_url;
 use noter_protocol::ipc::Sink;
 pub use settings::default_settings;
 
@@ -69,6 +71,8 @@ pub struct CoreDeps {
     pub models: Arc<dyn ModelSource>,
     /// Downloaded app updates (`tauri-plugin-updater` in the app).
     pub updater: Arc<dyn Updater>,
+    /// Where model bundles go (the App Group container's `models/`); `<data>/models` if unset.
+    pub models_dir: Option<std::path::PathBuf>,
 }
 
 impl CoreDeps {
@@ -82,6 +86,7 @@ impl CoreDeps {
             native: Arc::new(first_run::NoNative),
             models: Arc::new(first_run::NoModels),
             updater: Arc::new(first_run::NoUpdater),
+            models_dir: None,
         }
     }
 
@@ -92,6 +97,11 @@ impl CoreDeps {
 
     pub fn with_shortcuts(mut self, shortcuts: Arc<dyn ShortcutRegistrar>) -> Self {
         self.shortcuts = shortcuts;
+        self
+    }
+
+    pub fn with_models_dir(mut self, dir: std::path::PathBuf) -> Self {
+        self.models_dir = Some(dir);
         self
     }
 
@@ -151,6 +161,10 @@ pub struct Core {
     glossary_hooks: Hooks<GlossaryList>,
     /// First run's stored setup state and the settings values it follows.
     first_run: Mutex<first_run::State>,
+    /// Model downloads, shown in the setup status.
+    downloads: Mutex<models::Downloads>,
+    /// This core, for the tasks first run spawns (set by `start_first_run`).
+    this: std::sync::OnceLock<std::sync::Weak<Core>>,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -185,6 +199,11 @@ impl Core {
         let snapshot = app::fresh_snapshot(&deps.app_version);
         let settings = settings::load(&store).map_err(BootError::Load)?;
         let first_run = first_run::load(&store, &settings).map_err(BootError::Load)?;
+        let models_dir = deps
+            .models_dir
+            .clone()
+            .unwrap_or_else(|| data_dir.join("models"));
+        let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
         let core = Core {
             deps,
             store,
@@ -196,6 +215,8 @@ impl Core {
             settings_hooks: Mutex::new(vec![]),
             glossary_hooks: Mutex::new(vec![]),
             first_run: Mutex::new(first_run),
+            downloads: Mutex::new(downloads),
+            this: std::sync::OnceLock::new(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -385,6 +406,14 @@ impl CoreApi for Core {
         args: PermissionArgs,
     ) -> Result<PermissionRow, CoreError> {
         self.request_permission(args).await
+    }
+
+    async fn models_download(
+        &self,
+        _ctx: &CommandCtx,
+        args: ModelsDownloadArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.download_models(args)
     }
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {

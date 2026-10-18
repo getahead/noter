@@ -272,6 +272,7 @@ impl Core {
     /// Starts first run's reactions: the login item and the detection rule follow settings
     /// (decision D7), environment changes are broadcast. The host calls it once after `open`.
     pub fn start_first_run(self: &Arc<Self>) {
+        let _ = self.this.set(Arc::downgrade(self));
         let weak: Weak<Core> = Arc::downgrade(self);
         self.on_settings_changed(move |section| {
             if let Some(core) = weak.upgrade() {
@@ -295,6 +296,11 @@ impl Core {
                 "level": "warn", "module": "first_run", "message": format!("login item: {}", e.message)
             })));
         }
+    }
+
+    /// This core as an `Arc`, for spawned tasks; `None` before `start_first_run`.
+    pub(crate) fn this(&self) -> Option<Arc<Core>> {
+        self.this.get().and_then(Weak::upgrade)
     }
 
     /// Runs inside the settings write (settings lock held): uses the section, never the lock.
@@ -367,7 +373,7 @@ impl Core {
     }
 
     /// Recomputes the setup status and the degraded set; sends `setup:changed` when it changed.
-    fn refresh_setup(&self) {
+    pub(crate) fn refresh_setup(&self) {
         let (stored, offer, call_display) = {
             let s = lock(&self.first_run);
             (s.stored.clone(), s.offer_to_record, s.call_display.clone())
@@ -379,12 +385,13 @@ impl Core {
             .iter()
             .all(|r| matches!(r.state, StepState::Done | StepState::Skipped));
         let permissions = self.permission_rows(&stored.self_test);
+        let models = lock(&self.downloads).status();
         let mut app = self.app();
         let next = SetupStatus {
             version: app.setup.version,
             complete,
             steps: stored.steps,
-            models: app.setup.models.clone(),
+            models,
             permissions,
             self_test: stored.self_test,
             call_display,
