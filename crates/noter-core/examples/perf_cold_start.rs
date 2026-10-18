@@ -31,7 +31,6 @@ impl EventEmitter for NoEvents {
 }
 
 /// Runs `rounds` cold starts; returns the bytes of every serialized snapshot as a checksum.
-// @cpt-dod:cpt-noter-dod-core-storage-cold-start:p2
 fn cold_start(rounds: usize) -> usize {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
