@@ -100,18 +100,18 @@ Agents work in lanes. Choose one with `NOTER_LANE=<lane>` or a branch named `lan
 
 | Lane | May change | Notes |
 | --- | --- | --- |
-| `contract` | `crates/noter-protocol`, the fake core, the conformance suite, ADRs, DESIGN-core | Every PR needs one core and one UI review |
+| `contract` | `crates/noter-protocol` and the output `just contract-regen` writes (`contracts/`, `bindings.ts`), the fake core, the conformance suite, ADRs, DESIGN-core | One core review; a UI review too when the wire changes (a generated file or `CONTRACT_VERSION`) |
 | `ui` | `apps/desktop` except `src-tauri`, the fake and the conformance suite | Builds against the fake core |
 | `core` | `crates/*` except the protocol, native and engine-client crates; `src-tauri`; `perf/` | |
-| `engine` | `engine/`, `noter-engine-client`, `noter-native` | Mac only |
+| `engine` | `engine/`, `noter-engine-client`, `noter-native`, the root `Cargo.toml` and `Cargo.lock` | Mac only |
 | `skills` | `skills/`, `evals/` (not `evals/golden`) | |
 
-Every lane may also touch `.plans/`, `docs/features/` and `docs/DECOMPOSITION.md`. With no lane set, the owner rules apply.
+Every lane may also touch `.plans/`, `.prs/` (PR reviews), `docs/features/` and `docs/DECOMPOSITION.md`. With no lane set, the owner rules apply.
 
 The lane guard (`scripts/harness/lane_guard.py`) runs as a Claude Code PreToolUse hook on every edit (and on shell commands that write to a guarded path), as the git pre-commit hook for every tool, and in CI over the files of a `lane/<lane>/…` branch. It blocks:
 
 1. hand edits to generated files (`contracts/**`, `bindings.ts`): change the Rust types and run `just contract-regen`;
-2. changes to baselines (`**/__screenshots__/**`, `evals/golden/**`) except through their workflows;
+2. changes to baselines (`**/__screenshots__/**`, `evals/golden/**`) except through their workflows (in CI's lane check a screenshot passes on to the visual gate, which requires `visual-change-approved`; golden data stays blocked);
 3. inside a lane, any change to the harness itself (`harness/`, `scripts/harness/`, `.github/`, hooks, `justfile`, test configs), so an agent cannot move the goalposts;
 4. inside a lane, any file outside the lane.
 
