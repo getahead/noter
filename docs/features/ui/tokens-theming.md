@@ -197,15 +197,16 @@ The system **MUST** run a unit test that reads the Increase Contrast values of t
 
 **DESIGN versus prototype.** Under Increase Contrast the prototype's glass is 94 % white in light and 96 % in dark, where DESIGN says opaque, and its dark focus ring is #4DA3FF where DESIGN names the accent #0A84FF. This feature follows the prototype (owner decision); the difference is listed in `docs/DECOMPOSITION.md`. The prototype has no Reduce transparency rule; DESIGN's rule (materials opaque) applies, because there is no prototype state to follow.
 
-**Accessibility versus prototype.** WCAG 2.2 AA under Increase Contrast is a PRD bar (AC5, PM-57), so it overrides the prototype where the prototype misses it. Three Increase Contrast values change, each by the smallest step on the same hue that reaches 4.5:1; the automated check covers the pairs:
+**Accessibility versus prototype.** WCAG 2.2 AA under Increase Contrast is a PRD bar (AC5, PM-57), so it overrides the prototype where the prototype misses it. Three Increase Contrast values change, each by the smallest step on the same hue that reaches 4.5:1, and the recording dot takes the error fill; the automated check covers the pairs:
 
 | Pair | Appearance | Prototype | Production | Ratio |
 |---|---|---|---|---|
 | accent text on accent selection (token chips, pressed icon buttons) | light | `--accent-text` #0064D1 | #0060C9 | 4.29 → 4.56:1 (content and card) |
 | accent text on accent selection | dark | `--accent-text` #4DA3FF | #6DB4FF | 4.27 → 5.14:1 on content, 3.77 → 4.54:1 on a card |
 | white on the error fill (destructive button, icon badge, failed step dot) | dark | `--error` #FF6961 as the fill | new `--error-fill` #C4514B | 2.82 → 4.54:1 |
+| white warning glyph on the recording dot (**mic only**, **no mic**; non-text, 3:1) | dark | `--rec` #FF6961 as the fill | `--error-fill` #C4514B; the paused ring keeps `--rec` | 2.82 → 4.54:1 |
 
-The error fill needs its own token: as text on the dark content background the error colour needs a relative luminance of at least 0.233, and under white text at most 0.183, so no single value serves both (the prototype splits `--accent-fill` from `--accent` for the same reason). `--error-fill` equals the error colour in the other appearances; under Increase Contrast `tokens.css` fills `.np-btn--destructive.np-btn--primary`, `.np-ibtn__badge` and `.f-steps__i.is-err .f-steps__dot` with it.
+The error fill needs its own token: as text on the dark content background the error colour needs a relative luminance of at least 0.233, and under white text at most 0.183, so no single value serves both (the prototype splits `--accent-fill` from `--accent` for the same reason). `--error-fill` equals the error colour in the other appearances; under Increase Contrast `tokens.css` fills `.np-btn--destructive.np-btn--primary`, `.np-ibtn__badge`, `.f-steps__i.is-err .f-steps__dot` and the recording dot `.np-recdot:not(.is-paused)` with it (the recording dot's glyph is the only sign of **mic only** and **no mic**; the check holds it to 3:1 as `RECDOT_PAIR`). The designer confirms the recording dot's colour.
 
 **Cascade order.** The prototype's component sheets load after `tokens.css` and carry rules as specific as the treatments (`.np-toolbar .np-btn`), so the Increase Contrast treatments use `:root:root`, the specificity they have in `02-contrast.css`; `tokens-theming.spec.ts` loads both in production order and compares every treatment with the prototype.
 

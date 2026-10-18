@@ -153,7 +153,14 @@ export const TEXT_PAIRS: Pair[] = [
   ["--accent-text", "--sel-accent", "--card-bg"],
   ["--on-accent", "--error-fill"],
 ];
-export const NON_TEXT_PAIRS: Pair[] = ["--ctrl-border", "--accent", "--accent-fill", "--focus-ring", "--rec", "--error", "--warning", "--success"].map((t) => [t, "--content-bg"]);
+/** The white warning glyph in the recording dot ('mic only', 'no mic'; prototype 04-shared.js C.recordingIndicator) is
+ *  the only sign of that state, so it is a non-text pair. The prototype fills the dot with --rec (2.82:1 in dark Increase
+ *  Contrast); tokens.css fills it with --error-fill under Increase Contrast, the paused ring keeps --rec. */
+export const RECDOT_PAIR: Pair = ["--on-accent", "--error-fill"];
+export const NON_TEXT_PAIRS: Pair[] = [
+  ...["--ctrl-border", "--accent", "--accent-fill", "--focus-ring", "--rec", "--error", "--warning", "--success"].map((t): Pair => [t, "--content-bg"]),
+  RECDOT_PAIR,
+];
 
 // @cpt-algo:cpt-noter-algo-ui-tokens-theming-check-contrast:p1
 // @cpt-dod:cpt-noter-dod-ui-tokens-theming-contrast-check:p1
