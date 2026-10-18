@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use noter_core::{Core, CoreDeps, EventEmitter, SystemClock};
-use noter_desktop::{builder, Booted};
+use noter_desktop::{builder, hotkey_pressed, Booted};
 use noter_protocol::ipc::COMMANDS;
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
@@ -38,7 +38,8 @@ fn app(dir: &std::path::Path) -> tauri::App<MockRuntime> {
         CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)),
     )
     .unwrap();
-    builder(mock_builder(), Booted(Ok(Arc::new(core))))
+    builder(mock_builder())
+        .manage(Booted(Ok(Arc::new(core))))
         .build(mock_context(noop_assets()))
         .unwrap()
 }
@@ -151,12 +152,10 @@ fn answers_and_typed_errors_cross_as_json() {
 
 #[test]
 fn a_core_that_did_not_boot_answers_internal() {
-    let app = builder(
-        mock_builder(),
-        Booted(Err("the database failed its quick check".into())),
-    )
-    .build(mock_context(noop_assets()))
-    .unwrap();
+    let app = builder(mock_builder())
+        .manage(Booted(Err("the database failed its quick check".into())))
+        .build(mock_context(noop_assets()))
+        .unwrap();
     let main = window(&app, "main");
     let err = call(&main, "app_snapshot", json!({ "args": {} })).unwrap_err();
     assert_eq!(
@@ -188,4 +187,36 @@ fn each_window_capability_allows_exactly_its_commands() {
             .collect();
         assert_eq!(allowed, expected, "{}", w.as_str());
     }
+}
+
+#[test]
+fn commands_before_the_core_started_are_not_ready() {
+    let app = builder(mock_builder())
+        .build(mock_context(noop_assets()))
+        .unwrap();
+    let main = window(&app, "main");
+    let err = call(&main, "app_snapshot", json!({ "args": {} })).unwrap_err();
+    assert_eq!(
+        serde_json::from_value::<CoreError>(err).unwrap().code,
+        ErrorCode::NotReady
+    );
+    assert!(hotkey_pressed(app.handle(), "Ctrl+Alt+Super+N").is_none());
+}
+
+#[test]
+fn a_pressed_hotkey_reaches_the_core_as_a_native_caller() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = app(dir.path());
+    let pressed = hotkey_pressed(app.handle(), "Ctrl+Alt+Super+N").expect("the core is up");
+    let answer = tauri::async_runtime::block_on(pressed).unwrap();
+    // Open Call Screen runs window_show_call, which answers not_implemented until M1.
+    let err = answer.unwrap_err();
+    assert_eq!(
+        (err.code, err.message.as_str()),
+        (ErrorCode::NotImplemented, "window_show_call")
+    );
+    let unbound =
+        tauri::async_runtime::block_on(hotkey_pressed(app.handle(), "Ctrl+Alt+Super+Q").unwrap())
+            .unwrap();
+    assert_eq!(unbound.unwrap_err().code, ErrorCode::NotFound);
 }
