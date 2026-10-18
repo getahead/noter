@@ -1,5 +1,6 @@
 // M0 — Core bridge and window stores (docs/features/ui/core-bridge.md). The bridge has no screen
-// of its own: these flows open the real window frame in the browser over the fake core and check
+// of its own: these flows open the real window frame in the browser over the selected core (the
+// fake, or noter-core-harness with NOTER_CORE=stdio; see support/app.ts) and check
 // what every screen relies on — snapshot after the event subscriptions, the window states, the
 // section-level error with Try Again only when retryable, and nothing kept in browser storage.
 // Story: DESIGN-core › Open a window: snapshot, then stream.
