@@ -66,6 +66,10 @@ The user should finish setup in one sitting before the first real call, and call
 - Events: `setup:changed`, `env:changed`.
 - DESIGN.md stories (M0): `cpt-noter-seq-first-run-complete-setup`, `cpt-noter-seq-first-run-download-models`.
 
+**Pending** (named follow-ups, not in M0's first run yet):
+- Decision D14: `noter-native` gives the App Group container path (an engine-lane change the owner must allow); the Tauri host then passes it to the engine and to `models/`, wires `noter-native` as `NativeServices` and `noter-llm` as the default `ModelSource`. Until then the data folder stands in.
+- The D-19 re-check needs the Swift engine to play its clip (`inst-play-clip` of `cpt-noter-flow-core-engine-foundation-self-test`); until it does, a granted tap with nothing playing still reads as denied.
+
 ### 1.3 Actors
 
 | Actor | Role in Feature |
@@ -118,6 +122,7 @@ The user should finish setup in one sitting before the first real call, and call
 **Error Scenarios**:
 - The user denies it: the row becomes `denied` and the command answers `permission_denied`; the UI offers System Settings (`open_external`, M1).
 - System Audio Recording cannot be queried: it is reported as inferred from the self-test (non-zero buffers) and never blocks anything.
+- Back from System Settings (the app becomes active, or macOS reports a change) while first run shows system audio denied: one engine test of about 3 s plays the test clip and re-checks it, never during a capture; the row becomes `granted` or stays `denied`, and `setup:changed` ends the check either way (decision D-19). Settings leaves it to **Run Test**.
 
 **Steps**:
 1. [x] - `p1` - API: `permission_request { kind }` from the First run, Settings or main window - `inst-permission-call`
