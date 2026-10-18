@@ -252,7 +252,7 @@ The system **MUST** store each `Settings` section in `settings`, serve defaults 
 
 ### Hotkeys
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-settings-hotkeys`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-settings-hotkeys`
 
 The system **MUST** register app hotkeys at launch and keep them registered, refuse chords without a modifier, reserved chords and conflicts with the codes above while keeping the old chord, call the core as `Caller::Native { surface: hotkey }` when a hotkey fires, and restore defaults with `hotkeys_reset`.
 
