@@ -133,7 +133,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Dismiss an app banner
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-banner-dismiss`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-banner-dismiss`
 
 **Actor**: UI window (main)
 
@@ -144,16 +144,14 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The banner is already gone: the current `BannerSet` is returned unchanged.
 
 **Steps**:
-1. [ ] - `p1` - API: `banner_dismiss { banner }` from the main window - `inst-dismiss`
-2. [ ] - `p1` - Core removes the banner kind from the set and bumps the `BannerSet` version - `inst-remove-banner`
-3. [ ] - `p1` - **IF** the banner was `RecordingInterruptedByQuit` - `inst-if-interrupted`
-   1. [ ] - `p1` - Tell the session manager the resume offer for that call ended (once it exists, M1) - `inst-end-resume-offer`
-4. [ ] - `p1` - Emit `banners:changed` with the whole set - `inst-emit-banners`
-5. [ ] - `p1` - **RETURN** the `BannerSet` - `inst-return-banners`
+1. [x] - `p1` - API: `banner_dismiss { banner }` from the main window - `inst-dismiss`
+2. [x] - `p1` - Core removes the banner kind from the set (an absent kind returns the set unchanged, without an event). The `RecordingInterruptedByQuit` banner is the resume offer itself, so removing it ends the offer to resume that call - `inst-remove-banner`
+3. [x] - `p1` - Bump the `BannerSet` version and emit `banners:changed` with the whole set - `inst-emit-banners`
+4. [x] - `p1` - **RETURN** the `BannerSet` - `inst-return-banners`
 
 ### Log a UI error
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-ipc-host-log-ui`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-ipc-host-log-ui`
 
 **Actor**: UI window
 
@@ -164,10 +162,10 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The message carries a field that may hold transcript, document or model text: the field is dropped before writing.
 
 **Steps**:
-1. [ ] - `p1` - API: `log_ui { level, message, context }` - `inst-log-call`
-2. [ ] - `p1` - Core applies `cpt-noter-algo-core-ipc-host-scrub-log` - `inst-log-scrub`
-3. [ ] - `p1` - Write the line to `logs/` (structured, 0600) - `inst-log-write`
-4. [ ] - `p1` - **RETURN** `Ack` - `inst-log-return`
+1. [x] - `p1` - API: `log_ui { level, message, context }` - `inst-log-call`
+2. [x] - `p1` - Core applies `cpt-noter-algo-core-ipc-host-scrub-log` - `inst-log-scrub`
+3. [x] - `p1` - Write the line to `logs/` (structured, 0600) - `inst-log-write`
+4. [x] - `p1` - **RETURN** `Ack` - `inst-log-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -235,30 +233,30 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Stamp whole-state versions
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-version`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-version`
 
 **Input**: A whole-state payload kind (capture, degraded, banners, settings, setup, environment, …) and its new state.
 
 **Output**: The payload stamped with a `version` higher than any earlier one of that kind.
 
 **Steps**:
-1. [ ] - `p1` - Increment the kind's counter (kept in memory, starting from 1 at each core start) - `inst-increment`
-2. [ ] - `p1` - Stamp the payload, and the matching command result or snapshot slice, with it - `inst-stamp`
-3. [ ] - `p1` - Emit the event with the whole state - `inst-emit-event`
-4. [ ] - `p1` - **RETURN** the stamped payload - `inst-return-version`
+1. [x] - `p1` - Increment the kind's counter (kept in memory, starting from 1 at each core start) - `inst-increment`
+2. [x] - `p1` - Stamp the payload, and the matching command result or snapshot slice, with it - `inst-stamp`
+3. [x] - `p1` - Emit the event with the whole state - `inst-emit-event`
+4. [x] - `p1` - **RETURN** the stamped payload - `inst-return-version`
 
 ### Scrub log lines
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scrub-log`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scrub-log`
 
 **Input**: A log record from the UI or from any core module.
 
 **Output**: The record without transcript, document or model text.
 
 **Steps**:
-1. [ ] - `p1` - Keep only fields of an allow-list (level, module, window, command name, error code, ids, durations, counts) - `inst-allow-list`
-2. [ ] - `p1` - Truncate free-text messages from the UI to a fixed length and drop any field named or typed as text content - `inst-truncate`
-3. [ ] - `p1` - **RETURN** the scrubbed record - `inst-return-scrubbed`
+1. [x] - `p1` - Keep only fields of an allow-list (level, module, window, command name, error code, ids, durations, counts) - `inst-allow-list`
+2. [x] - `p1` - Truncate free-text messages from the UI to a fixed length and drop any field named or typed as text content - `inst-truncate`
+3. [x] - `p1` - **RETURN** the scrubbed record - `inst-return-scrubbed`
 
 ## 4. States (CDSL)
 
@@ -323,7 +321,7 @@ The system **MUST** answer `app_snapshot` with every slice the current milestone
 
 ### No content in logs
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-log-scrub`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-log-scrub`
 
 The system **MUST** never write transcript, document or model text to `logs/`; a test feeds every log path (including `log_ui`) records with such text and finds none of it on disk.
 
@@ -340,5 +338,5 @@ The system **MUST** never write transcript, document or model text to `logs/`; a
 - [ ] A Channel message published before the subscribing `invoke` resolves is delivered after the snapshot, and none with `seq ≤ last_seq` is delivered (conformance, against the real core).
 - [ ] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
 - [ ] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
-- [ ] No log file contains transcript text after the log-scrubbing test.
+- [x] No log file contains transcript text after the log-scrubbing test.
 - [ ] `just gate` passes.
