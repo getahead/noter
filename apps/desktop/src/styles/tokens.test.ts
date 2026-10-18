@@ -29,9 +29,19 @@ describe("contrastRatio", () => {
     expect(() => contrastRatio("none", "#FFFFFF")).toThrow(/no colour/);
     expect(() => contrastRatio("#000000", "rgba(0,0,0,.5)")).toThrow(/opaque/);
   });
+
+  it("rejects a colour syntax it cannot read rather than passing it", () => {
+    expect(() => contrastRatio("rgb(0 0 0 / 50%)", "#FFFFFF")).toThrow(/no colour/);
+    expect(() => contrastRatio("#000000", "rgba(0,0,0,50%)", "#FFFFFF")).toThrow(/no colour/);
+  });
 });
 
 describe("tokens.css", () => {
+  it("is loaded by the app through tokens.ts, where its @cpt markers are", () => {
+    const main = readFileSync(fileURLToPath(new URL("../main.tsx", import.meta.url)), "utf8");
+    expect(main).toMatch(/^import "\.\/styles\/tokens";$/m);
+  });
+
   // cpt-noter-dod-ui-tokens-theming-contrast-check
   it.each(["LIGHT_CONTRAST", "DARK_CONTRAST"] as const)("meets WCAG 2.2 AA under Increase Contrast (%s)", (appearance) => {
     expect(checkContrast(resolveTokens(css, appearance))).toEqual([]);

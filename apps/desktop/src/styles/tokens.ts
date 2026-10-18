@@ -113,7 +113,8 @@ function parseColor(value: string): Rgba {
   const fn = /rgba?\(([^)]+)\)/.exec(value);
   if (fn) {
     const [r, g, b, a = 1] = fn[1].split(",").map(Number);
-    return [r, g, b, a];
+    // NaN would compare false against every target and pass the check, so an unread syntax throws
+    if ([r, g, b, a].every(Number.isFinite)) return [r, g, b, a];
   }
   throw new Error(`no colour in "${value}"`);
 }
