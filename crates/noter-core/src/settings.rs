@@ -300,7 +300,8 @@ pub(crate) fn put(
 
 impl Core {
     /// Hears every section a write changed, after it committed (first run applies the login
-    /// item and the detection rule from it; settings never calls into other features).
+    /// item and the detection rule from it; settings never calls into other features). Hooks run
+    /// under the settings lock, before `settings:changed`: they must not call back into settings.
     pub fn on_settings_changed(&self, hook: impl Fn(&SettingsSection) + Send + Sync + 'static) {
         lock(&self.settings_hooks).push(Box::new(hook));
     }
