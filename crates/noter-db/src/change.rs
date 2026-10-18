@@ -74,7 +74,6 @@ impl Store {
     }
 
     // @cpt-flow:cpt-noter-flow-core-storage-write:p1
-    // @cpt-dod:cpt-noter-dod-core-storage-change-log:p1
     fn commit(
         &self,
         mutations: Vec<Mutation>,
@@ -159,14 +158,12 @@ fn change_tx(
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
         let change_id = ChangeId::new(format!("chg_{}", ulid::Ulid::generate()));
-        let field = match m.values.as_slice() {
-            [(column, _)] => Some(*column),
-            _ => None,
-        };
+        let (field, old, new, delta) =
+            what_changed(m, before.as_ref(), &after).map_err(internal)?;
         tx.execute(
-            "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, summary, reason,
-                                  evidence_ids, status, batch_id, undoable, surface)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'applied', ?12, ?13, ?14)",
+            "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, delta, summary,
+                                  reason, evidence_ids, status, batch_id, undoable, surface)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'applied', ?13, ?14, ?15)",
             params![
                 change_id.as_str(),
                 now_ms(),
@@ -174,8 +171,9 @@ fn change_tx(
                 m.entity_type,
                 m.id,
                 field,
-                before.map(|b| b.to_string()),
-                after.to_string(),
+                old,
+                new,
+                delta,
                 meta.summary,
                 meta.reason,
                 serde_json::to_string(&meta.evidence_ids).map_err(internal)?,
@@ -198,6 +196,54 @@ fn change_tx(
     // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-return-tx
     Ok(out)
     // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-return-tx
+}
+
+/// The change row's content (DESIGN-core 3.7, table `changes`): one changed column is
+/// `field`, `before` and `after` as text; several are only a `delta` of
+/// `{"column": [before, after]}` over the columns that changed.
+#[allow(clippy::type_complexity)]
+fn what_changed(
+    m: &Mutation,
+    before: Option<&Value>,
+    after: &Value,
+) -> serde_json::Result<(
+    Option<&'static str>,
+    Option<String>,
+    Option<String>,
+    Option<Vec<u8>>,
+)> {
+    let changed: Vec<(&'static str, Value, Value)> = m
+        .values
+        .iter()
+        .filter(|(c, _)| !matches!(*c, "id" | "rev"))
+        .map(|(c, _)| {
+            (
+                *c,
+                before.map_or(Value::Null, |b| b[*c].clone()),
+                after[*c].clone(),
+            )
+        })
+        .filter(|(_, old, new)| old != new)
+        .collect();
+    Ok(match changed.as_slice() {
+        [(column, old, new)] => (Some(*column), as_text(old), as_text(new), None),
+        _ => {
+            let delta: Map<String, Value> = changed
+                .into_iter()
+                .map(|(c, old, new)| (c.to_string(), Value::from(vec![old, new])))
+                .collect();
+            (None, None, None, Some(serde_json::to_vec(&delta)?))
+        }
+    })
+}
+
+/// A column value as `before`/`after` text: strings as they are, `NULL` stays `NULL`.
+fn as_text(v: &Value) -> Option<String> {
+    match v {
+        Value::Null => None,
+        Value::String(s) => Some(s.clone()),
+        other => Some(other.to_string()),
+    }
 }
 
 /// `you`, `job:<id>`, `llm_run:<id>` (DESIGN-core 3.7, table `changes`).

@@ -223,7 +223,7 @@ The system **MUST** apply numbered migrations in order, each in its own transact
 
 ### Every write has its change row
 
-- [x] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
+- [ ] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
 
 The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test.
 

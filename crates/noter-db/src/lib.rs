@@ -226,7 +226,12 @@ impl Store {
     ) -> Result<T, CoreError> {
         // @cpt-begin:cpt-noter-algo-core-storage-snapshot-read:p2:inst-if-snapshot
         // @cpt-begin:cpt-noter-algo-core-storage-snapshot-read:p2:inst-read-writer
-        self.on_writer(move |conn| f(conn).map_err(internal))
+        self.on_writer(move |conn| {
+            conn.pragma_update(None, "query_only", true)
+                .map_err(internal)?;
+            let _writable_again = QueryOnly(conn);
+            f(conn).map_err(internal)
+        })
         // @cpt-end:cpt-noter-algo-core-storage-snapshot-read:p2:inst-read-writer
         // @cpt-end:cpt-noter-algo-core-storage-snapshot-read:p2:inst-if-snapshot
     }
@@ -282,10 +287,20 @@ impl Drop for Store {
     }
 }
 
+/// Turns `query_only` off again when a snapshot read ends, even by a panic.
+struct QueryOnly<'a>(&'a Connection);
+
+impl Drop for QueryOnly<'_> {
+    fn drop(&mut self) {
+        let _ = self.0.pragma_update(None, "query_only", false);
+    }
+}
+
 /// The only read-write connection: jobs run one at a time, in order, until the store closes.
+/// A job that panics answers `internal` (its reply is dropped) and the writer goes on.
 fn writer_task(mut conn: Connection, jobs: mpsc::Receiver<Job>) {
     for job in jobs {
-        job(&mut conn);
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| job(&mut conn)));
     }
     let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
 }
