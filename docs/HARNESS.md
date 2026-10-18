@@ -111,7 +111,7 @@ Every lane may also touch `.plans/`, `docs/features/` and `docs/DECOMPOSITION.md
 The lane guard (`scripts/harness/lane_guard.py`) runs as a Claude Code PreToolUse hook on every edit (and on shell commands that write to a guarded path), as the git pre-commit hook for every tool, and in CI over the files of a `lane/<lane>/…` branch. It blocks:
 
 1. hand edits to generated files (`contracts/**`, `bindings.ts`): change the Rust types and run `just contract-regen`;
-2. changes to baselines (`**/__screenshots__/**`, `evals/golden/**`) except through their workflows;
+2. changes to baselines (`**/__screenshots__/**`, `evals/golden/**`) except through their workflows (in CI's lane check a screenshot passes on to the visual gate, which requires `visual-change-approved`; golden data stays blocked);
 3. inside a lane, any change to the harness itself (`harness/`, `scripts/harness/`, `.github/`, hooks, `justfile`, test configs), so an agent cannot move the goalposts;
 4. inside a lane, any file outside the lane.
 
