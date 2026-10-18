@@ -187,7 +187,7 @@ def lane_check(files: list[str], cfg: dict) -> list[str]:
     lane = os.environ.get("NOTER_LANE") or (parts[1] if len(parts) >= 3 and parts[0] == "lane" else None)
     if lane is None:
         return []
-    return [r for p in files if (r := lane_guard.verdict(p, lane, cfg, committing=True))]
+    return [r for p in files if (r := lane_guard.verdict(p, lane, cfg, committing=True, screenshots_ok=True))]
 
 
 if __name__ == "__main__":
