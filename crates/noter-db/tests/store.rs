@@ -14,7 +14,7 @@ const NOTES: &[Migration] = &[Migration {
     version: 1,
     name: "notes",
     // Not idempotent on purpose: running it twice fails. The trigger forces a failure after the row write.
-    sql: "CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, body TEXT, rev INTEGER NOT NULL);
+    sql: "CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, body TEXT, score REAL, pinned INTEGER, rev INTEGER NOT NULL);
           CREATE TRIGGER changes_boom AFTER INSERT ON changes WHEN NEW.reason = 'boom'
           BEGIN SELECT RAISE(ABORT, 'boom'); END;",
 }];
@@ -391,7 +391,9 @@ fn a_batch_commits_together_under_one_batch_id() {
     let mut two = note("not_2", None, "Two");
     two.values = vec![
         ("title", json!("Two")),
-        ("body", json!(2.5)),
+        ("score", json!(2.5)),
+        ("pinned", json!(true)),
+        ("body", json!(["a"])),
         ("rev", json!(7)),
     ];
     let written = store
@@ -406,7 +408,9 @@ fn a_batch_commits_together_under_one_batch_id() {
         Rev(1),
         "rev is the store's, not the caller's"
     );
-    assert_eq!(written[1].record["body"], json!(2.5));
+    assert_eq!(written[1].record["score"], json!(2.5));
+    assert_eq!(written[1].record["pinned"], json!(1));
+    assert_eq!(written[1].record["body"], json!(r#"["a"]"#));
     let actors: Vec<String> = store
         .read(|c| {
             let mut s = c.prepare("SELECT actor FROM changes ORDER BY id")?;
