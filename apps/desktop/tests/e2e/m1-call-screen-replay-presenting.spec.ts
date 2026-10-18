@@ -4,6 +4,7 @@
 // (docs/TEST-PLAN.md › M1).
 import type { PlaybackState } from "../../src/core/bindings";
 import { ahead, ok, pending, refused, until } from "../support/results";
+import { isLaterMilestone } from "../support/milestones";
 import type { Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { changeAhead, expect, given, test, versionsGrow } from "./support/fixtures";
@@ -129,7 +130,8 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
     if (!hidden) return; // app_set_hidden_for_presenting (M1)
     expect(hidden.hidden).toBe(true);
     await until(() => presenting.latest()?.hidden === true, "app:presenting hidden");
-    await until(() => copilot.latest()?.card_keys.registered === false, "card keys released while hidden");
+    // copilot:status is the copilot's (M4): the real core sends it from then on.
+    if (scenario.target === "fake" || !isLaterMilestone("M4")) await until(() => copilot.latest()?.card_keys.registered === false, "card keys released while hidden");
     expect(ok(await scenario.core("main").appSnapshot({})).capture.phase).toBe("recording");
 
     expect(ok(await screen.appSetHiddenForPresenting({ hidden: false })).hidden).toBe(false); // ⌃⌥⌘0 again, or Show Noter
@@ -142,7 +144,7 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
     await given(scenario, W.idle);
     const main = scenario.core("main");
     if (!ahead(await main.appSetHiddenForPresenting({ hidden: true }))) return; // app_set_hidden_for_presenting (M1)
-    if (!(await changeAhead(scenario, (w) => W.detect(w, W.APPS.teams)))) return; // a second call starts; detection (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => W.detect(w, W.APPS.teams)))) return; // a second call starts; detection (M1)
 
     expect(ok(await main.appSnapshot({})).detection.detection?.app_name).toBe("Microsoft Teams"); // Call Detected · Start Recording
     const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false }));
