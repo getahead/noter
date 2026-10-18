@@ -41,7 +41,7 @@ crates/noter-core-harness/
 
 ## 3. `--fixture world`: how the world gets into the core
 
-- Use `noter_protocol::fixtures::world()` directly. `contracts/fixtures/world.json` is exported from that same function, and the contract export check keeps the two equal. This avoids resolving a JSON path from whatever cwd Playwright starts us in. A one-line test asserts `serde_json::to_value(world())` equals the JSON file, so the spec's "loads world.json" still holds.
+- Use `noter_protocol::fixtures::world()` directly. `contracts/fixtures/world.json` is exported from that same function, and `just contract` (`noter-contract-export --check`) already fails when the two differ, so no harness test is needed for parity. This also avoids resolving a JSON path from whatever cwd Playwright starts us in.
 - Boot (`cpt-noter-algo-core-harness-boot`): make a temp dir (database plus App Group stand-in with `models/`), then `noter_core::Core::open(dir, deps)`, which opens the store and runs migrations. Then `testing::apply_world(&core, &world)`. A failure prints the reason to stderr and exits 1 before reading stdin.
 - `apply_world` splits the `FakeWorld` by owner. The same function serves boot and `harness.world_set`:
 
@@ -52,14 +52,16 @@ crates/noter-core-harness/
 | `glossary` | core storage | glossary write path |
 | `app.setup` steps, call display, audio storage, self-test result | core storage | setup section write path |
 | `app.setup` model bundles | temp `models/` + `ScriptedModelSource` | `ready` writes a file with the right checksum; `pending` removes it; `downloading` starts a fetch held open by the source; `checksum_failed` serves corrupt bytes once |
-| `app.permissions` / setup permission rows | `ScriptedNative` | `request(kind)` returns `granted` for `not_determined` and the stored state otherwise; changing a row fires the native change callback, so the core re-reads it and emits `setup:changed` itself |
-| `app.environment` (online, disk, displays, output route) | `ScriptedNative` | same change callback, so `env:changed` comes from the core |
+| `app.setup.permissions` and `app.environment.permissions` (`W.permission` writes both) | `ScriptedNative` | one table per kind; `request(kind)` returns `granted` for `not_asked` and the stored state otherwise (`denied`, `needs_relaunch`); changing a row fires the native change callback, so the core re-reads it and emits `setup:changed` itself |
+| rest of `app.environment` (online, disk, displays, output route) | `ScriptedNative` | same change callback, so `env:changed` comes from the core |
 | `app.environment.update`, `update_ready` banner | `ScriptedUpdater` | `ready()` returns the update; `install()` records it and returns. The harness process does not exit: restarting is the app's job |
 | `app.banners` | core (ipc-host banner set) | banner write path |
 | `now` | `Clock` | `--clock fixed` pins `now()` to `world.now` |
 | everything else (calls, transcripts, items, copilot, …) | not owned in M0 | see below |
 
-- `harness.world_get` returns the real read models for owned slices. For slices that the snapshot exposes but no M0 service writes (for example `capture`, which is idle), it returns what the snapshot says. For every other slice it returns the last value it accepted. `world_set(world_get())` is therefore a no-op that emits nothing.
+- Derived fields (`setup.complete`, `setup.detection_enabled`, `models.done_mb`) are recomputed by the core, never written. If they disagree with the world after the apply, `world_set` answers `invalid_input` naming the field, so a preset that drifts from the core's rules fails loudly.
+- `harness.world_get` returns the real read models for owned slices. For slices that the snapshot exposes but no M0 service writes, it returns what the snapshot says. For every other slice it returns the last value it accepted. `world_set(world_get())` is therefore a no-op that emits nothing.
+- Divergence from the fake in M0: the real snapshot has `capture` idle and no `detection`, because nothing in M0 can seed the fixture's live recording of `call_live`. `W.idle` and `W.firstRun` still pass, because the diff compares slices by value and their result equals what the core reports. Tests that need the live call are M1 and tolerate it through `ahead()` (§8 Q1).
 - `harness.world_set` diffs against the last world. An owned slice that changed is applied, and its owner emits the whole-state event with a new version. An unowned slice that changed is answered `not_implemented` with the slice name and its milestone in `message`.
 - `harness.fail_next`: a `(window, cmd) → CoreError` table checked in `dispatch.rs` before the core is called, used once. It needs no core seam.
 - `harness.push { cmd, body }`: routed to the scripted engine. For `self_test_run` it emits the matching engine event, so the message goes through the real supervisor and the real stream hub to the newest open Channel, which returns `{ seq }` (or `{ seq: null }` when no Channel is open).
@@ -89,7 +91,6 @@ All in-process tests run against a stub `CoreApi` (a handful of methods; everyth
 | W13 | `world_get_then_set_is_a_no_op` | no event lines |
 | W14 | `world_set_settings_emits_settings_changed_with_higher_version`, `world_set_unowned_slice_is_not_implemented` | control semantics (real core, P4) |
 | W15 | `push_reaches_newest_self_test_channel` | `{seq}`; `{seq: null}` with no Channel open (real core, P4) |
-| W16 | `fixture_function_equals_world_json` | parity of `world()` with `contracts/fixtures/world.json` |
 
 ## 5. The 22 M0 commands and 3 M0 stories → covering real-core test
 
@@ -146,7 +147,7 @@ UI team asks (UI lane: `apps/desktop/tests/e2e/**`, `tests/support/**`):
 | --- | --- | --- | --- |
 | P1 | `lane/core/harness-plan` | this plan (docs) | — |
 | P2 | `lane/contract/coreapi-dispatch` (**be-eng-2**) | S1, S2 below | — |
-| P3 | `lane/core/harness-wire` | crate, `main`, `lib::serve<C>`, wire + process tests W1–W11, W16 on a stub core | P2 |
+| P3 | `lane/core/harness-wire` | crate, `main`, `lib::serve<C>`, wire + process tests W1–W11 on a stub core | P2 |
 | P4 | `lane/core/harness-boot` | `Core::open`, `apply_world`, controls, scripted seams, W12–W15 on the real core | be-eng-1: S3–S6, the per-slice write paths, and the S7–S10 traits as each M0 feature lands |
 | P5 | `lane/contract/…` (my next task) | existing conformance files tolerant through `ahead()`, plus the new `conformance/m0-core.test.ts` | none; it **merges before P4** |
 | P6 | as each M0 feature lands | flip its rows in §5 to green under `NOTER_CORE=stdio` locally: `NOTER_CORE=stdio NOTER_CORE_CMD="target/debug/noter-core-harness --fixture world" pnpm --dir apps/desktop test:conformance` (and `test:e2e`) | the feature, U1 |
@@ -177,7 +178,7 @@ UI team asks (UI lane: `apps/desktop/tests/e2e/**`, `tests/support/**`):
 - **S8** `trait ModelSource: Send + Sync { fn manifest(&self) -> Vec<BundleSpec>; fn fetch(&self, bundle: &str, from_byte: u64) -> impl Future<Output = Result<ByteStream, FetchError>>; }`. The manifest must be injectable so the harness serves tiny bundles. Offline and disk come from S7.
 - **S9** `trait Updater: Send + Sync { fn ready(&self) -> Option<UpdateInfo>; fn install(&self) -> impl Future<Output = Result<(), CoreError>>; }`. The real one is `tauri-plugin-updater` in `src-tauri`.
 - **S10** `trait ShortcutRegistrar: Send + Sync { fn register(&self, chord: &str) -> Result<(), ShortcutTaken /* { owner } */>; fn unregister(&self, chord: &str); }`. The real one is the Tauri global-shortcut plugin. Reserved chords such as VoiceOver's stay core logic.
-- **S11** Cargo feature `harness` on `noter-core`, which must never be on in `src-tauri`. Behind it I write `noter_core::testing::{apply_world, world_slices}` myself (core lane). What I need from be-eng-1 is the per-slice write functions (settings section, hotkey bindings, glossary term, setup section, banner set) public to the crate, plus their read models.
+- **S11** Cargo feature `harness` on `noter-core`, which must never be on in `src-tauri` (I will ask the owner for an arch check that `src-tauri`'s dependency on `noter-core` has no `harness` feature). Behind it I write `noter_core::testing::{apply_world, world_slices}` myself (core lane). What I need from be-eng-1 is the per-slice write functions (settings section, hotkey bindings, glossary term, setup section, banner set) public to the crate, plus their read models.
 
 ### From the engine lane (`noter-engine-client`)
 
