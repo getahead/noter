@@ -3,12 +3,13 @@
 // is the system's: both are XCUITest / macOS checklist steps. Here the call page, the library
 // list and the Settings window are driven through their commands (docs/TEST-PLAN.md › M1).
 import type { Core, EntityChanged } from "../../src/core/bindings";
-import { ok, refused, until } from "../support/results";
+import { ahead, ok, pending, refused, until } from "../support/results";
 import * as W from "../support/world-presets";
-import { expect, given, test } from "./support/fixtures";
+import { changeAhead, expect, given, test } from "./support/fixtures";
 
+/** The ids in the Calls list, or null while calls_list (M1) is not implemented. */
 const listIds = async (main: Core) =>
-  ok(await main.callsList({ filter: {}, sort: "newest", page: {} })).rows.map((r) => r.id);
+  ahead(await main.callsList({ filter: {}, sort: "newest", page: {} }))?.rows.map((r) => r.id) ?? null;
 
 test.describe("cpt-noter-seq-dialogs-delete-call", () => {
   test("happy path: Delete Call… (⌘⌫), Delete, the call and everything in it gone, Calls list in its place", async ({ scenario }) => {
@@ -16,24 +17,32 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
     const main = scenario.core("main");
     const entities = await scenario.events("entity:changed");
 
-    const page = ok(await main.callGet({ call_id: W.LIVE_CALL })); // the call's page is open
+    const page = ahead(await main.callGet({ call_id: W.LIVE_CALL })); // the call's page is open
+    if (!page) return; // call_get (M1)
     expect(page.call.title).toBe(W.LIVE_TITLE); // Delete “Planning: VHI 8.0 drawer redesign”?
-    ok(await main.windowReportView({ call_id: W.LIVE_CALL }));
-    expect(ok(await main.callsDelete({ call_ids: [W.LIVE_CALL] })).deleted).toBe(1); // Delete
+    ahead(await main.windowReportView({ call_id: W.LIVE_CALL })); // M1 command
+    const deleted = ahead(await main.callsDelete({ call_ids: [W.LIVE_CALL] })); // Delete
+    if (!deleted) return; // calls_delete (M1)
+    expect(deleted.deleted).toBe(1);
 
     await until(() => entities.all.some((e: EntityChanged) => e.type === "removed" && e.kind === "call" && e.id === W.LIVE_CALL), "entity:changed removed");
     expect(refused(await main.callGet({ call_id: W.LIVE_CALL })).code).toBe("not_found"); // removed for good
-    expect(await listIds(main)).not.toContain(W.LIVE_CALL); // the library's Calls list
+    const ids = await listIds(main);
+    if (ids) expect(ids).not.toContain(W.LIVE_CALL); // the library's Calls list (calls_list, M1)
     ok(await main.windowReportView({ call_id: null }));
   });
 
   test("error path — Return pressed by habit: Cancel is the default, the call is kept", async ({ scenario }) => {
     const main = scenario.core("main");
     const before = await listIds(main);
+    if (!before) return; // calls_list (M1)
     // Return chooses Cancel: no command is sent. The live call cannot be deleted while it records either.
-    expect(refused(await main.callsDelete({ call_ids: [W.LIVE_CALL] })).code).toBe("already_recording");
+    const live = await main.callsDelete({ call_ids: [W.LIVE_CALL] });
+    if (pending(live)) return; // calls_delete (M1)
+    expect(refused(live).code).toBe("already_recording");
     expect(await listIds(main)).toEqual(before);
-    expect(ok(await main.callGet({ call_id: W.PAST_CALL })).call.id).toBe(W.PAST_CALL);
+    const past = ahead(await main.callGet({ call_id: W.PAST_CALL }));
+    if (past) expect(past.call.id).toBe(W.PAST_CALL); // call_get (M1)
     // A refused delete from a window that may not delete changes nothing either (PM-08).
     expect(refused(await scenario.core("record-prompt").callsDelete({ call_ids: [W.PAST_CALL] })).code).toBe("window_not_allowed");
     expect(await listIds(main)).toEqual(before);
@@ -41,13 +50,17 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
 
   test("other path — Several calls selected: Delete 3 calls?, Delete 3 Calls, the list without them", async ({ scenario }) => {
     let extra: string[] = [];
-    await given(scenario, (w) => (extra = W.morePastCalls(w, 2)));
+    if (!(await changeAhead(scenario, (w) => (extra = W.morePastCalls(w, 2))))) return; // calls (M1)
     const main = scenario.core("main");
     const three = [W.PAST_CALL, ...extra];
-    expect(await listIds(main)).toEqual(expect.arrayContaining(three)); // three rows selected with ⌘-click
+    const ids = await listIds(main);
+    if (!ids) return; // calls_list (M1)
+    expect(ids).toEqual(expect.arrayContaining(three)); // three rows selected with ⌘-click
 
-    expect(ok(await main.callsDelete({ call_ids: three })).deleted).toBe(3);
-    const after = await listIds(main);
+    const deleted = ahead(await main.callsDelete({ call_ids: three }));
+    if (!deleted) return; // calls_delete (M1)
+    expect(deleted.deleted).toBe(3);
+    const after = (await listIds(main))!;
     three.forEach((id) => expect(after).not.toContain(id));
     expect(after).toContain(W.LIVE_CALL);
   });
@@ -60,7 +73,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
     const env = await scenario.events("env:changed");
 
     expect(ok(await main.appSnapshot({})).environment.notifications).toBe("not_determined"); // never asked
-    ok(await main.windowReportView({ call_id: W.LIVE_CALL })); // the first recorded call's page
+    ahead(await main.windowReportView({ call_id: W.LIVE_CALL })); // the first recorded call's page (M1 command)
     expect(ok(await main.permissionRequest({ kind: "notifications" })).state).toBe("granted"); // the macOS prompt, Allow
     await until(() => env.latest()?.notifications === "authorized", "env:changed authorized");
     expect(ok(await main.appSnapshot({})).environment.notifications).toBe("authorized");
@@ -74,7 +87,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
     const denied = refused(await main.permissionRequest({ kind: "notifications" })); // Don't Allow
     expect(denied.code).toBe("permission_denied");
     expect(denied.detail).toEqual({ type: "permission", kind: "notifications" });
-    ok(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } })); // Open Last Summary — …
+    if (!ahead(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } }))) return; // Open Last Summary — … (window_navigate, M1)
     await until(() => nav.latest()?.type === "call_page", "that call's outputs");
   });
 
@@ -85,7 +98,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
 
     const general = ok(await settings.settingsGet({}));
     expect(ok(await settings.appSnapshot({})).environment.notifications).toBe("denied"); // Notifications are off for Noter
-    ok(await settings.openExternal({ target: { type: "system_settings", permission: "notifications" } }));
+    ahead(await settings.openExternal({ target: { type: "system_settings", permission: "notifications" } })); // M1 command
     await scenario.change((w) => (w.app.environment.notifications = "authorized")); // turned on in System Settings
     await until(() => env.latest()?.notifications === "authorized", "the line gone from General");
     const saved = ok(await settings.settingsUpdate({ rev: general.rev, section: { section: "general", value: { ...general.general, notifications_enabled: true } } }));

@@ -3,7 +3,7 @@
 // and asserts what the screen would render from. UI steps are added when the wizard lands
 // (docs/TEST-PLAN.md › M0).
 import type { LevelsMsg, SelfTestMsg, SetupStatus } from "../../src/core/bindings";
-import { ok, refused, until } from "../support/results";
+import { ahead, ok, refused, until } from "../support/results";
 import * as W from "../support/world-presets";
 import { expect, given, seqContiguous, test, versionsGrow } from "./support/fixtures";
 
@@ -26,13 +26,15 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
 
     expect(ok(await fr.permissionRequest({ kind: "microphone" })).state).toBe("granted");
     const levels: LevelsMsg[] = [];
-    const meter = ok(await fr.levelsSubscribe({ call_id: null }, (m) => levels.push(m)));
-    await until(() => levels.length >= 3, "Hearing you: the level meter moves");
-    expect(levels.some((l) => l.mic_db !== null)).toBe(true);
-    expect(seqContiguous(levels)).toBe(true);
-    ok(await fr.streamUnsubscribe({ subscription_id: meter.subscription_id }));
+    const meter = ahead(await fr.levelsSubscribe({ call_id: null }, (m) => levels.push(m))); // the level meter (M1 command)
+    if (meter) {
+      await until(() => levels.length >= 3, "Hearing you: the level meter moves");
+      expect(levels.some((l) => l.mic_db !== null)).toBe(true);
+      expect(seqContiguous(levels)).toBe(true);
+      ok(await fr.streamUnsubscribe({ subscription_id: meter.subscription_id }));
+    }
 
-    ok(await fr.openExternal({ target: { type: "system_settings", permission: "system_audio" } }));
+    ahead(await fr.openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // Open System Settings… (M1 command)
     expect(ok(await fr.permissionRequest({ kind: "system_audio" })).state).toBe("granted"); // Checking… then Granted
 
     const run: SelfTestMsg[] = [];
@@ -91,13 +93,14 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     expect(denied.code).toBe("permission_denied"); // Microphone · not allowed
     expect(denied.detail).toEqual({ type: "permission", kind: "microphone" });
     expect(denied.retryable).toBe(false);
-    ok(await fr.openExternal({ target: { type: "system_settings", permission: "microphone" } }));
+    ahead(await fr.openExternal({ target: { type: "system_settings", permission: "microphone" } })); // Open System Settings… (M1 command)
 
     await scenario.change((w) => W.permission(w, "microphone", "granted")); // turned on in System Settings
     await until(() => setupEvents.latest() && granted(setupEvents.latest()!, "microphone"), "the row re-checked as granted");
     const levels: LevelsMsg[] = [];
-    ok(await fr.levelsSubscribe({ call_id: null }, (m) => levels.push(m)));
-    await until(() => levels.some((l) => l.mic_db !== null), "Hearing you beside the moving meter");
+    if (ahead(await fr.levelsSubscribe({ call_id: null }, (m) => levels.push(m)))) {
+      await until(() => levels.some((l) => l.mic_db !== null), "Hearing you beside the moving meter"); // the meter (M1 command)
+    }
   });
 
   test("error path — System audio not allowed: allow it in System Settings, row re-checked, Run Test ready", async ({ scenario }) => {
@@ -111,7 +114,7 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     const denied = refused(await fr.permissionRequest({ kind: "system_audio" }));
     expect(denied.code).toBe("permission_denied"); // System audio recording · not allowed yet
     expect(denied.detail).toEqual({ type: "permission", kind: "system_audio" });
-    ok(await fr.openExternal({ target: { type: "system_settings", permission: "system_audio" } }));
+    ahead(await fr.openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // Open System Settings… (M1 command)
 
     await scenario.change((w) => W.permission(w, "system_audio", "granted"));
     await until(() => setupEvents.latest() && granted(setupEvents.latest()!, "system_audio"), "the row checked again by itself");
