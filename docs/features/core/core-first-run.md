@@ -202,7 +202,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 **Steps**:
 1. [ ] - `p1` - **FOR EACH** bundle not `ready`, required-for-capture bundles first - `inst-for-bundles`
-   1. [ ] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second - `inst-try-download`
+   1. [ ] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second; the HTTP fetcher is noter-llm's `RangeFetcher`, the egress gate, since noter-core opens no connection (backend decision D11) - `inst-try-download`
    2. [ ] - `p1` - **CATCH** a network failure: state `paused`, error `offline` - `inst-catch-offline`
    3. [ ] - `p1` - Verify the checksum (`verifying`); on mismatch delete the partial file, state `checksum_failed` - `inst-verify`
    4. [ ] - `p1` - Move the verified file into `models/` (0600) and mark the bundle `ready` - `inst-move-ready`

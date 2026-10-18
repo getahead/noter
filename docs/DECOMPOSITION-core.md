@@ -68,8 +68,8 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 | --- | --- | --- | --- | --- |
 | M0 | 7 | 22 | 3 | written |
 | M1 | 5 | 36 | 13 | written |
-| M2 | 9 | 39 | 10 | written |
-| M3 | 5 | 41 | 13 | written |
+| M2 | 9 | 41 | 10 | written |
+| M3 | 5 | 39 | 13 | written |
 | M4 | 2 | 23 | 6 | written |
 | M5 | 3 | 11 | 4 | written |
 | Total | 31 | 172 | 49 | 31 written |
@@ -82,21 +82,22 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - Native macOS (`cpt-noter-component-core-native`): permissions, environment, login item and updates in M0; panels, menu bar, notifications and windows in M1; launch, clipboard, save panels and the screen-share test in M2.
 - The transcript (`cpt-noter-component-core-transcript`): live persistence, streams and replay in M1; corrections in M2.
 - The change log (`cpt-noter-component-core-changelog`): the write path in M0, undo, redo and History in M2, proposals in M5. Storage (`cpt-noter-component-core-storage`): writer and migrations in M0, backups, integrity and recovery in M5. Jobs (`cpt-noter-component-core-jobs`): scheduler and pipeline jobs in M2, maintenance and evidence in M5.
+- Keys and runtime availability (`cpt-noter-flow-core-credentials-privacy-keys`, `cpt-noter-algo-core-credentials-privacy-availability`, `cpt-noter-algo-core-credentials-privacy-secret-boundary`, `cpt-noter-state-core-credentials-privacy-key`, and the component `cpt-noter-component-core-credentials`): `accounts_get` and `api_key_set` (steps 1 to 5 of the flow, the availability algorithm, the secret boundary for API keys, the key state except removal) in M2 with the LLM gate; `api_key_remove` and the rest in M3 with credentials (discrepancy 1).
 - Two sequences are split at a seam: `cpt-noter-seq-core-call-end-outputs` (the stop half in M1, the outputs half in M2) and `cpt-noter-seq-core-live-tick` (the transcript half in M1, the tick half in M4).
 - Interfaces are declared once by the contract feature and implemented elsewhere: `cpt-noter-interface-core-ipc` is served by the IPC host and run over stdio by the harness; `cpt-noter-interface-engine-stdio` is spoken by the three engine features; `cpt-noter-interface-skill-outputs` is validated by the LLM router and the post-call pipeline.
 
 **Discrepancies found** between DESIGN-core, PRD › Roadmap and milestones and `harness/milestones.toml`. This decomposition follows `milestones.toml` in each case; none needs a contract change.
 
-1. **Model runtime credentials come after the first model runs.** Post-call outputs (M2) need an LLM runtime, but `api_key_set`, `accounts_get` and `cli_install` are placed in M3. In M2 the router uses a key already in the Keychain or a local Ollama, and the E2E flows use the scripted runtime. Owner to decide whether `api_key_set` and `accounts_get` move to M2.
-2. **Model download is a job in DESIGN-core, but the scheduler comes later.** DESIGN-core lists model download among the pipeline jobs of `noter-jobs`; `models_download` is M0, the scheduler arrives with post-call in M2 and the Jobs commands in M5. M0 runs the download as a setup task; M2 moves it onto the scheduler without changing the contract.
-3. **First run needs commands placed in M1.** DESIGN-core allows `levels_subscribe` from the first-run and Settings windows and first run opens System Settings panes and leaves to the main window, but `levels_subscribe`, `open_external` and `window_navigate` are M1. In M0 the first-run levels come from the self-test Channel; QA should not count those three commands in M0.
-4. **Calendar.** PRD › Roadmap lists "calendar" under v1.x, while DESIGN-core reads EventKit in v1 (new-meeting detection and Today) and `milestones.toml` places the Calendar permission in M0 and `today_get` in M2. This decomposition reads the PRD's v1.x calendar as the calendar integration as a knowledge source and keeps EventKit reads in v1 (M1 detection, M2 Today).
-5. **Two "week one" tests.** PRD › Roadmap makes week one of M0 a throwaway Swift spike (sandbox attribution Q4, streaming policy); DESIGN-core Q7 names "the M1 week-one test (engine kills during capture)". Both are kept: the Q4 spike in `cpt-noter-feature-core-engine-foundation` (M0), the Q7 drill in `cpt-noter-feature-core-engine-capture` (M1).
+1. **Model runtime credentials come after the first model runs.** Post-call outputs (M2) need an LLM runtime, but `api_key_set`, `accounts_get` and `cli_install` are placed in M3. **Decided by the owner (18 Oct): moved to M2.** `accounts_get` and `api_key_set` are delivered with `cpt-noter-feature-core-llm-gate`, so the M2 post-call runtime can be configured from the app; `cli_install`, key removal and own accounts stay in M3 with `cpt-noter-feature-core-credentials-privacy`. The E2E flows still use the scripted runtime.
+2. **Model download is a job in DESIGN-core, but the scheduler comes later.** DESIGN-core lists model download among the pipeline jobs of `noter-jobs`; `models_download` is M0, the scheduler arrives with post-call in M2 and the Jobs commands in M5. M0 runs the download as a setup task; M2 moves it onto the scheduler without changing the contract. **Confirmed by the owner (18 Oct).**
+3. **First run needs commands placed in M1.** DESIGN-core allows `levels_subscribe` from the first-run and Settings windows and first run opens System Settings panes and leaves to the main window, but `levels_subscribe`, `open_external` and `window_navigate` are M1. In M0 the first-run levels come from the self-test Channel; QA should not count those three commands in M0. **Confirmed by the owner (18 Oct).**
+4. **Calendar.** PRD › Roadmap lists "calendar" under v1.x, while DESIGN-core reads EventKit in v1 (new-meeting detection and Today) and `milestones.toml` places the Calendar permission in M0 and `today_get` in M2. This decomposition reads the PRD's v1.x calendar as the calendar integration as a knowledge source and keeps EventKit reads in v1 (M1 detection, M2 Today). **Confirmed by the owner (18 Oct).**
+5. **Two "week one" tests.** PRD › Roadmap makes week one of M0 a throwaway Swift spike (sandbox attribution Q4, streaming policy); DESIGN-core Q7 names "the M1 week-one test (engine kills during capture)". Both are kept: the Q4 spike in `cpt-noter-feature-core-engine-foundation` (M0), the Q7 drill in `cpt-noter-feature-core-engine-capture` (M1). **Confirmed by the owner (18 Oct).**
 6. **Footprint and dropout metrics.** DESIGN-core samples memory, CPU and thermal state every 10 s during capture into `metrics` and stores `dropout_ms` there, and `harness/perf.toml` has `call-memory-footprint` in M1; the Metrics component, the `metrics` table and the Performance commands are M5. In M1 footprint is measured by the harness scenario and gaps are stored in `gaps`; in-app sampling and roll-ups arrive with `cpt-noter-feature-core-metrics-performance`.
 7. **Audit visible one milestone late.** The egress gate writes `audit_log` from the first cloud run (M2), while `audit_list` and `audit_export` are M3, so for one milestone the audit exists but the Privacy pane cannot show it.
 8. **Summary notifications.** `cpt-noter-seq-notifications-allow-notifications` is M1, but the summary it is about arrives with post-call outputs in M2. M1 delivers the authorization path and NT-3; the "Summary ready" notification itself is M2.
-9. **Assistants step of first run.** `SetupStep::Assistants` exists in the M0 setup status, but connecting an assistant (`cpt-noter-seq-first-run-connect-assistant`) is M3. In M0 the step can only be skipped.
-10. **Lanes.** DESIGN-core puts the native component in `apps/desktop/src-tauri` and `noter-native`, which `docs/HARNESS.md` assigns to different lanes (core and engine). Features that touch both are marked and land as two pull requests.
+9. **Assistants step of first run.** `SetupStep::Assistants` exists in the M0 setup status, but connecting an assistant (`cpt-noter-seq-first-run-connect-assistant`) is M3. In M0 the step can only be skipped. **Confirmed by the owner (18 Oct).**
+10. **Lanes.** DESIGN-core puts the native component in `apps/desktop/src-tauri` and `noter-native`, which `docs/HARNESS.md` assigns to different lanes (core and engine). Features that touch both are marked and land as two pull requests. **Confirmed by the owner (18 Oct).**
 
 ## 2. Entries
 
@@ -880,9 +881,10 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
   - `LlmRuntime` with Claude Code, Codex and Ollama adapters; version pins; schema validation and retry
   - Run lockdown flags and the run-lockdown CI test
   - Egress gate: privacy mode, sensitive flag, redaction, `audit_log` before send; `llm_runs`
+  - `accounts_get` and `api_key_set` (owner decision of 18 Oct, discrepancy 1): runtime availability and verified API keys in the Keychain, steps 1 to 5 of `cpt-noter-flow-core-credentials-privacy-keys`
 
 - **Out of scope**:
-  - Key and account management UI commands (M3)
+  - Key removal, own accounts, CLI install and the Privacy pane commands (M3)
   - noter-mcp (M3)
 
 - **Requirements Covered** (the PRD has no requirement IDs; sections by name):
@@ -906,9 +908,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
   - [ ] `p3` - `cpt-noter-component-core-llm-router`
   - [ ] `p3` - `cpt-noter-component-core-privacy`
+  - [ ] `p3` - `cpt-noter-component-core-credentials` (shared with `cpt-noter-feature-core-credentials-privacy`; the M2 part is the Keychain code behind `api_key_set` and the availability behind `accounts_get`)
 
 - **API**:
-  - Events: `privacy:changed`
+  - Commands (frozen unless noted in DESIGN-core 3.3): `accounts_get`, `api_key_set`
+  - Events: `privacy:changed`, `accounts:changed`
   - Interface `cpt-noter-interface-llm-runtime`
   - Interface `cpt-noter-interface-skill-outputs`
 
@@ -1392,7 +1396,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - **Depends On**: `cpt-noter-feature-core-llm-gate`, `cpt-noter-feature-core-first-run`
 
 - **Scope**:
-  - API keys, own accounts, agent binding with Undo
+  - API key removal, own accounts, agent binding with Undo (`accounts_get` and `api_key_set` are M2, `cpt-noter-feature-core-llm-gate`)
   - CLI install as a job
   - Audit list and export; `storage_move` (draft, Q4)
 
@@ -1420,7 +1424,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
   - [ ] `p4` - `cpt-noter-component-core-credentials`
 
 - **API**:
-  - Commands (frozen unless noted in DESIGN-core 3.3): `accounts_get`, `api_key_set`, `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`, `audit_list`, `audit_export`, `storage_move`
+  - Commands (frozen unless noted in DESIGN-core 3.3): `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`, `audit_list`, `audit_export`, `storage_move`
   - Events: `accounts:changed`, `signin:progress`
 
 - **Sequences** (DESIGN-core sequences, then the DESIGN.md stories this feature delivers for the E2E gate):
