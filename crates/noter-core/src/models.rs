@@ -9,7 +9,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use noter_protocol::model::*;
@@ -25,25 +25,18 @@ const MARGIN_MB: u32 = 500;
 /// Progress goes out at most twice a second.
 const PROGRESS_EVERY: Duration = Duration::from_millis(500);
 
-/// Whether `url` is an https URL on a host the egress allow-list names for model downloads.
+/// Whether `url` is an https URL on a host the egress allow-list (`noter_protocol::egress`,
+/// the source of `contracts/egress-hosts.json`) names for model downloads.
 pub fn allowed_download_url(url: &str) -> bool {
-    static HOSTS: OnceLock<Vec<String>> = OnceLock::new();
-    let hosts = HOSTS.get_or_init(|| {
-        let list: serde_json::Value =
-            serde_json::from_str(include_str!("../../../contracts/egress-hosts.json"))
-                .unwrap_or_default();
-        list["allow_without_audit"]["model_downloads"]["hosts"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|h| h.as_str().map(str::to_string))
-            .collect()
-    });
+    let mut hosts = noter_protocol::egress::ALLOW_WITHOUT_AUDIT
+        .iter()
+        .filter(|g| g.name == "model_downloads")
+        .flat_map(|g| g.hosts.iter());
     let Some(rest) = url.strip_prefix("https://") else {
         return false;
     };
     let host = rest.split(['/', ':', '?', '#']).next().unwrap_or("");
-    hosts.iter().any(|h| h == host)
+    hosts.any(|h| *h == host)
 }
 
 fn ceil_mb(bytes: u64) -> u32 {
