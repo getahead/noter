@@ -15,7 +15,6 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
-pub use log::LOG_MESSAGE_MAX;
 
 /// Time as the core sees it (a fixed clock in tests and the harness).
 pub trait Clock: Send + Sync {
@@ -46,11 +45,22 @@ pub trait EventEmitter: Send + Sync {
 pub struct CoreDeps {
     pub clock: Arc<dyn Clock>,
     pub events: Arc<dyn EventEmitter>,
+    /// The app's version as the host knows it (`app_snapshot.app_version`); `dev` until set.
+    pub app_version: String,
 }
 
 impl CoreDeps {
     pub fn new(clock: Arc<dyn Clock>, events: Arc<dyn EventEmitter>) -> Self {
-        Self { clock, events }
+        Self {
+            clock,
+            events,
+            app_version: "dev".into(),
+        }
+    }
+
+    pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
+        self.app_version = version.into();
+        self
     }
 }
 
@@ -92,16 +102,17 @@ impl Core {
             Ok(store) => store,
             Err(e) => {
                 let record =
-                    json!({ "level": "error", "module": "storage", "message": e.to_string() });
+                    json!({ "level": "error", "module": "storage", "code": open_error_kind(&e) });
                 let _ = log.write(object(record), deps.clock.now().0);
                 return Err(BootError::Store(e));
             }
         };
+        let snapshot = app::fresh_snapshot(&deps.app_version);
         Ok(Core {
             deps,
             store,
             log,
-            app: Mutex::new(app::fresh_snapshot()),
+            app: Mutex::new(snapshot),
         })
     }
 
@@ -216,7 +227,7 @@ impl CoreApi for Core {
             "window": window,
             "screen": args.screen,
             "code": args.code,
-            "message": args.message,
+            "message_len": args.message.chars().count(),
         });
         // @cpt-end:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-call
         // @cpt-begin:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-scrub
@@ -229,6 +240,18 @@ impl CoreApi for Core {
         // @cpt-begin:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-return
         Ok(Ack {})
         // @cpt-end:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-return
+    }
+}
+
+/// What kind of failure stopped the store, for the log (its text may quote stored data).
+fn open_error_kind(e: &OpenError) -> &'static str {
+    match e {
+        OpenError::Io(_) => "io",
+        OpenError::Corrupt(_) => "corrupt",
+        OpenError::SchemaAhead { .. } => "schema_ahead",
+        OpenError::Migration { .. } => "migration_failed",
+        OpenError::InvalidMigrations(_) => "invalid_migrations",
+        OpenError::Sqlite(_) => "sqlite",
     }
 }
 
