@@ -7,7 +7,7 @@ use serde::Serialize;
 
 /// The app snapshot of a core that just started: every slice at version 1. Slices whose
 /// feature comes later hold its first-run defaults until that feature owns them.
-pub(crate) fn fresh_snapshot() -> AppSnapshot {
+pub(crate) fn fresh_snapshot(app_version: &str) -> AppSnapshot {
     let v1 = StateVersion(1);
     let permissions: Vec<PermissionRow> = [
         PermissionKind::Microphone,
@@ -40,7 +40,7 @@ pub(crate) fn fresh_snapshot() -> AppSnapshot {
     .collect();
     AppSnapshot {
         contract_version: CONTRACT_VERSION.into(),
-        app_version: env!("CARGO_PKG_VERSION").into(),
+        app_version: app_version.into(),
         window: WindowLabel::Main,
         setup: SetupStatus {
             version: v1,

@@ -1,4 +1,5 @@
-//! The local log (`logs/noter.log`, JSON lines, mode 0600): never transcript, document or model text.
+//! The local log (`logs/noter.log`, JSON lines, mode 0600): never transcript, document or model
+//! text, and no free text at all: a line holds allow-listed fields with identifiers and numbers.
 
 use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::Write;
@@ -8,8 +9,8 @@ use std::sync::Mutex;
 
 use serde_json::{Map, Value};
 
-/// Longest free-text value (characters) a log line keeps.
-pub const LOG_MESSAGE_MAX: usize = 200;
+/// Longest identifier a log line keeps (a screen, a command, an id).
+const ID_MAX: usize = 64;
 
 /// The only fields a log line may carry.
 const ALLOWED: &[&str] = &[
@@ -22,13 +23,14 @@ const ALLOWED: &[&str] = &[
     "id",
     "duration_ms",
     "count",
-    "message",
+    "message_len",
 ];
 
 pub(crate) struct Logger(Mutex<File>);
 
 impl Logger {
     pub(crate) fn open(data_dir: &Path) -> std::io::Result<Logger> {
+        // shortcut: the log has no size bound yet; rotation is M5 maintenance (core-maintenance).
         let dir = data_dir.join("logs");
         DirBuilder::new().recursive(true).mode(0o700).create(&dir)?;
         let file = OpenOptions::new()
@@ -66,15 +68,18 @@ pub(crate) fn scrub(record: Map<String, Value>) -> Map<String, Value> {
         .collect();
     // @cpt-end:cpt-noter-algo-core-ipc-host-scrub-log:p1:inst-allow-list
     // @cpt-begin:cpt-noter-algo-core-ipc-host-scrub-log:p1:inst-truncate
-    for value in kept.values_mut() {
-        if let Value::String(text) = value {
-            if text.chars().count() > LOG_MESSAGE_MAX {
-                *text = text.chars().take(LOG_MESSAGE_MAX).collect();
-            }
-        }
-    }
+    kept.retain(|_, v| v.as_str().map_or(true, is_identifier));
     // @cpt-end:cpt-noter-algo-core-ipc-host-scrub-log:p1:inst-truncate
     // @cpt-begin:cpt-noter-algo-core-ipc-host-scrub-log:p1:inst-return-scrubbed
     kept
     // @cpt-end:cpt-noter-algo-core-ipc-host-scrub-log:p1:inst-return-scrubbed
+}
+
+/// Text a log may keep: a short identifier (`call-page`, `transcript_subscribe`, `noter-db:2`).
+fn is_identifier(text: &str) -> bool {
+    !text.is_empty()
+        && text.len() <= ID_MAX
+        && text
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':'))
 }
