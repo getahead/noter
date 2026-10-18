@@ -24,6 +24,7 @@ design: docs/DESIGN-core.md
   - [Detect a call](#detect-a-call)
   - [Recover from an engine crash during capture](#recover-from-an-engine-crash-during-capture)
   - [Replay a span](#replay-a-span)
+  - [Complete the self-test on the capture pipeline](#complete-the-self-test-on-the-capture-pipeline)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Live ASR loop](#live-asr-loop)
   - [System audio silence detection](#system-audio-silence-detection)
@@ -161,6 +162,23 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 2. [ ] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
 3. [ ] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
 4. [ ] - `p1` - **RETURN** - `inst-return-replay`
+
+### Complete the self-test on the capture pipeline
+
+- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-self-test`
+
+**Actor**: Engine supervisor (on behalf of `self_test_run`)
+
+**Success Scenarios**:
+- The self-test of `cpt-noter-flow-core-engine-foundation-self-test` runs on the capture pipeline: both channels on one clock, and a recognised line per channel once the live model is present.
+
+**Error Scenarios**:
+- The live model is not downloaded: no `self_test_line`; the result is judged on the buffers alone, as in M0.
+
+**Steps**:
+1. [ ] - `p1` - Engine opens the tap and the microphone for the self-test on one clock, as for a session - `inst-self-test-one-clock`
+2. [ ] - `p1` - **IF** the live model is present, engine emits `self_test_line` per channel - `inst-self-test-lines`
+3. [ ] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
 
 ## 3. Processes / Business Logic (CDSL)
 
