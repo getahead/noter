@@ -285,7 +285,12 @@ describe("snapshot, then stream (R23/R24)", () => {
     typed(refused(await s.core("settings").selfTestRun({ play_clip: false }, (m) => got.push(m))), "model_missing");
     expect(got).toEqual([]); // the Channel never opened
     expect(ok(await s.core("settings").setupStatus({})).self_test.type).toBe("not_run");
-    await s.change((w) => w.app.setup.models.bundles.forEach((b) => Object.assign(b, { state: "ready", done_mb: b.size_mb })));
+    // The model arrived and the audio permissions were granted meanwhile: the real core's self-test checks the microphone first.
+    await s.change((w) => {
+      w.app.setup.models.bundles.forEach((b) => Object.assign(b, { state: "ready", done_mb: b.size_mb }));
+      W.permission(w, "microphone", "granted");
+      W.permission(w, "system_audio", "granted");
+    });
     ok(await s.core("settings").selfTestRun({ play_clip: false }, (m) => got.push(m)));
     await until(() => got.some((m) => m.event.type === "ended"), "the self-test stream to end");
     expect(ok(await s.core("settings").setupStatus({})).self_test.type).toBe("passed");
