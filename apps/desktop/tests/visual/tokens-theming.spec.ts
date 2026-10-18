@@ -9,7 +9,19 @@ import { expect, test, type Page } from "@playwright/test";
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 const css = read("../../src/styles/tokens.css");
 // The prototype of record, with its own appearance blocks (docs/prototype/clickable/src/css).
-const prototype = ["00-base", "01-macos27", "02-contrast"].map((f) => read(`../../../../docs/prototype/clickable/src/css/${f}.css`)).join("\n");
+const proto = (f: string) => read(`../../../../docs/prototype/clickable/src/css/${f}.css`);
+const prototype = ["00-base", "01-macos27", "02-contrast"].map(proto).join("\n");
+const groups = ["10-a", "20-b", "30-c", "40-d", "50-e", "60-f"];
+// The prototype's component sheets as production ports them: 00-base without its token blocks and
+// motion rule (tokens.css replaces them), then 01-macos27 and the screen groups, all after tokens.css.
+const base = proto("00-base");
+const components = [base.slice(base.indexOf("}", base.indexOf(':root[data-theme="dark"]')) + 1).replace(/@media \(prefers-reduced-motion: reduce\)[^\n]*\n/, ""), proto("01-macos27"), ...groups.map(proto)].join("\n");
+const wholePrototype = ["00-base", "01-macos27", "02-contrast", ...groups].map(proto).join("\n");
+// Increase Contrast values changed from the prototype to meet WCAG 2.2 AA (PRD AC5; FEATURE spec › Additional Context).
+const deviations: Record<string, Record<string, string>> = {
+  "light-contrast": { "--accent-text": "#0060C9" },
+  "dark-contrast": { "--accent-text": "#6DB4FF" },
+};
 
 const colours = [
   "win-bg", "side-bg", "content-bg", "card-bg", "ctrl-bg", "label", "label-2", "label-3", "label-dis", "sep",
@@ -80,6 +92,7 @@ test.describe("cpt-noter-state-ui-tokens-theming-appearance matches the prototyp
       const expected = Object.fromEntries(Object.entries(await rootTokens(page)).filter(([n]) => !/^--(wall|desk|chrome)-/.test(n)));
       // Production drops the blur through --glass-blur; the prototype does it per surface (02-contrast.css).
       if (media.contrast === "more") expected["--glass-blur"] = "none";
+      Object.assign(expected, deviations[state]);
       await page.setContent(`<style>${css}</style>`);
       const actual = await rootTokens(page);
       expect(Object.keys(expected).length).toBeGreaterThan(40);
@@ -136,6 +149,50 @@ test.describe("cpt-noter-flow-ui-tokens-theming-follow-appearance", () => {
     expect(await style(".np-btn--primary", "box-shadow")).toBe("none");
     await page.keyboard.press("Tab");
     expect(await style(".np-btn:focus-visible", "outline")).toMatch(/3px solid rgb\(0, 100, 209\)|rgb\(0, 100, 209\) solid 3px/);
+  });
+
+  // The prototype's component sheets load after tokens.css and carry rules as specific as `:root .np-btn`
+  // (`.np-toolbar .np-btn`); the Increase Contrast treatments must still win, as they do in the prototype.
+  const controls = `<div class="np-toolbar"><button class="np-btn">Share</button><button class="np-btn np-btn--quiet">Quiet</button>
+      <button class="np-btn np-btn--primary">Record</button><span class="np-popup"><select><option>All</option></select></span>
+      <div class="np-toolbar__nav">n</div><div class="np-search">q</div></div>
+    <button class="np-btn">Cancel</button><span class="np-popup"><select><option>A</option></select></span><input class="np-field__input">
+    <span class="np-check__box"></span><span class="np-radio__dot"></span><span class="np-toggle__track"></span>
+    <span class="np-badge">Draft</span><span class="np-lang">EN</span><div class="np-sidebar">s</div><div class="np-menu">m</div><div class="np-pop">p</div>`;
+  const treatments = (page: Page) =>
+    page.evaluate(() => [...document.body.querySelectorAll("*:not(style)")].map((el) => {
+      const s = getComputedStyle(el);
+      return [el.className || el.tagName, s.boxShadow, s.backdropFilter || s.getPropertyValue("-webkit-backdrop-filter")];
+    }));
+  for (const state of ["light-contrast", "dark-contrast"] as const) {
+    test(`Increase Contrast treatments win over the component sheets loaded after tokens.css (${state})`, async ({ page }) => {
+      await page.emulateMedia(states[state]);
+      const theme = state === "dark-contrast" ? ' data-theme="dark"' : "";
+      await page.setContent(`<html data-contrast="more"${theme}><body><style>${wholePrototype}</style>${controls}</body></html>`);
+      const expected = await treatments(page);
+      await page.setContent(`<html><body><style>${css}</style><style>${components}</style>${controls}</body></html>`);
+      const actual = await treatments(page);
+      expect(actual.find(([c]) => c === "np-btn")?.[1]).toMatch(/0px 0px 0px 1px inset/);
+      expect(actual).toEqual(expected);
+    });
+  }
+
+  test("Increase Contrast fills the destructive button, the icon badge and the failed step dot in --error-fill", async ({ page }) => {
+    const markup = `<button class="np-btn np-btn--destructive np-btn--primary">Delete</button><span class="np-ibtn__badge">3</span>
+      <div class="f-steps__i is-err"><span class="f-steps__dot">2</span></div>`;
+    // no transitions: .np-btn eases its background, and the check reads it right after each appearance change
+    await page.setContent(`<html><body><style>${css}</style><style>${components} * { transition: none !important; }</style>${markup}</body></html>`);
+    const fills = () => page.evaluate(() => [".np-btn", ".np-ibtn__badge", ".f-steps__dot"].map((sel) => {
+      const s = getComputedStyle(document.querySelector(sel)!);
+      return [s.backgroundColor, s.color];
+    }));
+    const white = "rgb(255, 255, 255)";
+    await page.emulateMedia(states["dark-contrast"]);
+    expect(await fills()).toEqual(Array(3).fill(["rgb(196, 81, 75)", white]));
+    await page.emulateMedia(states["light-contrast"]);
+    expect(await fills()).toEqual(Array(3).fill(["rgb(196, 40, 28)", white]));
+    await page.emulateMedia(states.dark); // the system red outside Increase Contrast, as in the prototype
+    expect(await fills()).toEqual(Array(3).fill(["rgb(255, 69, 58)", white]));
   });
 
   test("Reduce motion zeroes transitions and animations except the row spinner and level meters", async ({ page }) => {

@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { checkContrast, contrastRatio, resolveTokens, rootBlocks } from "./tokens";
+import { checkContrast, contrastRatio, resolveTokens, rootBlocks, TEXT_PAIRS } from "./tokens";
 
 const css = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
 
@@ -35,6 +35,19 @@ describe("tokens.css", () => {
   // cpt-noter-dod-ui-tokens-theming-contrast-check
   it.each(["LIGHT_CONTRAST", "DARK_CONTRAST"] as const)("meets WCAG 2.2 AA under Increase Contrast (%s)", (appearance) => {
     expect(checkContrast(resolveTokens(css, appearance))).toEqual([]);
+  });
+
+  it("checks the prototype's text pairs outside DESIGN's table: token chips and white on the error fill", () => {
+    expect(TEXT_PAIRS).toContainEqual(["--accent-text", "--sel-accent"]);
+    expect(TEXT_PAIRS).toContainEqual(["--accent-text", "--sel-accent", "--card-bg"]);
+    expect(TEXT_PAIRS).toContainEqual(["--on-accent", "--error-fill"]);
+    // the prototype's values miss AA (PR #30): 4.29 light, 4.27 dark (3.77 on a card), 2.82 on the dark error fill
+    const proto = { ...resolveTokens(css, "DARK_CONTRAST"), "--accent-text": "#4DA3FF", "--error-fill": "#FF6961" };
+    expect(checkContrast(proto)).toEqual([
+      "--accent-text on --sel-accent: 4.27 < 4.5",
+      "--accent-text on --sel-accent over --card-bg: 3.77 < 4.5",
+      "--on-accent on --error-fill: 2.82 < 4.5"]);
+    expect(checkContrast({ ...resolveTokens(css, "LIGHT_CONTRAST"), "--accent-text": "#0064D1" })).toEqual(["--accent-text on --sel-accent: 4.29 < 4.5", "--accent-text on --sel-accent over --card-bg: 4.29 < 4.5"]);
   });
 
   it("reports every pair below its target", () => {

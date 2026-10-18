@@ -138,35 +138,41 @@ export function contrastRatio(fg: string, bg: string, base?: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** Pairs of DESIGN's colour table (3.2 › Colour tokens, Contrast targets): [foreground, background]. */
+/** Pairs of DESIGN's colour table (3.2 › Colour tokens, Contrast targets) and the prototype's text pairs outside
+ *  it (accent text on the accent selection of token chips, white on the error fill): [foreground, background,
+ *  opaque base under a translucent background, default the content background]. */
 const TEXT = ["--label", "--label-2", "--label-3", "--accent-text", "--rec", "--error", "--warning", "--success"];
 const TINTS = ["--sel-unemph", "--sel-accent", "--match", "--evidence", "--diff-ins", "--diff-del", "--error-tint", "--warning-tint", "--success-tint", "--info-tint"];
-export const TEXT_PAIRS: [string, string][] = [
-  ...TEXT.flatMap((t): [string, string][] => [[t, "--content-bg"], [t, "--card-bg"]]),
+export type Pair = [fg: string, bg: string, base?: string];
+export const TEXT_PAIRS: Pair[] = [
+  ...TEXT.flatMap((t): Pair[] => [[t, "--content-bg"], [t, "--card-bg"]]),
   ["--on-accent", "--accent-fill"],
-  ...TINTS.map((bg): [string, string] => ["--label", bg]),
+  ...TINTS.map((bg): Pair => ["--label", bg]),
+  ["--accent-text", "--sel-accent"],
+  ["--accent-text", "--sel-accent", "--card-bg"],
+  ["--on-accent", "--error-fill"],
 ];
-export const NON_TEXT_PAIRS: [string, string][] = ["--ctrl-border", "--accent", "--accent-fill", "--focus-ring", "--rec", "--error", "--warning", "--success"].map((t) => [t, "--content-bg"]);
+export const NON_TEXT_PAIRS: Pair[] = ["--ctrl-border", "--accent", "--accent-fill", "--focus-ring", "--rec", "--error", "--warning", "--success"].map((t) => [t, "--content-bg"]);
 
 // @cpt-algo:cpt-noter-algo-ui-tokens-theming-check-contrast:p1
 // @cpt-dod:cpt-noter-dod-ui-tokens-theming-contrast-check:p1
 export function checkContrast(tokens: Tokens, textPairs = TEXT_PAIRS, nonTextPairs = NON_TEXT_PAIRS): string[] {
   const failures: string[] = [];
-  const check = (fg: string, bg: string, min: number) => {
-    const ratio = contrastRatio(tokens[fg], tokens[bg], tokens["--content-bg"]);
-    if (ratio < min) failures.push(`${fg} on ${bg}: ${ratio.toFixed(2)} < ${min}`);
+  const check = ([fg, bg, base]: Pair, min: number) => {
+    const ratio = contrastRatio(tokens[fg], tokens[bg], tokens[base ?? "--content-bg"]);
+    if (ratio < min) failures.push(`${fg} on ${bg}${base ? ` over ${base}` : ""}: ${ratio.toFixed(2)} < ${min}`);
   };
   // @cpt-begin:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-for-each-text
-  for (const [fg, bg] of textPairs) {
+  for (const pair of textPairs) {
     // @cpt-begin:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-text-ratio
-    check(fg, bg, 4.5);
+    check(pair, 4.5);
     // @cpt-end:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-text-ratio
   }
   // @cpt-end:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-for-each-text
   // @cpt-begin:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-for-each-nontext
-  for (const [fg, bg] of nonTextPairs) {
+  for (const pair of nonTextPairs) {
     // @cpt-begin:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-nontext-ratio
-    check(fg, bg, 3);
+    check(pair, 3);
     // @cpt-end:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-nontext-ratio
   }
   // @cpt-end:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-for-each-nontext

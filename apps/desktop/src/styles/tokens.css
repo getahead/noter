@@ -21,6 +21,8 @@
   --accent: #007AFF; --accent-fill: #007AFF; --accent-text: #0068DA; --on-accent: #FFFFFF;
   --sel-unemph: rgba(0,0,0,.06); --sel-accent: rgba(0,122,255,.16);
   --rec: #FF3B30; --error: #FF3B30; --warning: #FF9500; --success: #28CD41;
+  /* fill under white text (destructive button, icon badge, failed step dot); not in the prototype, which fills with --error */
+  --error-fill: #FF3B30;
   --error-tint: rgba(255,59,48,.12); --warning-tint: rgba(255,149,0,.13); --success-tint: rgba(40,205,65,.13); --info-tint: rgba(0,122,255,.09);
   --match: rgba(255,204,0,.45); --evidence: rgba(0,122,255,.14);
   --diff-ins: rgba(40,205,65,.18); --diff-del: rgba(255,59,48,.16);
@@ -51,7 +53,7 @@
     --sep: rgba(255,255,255,.10); --ctrl-border: rgba(255,255,255,.22); --ctrl-border-soft: rgba(255,255,255,.10);
     --accent: #0A84FF; --accent-fill: #0A84FF; --accent-text: #419CFF; --on-accent: #FFFFFF;
     --sel-unemph: rgba(255,255,255,.08); --sel-accent: rgba(10,132,255,.30);
-    --rec: #FF453A; --error: #FF453A; --warning: #FF9F0A; --success: #32D74B;
+    --rec: #FF453A; --error: #FF453A; --warning: #FF9F0A; --success: #32D74B; --error-fill: #FF453A;
     --error-tint: rgba(255,69,58,.18); --warning-tint: rgba(255,159,10,.18); --success-tint: rgba(50,215,75,.16); --info-tint: rgba(10,132,255,.16);
     --match: rgba(255,214,10,.38); --evidence: rgba(10,132,255,.24);
     --diff-ins: rgba(50,215,75,.22); --diff-del: rgba(255,69,58,.22);
@@ -66,14 +68,17 @@
 }
 
 /* Increase Contrast: the AA-checked values of 02-contrast.css; materials lose their blur.
-   Glass stays 94 % light / 96 % dark and the dark focus ring is #4DA3FF, as in the prototype (owner decision). */
+   Glass stays 94 % light / 96 % dark and the dark focus ring is #4DA3FF, as in the prototype (owner decision).
+   Changed from the prototype to meet WCAG 2.2 AA (PRD AC5), smallest step on the same hue: accent text on the
+   accent selection of token chips, light #0064D1 -> #0060C9 (4.29 -> 4.56:1) and dark #4DA3FF -> #6DB4FF
+   (4.27 -> 5.14:1, 3.77 -> 4.54:1 on a card); white on the dark error fill #FF6961 -> #C4514B (2.82 -> 4.54:1). */
 @media (prefers-contrast: more) {
   :root {
     --label: #1D1D1F; --label-2: #616161; --label-3: #616161; --label-dis: rgba(0,0,0,.40);
     --sep: rgba(0,0,0,.25); --ctrl-border: rgba(0,0,0,.60); --ctrl-border-soft: rgba(0,0,0,.35);
-    --accent: #0064D1; --accent-fill: #0064D1; --accent-text: #0064D1;
+    --accent: #0064D1; --accent-fill: #0064D1; --accent-text: #0060C9;
     --sel-accent: rgba(0,100,209,.18);
-    --rec: #C4281C; --error: #C4281C; --warning: #A85A00; --success: #1E7E34;
+    --rec: #C4281C; --error: #C4281C; --warning: #A85A00; --success: #1E7E34; --error-fill: #C4281C;
     --side-bg: #F3F3F3; --glass-bg: rgba(255,255,255,.94); --glass-bg-strong: #FFFFFF;
     --glass-blur: none;
     --focus-ring: 0 0 0 3px #0064D1;
@@ -83,9 +88,9 @@
   :root {
     --label: #F2F2F2; --label-2: #AAAAAA; --label-3: #AAAAAA; --label-dis: rgba(255,255,255,.40);
     --sep: rgba(255,255,255,.25); --ctrl-border: rgba(255,255,255,.60); --ctrl-border-soft: rgba(255,255,255,.35);
-    --accent: #0A84FF; --accent-fill: #0A6FE0; --accent-text: #4DA3FF;
+    --accent: #0A84FF; --accent-fill: #0A6FE0; --accent-text: #6DB4FF;
     --sel-accent: rgba(10,132,255,.30);
-    --rec: #FF6961; --error: #FF6961; --warning: #FF9F0A; --success: #30D158;
+    --rec: #FF6961; --error: #FF6961; --warning: #FF9F0A; --success: #30D158; --error-fill: #C4514B;
     --side-bg: #232323; --glass-bg: rgba(38,38,40,.96); --glass-bg-strong: #2A2A2A;
     --focus-ring: 0 0 0 3px #4DA3FF;
   }
@@ -93,15 +98,18 @@
 
 /* Component treatments of 02-contrast.css under Increase Contrast, without the prototype's toggle:
    solid tag and chip outlines, a solid focus outline, control borders, and no blur on glass surfaces.
-   `:root` keeps them above the component rules, as the prototype's `:root:not(…)` does. */
+   The component sheets load after this one and carry rules such as `.np-toolbar .np-btn`; `:root:root`
+   gives the treatments the specificity they have in 02-contrast.css (0-3-0: root, toggle attribute, class) so they win. */
 @media (prefers-contrast: more) {
-  :root .np-badge, :root .np-lang, :root .np-agent, :root .np-prov--chip, :root .np-token { box-shadow: inset 0 0 0 1px currentColor; }
-  :root :focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
-  :root .np-btn, :root .np-popup select, :root .np-field__input, :root .np-check__box,
-  :root .np-radio__dot, :root .np-toggle__track { box-shadow: inset 0 0 0 1px var(--ctrl-border); }
-  :root .np-btn--primary { box-shadow: none; }
-  :root .np-sidebar, :root .np-menu, :root .np-pop, :root .np-toolbar .np-btn, :root .np-toolbar__nav,
-  :root .np-toolbar .np-search { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :root:root .np-badge, :root:root .np-lang, :root:root .np-agent, :root:root .np-prov--chip, :root:root .np-token { box-shadow: inset 0 0 0 1px currentColor; }
+  :root:root :focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  :root:root .np-btn, :root:root .np-popup select, :root:root .np-field__input, :root:root .np-check__box,
+  :root:root .np-radio__dot, :root:root .np-toggle__track { box-shadow: inset 0 0 0 1px var(--ctrl-border); }
+  :root:root .np-btn--primary { box-shadow: none; }
+  :root:root .np-sidebar, :root:root .np-menu, :root:root .np-pop, :root:root .np-toolbar .np-btn, :root:root .np-toolbar__nav,
+  :root:root .np-toolbar .np-search { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  /* white text sits on --error-fill, which differs from --error in dark (see the token block above) */
+  :root:root .np-btn--destructive.np-btn--primary, :root:root .np-ibtn__badge, :root:root .f-steps__i.is-err .f-steps__dot { background: var(--error-fill); }
 }
 
 /* Reduce transparency (DESIGN; the prototype has no such state): every material opaque in the
