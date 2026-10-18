@@ -524,3 +524,54 @@ fn the_fixture_file_round_trips_through_the_types() {
     assert_eq!(file, fixtures::world());
 }
 // @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-roundtrip
+
+/// The `type` tags of an internally tagged enum, read from its JSON Schema.
+fn variant_tags<T: schemars::JsonSchema>() -> Vec<String> {
+    let schema = serde_json::to_value(schemars::schema_for!(T)).unwrap();
+    let mut tags: Vec<String> = schema["oneOf"]
+        .as_array()
+        .expect("tagged enum")
+        .iter()
+        .map(|v| {
+            v["properties"]["type"]["const"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect();
+    tags.sort();
+    tags
+}
+
+/// Swift's round-trip tests read these lines (`contracts/fixtures/engine-lines.json`), so an engine
+/// command or event without an example, or an example that does not survive serde, fails here.
+#[test]
+fn engine_example_lines_cover_every_command_and_event() {
+    use noter_protocol::engine::*;
+    use noter_protocol::fixtures::engine_lines;
+    fn tags<T: serde::Serialize>(lines: &[T]) -> Vec<String> {
+        let mut t: Vec<String> = lines
+            .iter()
+            .map(|l| {
+                let v = serde_json::to_value(l).unwrap();
+                let body = v.get("cmd").or_else(|| v.get("event")).unwrap();
+                body["type"].as_str().unwrap().to_string()
+            })
+            .collect();
+        t.sort();
+        t
+    }
+    let (cmds, events) = (engine_lines::commands(), engine_lines::events());
+    assert_eq!(tags(&cmds), variant_tags::<EngineCommand>());
+    assert_eq!(tags(&events), variant_tags::<EngineEvent>());
+    for l in &cmds {
+        let back: EngineCommandLine =
+            serde_json::from_str(&serde_json::to_string(l).unwrap()).unwrap();
+        assert_eq!(&back, l);
+    }
+    for l in &events {
+        let back: EngineEventLine =
+            serde_json::from_str(&serde_json::to_string(l).unwrap()).unwrap();
+        assert_eq!(&back, l);
+    }
+}

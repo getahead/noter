@@ -6,6 +6,7 @@
 //! * `apps/desktop/src/core/bindings.ts`   TypeScript types, command/event maps, typed client
 //! * `contracts/ipc.manifest.json`         commands, events, error codes as data
 //! * `contracts/engine.schema.json`        engine stdio protocol (→ Swift Codable)
+//! * `contracts/fixtures/engine-lines.json` one example line per engine command and event (Swift round-trip tests)
 //! * `contracts/mcp-tools.schema.json`     noter-mcp tool input/output schemas
 //! * `contracts/skills/*.schema.json`      LLM skill output schemas
 //! * `contracts/fixtures/world.json`       typed fixtures for the fake core
@@ -443,6 +444,17 @@ fn main() {
         &root,
         "contracts/engine.schema.json",
         &pretty(&engine),
+        check,
+        &mut diffs,
+    );
+    let lines = json!({
+        "commands": noter_protocol::fixtures::engine_lines::commands(),
+        "events": noter_protocol::fixtures::engine_lines::events(),
+    });
+    write(
+        &root,
+        "contracts/fixtures/engine-lines.json",
+        &pretty(&lines),
         check,
         &mut diffs,
     );
