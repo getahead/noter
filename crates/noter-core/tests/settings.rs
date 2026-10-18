@@ -656,3 +656,38 @@ async fn the_same_new_term_from_two_windows_is_a_duplicate_not_an_error() {
         1
     );
 }
+
+#[tokio::test]
+async fn a_native_surface_is_recorded_on_its_settings_change_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    // The menu bar's privacy toggle writes as the user, through that surface.
+    let menu_bar = CommandCtx {
+        caller: Caller::Native {
+            surface: noter_protocol::ipc::NativeSurface::MenuBar,
+        },
+    };
+    let privacy = noter_core::default_settings().privacy;
+    core.settings_update(&menu_bar, update(1, SettingsSection::Privacy(privacy)))
+        .await
+        .unwrap();
+    core.glossary_upsert(&settings_window(), term("VSTOR"))
+        .await
+        .unwrap();
+    let c = Connection::open(dir.path().join("noter.db")).unwrap();
+    let mut s = c
+        .prepare("SELECT actor, surface FROM changes ORDER BY rowid")
+        .unwrap();
+    let rows: Vec<(String, Option<String>)> = s
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("you".to_string(), Some("menu_bar".to_string())),
+            ("you".to_string(), None)
+        ]
+    );
+}
