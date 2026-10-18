@@ -87,10 +87,7 @@ async fn the_snapshot_answers_for_the_calling_window_with_every_slice_at_version
         snap.banners.version,
         snap.environment.version,
     ];
-    assert!(
-        versions.iter().all(|v| *v == StateVersion(1)),
-        "{versions:?}"
-    );
+    assert!(versions.iter().all(|v| *v == StateVersion(1)));
     assert_eq!(snap.capture.phase, CapturePhase::Idle);
     assert!(!snap.setup.complete);
     assert!(snap.banners.banners.is_empty() && snap.degraded.states.is_empty());
@@ -277,14 +274,14 @@ async fn core_log_records_keep_only_the_allow_list() {
     });
     core.log(record.as_object().unwrap().clone());
     let text = log_text(dir.path());
-    assert!(!text.contains(secret), "{text}");
+    assert!(!text.contains(secret));
     let line: Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
     assert_eq!(line["command"], "transcript_subscribe");
     assert_eq!(
         (line["count"].clone(), line["duration_ms"].clone()),
         (json!(3), json!(12))
     );
-    assert_eq!(line.as_object().unwrap().len(), 7, "{line}");
+    assert_eq!(line.as_object().unwrap().len(), 7);
 }
 
 #[tokio::test]
