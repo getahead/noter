@@ -7,9 +7,11 @@ use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader, ReadBuf};
 use tokio::process::{Child, ChildStdout, Command};
 
 /// The two pipes of one engine: the core writes command lines to `stdin` and reads event
@@ -30,6 +32,7 @@ pub struct ProcessLauncher {
     program: PathBuf,
     args: Vec<OsString>,
     app_group: Option<PathBuf>,
+    stderr_lines: Arc<AtomicU64>,
 }
 
 impl ProcessLauncher {
@@ -38,7 +41,14 @@ impl ProcessLauncher {
             program: program.into(),
             args: Vec::new(),
             app_group: None,
+            stderr_lines: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Lines the engines wrote to stderr. They are counted, never kept: the engine must not
+    /// write content there, and anything it writes stays out of the core's scrubbed log.
+    pub fn stderr_lines(&self) -> u64 {
+        self.stderr_lines.load(Ordering::Relaxed)
     }
 
     // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-resolve
@@ -75,11 +85,11 @@ impl EngineLauncher for ProcessLauncher {
     // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-spawn
     async fn launch(&self) -> io::Result<EngineIo> {
         let mut cmd = Command::new(&self.program);
-        // stderr is the engine's log and goes to the core's log; stdout carries protocol only.
+        // stdout carries protocol only; stderr is drained and counted (see `stderr_lines`).
         cmd.args(&self.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::piped())
             .kill_on_drop(true);
         if let Some(dir) = &self.app_group {
             cmd.env("NOTER_APP_GROUP_DIR", dir);
@@ -87,6 +97,14 @@ impl EngineLauncher for ProcessLauncher {
         let mut child = cmd.spawn()?;
         let stdin = child.stdin.take().expect("stdin is piped");
         let stdout = child.stdout.take().expect("stdout is piped");
+        let stderr = child.stderr.take().expect("stderr is piped");
+        let count = self.stderr_lines.clone();
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(_)) = lines.next_line().await {
+                count.fetch_add(1, Ordering::Relaxed);
+            }
+        });
         Ok(EngineIo {
             stdin: Box::new(stdin),
             stdout: Box::new(OwnedStdout {
