@@ -17,6 +17,7 @@ use noter_core::{
     BoxFuture as CoreFuture, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
     EventEmitter, FetchError, ModelSource, NativeServices, SystemClock, Updater,
 };
+use noter_engine_client::scripted::ScriptedEngine;
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
@@ -83,6 +84,7 @@ impl Harness {
         let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
             .with_native(native.clone())
             .with_models(models.clone())
+            .with_engine(Arc::new(ScriptedEngine::new()))
             .with_updater(updater.clone());
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core

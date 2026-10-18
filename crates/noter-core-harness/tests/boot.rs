@@ -239,6 +239,33 @@ async fn world_set_rereads_the_models_folder_for_the_bundles_it_changes() {
 }
 
 #[tokio::test]
+async fn the_scripted_engine_lets_the_self_test_pass() {
+    let mut r = start().await;
+    let id = r.next;
+    r.next += 1;
+    let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
+    r.input
+        .write_all(format!("{req}\n").as_bytes())
+        .await
+        .unwrap();
+    let mut seen = vec![];
+    loop {
+        let line = r.line().await;
+        seen.push(
+            line["message"]["event"]["type"]
+                .as_str()
+                .unwrap_or("")
+                .to_string(),
+        );
+        if line["event"] == "setup:changed" && line["payload"]["self_test"]["type"] == "passed" {
+            break;
+        }
+    }
+    assert!(seen.iter().any(|t| t == "passed"), "{seen:?}");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_refuses_derived_setup_fields_the_core_would_compute_otherwise() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
