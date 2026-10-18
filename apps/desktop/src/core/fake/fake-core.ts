@@ -33,6 +33,7 @@ import {
   type EventPayloads,
   type FakeWorld,
   type PlaybackState,
+  type StreamEndReason,
   type Transport,
   type WindowLabel,
 } from "../bindings";
@@ -226,8 +227,14 @@ export class FakeCore implements Transport {
     this.channels.set(subscription, { cmd, send, seq: fromSeq });
   }
 
-  /** End a Channel (`stream_unsubscribe`); later pushes to it are ignored. */
-  closeChannel(subscription: string): boolean {
+  /**
+   * End a Channel; later pushes to it are ignored. With a `reason`, its last message is
+   * `ended { reason }`, as the core's stream hub sends it (levels have no event to end with).
+   */
+  closeChannel(subscription: string, reason?: StreamEndReason): boolean {
+    if (reason && this.channels.get(subscription)?.cmd !== "levels_subscribe") {
+      this.push(subscription, { event: { type: "ended", reason } } as ChannelBody);
+    }
     return this.channels.delete(subscription);
   }
 
