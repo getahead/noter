@@ -128,12 +128,11 @@
 }
 
 /* Reduce motion: zero durations rather than `none`, so transitionend and animationend still fire.
-   The level meters carry state and keep moving (DESIGN › Motion); the row spinner stands still, as in the
-   prototype, and its working text says the job runs on. */
+   The row spinner and the level meters carry state and keep moving (DESIGN › Motion). */
 @media (prefers-reduced-motion: reduce) {
-  *:not(.np-meter):not(.np-meter *),
-  *:not(.np-meter):not(.np-meter *)::before,
-  *:not(.np-meter):not(.np-meter *)::after {
+  *:not(.np-spin):not(.np-meter):not(.np-meter *),
+  *:not(.np-spin):not(.np-meter):not(.np-meter *)::before,
+  *:not(.np-spin):not(.np-meter):not(.np-meter *)::after {
     transition-duration: 0s !important; transition-delay: 0s !important;
     animation-duration: 0s !important; animation-delay: 0s !important; animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;

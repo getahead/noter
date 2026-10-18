@@ -112,7 +112,7 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
 4. [x] - `p1` - **IF** Reduce transparency or Increase Contrast is on - `inst-if-opaque`
    1. [x] - `p1` - Make the sidebar, toolbar control groups, menus, popovers, alerts, the undo strip, the record prompt and the floating panel opaque in the window or card colour; drop the backdrop blur - `inst-opaque`
 5. [x] - `p1` - **IF** Reduce motion is on - `inst-if-motion`
-   1. [x] - `p1` - Set every transition and animation duration to zero except the level meters, which carry state (motion table of DESIGN); the row spinner stands still, as in the prototype, and its working text stays - `inst-no-motion`
+   1. [x] - `p1` - Set every transition and animation duration to zero except the row spinner and the level meters, which carry state (motion table of DESIGN) - `inst-no-motion`
 6. [x] - `p1` - **RETURN** the active token set - `inst-return-tokens`
 
 ### Check contrast
@@ -188,7 +188,7 @@ The system **MUST** run a unit test that reads the Increase Contrast values of t
 - [ ] Every custom property used by a component is defined in the token stylesheet; no component file holds a literal colour
 - [ ] In each of the four appearance states every token of the prototype resolves to the prototype's value, and the token sheet renders identically to its baseline (screenshot match ≥ 98 % in the pinned container). The primitives page compared with the prototype's renderings is an acceptance criterion of `cpt-noter-feature-ui-primitives`, which builds that page
 - [x] With Reduce transparency or Increase Contrast on, no element uses `backdrop-filter`
-- [x] With Reduce motion on, no transition or animation runs except the level meters; row spinners stand still
+- [x] With Reduce motion on, no transition or animation runs except row spinners and level meters
 - [x] The contrast test passes for light and dark Increase Contrast values
 
 ## 7. Additional Context
