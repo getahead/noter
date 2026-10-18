@@ -117,16 +117,18 @@ First run needs a self-test that proves both streams arrive, and everything afte
 
 **Steps**:
 1. [ ] - `p1` - Supervisor sends `self_test { play_clip, timeout_ms: 10000 }` - `inst-send-self-test`
-2. [ ] - `p1` - Engine opens the tap (excluding its own and the app's PIDs) and the microphone on one clock - `inst-open-taps`
-3. [ ] - `p1` - **FOR EACH** channel whose first non-zero buffer arrives, engine emits `self_test_stream` - `inst-stream-arrived`
-4. [ ] - `p1` - Engine emits levels and, when the model is present, `self_test_line` per channel - `inst-levels-lines`
+2. [x] - `p1` - Engine opens the tap (excluding its own and the app's PIDs) and the microphone - `inst-open-taps`
+3. [x] - `p1` - **FOR EACH** channel whose first non-zero buffer arrives, engine emits `self_test_stream` - `inst-stream-arrived`
+4. [x] - `p1` - Engine emits levels - `inst-levels-lines`
 5. [ ] - `p1` - **IF** `play_clip`, engine plays its clip and checks the tap does not hear it - `inst-play-clip`
-6. [ ] - `p1` - Engine emits `self_test_result { passed, failure, own_sounds_leak }` and closes the taps - `inst-result`
-7. [ ] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test`
+6. [x] - `p1` - Engine emits `self_test_result { passed, failure, own_sounds_leak }` and closes the taps - `inst-result`
+7. [x] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test`
+
+The tap and the microphone on one clock, and `self_test_line` per channel when the model is present, are delivered with capture in M1: `cpt-noter-flow-core-engine-capture-self-test` (decision D-12).
 
 ### Replay a recording in file mode
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-engine-foundation-file-mode`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-engine-foundation-file-mode`
 
 **Actor**: Test or golden-set replay
 
@@ -137,9 +139,9 @@ First run needs a self-test that proves both streams arrive, and everything afte
 - A file is missing or unreadable: `error { code: device_unavailable }` and exit.
 
 **Steps**:
-1. [ ] - `p1` - Start the engine with file arguments instead of devices - `inst-file-args`
-2. [ ] - `p1` - Engine emits `ready`, then events in file time (or as fast as possible with a flag) - `inst-file-events`
-3. [ ] - `p1` - **RETURN** when both files end, with `session_stopped` - `inst-file-return`
+1. [x] - `p1` - Start the engine with file arguments instead of devices - `inst-file-args`
+2. [x] - `p1` - Engine emits `ready`, then events in file time (or as fast as possible with a flag) - `inst-file-events`
+3. [x] - `p1` - **RETURN** when both files end, with `session_stopped` - `inst-file-return`
 
 ### Week-one spike
 
