@@ -13,7 +13,7 @@ const recording = (c: CaptureState) => c.phase === "recording" && c.call_id !== 
 test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   test("happy path: Record this call? → Record → call screen recording, focus stays in Teams", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
+    if (!(await changeAhead(scenario, "M1", W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const captures = await scenario.events("capture:state");
     const detected = await scenario.events("capture:detected");
@@ -41,7 +41,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
 
   test("other path — Vendor call recorded as sensitive: Record as Sensitive, nothing leaves the Mac", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.zoom))))) return; // detection (M1)
+    if (!(await changeAhead(scenario, "M1", W.idle, (w) => (detection = W.detect(w, W.APPS.zoom))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
 
     const started = ahead(await prompt.captureStart({ source: "record_prompt", sensitive: true, detection_id: detection.id }));
@@ -55,7 +55,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   });
 
   test("other path — Not a call: Don't Ask for Safari…, no more prompts, listed in Settings › General with Remove", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, W.idle, (w) => W.detect(w, W.APPS.safari)))) return; // detection (M1)
+    if (!(await changeAhead(scenario, "M1", W.idle, (w) => W.detect(w, W.APPS.safari)))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
@@ -71,7 +71,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   });
 
   test("error path — Not enough disk space: Record disabled, Delete Old Audio…, then Call Detected · Start Recording", async ({ scenario }) => {
-    const blocked = await changeAhead(scenario, W.idle, (w) => {
+    const blocked = await changeAhead(scenario, "M1", W.idle, (w) => {
       w.app.environment.disk_free_mb = 420;
       W.detect(w, W.APPS.teams, "disk_full");
     });
@@ -98,7 +98,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
   });
 
   test("error path — System audio access is off: only your side, Record still the default and records at once", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, W.idle, (w) => W.permission(w, "system_audio", "denied"), (w) => W.detect(w, W.APPS.teams)))) return; // detection (M1)
+    if (!(await changeAhead(scenario, "M1", W.idle, (w) => W.permission(w, "system_audio", "denied"), (w) => W.detect(w, W.APPS.teams)))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
 
     const snap = ok(await prompt.appSnapshot({}));
@@ -110,7 +110,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
     if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     // …and the call screen says System audio silent until it is allowed and Noter reopens.
-    if (!(await changeAhead(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) return; // degraded (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) return; // degraded (M1)
     expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.some((d) => d.type === "system_audio_silent")).toBe(true);
     ahead(await scenario.core("call-screen").openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // M1 command
   });
@@ -119,7 +119,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
 test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
   test("happy path: Not Now, then ⌃⌥⌘R minutes later records from that moment", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
+    if (!(await changeAhead(scenario, "M1", W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
@@ -133,7 +133,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
 
   test("empty path — Prompt closed unanswered: Call Detected · Start Recording from the menu, no second prompt", async ({ scenario }) => {
     let detection!: ReturnType<typeof W.detect>;
-    if (!(await changeAhead(scenario, W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
+    if (!(await changeAhead(scenario, "M1", W.idle, (w) => (detection = W.detect(w, W.APPS.teams))))) return; // detection (M1)
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
@@ -183,7 +183,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false })); // O1: never gated on permissions
     if (started) expect(recording(started)).toBe(true); // capture_start (M1)
     expect(ok(await main.permissionRequest({ kind: "microphone" })).state).toBe("granted"); // the macOS prompt, allowed
-    if (started && (await changeAhead(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) {
+    if (started && (await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) {
       expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.map((d) => d.type)).toContain("system_audio_silent"); // Recording · mic only (degraded, M1)
     }
 
@@ -198,7 +198,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     const hidden = ahead(await main.appSetHiddenForPresenting({ hidden: true }));
     if (!hidden) return; // app_set_hidden_for_presenting (M1)
     expect(hidden.hidden).toBe(true);
-    if (!(await changeAhead(scenario, (w) => W.detect(w, W.APPS.teams)))) return; // the call starts while hidden; detection (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => W.detect(w, W.APPS.teams)))) return; // the call starts while hidden; detection (M1)
 
     const snap = ok(await main.appSnapshot({}));
     expect(snap.presenting.hidden).toBe(true); // eye-slash mark; Show Noter in the menu

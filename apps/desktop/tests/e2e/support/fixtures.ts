@@ -17,6 +17,7 @@ import { test as base } from "@playwright/test";
 
 import type { CommandName, CoreError } from "../../../src/core/bindings";
 import { registerJsonModules } from "../../support/json-modules";
+import { isLaterMilestone } from "../../support/milestones";
 import type { Scenario, World } from "../../support/scenario";
 
 // The fake core imports the fixture world as JSON; see json-modules.ts. The scenario module
@@ -56,16 +57,17 @@ export async function given(scenario: Scenario, ...presets: Array<(w: World) => 
 }
 
 /**
- * `given` for a world slice that a later milestone's core owns (capture, detection, degraded,
- * calls, transcripts, copilot…): false while the real core answers `not_implemented` for that
- * slice, so the steps that need the state wait for that milestone. The fake always applies it.
+ * `given` for a world slice that `milestone`'s core owns (capture, detection, degraded, calls,
+ * transcripts, copilot…): false while the real core answers `not_implemented` for that slice
+ * and `milestone` is later than the current one, so the steps that need the state wait for it.
+ * Once `milestone` is current the refusal fails the test. The fake always applies it.
  */
-export async function changeAhead(scenario: Scenario, ...presets: Array<(w: World) => void>): Promise<boolean> {
+export async function changeAhead(scenario: Scenario, milestone: string, ...presets: Array<(w: World) => void>): Promise<boolean> {
   try {
     await given(scenario, ...presets);
     return true;
   } catch (e) {
-    if ((e as CoreError | null)?.code === "not_implemented") return false;
+    if ((e as CoreError | null)?.code === "not_implemented" && isLaterMilestone(milestone)) return false;
     throw e;
   }
 }
