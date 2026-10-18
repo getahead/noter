@@ -263,6 +263,14 @@ class LaneGuardTests(unittest.TestCase):
         self.assertEqual(run("sed -i 's/80.0/50.0/' harness/harness.toml", lane="ui"), 2)
         self.assertEqual(run("sed -i 's/a/b/' apps/desktop/src/x.ts", lane="ui"), 0)
 
+    def test_ci_lane_check_lets_screenshots_through_to_the_label_gate(self):
+        shot = "apps/desktop/tests/visual/__screenshots__/tokens.spec.ts/light.png"
+        with mock.patch.dict("os.environ", {"GITHUB_HEAD_REF": "lane/ui/tokens", "NOTER_LANE": "", "NOTER_ALLOW_BASELINE": ""}):
+            self.assertEqual(config_guard.lane_check([shot], CFG), [])
+            self.assertEqual(len(config_guard.lane_check(["evals/golden/a.json"], CFG)), 1)
+            self.assertEqual(len(config_guard.lane_check(["crates/noter-core/__screenshots__/a.png"], CFG)), 1)
+        self.assertIsNotNone(lane_guard.verdict(shot, "ui", CFG, committing=True))  # hand edits stay blocked
+
     def test_lane_from_branch_name(self):
         with mock.patch.dict("os.environ", {"NOTER_LANE": ""}), mock.patch("subprocess.run") as run:
             run.return_value.stdout = "lane/ui/today-screen\n"
