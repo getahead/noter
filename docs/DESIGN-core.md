@@ -835,7 +835,7 @@ Self-maintaining jobs are acceptable only if every change they make can be read 
 
 ##### Responsibility scope
 
-A write API every service uses: a mutation and its `changes` row commit in one transaction; batches get a `batch_id` and a delta blob for bulk edits. Undo (`change_undo`) restores `before` for each row not edited later and reports how many were skipped (`UndoResult.skipped_edited_later`). Redo (`change_redo` with the same `UndoTarget`, a change or a batch) works at any time on an undone change or batch whose rows were not edited later and writes new change rows; there is no redo token and no time window. Wrong states are refused with `already_undone`, `not_undone` or `not_undoable`, and `edited_later` when every row was edited later. Proposals are changes with status `proposed`; accepting applies them as one batch, rejecting records it, "Always for this term" writes the glossary rule. History and Activity read models; export to Markdown or JSON. Emits `proposals:counts`.
+A write API every service uses: a mutation and its `changes` row commit in one transaction; each row of a batch gets its own change row under the batch's `batch_id`. Undo (`change_undo`) restores `before` for each row not edited later and reports how many were skipped (`UndoResult.skipped_edited_later`). Redo (`change_redo` with the same `UndoTarget`, a change or a batch) works at any time on an undone change or batch whose rows were not edited later and writes new change rows; there is no redo token and no time window. Wrong states are refused with `already_undone`, `not_undone` or `not_undoable`, and `edited_later` when every row was edited later. Proposals are changes with status `proposed`; accepting applies them as one batch, rejecting records it, "Always for this term" writes the glossary rule. History and Activity read models; export to Markdown or JSON. Emits `proposals:counts`.
 
 ##### Responsibility boundaries
 
@@ -2565,7 +2565,7 @@ Knowledge sources; documents and chunks as in the PRD. Change from the PRD: adds
 
 **ID**: `cpt-noter-dbtable-changes`
 
-The change log; proposals are rows with status `proposed`. Change from the PRD: adds `summary`, `proposal_kind`, `undoable`, `redo_of`, `surface`; actor `user` is written `you`. A change to one column of one row is written as `field`, `before` and `after`; a change to several columns of one row, or a bulk edit of a batch, as `delta` `{"column": [before, after]}` over the columns that changed.
+The change log; proposals are rows with status `proposed`. Change from the PRD: adds `summary`, `proposal_kind`, `undoable`, `redo_of`, `surface`; actor `user` is written `you`. A change to one column of one row is written as `field`, `before` and `after`; a change to several columns of one row as `delta` `{"column": [before, after]}` over the columns that changed; each row of a batch gets its own change row under the batch's `batch_id`.
 
 **Schema**:
 
@@ -2576,7 +2576,7 @@ The change log; proposals are rows with status `proposed`. Change from the PRD: 
 | actor | TEXT | `you`, `job:<id>`, `llm_run:<id>` |
 | entity_type, entity_id | TEXT | Target |
 | field, before, after | TEXT NULL | One changed column |
-| delta | BLOB NULL | JSON `{"column": [before, after]}`: several changed columns of one row, or a bulk edit of a batch |
+| delta | BLOB NULL | JSON `{"column": [before, after]}`: several changed columns of one row |
 | summary, reason | TEXT | Plain words |
 | evidence_ids | TEXT | JSON list |
 | confidence | TEXT NULL | Level |
