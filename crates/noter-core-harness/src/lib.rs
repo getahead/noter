@@ -148,6 +148,7 @@ pub async fn serve_with<C: CoreApi, R: AsyncRead + Unpin>(
     let mut input = BufReader::new(input);
     let mut tasks = JoinSet::new();
     let mut buf = Vec::new();
+    // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-request
     while {
         buf.clear();
         input.read_until(b'\n', &mut buf).await? > 0
@@ -156,18 +157,25 @@ pub async fn serve_with<C: CoreApi, R: AsyncRead + Unpin>(
         if line.is_empty() {
             continue;
         }
+        // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-request
         let (core, controls, fails, out) = (
             core.clone(),
             controls.clone(),
             fails.clone(),
             output.lines(),
         );
+        // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-dispatch
         tasks.spawn(async move { dispatch(&*core, &*controls, &fails, &line, &out).await });
+        // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-dispatch
     }
+    // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-if-eof
+    // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-return-exit
     while tasks.join_next().await.is_some() {}
     controls.shutdown().await;
     output.lines.0.send(None).ok();
     output.writer.await.map_err(std::io::Error::other)?
+    // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-return-exit
+    // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-if-eof
 }
 
 // @cpt-algo:cpt-noter-algo-core-harness-dispatch:p1
@@ -180,6 +188,7 @@ async fn dispatch<C: CoreApi>(
     line: &str,
     out: &Lines,
 ) {
+    // @cpt-begin:cpt-noter-algo-core-harness-dispatch:p1:inst-parse-line
     let raw: Value = match serde_json::from_str(line) {
         Ok(v) => v,
         Err(_) => {
@@ -195,11 +204,16 @@ async fn dispatch<C: CoreApi>(
             return;
         }
     };
+    // @cpt-end:cpt-noter-algo-core-harness-dispatch:p1:inst-parse-line
+    // @cpt-begin:cpt-noter-algo-core-harness-dispatch:p1:inst-ctx-scope
     let ctx = CommandCtx {
         caller: Caller::Window { label: req.window },
     };
+    // @cpt-begin:cpt-noter-algo-core-harness-dispatch:p1:inst-channel-sink
     let held = req.channel.then(|| Held::new(req.id, out.clone()));
+    // @cpt-end:cpt-noter-algo-core-harness-dispatch:p1:inst-channel-sink
     let failed = lock(fails).remove(&(req.window, req.cmd.clone()));
+    // @cpt-begin:cpt-noter-algo-core-harness-dispatch:p1:inst-call
     let result = if req.cmd == "harness.fail_next" {
         fail_next(fails, req.args)
     } else if let Some(name) = req.cmd.strip_prefix("harness.") {
@@ -216,6 +230,11 @@ async fn dispatch<C: CoreApi>(
         )
         .await
     };
+    // @cpt-end:cpt-noter-algo-core-harness-dispatch:p1:inst-call
+    // @cpt-end:cpt-noter-algo-core-harness-dispatch:p1:inst-ctx-scope
+    // @cpt-begin:cpt-noter-algo-core-harness-dispatch:p1:inst-write-ordered
+    // @cpt-begin:cpt-noter-algo-core-harness-dispatch:p1:inst-return-dispatch
+    // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-write-result
     match result {
         Ok(ok) => {
             out.send(json!({ "id": req.id, "ok": ok }));
@@ -230,6 +249,9 @@ async fn dispatch<C: CoreApi>(
             }
         }
     }
+    // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-write-result
+    // @cpt-end:cpt-noter-algo-core-harness-dispatch:p1:inst-return-dispatch
+    // @cpt-end:cpt-noter-algo-core-harness-dispatch:p1:inst-write-ordered
 }
 
 fn fail_next(fails: &FailNext, args: Value) -> Result<Value, CoreError> {

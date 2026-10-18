@@ -53,6 +53,7 @@ pub struct Harness {
 
 impl Harness {
     /// Boots the core; `Err` with the reason when the data folder or the store cannot open.
+    // @cpt-algo:cpt-noter-algo-core-harness-boot:p1
     pub async fn start(options: Options, lines: Lines) -> Result<Arc<Harness>, String> {
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-temp-dir
         static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
@@ -69,6 +70,7 @@ impl Harness {
         } else {
             blank(world())
         };
+        // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-inject
         let native = Arc::new(ScriptedNative::new(&w.app.environment));
         let updater = Arc::new(ScriptedUpdater(Mutex::new(
             w.app.environment.update.clone(),
@@ -97,6 +99,7 @@ impl Harness {
             .with_models(models.clone())
             .with_engine(Arc::new(engine.clone()))
             .with_updater(updater.clone());
+        // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-inject
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
         let core = Arc::new(Core::open(&dir, deps).map_err(|e| e.to_string())?);
@@ -515,9 +518,11 @@ struct EventLines(Lines, Arc<AtomicBool>);
 
 impl EventEmitter for EventLines {
     fn emit(&self, event: &'static str, payload: Value) {
+        // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-write-events
         if !self.1.load(Ordering::SeqCst) {
             self.0.event(event, payload);
         }
+        // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-write-events
     }
 }
 

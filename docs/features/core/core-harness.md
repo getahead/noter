@@ -88,19 +88,19 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 **Steps**:
 1. [ ] - `p1` - Runner starts the binary with `--fixture world` (and optionally an engine script) - `inst-start`
-2. [ ] - `p1` - Harness runs `cpt-noter-algo-core-harness-boot` - `inst-boot`
-3. [ ] - `p1` - Runner writes a request line `{ id, window, cmd, args, channel }` - `inst-request`
-4. [ ] - `p1` - Harness runs `cpt-noter-algo-core-harness-dispatch` for the line - `inst-dispatch`
-5. [ ] - `p1` - Harness writes `{ id, ok }` or `{ id, error }`; for a subscribing command, then `{ id, message }` lines in `seq` order - `inst-write-result`
-6. [ ] - `p1` - Harness writes `{ event, payload }` for every event the core emits - `inst-write-events`
-7. [ ] - `p1` - **IF** stdin reaches its end - `inst-if-eof`
-   1. [ ] - `p1` - Shut the core down (streams end with `shutdown`), flush, **RETURN** exit code 0 - `inst-return-exit`
+2. [x] - `p1` - Harness runs `cpt-noter-algo-core-harness-boot` - `inst-boot`
+3. [x] - `p1` - Runner writes a request line `{ id, window, cmd, args, channel }` - `inst-request`
+4. [x] - `p1` - Harness runs `cpt-noter-algo-core-harness-dispatch` for the line - `inst-dispatch`
+5. [x] - `p1` - Harness writes `{ id, ok }` or `{ id, error }`; for a subscribing command, then `{ id, message }` lines in `seq` order - `inst-write-result`
+6. [x] - `p1` - Harness writes `{ event, payload }` for every event the core emits - `inst-write-events`
+7. [x] - `p1` - **IF** stdin reaches its end - `inst-if-eof`
+   1. [x] - `p1` - Shut the core down (streams end with `shutdown`), flush, **RETURN** exit code 0 - `inst-return-exit`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Boot the core on a fixture
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-boot`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-harness-boot`
 
 **Input**: Command-line options: fixture name, optional engine script, optional fixed clock.
 
@@ -111,27 +111,29 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 2. [x] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
 3. [x] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
    1. [x] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`
-4. [ ] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime - `inst-inject`
+4. [x] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime (the scripted runtime comes with llm-gate in M2, decision H2) - `inst-inject`
 5. [x] - `p1` - Build the `noter-core` composition root exactly as `src-tauri` does, with an event emitter that writes event lines - `inst-build-core`
 6. [x] - `p1` - **RETURN** ready; log the start to stderr only - `inst-return-booted`
 
 ### Dispatch a request line
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-dispatch`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-harness-dispatch`
 
 **Input**: One request line.
 
 **Output**: One result or error line, and Channel message lines after it for a subscribing command.
 
 **Steps**:
-1. [ ] - `p1` - Parse the line; a failure **RETURN** an error line with `invalid_input` - `inst-parse-line`
-2. [ ] - `p1` - Build `CommandCtx` with `Caller::Window { label: window }` and run the same scope check as the IPC host (`cpt-noter-algo-core-ipc-host-scope-check`) - `inst-ctx-scope`
-3. [ ] - `p1` - **IF** `channel` is true, create a `Sink` that holds messages until the result line is written, then writes `{ id, message }` lines - `inst-channel-sink`
-4. [ ] - `p1` - API: call the `CoreApi` method named by `cmd` with the parsed arguments - `inst-call`
-5. [ ] - `p1` - Write the result or error line, then release any held Channel messages in order - `inst-write-ordered`
-6. [ ] - `p1` - **RETURN** - `inst-return-dispatch`
+1. [x] - `p1` - Parse the line; a failure **RETURN** an error line with `invalid_input` - `inst-parse-line`
+2. [x] - `p1` - Build `CommandCtx` with `Caller::Window { label: window }` and run the same scope check as the IPC host (`cpt-noter-algo-core-ipc-host-scope-check`) - `inst-ctx-scope`
+3. [x] - `p1` - **IF** `channel` is true, create a `Sink` that holds messages until the result line is written, then writes `{ id, message }` lines - `inst-channel-sink`
+4. [x] - `p1` - API: call the `CoreApi` method named by `cmd` with the parsed arguments - `inst-call`
+5. [x] - `p1` - Write the result or error line, then release any held Channel messages in order - `inst-write-ordered`
+6. [x] - `p1` - **RETURN** - `inst-return-dispatch`
 
 ### Scripted engine
+
+> Delivered by `ScriptedEngine` in `crates/noter-engine-client` (engine lane, #67); the harness injects it in `inst-inject` above. The steps below are ticked in the engine lane's change, not in this core-lane PR.
 
 - [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-scripted-engine`
 
