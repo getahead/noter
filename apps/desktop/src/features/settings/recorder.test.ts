@@ -18,6 +18,11 @@ describe("recorderReduce", () => {
     expect(recorderReduce(s, { type: "registered" })).toEqual({ type: "IDLE" });
   });
 
+  it("keeps RECORDING while a modifier waits for its letter", () => {
+    const rec = recorderReduce(IDLE_RECORDER, { type: "start" });
+    expect(recorderReduce(rec, { type: "chord", result: { type: "wait" } })).toBe(rec);
+  });
+
   it("goes IDLE on Esc", () => {
     expect(run(IDLE_RECORDER, { type: "start" }, { type: "chord", result: { type: "cancel" } })).toEqual({ type: "IDLE" });
   });

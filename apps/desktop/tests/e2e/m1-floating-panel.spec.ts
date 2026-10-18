@@ -115,7 +115,7 @@ test.describe("cpt-noter-seq-floating-panel-collapse-strip", () => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
     if (!ahead(await screen.windowSetCollapsed({ collapsed: true }))) return; // window_set_collapsed (M1)
-    if (!(await changeAhead(scenario, (w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 })))) return; // capture notice (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 })))) return; // capture notice (M1)
 
     expect(ok(await screen.appSnapshot({})).capture.notice?.type).toBe("call_ended"); // the strip expands for the notice
     const kept = ahead(await screen.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "keep_recording" }));
@@ -159,7 +159,7 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
     if (!ahead(await screen.windowHideCall({}))) return; // window_hide_call (M1)
-    if (!(await changeAhead(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: W.LIVE_CALL, since: Date.now(), confidence: 0.8 })))) return; // degraded (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: W.LIVE_CALL, since: Date.now(), confidence: 0.8 })))) return; // degraded (M1)
 
     const shown = ahead(await scenario.core("main").windowShowCall({})); // clicking the notification
     if (shown) expect(shown.visible).toBe(true); // window_show_call (M1)

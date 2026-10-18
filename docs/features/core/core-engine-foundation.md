@@ -116,7 +116,7 @@ First run needs a self-test that proves both streams arrive, and everything afte
 - The live model is not downloaded: `failed` with `ModelMissing`.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sends `self_test { play_clip, timeout_ms: 10000 }` - `inst-send-self-test`
+1. [x] - `p1` - Supervisor sends `self_test { play_clip, timeout_ms: 10000 }` - `inst-send-self-test`
 2. [x] - `p1` - Engine opens the tap (excluding its own and the app's PIDs) and the microphone - `inst-open-taps`
 3. [x] - `p1` - **FOR EACH** channel whose first non-zero buffer arrives, engine emits `self_test_stream` - `inst-stream-arrived`
 4. [x] - `p1` - Engine emits levels - `inst-levels-lines`

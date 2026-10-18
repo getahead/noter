@@ -82,7 +82,7 @@ test.describe("cpt-noter-seq-menu-bar-check-state", () => {
   });
 
   test("error path — Switched to local: the line under the call, recording still running on the local model", async ({ scenario }) => {
-    const local = await changeAhead(scenario, (w) => {
+    const local = await changeAhead(scenario, "M1", (w) => {
       W.degrade(w, { type: "switched_to_local", call_id: W.LIVE_CALL, reason: "offline", retry_at: null });
       w.app.privacy.effective = "switched_to_local";
     });
@@ -112,7 +112,7 @@ test.describe("cpt-noter-seq-menu-bar-check-state", () => {
   test("other path — New meeting while hidden: Start as New Call from the menu, nothing on the shared screen", async ({ scenario }) => {
     const screen = scenario.core("call-screen");
     if (!ahead(await screen.appSetHiddenForPresenting({ hidden: true }))) return; // app_set_hidden_for_presenting (M1)
-    const notified = await changeAhead(scenario, (w) =>
+    const notified = await changeAhead(scenario, "M1", (w) =>
       W.notice(w, {
         type: "new_meeting",
         event: { id: "evt_anna", title: "1:1 with Anna K.", starts_at: Date.now(), ends_at: Date.now() + 30 * W.MIN },

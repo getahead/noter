@@ -45,4 +45,28 @@ describe("section draft", () => {
     const d = editDraft(editDraft(newDraft("general"), { a: 1 } as never), { b: 2 } as never);
     expect(d.edits).toEqual({ a: 1, b: 2 });
   });
+
+  it("records nested edits as leaves, so a newer sibling leaf survives the rebase", () => {
+    // the user flips only enablement; Restore Defaults changes the modifiers meanwhile
+    const d = editDraft(newDraft("copilot"), { card_keys: { enabled: false } });
+    expect(d.edits).toEqual({ card_keys: { enabled: false } });
+    const mods = { control: false, option: false, command: true };
+    const next = changed({ copilot: { ...base.copilot, card_keys: { enabled: true, modifiers: mods } } });
+    expect(toUpdateArgs(next, d)).toEqual({
+      rev: 6,
+      section: { section: "copilot", value: { ...base.copilot, card_keys: { enabled: false, modifiers: mods } } },
+    });
+  });
+
+  it("merges nested edits and lets a later edit of the same leaf win", () => {
+    let d = editDraft(newDraft("copilot"), { card_keys: { enabled: false } });
+    d = editDraft(d, { card_keys: { modifiers: { command: false } } });
+    d = editDraft(d, { card_keys: { enabled: true } });
+    expect(d.edits).toEqual({ card_keys: { enabled: true, modifiers: { command: false } } });
+  });
+
+  it("replaces arrays whole instead of merging them", () => {
+    const d = editDraft(editDraft(newDraft("copilot"), { muted_call_types: ["a", "b"] } as never), { muted_call_types: ["c"] } as never);
+    expect(d.edits).toEqual({ muted_call_types: ["c"] });
+  });
 });

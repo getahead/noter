@@ -49,7 +49,7 @@ jobs:
           # A plain (non-forced) push is refused if the branch moved since this run started.
           git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
-      - name: Remove the label and re-run CI on the new commit
+      - name: Remove the label and run the checks on the new commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -59,8 +59,16 @@ jobs:
         run: |
           api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$@"; }
           api -X DELETE "https://api.github.com/repos/$REPO/issues/$PR/labels/update-screenshots" >/dev/null || true
-          # Pushes made with GITHUB_TOKEN do not start workflows; a dispatch does.
+          # Pushes made with GITHUB_TOKEN do not start workflows; a dispatch does. Each run is
+          # filtered like a push to the PR: only the jobs its changes affect.
           if [ "$CHANGED" = "true" ]; then
-            api -X POST "https://api.github.com/repos/$REPO/actions/workflows/ci.yml/dispatches" -d "{\"ref\":\"$BRANCH\"}" \
-              || echo "::warning::Could not dispatch CI (it must exist on main first). Push any commit to the branch to re-run the checks."
+            for w in ci codeql; do
+              api -X POST "https://api.github.com/repos/$REPO/actions/workflows/$w.yml/dispatches" -d "{\"ref\":\"$BRANCH\"}" \
+                || echo "::warning::Could not dispatch $w.yml. Push any commit to the branch to run the checks."
+            done
+            for w in pr review; do
+              api -X POST "https://api.github.com/repos/$REPO/actions/workflows/$w.yml/dispatches" \
+                -d "{\"ref\":\"$BRANCH\",\"inputs\":{\"pr\":\"$PR\"}}" \
+                || echo "::warning::Could not dispatch $w.yml. Push any commit to the branch to run the checks."
+            done
           fi
