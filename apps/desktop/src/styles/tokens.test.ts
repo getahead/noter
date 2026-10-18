@@ -87,6 +87,15 @@ describe("tokens.css", () => {
     expect(resolveTokens(css, "DARK")["--glass-blur"]).toBe("blur(22px) saturate(185%)");
   });
 
+  it("styles the document from the tokens: body text, window background, no browser margin", () => {
+    // 00-base.css: body { color: var(--label); font: 13px/1.38 var(--font) }, on the window background
+    const body = /(?:^|\n)body\s*\{([^}]*)\}/.exec(css.replace(/\/\*[\s\S]*?\*\//g, ""))?.[1] ?? "";
+    expect(body).toMatch(/margin:\s*0\b/);
+    expect(body).toMatch(/background:\s*var\(--win-bg\)/);
+    expect(body).toMatch(/color:\s*var\(--label\)/);
+    expect(body).toMatch(/font:\s*13px\/1\.38 var\(--font\)/);
+  });
+
   it("keeps no prototype-only tokens or toggles", () => {
     expect(css).not.toMatch(/--(wall|desk|chrome)-|data-theme|data-contrast/);
   });
