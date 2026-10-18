@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-change-redo"
+description = "Enables the change_redo command without any pre-configured scope."
+commands.allow = ["change_redo"]
+
+[[permission]]
+identifier = "deny-change-redo"
+description = "Denies the change_redo command without any pre-configured scope."
+commands.deny = ["change_redo"]

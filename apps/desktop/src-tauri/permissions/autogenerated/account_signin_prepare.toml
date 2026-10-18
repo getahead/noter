@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-signin-prepare"
+description = "Enables the account_signin_prepare command without any pre-configured scope."
+commands.allow = ["account_signin_prepare"]
+
+[[permission]]
+identifier = "deny-account-signin-prepare"
+description = "Denies the account_signin_prepare command without any pre-configured scope."
+commands.deny = ["account_signin_prepare"]

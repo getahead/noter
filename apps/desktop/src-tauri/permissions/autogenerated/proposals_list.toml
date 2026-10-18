@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-proposals-list"
+description = "Enables the proposals_list command without any pre-configured scope."
+commands.allow = ["proposals_list"]
+
+[[permission]]
+identifier = "deny-proposals-list"
+description = "Denies the proposals_list command without any pre-configured scope."
+commands.deny = ["proposals_list"]

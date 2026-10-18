@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-card-set-held"
+description = "Enables the card_set_held command without any pre-configured scope."
+commands.allow = ["card_set_held"]
+
+[[permission]]
+identifier = "deny-card-set-held"
+description = "Denies the card_set_held command without any pre-configured scope."
+commands.deny = ["card_set_held"]

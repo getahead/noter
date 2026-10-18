@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-call-types-list"
+description = "Enables the call_types_list command without any pre-configured scope."
+commands.allow = ["call_types_list"]
+
+[[permission]]
+identifier = "deny-call-types-list"
+description = "Denies the call_types_list command without any pre-configured scope."
+commands.deny = ["call_types_list"]

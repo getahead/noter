@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-people-list"
+description = "Enables the people_list command without any pre-configured scope."
+commands.allow = ["people_list"]
+
+[[permission]]
+identifier = "deny-people-list"
+description = "Denies the people_list command without any pre-configured scope."
+commands.deny = ["people_list"]

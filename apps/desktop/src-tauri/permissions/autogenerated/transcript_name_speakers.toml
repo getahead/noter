@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-transcript-name-speakers"
+description = "Enables the transcript_name_speakers command without any pre-configured scope."
+commands.allow = ["transcript_name_speakers"]
+
+[[permission]]
+identifier = "deny-transcript-name-speakers"
+description = "Denies the transcript_name_speakers command without any pre-configured scope."
+commands.deny = ["transcript_name_speakers"]

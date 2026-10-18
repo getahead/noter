@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-account-use-existing"
+description = "Enables the account_use_existing command without any pre-configured scope."
+commands.allow = ["account_use_existing"]
+
+[[permission]]
+identifier = "deny-account-use-existing"
+description = "Denies the account_use_existing command without any pre-configured scope."
+commands.deny = ["account_use_existing"]

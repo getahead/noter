@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-storage-move"
+description = "Enables the storage_move command without any pre-configured scope."
+commands.allow = ["storage_move"]
+
+[[permission]]
+identifier = "deny-storage-move"
+description = "Denies the storage_move command without any pre-configured scope."
+commands.deny = ["storage_move"]

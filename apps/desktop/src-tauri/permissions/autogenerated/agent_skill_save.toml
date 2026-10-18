@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-agent-skill-save"
+description = "Enables the agent_skill_save command without any pre-configured scope."
+commands.allow = ["agent_skill_save"]
+
+[[permission]]
+identifier = "deny-agent-skill-save"
+description = "Denies the agent_skill_save command without any pre-configured scope."
+commands.deny = ["agent_skill_save"]

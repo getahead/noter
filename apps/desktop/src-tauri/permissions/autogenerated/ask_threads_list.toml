@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ask-threads-list"
+description = "Enables the ask_threads_list command without any pre-configured scope."
+commands.allow = ["ask_threads_list"]
+
+[[permission]]
+identifier = "deny-ask-threads-list"
+description = "Denies the ask_threads_list command without any pre-configured scope."
+commands.deny = ["ask_threads_list"]

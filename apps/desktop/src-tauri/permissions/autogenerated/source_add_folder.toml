@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-source-add-folder"
+description = "Enables the source_add_folder command without any pre-configured scope."
+commands.allow = ["source_add_folder"]
+
+[[permission]]
+identifier = "deny-source-add-folder"
+description = "Denies the source_add_folder command without any pre-configured scope."
+commands.deny = ["source_add_folder"]

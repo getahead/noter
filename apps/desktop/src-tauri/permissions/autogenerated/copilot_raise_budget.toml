@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-copilot-raise-budget"
+description = "Enables the copilot_raise_budget command without any pre-configured scope."
+commands.allow = ["copilot_raise_budget"]
+
+[[permission]]
+identifier = "deny-copilot-raise-budget"
+description = "Denies the copilot_raise_budget command without any pre-configured scope."
+commands.deny = ["copilot_raise_budget"]
