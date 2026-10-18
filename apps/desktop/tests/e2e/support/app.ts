@@ -24,6 +24,8 @@ export interface CorePlan {
   latency?: number;
   /** The story's starting state (tests/support/world-presets.ts), applied before the window's first command. */
   world?: (world: World) => void;
+  /** The window's first bundle download ends in `checksum_failed` once (harness.corrupt_next_download), set before the page loads. */
+  corruptNextDownload?: boolean;
 }
 
 /** What the outside world does to the core behind an open window, as the scenario controls do. */
@@ -53,6 +55,10 @@ const HOOK = `
         (plan.fail ?? []).forEach((f) => this.failNext(f.cmd, f.code));
         if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
         if (plan.latency) this.latency = plan.latency;
+        if (plan.corruptNextDownload) {
+          if (!this.corruptNextDownload) throw new Error("the fake core has no corruptNextDownload yet (backend ask in _team/ui/e2e/M0-coverage.md)");
+          this.corruptNextDownload();
+        }
       })();
     }
     calls.push({ kind: "invoke", name: cmd, args: structuredClone(args) });
@@ -132,6 +138,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     push: async (cmd, body) => void (await control("harness.push", { cmd, body })),
   };
   if (plan.world) await steer.change(plan.world);
+  if (plan.corruptNextDownload) await control("harness.corrupt_next_download", {});
   for (const f of plan.fail ?? []) await steer.failNext(f.cmd, f.code);
   // A delivery may race a reload or the page closing; the new document ignores it anyway.
   const deliver = (doc: string, id: number, x: unknown) =>

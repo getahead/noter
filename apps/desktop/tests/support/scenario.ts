@@ -48,6 +48,8 @@ export const HARNESS_CONTROLS = {
   failNext: "harness.fail_next",
   /** `{ cmd, body }` → the scripted engine or runtime emits `body` on the newest open Channel of `cmd`. */
   push: "harness.push",
+  /** `{}` → the next bundle fetch serves wrong bytes once: `models_download` start ends in `checksum_failed`, retry reaches `ready`. */
+  corruptNextDownload: "harness.corrupt_next_download",
 } as const;
 
 /** Everything a listener of one event received, in order. */
@@ -70,6 +72,8 @@ export interface Scenario {
   change(mutate: (world: World) => void): Promise<void>;
   /** The next call of `cmd` from `window` fails with this error (an external failure the story names). */
   failNext(window: WindowLabel, cmd: CommandName, code: ErrorCode, detail?: ErrorDetail | null): Promise<void>;
+  /** The next `models_download` start ends in `checksum_failed`; the retry after it succeeds. */
+  corruptNextDownload(): Promise<void>;
   /** The engine or runtime sends a message on the newest open Channel of `cmd`. */
   push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null>;
   dispose(): Promise<void>;
@@ -109,6 +113,7 @@ abstract class BaseScenario implements Scenario {
   protected abstract transport(window: WindowLabel, fresh: boolean): Transport;
   abstract change(mutate: (world: World) => void): Promise<void>;
   abstract failNext(window: WindowLabel, cmd: CommandName, code: ErrorCode, detail?: ErrorDetail | null): Promise<void>;
+  abstract corruptNextDownload(): Promise<void>;
   abstract push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null>;
   protected abstract close(): Promise<void>;
 
@@ -175,6 +180,12 @@ class FakeScenario extends BaseScenario {
     this.fake(window, false).failNext(cmd, code, detail);
   }
 
+  async corruptNextDownload(): Promise<void> {
+    const fake = this.root as FakeCore & { corruptNextDownload?: () => void };
+    if (!fake.corruptNextDownload) throw new Error("the fake core has no corruptNextDownload yet (backend ask in _team/ui/e2e/M0-coverage.md)");
+    fake.corruptNextDownload();
+  }
+
   async push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null> {
     for (const fake of [...this.all].reverse()) {
       const seq = fake.push(cmd, body);
@@ -226,6 +237,11 @@ class StdioScenario extends BaseScenario {
   async failNext(window: WindowLabel, cmd: CommandName, code: ErrorCode, detail: ErrorDetail | null = null): Promise<void> {
     await this.ready;
     await this.control(HARNESS_CONTROLS.failNext, { window, cmd, code, detail });
+  }
+
+  async corruptNextDownload(): Promise<void> {
+    await this.ready;
+    await this.control(HARNESS_CONTROLS.corruptNextDownload, {});
   }
 
   async push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null> {

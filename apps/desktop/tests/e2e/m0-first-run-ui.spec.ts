@@ -210,13 +210,7 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
   });
 
   test("UI — error path: Download failed its check — Check failed and Try Again on the row, error glyph on Models", async ({ page }) => {
-    await openWindow(page, "first-run", {
-      world: (w) => {
-        W.firstRun(w, { modelsReady: false });
-        Object.assign(W.speechModel(w), { state: "checksum_failed" });
-        w.app.setup.models.error = "checksum_failed";
-      },
-    });
+    await openWindow(page, "first-run", { world: (w) => W.firstRun(w, { modelsReady: false }), corruptNextDownload: true }); // the window's own download fails its check once
 
     await expect(stepBody(page)).toContainText("Check failed");
     await button(page, "Continue").click(); // moving on shows the error glyph on Models
@@ -233,9 +227,7 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
     await openWindow(page, "first-run", {
       world: (w) => {
         W.firstRun(w, { modelsReady: false });
-        audioGranted(w);
-        const speech = W.speechModel(w);
-        Object.assign(speech, { state: "downloading", done_mb: Math.round(speech.size_mb * 0.62) });
+        audioGranted(w); // the window starts the download itself; the speech model is still coming in
         w.app.setup.steps.find((s) => s.step === "models")!.state = "done";
       },
     });
