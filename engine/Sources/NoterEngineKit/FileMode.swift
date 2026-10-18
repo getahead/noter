@@ -48,8 +48,11 @@ public struct FileMode {
     /// Replays the pair and returns the exit code: `ready`, levels in file time (or as fast as
     /// possible), then `session_stopped`; a file that cannot be read is `device_unavailable`.
     /// `afterReady` runs once `ready` is out (the caller starts answering commands then).
+    /// `models` are the installed model folders, as in live mode, so a self-test over the
+    /// replayed files is judged the same way.
     public func run(
-        writer: EventWriter, engineVersion: String, sandboxed: Bool = false, afterReady: () -> Void = {}
+        writer: EventWriter, engineVersion: String, sandboxed: Bool = false, models: [String] = [],
+        afterReady: () -> Void = {}
     ) -> Int32 {
         let audio: (mic: WAVAudio, sys: WAVAudio)
         do {
@@ -59,7 +62,8 @@ public struct FileMode {
             return 1
         }
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p2:inst-file-events
-        writer.emit(.ready(protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: [], sandboxed: sandboxed))
+        writer.emit(
+            .ready(protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: models, sandboxed: sandboxed))
         afterReady()
         for (m, s) in FileAudioSource.windows(mic: audio.mic, sys: audio.sys) {
             writer.emit(.levels(callId: FileMode.callId, micDb: Levels.db(m), sysDb: Levels.db(s)))
@@ -80,7 +84,8 @@ public enum Models {
         guard let container,
             let names = try? FileManager.default.contentsOfDirectory(atPath: container.appendingPathComponent("models").path)
         else { return [] }
-        return names.filter { !$0.hasPrefix(".") }.sorted()
+        // Hidden files and downloads still in progress (`<name>.partial`) are not installed.
+        return names.filter { !$0.hasPrefix(".") && !$0.hasSuffix(".partial") }.sorted()
     }
 
     public static func container(environment: [String: String]) -> URL? {

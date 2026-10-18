@@ -93,16 +93,18 @@ harness = [
   ".claude/settings.json", "justfile", "rust-toolchain.toml",
   "apps/desktop/vitest.*.ts", "apps/desktop/playwright.config.ts",
 ]
-# Files every lane may touch (plans, FEATURE checkboxes, the decomposition).
-common = [".plans/**", "docs/features/**", "docs/DECOMPOSITION.md"]
+# Files every lane may touch (plans, PR reviews, FEATURE checkboxes, the decomposition).
+common = [".plans/**", ".prs/**", "docs/features/**", "docs/DECOMPOSITION.md"]
 
 # A lane is chosen with NOTER_LANE=<name> or a branch named lane/<name>/<topic>.
 # With no lane the owner rules apply: only `generated` and `baselines` are protected.
 [lanes.contract]
-why = "noter-protocol, the fake core and the conformance suite; every PR needs one core and one UI review"
+why = "noter-protocol, its regenerated output, the fake core and the conformance suite; one core review, plus a UI review when the wire changes"
 paths = [
   "crates/noter-protocol/**", "apps/desktop/src/core/fake/**", "apps/desktop/tests/conformance/**",
   "docs/ADR/**", "docs/DESIGN-core.md", "Cargo.lock",
+  # Regenerated output only: guard.generated still refuses hand edits to these.
+  "contracts/**", "apps/desktop/src/core/bindings.ts",
 ]
 
 [lanes.ui]
@@ -117,7 +119,7 @@ deny = ["crates/noter-protocol/**", "crates/noter-native/**", "crates/noter-engi
 
 [lanes.engine]
 why = "Swift engine, its Rust client and native bindings (Mac only)"
-paths = ["engine/**", "crates/noter-engine-client/**", "crates/noter-native/**", "scripts/models/**"]
+paths = ["engine/**", "crates/noter-engine-client/**", "crates/noter-native/**", "scripts/models/**", "Cargo.toml", "Cargo.lock"]
 
 [lanes.skills]
 why = "LLM skills, role prompts and their evals"
