@@ -461,6 +461,9 @@ impl Controls for Harness {
                                 "harness.hold_next_download needs { at_percent: 0..=99 }",
                             )
                         })?;
+                    // A release sent before the fetch starts must still count, so the flag is
+                    // cleared here, when the hold is set, not when the fetch begins.
+                    self.models.released.store(false, Ordering::SeqCst);
                     *lock(&self.models.hold_at) = Some(pct);
                     Ok(json!({}))
                 }
@@ -710,7 +713,6 @@ impl ModelSource for TinyModels {
             let hold = lock(&self.hold_at)
                 .take()
                 .map(|pct| bytes.len() as u64 * pct / 100);
-            self.released.store(false, Ordering::SeqCst);
             let mut at = (from_byte as usize).min(bytes.len());
             while at < bytes.len() {
                 if hold.is_some_and(|limit| at as u64 >= limit)
@@ -738,8 +740,9 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// A downloaded update, as the world says; installing it answers and the process keeps serving
-/// (relaunching is the app's job, not the harness's).
+/// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
+/// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
+/// the harness's.
 struct ScriptedUpdater(Mutex<Option<UpdateInfo>>);
 
 impl Updater for ScriptedUpdater {

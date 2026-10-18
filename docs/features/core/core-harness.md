@@ -74,7 +74,7 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 ### Drive the real core over stdio
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-harness-session`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-harness-session`
 
 **Actor**: Test runner
 
@@ -87,7 +87,7 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 - The fixture cannot be loaded: the process exits non-zero before reading any request, with the reason on stderr.
 
 **Steps**:
-1. [ ] - `p1` - Runner starts the binary with `--fixture world` (and optionally an engine script) - `inst-start`
+1. [x] - `p1` - Runner starts the binary with `--fixture world`; the `--engine-script` option comes with golden-set replay in M1 (Teamlead decision M1-D3) - `inst-start`
 2. [x] - `p1` - Harness runs `cpt-noter-algo-core-harness-boot` - `inst-boot`
 3. [x] - `p1` - Runner writes a request line `{ id, window, cmd, args, channel }` - `inst-request`
 4. [x] - `p1` - Harness runs `cpt-noter-algo-core-harness-dispatch` for the line - `inst-dispatch`
@@ -111,7 +111,7 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 2. [x] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
 3. [x] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
    1. [x] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`
-4. [x] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime (the scripted runtime comes with llm-gate in M2, decision H2) - `inst-inject`
+4. [x] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime (Backend Teamlead decision D8/H2, 18 Oct 2026: the scripted LLM runtime comes with `cpt-noter-feature-core-llm-gate`, M2) - `inst-inject`
 5. [x] - `p1` - Build the `noter-core` composition root exactly as `src-tauri` does, with an event emitter that writes event lines - `inst-build-core`
 6. [x] - `p1` - **RETURN** ready; log the start to stderr only - `inst-return-booted`
 
