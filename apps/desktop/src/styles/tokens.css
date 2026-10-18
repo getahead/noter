@@ -139,6 +139,10 @@
 /* Liquid Glass material helper (01-macos27.css); every blur goes through --glass-blur */
 .np-glass { background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
 
+/* Document base (00-base.css body): every window and any text outside a .t-* class takes SF Pro 13 px in the label colour on the window background */
+body { margin: 0; background: var(--win-bg); color: var(--label); font: 13px/1.38 var(--font); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+
 /* Typography (00-base.css; call styles as in 20-b.css) */
 .t-large { font: 700 26px/32px var(--font-display); }
 .t-title1 { font: 600 22px/28px var(--font-display); }
