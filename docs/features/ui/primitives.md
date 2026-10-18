@@ -77,7 +77,7 @@ It implements the controls of `cpt-noter-component-ui-primitives` (its inventory
 
 ### Operate a control
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-primitives-operate-control`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-primitives-operate-control`
 
 **Actor**: Primary user
 
@@ -90,16 +90,16 @@ It implements the controls of `cpt-noter-component-ui-primitives` (its inventory
 - The action is running: the control shows its loading state (a spinner replaces the icon, the label stays) and ignores a second activation
 
 **Steps**:
-1. [ ] - `p1` - User points at, clicks, tabs to or presses a key on a control - `inst-user-input`
-2. [ ] - `p1` - UI: show hover (120 ms), pressed and focus feedback; the focus ring shows for keyboard focus only - `inst-feedback`
-3. [ ] - `p1` - **IF** the control is disabled or loading - `inst-if-disabled`
-   1. [ ] - `p1` - **RETURN** no action; a disabled control with a reason keeps it as its help tag and description - `inst-return-noop`
-4. [ ] - `p1` - UI: call the handler the owning component passed in; primitives call no core command themselves - `inst-call-handler`
-5. [ ] - `p1` - **RETURN** the control in the state its owner sets - `inst-return-control`
+1. [x] - `p1` - User points at, clicks, tabs to or presses a key on a control - `inst-user-input`
+2. [x] - `p1` - UI: show hover (120 ms), pressed and focus feedback; the focus ring shows for keyboard focus only - `inst-feedback`
+3. [x] - `p1` - **IF** the control is disabled or loading - `inst-if-disabled`
+   1. [x] - `p1` - **RETURN** no action; a disabled control with a reason keeps it as its help tag and description - `inst-return-noop`
+4. [x] - `p1` - UI: call the handler the owning component passed in; primitives call no core command themselves - `inst-call-handler`
+5. [x] - `p1` - **RETURN** the control in the state its owner sets - `inst-return-control`
 
 ### Read and act on a banner
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-primitives-banner`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-primitives-banner`
 
 **Actor**: Primary user
 
@@ -111,19 +111,19 @@ It implements the controls of `cpt-noter-component-ui-primitives` (its inventory
 - Several banners wait for one slot: the highest severity shows, with **+2 More** that lists the rest in place
 
 **Steps**:
-1. [ ] - `p1` - UI: the slot receives the banners the screen maps from typed errors and degraded events - `inst-receive`
-2. [ ] - `p1` - Algorithm: order them with `cpt-noter-algo-ui-primitives-order-banners` - `inst-order`
-3. [ ] - `p1` - UI: show the first banner with severity icon, optional title, one sentence, up to three actions, optional progress, × for info and success, and **+2 More** when others wait - `inst-show-banner`
-4. [ ] - `p1` - User chooses an action, × or **+2 More** - `inst-user-banner`
-5. [ ] - `p1` - **IF** the user chose **+2 More** - `inst-if-more`
-   1. [ ] - `p1` - UI: list the waiting banners in place, most severe first - `inst-list-more`
-6. [ ] - `p1` - **IF** the user chose × on an info or success banner - `inst-if-dismiss`
-   1. [ ] - `p1` - UI: hide it until the event happens again (the owner may also send `banner_dismiss` for app-level banners) - `inst-dismiss`
-7. [ ] - `p1` - **RETURN** the slot showing the next banner, or empty - `inst-return-slot`
+1. [x] - `p1` - UI: the slot receives the banners the screen maps from typed errors and degraded events - `inst-receive`
+2. [x] - `p1` - Algorithm: order them with `cpt-noter-algo-ui-primitives-order-banners` - `inst-order`
+3. [x] - `p1` - UI: show the first banner with severity icon, optional title, one sentence, up to three actions, optional progress, × for info and success, and **+2 More** when others wait - `inst-show-banner`
+4. [x] - `p1` - User chooses an action, × or **+2 More** - `inst-user-banner`
+5. [x] - `p1` - **IF** the user chose **+2 More** - `inst-if-more`
+   1. [x] - `p1` - UI: list the waiting banners in place, most severe first - `inst-list-more`
+6. [x] - `p1` - **IF** the user chose × on an info or success banner - `inst-if-dismiss`
+   1. [x] - `p1` - UI: hide it until the event happens again (the owner may also send `banner_dismiss` for app-level banners) - `inst-dismiss`
+7. [x] - `p1` - **RETURN** the slot showing the next banner, or empty - `inst-return-slot`
 
 ### See a confirmation where the eye is
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-primitives-inline-status`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-primitives-inline-status`
 
 **Actor**: Primary user
 
@@ -135,100 +135,100 @@ It implements the controls of `cpt-noter-component-ui-primitives` (its inventory
 - None: failures use the inline banner, never the inline status
 
 **Steps**:
-1. [ ] - `p1` - UI: the owning control passes the text and variant (on the label, trailing, blind feedback, row outcome, notice) - `inst-receive-status`
-2. [ ] - `p1` - UI: show the check or info glyph and the text with a status role; focus never moves to it - `inst-show-status`
-3. [ ] - `p1` - **WHILE** the status is hovered or focused and has an action - `inst-while-hover`
-   1. [ ] - `p1` - UI: pause its timer - `inst-pause-timer`
-4. [ ] - `p1` - UI: after 2 s (label, notice), 3 s (blind feedback) or 10 s (row outcome), remove it; nothing else moves - `inst-remove-status`
-5. [ ] - `p1` - **RETURN** the control's own label - `inst-return-label`
+1. [x] - `p1` - UI: the owning control passes the text and variant (on the label, trailing, blind feedback, row outcome, notice) - `inst-receive-status`
+2. [x] - `p1` - UI: show the check or info glyph and the text with a status role; focus never moves to it - `inst-show-status`
+3. [x] - `p1` - **WHILE** the status is hovered or focused and has an action - `inst-while-hover`
+   1. [x] - `p1` - UI: pause its timer - `inst-pause-timer`
+4. [x] - `p1` - UI: after 2 s (label, notice), 3 s (blind feedback) or 10 s (row outcome), remove it; nothing else moves - `inst-remove-status`
+5. [x] - `p1` - **RETURN** the control's own label - `inst-return-label`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Order banners in a slot
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-primitives-order-banners`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-primitives-order-banners`
 
 **Input**: the banners waiting for one slot (MW-R5, CS-R3, CS-R4d, FP-R3, ST-R3, a section, a sheet)
 
 **Output**: the banner to show and the count behind **+2 More**
 
 **Steps**:
-1. [ ] - `p1` - Sort by severity: error, warning, degraded, info, success - `inst-sort-severity`
-2. [ ] - `p1` - Within one severity keep the order the core sent - `inst-keep-order`
-3. [ ] - `p1` - **RETURN** the first banner and the number of the others - `inst-return-first`
+1. [x] - `p1` - Sort by severity: error, warning, degraded, info, success - `inst-sort-severity`
+2. [x] - `p1` - Within one severity keep the order the core sent - `inst-keep-order`
+3. [x] - `p1` - **RETURN** the first banner and the number of the others - `inst-return-first`
 
 ### Fit labels without truncation
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-primitives-fit-labels`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-primitives-fit-labels`
 
 **Input**: a control or control group and its available width
 
 **Output**: the layout that keeps every label whole
 
 **Steps**:
-1. [ ] - `p1` - Push buttons hug their label and never truncate; at regular size they are at least 56 pt wide - `inst-hug`
-2. [ ] - `p1` - **IF** a segmented control's labels do not fit - `inst-if-seg`
-   1. [ ] - `p1` - Render it as a popup-button with the same options - `inst-seg-popup`
-3. [ ] - `p1` - **IF** a footer's buttons do not fit side by side - `inst-if-footer`
-   1. [ ] - `p1` - Stack them, the default button last - `inst-stack`
-4. [ ] - `p1` - Table cells and pop-up values tail-truncate with the full text in a help tag and for VoiceOver - `inst-tail-truncate`
-5. [ ] - `p1` - **RETURN** the layout - `inst-return-layout`
+1. [x] - `p1` - Push buttons hug their label and never truncate; at regular size they are at least 56 pt wide - `inst-hug`
+2. [x] - `p1` - **IF** a segmented control's labels do not fit - `inst-if-seg`
+   1. [x] - `p1` - Render it as a popup-button with the same options - `inst-seg-popup`
+3. [x] - `p1` - **IF** a footer's buttons do not fit side by side - `inst-if-footer`
+   1. [x] - `p1` - Stack them, the default button last - `inst-stack`
+4. [x] - `p1` - Table cells and pop-up values tail-truncate with the full text in a help tag and for VoiceOver - `inst-tail-truncate`
+5. [x] - `p1` - **RETURN** the layout - `inst-return-layout`
 
 ## 4. States (CDSL)
 
 ### Push button
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-primitives-push-button`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-primitives-push-button`
 
 **States**: DEFAULT, HOVER, PRESSED, FOCUS, DISABLED, LOADING
 
 **Initial State**: DEFAULT
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** DEFAULT **TO** HOVER **WHEN** the pointer enters - `inst-default-hover`
-2. [ ] - `p1` - **FROM** HOVER **TO** PRESSED **WHEN** the pointer is pressed - `inst-hover-pressed`
-3. [ ] - `p1` - **FROM** DEFAULT **TO** FOCUS **WHEN** keyboard focus arrives - `inst-default-focus`
-4. [ ] - `p1` - **FROM** PRESSED **TO** LOADING **WHEN** the owner starts a command for this button - `inst-pressed-loading`
-5. [ ] - `p1` - **FROM** LOADING **TO** DEFAULT **WHEN** the owner reports the result - `inst-loading-default`
-6. [ ] - `p1` - **FROM** DEFAULT **TO** DISABLED **WHEN** the owner disables it, with or without a reason - `inst-default-disabled`
-7. [ ] - `p1` - **FROM** DISABLED **TO** DEFAULT **WHEN** the owner enables it - `inst-disabled-default`
+1. [x] - `p1` - **FROM** DEFAULT **TO** HOVER **WHEN** the pointer enters - `inst-default-hover`
+2. [x] - `p1` - **FROM** HOVER **TO** PRESSED **WHEN** the pointer is pressed - `inst-hover-pressed`
+3. [x] - `p1` - **FROM** DEFAULT **TO** FOCUS **WHEN** keyboard focus arrives - `inst-default-focus`
+4. [x] - `p1` - **FROM** PRESSED **TO** LOADING **WHEN** the owner starts a command for this button - `inst-pressed-loading`
+5. [x] - `p1` - **FROM** LOADING **TO** DEFAULT **WHEN** the owner reports the result - `inst-loading-default`
+6. [x] - `p1` - **FROM** DEFAULT **TO** DISABLED **WHEN** the owner disables it, with or without a reason - `inst-default-disabled`
+7. [x] - `p1` - **FROM** DISABLED **TO** DEFAULT **WHEN** the owner enables it - `inst-disabled-default`
 
 ### Inline banner
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-primitives-inline-banner`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-primitives-inline-banner`
 
 **States**: SHOWN, WORKING, STACKED, DISMISSED, RESOLVED
 
 **Initial State**: SHOWN
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** SHOWN **TO** WORKING **WHEN** the user runs an action and the owner's command is running - `inst-shown-working`
-2. [ ] - `p1` - **FROM** WORKING **TO** SHOWN **WHEN** the command fails and the cause remains - `inst-working-shown`
-3. [ ] - `p1` - **FROM** SHOWN **TO** STACKED **WHEN** the user opens **+2 More** - `inst-shown-stacked`
-4. [ ] - `p1` - **FROM** STACKED **TO** SHOWN **WHEN** the user closes the list - `inst-stacked-shown`
-5. [ ] - `p1` - **FROM** SHOWN **TO** DISMISSED **WHEN** the user dismisses an info or success banner, or the warning **Noter quit during …** - `inst-shown-dismissed`
-6. [ ] - `p1` - **FROM** SHOWN **TO** RESOLVED **WHEN** the core reports the fix and the owner removes the banner - `inst-shown-resolved`
-7. [ ] - `p1` - **FROM** WORKING **TO** RESOLVED **WHEN** the core reports the fix - `inst-working-resolved`
+1. [x] - `p1` - **FROM** SHOWN **TO** WORKING **WHEN** the user runs an action and the owner's command is running - `inst-shown-working`
+2. [x] - `p1` - **FROM** WORKING **TO** SHOWN **WHEN** the command fails and the cause remains - `inst-working-shown`
+3. [x] - `p1` - **FROM** SHOWN **TO** STACKED **WHEN** the user opens **+2 More** - `inst-shown-stacked`
+4. [x] - `p1` - **FROM** STACKED **TO** SHOWN **WHEN** the user closes the list - `inst-stacked-shown`
+5. [x] - `p1` - **FROM** SHOWN **TO** DISMISSED **WHEN** the user dismisses an info or success banner, or the warning **Noter quit during …** - `inst-shown-dismissed`
+6. [x] - `p1` - **FROM** SHOWN **TO** RESOLVED **WHEN** the core reports the fix and the owner removes the banner - `inst-shown-resolved`
+7. [x] - `p1` - **FROM** WORKING **TO** RESOLVED **WHEN** the core reports the fix - `inst-working-resolved`
 
 ### Inline status
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-primitives-inline-status`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-primitives-inline-status`
 
 **States**: HIDDEN, SHOWN, PAUSED
 
 **Initial State**: HIDDEN
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** HIDDEN **TO** SHOWN **WHEN** the owner reports a result to confirm - `inst-hidden-shown`
-2. [ ] - `p1` - **FROM** SHOWN **TO** PAUSED **WHEN** a row outcome or blind feedback with an action is hovered or focused - `inst-shown-paused`
-3. [ ] - `p1` - **FROM** PAUSED **TO** SHOWN **WHEN** hover and focus leave - `inst-paused-shown`
-4. [ ] - `p1` - **FROM** SHOWN **TO** HIDDEN **WHEN** its time (2, 3 or 10 s) ends or its **Undo** runs - `inst-shown-hidden`
+1. [x] - `p1` - **FROM** HIDDEN **TO** SHOWN **WHEN** the owner reports a result to confirm - `inst-hidden-shown`
+2. [x] - `p1` - **FROM** SHOWN **TO** PAUSED **WHEN** a row outcome or blind feedback with an action is hovered or focused - `inst-shown-paused`
+3. [x] - `p1` - **FROM** PAUSED **TO** SHOWN **WHEN** hover and focus leave - `inst-paused-shown`
+4. [x] - `p1` - **FROM** SHOWN **TO** HIDDEN **WHEN** its time (2, 3 or 10 s) ends or its **Undo** runs - `inst-shown-hidden`
 
 ## 5. Definitions of Done
 
 ### The 26 primitives
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-primitives-controls`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-primitives-controls`
 
 The system **MUST** provide React components for the 26 primitives of DESIGN's inventory with their variants, sizes (20, 24, 28, 32 pt), visual states, keys and VoiceOver roles, rendering `data-component="cpt-noter-component-ui-primitives"`, `data-primitive`, `data-variant`, `data-size` and `data-state` exactly as `src/js/02-primitives.js` does, with a 24 by 24 pt hit area and a focus ring for keyboard focus only.
 
@@ -246,7 +246,7 @@ The system **MUST** provide React components for the 26 primitives of DESIGN's i
 
 ### Empty state, inline banner and inline status
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-primitives-feedback`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-primitives-feedback`
 
 The system **MUST** provide the empty state (first use, filtered empty, section line, large area), the inline banner (info, warning, error, degraded, success, compact; one per slot, highest severity first, **+2 More**) and the inline status (on the label, trailing, blind feedback, row outcome, notice) with the prototype's markup and timings.
 
@@ -266,7 +266,7 @@ The system **MUST** provide the empty state (first use, filtered empty, section 
 
 ### Text-only rendering
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-primitives-text-only`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-primitives-text-only`
 
 The system **MUST** render transcript, document, model and user text as plain text in every primitive (no `dangerouslySetInnerHTML`), and Markdown only through a renderer that drops raw HTML, so hostile strings never become markup (PM-08).
 
