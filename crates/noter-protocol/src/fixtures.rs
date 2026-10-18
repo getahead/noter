@@ -903,6 +903,113 @@ pub fn world() -> FakeWorld {
         audio_available: true,
     };
 
+    // The past call as the Library and the call page read it back: an archive-pass transcript,
+    // whose speakers, mark and gap the call detail repeats (fixture parity, M1).
+    let past_speaker =
+        |id: &str, label: SpeakerLabel, channel: AudioChannel, segment_count: u32| SpeakerView {
+            id: SpeakerId(s(id)),
+            call_id: CallId(s(BACKEND)),
+            label,
+            channel,
+            segment_count,
+            talk_ms: None,
+            sample: None,
+            suggestion: None,
+            named_by: Some(NamedBy::Calendar),
+        };
+    let past_speakers = vec![
+        past_speaker("spk_b_you", SpeakerLabel::You, AudioChannel::Mic, 1),
+        past_speaker(
+            "spk_b_dmitri",
+            SpeakerLabel::Person {
+                person: chip("per_dmitri"),
+            },
+            AudioChannel::Sys,
+            2,
+        ),
+        past_speaker(
+            "spk_b_oleg",
+            SpeakerLabel::Person {
+                person: chip("per_oleg"),
+            },
+            AudioChannel::Sys,
+            1,
+        ),
+    ];
+    let past_seg = |n: u32, speaker_at: usize, t0_s: u32, text: &str, lang: Lang| {
+        let spk = &past_speakers[speaker_at];
+        SegmentView {
+            id: SegmentId(format!("seg_backend_{n:03}")),
+            call_id: CallId(s(BACKEND)),
+            channel: spk.channel,
+            speaker: speaker(spk.id.as_str(), spk.label.clone()),
+            crosstalk_with: vec![],
+            t0_ms: OffsetMs(t0_s * 1000),
+            t1_ms: OffsetMs((t0_s + 8) * 1000),
+            text: s(text),
+            lang,
+            lang_p: 0.95,
+            confidence: 0.96,
+            state: SegmentState::Confirmed,
+            pass: TranscriptPass::Archive,
+            corrections: vec![],
+        }
+    };
+    let past_transcript = TranscriptSnapshot {
+        subscription_id: None,
+        call_id: CallId(s(BACKEND)),
+        live: false,
+        pass: TranscriptPass::Archive,
+        archive: ArchiveStatus::Done,
+        segments: vec![
+            past_seg(
+                1,
+                1,
+                12,
+                "Давайте начнём с ostor: что с бакетами после рестарта?",
+                Lang::Ru,
+            ),
+            past_seg(
+                2,
+                2,
+                25,
+                "The buckets come back, but the index rebuild takes about four minutes.",
+                Lang::En,
+            ),
+            past_seg(
+                3,
+                0,
+                40,
+                "Can we keep serving reads while it rebuilds?",
+                Lang::En,
+            ),
+            past_seg(
+                4,
+                1,
+                52,
+                "Yes, reads stay up; writes wait for the index.",
+                Lang::En,
+            ),
+        ],
+        hypotheses: vec![],
+        marks: vec![MarkView {
+            id: MarkId(s("mrk_b_1")),
+            call_id: CallId(s(BACKEND)),
+            at_ms: OffsetMs(41_000),
+            note: None,
+        }],
+        gaps: vec![GapView {
+            call_id: CallId(s(BACKEND)),
+            t0_ms: OffsetMs(30_000),
+            t1_ms: OffsetMs(33_000),
+            reason: GapReason::DeviceChanged,
+        }],
+        speakers: past_speakers.clone(),
+        // The last sequence number the call's stream reached before it stopped.
+        last_seq: Seq(17),
+        audio_available: true,
+    };
+
     let mut confirmed = hypothesis.clone();
     confirmed.state = SegmentState::Confirmed;
     confirmed.text =
@@ -1553,18 +1660,23 @@ pub fn world() -> FakeWorld {
         app,
         settings: settings(),
         people,
-        call_details: vec![CallDetail {
-            call: calls[1].clone(),
-            calendar_event: None,
-            speakers: vec![],
-            marks: vec![],
-            gaps: vec![],
-            mode_used: EffectiveMode::CloudRedacted,
-            audio_not_stored: false,
-            first_recorded_call: false,
-        }],
+        // One detail per call, repeating its row and its transcript's speakers, marks and gaps,
+        // as a core reading the rows back serves them (fixture parity, M1).
+        call_details: [(&calls[0], &transcript), (&calls[1], &past_transcript)]
+            .into_iter()
+            .map(|(call, t)| CallDetail {
+                call: call.clone(),
+                calendar_event: None,
+                speakers: t.speakers.clone(),
+                marks: t.marks.clone(),
+                gaps: t.gaps.clone(),
+                mode_used: EffectiveMode::CloudRedacted,
+                audio_not_stored: false,
+                first_recorded_call: false,
+            })
+            .collect(),
+        transcripts: vec![transcript, past_transcript],
         calls,
-        transcripts: vec![transcript],
         live_script,
         script_interval_ms: 1500,
         cards,

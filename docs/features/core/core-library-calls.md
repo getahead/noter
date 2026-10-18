@@ -217,9 +217,9 @@ After M1 the user can record calls and find them again. The list and the call re
 
 **Steps**:
 1. [ ] - `p1` - Seed the fixture calls, segments, speakers, marks and gaps as database rows - `inst-parity-seed`
-2. [ ] - `p1` - Run `calls_list`, `call_get` and the transcript snapshot over them with the injected clock - `inst-parity-run`
-3. [ ] - `p1` - Compare the fields the test lists with the fake world's values; a difference fails the test - `inst-parity-compare`
-4. [ ] - `p1` - **RETURN** pass or the differing fields - `inst-parity-return`
+2. [x] - `p1` - Run `calls_list`, `call_get` and the transcript snapshot over them with the injected clock - `inst-parity-run`
+3. [x] - `p1` - Compare the fields the test lists with the fake world's values; a difference fails the test - `inst-parity-compare`
+4. [x] - `p1` - **RETURN** pass or the differing fields - `inst-parity-return`
 
 ## 4. States (CDSL)
 
