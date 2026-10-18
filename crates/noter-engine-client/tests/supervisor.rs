@@ -440,3 +440,28 @@ async fn engine_stderr_is_counted_never_kept() {
     assert_eq!(launcher.stderr_lines(), 2);
     c.shutdown().await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn the_launcher_is_object_safe_so_the_core_can_hold_any_engine() {
+    use noter_engine_client::EngineLauncher;
+    use std::sync::Arc;
+    let engine = ScriptedEngine::new();
+    let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
+    let c = EngineClient::new(launcher, Config::default());
+    c.ensure_ready().await.unwrap();
+    assert_eq!(engine.launches(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn liveness_never_relaunches_a_shut_down_engine() {
+    let engine = ScriptedEngine::new();
+    let c = client(&engine);
+    c.ensure_ready().await.unwrap();
+    // Shut down just before the liveness tick.
+    tokio::time::sleep(Config::default().liveness_interval - Duration::from_millis(1)).await;
+    c.shutdown().await;
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    settle().await;
+    assert_eq!(engine.launches(), 1);
+    assert_eq!(c.state(), EngineState::Stopped);
+}
