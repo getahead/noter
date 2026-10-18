@@ -155,7 +155,7 @@ impl<T> std::fmt::Debug for Sink<T> {
     }
 }
 
-/// Arguments for [`dispatch`]. serde's message can quote the input, which may hold transcript
+/// Arguments for [`dispatch_json`]. serde's message can quote the input, which may hold transcript
 /// text, so the error names only the command and the type.
 fn parse_args<T: serde::de::DeserializeOwned>(
     name: &str,
@@ -216,7 +216,7 @@ macro_rules! commands {
 
         // @cpt-dod:cpt-noter-dod-core-contract-coreapi:p1
         /// The core implements this trait on its composition root. The IPC host and
-        /// `noter-core-harness` reach it through [`dispatch`] (or call a method after
+        /// `noter-core-harness` reach it through [`dispatch_json`] (or call a method after
         /// [`CommandSpec::check_caller`]). Every method answers `not_implemented` until the core
         /// implements it, so an early core answers what its milestone delivers and the
         /// conformance suite lists the rest as pending.
@@ -234,8 +234,8 @@ macro_rules! commands {
         /// `noter-core-harness` receive it: the window-scope check, then the Channel and the
         /// arguments (`invalid_input` naming the command, never echoing the input), then the
         /// [`CoreApi`] method; the result and every Channel message cross as JSON.
-        /// An unknown name answers `not_implemented`.
-        pub async fn dispatch<A: CoreApi>(
+        /// An unknown name is `invalid_input`.
+        pub async fn dispatch_json<A: CoreApi>(
             api: &A,
             ctx: &CommandCtx,
             name: &str,
@@ -251,7 +251,7 @@ macro_rules! commands {
                     let args = parse_args::<$args>(stringify!($name), stringify!($args), args)?;
                     to_json(api.$name(ctx, args $(, commands!(@channel channel $chan))?).await?)
                 })*
-                _ => Err(CoreError::new(ErrorCode::NotImplemented, format!("no command {name}"))),
+                _ => Err(CoreError::new(ErrorCode::InvalidInput, format!("no command {name}"))),
             }
         }
 
