@@ -1,13 +1,18 @@
 # Pull request hygiene (docs/DELIVERY.md). Separate from the harness gate in
 # ci.yml: these checks are about the change as a delivery unit, not about the
-# product's quality bars. The `Default ruleset` requires the `hygiene` job.
+# product's quality bars, plus the checks that depend on the owner's labels.
+# The `Default ruleset` requires the `hygiene` job.
+#
+# Everything here is cheap, so a title edit or a label re-runs it instead of CI:
+# the dependency, cargo-deny and workflow checks run only when the files they
+# check changed (`changes`, rules in harness.toml [ci]).
 name: PR hygiene
 
 on:
   pull_request:
     branches: [main]
-    # edited: the title is checked again when it changes
-    types: [opened, edited, synchronize, reopened]
+    # edited: the title is checked again; labeled/unlabeled: an approval label takes effect without a push
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
   # The Release PR: release.yml dispatches this on its branch (the workflow token starts no runs).
   workflow_dispatch:
     inputs:
@@ -24,6 +29,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: What this change runs
+    runs-on: ubuntu-24.04
+    outputs:
+      jobs: ${{ steps.c.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: c
+        run: python3 scripts/harness/ci_changes.py --workflow hygiene
+
   title:
     name: PR title (Conventional Commits)
     runs-on: ubuntu-24.04
@@ -63,8 +81,35 @@ jobs:
           echo "$title" | grep -qE '^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([^)]+\))?!?: [^A-Z]' \
             || { echo "::error::PR title is not a Conventional Commit: $title"; exit 1; }
 
+  approvals:
+    name: Owner approvals (gate config, lanes, screenshot baselines)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Gate config guard and lane check
+        env:
+          EVENT_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          GH_TOKEN: ${{ github.token }}
+        run: PR_LABELS="$(scripts/ci/pr-labels.sh)" python3 scripts/harness/config_guard.py --base origin/main --lane-check
+      - name: Baselines change only with the owner's approval
+        env:
+          EVENT_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_LABELS="$(scripts/ci/pr-labels.sh)"
+          git rev-parse --verify --quiet origin/main >/dev/null || { echo "::error::origin/main not fetched"; exit 1; }
+          changed=$(git diff --name-only "origin/main...HEAD" -- '**/__screenshots__/**')
+          if [ -n "$changed" ] && ! echo ",$PR_LABELS," | grep -q ',visual-change-approved,'; then
+            echo "::error::Screenshot baselines changed without the 'visual-change-approved' label:"; echo "$changed"; exit 1
+          fi
+
   dependencies:
     name: Dependency review
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['dependencies']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,6 +127,8 @@ jobs:
 
   rust-deps:
     name: Rust licenses, bans and sources (cargo-deny)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['rust-deps']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,6 +142,8 @@ jobs:
 
   workflows:
     name: Workflow lint (actionlint, zizmor)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['workflows']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -112,15 +161,14 @@ jobs:
   hygiene:
     name: hygiene
     if: always()
-    needs: [title, dependencies, rust-deps, workflows]
+    needs: [changes, title, approvals, dependencies, rust-deps, workflows]
     runs-on: ubuntu-24.04
     steps:
-      - name: Every hygiene check passed
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Every hygiene check this change needs passed
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: |
-          echo "$RESULTS" | python3 -c '
-          import json, sys
-          bad = {k: v["result"] for k, v in json.load(sys.stdin).items() if v["result"] != "success"}
-          for k, r in bad.items(): print(f"::error::{k}: {r}")
-          sys.exit(1 if bad else 0)'
+          EXPECTED: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/harness/ci_changes.py verdict

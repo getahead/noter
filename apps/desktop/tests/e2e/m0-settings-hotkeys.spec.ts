@@ -39,7 +39,7 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
   });
 
   test("error path — Card key used by another app: the warning, fixed in Raycast, gone on return", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, (w) => (w.copilot.card_keys.conflicts = ["Ctrl+Alt+Super+3"])))) return; // card keys are the copilot's (M4)
+    if (!(await changeAhead(scenario, "M4", (w) => (w.copilot.card_keys.conflicts = ["Ctrl+Alt+Super+3"])))) return; // card keys are the copilot's (M4)
     const settings = scenario.core("settings");
     const status = await scenario.events("copilot:status");
 

@@ -19,6 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 noter-core = { path = "../../../crates/noter-core" }
+noter-engine-client = { path = "../../../crates/noter-engine-client" }
 noter-protocol = { path = "../../../crates/noter-protocol" }
 serde_json = "1"
 tauri = { version = "2", features = [] }

@@ -33,6 +33,8 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
   });
 
   test("error path — Return pressed by habit: Cancel is the default, the call is kept", async ({ scenario }) => {
+    // A delete from a window that may not delete is refused before any milestone guard (PM-08).
+    expect(refused(await scenario.core("record-prompt").callsDelete({ call_ids: [W.PAST_CALL] })).code).toBe("window_not_allowed");
     const main = scenario.core("main");
     const before = await listIds(main);
     if (!before) return; // calls_list (M1)
@@ -43,14 +45,12 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
     expect(await listIds(main)).toEqual(before);
     const past = ahead(await main.callGet({ call_id: W.PAST_CALL }));
     if (past) expect(past.call.id).toBe(W.PAST_CALL); // call_get (M1)
-    // A refused delete from a window that may not delete changes nothing either (PM-08).
-    expect(refused(await scenario.core("record-prompt").callsDelete({ call_ids: [W.PAST_CALL] })).code).toBe("window_not_allowed");
-    expect(await listIds(main)).toEqual(before);
+    expect(await listIds(main)).toEqual(before); // the refused deletes changed nothing
   });
 
   test("other path — Several calls selected: Delete 3 calls?, Delete 3 Calls, the list without them", async ({ scenario }) => {
     let extra: string[] = [];
-    if (!(await changeAhead(scenario, (w) => (extra = W.morePastCalls(w, 2))))) return; // calls (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => (extra = W.morePastCalls(w, 2))))) return; // calls (M1)
     const main = scenario.core("main");
     const three = [W.PAST_CALL, ...extra];
     const ids = await listIds(main);

@@ -25,7 +25,11 @@ export type ChordResult =
   | { type: "accept"; code: string; modifiers: ChordModifiers }
   | { type: "keep"; reason: KeepReason; message: string }
   | { type: "cancel" }
-  | { type: "clear" };
+  | { type: "clear" }
+  /** A single chord got only a modifier keydown: keep recording until a non-modifier key arrives. */
+  | { type: "wait" };
+
+const MODIFIER_CODES = new Set(["Control", "Alt", "Meta", "Shift"].flatMap((m) => [`${m}Left`, `${m}Right`]));
 
 // @cpt-algo:cpt-noter-algo-ui-settings-check-chord:p1
 export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInput): ChordResult {
@@ -34,6 +38,7 @@ export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInpu
   // a modifier set is never empty: the core refuses it (`no_modifier`)
   if (code === "Backspace" && variant === "single") return { type: "clear" };
   if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: "Add Command, Option or Control" };
+  if (variant === "single" && MODIFIER_CODES.has(code)) return { type: "wait" };
   if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: "Used by VoiceOver" };
   return { type: "accept", code, modifiers: m };
 }

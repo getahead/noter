@@ -9,20 +9,30 @@ export type SectionKey = SettingsSection["section"] & keyof Settings;
  */
 export interface SectionDraft<K extends SectionKey = SectionKey> {
   section: K;
-  edits: Partial<Settings[K]>;
+  edits: DeepPartial<Settings[K]>;
 }
 
-export const newDraft = <K extends SectionKey>(section: K): SectionDraft<K> => ({ section, edits: {} });
+/** Edits go down to the leaf the user touched, so a newer value of a sibling leaf is never overwritten. */
+export type DeepPartial<T> = T extends readonly unknown[] ? T : T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
 
-export const editDraft = <K extends SectionKey>(d: SectionDraft<K>, edits: Partial<Settings[K]>): SectionDraft<K> => ({
+const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+// shortcut: arrays are replaced whole, not merged; fine while no section edits a list element by element
+function merge<T>(base: T, edits: unknown): T {
+  if (!isPlain(base) || !isPlain(edits)) return edits as T;
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(edits)) out[k] = k in base ? merge(base[k], v) : v;
+  return out as T;
+}
+
+export const newDraft = <K extends SectionKey>(section: K): SectionDraft<K> => ({ section, edits: {} as DeepPartial<Settings[K]> });
+
+export const editDraft = <K extends SectionKey>(d: SectionDraft<K>, edits: DeepPartial<Settings[K]>): SectionDraft<K> => ({
   ...d,
-  edits: { ...d.edits, ...edits },
+  edits: merge(d.edits, edits),
 });
 
-export const draftValue = <K extends SectionKey>(settings: Settings, d: SectionDraft<K>): Settings[K] => ({
-  ...settings[d.section],
-  ...d.edits,
-});
+export const draftValue = <K extends SectionKey>(settings: Settings, d: SectionDraft<K>): Settings[K] => merge(settings[d.section], d.edits);
 
 /** The whole section as wanted state with the current `rev`. */
 export const toUpdateArgs = (settings: Settings, d: SectionDraft): SettingsUpdateArgs => ({

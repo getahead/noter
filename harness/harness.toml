@@ -124,3 +124,76 @@ paths = ["engine/**", "crates/noter-engine-client/**", "crates/noter-native/**",
 [lanes.skills]
 why = "LLM skills, role prompts and their evals"
 paths = ["skills/**", "evals/**"]
+
+# ---------------------------------------------------------------- which checks a PR runs
+# scripts/harness/ci_changes.py turns the files a pull request changes (its merge commit against
+# main) into the jobs of ci.yml, pr.yml and codeql.yml that check them; a job no changed file
+# can affect is skipped, and the aggregators (`gate`, `hygiene`) fail if a job that should run
+# did not pass. A file matching `everything`, or matching no area and not listed in `inert`,
+# runs every job: an unknown file fails safe. Pushes to main and the nightly run every job.
+# Narrowing these rules lets a PR skip a gate, so it is a harness change like any other.
+[ci]
+everything = [
+  ".github/workflows/ci.yml", ".github/workflows/pr.yml", ".github/workflows/codeql.yml", ".github/actions/**",
+  "justfile", "harness/**", "scripts/harness/**", "scripts/ci/**", "rust-toolchain.toml",
+]
+# Read by no CI job.
+inert = [
+  ".github/ISSUE_TEMPLATE/**", ".github/CODEOWNERS", ".github/dependabot.yml", ".github/rulesets/**",
+  "**/.gitignore", ".idea/**", ".claude/**", ".githooks/**", ".plans/**", ".prs/**", "scripts/dev/**",
+  ".release-please-manifest.json", "release-please-config.json", "LICENSE*",
+]
+
+[ci.areas]
+rust = ["crates/**", "Cargo.toml", "Cargo.lock", "perf/**"]
+protocol = [
+  "crates/noter-protocol/**", "contracts/**", "apps/desktop/src/core/**", "apps/desktop/package.json", "Cargo.lock", "pnpm-lock.yaml",
+]
+ui = ["apps/desktop/**", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]
+tauri = ["apps/desktop/src-tauri/**"]
+native = ["apps/desktop/tests/native/**"]
+engine = ["engine/**"]
+stories = ["docs/DESIGN.md"]   # the E2E coverage gate counts its stories
+docs = ["docs/**", ".cf-studio/**", "**/*.md"]
+cargo = ["**/Cargo.toml", "**/Cargo.lock", "deny.toml"]
+manifests = [
+  "**/Cargo.toml", "**/Cargo.lock", "**/package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+  "engine/Package.swift", "engine/Package.resolved", ".github/workflows/**", ".github/actions/**",
+]
+workflows = [".github/workflows/**", ".github/actions/**", ".github/zizmor.yml", ".github/actionlint.yaml"]
+rust-source = ["**/*.rs", "**/Cargo.toml", "**/Cargo.lock"]
+js-source = [
+  "**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs", "**/*.html",
+  "**/package.json", "pnpm-lock.yaml",
+]
+
+# An area is excluded from a file that also matches one of these.
+[ci.except]
+ui = ["apps/desktop/src-tauri/**", "apps/desktop/tests/native/**"]
+
+# job = the areas that switch it on ("always": every pull request).
+[ci.jobs.ci]
+lint-rust = ["rust"]
+lint-ui = ["ui"]
+contract = ["protocol"]
+arch = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
+unit = ["rust", "ui", "protocol"]
+e2e = ["rust", "ui", "protocol", "stories"]
+e2e-coverage = ["rust", "ui", "protocol", "stories"]
+visual = ["ui", "protocol"]
+perf = ["rust", "ui", "protocol"]   # perf.toml has Rust and UI scenarios
+docs = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
+macos = ["rust", "tauri", "native", "engine"]
+
+[ci.jobs.hygiene]
+title = ["always"]
+approvals = ["always"]
+dependencies = ["manifests"]
+rust-deps = ["cargo"]
+workflows = ["workflows"]
+
+[ci.jobs.codeql]
+# `actions` always runs, so every PR has a CodeQL result for the code-scanning merge rule.
+actions = ["always"]
+javascript-typescript = ["js-source"]
+rust = ["rust-source"]

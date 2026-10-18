@@ -41,6 +41,19 @@ describe("checkChord", () => {
     expect(checkChord(ev({ code: "Digit3", modifiers: m }))).toEqual({ type: "accept", code: "Digit3", modifiers: m });
   });
 
+  it.each(["ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight", "ShiftLeft", "ShiftRight"])(
+    "waits for a letter when a single chord gets the lone %s keydown",
+    (code) => {
+      expect(checkChord(ev({ code, modifiers: { ...none, control: true } }))).toEqual({ type: "wait" });
+    },
+  );
+
+  it("submits only the completed chord: modifier down, then letter down", () => {
+    const held = { ...none, control: true, option: true };
+    const results = [ev({ code: "ControlLeft", modifiers: { ...none, control: true } }), ev({ code: "AltLeft", modifiers: held }), ev({ code: "KeyR", modifiers: held })].map(checkChord);
+    expect(results.map((r) => r.type)).toEqual(["wait", "wait", "accept"]);
+  });
+
   it("checks the modifier-set variant on modifiers alone", () => {
     const r = checkChord(ev({ variant: "modifier-set", code: "ControlLeft" }));
     expect(r.type).toBe("accept");

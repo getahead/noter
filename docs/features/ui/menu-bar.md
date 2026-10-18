@@ -181,7 +181,7 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 1. [ ] - `p1` - MB-R2 first line by state: **Noter — Not recording**; **Recording · <title> · 23:14** then **4 speakers · EN / RU · Cloud, redacted**; **Paused for 5 min** after five minutes paused; **Call seems to have ended · stopping in 8 s** (no countdown while hidden); **A new meeting may have started: <title>** while hidden; the closing line for 5 minutes after any stop - `inst-mbr2-first`
 2. [ ] - `p1` - Add one degraded line when it applies: **Switched to local**, **System audio silent**, **Microphone off** (announced assertively when no surface is visible), **Not recording · engine stopped**; while hidden and recording, **Hidden for presenting** - `inst-mbr2-degraded`
 3. [ ] - `p1` - **IF** setup is incomplete: **Setup incomplete · call detection off** and the **Finish Setup…** link; never in place of **Start Recording** - `inst-mbr2-setup`
-4. [ ] - `p1` - **IF** a call is detected and not recorded, or Noter is hidden for presenting (prototype behaviour, see 7): **Call Detected · Start Recording** as the one enabled item in MB-R2 - `inst-mbr2-detected`
+4. [ ] - `p1` - **IF** a call is detected and not recorded (visible or hidden for presenting): **Call Detected · Start Recording** as the one enabled item in MB-R2; never while a capture runs (HoD decision D-1, see 7) - `inst-mbr2-detected`
 5. [ ] - `p1` - MB-R3: **Keep Recording** and **Stop Now** while the call-ended notice is open; **Start as New Call** and **Keep in This Call** for a new meeting while hidden; **Start Recording** or **Stop Recording** ⌃⌥⌘R (dimmed only below 500 MB or without the speech model); **Try Again** while capture failed; **Pause** or **Resume** ⌃⌥⌘P; **Continue Recording** for 5 minutes after any stop - `inst-mbr3`
 6. [ ] - `p1` - MB-R4 while recording: **Mark Moment** ⌃⌥⌘M; with the copilot on (M4) also **Catch Me Up**, **Ask About This Call…**, **Unmute** while muted and **Mute Copilot ▸** - `inst-mbr4`
 7. [ ] - `p1` - MB-R5: **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel** (checkmark), **Open Last Summary — <title> · <time>**, **Hide for Presenting** or **Show Noter** ⌃⌥⌘0 - `inst-mbr5`
@@ -276,7 +276,7 @@ The system **MUST** have XCUITest cases for every menu item and every glyph, nam
 | Copilot muted, Card keys released while muted | `muted` (M4, `cpt-noter-feature-ui-copilot`) |
 | Call detected, not recorded | `call-detected` |
 | Call seems to have ended | `call-ended` |
-| Hidden for presenting | `hidden` |
+| Hidden for presenting | `hidden`, without its **Call Detected · Start Recording** item (D-1) |
 | Call ended while hidden | `hidden-ended` |
 | New meeting while hidden | `hidden-new-meeting` |
 | Capture problem, no surface visible | `capture-problem` |
@@ -284,6 +284,6 @@ The system **MUST** have XCUITest cases for every menu item and every glyph, nam
 | Hotkey not registered | `no-hotkey` |
 | — | `closing` (After a stop, **Continue Recording**) |
 
-**DESIGN versus prototype.** (1) The prototype's `closing` state (the 5 minutes after any stop) has no row in DESIGN's menu-bar States table; this feature includes it. (2) While hidden for presenting and recording, the prototype also lists **Call Detected · Start Recording**, which DESIGN offers only while not recording; this feature follows the prototype and the owner should confirm. (3) DESIGN's line **Stopped at 11:12 · the call had ended** after 10 minutes hidden is not drawn by the prototype; this feature keeps **Call seems to have ended** until the core reports the stop. All three are listed in `docs/DECOMPOSITION.md`.
+**DESIGN versus prototype.** (1) The prototype's `closing` state (the 5 minutes after any stop) has no row in DESIGN's menu-bar States table; this feature includes it. (2) While hidden for presenting and recording, the prototype also lists **Call Detected · Start Recording**, which DESIGN offers only while not recording; HoD decision D-1 (18 Oct 2026) follows DESIGN, because the core rejects a second capture (`already_recording`): hidden and recording, MB-R2 shows **Hidden for presenting** and the capture group offers Stop and Pause as when visible. (3) DESIGN's line **Stopped at 11:12 · the call had ended** after 10 minutes hidden is not drawn by the prototype; this feature keeps **Call seems to have ended** until the core reports the stop. All three are listed in `docs/DECOMPOSITION.md`.
 
 **Not applicable.** WebView rendering, screenshots: none (native). Data: the core builds the menu from its own state.
