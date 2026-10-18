@@ -68,8 +68,8 @@ async fn a_minor_difference_is_accepted() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn three_failed_starts_within_a_minute_stop_the_retries() {
-    // No `ready` in time, then a launch that fails, then no `ready` again.
+async fn a_failed_start_is_engine_unavailable_until_the_next_request() {
+    // No `ready` in time, then a launch that fails, then a good engine.
     let engine = ScriptedEngine::new()
         .then(Behaviour {
             protocol_version: None,
@@ -77,10 +77,6 @@ async fn three_failed_starts_within_a_minute_stop_the_retries() {
         })
         .then(Behaviour {
             launch_fails: true,
-            ..Behaviour::default()
-        })
-        .with_default(Behaviour {
-            protocol_version: None,
             ..Behaviour::default()
         });
     let c = client(&engine);
@@ -89,19 +85,18 @@ async fn three_failed_starts_within_a_minute_stop_the_retries() {
             c.ensure_ready().await.unwrap_err().code,
             ErrorCode::EngineUnavailable
         );
-        assert_ne!(c.state(), EngineState::Unavailable);
+        assert_eq!(c.state(), EngineState::Unavailable);
     }
-    assert_eq!(
-        c.ensure_ready().await.unwrap_err().code,
-        ErrorCode::EngineUnavailable
-    );
-    assert_eq!(c.state(), EngineState::Unavailable);
+    c.ensure_ready().await.unwrap();
+    assert_eq!(c.state(), EngineState::Ready);
     assert_eq!(engine.launches(), 3);
 }
 
 #[tokio::test(start_paused = true)]
-async fn failed_starts_older_than_a_minute_do_not_count() {
+async fn failed_restarts_older_than_a_minute_do_not_count() {
+    // Restarts 40 s, 80 s and 160 s apart: never three failures within a minute.
     let engine = ScriptedEngine::new()
+        .then(Behaviour::default())
         .then(Behaviour {
             launch_fails: true,
             ..Behaviour::default()
@@ -114,15 +109,21 @@ async fn failed_starts_older_than_a_minute_do_not_count() {
             launch_fails: true,
             ..Behaviour::default()
         });
-    let c = client(&engine);
-    c.ensure_ready().await.unwrap_err();
-    c.ensure_ready().await.unwrap_err();
-    tokio::time::sleep(Duration::from_secs(61)).await;
-    c.ensure_ready().await.unwrap_err();
-    assert_ne!(c.state(), EngineState::Unavailable);
-    // The next request tries again and succeeds (default behaviour).
+    let c = EngineClient::new(
+        engine.clone(),
+        Config {
+            restart_backoff: Duration::from_secs(40),
+            ..Config::default()
+        },
+    );
     c.ensure_ready().await.unwrap();
+    engine.kill_current();
+    settle().await;
+    assert_eq!(c.state(), EngineState::Restarting);
+    tokio::time::sleep(Duration::from_secs(1000)).await;
+    settle().await;
     assert_eq!(c.state(), EngineState::Ready);
+    assert_eq!(engine.launches(), 5);
 }
 
 #[tokio::test(start_paused = true)]
