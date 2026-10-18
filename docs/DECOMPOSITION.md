@@ -118,7 +118,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Give every WebView window one typed path to the Rust core and one in-memory store, so screens render only what the core sent, typed errors become named states, and the UI can be built against the fake core first and switched to the real core per milestone.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/core-bridge.md`](features/ui/core-bridge.md). **Status**: NOT_STARTED.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/core-bridge.md`](features/ui/core-bridge.md). **Status**: IN_PROGRESS.
 
 - **Depends On**: None
 
