@@ -654,6 +654,56 @@ async fn update_install_answers_and_the_harness_keeps_serving() {
     r.finish().await;
 }
 
+// M1-D3: the outside world moves the Mac's output route and its free disk.
+#[tokio::test]
+async fn set_output_route_switches_the_route_the_core_reports() {
+    let mut r = start().await;
+    let (set, events) = r
+        .call(
+            "main",
+            "harness.set_output_route",
+            json!({ "route": "speakers", "output_device": null }),
+        )
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "env:changed"),
+        "{events:?}"
+    );
+    let env = r.ok("main", "app_snapshot", json!({})).await["environment"].clone();
+    assert_eq!(env["output_route"], "speakers");
+    assert_eq!(env["output_device"], json!(null));
+    let (bad, _) = r
+        .call(
+            "main",
+            "harness.set_output_route",
+            json!({ "route": "radio" }),
+        )
+        .await;
+    assert_eq!(bad["error"]["code"], "invalid_input");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn set_free_disk_changes_the_free_space_the_core_reports() {
+    let mut r = start().await;
+    let (set, events) = r
+        .call("main", "harness.set_free_disk", json!({ "mb": 300 }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "env:changed"),
+        "{events:?}"
+    );
+    assert_eq!(
+        r.ok("main", "app_snapshot", json!({})).await["environment"]["disk_free_mb"],
+        300
+    );
+    let (bad, _) = r.call("main", "harness.set_free_disk", json!({})).await;
+    assert_eq!(bad["error"]["code"], "invalid_input");
+    r.finish().await;
+}
+
 // W15
 #[tokio::test]
 async fn push_reaches_the_running_self_test_as_an_engine_fact() {

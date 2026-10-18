@@ -432,6 +432,45 @@ impl Harness {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct OutputRouteArgs {
+    route: OutputRoute,
+    output_device: Option<OutputDeviceInfo>,
+}
+
+#[derive(serde::Deserialize)]
+struct FreeDiskArgs {
+    mb: u32,
+}
+
+/// The M1 controls on the Mac's side (M1-D3): the core re-reads the reading and sends
+/// `env:changed` itself, as it does for a real notification from macOS.
+impl Harness {
+    fn set_output_route(&self, args: Value) -> Result<Value, CoreError> {
+        let a: OutputRouteArgs = parse(
+            args,
+            "harness.set_output_route needs { route, output_device }",
+        )?;
+        self.native.update(|r| {
+            r.output_route = a.route;
+            r.output_device = a.output_device;
+        });
+        self.core.environment_changed(self.native.environment());
+        Ok(json!({}))
+    }
+
+    fn set_free_disk(&self, args: Value) -> Result<Value, CoreError> {
+        let a: FreeDiskArgs = parse(args, "harness.set_free_disk needs { mb }")?;
+        self.native.update(|r| r.disk_free_mb = a.mb);
+        self.core.environment_changed(self.native.environment());
+        Ok(json!({}))
+    }
+}
+
+fn parse<T: serde::de::DeserializeOwned>(args: Value, usage: &str) -> Result<T, CoreError> {
+    serde_json::from_value(args).map_err(|_| CoreError::new(ErrorCode::InvalidInput, usage))
+}
+
 /// App snapshot slices the harness can set on the M0 core; `window` is the caller's own and the
 /// version-only slices follow their owners.
 const OWNED_APP: &[&str] = &["setup", "environment", "banners", "window"];
@@ -475,6 +514,8 @@ impl Controls for Harness {
                     self.models.released.store(true, Ordering::SeqCst);
                     Ok(json!({}))
                 }
+                "set_output_route" => self.set_output_route(args),
+                "set_free_disk" => self.set_free_disk(args),
                 _ => Err(CoreError::new(
                     ErrorCode::InvalidInput,
                     format!("no control harness.{name}"),
@@ -542,6 +583,10 @@ struct ScriptedNative(
 );
 
 impl ScriptedNative {
+    fn update(&self, change: impl FnOnce(&mut EnvironmentReading)) {
+        change(&mut lock(&self.0).1);
+    }
+
     fn new(env: &EnvironmentState) -> Self {
         let native = ScriptedNative(
             Mutex::new((HashMap::new(), EnvironmentReading::default())),
