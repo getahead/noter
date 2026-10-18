@@ -126,6 +126,29 @@ final class SelfTestTests: XCTestCase {
     }
 }
 
+final class ChunkTests: XCTestCase {
+    func testFileChunksCarryTheFileSampleRate() throws {
+        let mic = try WAV.read(try wav("mic", seconds: 0.2, amplitude: 0.3))
+        var chunks: [AudioChunk] = []
+        FileAudioSource(mic: mic, sys: mic, realtime: false).play { chunks.append($0) }
+        XCTAssertEqual(chunks.count, 4)
+        XCTAssertTrue(chunks.allSatisfy { $0.sampleRate == 16_000 && $0.samples.count == 1_600 })
+    }
+
+    func testInterleavedStereoIsDownmixedToMono() {
+        XCTAssertEqual(Mix.mono([1, 3, -1, -3, 0.5, 0.5], channels: 2), [2, -2, 0.5])
+        XCTAssertEqual(Mix.mono([1, 2, 3], channels: 1), [1, 2, 3])
+    }
+
+    func testResamplesTo16kHz() {
+        let one = [Float](repeating: 0.25, count: 48_000)
+        let out = Mix.resample(one, from: 48_000, to: 16_000)
+        XCTAssertEqual(out.count, 16_000)
+        XCTAssertEqual(out.first ?? 0, 0.25, accuracy: 0.0001)
+        XCTAssertEqual(Mix.resample([1, 2], from: 16_000, to: 16_000), [1, 2])
+    }
+}
+
 final class WAVTests: XCTestCase {
     func testReadsPCM16AndFloat32() throws {
         for float in [false, true] {
