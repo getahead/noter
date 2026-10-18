@@ -117,7 +117,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
     1. [ ] - `p1` - API: `setup_set_step` (skip); the stepper marks the step skipped with a dash - `inst-api-skip`
 16. [ ] - `p1` - UI: **Call display** with `cpt-noter-component-ui-display-picker`; the user keeps or changes the choice; API: `setup_set_call_display` (display identity, open automatically) - `inst-call-display`
 17. [ ] - `p1` - UI: **Audio storage** radio group (**Keep audio for 30 days**, **7 days**, **90 days**, **Forever**, **Never store audio**); API: `setup_set_audio_storage` - `inst-audio-storage`
-18. [ ] - `p1` - UI: **Assistants** shows the step 6 frame: the cards of `cpt-noter-feature-ui-accounts` (M3), the **Local runtime** line and the **Privacy mode** radio group; a change calls `settings_update` (privacy) - `inst-assistants`
+18. [ ] - `p1` - UI: **Assistants** shows the step 6 frame: the cards of `cpt-noter-feature-ui-accounts` (key fields M2, sign-in M3), the **Local runtime** line and the **Privacy mode** radio group; a change calls `settings_update` (privacy) - `inst-assistants`
 19. [ ] - `p1` - **IF** no key is stored, no account is signed in and no local runtime is found - `inst-if-no-assistant`
     1. [ ] - `p1` - UI: the warning **Without an assistant Noter still records and transcribes; summaries wait until one is connected.**; **Finish** stays enabled - `inst-no-assistant`
 20. [ ] - `p1` - User clicks **Finish** - `inst-finish`
@@ -366,9 +366,9 @@ The system **MUST** provide the permission check row (setup, status and test-onl
 | Self-test skipped | `skipped` |
 | Remaining steps | `display`, `storage`, `assistants` |
 | One display | `one-display` |
-| Key rejected, Assistants · sign in, Installing a local runtime, No key and no local runtime | `key-rejected`, `acct-wizard`, `assistants`, `no-assistant` (step 6, `cpt-noter-feature-ui-accounts`, M3; the warning line is built here) |
+| Key rejected, Assistants · sign in, Installing a local runtime, No key and no local runtime | `key-rejected`, `acct-wizard`, `assistants`, `no-assistant` (step 6, `cpt-noter-feature-ui-accounts`: key states M2, sign-in M3; the warning line is built here) |
 | Setup left unfinished, Audio access not granted yet | Menu bar and record prompt states (`cpt-noter-feature-ui-menu-bar`, `cpt-noter-feature-ui-record-prompt`) |
 
 **Milestone notes.** `levels_subscribe`, `open_external` and `window_navigate` are placed in M1 by milestones.toml; M0 builds and unit-tests them against the fake core, and their E2E proof against the real core counts from M1 (`docs/DECOMPOSITION.md`, discrepancy 2). The skipped-self-test banner shows in MW-R5 until Today ships in M2 (discrepancy 8).
 
-**Not applicable.** Credentials in this feature: none; step 6's key fields and sign-ins are M3. Data: the UI stores nothing; every choice is a setting the core writes.
+**Not applicable.** Credentials in this feature: none; step 6's key fields are M2 and its sign-ins M3 (`cpt-noter-feature-ui-accounts`). Data: the UI stores nothing; every choice is a setting the core writes.
