@@ -2941,7 +2941,7 @@ Items of the DESIGN checklist that do not apply, with the reason; everything els
 - **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`
 - **Review**: [REVIEW-2026-10-17-design-core.md](./REVIEW-2026-10-17-design-core.md) — the owner decisions and resolutions v0.4 applies
 - **Contract**: [crates/noter-protocol](../crates/noter-protocol/), [contracts/](../contracts/), [apps/desktop/src/core](../apps/desktop/src/core/)
-- **Features**: not yet written; FEATURE specs will reference the component, interface and sequence IDs of this document
+- **Features**: [DECOMPOSITION-core.md](DECOMPOSITION-core.md) splits this design into 31 features by milestone (M0 to M5); each has a FEATURE spec in [features/core/](features/core/) that references the component, interface and sequence IDs of this document
 - **Code**: traceability is FULL. `@cpt-*` markers in `crates/` and `apps/desktop/src` are validated against the IDs of this document by `cfs validate`, and `just trace` keeps the share of component, interface, seq and dbtable IDs with a marker from going down
 - **Harness**: [HARNESS.md](./HARNESS.md), `harness/milestones.toml` (which milestone delivers each command and story), `harness/perf.toml` and the native UI tests in `apps/desktop/tests/native` (XCUITest)
 
