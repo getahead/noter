@@ -44,6 +44,9 @@ valgrind and the linters. It fails while anything `just gate` needs is missing; 
 | `just <gate>` | One gate: `lint`, `contract`, `arch`, `trace`, `test-unit`, `cov-unit`, `native`, `e2e`, `visual`, `perf`, `docs`, `config-guard` |
 | `just fmt` | Format Rust (the pre-commit hook refuses unformatted staged Rust) |
 
+Several worktrees on one machine share port 5173: export `NOTER_E2E_LOCK=<path to a lock file>` (one file for the
+machine) and `just e2e`, `just visual` and `just visual-update` wait for each other; every other recipe runs unlocked.
+
 What runs where on a Mac: `just native` passes with a notice until `apps/desktop/tests/native` exists, then needs
 Xcode. `just visual` needs a running Docker daemon (without one it says screenshots are checked in CI only).
 `just perf` gates scenario coverage and reports wall time only; the 10% instruction-count bar is enforced in CI.
