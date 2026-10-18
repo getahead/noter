@@ -9,6 +9,7 @@
 //! * `contracts/mcp-tools.schema.json`     noter-mcp tool input/output schemas
 //! * `contracts/skills/*.schema.json`      LLM skill output schemas
 //! * `contracts/fixtures/world.json`       typed fixtures for the fake core
+//! * `contracts/egress-hosts.json`         every host Noter's processes may reach
 
 use std::path::{Path, PathBuf};
 
@@ -362,6 +363,47 @@ fn write(root: &Path, rel: &str, content: &str, check: bool, diffs: &mut Vec<Str
     println!("wrote {rel}");
 }
 
+/// `contracts/egress-hosts.json`, laid out for review: one line per host list.
+fn egress_hosts() -> String {
+    use noter_protocol::egress::*;
+    let q = |s: &str| serde_json::to_string(s).unwrap();
+    let list = |hosts: &[&str]| {
+        let items: Vec<String> = hosts.iter().map(|h| q(h)).collect();
+        format!("[{}]", items.join(", "))
+    };
+    let mut s = format!(
+        "{{\n  \"$comment\": {},\n  \"version\": {VERSION},\n",
+        q(COMMENT)
+    );
+    s += &format!(
+        "  \"provider_hosts\": {{\n    \"$comment\": {}",
+        q(PROVIDER_HOSTS_COMMENT)
+    );
+    for (runtime, hosts) in PROVIDER_HOSTS {
+        s += &format!(",\n    {}: {}", q(runtime), list(hosts));
+    }
+    s += &format!(
+        "\n  }},\n  \"allow_without_audit\": {{\n    \"$comment\": {}",
+        q(ALLOW_WITHOUT_AUDIT_COMMENT)
+    );
+    for g in ALLOW_WITHOUT_AUDIT {
+        s += &format!(
+            ",\n    {}: {{\n      \"hosts\": {},\n      \"note\": {}\n    }}",
+            q(g.name),
+            list(g.hosts),
+            q(g.note)
+        );
+    }
+    s += &format!(
+        "\n  }},\n  \"user_configured\": {{\n    \"$comment\": {}",
+        q(USER_CONFIGURED_COMMENT)
+    );
+    for (key, text) in USER_CONFIGURED {
+        s += &format!(",\n    {}: {}", q(key), q(text));
+    }
+    s + "\n  }\n}\n"
+}
+
 fn pretty(v: &Value) -> String {
     let mut s = serde_json::to_string_pretty(v).unwrap();
     s.push('\n');
@@ -446,6 +488,13 @@ fn main() {
             &mut diffs,
         );
     }
+    write(
+        &root,
+        "contracts/egress-hosts.json",
+        &egress_hosts(),
+        check,
+        &mut diffs,
+    );
     let world = serde_json::to_value(noter_protocol::fixtures::world()).unwrap();
     write(
         &root,

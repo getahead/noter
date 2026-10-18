@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-written, not generated. Every host Noter's processes may reach (docs/REVIEW-2026-10-17-design-core.md, R2 and R46). The network-monitor release gate checks recorded proxy lines against this file: a line to a provider_hosts host must match an audit_log run row by time window and run id header; a line to an allow_without_audit host needs no row; any other host fails the gate. Change it in the same pull request as the code that adds a destination.",
+  "$comment": "Generated from crates/noter-protocol/src/egress.rs (just contract-regen). Every host Noter's processes may reach (docs/REVIEW-2026-10-17-design-core.md, R2 and R46). The network-monitor release gate checks recorded proxy lines against this file: a line to a provider_hosts host must match an audit_log run row by time window and run id header; a line to an allow_without_audit host needs no row; any other host fails the gate. Change it in the same pull request as the code that adds a destination.",
   "version": 1,
   "provider_hosts": {
     "$comment": "Where an LLM run's own HTTPS requests may go, per runtime. Each run has an audit_log row (kind run) and, for cloud runs, one row per noter-mcp tool result (kind tool_result). CLI runs are locked down (strict MCP config, no WebFetch, WebSearch or Bash, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1; Codex with an isolated CODEX_HOME), so no other host is expected from them.",
@@ -16,7 +16,7 @@
       "note": "Signed update manifest and bundles (Tauri updater). Replace with the release host once it is chosen."
     },
     "model_downloads": {
-      "hosts": ["huggingface.co", "cdn-lfs.huggingface.co", "cdn-lfs.hf.co", "cas-bridge.xethub.hf.co", "registry.ollama.ai"],
+      "hosts": ["huggingface.co", "cdn-lfs.huggingface.co", "cdn-lfs.hf.co", "cas-bridge.xethub.hf.co", "us.aws.cdn.hf.co", "registry.ollama.ai"],
       "note": "WhisperKit, FluidAudio and bge-m3 bundles (checksummed), and local models pulled through Ollama."
     },
     "cli_install": {
