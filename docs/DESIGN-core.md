@@ -2741,7 +2741,7 @@ Typed settings sections and the account binding.
 
 **PK**: key
 
-**Constraints**: Writes of the sections are guarded by the settings `rev`; `hotkeys` and `setup` have their own commands and do not bump `rev`
+**Constraints**: Writes of the sections are guarded by the settings `rev`; the `hotkeys` and `setup` rows have their own commands, and writing only those rows does not bump `rev`. `setup_set_call_display`, `setup_set_audio_storage` and `hotkeys_reset` also change sections, so they do bump `rev` and emit `settings:changed` as well as their own event (Backend Teamlead decision of 18 Oct 2026)
 
 **Additional info**: Account binding holds email and plan, never a token
 
