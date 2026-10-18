@@ -120,13 +120,13 @@ The user should finish setup in one sitting before the first real call, and call
 - System Audio Recording cannot be queried: it is reported as inferred from the self-test (non-zero buffers) and never blocks anything.
 
 **Steps**:
-1. [ ] - `p1` - API: `permission_request { kind }` from the First run, Settings or main window - `inst-permission-call`
-2. [ ] - `p1` - **IF** `kind` is `system_audio` - `inst-if-system-audio`
+1. [x] - `p1` - API: `permission_request { kind }` from the First run, Settings or main window - `inst-permission-call`
+2. [x] - `p1` - **IF** `kind` is `system_audio` - `inst-if-system-audio`
    1. [ ] - `p1` - Ask the engine to open the tap briefly so macOS shows its prompt; the state comes from the next self-test - `inst-system-audio`
 3. [ ] - `p1` - **ELSE** ask through `noter-native` (AVCaptureDevice for the microphone, EventKit for the calendar, `UNUserNotificationCenter` for notifications, the screen-capture check, Apple Events for automation) - `inst-native-ask`
-4. [ ] - `p1` - Update the permission row and emit `env:changed` and `setup:changed` with new versions - `inst-emit-permission`
-5. [ ] - `p1` - **IF** the result is denied **RETURN** `permission_denied` - `inst-if-denied`
-6. [ ] - `p1` - **RETURN** the `PermissionRow` - `inst-return-permission`
+4. [x] - `p1` - Update the permission row and emit `env:changed` and `setup:changed` with new versions - `inst-emit-permission`
+5. [x] - `p1` - **IF** the result is denied **RETURN** `permission_denied` - `inst-if-denied`
+6. [x] - `p1` - **RETURN** the `PermissionRow` - `inst-return-permission`
 
 ### Run the self-test
 
@@ -153,7 +153,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Choose call display, audio storage and step states
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-first-run-choices`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-first-run-choices`
 
 **Actor**: Primary user (First run)
 
@@ -164,15 +164,15 @@ The user should finish setup in one sitting before the first real call, and call
 - The chosen display is gone: `invalid_input`; the window reloads the display list from `env:changed`.
 
 **Steps**:
-1. [ ] - `p1` - API: `setup_set_call_display { display_id }`, `setup_set_audio_storage { never_store_audio, retention }` or `setup_set_step { step, state }` - `inst-choice-call`
-2. [ ] - `p1` - Validate the display id against the current displays; an unknown one **RETURN** `invalid_input` - `inst-validate-display`
-3. [ ] - `p1` - DB: write the choice into its settings section through the change-log write path (`cpt-noter-flow-core-settings-update` rules) - `inst-write-choice`
-4. [ ] - `p1` - Recompute `SetupStatus.complete`; the Assistants step can only be skipped in M0 (connecting an assistant is M3) - `inst-recompute`
-5. [ ] - `p1` - **RETURN** `SetupStatus`; emit `setup:changed` - `inst-return-choice`
+1. [x] - `p1` - API: `setup_set_call_display { display_id }`, `setup_set_audio_storage { never_store_audio, retention }` or `setup_set_step { step, state }` - `inst-choice-call`
+2. [x] - `p1` - Validate the display id against the current displays; an unknown one **RETURN** `invalid_input` - `inst-validate-display`
+3. [x] - `p1` - DB: write the choice into its settings section through the change-log write path (`cpt-noter-flow-core-settings-update` rules) - `inst-write-choice`
+4. [x] - `p1` - Recompute `SetupStatus.complete`; the Assistants step can only be skipped in M0 (connecting an assistant is M3) - `inst-recompute`
+5. [x] - `p1` - **RETURN** `SetupStatus`; emit `setup:changed` - `inst-return-choice`
 
 ### Install a downloaded update
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-first-run-update`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-first-run-update`
 
 **Actor**: Primary user (Settings or main window, from the update banner)
 
@@ -184,11 +184,11 @@ The user should finish setup in one sitting before the first real call, and call
 - No update is ready: `not_found`.
 
 **Steps**:
-1. [ ] - `p1` - API: `update_install {}` - `inst-update-call`
-2. [ ] - `p1` - **IF** a capture is running, schedule the install for the next stop and **RETURN** `Ack` - `inst-if-recording`
-3. [ ] - `p1` - **IF** no verified update is ready **RETURN** `not_found` - `inst-if-no-update`
-4. [ ] - `p1` - Shut the core down in order (streams end with `shutdown`, the writer drains) and let `tauri-plugin-updater` install and relaunch - `inst-install`
-5. [ ] - `p1` - **RETURN** `Ack` before the relaunch - `inst-return-update`
+1. [x] - `p1` - API: `update_install {}` - `inst-update-call`
+2. [x] - `p1` - **IF** a capture is running, schedule the install for the next stop and **RETURN** `Ack` - `inst-if-recording`
+3. [x] - `p1` - **IF** no verified update is ready **RETURN** `not_found` - `inst-if-no-update`
+4. [x] - `p1` - Shut the core down in order (streams end with `shutdown`, the writer drains) and let `tauri-plugin-updater` install and relaunch - `inst-install`
+5. [x] - `p1` - **RETURN** `Ack` before the relaunch - `inst-return-update`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -211,31 +211,31 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Detection rule
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-first-run-detection-rule`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-first-run-detection-rule`
 
 **Input**: `GeneralSettings.offer_to_record`, the stored `SelfTestState`.
 
 **Output**: Whether call detection runs, and the matching degraded state.
 
 **Steps**:
-1. [ ] - `p1` - **IF** `offer_to_record` is on and the self-test passed - `inst-if-detect`
-   1. [ ] - `p1` - Detection on; remove `SetupIncomplete` from the degraded set - `inst-detect-on`
-2. [ ] - `p1` - **ELSE** detection off; add `SetupIncomplete` to the degraded set when the self-test has not passed - `inst-detect-off`
-3. [ ] - `p1` - **RETURN** the decision; it never affects `capture_start` - `inst-return-detection`
+1. [x] - `p1` - **IF** `offer_to_record` is on and the self-test passed - `inst-if-detect`
+   1. [x] - `p1` - Detection on; remove `SetupIncomplete` from the degraded set - `inst-detect-on`
+2. [x] - `p1` - **ELSE** detection off; add `SetupIncomplete` to the degraded set when the self-test has not passed - `inst-detect-off`
+3. [x] - `p1` - **RETURN** the decision; it never affects `capture_start` - `inst-return-detection`
 
 ### Assemble setup status and environment
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-first-run-status`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-first-run-status`
 
 **Input**: Settings, model states, permission rows, self-test state, displays, output route and device, notification authorization, network reachability, update info, free disk.
 
 **Output**: `SetupStatus` and `EnvironmentState`, each with a new `version` when it changed.
 
 **Steps**:
-1. [ ] - `p1` - Build `SetupStatus` from the stored choices and the current states; `complete` is true when every step is done or skipped - `inst-build-setup`
-2. [ ] - `p1` - Build `EnvironmentState` from `noter-native` readings; re-read on display, output-route, permission, notification-authorization, reachability and disk notifications - `inst-build-env`
-3. [ ] - `p1` - **IF** either changed, stamp a new version and emit `setup:changed` or `env:changed` - `inst-emit-changes`
-4. [ ] - `p1` - **RETURN** both - `inst-return-status`
+1. [x] - `p1` - Build `SetupStatus` from the stored choices and the current states; `complete` is true when every step is done or skipped - `inst-build-setup`
+2. [x] - `p1` - Build `EnvironmentState` from `noter-native` readings; re-read on display, output-route, permission, notification-authorization, reachability and disk notifications - `inst-build-env`
+3. [x] - `p1` - **IF** either changed, stamp a new version and emit `setup:changed` or `env:changed` - `inst-emit-changes`
+4. [x] - `p1` - **RETURN** both - `inst-return-status`
 
 ### Launch at login
 
@@ -289,7 +289,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Setup status and choices
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-first-run-status`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-status`
 
 The system **MUST** answer `setup_status`, `setup_set_call_display`, `setup_set_audio_storage` and `setup_set_step` with a versioned `SetupStatus`, store the choices in settings through the change log, and emit `setup:changed` and `env:changed` whole on every change.
 
