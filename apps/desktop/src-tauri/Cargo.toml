@@ -1,0 +1,28 @@
+[package]
+name = "noter-desktop"
+version = "0.2.0"
+edition = "2021"
+license = "UNLICENSED"
+rust-version = "1.80"
+description = "The thin Tauri host: one handler per contract command, window capabilities, events; no product logic."
+publish = false
+
+# Its own workspace: only the macOS job builds Tauri (ci.yml › macos), the Linux jobs never do.
+[workspace]
+
+[lib]
+name = "noter_desktop"
+
+[build-dependencies]
+noter-protocol = { path = "../../../crates/noter-protocol" }
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+noter-core = { path = "../../../crates/noter-core" }
+noter-protocol = { path = "../../../crates/noter-protocol" }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tempfile = "3"

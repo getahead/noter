@@ -86,7 +86,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Call a command from a window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-command`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-command`
 
 **Actor**: UI window (WebView)
 
@@ -99,19 +99,19 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The core is still starting: `not_ready`, retryable.
 
 **Steps**:
-1. [ ] - `p1` - Window invokes the command with `{ args }` (and `channel` for subscribing commands) - `inst-invoke`
-2. [ ] - `p1` - Host builds `CommandCtx` with `Caller::Window { label }` from the calling webview - `inst-build-ctx`
-3. [ ] - `p1` - Host runs `cpt-noter-algo-core-ipc-host-scope-check` - `inst-scope-check`
-4. [ ] - `p1` - **IF** the scope check refused - `inst-if-refused`
-   1. [ ] - `p1` - **RETURN** `CoreError { code: window_not_allowed }` - `inst-return-not-allowed`
-5. [ ] - `p1` - Host deserializes `args` into the command's argument type; a failure **RETURN** `invalid_input` - `inst-parse-args`
-6. [ ] - `p1` - **IF** the command subscribes, adapt the Tauri Channel into a contract `Sink` - `inst-adapt-sink`
-7. [ ] - `p1` - API: call the `CoreApi` method on the concrete core - `inst-call-core`
-8. [ ] - `p1` - **RETURN** the result, or the `CoreError` serialized as the rejection - `inst-return-result`
+1. [x] - `p1` - Window invokes the command with `{ args }` (and `channel` for subscribing commands) - `inst-invoke`
+2. [x] - `p1` - Host builds `CommandCtx` with `Caller::Window { label }` from the calling webview - `inst-build-ctx`
+3. [x] - `p1` - Host runs `cpt-noter-algo-core-ipc-host-scope-check` - `inst-scope-check`
+4. [x] - `p1` - **IF** the scope check refused - `inst-if-refused`
+   1. [x] - `p1` - **RETURN** `CoreError { code: window_not_allowed }` - `inst-return-not-allowed`
+5. [x] - `p1` - Host deserializes `args` into the command's argument type; a failure **RETURN** `invalid_input` - `inst-parse-args`
+6. [x] - `p1` - **IF** the command subscribes, adapt the Tauri Channel into a contract `Sink` - `inst-adapt-sink`
+7. [x] - `p1` - API: call the `CoreApi` method on the concrete core - `inst-call-core`
+8. [x] - `p1` - **RETURN** the result, or the `CoreError` serialized as the rejection - `inst-return-result`
 
 ### Open or reload a window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-window-open`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-window-open`
 
 **Actor**: UI window (WebView)
 
@@ -123,17 +123,17 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The webview reloads: every subscription it held ends; the reloaded page subscribes again.
 
 **Steps**:
-1. [ ] - `p1` - API: `app_snapshot {}` returns `AppSnapshot` with each slice carrying its `version` - `inst-app-snapshot`
-2. [ ] - `p1` - Window calls a subscribing command (for example `transcript_subscribe`) with a Channel - `inst-subscribe`
-3. [ ] - `p1` - Hub runs `cpt-noter-algo-core-ipc-host-subscribe` and returns the snapshot with `last_seq` - `inst-run-subscribe`
-4. [ ] - `p1` - Hub delivers messages with `seq = last_seq + 1, + 2, …`; the generated transport buffers any that arrive before the snapshot and drops `seq ≤ last_seq` - `inst-deliver`
-5. [ ] - `p1` - API: window sends `stream_ack { subscription_id, seq }` every 100 messages or 1 s; hub runs `cpt-noter-algo-core-ipc-host-ack` - `inst-ack`
-6. [ ] - `p1` - **IF** the window calls `stream_unsubscribe` - `inst-if-unsubscribe`
-   1. [ ] - `p1` - Hub ends the subscription with `ended { unsubscribed }` and **RETURN** `Ack` - `inst-return-unsubscribed`
+1. [x] - `p1` - API: `app_snapshot {}` returns `AppSnapshot` with each slice carrying its `version` - `inst-app-snapshot`
+2. [x] - `p1` - Window calls a subscribing command (for example `transcript_subscribe`) with a Channel - `inst-subscribe`
+3. [x] - `p1` - Hub runs `cpt-noter-algo-core-ipc-host-subscribe` and returns the snapshot with `last_seq` - `inst-run-subscribe`
+4. [x] - `p1` - Hub delivers messages with `seq = last_seq + 1, + 2, …`; the generated transport buffers any that arrive before the snapshot and drops `seq ≤ last_seq` - `inst-deliver`
+5. [x] - `p1` - API: window sends `stream_ack { subscription_id, seq }` every 100 messages or 1 s; hub runs `cpt-noter-algo-core-ipc-host-ack` - `inst-ack`
+6. [x] - `p1` - **IF** the window calls `stream_unsubscribe` - `inst-if-unsubscribe`
+   1. [x] - `p1` - Hub ends the subscription with `ended { unsubscribed }` and **RETURN** `Ack` - `inst-return-unsubscribed`
 
 ### Dismiss an app banner
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-banner-dismiss`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-banner-dismiss`
 
 **Actor**: UI window (main)
 
@@ -144,16 +144,14 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The banner is already gone: the current `BannerSet` is returned unchanged.
 
 **Steps**:
-1. [ ] - `p1` - API: `banner_dismiss { banner }` from the main window - `inst-dismiss`
-2. [ ] - `p1` - Core removes the banner kind from the set and bumps the `BannerSet` version - `inst-remove-banner`
-3. [ ] - `p1` - **IF** the banner was `RecordingInterruptedByQuit` - `inst-if-interrupted`
-   1. [ ] - `p1` - Tell the session manager the resume offer for that call ended (once it exists, M1) - `inst-end-resume-offer`
-4. [ ] - `p1` - Emit `banners:changed` with the whole set - `inst-emit-banners`
-5. [ ] - `p1` - **RETURN** the `BannerSet` - `inst-return-banners`
+1. [x] - `p1` - API: `banner_dismiss { banner }` from the main window - `inst-dismiss`
+2. [x] - `p1` - Core removes the banner kind from the set (an absent kind returns the set unchanged, without an event). The `RecordingInterruptedByQuit` banner is the resume offer itself, so removing it ends the offer to resume that call - `inst-remove-banner`
+3. [x] - `p1` - Bump the `BannerSet` version and emit `banners:changed` with the whole set - `inst-emit-banners`
+4. [x] - `p1` - **RETURN** the `BannerSet` - `inst-return-banners`
 
 ### Log a UI error
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-ipc-host-log-ui`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-ipc-host-log-ui`
 
 **Actor**: UI window
 
@@ -164,121 +162,121 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The message carries a field that may hold transcript, document or model text: the field is dropped before writing.
 
 **Steps**:
-1. [ ] - `p1` - API: `log_ui { level, message, context }` - `inst-log-call`
-2. [ ] - `p1` - Core applies `cpt-noter-algo-core-ipc-host-scrub-log` - `inst-log-scrub`
-3. [ ] - `p1` - Write the line to `logs/` (structured, 0600) - `inst-log-write`
-4. [ ] - `p1` - **RETURN** `Ack` - `inst-log-return`
+1. [x] - `p1` - API: `log_ui { level, message, context }` - `inst-log-call`
+2. [x] - `p1` - Core applies `cpt-noter-algo-core-ipc-host-scrub-log` - `inst-log-scrub`
+3. [x] - `p1` - Write the line to `logs/` (structured, 0600); bounding and rotating `logs/noter.log` is M5 maintenance (`cpt-noter-feature-core-maintenance`) - `inst-log-write`
+4. [x] - `p1` - **RETURN** `Ack` - `inst-log-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Window scope check
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scope-check`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scope-check`
 
 **Input**: `CommandCtx.caller` and the command's window list from `COMMANDS`.
 
 **Output**: Allowed, or refused with `window_not_allowed`.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the caller is `Caller::Native { surface }` - `inst-if-native`
-   1. [ ] - `p1` - **RETURN** allowed; record the surface as the actor surface for any change the command writes - `inst-return-native`
-2. [ ] - `p1` - **IF** the window label is in the command's list - `inst-if-in-scope`
-   1. [ ] - `p1` - **RETURN** allowed - `inst-return-allowed`
-3. [ ] - `p1` - **RETURN** refused - `inst-return-refused`
+1. [x] - `p1` - **IF** the caller is `Caller::Native { surface }` - `inst-if-native`
+   1. [x] - `p1` - **RETURN** allowed; record the surface as the actor surface for any change the command writes - `inst-return-native`
+2. [x] - `p1` - **IF** the window label is in the command's list - `inst-if-in-scope`
+   1. [x] - `p1` - **RETURN** allowed - `inst-return-allowed`
+3. [x] - `p1` - **RETURN** refused - `inst-return-refused`
 
 ### Subscribe with a snapshot
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-subscribe`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-subscribe`
 
 **Input**: Stream kind and key (for example transcript of a call), the window label, the `Sink`.
 
 **Output**: The snapshot with `last_seq` and a subscription id.
 
 **Steps**:
-1. [ ] - `p1` - Take the hub lock for the stream key - `inst-lock`
-2. [ ] - `p1` - Ask the owning service for its snapshot, read through the writer connection (`cpt-noter-algo-core-storage-snapshot-read`) - `inst-snapshot`
-3. [ ] - `p1` - Read the stream's current `seq` as `last_seq` - `inst-read-seq`
-4. [ ] - `p1` - Register the subscription: id, window label, `Sink`, last acknowledged `seq = last_seq` - `inst-register`
-5. [ ] - `p1` - Release the lock - `inst-unlock`
-6. [ ] - `p1` - **RETURN** the snapshot, `last_seq` and the subscription id - `inst-return-subscribe`
+1. [x] - `p1` - Take the hub lock for the stream key - `inst-lock`
+2. [x] - `p1` - Ask the owning service for its snapshot, read through the writer connection (`cpt-noter-algo-core-storage-snapshot-read`) - `inst-snapshot`
+3. [x] - `p1` - Read the stream's current `seq` as `last_seq` - `inst-read-seq`
+4. [x] - `p1` - Register the subscription: id, window label, `Sink`, last acknowledged `seq = last_seq` - `inst-register`
+5. [x] - `p1` - Release the lock - `inst-unlock`
+6. [x] - `p1` - **RETURN** the snapshot, `last_seq` and the subscription id - `inst-return-subscribe`
 
 ### Publish and acknowledge
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-ack`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-ack`
 
 **Input**: A stream message from a service, or a `stream_ack` from a window.
 
 **Output**: Messages delivered in order; lagging subscriptions ended.
 
 **Steps**:
-1. [ ] - `p1` - On publish, take the hub lock, assign `seq + 1`, append to the bounded replay buffer, send to every subscription of the stream - `inst-publish`
-2. [ ] - `p1` - **FOR EACH** subscription after a send - `inst-for-subs`
-   1. [ ] - `p1` - **IF** unacknowledged messages reach 2 000, end it with `ended { lagged }` and drop it - `inst-end-lagged`
-3. [ ] - `p1` - On `stream_ack`, set the subscription's last acknowledged `seq` (never lower than before) - `inst-ack-update`
-4. [ ] - `p1` - Levels are coalesced to at most one message per 100 ms per subscription; cards are never batched or delayed - `inst-coalesce`
-5. [ ] - `p1` - **RETURN** - `inst-return-publish`
+1. [x] - `p1` - On publish, take the hub lock, assign `seq + 1`, append to the replay buffer (bounded at 2 000 messages, the lag limit), send to every subscription of the stream - `inst-publish`
+2. [x] - `p1` - **FOR EACH** subscription after a send - `inst-for-subs`
+   1. [x] - `p1` - **IF** unacknowledged messages reach 2 000, end it with `ended { lagged }` and drop it - `inst-end-lagged`
+3. [x] - `p1` - On `stream_ack`, set the subscription's last acknowledged `seq` (never lower than before) - `inst-ack-update`
+4. [x] - `p1` - Levels are coalesced per stream to at most one message per 100 ms, before a `seq` is assigned: a skipped level takes no `seq` and is not kept for replay, so every subscriber sees consecutive `seq`s (ADR-0002); cards are never batched or delayed - `inst-coalesce`
+5. [x] - `p1` - **RETURN** - `inst-return-publish`
 
 ### End subscriptions of a webview
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-webview-reset`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-webview-reset`
 
 **Input**: A page-load or destroy notice for a webview label, or a stream end (stop, discard, shutdown).
 
 **Output**: Every affected subscription ended with a reason.
 
 **Steps**:
-1. [ ] - `p1` - **IF** a webview loaded a page or was destroyed - `inst-if-webview`
-   1. [ ] - `p1` - End every subscription of that label with `ended { unsubscribed }` - `inst-end-webview`
-2. [ ] - `p1` - **IF** a stream ended (call stopped, discarded, shutdown) - `inst-if-stream-end`
-   1. [ ] - `p1` - End every subscription of the stream with that reason (`call_stopped`, `discarded`, `shutdown`) - `inst-end-stream`
-3. [ ] - `p1` - **RETURN** - `inst-return-reset`
+1. [x] - `p1` - **IF** a webview loaded a page or was destroyed - `inst-if-webview`
+   1. [x] - `p1` - End every subscription of that label with `ended { unsubscribed }` - `inst-end-webview`
+2. [x] - `p1` - **IF** a stream ended (call stopped, discarded, shutdown) - `inst-if-stream-end`
+   1. [x] - `p1` - End every subscription of the stream with that reason (`call_stopped`, `discarded`, `shutdown`) - `inst-end-stream`
+3. [x] - `p1` - **RETURN** - `inst-return-reset`
 
 ### Stamp whole-state versions
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-version`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-version`
 
 **Input**: A whole-state payload kind (capture, degraded, banners, settings, setup, environment, …) and its new state.
 
 **Output**: The payload stamped with a `version` higher than any earlier one of that kind.
 
 **Steps**:
-1. [ ] - `p1` - Increment the kind's counter (kept in memory, starting from 1 at each core start) - `inst-increment`
-2. [ ] - `p1` - Stamp the payload, and the matching command result or snapshot slice, with it - `inst-stamp`
-3. [ ] - `p1` - Emit the event with the whole state - `inst-emit-event`
-4. [ ] - `p1` - **RETURN** the stamped payload - `inst-return-version`
+1. [x] - `p1` - Increment the kind's counter (kept in memory, starting from 1 at each core start) - `inst-increment`
+2. [x] - `p1` - Stamp the payload, and the matching command result or snapshot slice, with it - `inst-stamp`
+3. [x] - `p1` - Emit the event with the whole state - `inst-emit-event`
+4. [x] - `p1` - **RETURN** the stamped payload - `inst-return-version`
 
 ### Scrub log lines
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scrub-log`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scrub-log`
 
 **Input**: A log record from the UI or from any core module.
 
 **Output**: The record without transcript, document or model text.
 
 **Steps**:
-1. [ ] - `p1` - Keep only fields of an allow-list (level, module, window, command name, error code, ids, durations, counts) - `inst-allow-list`
-2. [ ] - `p1` - Truncate free-text messages from the UI to a fixed length and drop any field named or typed as text content - `inst-truncate`
-3. [ ] - `p1` - **RETURN** the scrubbed record - `inst-return-scrubbed`
+1. [x] - `p1` - Keep only fields of an allow-list (level, module, window, command name, error code, ids, durations, counts) - `inst-allow-list`
+2. [x] - `p1` - Keep no free text: a UI message keeps only its length (`message_len`), and any string that is not a short identifier (screen, command, id, error code) is left out - `inst-truncate`
+3. [x] - `p1` - **RETURN** the scrubbed record - `inst-return-scrubbed`
 
 ## 4. States (CDSL)
 
 ### Subscription lifecycle
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-ipc-host-subscription`
+- [x] `p1` - **ID**: `cpt-noter-state-core-ipc-host-subscription`
 
 **States**: registering, streaming, ended
 
 **Initial State**: registering
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** registering **TO** streaming **WHEN** the snapshot was taken and the subscription registered under the hub lock - `inst-st-streaming`
-2. [ ] - `p1` - **FROM** streaming **TO** ended **WHEN** the window unsubscribes, its webview reloads or is destroyed, it falls 2 000 messages behind, or the stream ends (call stopped, discarded, shutdown) - `inst-st-ended`
+1. [x] - `p1` - **FROM** registering **TO** streaming **WHEN** the snapshot was taken and the subscription registered under the hub lock - `inst-st-streaming`
+2. [x] - `p1` - **FROM** streaming **TO** ended **WHEN** the window unsubscribes, its webview reloads or is destroyed, it falls 2 000 messages behind, or the stream ends (call stopped, discarded, shutdown) - `inst-st-ended`
 
 ## 5. Definitions of Done
 
 ### Scoped handlers with parity
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-handlers`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-handlers`
 
 The system **MUST** register one handler per entry of `COMMANDS` in `src-tauri`, generate `AppManifest::commands` and one capability per window in `build.rs`, map Tauri's denial to `window_not_allowed` and parse failures to `invalid_input`, and prove with `tauri::test::mock_builder` that the registered list equals `COMMANDS` and every command called from every window gets its answer or `window_not_allowed`.
 
@@ -294,7 +292,7 @@ The system **MUST** register one handler per entry of `COMMANDS` in `src-tauri`,
 
 ### Stream hub
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-stream-hub`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-stream-hub`
 
 The system **MUST** start every Channel at `last_seq + 1` after a snapshot taken under the hub lock, keep consecutive `seq` numbers, accept `stream_ack`, end a subscription at 2 000 unacknowledged messages with `lagged`, end every subscription of a webview on page load or destroy, and end streams with their reason.
 
@@ -323,7 +321,7 @@ The system **MUST** answer `app_snapshot` with every slice the current milestone
 
 ### No content in logs
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-log-scrub`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-log-scrub`
 
 The system **MUST** never write transcript, document or model text to `logs/`; a test feeds every log path (including `log_ui`) records with such text and finds none of it on disk.
 
@@ -336,9 +334,9 @@ The system **MUST** never write transcript, document or model text to `logs/`; a
 
 ## 6. Acceptance Criteria
 
-- [ ] The handler-parity test passes: registered handlers equal `COMMANDS`, and every command from every window is answered or refused with `window_not_allowed`.
+- [x] The handler-parity test passes: registered handlers equal `COMMANDS`, and every command from every window is answered or refused with `window_not_allowed`.
 - [ ] A Channel message published before the subscribing `invoke` resolves is delivered after the snapshot, and none with `seq ≤ last_seq` is delivered (conformance, against the real core).
-- [ ] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
+- [x] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
 - [ ] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
-- [ ] No log file contains transcript text after the log-scrubbing test.
+- [x] No log file contains transcript text after the log-scrubbing test.
 - [ ] `just gate` passes.
