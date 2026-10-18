@@ -63,6 +63,10 @@ test.describe("cpt-noter-dod-ui-primitives-controls primitives page", () => {
       [".np-btn--small", ".np-btn"],
       [".np-ibtn--inline", ".np-ibtn"],
       [".np-disc", ".np-disc"],
+      ["#ibtn-toolbar", ".np-ibtn"],
+      ['[data-gallery="segmented-control"] .np-seg__item', ".np-seg__item"],
+      [".np-token__x", ".np-token__x"],
+      ["#link-inline", ".np-link"],
     ];
     for (const [visible, target] of controls) {
       const hits = await page.locator(visible).first().evaluate((el, sel) => {

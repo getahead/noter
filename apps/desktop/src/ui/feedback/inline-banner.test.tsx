@@ -31,6 +31,10 @@ describe("InlineBanner (cpt-noter-dod-ui-primitives-feedback)", () => {
     expect(html).toContain("+2 More");
   });
 
+  it("shows progress text within 0 to 100", () => {
+    expect(renderToString(<InlineBanner banner={b("dl", "info", { progress: 140 })} />)).toContain("100 %");
+  });
+
   it("a link action renders as a link", () => {
     expect(renderToString(<InlineBanner banner={b("w", "warning", { actions: [{ label: "Learn More", link: true }] })} />)).toContain('class="np-link"');
   });

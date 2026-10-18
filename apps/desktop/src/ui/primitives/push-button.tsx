@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
 
 import { Icon, type IconName } from "../icons";
 import { base, cx, type Common } from "./attrs";
@@ -71,7 +71,10 @@ export function PushButton({ label, variant = "secondary", size = "regular", ico
   const className = cx("np-btn", `np-btn--${variant}`, `np-btn--${size}`, o.cls);
   // @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
   // @cpt-begin:cpt-noter-flow-ui-primitives-operate-control:p1:inst-user-input
-  const onClick = () => press({ disabled, loading }, onAction);
+  const onClick = (e: MouseEvent) => {
+    if (loading) e.preventDefault(); // Space, Return and a click submit a form natively; a busy button must not
+    press({ disabled, loading }, onAction);
+  };
   // @cpt-end:cpt-noter-flow-ui-primitives-operate-control:p1:inst-user-input
   // @cpt-begin:cpt-noter-flow-ui-primitives-operate-control:p1:inst-return-control
   return (
@@ -83,6 +86,7 @@ export function PushButton({ label, variant = "secondary", size = "regular", ico
       aria-keyshortcuts={shortcut}
       aria-label={ariaLabel}
       aria-expanded={expanded}
+      aria-busy={loading || undefined}
       {...attrs}
       onClick={onClick}
       onKeyDown={onKeyDown}

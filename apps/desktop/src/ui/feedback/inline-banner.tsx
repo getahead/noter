@@ -72,7 +72,7 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
         {b.progress != null && (
           <div className="np-banner__prog">
             <Progress value={b.progress} label={b.text} />
-            <span className="np-tnum">{`${b.progress} %`}</span>
+            <span className="np-tnum">{`${Math.max(0, Math.min(100, b.progress))} %`}</span>
           </div>
         )}
       </div>
@@ -118,6 +118,7 @@ export function BannerSlot({ banners, region, onDismiss }: BannerSlotProps) {
   const kept = pruneDismissed(dismissed, banners);
   if (kept !== dismissed) setDismissed(kept);
   const { first, more, list } = slotView(banners, kept, open);
+  if (open && !more) setOpen(false); // nothing waits any more: the list closes, and later banners arrive collapsed
   // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-if-dismiss
   const dismiss = (id: string) => {
     // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-dismiss

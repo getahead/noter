@@ -39,7 +39,7 @@ describe("component stylesheets", () => {
   });
 
   it("give every control drawn smaller than 24 pt a 24 by 24 pt hit area", () => {
-    for (const small of [".np-btn--small::after", ".np-ibtn--inline::after", ".np-disc::after"]) expect(all).toContain(small);
+    for (const small of [".np-btn--small::after", ".np-ibtn::after", ".np-disc::after", ".np-seg__item::after", ".np-token__x::after", ".np-link::after", ".np-check__box::after", ".np-radio__dot::after", ".np-toggle__track::after"]) expect(all).toContain(small);
     expect(all).toMatch(/width: max\(100%, 24px\); height: max\(100%, 24px\)/);
   });
 });

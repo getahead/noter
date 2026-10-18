@@ -41,7 +41,7 @@ describe("push-button", () => {
     expect(html).toContain('<span class="np-spin" aria-hidden="true"></span><span>Retry</span>');
     expect(html).not.toContain("<svg");
     const onAction = vi.fn();
-    PushButton({ label: "Retry", loading: true, onAction }).props.onClick();
+    PushButton({ label: "Retry", loading: true, onAction }).props.onClick({ preventDefault: vi.fn() });
     expect(onAction).not.toHaveBeenCalled();
   });
 
@@ -64,5 +64,18 @@ describe("push-button", () => {
     expect(html).toContain('<span class="np-btn__flash"><svg');
     expect(html).toContain("Copied</span>");
     expect(html).not.toContain("<span>Copy</span>");
+  });
+});
+
+describe("PushButton loading (cpt-noter-state-ui-primitives-push-button)", () => {
+  it("a loading submit button neither runs its action nor submits its form again", async () => {
+    const { find, rendered } = await import("../testing");
+    const onAction = vi.fn();
+    const button = find(rendered(PushButton, { label: "Save", submit: true, loading: true, onAction }), (p) => p.type === "submit");
+    const preventDefault = vi.fn();
+    (button.props.onClick as (e: unknown) => void)({ preventDefault });
+    expect(preventDefault).toHaveBeenCalled(); // the browser's own submit is what Space, Return and a click trigger
+    expect(onAction).not.toHaveBeenCalled();
+    expect(button.props["aria-busy"]).toBe(true);
   });
 });
