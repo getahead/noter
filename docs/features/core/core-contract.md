@@ -115,11 +115,11 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 2. [ ] - `p1` - CI starts `noter-core-harness --fixture world` and runs the same suite with `NOTER_CORE=stdio` - `inst-run-stdio`
 3. [ ] - `p1` - **FOR EACH** assertion group (window scope, typed errors, snapshot then stream with a Channel message before the snapshot resolves, revisions and `conflict`, whole-state versions) - `inst-for-groups`
    1. [ ] - `p1` - Run the group against the core under test with the same fixtures - `inst-run-group`
-4. [ ] - `p1` - **IF** a command answers `not_implemented` and its milestone is later than `harness.toml [milestone].current` - `inst-if-later`
-   1. [ ] - `p1` - Record it as pending in the run summary - `inst-record-pending`
-5. [ ] - `p1` - **ELSE IF** a command answers `not_implemented` or differs from the fake - `inst-if-differs`
-   1. [ ] - `p1` - Fail the run naming the command and the assertion - `inst-fail-run`
-6. [ ] - `p1` - **RETURN** the pass or fail result and the count of answered commands - `inst-return-conformance`
+4. [x] - `p1` - **IF** a command answers `not_implemented` and its milestone is later than `harness.toml [milestone].current` - `inst-if-later`
+   1. [x] - `p1` - Record it as pending in the run summary - `inst-record-pending`
+5. [x] - `p1` - **ELSE IF** a command answers `not_implemented` or differs from the fake - `inst-if-differs`
+   1. [x] - `p1` - Fail the run naming the command and the assertion - `inst-fail-run`
+6. [x] - `p1` - **RETURN** the pass or fail result and the count of answered commands - `inst-return-conformance`
 
 ## 3. Processes / Business Logic (CDSL)
 
