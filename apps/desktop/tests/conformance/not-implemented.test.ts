@@ -2,11 +2,20 @@
 // `not_implemented` only while the milestone that delivers it is later than the current one
 // (harness/harness.toml); such commands are listed as pending in the run summary, by milestone,
 // with the count of commands the core answers. Any other `not_implemented` fails, naming it.
+//
+// Each command is called with valid example arguments (./example-args.ts), not `{}`: the real
+// core checks the window scope, then parses the arguments, then calls the method, so with `{}`
+// an unimplemented command would answer `invalid_input` and pass as answered. An `invalid_input`
+// for arguments the fake accepts therefore fails too: against the fake it means the table is
+// wrong, against the real core that the core differs from the fake on that command. The rest of
+// "differs from the fake" (scope, typed errors, streams, revisions, versions) is checked by the
+// other files of this suite against the same fixtures.
 // @cpt-flow:cpt-noter-flow-core-contract-conformance:p1
 import { afterAll, describe, expect, it } from "vitest";
 
 import { COMMANDS, type CommandName, type WindowLabel } from "../../src/core/bindings";
 import { target, transportFor } from "../support/core";
+import { EXAMPLE_ARGS } from "./example-args";
 import { CURRENT, isLater, milestoneOf, ORDER, summary } from "./milestones";
 
 const names = Object.keys(COMMANDS) as CommandName[];
@@ -23,15 +32,20 @@ describe("commands the core does not answer yet", () => {
     expect(isLater("no_such_command", "pre-M0")).toBe(false);
   });
 
+  it("has example arguments for exactly the commands of the contract", () => {
+    expect(Object.keys(EXAMPLE_ARGS).sort()).toEqual([...names].sort());
+  });
+
   it.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
     const t = transportFor(COMMANDS[name].windows[0] as WindowLabel);
-    const code = await t.invoke(name, {}, COMMANDS[name].channel ? () => {} : undefined).then(
+    const code = await t.invoke(name, EXAMPLE_ARGS[name], COMMANDS[name].channel ? () => {} : undefined).then(
       () => null,
       (e) => (e as { code?: string } | null)?.code,
     );
-    if (code !== "not_implemented") return;
     // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-if-differs
     // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
+    expect(code, target === "fake" ? `the fake refuses the example arguments of ${name}: fix example-args.ts` : `${name} refuses arguments the fake accepts`).not.toBe("invalid_input");
+    if (code !== "not_implemented") return;
     expect(isLater(name), `${name} answers not_implemented, but ${milestoneOf(name)} is not after the current ${CURRENT}`).toBe(true);
     // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
     // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-if-differs
