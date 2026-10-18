@@ -107,6 +107,14 @@ impl Downloads {
         }
     }
 
+    /// The models capture needs are downloaded (an empty manifest needs none).
+    pub(crate) fn capture_ready(&self) -> bool {
+        self.bundles
+            .iter()
+            .filter(|b| b.required_for_capture)
+            .all(|b| b.state == BundleState::Ready)
+    }
+
     fn set(&mut self, name: &str, state: BundleState, done_bytes: Option<u64>) {
         if let Some(b) = self.bundles.iter_mut().find(|b| b.name == name) {
             b.state = state;
