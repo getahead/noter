@@ -115,11 +115,11 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 2. [ ] - `p1` - CI starts `noter-core-harness --fixture world` and runs the same suite with `NOTER_CORE=stdio` - `inst-run-stdio`
 3. [ ] - `p1` - **FOR EACH** assertion group (window scope, typed errors, snapshot then stream with a Channel message before the snapshot resolves, revisions and `conflict`, whole-state versions) - `inst-for-groups`
    1. [ ] - `p1` - Run the group against the core under test with the same fixtures - `inst-run-group`
-4. [ ] - `p1` - **IF** a command answers `not_implemented` and its milestone is later than `harness.toml [milestone].current` - `inst-if-later`
-   1. [ ] - `p1` - Record it as pending in the run summary - `inst-record-pending`
-5. [ ] - `p1` - **ELSE IF** a command answers `not_implemented` or differs from the fake - `inst-if-differs`
-   1. [ ] - `p1` - Fail the run naming the command and the assertion - `inst-fail-run`
-6. [ ] - `p1` - **RETURN** the pass or fail result and the count of answered commands - `inst-return-conformance`
+4. [x] - `p1` - **IF** a command answers `not_implemented` and its milestone is later than `harness.toml [milestone].current` - `inst-if-later`
+   1. [x] - `p1` - Record it as pending in the run summary - `inst-record-pending`
+5. [x] - `p1` - **ELSE IF** a command answers `not_implemented` or differs from the fake - `inst-if-differs`
+   1. [x] - `p1` - Fail the run naming the command and the assertion - `inst-fail-run`
+6. [x] - `p1` - **RETURN** the pass or fail result and the count of answered commands - `inst-return-conformance`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -150,11 +150,11 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 **Output**: The version bump to apply.
 
 **Steps**:
-1. [ ] - `p1` - **IF** only draft surfaces changed - `inst-if-draft`
-   1. [ ] - `p1` - **RETURN** minor - `inst-return-draft-minor`
-2. [ ] - `p1` - **IF** every frozen change is additive (new optional field, new command, new enum variant the UI can ignore) - `inst-if-additive`
+1. [x] - `p1` - **IF** only draft surfaces changed - `inst-if-draft`
+   1. [x] - `p1` - **RETURN** minor - `inst-return-draft-minor`
+2. [ ] - `p1` - **IF** every frozen change is additive (new optional field, new command, new enum variant the UI can ignore) - `inst-if-additive`. Enforced so far at the manifest level only (commands, events, windows, error codes); a field change inside an argument or result type is not enforced yet and rests on `noter-contract-export --check` and the two reviews. Follow-up: diff the exported declarations per frozen surface
    1. [ ] - `p1` - **RETURN** minor - `inst-return-additive-minor`
-3. [ ] - `p1` - **RETURN** major, with sign-off from both sides - `inst-return-major`
+3. [x] - `p1` - **RETURN** major, with sign-off from both sides - `inst-return-major`
 
 ## 4. States (CDSL)
 
@@ -167,9 +167,9 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 **Initial State**: draft for Copilot, Agents, Performance, `storage_move` and `copilot:status`; frozen for everything else
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** draft **TO** frozen **WHEN** the surface's milestone gate passes (Copilot and Agents at M4, Performance at M5) - `inst-st-freeze`
+1. [x] - `p1` - **FROM** draft **TO** frozen **WHEN** the surface's milestone gate passes (Copilot and Agents at M4, Performance at M5) - `inst-st-freeze`
 2. [ ] - `p1` - **FROM** frozen **TO** frozen **WHEN** an additive change lands with a minor version - `inst-st-additive`
-3. [ ] - `p1` - **FROM** draft **TO** draft **WHEN** any change lands with a minor version - `inst-st-draft-change`
+3. [x] - `p1` - **FROM** draft **TO** draft **WHEN** any change lands with a minor version - `inst-st-draft-change`
 
 ## 5. Definitions of Done
 
