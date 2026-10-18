@@ -40,6 +40,7 @@ pub struct Harness {
     core: Arc<Core>,
     native: Arc<ScriptedNative>,
     updater: Arc<ScriptedUpdater>,
+    models: Arc<TinyModels>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -81,7 +82,7 @@ impl Harness {
         let seeding = Arc::new(AtomicBool::new(true));
         let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
             .with_native(native.clone())
-            .with_models(models)
+            .with_models(models.clone())
             .with_updater(updater.clone());
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
@@ -93,6 +94,7 @@ impl Harness {
             core,
             native,
             updater,
+            models,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -255,10 +257,8 @@ impl Harness {
                 refused.push(format!("app.{key}"));
             }
         }
-        for key in ["models", "self_test"] {
-            if current["app"]["setup"][key] != wanted["app"]["setup"][key] {
-                refused.push(format!("app.setup.{key}"));
-            }
+        if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
+            refused.push("app.setup.self_test".to_string());
         }
         if !refused.is_empty() {
             return Err(CoreError::new(
@@ -279,13 +279,19 @@ impl Harness {
             *lock(&self.updater.0) = env.update.clone();
             self.core.environment_changed(self.native.environment());
         }
+        if current["app"]["setup"]["models"] != wanted["app"]["setup"]["models"] {
+            self.models
+                .place(&self.dir.join("models"), &parsed.app.setup.models)
+                .map_err(crate::internal)?;
+            self.core.refresh_models();
+        }
         if current["app"]["banners"]["banners"] != wanted["app"]["banners"]["banners"] {
             self.core.set_banners(parsed.app.banners.banners.clone());
         }
         // Derived fields are the core's to compute; a world that disagrees with it is a preset
         // that drifted from the core's rules (what was applied stays applied).
         let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
-        let drifted: Vec<String> = ["complete", "detection_enabled"]
+        let drifted: Vec<String> = ["complete", "detection_enabled", "models"]
             .into_iter()
             .filter(|f| after["app"]["setup"][f] != wanted["app"]["setup"][f])
             .map(|f| format!("app.setup.{f}"))
@@ -469,7 +475,7 @@ impl TinyModels {
         TinyModels { specs, native }
     }
 
-    /// Writes the bundles the world shows as ready, before the core reads `models/`.
+    /// Makes `models/` hold exactly the bundles the world shows as ready.
     fn place(&self, dir: &std::path::Path, models: &ModelsStatus) -> std::io::Result<()> {
         for (spec, bytes) in &self.specs {
             if models
@@ -478,6 +484,10 @@ impl TinyModels {
                 .any(|b| b.name == spec.name && b.state == BundleState::Ready)
             {
                 std::fs::write(dir.join(&spec.name), bytes)?;
+            } else if let Err(e) = std::fs::remove_file(dir.join(&spec.name)) {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    return Err(e);
+                }
             }
         }
         Ok(())
