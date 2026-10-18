@@ -167,7 +167,7 @@ The user should finish setup in one sitting before the first real call, and call
 1. [x] - `p1` - API: `setup_set_call_display { display_id }`, `setup_set_audio_storage { never_store_audio, retention }` or `setup_set_step { step, state }` - `inst-choice-call`
 2. [x] - `p1` - Validate the display id against the current displays; an unknown one **RETURN** `invalid_input` - `inst-validate-display`
 3. [x] - `p1` - DB: write the choice into its settings section through the change-log write path (`cpt-noter-flow-core-settings-update` rules) - `inst-write-choice`
-4. [x] - `p1` - Recompute `SetupStatus.complete`; the Assistants step can only be skipped in M0 (connecting an assistant is M3) - `inst-recompute`
+4. [x] - `p1` - Recompute `SetupStatus.complete`; the Assistants step may be marked done or skipped in M0, while connecting an assistant is M3 (decision D10) - `inst-recompute`
 5. [x] - `p1` - **RETURN** `SetupStatus`; emit `setup:changed` - `inst-return-choice`
 
 ### Install a downloaded update
@@ -185,9 +185,9 @@ The user should finish setup in one sitting before the first real call, and call
 
 **Steps**:
 1. [x] - `p1` - API: `update_install {}` - `inst-update-call`
-2. [x] - `p1` - **IF** a capture is running, schedule the install for the next stop and **RETURN** `Ack` - `inst-if-recording`
-3. [x] - `p1` - **IF** no verified update is ready **RETURN** `not_found` - `inst-if-no-update`
-4. [x] - `p1` - Shut the core down in order (streams end with `shutdown`, the writer drains) and let `tauri-plugin-updater` install and relaunch - `inst-install`
+2. [x] - `p1` - **IF** no verified update is ready **RETURN** `not_found` (checked first, decision F3) - `inst-if-no-update`
+3. [x] - `p1` - **IF** a capture is running, schedule the install for the next stop and **RETURN** `Ack` - `inst-if-recording`
+4. [x] - `p1` - Let `tauri-plugin-updater` install the update; on success shut the core down in order (streams end with `shutdown`, the writer drains) and relaunch, on failure keep running - `inst-install`
 5. [x] - `p1` - **RETURN** `Ack` before the relaunch - `inst-return-update`
 
 ## 3. Processes / Business Logic (CDSL)

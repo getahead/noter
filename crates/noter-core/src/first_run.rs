@@ -96,8 +96,10 @@ pub trait ModelSource: Send + Sync {
 pub trait Updater: Send + Sync {
     /// A downloaded and verified update, if any.
     fn ready(&self) -> Option<UpdateInfo>;
-    /// Installs it and relaunches Noter.
+    /// Installs the downloaded update without relaunching.
     fn install(&self) -> BoxFuture<'_, Result<(), CoreError>>;
+    /// Relaunches Noter after an install and the core's shutdown.
+    fn relaunch(&self) {}
 }
 
 /// No Mac: nothing granted, an empty environment (tests and hosts without native services).
@@ -418,14 +420,16 @@ impl Core {
     // @cpt-end:cpt-noter-algo-core-first-run-status:p1:inst-return-status
 
     /// Writes the stored setup state (never the settings revision).
+    /// The caller holds the first-run lock across its read-modify-write.
     fn store_setup(
         &self,
         ctx: &CommandCtx,
-        stored: Stored,
+        before: &Stored,
+        stored: &Stored,
         command: &str,
     ) -> Result<(), CoreError> {
-        let before = serde_json::to_value(&lock(&self.first_run).stored).map_err(internal)?;
-        let after = serde_json::to_value(&stored).map_err(internal)?;
+        let before = serde_json::to_value(before).map_err(internal)?;
+        let after = serde_json::to_value(stored).map_err(internal)?;
         let meta = self.change_meta(ctx, "Changed setup".into(), command);
         self.store().write_with(meta, move |tx| {
             tx.execute(
@@ -443,7 +447,6 @@ impl Core {
             };
             Ok(((), vec![logged]))
         })?;
-        lock(&self.first_run).stored = stored;
         Ok(())
     }
 
@@ -454,16 +457,17 @@ impl Core {
         args: StepArgs,
     ) -> Result<SetupStatus, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-first-run-choices:p2:inst-choice-call
-        if args.step == SetupStep::Assistants && args.state == StepState::Done {
-            // Connecting an assistant is M3; in M0 the step can only be skipped.
-            return Err(settings::invalid("state", ValidationRule::OutOfRange));
-        }
-        let mut stored = lock(&self.first_run).stored.clone();
+        // Decision D10: the Assistants step may be marked done or skipped in M0; connecting an
+        // assistant is M3.
+        let mut state = lock(&self.first_run);
+        let mut stored = state.stored.clone();
         for row in stored.steps.iter_mut().filter(|r| r.step == args.step) {
             row.state = args.state;
         }
         // @cpt-end:cpt-noter-flow-core-first-run-choices:p2:inst-choice-call
-        self.store_setup(ctx, stored, "setup_set_step")?;
+        self.store_setup(ctx, &state.stored, &stored, "setup_set_step")?;
+        state.stored = stored;
+        drop(state);
         // @cpt-begin:cpt-noter-flow-core-first-run-choices:p2:inst-recompute
         // @cpt-begin:cpt-noter-flow-core-first-run-choices:p2:inst-return-choice
         Ok(self.setup_now())
@@ -590,8 +594,11 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-if-recording
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-install
-        self.shutdown().await;
+        // Install first: a failed install leaves the core running. Then shut down in order
+        // and relaunch into the new version.
         self.deps.updater.install().await?;
+        self.shutdown().await;
+        self.deps.updater.relaunch();
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-install
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-return-update
         Ok(Ack {})
