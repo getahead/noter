@@ -62,8 +62,9 @@ The user can connect an assistant during first run or repair it later without in
 **Principles**: `cpt-noter-principle-core-egress-gate`
 
 **Delivers**:
-- Frozen commands (M3): `accounts_get`, `api_key_set`, `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`, `audit_list`, `audit_export`.
+- Frozen commands (M3): `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`, `audit_list`, `audit_export`.
 - Draft command assigned to M3: `storage_move` (Q4).
+- Delivered earlier, in M2, by `cpt-noter-feature-core-llm-gate` (owner decision, 18 Oct): `accounts_get` and `api_key_set` with `accounts:changed`. That covers steps 1 to 5 of `cpt-noter-flow-core-credentials-privacy-keys`, the availability algorithm, the secret boundary for API keys, and the key state except removal. Their IDs and text stay here; this feature completes the flow with `api_key_remove` in M3.
 - Events: `accounts:changed`, `signin:progress`; install and move jobs use `jobs:progress`.
 - DESIGN.md stories (M3): `cpt-noter-seq-first-run-connect-assistant`, `cpt-noter-seq-settings-replace-api-key`, `cpt-noter-seq-settings-sign-in-account`, `cpt-noter-seq-settings-check-privacy`.
 
@@ -81,7 +82,7 @@ Agent editing belongs to M4; binding existing agents is in scope now. Audit writ
 
 ### 1.4 References
 
-- **Decomposition**: [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md), entry `cpt-noter-feature-core-credentials-privacy`; overview discrepancies 1, 7 and 9
+- **Decomposition**: [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md), entry `cpt-noter-feature-core-credentials-privacy`; overview discrepancies 1 (decided: `accounts_get` and `api_key_set` in M2), 7 and 9
 - **Design**: [DESIGN-core.md](../../DESIGN-core.md): `cpt-noter-component-core-credentials`, `cpt-noter-seq-core-account-signin`, `cpt-noter-constraint-core-api-keys`, `cpt-noter-principle-core-egress-gate`; 3.3 scopes and errors, 3.7 audit log, 3.8 storage, 4.3 Q4 and Q8
 - **PRD**: [PRD.md](../../PRD.md) › LLM orchestration › Own accounts; Security, privacy and permissions
 - **Contract**: `crates/noter-protocol/src/model/accounts.rs`, `model/settings.rs`, `error.rs`, `contracts/ipc.manifest.json`
@@ -107,12 +108,12 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Provider rejection: `key_rejected`; locked Keychain: `keychain_locked`; offline verification: `offline`. A failed replacement does not destroy a previously working key.
 
 **Steps**:
-1. [ ] - `p1` - API: `accounts_get` from main, Settings or First run runs `cpt-noter-algo-core-credentials-privacy-availability` and returns versioned `AccountsView` - `inst-key-read`
-2. [ ] - `p1` - API: `api_key_set { provider, key }` only from Settings or First run; validate the provider and non-empty secret without logging or persisting the submitted arguments - `inst-key-request`
-3. [ ] - `p1` - Publish verifying status; verify the candidate using the router and egress gate, without replacing the saved key until verification succeeds - `inst-key-verify`
-4. [ ] - `p1` - Store the verified key in Keychain; store only status and verification time in settings through the change-log writer, never secret before/after values - `inst-key-store`
-5. [ ] - `p1` - Recompute availability and emit `accounts:changed` with a new version; **RETURN** `AccountsView` with status only - `inst-key-return`
-6. [ ] - `p1` - API: `api_key_remove { provider }` only from Settings removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` - `inst-key-remove`
+1. [ ] - `p1` - API: `accounts_get` from main, Settings or First run runs `cpt-noter-algo-core-credentials-privacy-availability` and returns versioned `AccountsView` (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-read`
+2. [ ] - `p1` - API: `api_key_set { provider, key }` only from Settings or First run; validate the provider and non-empty secret without logging or persisting the submitted arguments (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-request`
+3. [ ] - `p1` - Publish verifying status; verify the candidate using the router and egress gate, without replacing the saved key until verification succeeds (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-verify`
+4. [ ] - `p1` - Store the verified key in Keychain; store only status and verification time in settings through the change-log writer, never secret before/after values (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-store`
+5. [ ] - `p1` - Recompute availability and emit `accounts:changed` with a new version; **RETURN** `AccountsView` with status only (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-return`
+6. [ ] - `p1` - API: `api_key_remove { provider }` only from Settings removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` (M3) - `inst-key-remove`
 
 ### Prepare and install an account runtime
 
@@ -303,7 +304,7 @@ Within signing_in, `SignInStep` progresses through waiting_for_browser, signed_i
 4. [ ] - `p1` - **FROM** configured **TO** rejected **WHEN** the provider rejects the saved key - `inst-key-state-revoked`
 5. [ ] - `p1` - **FROM** configured **TO** keychain_locked **WHEN** Keychain access fails; also from verifying or not_set - `inst-key-state-locked`
 6. [ ] - `p1` - **FROM** keychain_locked **TO** configured **WHEN** access returns and the saved key is verified; otherwise recompute not_set or rejected - `inst-key-state-unlocked`
-7. [ ] - `p1` - **FROM** configured **TO** not_set **WHEN** removal succeeds; also from rejected or keychain_locked after a successful Keychain delete - `inst-key-state-remove`
+7. [ ] - `p1` - **FROM** configured **TO** not_set **WHEN** removal succeeds; also from rejected or keychain_locked after a successful Keychain delete (M3; the other transitions are M2 with `cpt-noter-feature-core-llm-gate`) - `inst-key-state-remove`
 
 ## 5. Definitions of Done
 
