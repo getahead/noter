@@ -74,7 +74,7 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 ### Drive the real core over stdio
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-harness-session`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-harness-session`
 
 **Actor**: Test runner
 
@@ -87,51 +87,53 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 - The fixture cannot be loaded: the process exits non-zero before reading any request, with the reason on stderr.
 
 **Steps**:
-1. [ ] - `p1` - Runner starts the binary with `--fixture world` (and optionally an engine script) - `inst-start`
-2. [ ] - `p1` - Harness runs `cpt-noter-algo-core-harness-boot` - `inst-boot`
-3. [ ] - `p1` - Runner writes a request line `{ id, window, cmd, args, channel }` - `inst-request`
-4. [ ] - `p1` - Harness runs `cpt-noter-algo-core-harness-dispatch` for the line - `inst-dispatch`
-5. [ ] - `p1` - Harness writes `{ id, ok }` or `{ id, error }`; for a subscribing command, then `{ id, message }` lines in `seq` order - `inst-write-result`
-6. [ ] - `p1` - Harness writes `{ event, payload }` for every event the core emits - `inst-write-events`
-7. [ ] - `p1` - **IF** stdin reaches its end - `inst-if-eof`
-   1. [ ] - `p1` - Shut the core down (streams end with `shutdown`), flush, **RETURN** exit code 0 - `inst-return-exit`
+1. [x] - `p1` - Runner starts the binary with `--fixture world`; the `--engine-script` option comes with golden-set replay in M1 (Teamlead decision M1-D3) - `inst-start`
+2. [x] - `p1` - Harness runs `cpt-noter-algo-core-harness-boot` - `inst-boot`
+3. [x] - `p1` - Runner writes a request line `{ id, window, cmd, args, channel }` - `inst-request`
+4. [x] - `p1` - Harness runs `cpt-noter-algo-core-harness-dispatch` for the line - `inst-dispatch`
+5. [x] - `p1` - Harness writes `{ id, ok }` or `{ id, error }`; for a subscribing command, then `{ id, message }` lines in `seq` order - `inst-write-result`
+6. [x] - `p1` - Harness writes `{ event, payload }` for every event the core emits - `inst-write-events`
+7. [x] - `p1` - **IF** stdin reaches its end - `inst-if-eof`
+   1. [x] - `p1` - Shut the core down (streams end with `shutdown`), flush, **RETURN** exit code 0 - `inst-return-exit`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Boot the core on a fixture
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-boot`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-harness-boot`
 
 **Input**: Command-line options: fixture name, optional engine script, optional fixed clock.
 
 **Output**: A running core composition root, or exit with an error.
 
 **Steps**:
-1. [ ] - `p1` - Create a fresh temporary data folder (database, App Group stand-in) - `inst-temp-dir`
-2. [ ] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
-3. [ ] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
-   1. [ ] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`
-4. [ ] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime - `inst-inject`
-5. [ ] - `p1` - Build the `noter-core` composition root exactly as `src-tauri` does, with an event emitter that writes event lines - `inst-build-core`
-6. [ ] - `p1` - **RETURN** ready; log the start to stderr only - `inst-return-booted`
+1. [x] - `p1` - Create a fresh temporary data folder (database, App Group stand-in) - `inst-temp-dir`
+2. [x] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
+3. [x] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
+   1. [x] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`
+4. [x] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime (Backend Teamlead decision D8/H2, 18 Oct 2026: the scripted LLM runtime comes with `cpt-noter-feature-core-llm-gate`, M2) - `inst-inject`
+5. [x] - `p1` - Build the `noter-core` composition root exactly as `src-tauri` does, with an event emitter that writes event lines - `inst-build-core`
+6. [x] - `p1` - **RETURN** ready; log the start to stderr only - `inst-return-booted`
 
 ### Dispatch a request line
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-dispatch`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-harness-dispatch`
 
 **Input**: One request line.
 
 **Output**: One result or error line, and Channel message lines after it for a subscribing command.
 
 **Steps**:
-1. [ ] - `p1` - Parse the line; a failure **RETURN** an error line with `invalid_input` - `inst-parse-line`
-2. [ ] - `p1` - Build `CommandCtx` with `Caller::Window { label: window }` and run the same scope check as the IPC host (`cpt-noter-algo-core-ipc-host-scope-check`) - `inst-ctx-scope`
-3. [ ] - `p1` - **IF** `channel` is true, create a `Sink` that holds messages until the result line is written, then writes `{ id, message }` lines - `inst-channel-sink`
-4. [ ] - `p1` - API: call the `CoreApi` method named by `cmd` with the parsed arguments - `inst-call`
-5. [ ] - `p1` - Write the result or error line, then release any held Channel messages in order - `inst-write-ordered`
-6. [ ] - `p1` - **RETURN** - `inst-return-dispatch`
+1. [x] - `p1` - Parse the line; a failure **RETURN** an error line with `invalid_input` - `inst-parse-line`
+2. [x] - `p1` - Build `CommandCtx` with `Caller::Window { label: window }` and run the same scope check as the IPC host (`cpt-noter-algo-core-ipc-host-scope-check`) - `inst-ctx-scope`
+3. [x] - `p1` - **IF** `channel` is true, create a `Sink` that holds messages until the result line is written, then writes `{ id, message }` lines - `inst-channel-sink`
+4. [x] - `p1` - API: call the `CoreApi` method named by `cmd` with the parsed arguments - `inst-call`
+5. [x] - `p1` - Write the result or error line, then release any held Channel messages in order - `inst-write-ordered`
+6. [x] - `p1` - **RETURN** - `inst-return-dispatch`
 
 ### Scripted engine
+
+> Delivered by `ScriptedEngine` in `crates/noter-engine-client` (engine lane, #67); the harness injects it in `inst-inject` above. The steps below are ticked in the engine lane's change, not in this core-lane PR.
 
 - [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-scripted-engine`
 
@@ -150,23 +152,23 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 ### Harness process
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-harness-process`
+- [x] `p1` - **ID**: `cpt-noter-state-core-harness-process`
 
 **States**: booting, serving, shutting_down, exited
 
 **Initial State**: booting
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** booting **TO** serving **WHEN** the fixture is loaded and the core is built - `inst-st-serving`
-2. [ ] - `p1` - **FROM** booting **TO** exited **WHEN** the fixture or the store fails to load (non-zero exit) - `inst-st-boot-fail`
-3. [ ] - `p1` - **FROM** serving **TO** shutting_down **WHEN** stdin ends - `inst-st-shutdown`
-4. [ ] - `p1` - **FROM** shutting_down **TO** exited **WHEN** every stream ended and output is flushed - `inst-st-exited`
+1. [x] - `p1` - **FROM** booting **TO** serving **WHEN** the fixture is loaded and the core is built - `inst-st-serving`
+2. [x] - `p1` - **FROM** booting **TO** exited **WHEN** the fixture or the store fails to load (non-zero exit) - `inst-st-boot-fail`
+3. [x] - `p1` - **FROM** serving **TO** shutting_down **WHEN** stdin ends - `inst-st-shutdown`
+4. [x] - `p1` - **FROM** shutting_down **TO** exited **WHEN** every stream ended and output is flushed - `inst-st-exited`
 
 ## 5. Definitions of Done
 
 ### Wire format
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-harness-wire`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-harness-wire`
 
 The system **MUST** speak exactly the request, result, error, channel-message and event lines of docs/HARNESS.md, apply the `window` field as the IPC host applies a window label, write Channel messages only after the result of their subscribing command, and write nothing but protocol lines to stdout (logs go to stderr).
 

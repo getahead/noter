@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import { Msg } from "../i18n/Msg";
+import { LiveRegions } from "./a11y/LiveRegions";
 import type { Bridge } from "./bridge/bridge";
 import type { WindowState } from "./store/window-store";
 
@@ -15,12 +17,15 @@ export function App({ bridge }: { bridge: Bridge }) {
   const error = useWindow(bridge, (s) => s.error);
   return (
     <div data-region="window" data-window={bridge.label} data-state={status.toLowerCase()} aria-busy={status === "LOADING"}>
+      <LiveRegions />
       {error && (
         <section role="alert" data-region="section-error">
-          <p>Something went wrong</p>
+          <p>
+            <Msg id="window.error" />
+          </p>
           {error.tryAgain && (
             <button type="button" onClick={bridge.open}>
-              Try Again
+              <Msg id="action.try_again" />
             </button>
           )}
         </section>

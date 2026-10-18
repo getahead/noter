@@ -20,6 +20,8 @@ describe("App", () => {
     expect(html).toContain('data-window="main"');
     expect(html).toContain('data-state="ready"');
     expect(html).not.toContain("Try Again");
+    expect(html).toContain('data-live="polite"');
+    expect(html).toContain('data-live="assertive"');
   });
 
   it("shows the section-level error with Try Again only when retryable", async () => {

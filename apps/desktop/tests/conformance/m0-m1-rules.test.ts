@@ -278,6 +278,23 @@ describe("snapshot, then stream (R23/R24)", () => {
     expect(got.at(-1)!.event.type).toBe("ended");
     expect(ok(await s.core("settings").setupStatus({})).self_test.type).toBe("passed");
   });
+
+  it("self-test: refused with model_missing while the speech bundle is not ready (D-21), then it runs", async () => {
+    await s.change((w) => W.firstRun(w, { modelsReady: false }));
+    const got: { event: { type: string } }[] = [];
+    typed(refused(await s.core("settings").selfTestRun({ play_clip: false }, (m) => got.push(m))), "model_missing");
+    expect(got).toEqual([]); // the Channel never opened
+    expect(ok(await s.core("settings").setupStatus({})).self_test.type).toBe("not_run");
+    // The model arrived and the audio permissions were granted meanwhile: the real core's self-test checks the microphone first.
+    await s.change((w) => {
+      w.app.setup.models.bundles.forEach((b) => Object.assign(b, { state: "ready", done_mb: b.size_mb }));
+      W.permission(w, "microphone", "granted");
+      W.permission(w, "system_audio", "granted");
+    });
+    ok(await s.core("settings").selfTestRun({ play_clip: false }, (m) => got.push(m)));
+    await until(() => got.some((m) => m.event.type === "ended"), "the self-test stream to end");
+    expect(ok(await s.core("settings").setupStatus({})).self_test.type).toBe("passed");
+  });
 });
 
 describe("whole-state events carry growing versions (R25)", () => {

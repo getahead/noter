@@ -10,6 +10,8 @@ import { createBridge } from "./app/bridge/bridge";
 import { COMMANDS, type WindowLabel } from "./core/bindings";
 import { FakeCore } from "./core/fake/fake-core";
 import { tauriTransport } from "./core/tauri-transport";
+import { installTabNavigation, installUnobscure } from "./app/a11y/focus";
+import { setPseudo, type Pseudo } from "./i18n/format";
 
 const LABELS = COMMANDS.app_snapshot.windows as readonly WindowLabel[];
 
@@ -26,6 +28,12 @@ const bridge = createBridge(label, import.meta.env.VITE_FAKE_CORE ? new FakeCore
 // @cpt-begin:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-user-closes
 addEventListener("pagehide", () => void bridge.close());
 // @cpt-end:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-user-closes
+
+// ?pseudo=cyrillic|german turns on pseudo-localisation (the screenshot suite's string pass).
+const pseudo = new URLSearchParams(location.search).get("pseudo");
+if (pseudo === "cyrillic" || pseudo === "german") setPseudo(pseudo satisfies Pseudo);
+installTabNavigation(document);
+installUnobscure(document);
 
 // @cpt-tech:cpt-noter-tech-ui-stack:p1
 createRoot(document.getElementById("root")!).render(
