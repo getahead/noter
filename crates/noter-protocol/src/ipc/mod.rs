@@ -24,7 +24,6 @@ use crate::common::*;
 use crate::error::{CoreError, ErrorCode};
 use crate::model::*;
 
-// @cpt-state:cpt-noter-state-core-contract-stability:p2
 /// Whether the UI may build on a surface as final.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -219,7 +218,9 @@ macro_rules! commands {
         /// `noter-core-harness` reach it through [`dispatch_json`] (or call a method after
         /// [`CommandSpec::check_caller`]). Every method answers `not_implemented` until the core
         /// implements it, so an early core answers what its milestone delivers and the
-        /// conformance suite lists the rest as pending.
+        /// conformance suite lists the rest as pending. DESIGN-core 3.3 keeps `not_implemented` to
+        /// development builds; a release build relies on the conformance suite judging it by
+        /// milestone: a command of the current milestone that still answers it fails the run.
         pub trait CoreApi: Send + Sync + 'static {
             $(
                 $(#[doc = $doc])*

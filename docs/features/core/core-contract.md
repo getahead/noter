@@ -137,7 +137,7 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 3. [x] - `p1` - Check window scopes, including that the call window may not delete - `inst-check-scopes`
 4. [x] - `p1` - Check every `Option` field of an argument type has `#[serde(default)]` - `inst-check-serde-default`
 5. [x] - `p1` - Check `ErrorCode` is the closed list of DESIGN-core 3.3 and `DEFAULT_RETRYABLE` matches it - `inst-check-errors`
-6. [x] - `p1` - Check the fixture world and every schema in `contracts/` round-trip through the types - `inst-check-roundtrip`
+6. [x] - `p1` - Check the fixture world round-trips through the types, and every generated file in `contracts/` matches them (`noter-contract-export --check`) - `inst-check-roundtrip`
 7. [x] - `p1` - Check `CoreApi` has one method per command with the command's argument, result and Channel types - `inst-check-coreapi`
 8. [x] - `p1` - **RETURN** pass or the first failure - `inst-return-tests`
 

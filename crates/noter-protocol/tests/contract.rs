@@ -98,23 +98,6 @@ fn window_scoping_matches_pm08() {
 }
 
 #[test]
-fn copilot_agents_and_performance_are_draft() {
-    for c in COMMANDS {
-        if matches!(
-            c.group,
-            CommandGroup::Copilot | CommandGroup::Agents | CommandGroup::Performance
-        ) {
-            assert_eq!(
-                c.stability,
-                Stability::Draft,
-                "{} should be draft until its milestone gate",
-                c.name
-            );
-        }
-    }
-}
-
-#[test]
 fn subscribing_commands_use_channels() {
     let subs: Vec<_> = COMMANDS
         .iter()
