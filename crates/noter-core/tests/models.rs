@@ -457,3 +457,54 @@ async fn refresh_models_rereads_the_models_folder() {
     assert_eq!(state(&st, "bge-m3"), BundleState::Pending);
     assert_eq!(state(&st, "whisper-turbo"), BundleState::Ready);
 }
+
+/// A Mac with no network and plenty of disk.
+struct OfflineMac;
+
+impl NativeServices for OfflineMac {
+    fn permission(&self, _: PermissionKind) -> PermissionState {
+        PermissionState::NotAsked
+    }
+    fn request_permission(&self, _: PermissionKind) -> BoxFuture<'_, PermissionState> {
+        Box::pin(async { PermissionState::NotAsked })
+    }
+    fn environment(&self) -> EnvironmentReading {
+        EnvironmentReading {
+            online: false,
+            disk_free_mb: 100_000,
+            ..EnvironmentReading::default()
+        }
+    }
+    fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
+        Ok(())
+    }
+}
+
+/// Like the fake core: with no connection a start answers `offline` (retryable) at once and
+/// nothing is fetched; pausing still works.
+#[tokio::test]
+async fn starting_while_offline_answers_offline_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = Arc::new(Bundles::default().with(
+        "whisper-turbo",
+        b"model",
+        "huggingface.co",
+        b"model",
+        true,
+    ));
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        .with_native(Arc::new(OfflineMac))
+        .with_models(source.clone());
+    let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
+    core.start_first_run();
+    for action in [
+        DownloadAction::Start,
+        DownloadAction::Resume,
+        DownloadAction::Retry,
+    ] {
+        let err = download(&core, action).await.unwrap_err();
+        assert_eq!((err.code, err.retryable), (ErrorCode::Offline, true));
+    }
+    assert!(source.fetches.lock().unwrap().is_empty());
+    assert!(download(&core, DownloadAction::Pause).await.is_ok());
+}
