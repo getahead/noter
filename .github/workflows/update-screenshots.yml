@@ -35,6 +35,9 @@ jobs:
         id: commit
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "noter-ci"
@@ -42,7 +45,9 @@ jobs:
           git add -A -- '**/__screenshots__/**'
           if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           git commit -m "test(visual): refresh screenshot baselines" -m "Rendered by the update-screenshots workflow in $HEAD_SHA."
-          git push
+          # The checkout is a detached HEAD without credentials: name the PR branch and use the job token.
+          # A plain (non-forced) push is refused if the branch moved since this run started.
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
       - name: Remove the label and re-run CI on the new commit
         env:

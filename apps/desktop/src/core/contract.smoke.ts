@@ -62,8 +62,10 @@ async function main() {
     assert.equal(pushed, before + 1);
     await sleep(10);
     assert.equal(got.at(-1)!.event.type, "gap");
-    await sleep(1100);
-    assert.equal(callFake.acks.get(sub.data.subscription_id!), got.at(-1)!.seq, "stream_ack sent");
+    // The ack is batched on a timer; wait for it instead of guessing how long a loaded machine takes.
+    const acked = () => callFake.acks.get(sub.data.subscription_id!);
+    for (let t = 0; t < 100 && acked() !== got.at(-1)!.seq; t++) await sleep(100);
+    assert.equal(acked(), got.at(-1)!.seq, "stream_ack sent");
   }
   callFake.dispose();
 
