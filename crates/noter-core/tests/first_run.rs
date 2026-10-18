@@ -105,6 +105,8 @@ impl NativeServices for FakeNative {
 struct FakeUpdater {
     ready: Mutex<Option<UpdateInfo>>,
     installs: Mutex<u32>,
+    fail: Mutex<bool>,
+    relaunched: Mutex<bool>,
 }
 
 impl Updater for FakeUpdater {
@@ -113,7 +115,17 @@ impl Updater for FakeUpdater {
     }
     fn install(&self) -> BoxFuture<'_, Result<(), CoreError>> {
         *self.installs.lock().unwrap() += 1;
-        Box::pin(async { Ok(()) })
+        let fail = *self.fail.lock().unwrap();
+        Box::pin(async move {
+            if fail {
+                Err(CoreError::new(ErrorCode::Internal, "bad signature"))
+            } else {
+                Ok(())
+            }
+        })
+    }
+    fn relaunch(&self) {
+        *self.relaunched.lock().unwrap() = true;
     }
 }
 
@@ -202,9 +214,8 @@ async fn steps_are_marked_and_setup_completes_when_every_step_is_done_or_skipped
         rev
     );
 
-    // Connecting an assistant is M3: the Assistants step can only be skipped in M0.
-    let err = s
-        .core
+    // Decision D10: connecting an assistant is M3, but marking the step is M0.
+    s.core
         .setup_set_step(
             &first_run(),
             StepArgs {
@@ -213,8 +224,7 @@ async fn steps_are_marked_and_setup_completes_when_every_step_is_done_or_skipped
             },
         )
         .await
-        .unwrap_err();
-    assert_eq!(err.code, ErrorCode::InvalidInput);
+        .unwrap();
 
     let mut last = after;
     for step in [
@@ -550,6 +560,23 @@ async fn update_install_needs_a_ready_update() {
         notes_md: "Fixes.".into(),
         ready: true,
     });
+    // A failed install leaves the core running and nothing relaunches.
+    *s.updater.fail.lock().unwrap() = true;
+    assert_eq!(
+        s.core
+            .update_install(&ctx, NoArgs {})
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal
+    );
+    assert!(!*s.updater.relaunched.lock().unwrap());
+    s.core.settings_get(&ctx, NoArgs {}).await.unwrap();
+    *s.updater.fail.lock().unwrap() = false;
     s.core.update_install(&ctx, NoArgs {}).await.unwrap();
-    assert_eq!(*s.updater.installs.lock().unwrap(), 1);
+    assert_eq!(*s.updater.installs.lock().unwrap(), 2);
+    assert!(
+        *s.updater.relaunched.lock().unwrap(),
+        "relaunched after the in-order shutdown"
+    );
 }
