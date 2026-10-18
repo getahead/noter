@@ -647,6 +647,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "noter-core"
+version = "0.1.0"
+dependencies = [
+ "noter-db",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "noter-db"
 version = "0.1.0"
 dependencies = [
