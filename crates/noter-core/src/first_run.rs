@@ -644,13 +644,11 @@ impl Core {
             return Ok(Ack {});
         }
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-if-recording
-        // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-install
         // Install first: a failed install leaves the core running. Then shut down in order
         // and relaunch into the new version.
         self.deps.updater.install().await?;
         self.shutdown().await;
         self.deps.updater.relaunch();
-        // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-install
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-return-update
         Ok(Ack {})
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-return-update

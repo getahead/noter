@@ -172,7 +172,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Install a downloaded update
 
-- [x] `p2` - **ID**: `cpt-noter-flow-core-first-run-update`
+- [ ] `p2` - **ID**: `cpt-noter-flow-core-first-run-update`
 
 **Actor**: Primary user (Settings or main window, from the update banner)
 
@@ -187,7 +187,7 @@ The user should finish setup in one sitting before the first real call, and call
 1. [x] - `p1` - API: `update_install {}` - `inst-update-call`
 2. [x] - `p1` - **IF** no verified update is ready **RETURN** `not_found` (checked first, decision F3) - `inst-if-no-update`
 3. [x] - `p1` - **IF** a capture is running, schedule the install for the next stop and **RETURN** `Ack` - `inst-if-recording`
-4. [x] - `p1` - Let `tauri-plugin-updater` install the update; on success shut the core down in order (streams end with `shutdown`, the writer drains) and relaunch, on failure keep running - `inst-install`
+4. [ ] - `p1` - Let `tauri-plugin-updater` install the update; on success shut the core down in order (streams end with `shutdown`, the writer drains) and relaunch, on failure keep running - `inst-install`
 5. [x] - `p1` - **RETURN** `Ack` before the relaunch - `inst-return-update`
 
 ## 3. Processes / Business Logic (CDSL)
