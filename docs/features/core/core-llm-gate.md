@@ -44,7 +44,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-`noter-llm` implements the runtime interface and its three adapters, task routing, schema and citation validation, redaction and the audit-before-send gate. It records model runs and locks down every CLI process. Key/account UI commands, the Privacy pane and noter-mcp arrive in M3. M2 uses a key already in the Keychain or local Ollama; deterministic E2E uses the scripted runtime. No tools from a later feature are silently enabled.
+`noter-llm` implements the runtime interface and its three adapters, task routing, schema and citation validation, redaction and the audit-before-send gate. It records model runs and locks down every CLI process. It also answers `accounts_get` and `api_key_set` (owner decision, 18 Oct), so the M2 runtime can be configured from the app: a verified key goes to the Keychain, or local Ollama is used. Key removal, own accounts, CLI install, the Privacy pane and noter-mcp arrive in M3. Deterministic E2E uses the scripted runtime. No tools from a later feature are silently enabled.
 
 ### 1.2 Purpose
 
@@ -55,7 +55,13 @@ Post-call and handoff can call a model without creating another path for user te
 **Principles**: `cpt-noter-principle-core-egress-gate`
 
 **Delivers**:
-- Frozen IPC commands (M2): none.
+- Frozen IPC commands (M2): `accounts_get`, `api_key_set`, with event `accounts:changed`. Their behaviour is specified in [core-credentials-privacy.md](core-credentials-privacy.md) and delivered here: steps 1 to 5 of `cpt-noter-flow-core-credentials-privacy-keys`, `cpt-noter-algo-core-credentials-privacy-availability`, `cpt-noter-algo-core-credentials-privacy-secret-boundary` for API keys, and `cpt-noter-state-core-credentials-privacy-key` except removal. The IDs stay in that spec. The M2 code carries the block markers (`@cpt-begin`/`@cpt-end`) of the instructions it implements, and ticks those instructions in M2:
+  - flow steps 1 to 5 (`inst-key-read`, `inst-key-request`, `inst-key-verify`, `inst-key-store`, `inst-key-return`);
+  - the availability steps for keys and runtimes (`inst-availability-keys`, `inst-availability-clis`, `inst-availability-version`, `inst-availability-return`);
+  - the API-key steps of the secret boundary (`inst-secret-key`, `inst-secret-scrub`, `inst-secret-return`);
+  - the key transitions except removal (`inst-key-state-verify`, `inst-key-state-save`, `inst-key-state-reject`, `inst-key-state-revoked`, `inst-key-state-locked`, `inst-key-state-unlocked`).
+
+  The flow, algorithm and state IDs are ticked when the credentials feature adds the rest in M3: `inst-key-remove`, `inst-availability-ended`, `inst-availability-bindings`, `inst-secret-account`, `inst-secret-metadata` and `inst-key-state-remove`. This follows `.cf-studio/config/kits/sdlc/codebase/rules.md`: a parent is `[x]` only when all its nested steps are.
 - DESIGN.md stories (M2): none owned here; used by post-call and handoff stories.
 - Interfaces: `cpt-noter-interface-llm-runtime`, `cpt-noter-interface-skill-outputs`; event `privacy:changed` when effective privacy state changes.
 - `llm_runs` and `audit_log` from the first cloud run, even before the M3 audit commands exist.
@@ -71,7 +77,7 @@ Post-call and handoff can call a model without creating another path for user te
 
 ### 1.4 References
 
-- **Decomposition**: [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md), entry `cpt-noter-feature-core-llm-gate`; overview discrepancies 1 and 7
+- **Decomposition**: [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md), entry `cpt-noter-feature-core-llm-gate`; overview discrepancies 1 (decided: `accounts_get` and `api_key_set` in M2) and 7
 - **Design**: [DESIGN-core.md](../../DESIGN-core.md): `cpt-noter-component-core-llm-router`, `cpt-noter-component-core-privacy`, `cpt-noter-interface-llm-runtime`, `cpt-noter-interface-skill-outputs`, `cpt-noter-dbtable-llm-runs`, `cpt-noter-dbtable-audit-log`
 - **Contract**: `crates/noter-protocol/src/skills.rs`, `common.rs`, `error.rs`; `contracts/skills/`, `contracts/egress-hosts.json`
 - **Dependencies**: `cpt-noter-feature-core-storage`, `cpt-noter-feature-core-settings`
@@ -256,4 +262,5 @@ The system **MUST** pass unit tests for routing, redaction, failed-audit refusal
 - [ ] Invalid schema and missing or unknown evidence trigger one repair retry and then the simpler fallback; unvalidated output is never committed.
 - [ ] Unit tests cover cancellation, two consecutive failures, budget and timeout paths; adapter conformance covers all three runtimes and cleanup.
 - [ ] M2 real-core output and handoff E2E passes with the scripted runtime; the network-monitor release test separately proves actual egress behavior.
+- [ ] `accounts_get` and `api_key_set` succeed in E2E against the real core with the scripted runtime. `noter-core-harness` provides a Keychain stand-in, a scripted secret store, as part of the Platform seam (Backend Teamlead decision D1, `.plans/core-harness.md`).
 - [ ] `just gate` passes.
