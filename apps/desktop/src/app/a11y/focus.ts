@@ -37,8 +37,11 @@ export function createFocusReturn(getActive: () => FocusTarget | null) {
   };
 }
 
-const NOT_OFF = ':not([disabled]):not([tabindex="-1"]):not([hidden]):not([inert])';
-export const FOCUSABLE = ["a[href]", "button", "input", "select", "textarea", "[tabindex]", "summary", "[contenteditable]"].map((s) => s + NOT_OFF).join(",");
+// `:disabled` also covers controls inside a disabled fieldset.
+const NOT_OFF = ':not(:disabled):not([tabindex="-1"]):not([hidden]):not([inert])';
+export const FOCUSABLE = ["a[href]", "button", "input", "select", "textarea", "[tabindex]", "summary", '[contenteditable]:not([contenteditable="false"])']
+  .map((s) => s + NOT_OFF)
+  .join(",");
 
 /** The next element in Tab order, wrapping around; with no current one, the first (or last going back). */
 export function nextFocusable<T>(candidates: T[], current: unknown, back: boolean): T | undefined {
@@ -47,17 +50,28 @@ export function nextFocusable<T>(candidates: T[], current: unknown, back: boolea
   return candidates[(i + (back ? -1 : 1) + candidates.length) % candidates.length];
 }
 
-const focusables = (scope: ParentNode) => [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => !el.closest("[inert],[hidden]") && el.getClientRects().length > 0);
+/** Rendered and visible: not under [hidden] or [inert], not display: none, not visibility: hidden. */
+const shown = (el: Element) =>
+  !el.closest("[inert],[hidden]") && el.getClientRects().length > 0 && el.ownerDocument?.defaultView?.getComputedStyle(el).visibility !== "hidden";
+
+const focusables = (scope: ParentNode) => [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(shown);
 
 /** Tab and ⇧Tab move through every control; inside an open sheet focus stays in it. */
 export function installTabNavigation(root: Document): () => void {
   const on = (e: KeyboardEvent) => {
-    if (e.key !== "Tab" || e.ctrlKey || e.altKey || e.metaKey) return;
-    const scope = [...root.querySelectorAll('[aria-modal="true"]')].at(-1) ?? root;
-    const next = nextFocusable(focusables(scope as ParentNode), root.activeElement, e.shiftKey);
+    if (e.defaultPrevented || e.key !== "Tab" || e.ctrlKey || e.altKey || e.metaKey) return;
+    // The trap is the topmost open sheet; a closed one kept in the DOM does not count.
+    const scope = [...root.querySelectorAll('[aria-modal="true"]')].filter(shown).at(-1) ?? root;
+    const list = focusables(scope as ParentNode);
+    let next = nextFocusable(list, root.activeElement, e.shiftKey);
     if (!next) return;
     e.preventDefault();
-    next.focus();
+    // A control can still refuse focus: move on to the following one rather than stick.
+    for (let tries = 0; next && tries < list.length; tries++) {
+      next.focus();
+      if (root.activeElement === next) return;
+      next = nextFocusable(list, next, e.shiftKey);
+    }
   };
   root.addEventListener("keydown", on);
   return () => root.removeEventListener("keydown", on);
@@ -112,7 +126,7 @@ export function useFocusReturn(open: boolean, overlayRef: RefObject<HTMLElement 
     const me = {};
     overlays.push(me);
     const fr = createFocusReturn(() => document.activeElement as HTMLElement | null);
-    fr.open(overlayRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? undefined);
+    fr.open(overlayRef.current ? focusables(overlayRef.current)[0] : undefined);
     const top = () => overlays.at(-1) === me;
     const key = (e: KeyboardEvent) => top() && e.key === "Escape" && close.current();
     const press = (e: PointerEvent) => top() && !overlayRef.current?.contains(e.target as Node) && close.current();

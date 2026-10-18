@@ -14,13 +14,14 @@ afterEach(() => {
 function setup(open: boolean) {
   const l: Record<string, (e: unknown) => void> = {};
   const opener = { focus: vi.fn(), isConnected: true };
-  const first = { focus: vi.fn() };
+  const first = { focus: vi.fn(), closest: () => null, getClientRects: () => [{}] };
+  const hidden = { focus: vi.fn(), closest: () => ({}), getClientRects: () => [] }; // in a [hidden] part of the overlay
   vi.stubGlobal("document", { activeElement: opener, addEventListener: (t: string, f: never) => void (l[t] = f), removeEventListener: (t: string) => void delete l[t] });
   const inside = {};
-  const overlay = { current: { querySelector: () => first, contains: (n: unknown) => n === inside } };
+  const overlay = { current: { querySelectorAll: () => [hidden, first], contains: (n: unknown) => n === inside } };
   const onClose = vi.fn();
   useFocusReturn(open, overlay as never, onClose);
-  return { l, opener, first, inside, onClose, run: () => effects.at(-1)!() as (() => void) | undefined };
+  return { l, opener, first, hidden, inside, onClose, run: () => effects.at(-1)!() as (() => void) | undefined };
 }
 
 describe("useFocusReturn", () => {
@@ -34,6 +35,7 @@ describe("useFocusReturn", () => {
     const t = setup(true);
     const cleanup = t.run()!;
     expect(t.first.focus).toHaveBeenCalled();
+    expect(t.hidden.focus).not.toHaveBeenCalled();
     t.l.keydown!({ key: "a" });
     t.l.pointerdown!({ target: t.inside });
     expect(t.onClose).not.toHaveBeenCalled();

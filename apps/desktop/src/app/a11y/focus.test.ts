@@ -45,25 +45,39 @@ describe("nextFocusable", () => {
     expect(nextFocusable([], null, false)).toBeUndefined();
   });
   it("selects controls but not disabled, tabindex=-1, hidden or inert ones", () => {
-    expect(FOCUSABLE).toContain("button:not([disabled])");
-    expect(FOCUSABLE).toContain('[tabindex]:not([disabled]):not([tabindex="-1"])');
+    expect(FOCUSABLE).toContain("button:not(:disabled)"); // also a button inside a disabled fieldset
+    expect(FOCUSABLE).toContain('[tabindex]:not(:disabled):not([tabindex="-1"])');
+    expect(FOCUSABLE).toContain('[contenteditable]:not([contenteditable="false"])');
   });
 });
 
 type Listener = (e: never) => void;
-function fakeDoc(items: { sheet?: unknown[]; page: unknown[]; active?: unknown }) {
+const focus = { active: undefined as unknown };
+const shownBox = { closest: () => null, getClientRects: () => [{}] };
+function fakeDoc(items: { sheet?: unknown[]; hiddenModalAfter?: boolean; page: unknown[]; active?: unknown }) {
   const l: Record<string, Listener> = {};
+  focus.active = items.active;
+  const modals = [
+    ...(items.sheet ? [{ ...shownBox, querySelectorAll: () => items.sheet }] : []),
+    ...(items.hiddenModalAfter ? [{ closest: () => ({}), getClientRects: () => [], querySelectorAll: () => [] }] : []),
+  ];
   const doc = {
-    activeElement: items.active,
+    get activeElement() {
+      return focus.active;
+    },
     addEventListener: (t: string, f: Listener) => void (l[t] = f),
     removeEventListener: (t: string) => void delete l[t],
-    querySelectorAll: (s: string) => (s.startsWith("[aria-modal") ? (items.sheet ? [{ querySelectorAll: () => items.sheet }] : []) : items.page),
+    querySelectorAll: (s: string) => (s.startsWith("[aria-modal") ? modals : items.page),
     defaultView: { getComputedStyle: (el: { overflow?: string }) => ({ overflowY: el.overflow ?? "visible" }) },
   };
   return { doc: doc as unknown as Document, l };
 }
-const el = (name: string) => ({ name, focus: vi.fn(), closest: () => null, getClientRects: () => [{}] });
-const tab = (o = {}) => ({ key: "Tab", ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, preventDefault: vi.fn(), ...o });
+/** A candidate control; `takes: false` refuses focus as WebKit does for some it cannot focus. */
+const el = (name: string, takes = true) => {
+  const e = { name, ...shownBox, focus: vi.fn(() => void (takes && (focus.active = e))) };
+  return e;
+};
+const tab = (o = {}) => ({ key: "Tab", ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, defaultPrevented: false, preventDefault: vi.fn(), ...o });
 
 describe("installTabNavigation", () => {
   it("moves focus to the next control and wraps with ⇧Tab", () => {
@@ -75,7 +89,8 @@ describe("installTabNavigation", () => {
     expect(b.focus).toHaveBeenCalled();
     expect(e.preventDefault).toHaveBeenCalled();
     l.keydown!(tab({ shiftKey: true }) as never);
-    expect(b.focus).toHaveBeenCalledTimes(2);
+    expect(a.focus).toHaveBeenCalledTimes(1);
+    expect(focus.active).toBe(a);
     off();
     expect(l.keydown).toBeUndefined();
   });
@@ -91,6 +106,41 @@ describe("installTabNavigation", () => {
     expect(p.focus).not.toHaveBeenCalled();
     expect(hid.focus).not.toHaveBeenCalled();
     expect(unrendered.focus).not.toHaveBeenCalled();
+  });
+
+  it("moves past a control that refuses focus instead of sticking on it", () => {
+    const [a, refuses, b] = [el("a"), el("r", false), el("b")];
+    const { doc, l } = fakeDoc({ page: [a, refuses, b], active: a });
+    installTabNavigation(doc);
+    l.keydown!(tab() as never);
+    expect(refuses.focus).toHaveBeenCalled();
+    expect(focus.active).toBe(b);
+  });
+
+  it("skips visibility: hidden controls", () => {
+    const [a, b] = [el("a"), el("b")];
+    const invisible = { ...el("i"), ownerDocument: { defaultView: { getComputedStyle: () => ({ visibility: "hidden" }) } } };
+    const { doc, l } = fakeDoc({ page: [a, invisible, b], active: a });
+    installTabNavigation(doc);
+    l.keydown!(tab() as never);
+    expect(invisible.focus).not.toHaveBeenCalled();
+    expect(focus.active).toBe(b);
+  });
+
+  it("keeps the trap in the visible sheet although a closed dialog is retained after it", () => {
+    const [p, s1, s2] = [el("p"), el("s1"), el("s2")];
+    const { doc, l } = fakeDoc({ page: [p, s1, s2], sheet: [s1, s2], hiddenModalAfter: true, active: s2 });
+    installTabNavigation(doc);
+    l.keydown!(tab() as never);
+    expect(focus.active).toBe(s1);
+  });
+
+  it("leaves a Tab that another handler already took", () => {
+    const [a, b] = [el("a"), el("b")];
+    const { doc, l } = fakeDoc({ page: [a, b], active: a });
+    installTabNavigation(doc);
+    l.keydown!(tab({ defaultPrevented: true }) as never);
+    expect(b.focus).not.toHaveBeenCalled();
   });
 
   it("ignores other keys, other modifiers and an empty page", () => {
