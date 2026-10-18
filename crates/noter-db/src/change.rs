@@ -1,5 +1,6 @@
 //! The one write path: a mutation and its `changes` row commit in one transaction.
 
+use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::NativeSurface;
 use noter_protocol::model::Actor;
 use noter_protocol::{BatchId, ChangeId, CoreError, ErrorCode, ErrorDetail, EvidenceId, Rev};
@@ -152,37 +153,21 @@ fn change_tx(
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
         let new_rev = m.bump_rev.then(|| Rev(stored_rev.map_or(1, |r| r.0 + 1)));
-        write_row(&tx, m, new_rev, before.is_some()).map_err(internal)?;
+        write_row(&tx, m, new_rev, before.is_some()).map_err(|e| write_error(m, e))?;
         let after = select_row(&tx, m).map_err(internal)?.unwrap_or(Value::Null);
         let rev = rev_of(&after).unwrap_or(Rev(0));
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
-        let change_id = ChangeId::new(format!("chg_{}", ulid::Ulid::generate()));
-        let (field, old, new, delta) =
-            what_changed(m, before.as_ref(), &after).map_err(internal)?;
-        tx.execute(
-            "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, delta, summary,
-                                  reason, evidence_ids, status, batch_id, undoable, surface)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'applied', ?13, ?14, ?15)",
-            params![
-                change_id.as_str(),
-                now_ms(),
-                actor_column(&meta.actor),
-                m.entity_type,
-                m.id,
-                field,
-                old,
-                new,
-                delta,
-                meta.summary,
-                meta.reason,
-                serde_json::to_string(&meta.evidence_ids).map_err(internal)?,
-                meta.batch_id.as_ref().map(BatchId::as_str),
-                meta.undoable,
-                meta.surface.map(surface_column),
-            ],
-        )
-        .map_err(internal)?;
+        let (field, old, new, delta) = what_changed(m, before.as_ref(), &after);
+        let change = Logged {
+            entity_type: m.entity_type,
+            entity_id: m.id.clone(),
+            field: field.map(String::from),
+            before: old,
+            after: new,
+            delta,
+        };
+        let change_id = insert_change(&tx, meta, &change)?;
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
         out.push(Committed {
             record: after,
@@ -198,6 +183,118 @@ fn change_tx(
     // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-return-tx
 }
 
+/// What a custom write changed, for its change row (DESIGN-core 3.7, table `changes`): one
+/// changed value is `field`, `before` and `after` as text; several are a `delta` of
+/// `{"name": [before, after]}`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Logged {
+    pub entity_type: &'static str,
+    pub entity_id: String,
+    pub field: Option<String>,
+    pub before: Option<String>,
+    pub after: Option<String>,
+    pub delta: Option<Value>,
+}
+
+/// A committed custom write: what the closure returned and its change rows.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Custom<T> {
+    pub value: T,
+    pub change_ids: Vec<ChangeId>,
+    pub batch_id: Option<BatchId>,
+}
+
+impl Store {
+    /// A write the `Mutation` shape does not fit (key/value rows, deletes): `f` runs in one
+    /// immediate transaction on the writer and reports what it changed; its change rows commit
+    /// in the same transaction, and a write that reports nothing is refused. Several changes
+    /// share a batch id (the caller's, or a new `bat_` id).
+    // @cpt-algo:cpt-noter-algo-core-storage-custom-write:p1
+    pub fn write_with<T: Send + 'static>(
+        &self,
+        mut meta: ChangeMeta,
+        f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
+    ) -> Result<Custom<T>, CoreError> {
+        self.on_writer(move |conn| {
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-begin
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-begin
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-run-write
+            let (value, logged) = f(&tx)?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-run-write
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-if-unlogged
+            if logged.is_empty() {
+                // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-return-unlogged
+                return Err(internal("a write must log what it changed"));
+                // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-return-unlogged
+            }
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-if-unlogged
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-batch-id
+            if logged.len() > 1 {
+                meta.batch_id
+                    .get_or_insert_with(|| BatchId::new(format!("bat_{}", ulid::Ulid::generate())));
+            }
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-batch-id
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-insert-changes
+            let change_ids = logged
+                .iter()
+                .map(|change| insert_change(&tx, &meta, change))
+                .collect::<Result<Vec<_>, _>>()?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-insert-changes
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-commit
+            tx.commit().map_err(internal)?;
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-commit
+            // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-return-custom
+            Ok(Custom {
+                value,
+                change_ids,
+                batch_id: meta.batch_id,
+            })
+            // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-return-custom
+        })
+    }
+}
+
+fn insert_change(
+    tx: &Transaction,
+    meta: &ChangeMeta,
+    change: &Logged,
+) -> Result<ChangeId, CoreError> {
+    let change_id = ChangeId::new(format!("chg_{}", ulid::Ulid::generate()));
+    let delta = change
+        .delta
+        .as_ref()
+        .map(serde_json::to_vec)
+        .transpose()
+        .map_err(internal)?;
+    tx.execute(
+        "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, delta, summary,
+                              reason, evidence_ids, status, batch_id, undoable, surface)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'applied', ?13, ?14, ?15)",
+        params![
+            change_id.as_str(),
+            now_ms(),
+            actor_column(&meta.actor),
+            change.entity_type,
+            change.entity_id,
+            change.field,
+            change.before,
+            change.after,
+            delta,
+            meta.summary,
+            meta.reason,
+            serde_json::to_string(&meta.evidence_ids).map_err(internal)?,
+            meta.batch_id.as_ref().map(BatchId::as_str),
+            meta.undoable,
+            meta.surface.map(surface_column),
+        ],
+    )
+    .map_err(internal)?;
+    Ok(change_id)
+}
+
 /// The change row's content (DESIGN-core 3.7, table `changes`): one changed column is
 /// `field`, `before` and `after` as text; several are only a `delta` of
 /// `{"column": [before, after]}` over the columns that changed.
@@ -206,12 +303,12 @@ fn what_changed(
     m: &Mutation,
     before: Option<&Value>,
     after: &Value,
-) -> serde_json::Result<(
+) -> (
     Option<&'static str>,
     Option<String>,
     Option<String>,
-    Option<Vec<u8>>,
-)> {
+    Option<Value>,
+) {
     let changed: Vec<(&'static str, Value, Value)> = m
         .values
         .iter()
@@ -225,16 +322,16 @@ fn what_changed(
         })
         .filter(|(_, old, new)| old != new)
         .collect();
-    Ok(match changed.as_slice() {
+    match changed.as_slice() {
         [(column, old, new)] => (Some(*column), as_text(old), as_text(new), None),
         _ => {
             let delta: Map<String, Value> = changed
                 .into_iter()
                 .map(|(c, old, new)| (c.to_string(), Value::from(vec![old, new])))
                 .collect();
-            (None, None, None, Some(serde_json::to_vec(&delta)?))
+            (None, None, None, Some(Value::Object(delta)))
         }
-    })
+    }
 }
 
 /// A column value as `before`/`after` text: strings as they are, `NULL` stays `NULL`.
@@ -243,6 +340,26 @@ fn as_text(v: &Value) -> Option<String> {
         Value::Null => None,
         Value::String(s) => Some(s.clone()),
         other => Some(other.to_string()),
+    }
+}
+
+/// A row the table's unique index refuses is a duplicate (two writers can race past a
+/// caller's own check); anything else is `internal`.
+fn write_error(m: &Mutation, e: rusqlite::Error) -> CoreError {
+    match &e {
+        rusqlite::Error::SqliteFailure(f, _)
+            if f.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        {
+            CoreError::new(
+                ErrorCode::InvalidInput,
+                format!("{} already has this value", m.table),
+            )
+            .with_detail(ErrorDetail::Validation {
+                field: m.table.into(),
+                rule: ValidationRule::Duplicate,
+            })
+        }
+        _ => internal(e),
     }
 }
 
