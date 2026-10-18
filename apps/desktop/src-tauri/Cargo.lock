@@ -1940,7 +1940,6 @@ dependencies = [
  "noter-protocol",
  "serde",
  "serde_json",
- "ulid",
 ]
 
 [[package]]
