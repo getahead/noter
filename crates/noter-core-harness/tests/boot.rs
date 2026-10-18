@@ -492,6 +492,34 @@ async fn pausing_a_held_download_leaves_it_paused_with_its_progress() {
 }
 
 #[tokio::test]
+async fn an_allowed_notifications_prompt_shows_in_the_environment() {
+    let mut r = start().await;
+    assert_eq!(
+        r.ok("main", "app_snapshot", json!({})).await["environment"]["notifications"],
+        "not_determined"
+    );
+    let (reply, events) = r
+        .call(
+            "main",
+            "permission_request",
+            json!({ "kind": "notifications" }),
+        )
+        .await;
+    assert_eq!(reply["ok"]["state"], "granted", "{reply}");
+    assert!(
+        events
+            .iter()
+            .any(|e| e["event"] == "env:changed" && e["payload"]["notifications"] == "authorized"),
+        "{events:?}"
+    );
+    assert_eq!(
+        r.ok("main", "app_snapshot", json!({})).await["environment"]["notifications"],
+        "authorized"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_changes_the_free_disk_and_the_notifications_state() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
