@@ -91,7 +91,7 @@ fn every_command_from_every_window_is_answered_or_refused() {
                         spec.name,
                         w.as_str()
                     ),
-                    None => assert!(got.is_ok(), "{} from {}: {got:?}", spec.name, w.as_str()),
+                    None => assert!(got.is_ok(), "{} from {}", spec.name, w.as_str()),
                 }
             } else {
                 let code = refused.map(|e| e.code);
