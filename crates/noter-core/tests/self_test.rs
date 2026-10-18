@@ -58,10 +58,17 @@ impl NativeServices for Mac {
     }
 }
 
-/// One required bundle that is never downloaded.
-struct MissingModel;
+/// The live model's bundle: ready once its file is in `models/`, never downloaded here.
+struct Whisper;
 
-impl ModelSource for MissingModel {
+/// The live model, already downloaded.
+fn live_model(dir: &Path) -> Arc<dyn ModelSource> {
+    std::fs::create_dir_all(dir.join("models")).unwrap();
+    std::fs::write(dir.join("models/whisper-turbo"), b"model").unwrap();
+    Arc::new(Whisper)
+}
+
+impl ModelSource for Whisper {
     fn manifest(&self) -> Vec<BundleSpec> {
         vec![BundleSpec {
             name: "whisper-turbo".into(),
@@ -98,12 +105,10 @@ fn open(
         .unwrap()
         .insert(PermissionKind::Microphone, mic);
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let mut deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
         .with_native(Arc::new(mac))
-        .with_engine(launcher);
-    if let Some(m) = models {
-        deps = deps.with_models(m);
-    }
+        .with_engine(launcher)
+        .with_models(models.unwrap_or_else(|| live_model(dir)));
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Run { core, engine }
@@ -302,6 +307,7 @@ async fn an_engine_that_never_answers_times_out() {
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
         .with_native(Arc::new(mac))
         .with_engine(launcher)
+        .with_models(live_model(dir.path()))
         .with_engine_config(noter_engine_client::Config {
             command_timeout: Duration::from_millis(200),
             ping_timeout: Duration::from_millis(100),
@@ -321,7 +327,7 @@ async fn a_missing_live_model_is_refused_before_the_channel_opens() {
         dir.path(),
         ScriptedEngine::new(),
         PermissionState::Granted,
-        Some(Arc::new(MissingModel)),
+        Some(Arc::new(Whisper)),
     );
     let (sink, got) = collecting();
     let err = r
@@ -331,6 +337,21 @@ async fn a_missing_live_model_is_refused_before_the_channel_opens() {
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::ModelMissing);
     assert!(got.lock().unwrap().is_empty());
+
+    // No manifest at all names no live model: still missing.
+    let dir = tempfile::tempdir().unwrap();
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents));
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    let err = core
+        .self_test_run(
+            &first_run(),
+            SelfTestArgs { play_clip: false },
+            collecting().0,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::ModelMissing);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
