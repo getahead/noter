@@ -14,7 +14,7 @@ use noter_protocol::{AudioChannel, TimestampMs};
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, DuplexStream};
 use tokio::sync::oneshot;
 
-use crate::launch::{EngineIo, EngineLauncher};
+use crate::launch::{EngineIo, EngineLauncher, LaunchFuture};
 
 /// How one launched engine behaves.
 #[derive(Debug, Clone)]
@@ -104,7 +104,13 @@ impl ScriptedEngine {
 }
 
 impl EngineLauncher for ScriptedEngine {
-    async fn launch(&self) -> io::Result<EngineIo> {
+    fn launch(&self) -> LaunchFuture<'_> {
+        Box::pin(self.start())
+    }
+}
+
+impl ScriptedEngine {
+    async fn start(&self) -> io::Result<EngineIo> {
         let (behaviour, kill) = {
             let mut s = self.lock();
             s.launches += 1;
