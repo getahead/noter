@@ -1574,6 +1574,8 @@ export const defaultHandlers: Handlers = {
     return row;
   },
   self_test_run: (_a, { world, fake, send, publish }) => {
+    // D-21: the same refusal as the core (core-first-run inst-if-model-missing), before the Channel opens.
+    if (world.app.setup.models.bundles.some((b) => b.required_for_capture && b.state !== "ready")) throw coreError("model_missing", "the live model is not downloaded");
     const sub = newId("sub");
     fake.openChannel(sub, "self_test_run", send as (m: unknown) => void);
     const at = (ms: number, event: Parameters<typeof fake.push<"self_test_run">>[1]["event"]) => fake.later(ms, () => fake.push(sub, { event }));

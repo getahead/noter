@@ -684,7 +684,10 @@ class CiChangesTests(unittest.TestCase):
                 if areas != ["always"]:
                     self.assertIn(f"fromJSON(needs.changes.outputs.jobs)['{job}']", jobs[job], f"{wf}: {job} is not filtered")
         self.assertEqual(set(CFG["ci"]["jobs"]["codeql"]), {"actions", "javascript-typescript", "rust"})
-        self.assertEqual(CFG["ci"]["jobs"]["codeql"]["actions"], ["always"])
+        codeql = self._jobs_of("codeql.yml")["analyze"]
+        self.assertIn("language: [actions, javascript-typescript, rust]", codeql,
+                      "every language main has needs a result on every PR, analysed or carried forward")
+        self.assertIn("github/codeql-action/upload-sarif@", codeql)
 
     def test_the_repository_layout_is_classified(self):
         # One file per kind the repository holds today; a file no rule knows runs everything (fail safe).
@@ -733,7 +736,7 @@ class CiChangesTests(unittest.TestCase):
     def test_inert_files_run_nothing_but_the_always_checks(self):
         self.assertEqual(self.run_jobs([".github/dependabot.yml", ".plans/notes.txt"]), set())
         self.assertEqual(self.run_jobs([".github/dependabot.yml"], "hygiene"), {"title", "approvals"})
-        self.assertEqual(self.run_jobs([".github/dependabot.yml"], "codeql"), {"actions"})
+        self.assertEqual(self.run_jobs([".github/dependabot.yml"], "codeql"), set())
 
     def test_hygiene_checks_follow_their_files(self):
         self.assertEqual(self.run_jobs(["deny.toml"], "hygiene"), {"title", "approvals", "rust-deps"})
@@ -743,8 +746,9 @@ class CiChangesTests(unittest.TestCase):
         self.assertEqual(self.run_jobs([".github/workflows/nightly.yml"]), set(), "CI does not run for another workflow")
 
     def test_codeql_analyses_the_changed_languages(self):
-        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"], "codeql"), {"actions", "javascript-typescript"})
-        self.assertEqual(self.run_jobs(["engine/Sources/x.swift", "docs/PRD.md"], "codeql"), {"actions"})
+        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"], "codeql"), {"javascript-typescript"})
+        self.assertEqual(self.run_jobs(["engine/Sources/x.swift", "docs/PRD.md"], "codeql"), set())
+        self.assertEqual(self.run_jobs([".github/workflows/nightly.yml"], "codeql"), {"actions"})
 
     def test_not_a_pull_request_runs_everything(self):
         p = ci_changes.plan(None, CFG, "ci", "a push run of main checks everything")

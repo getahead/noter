@@ -146,7 +146,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
   });
 
   test("error path — Setup incomplete: no prompt, Start Recording works, Finish Setup… after the call", async ({ scenario }) => {
-    await given(scenario, W.idle, W.selfTestSkipped, (w) => (w.app.setup.complete = false));
+    await given(scenario, W.idle, W.selfTestSkipped);
     const main = scenario.core("main");
     const nav = await scenario.events("nav:request");
 
@@ -175,7 +175,6 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     await given(scenario, W.idle, (w) => {
       W.permission(w, "microphone", "not_asked");
       W.permission(w, "system_audio", "not_asked");
-      w.app.setup.complete = false;
       w.app.setup.detection_enabled = false;
     });
     const main = scenario.core("main");
