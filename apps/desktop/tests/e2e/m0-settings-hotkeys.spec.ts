@@ -3,7 +3,7 @@
 // field) are added when the Settings window lands (docs/TEST-PLAN.md › M0).
 import type { HotkeyAction, HotkeyList } from "../../src/core/bindings";
 import { ok, refused, until } from "../support/results";
-import { expect, given, test, versionsGrow } from "./support/fixtures";
+import { changeAhead, expect, test, versionsGrow } from "./support/fixtures";
 
 const chord = (list: HotkeyList, action: HotkeyAction) => list.bindings.find((b) => b.action === action);
 
@@ -39,7 +39,7 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
   });
 
   test("error path — Card key used by another app: the warning, fixed in Raycast, gone on return", async ({ scenario }) => {
-    await given(scenario, (w) => (w.copilot.card_keys.conflicts = ["Ctrl+Alt+Super+3"]));
+    if (!(await changeAhead(scenario, (w) => (w.copilot.card_keys.conflicts = ["Ctrl+Alt+Super+3"])))) return; // card keys are the copilot's (M4)
     const settings = scenario.core("settings");
     const status = await scenario.events("copilot:status");
 
