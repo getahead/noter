@@ -164,7 +164,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 **Steps**:
 1. [x] - `p1` - API: `log_ui { level, message, context }` - `inst-log-call`
 2. [x] - `p1` - Core applies `cpt-noter-algo-core-ipc-host-scrub-log` - `inst-log-scrub`
-3. [x] - `p1` - Write the line to `logs/` (structured, 0600) - `inst-log-write`
+3. [x] - `p1` - Write the line to `logs/` (structured, 0600); bounding and rotating `logs/noter.log` is M5 maintenance (`cpt-noter-feature-core-maintenance`) - `inst-log-write`
 4. [x] - `p1` - **RETURN** `Ack` - `inst-log-return`
 
 ## 3. Processes / Business Logic (CDSL)
@@ -255,7 +255,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 **Steps**:
 1. [x] - `p1` - Keep only fields of an allow-list (level, module, window, command name, error code, ids, durations, counts) - `inst-allow-list`
-2. [x] - `p1` - Truncate free-text messages from the UI to a fixed length and drop any field named or typed as text content - `inst-truncate`
+2. [x] - `p1` - Keep no free text: a UI message keeps only its length (`message_len`), and any string that is not a short identifier (screen, command, id, error code) is left out - `inst-truncate`
 3. [x] - `p1` - **RETURN** the scrubbed record - `inst-return-scrubbed`
 
 ## 4. States (CDSL)
