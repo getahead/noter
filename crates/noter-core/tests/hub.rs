@@ -240,18 +240,34 @@ fn a_closed_channel_is_dropped() {
 }
 
 #[test]
-fn levels_are_coalesced_per_subscription() {
+fn levels_are_coalesced_per_stream_before_they_get_a_seq() {
     let (hub, clock) = hub(Some(100));
-    let w = Window::default();
-    hub.subscribe("levels", MAIN, w.sink(), || Ok(())).unwrap();
+    let (first, second) = (Window::default(), Window::default());
+    hub.subscribe("levels", MAIN, first.sink(), || Ok(()))
+        .unwrap();
     for _ in 0..3 {
         hub.publish("levels", value(0));
     }
+    // A window that subscribes between two sends sees the same consecutive seqs.
+    let late = hub
+        .subscribe("levels", CALL, second.sink(), || Ok(()))
+        .unwrap();
+    assert_eq!(late.last_seq, Seq(1));
     clock.0.store(99, Ordering::SeqCst);
-    hub.publish("levels", value(0));
+    assert_eq!(
+        hub.publish("levels", value(0)),
+        Seq(1),
+        "dropped: still the last seq"
+    );
     clock.0.store(100, Ordering::SeqCst);
-    hub.publish("levels", value(0));
-    assert_eq!(w.seqs(), [1, 5]);
+    assert_eq!(hub.publish("levels", value(0)), Seq(2));
+    assert_eq!(first.seqs(), [1, 2], "no gap (ADR-0002 R24)");
+    assert_eq!(second.seqs(), [2]);
+    assert_eq!(
+        hub.replay_after("levels", Seq(0)).len(),
+        2,
+        "dropped messages are not replayed"
+    );
 }
 
 #[test]
