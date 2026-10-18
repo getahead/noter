@@ -150,3 +150,29 @@ async fn system_audio_follows_the_permission_state_the_world_gives() {
         );
     }
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_new_self_test_cancels_what_is_left_of_the_previous_one() {
+    let engine = ScriptedEngine::new().with_default(Behaviour {
+        self_test_pace_ms: 400,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    let mut events = c.events();
+    c.command(SELF_TEST).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(500)).await; // the first test's mic stream is out
+    c.command(SELF_TEST).await.unwrap();
+    let got = until_result(&mut events).await;
+    let streams = got
+        .iter()
+        .filter(|e| matches!(e, EngineEvent::SelfTestStream { .. }))
+        .count();
+    // one stream from the cancelled test, then the whole second test
+    assert_eq!(streams, 3, "{got:?}");
+    assert_eq!(
+        got.iter()
+            .filter(|e| matches!(e, EngineEvent::SelfTestResult { .. }))
+            .count(),
+        1
+    );
+}
