@@ -254,4 +254,4 @@ The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (
 - [ ] Every write made through M0 commands produces exactly one `changes` row in the same transaction (each later feature extends the test with its own commands); a forced failure after the row write leaves neither.
 - [x] A write with a stale `rev` returns `conflict` with `detail.current_rev` and changes nothing.
 - [x] `just arch` passes: no crate other than `noter-db` depends on an SQLite crate.
-- [ ] `just gate` passes, with unit line coverage of `noter-db` at 80 % or more.
+- [x] `just gate` passes, with unit line coverage of `noter-db` at 80 % or more.
