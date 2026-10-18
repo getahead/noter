@@ -584,6 +584,14 @@ impl NativeServices for ScriptedNative {
             Some(s) => *s,
         };
         state.0.insert(kind, answer);
+        // The notification centre's own state follows the answer, as macOS reports it.
+        if kind == PermissionKind::Notifications {
+            state.1.notifications = match answer {
+                PermissionState::Granted => NotificationAuth::Authorized,
+                PermissionState::Denied => NotificationAuth::Denied,
+                _ => state.1.notifications,
+            };
+        }
         Box::pin(async move { answer })
     }
 
