@@ -2,7 +2,7 @@
 //! (`just contract-regen`). The network-monitor release gate and the egress gate in noter-llm
 //! read that file; a new destination is added here, in the pull request that adds the code.
 
-pub const COMMENT: &str = "Hand-written, not generated. Every host Noter's processes may reach (docs/REVIEW-2026-10-17-design-core.md, R2 and R46). The network-monitor release gate checks recorded proxy lines against this file: a line to a provider_hosts host must match an audit_log run row by time window and run id header; a line to an allow_without_audit host needs no row; any other host fails the gate. Change it in the same pull request as the code that adds a destination.";
+pub const COMMENT: &str = "Generated from crates/noter-protocol/src/egress.rs (just contract-regen). Every host Noter's processes may reach (docs/REVIEW-2026-10-17-design-core.md, R2 and R46). The network-monitor release gate checks recorded proxy lines against this file: a line to a provider_hosts host must match an audit_log run row by time window and run id header; a line to an allow_without_audit host needs no row; any other host fails the gate. Change it in the same pull request as the code that adds a destination.";
 
 pub const VERSION: u32 = 1;
 
@@ -40,6 +40,7 @@ pub const ALLOW_WITHOUT_AUDIT: &[HostGroup] = &[
             "cdn-lfs.huggingface.co",
             "cdn-lfs.hf.co",
             "cas-bridge.xethub.hf.co",
+            "us.aws.cdn.hf.co",
             "registry.ollama.ai",
         ],
         note: "WhisperKit, FluidAudio and bge-m3 bundles (checksummed), and local models pulled through Ollama.",
