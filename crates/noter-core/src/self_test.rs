@@ -46,6 +46,8 @@ impl StreamMsg for SelfTestMsg {
 
 /// The engine's self-test window; the result must arrive within it plus a margin.
 const WINDOW_MS: u32 = 10_000;
+/// The short test that brings up the System Audio Recording prompt.
+const PROMPT_MS: u32 = 3_000;
 const MARGIN: Duration = Duration::from_secs(2);
 static NEXT_RUN: AtomicU64 = AtomicU64::new(1);
 
@@ -251,14 +253,37 @@ impl Core {
     }
 
     /// Decision F1: the System Audio Recording prompt comes from the engine opening its tap
-    /// in a short self-test (no clip); the state is inferred from the next full self-test.
-    pub(crate) async fn prompt_system_audio(&self) {
-        let _ = self
-            .engine
-            .command(EngineCommand::SelfTest {
-                play_clip: false,
-                timeout_ms: 3_000,
-            })
-            .await;
+    /// in a short self-test (no clip). What arrives is the inference: system audio heard →
+    /// granted, only zeros → denied, otherwise not asked.
+    pub(crate) async fn prompt_system_audio(&self) -> PermissionState {
+        let mut events = self.engine.events();
+        let short = EngineCommand::SelfTest {
+            play_clip: false,
+            timeout_ms: PROMPT_MS,
+        };
+        if self.engine.command(short).await.is_err() {
+            return PermissionState::NotAsked;
+        }
+        let deadline =
+            tokio::time::Instant::now() + Duration::from_millis(PROMPT_MS.into()) + MARGIN;
+        loop {
+            let line = match tokio::time::timeout_at(deadline, events.recv()).await {
+                Ok(Ok(line)) => line,
+                Ok(Err(RecvError::Lagged(_))) => continue,
+                _ => return PermissionState::NotAsked,
+            };
+            match line.event {
+                EngineEvent::SelfTestStream {
+                    channel: AudioChannel::Sys,
+                } => return PermissionState::Granted,
+                EngineEvent::SelfTestResult { failure, .. } => {
+                    return match failure {
+                        Some(EngineErrorCode::ZeroBuffers) => PermissionState::Denied,
+                        _ => PermissionState::NotAsked,
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }

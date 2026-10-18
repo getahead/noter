@@ -186,6 +186,9 @@ const SETUP_KEY: &str = "setup";
 pub(crate) struct Stored {
     steps: Vec<StepRow>,
     pub(crate) self_test: SelfTestState,
+    /// System Audio Recording as the last short engine test (F1) inferred it.
+    #[serde(default)]
+    system_audio: Option<PermissionState>,
 }
 
 impl Default for Stored {
@@ -199,6 +202,7 @@ impl Default for Stored {
                 })
                 .collect(),
             self_test: SelfTestState::NotRun,
+            system_audio: None,
         }
     }
 }
@@ -259,15 +263,15 @@ pub fn detection(offer_to_record: bool, self_test: &SelfTestState) -> (bool, boo
     // @cpt-end:cpt-noter-algo-core-first-run-detection-rule:p1:inst-detect-off
 }
 
-/// System Audio Recording cannot be queried: passed self-test means granted, only zeros
-/// means off.
-fn system_audio(self_test: &SelfTestState) -> PermissionState {
-    match self_test {
+/// System Audio Recording cannot be queried: a passed self-test means granted, only zeros
+/// means off; otherwise the short engine test's inference (F1), if any.
+fn system_audio(stored: &Stored) -> PermissionState {
+    match &stored.self_test {
         SelfTestState::Passed { .. } => PermissionState::Granted,
         SelfTestState::Failed {
             reason: SelfTestFailure::ZeroBuffers,
         } => PermissionState::Denied,
-        _ => PermissionState::NotAsked,
+        _ => stored.system_audio.unwrap_or(PermissionState::NotAsked),
     }
 }
 
@@ -337,13 +341,13 @@ impl Core {
         self.refresh_setup();
     }
 
-    fn permission_rows(&self, self_test: &SelfTestState) -> Vec<PermissionRow> {
+    fn permission_rows(&self, stored: &Stored) -> Vec<PermissionRow> {
         ALL_PERMISSIONS
             .iter()
             .map(|&kind| PermissionRow {
                 kind,
                 state: if kind == PermissionKind::SystemAudio {
-                    system_audio(self_test)
+                    system_audio(stored)
                 } else {
                     self.deps.native.permission(kind)
                 },
@@ -353,7 +357,7 @@ impl Core {
 
     // @cpt-algo:cpt-noter-algo-core-first-run-status:p1
     fn refresh_environment(&self, reading: EnvironmentReading) {
-        let self_test = lock(&self.first_run).stored.self_test.clone();
+        let stored = lock(&self.first_run).stored.clone();
         let headphones = lock(&self.settings).audio.output.headphones_devices.clone();
         // @cpt-begin:cpt-noter-algo-core-first-run-status:p1:inst-build-env
         let output_device = reading.output_device.map(|mut d| {
@@ -370,7 +374,7 @@ impl Core {
             displays: reading.displays,
             output_route,
             output_device,
-            permissions: self.permission_rows(&self_test),
+            permissions: self.permission_rows(&stored),
             notifications: reading.notifications,
             online: reading.online,
             update: self.deps.updater.ready(),
@@ -400,7 +404,7 @@ impl Core {
             .steps
             .iter()
             .all(|r| matches!(r.state, StepState::Done | StepState::Skipped));
-        let permissions = self.permission_rows(&stored.self_test);
+        let permissions = self.permission_rows(&stored);
         let models = lock(&self.downloads).status();
         let mut app = self.app();
         let next = SetupStatus {
@@ -578,6 +582,7 @@ impl Core {
     // @cpt-flow:cpt-noter-flow-core-first-run-permission:p1
     pub(crate) async fn request_permission(
         &self,
+        ctx: &CommandCtx,
         args: PermissionArgs,
     ) -> Result<PermissionRow, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-permission-call
@@ -586,9 +591,21 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-if-system-audio
         let state = if kind == PermissionKind::SystemAudio {
             // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio
-            // Decision F1: the engine opens the tap briefly; the state follows the self-test.
-            self.prompt_system_audio().await;
-            system_audio(&lock(&self.first_run).stored.self_test)
+            // Decision F1: the engine opens the tap briefly (macOS prompts); what it heard is
+            // the inference until a full self-test decides.
+            let heard = self.prompt_system_audio().await;
+            let mut fr = lock(&self.first_run);
+            if heard != PermissionState::NotAsked && fr.stored.system_audio != Some(heard) {
+                let mut stored = fr.stored.clone();
+                stored.system_audio = Some(heard);
+                if self
+                    .store_setup(ctx, &fr.stored, &stored, "permission_request")
+                    .is_ok()
+                {
+                    fr.stored = stored;
+                }
+            }
+            system_audio(&fr.stored)
             // @cpt-end:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio
         } else {
             self.deps.native.request_permission(kind).await
