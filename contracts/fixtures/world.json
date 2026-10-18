@@ -656,6 +656,199 @@
       "audio_not_stored": false,
       "calendar_event": null,
       "call": {
+        "archive": "not_started",
+        "audio_deleted": false,
+        "audio_kept_until": 1794729600000,
+        "call_type": "planning",
+        "duration_ms": 1380000,
+        "id": "call_live",
+        "languages": [
+          "en",
+          "ru",
+          "de"
+        ],
+        "open_items": 5,
+        "outputs": "not_started",
+        "participants": [
+          {
+            "display_name": "Anna Kuznetsova",
+            "id": "per_anna",
+            "initials": "AK",
+            "is_you": false,
+            "short_name": "Anna K."
+          },
+          {
+            "display_name": "Pavel Romanov",
+            "id": "per_pavel",
+            "initials": "PR",
+            "is_you": false,
+            "short_name": "Pavel"
+          },
+          {
+            "display_name": "Dmitri Sokolov",
+            "id": "per_dmitri",
+            "initials": "DS",
+            "is_you": false,
+            "short_name": "Dmitri S."
+          },
+          {
+            "display_name": "You",
+            "id": "per_you",
+            "initials": "You",
+            "is_you": true,
+            "short_name": "You"
+          }
+        ],
+        "platform": "Microsoft Teams",
+        "privacy": "normal",
+        "rev": 3,
+        "review_waiting": 3,
+        "started_at": 1792137600000,
+        "status": "recording",
+        "tags": [
+          "vhi-8.0"
+        ],
+        "title": "Planning: VHI 8.0 drawer redesign",
+        "unnamed_speakers": 1
+      },
+      "first_recorded_call": false,
+      "gaps": [
+        {
+          "call_id": "call_live",
+          "reason": "paused",
+          "t0_ms": 1330000,
+          "t1_ms": 1360000
+        }
+      ],
+      "marks": [
+        {
+          "at_ms": 1260000,
+          "call_id": "call_live",
+          "id": "mrk_1",
+          "note": null
+        }
+      ],
+      "mode_used": "cloud_redacted",
+      "speakers": [
+        {
+          "call_id": "call_live",
+          "channel": "mic",
+          "id": "spk_you",
+          "label": {
+            "type": "you"
+          },
+          "named_by": null,
+          "sample": null,
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_anna",
+          "label": {
+            "person": {
+              "display_name": "Anna Kuznetsova",
+              "id": "per_anna",
+              "initials": "AK",
+              "is_you": false,
+              "short_name": "Anna K."
+            },
+            "type": "person"
+          },
+          "named_by": "voice_profile",
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1198000,
+            "t1_ms": 1204000
+          },
+          "segment_count": 1,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_pavel",
+          "label": {
+            "person": {
+              "display_name": "Pavel Romanov",
+              "id": "per_pavel",
+              "initials": "PR",
+              "is_you": false,
+              "short_name": "Pavel"
+            },
+            "type": "person"
+          },
+          "named_by": "calendar",
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1180000,
+            "t1_ms": 1186000
+          },
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_dmitri",
+          "label": {
+            "person": {
+              "display_name": "Dmitri Sokolov",
+              "id": "per_dmitri",
+              "initials": "DS",
+              "is_you": false,
+              "short_name": "Dmitri S."
+            },
+            "type": "person"
+          },
+          "named_by": "voice_profile",
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1272000,
+            "t1_ms": 1278000
+          },
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_live",
+          "channel": "sys",
+          "id": "spk_3",
+          "label": {
+            "n": 3,
+            "type": "unnamed"
+          },
+          "named_by": null,
+          "sample": {
+            "call_id": "call_live",
+            "channel": null,
+            "t0_ms": 1235000,
+            "t1_ms": 1241000
+          },
+          "segment_count": 1,
+          "suggestion": {
+            "display_name": "Lena Krüger",
+            "id": "per_lena",
+            "initials": "LK",
+            "is_you": false,
+            "short_name": "Lena K."
+          },
+          "talk_ms": null
+        }
+      ]
+    },
+    {
+      "audio_not_stored": false,
+      "calendar_event": null,
+      "call": {
         "archive": "done",
         "audio_deleted": false,
         "audio_kept_until": 1793520000000,
@@ -704,10 +897,78 @@
         "unnamed_speakers": 0
       },
       "first_recorded_call": false,
-      "gaps": [],
-      "marks": [],
+      "gaps": [
+        {
+          "call_id": "call_backend",
+          "reason": "device_changed",
+          "t0_ms": 30000,
+          "t1_ms": 33000
+        }
+      ],
+      "marks": [
+        {
+          "at_ms": 41000,
+          "call_id": "call_backend",
+          "id": "mrk_b_1",
+          "note": null
+        }
+      ],
       "mode_used": "cloud_redacted",
-      "speakers": []
+      "speakers": [
+        {
+          "call_id": "call_backend",
+          "channel": "mic",
+          "id": "spk_b_you",
+          "label": {
+            "type": "you"
+          },
+          "named_by": "calendar",
+          "sample": null,
+          "segment_count": 1,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "id": "spk_b_dmitri",
+          "label": {
+            "person": {
+              "display_name": "Dmitri Sokolov",
+              "id": "per_dmitri",
+              "initials": "DS",
+              "is_you": false,
+              "short_name": "Dmitri S."
+            },
+            "type": "person"
+          },
+          "named_by": "calendar",
+          "sample": null,
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "id": "spk_b_oleg",
+          "label": {
+            "person": {
+              "display_name": "Oleg Morozov",
+              "id": "per_oleg",
+              "initials": "OM",
+              "is_you": false,
+              "short_name": "Oleg M."
+            },
+            "type": "person"
+          },
+          "named_by": "calendar",
+          "sample": null,
+          "segment_count": 1,
+          "suggestion": null,
+          "talk_ms": null
+        }
+      ]
     }
   ],
   "call_types": {
@@ -2961,6 +3222,194 @@
             "is_you": false,
             "short_name": "Lena K."
           },
+          "talk_ms": null
+        }
+      ],
+      "subscription_id": null
+    },
+    {
+      "archive": "done",
+      "audio_available": true,
+      "call_id": "call_backend",
+      "gaps": [
+        {
+          "call_id": "call_backend",
+          "reason": "device_changed",
+          "t0_ms": 30000,
+          "t1_ms": 33000
+        }
+      ],
+      "hypotheses": [],
+      "last_seq": 17,
+      "live": false,
+      "marks": [
+        {
+          "at_ms": 41000,
+          "call_id": "call_backend",
+          "id": "mrk_b_1",
+          "note": null
+        }
+      ],
+      "pass": "archive",
+      "segments": [
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "confidence": 0.9599999785423279,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_backend_001",
+          "lang": "ru",
+          "lang_p": 0.949999988079071,
+          "pass": "archive",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Dmitri Sokolov",
+                "id": "per_dmitri",
+                "initials": "DS",
+                "is_you": false,
+                "short_name": "Dmitri S."
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_b_dmitri"
+          },
+          "state": "confirmed",
+          "t0_ms": 12000,
+          "t1_ms": 20000,
+          "text": "Давайте начнём с ostor: что с бакетами после рестарта?"
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "confidence": 0.9599999785423279,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_backend_002",
+          "lang": "en",
+          "lang_p": 0.949999988079071,
+          "pass": "archive",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Oleg Morozov",
+                "id": "per_oleg",
+                "initials": "OM",
+                "is_you": false,
+                "short_name": "Oleg M."
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_b_oleg"
+          },
+          "state": "confirmed",
+          "t0_ms": 25000,
+          "t1_ms": 33000,
+          "text": "The buckets come back, but the index rebuild takes about four minutes."
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "mic",
+          "confidence": 0.9599999785423279,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_backend_003",
+          "lang": "en",
+          "lang_p": 0.949999988079071,
+          "pass": "archive",
+          "speaker": {
+            "label": {
+              "type": "you"
+            },
+            "speaker_id": "spk_b_you"
+          },
+          "state": "confirmed",
+          "t0_ms": 40000,
+          "t1_ms": 48000,
+          "text": "Can we keep serving reads while it rebuilds?"
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "confidence": 0.9599999785423279,
+          "corrections": [],
+          "crosstalk_with": [],
+          "id": "seg_backend_004",
+          "lang": "en",
+          "lang_p": 0.949999988079071,
+          "pass": "archive",
+          "speaker": {
+            "label": {
+              "person": {
+                "display_name": "Dmitri Sokolov",
+                "id": "per_dmitri",
+                "initials": "DS",
+                "is_you": false,
+                "short_name": "Dmitri S."
+              },
+              "type": "person"
+            },
+            "speaker_id": "spk_b_dmitri"
+          },
+          "state": "confirmed",
+          "t0_ms": 52000,
+          "t1_ms": 60000,
+          "text": "Yes, reads stay up; writes wait for the index."
+        }
+      ],
+      "speakers": [
+        {
+          "call_id": "call_backend",
+          "channel": "mic",
+          "id": "spk_b_you",
+          "label": {
+            "type": "you"
+          },
+          "named_by": "calendar",
+          "sample": null,
+          "segment_count": 1,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "id": "spk_b_dmitri",
+          "label": {
+            "person": {
+              "display_name": "Dmitri Sokolov",
+              "id": "per_dmitri",
+              "initials": "DS",
+              "is_you": false,
+              "short_name": "Dmitri S."
+            },
+            "type": "person"
+          },
+          "named_by": "calendar",
+          "sample": null,
+          "segment_count": 2,
+          "suggestion": null,
+          "talk_ms": null
+        },
+        {
+          "call_id": "call_backend",
+          "channel": "sys",
+          "id": "spk_b_oleg",
+          "label": {
+            "person": {
+              "display_name": "Oleg Morozov",
+              "id": "per_oleg",
+              "initials": "OM",
+              "is_you": false,
+              "short_name": "Oleg M."
+            },
+            "type": "person"
+          },
+          "named_by": "calendar",
+          "sample": null,
+          "segment_count": 1,
+          "suggestion": null,
           "talk_ms": null
         }
       ],
