@@ -5,7 +5,8 @@ export type PermissionRowState = "NOT_ASKED" | "MISSING" | "CHECKING" | "GRANTED
 export type PermissionRowEvent =
   | { type: "prompt_answered"; granted: boolean } // the macOS prompt after Allow…
   | { type: "returned_from_settings" } // Noter is active again after Open System Settings…
-  | { type: "read"; state: PermissionState }; // the core re-read the permission (setup:changed)
+  | { type: "read"; state: PermissionState } // the core re-read the permission (setup:changed)
+  | { type: "self_test_zero_buffers" }; // the self-test heard only digital silence: macOS has not granted System Audio Recording
 
 /** Row state for what the core reports; system audio starts in MISSING because macOS has no prompt for it. */
 export function initialPermissionRow(kind: PermissionKind, state: PermissionState): PermissionRowState {
@@ -30,6 +31,8 @@ export function permissionRowNext(state: PermissionRowState, event: PermissionRo
       return state === "MISSING" || state === "DENIED" ? "CHECKING" : state;
       // @cpt-end:cpt-noter-state-ui-first-run-permission-row:p1:inst-denied-checking
       // @cpt-end:cpt-noter-state-ui-first-run-permission-row:p1:inst-missing-checking
+    case "self_test_zero_buffers":
+      return "MISSING";
     case "read":
       // @cpt-begin:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-granted
       // @cpt-begin:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-missing

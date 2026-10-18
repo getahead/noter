@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCore, type SelfTestEvent, type SelfTestMsg } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import {
-  applySelfTestEvent, initialSelfTestPanel, levelsDue, newAnnouncements, ONE_STREAM_SILENT, OWN_SOUNDS_MESSAGE, runSelfTest,
+  SYSTEM_AUDIO_MISSING, TIMED_OUT, applySelfTestEvent, initialSelfTestPanel, levelsDue, newAnnouncements, ONE_STREAM_SILENT, OWN_SOUNDS_MESSAGE, runSelfTest,
   selfTestNext, type SelfTestInput, type SelfTestPanel, type SelfTestState,
 } from "./self-test";
 
@@ -22,7 +22,7 @@ describe("selfTestNext (cpt-noter-state-ui-first-run-self-test)", () => {
     ["RUNNING", core({ type: "passed" }), "PASSED"],
     ["RUNNING", core({ type: "failed", reason: { type: "one_stream_silent", channel: "sys" } }), "FAILED"],
     ["RUNNING", core({ type: "failed", reason: { type: "timed_out" } }), "FAILED"],
-    ["RUNNING", core({ type: "failed", reason: { type: "zero_buffers" } }), "FAILED"],
+    ["RUNNING", core({ type: "failed", reason: { type: "zero_buffers" } }), "PERMISSION_MISSING"],
     ["RUNNING", core({ type: "failed", reason: { type: "own_sounds_leak" } }), "PASSED"],
     ["RUNNING", core({ type: "failed", reason: { type: "model_missing" } }), "WAITING_FOR_MODEL"],
     ["RUNNING", core({ type: "failed", reason: { type: "permission_missing", kind: "system_audio" } }), "PERMISSION_MISSING"],
@@ -31,7 +31,8 @@ describe("selfTestNext (cpt-noter-state-ui-first-run-self-test)", () => {
     ["PASSED", core({ type: "ended", reason: "call_stopped" }), "PASSED"],
     ["FAILED", core({ type: "ended", reason: "call_stopped" }), "FAILED"],
     ["PERMISSION_MISSING", { type: "run", modelReady: true }, "PERMISSION_MISSING"],
-    ["PASSED", { type: "run", modelReady: true }, "PASSED"],
+    ["PASSED", { type: "run", modelReady: true }, "RUNNING"],
+    ["PASSED", { type: "run", modelReady: false }, "WAITING_FOR_MODEL"],
     ["RUNNING", { type: "system_audio", state: "denied" }, "RUNNING"],
     ["IDLE", { type: "system_audio", state: "granted" }, "IDLE"],
     ["IDLE", { type: "model_arrived" }, "IDLE"],
@@ -73,18 +74,48 @@ describe("applySelfTestEvent (cpt-noter-algo-ui-first-run-self-test-result)", ()
   it("names the silent stream on failure", () => {
     expect(fold(running(), { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } })).toMatchObject({ state: "FAILED", failure: ONE_STREAM_SILENT.sys, runEnabled: true });
     expect(fold(running(), { type: "failed", reason: { type: "one_stream_silent", channel: "mic" } }).failure).toBe(ONE_STREAM_SILENT.mic);
-    expect(fold(running(), { type: "failed", reason: { type: "timed_out" } }).failure).toBeNull();
+    expect(fold(running(), { type: "failed", reason: { type: "timed_out" } })).toMatchObject({ state: "FAILED", failure: TIMED_OUT, runEnabled: true });
   });
 
   it("stops the running state on ended and enables Run Test again after a failure", () => {
-    const failed = fold(running(), { type: "levels", mic_db: -20, sys_db: -20 }, { type: "failed", reason: { type: "zero_buffers" } }, { type: "ended", reason: "call_stopped" });
+    const failed = fold(running(), { type: "levels", mic_db: -20, sys_db: -20 }, { type: "failed", reason: { type: "timed_out" } }, { type: "ended", reason: "call_stopped" });
     expect(failed).toMatchObject({ state: "FAILED", micDb: null, sysDb: null, runEnabled: true });
     expect(fold(running(), { type: "ended", reason: "lagged" })).toMatchObject({ state: "IDLE", runEnabled: true });
   });
 
   it("enables Run Test only when idle or failed", () => {
     expect(initialSelfTestPanel("IDLE", true).runEnabled).toBe(true);
-    for (const s of ["WAITING_FOR_MODEL", "PERMISSION_MISSING", "RUNNING", "PASSED"] as const) expect(initialSelfTestPanel(s, true).runEnabled).toBe(false);
+    expect(initialSelfTestPanel("PASSED", true).runEnabled).toBe(true);
+    for (const s of ["WAITING_FOR_MODEL", "PERMISSION_MISSING", "RUNNING"] as const) expect(initialSelfTestPanel(s, true).runEnabled).toBe(false);
+  });
+
+  it("lets a passed test run again once its stream ended, showing the result until then", () => {
+    const passed = fold(running(), { type: "stream_arrived", channel: "sys" }, { type: "passed" }, { type: "ended", reason: "call_stopped" });
+    expect(passed).toMatchObject({ state: "PASSED", runEnabled: true, aligned: true, arrived: { sys: true } });
+    expect(runSelfTest(passed, true)).toMatchObject({ state: "RUNNING", aligned: false, arrived: { sys: false, mic: false }, runEnabled: false });
+    expect(runSelfTest(passed, false).state).toBe("WAITING_FOR_MODEL");
+  });
+
+  it("lets the test run again after the own-sounds line failed, so the fix can be proved", () => {
+    const leaked = fold(running(), { type: "failed", reason: { type: "own_sounds_leak" } }, { type: "ended", reason: "call_stopped" });
+    expect(leaked).toMatchObject({ state: "PASSED", ownSounds: "leaked", runEnabled: true });
+    expect(runSelfTest(leaked, true)).toMatchObject({ state: "RUNNING", ownSounds: "pending" });
+  });
+
+  it("treats zero buffers as a missing System Audio Recording permission", () => {
+    const p = fold(running(), { type: "failed", reason: { type: "zero_buffers" } }, { type: "ended", reason: "call_stopped" });
+    expect(p).toMatchObject({ state: "PERMISSION_MISSING", failure: null, runEnabled: false });
+    expect(selfTestNext(p.state, { type: "system_audio", state: "granted" })).toBe("IDLE");
+    expect(SYSTEM_AUDIO_MISSING).toBe("System audio recording is not allowed yet.");
+  });
+
+  it("drops messages that arrive when no test runs, except the meters going quiet", () => {
+    const idle = initialSelfTestPanel("IDLE", true);
+    expect(applySelfTestEvent(idle, { type: "passed" })).toBe(idle);
+    const waiting = initialSelfTestPanel("WAITING_FOR_MODEL", true);
+    expect(applySelfTestEvent(waiting, { type: "levels", mic_db: -20, sys_db: -20 })).toBe(waiting);
+    const late = fold(running(), { type: "passed" }, { type: "passed" }, { type: "stream_arrived", channel: "mic" });
+    expect(late.arrived.mic).toBe(false);
   });
 
   it("ignores messages that arrive while no test runs, apart from showing them", () => {

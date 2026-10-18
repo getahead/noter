@@ -21,6 +21,9 @@ describe("permissionRowNext (cpt-noter-state-ui-first-run-permission-row)", () =
     ["CHECKING", { type: "read", state: "granted" }, "GRANTED"],
     ["CHECKING", { type: "read", state: "not_asked" }, "MISSING"],
     ["CHECKING", { type: "read", state: "denied" }, "MISSING"],
+    ["GRANTED", { type: "self_test_zero_buffers" }, "MISSING"],
+    ["CHECKING", { type: "self_test_zero_buffers" }, "MISSING"],
+    ["NOT_ASKED", { type: "self_test_zero_buffers" }, "MISSING"],
   ];
   it.each(table)("%s on %j is %s", (from, event, to) => expect(permissionRowNext(from, event)).toBe(to));
 

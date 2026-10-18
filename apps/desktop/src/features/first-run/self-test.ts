@@ -16,7 +16,7 @@ export function selfTestNext(state: SelfTestState, input: SelfTestInput): SelfTe
       // @cpt-begin:cpt-noter-state-ui-first-run-self-test:p1:inst-idle-waiting
       // @cpt-begin:cpt-noter-state-ui-first-run-self-test:p1:inst-idle-running
       // @cpt-begin:cpt-noter-state-ui-first-run-self-test:p1:inst-failed-running
-      return state === "IDLE" || state === "FAILED" ? (input.modelReady ? "RUNNING" : "WAITING_FOR_MODEL") : state;
+      return state === "IDLE" || state === "FAILED" || state === "PASSED" ? (input.modelReady ? "RUNNING" : "WAITING_FOR_MODEL") : state;
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-failed-running
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-idle-running
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-idle-waiting
@@ -44,7 +44,7 @@ export function selfTestNext(state: SelfTestState, input: SelfTestInput): SelfTe
         // the fourth line is information only: the first three still passed
         if (e.reason.type === "own_sounds_leak") return "PASSED";
         if (e.reason.type === "model_missing") return "WAITING_FOR_MODEL";
-        return e.reason.type === "permission_missing" ? "PERMISSION_MISSING" : "FAILED";
+        return e.reason.type === "permission_missing" || e.reason.type === "zero_buffers" ? "PERMISSION_MISSING" : "FAILED";
       }
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-running-failed
       return e.type === "ended" ? "IDLE" : state; // the stream ended without a verdict
@@ -78,9 +78,12 @@ export const ONE_STREAM_SILENT: Record<AudioChannel, string> = {
   sys: "We hear your microphone but not system audio. Play any sound in another app and try again.",
   mic: "We hear system audio but not your microphone. Speak and try again.",
 };
+export const SYSTEM_AUDIO_MISSING = "System audio recording is not allowed yet.";
+export const TIMED_OUT = "The test didn't finish. Check that sound is playing, then try again.";
 export const LEVELS_MIN_INTERVAL_MS = 100;
 
-const runEnabled = (s: SelfTestState) => s === "IDLE" || s === "FAILED";
+// Run Test is dimmed only while waiting for the model, with the permission missing, or while a test runs
+const runEnabled = (s: SelfTestState) => s === "IDLE" || s === "FAILED" || s === "PASSED";
 
 export function initialSelfTestPanel(state: SelfTestState, excludeOwnSounds: boolean): SelfTestPanel {
   return { state, micDb: null, sysDb: null, line: null, arrived: { mic: false, sys: false }, aligned: false, ownSounds: "pending", excludeOwnSounds, failure: null, runEnabled: runEnabled(state) };
@@ -97,6 +100,8 @@ export const levelsDue = (lastMs: number | null, nowMs: number) => lastMs === nu
 
 // @cpt-algo:cpt-noter-algo-ui-first-run-self-test-result:p1
 export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): SelfTestPanel {
+  // a late message after the verdict changes nothing but the meters going quiet
+  if (panel.state !== "RUNNING" && e.type !== "ended") return panel;
   const state = selfTestNext(panel.state, { type: "core", event: e });
   let next: SelfTestPanel = { ...panel, state };
   // @cpt-begin:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-match-event
@@ -125,6 +130,7 @@ export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): Self
       // @cpt-begin:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-case-failed
       if (e.reason.type === "own_sounds_leak") next = { ...next, aligned: true, ownSounds: "leaked" };
       else if (e.reason.type === "one_stream_silent") next = { ...next, failure: ONE_STREAM_SILENT[e.reason.channel] };
+      else if (e.reason.type === "timed_out") next = { ...next, failure: TIMED_OUT };
       // @cpt-end:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-case-failed
       break;
     case "ended":
