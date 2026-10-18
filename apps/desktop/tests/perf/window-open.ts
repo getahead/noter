@@ -53,9 +53,18 @@ async function session(label: WindowLabel): Promise<void> {
   for (let n = 0; n < CALLS; n++) emit("entity:changed", { type: "call", call: { ...call, id: `call_${n}`, rev: 1 } });
   for (let n = 0; n < ITEMS; n++) emit("entity:changed", { type: "item", item: { ...item, id: `item_${n}`, call: `call_${n % CALLS}`, rev: 1 } });
   for (let n = 0; n < PEOPLE; n++) emit("entity:changed", { type: "person", person: { ...person, id: `person_${n}`, rev: 1 } });
+  const callRev = new Map<string, number>(); // the newest revision each update left, to check against the store
+  const itemRev = new Map<string, number>();
   for (let n = 0; n < UPDATES; n++) {
-    if (n % 10 === 0) emit("entity:changed", { type: "call", call: { ...call, id: `call_${n % CALLS}`, rev: 2 + n } });
-    else emit("entity:changed", { type: "item", item: { ...item, id: `item_${(n * 7) % ITEMS}`, status: "done", rev: 2 + n } });
+    if (n % 10 === 0) {
+      const id = `call_${n % CALLS}`;
+      callRev.set(id, 2 + n);
+      emit("entity:changed", { type: "call", call: { ...call, id, rev: 2 + n } });
+    } else {
+      const id = `item_${(n * 7) % ITEMS}`;
+      itemRev.set(id, 2 + n);
+      emit("entity:changed", { type: "item", item: { ...item, id, status: "done", rev: 2 + n } });
+    }
   }
   for (let v = 2; v <= VERSIONS + 1; v++) {
     for (const [event, slice] of whole) {
@@ -70,6 +79,8 @@ async function session(label: WindowLabel): Promise<void> {
   expect(s.status === "READY" && s.app?.window === label, "window not READY after reload");
   expect(Object.keys(s.entities.call).length === CALLS && Object.keys(s.entities.person).length === PEOPLE, "calls or people lost");
   expect(Object.keys(s.entities.item).length === ITEMS - REMOVED && !("item_0" in s.entities.item), "items lost, doubled or not removed");
+  expect([...callRev].every(([id, rev]) => s.entities.call[id]?.rev === rev), "a call update was dropped");
+  expect([...itemRev].every(([id, rev]) => id in s.entities.item === (Number(id.slice(5)) >= REMOVED) && (!(id in s.entities.item) || (s.entities.item[id]!.rev === rev && s.entities.item[id]!.status === "done"))), "an item update was dropped");
   expect(whole.every(([, slice]) => (s.whole as Record<string, { version: number }>)[slice]!.version === VERSIONS + 1), "a slice lost its newest version");
   await bridge.close();
   expect(bridge.store.getState().status === "CLOSED" && handlers.size === 0, "window did not close cleanly");
