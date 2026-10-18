@@ -3,11 +3,16 @@
 //! Every later feature plugs its service in through [`CoreDeps`] and this crate.
 
 mod app;
+mod first_run;
 mod glossary;
 mod hotkeys;
 mod hub;
 mod log;
+mod models;
+mod self_test;
 mod settings;
+#[cfg(feature = "harness")]
+pub mod testing;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -19,9 +24,14 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
+pub use first_run::{
+    detection, BoxFuture, BundleSpec, ChunkSink, EnvironmentReading, FetchError, ModelSource,
+    NativeServices, Updater,
+};
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
+pub use models::allowed_download_url;
 use noter_protocol::ipc::Sink;
 pub use settings::default_settings;
 
@@ -63,16 +73,44 @@ pub struct CoreDeps {
     pub app_version: String,
     /// Global shortcuts; accepts every chord until the host sets its own (`with_shortcuts`).
     pub shortcuts: Arc<dyn ShortcutRegistrar>,
+    /// Permissions, environment and the login item (`noter-native` in the app).
+    pub native: Arc<dyn NativeServices>,
+    /// Model bundles to download (the pinned manifest in the app).
+    pub models: Arc<dyn ModelSource>,
+    /// Downloaded app updates (`tauri-plugin-updater` in the app).
+    pub updater: Arc<dyn Updater>,
+    /// Where model bundles go (the App Group container's `models/`); `<data>/models` if unset.
+    pub models_dir: Option<std::path::PathBuf>,
+    /// Starts the engine (`ProcessLauncher` in the app, a scripted engine in the harness, S12).
+    pub engine: Arc<dyn noter_engine_client::EngineLauncher>,
+    pub engine_config: noter_engine_client::Config,
 }
 
 impl CoreDeps {
+    /// The clock and events; every other seam starts empty (no Mac, no models, no updater).
     pub fn new(clock: Arc<dyn Clock>, events: Arc<dyn EventEmitter>) -> Self {
         Self {
             clock,
             events,
             app_version: "dev".into(),
             shortcuts: Arc::new(hotkeys::AcceptAll),
+            native: Arc::new(first_run::NoNative),
+            models: Arc::new(first_run::NoModels),
+            updater: Arc::new(first_run::NoUpdater),
+            models_dir: None,
+            engine: Arc::new(self_test::NoEngine),
+            engine_config: noter_engine_client::Config::default(),
         }
+    }
+
+    pub fn with_engine(mut self, engine: Arc<dyn noter_engine_client::EngineLauncher>) -> Self {
+        self.engine = engine;
+        self
+    }
+
+    pub fn with_engine_config(mut self, config: noter_engine_client::Config) -> Self {
+        self.engine_config = config;
+        self
     }
 
     pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
@@ -82,6 +120,26 @@ impl CoreDeps {
 
     pub fn with_shortcuts(mut self, shortcuts: Arc<dyn ShortcutRegistrar>) -> Self {
         self.shortcuts = shortcuts;
+        self
+    }
+
+    pub fn with_models_dir(mut self, dir: std::path::PathBuf) -> Self {
+        self.models_dir = Some(dir);
+        self
+    }
+
+    pub fn with_native(mut self, native: Arc<dyn NativeServices>) -> Self {
+        self.native = native;
+        self
+    }
+
+    pub fn with_models(mut self, models: Arc<dyn ModelSource>) -> Self {
+        self.models = models;
+        self
+    }
+
+    pub fn with_updater(mut self, updater: Arc<dyn Updater>) -> Self {
+        self.updater = updater;
         self
     }
 }
@@ -124,6 +182,19 @@ pub struct Core {
     hotkeys: Mutex<HotkeyList>,
     settings_hooks: Hooks<SettingsSection>,
     glossary_hooks: Hooks<GlossaryList>,
+    /// First run's stored setup state and the settings values it follows.
+    first_run: Mutex<first_run::State>,
+    /// Model downloads, shown in the setup status.
+    downloads: Mutex<models::Downloads>,
+    /// This core, for the tasks first run spawns (set by `start_first_run`).
+    this: std::sync::OnceLock<std::sync::Weak<Core>>,
+    /// The async runtime first run started on, for work that macOS notices start on its own
+    /// threads.
+    runtime: std::sync::OnceLock<tokio::runtime::Handle>,
+    /// The engine supervisor; the engine starts on first need.
+    engine: self_test::Engine,
+    /// The self-test's Channel messages.
+    self_test_hub: std::sync::OnceLock<Arc<StreamHub<SelfTestMsg>>>,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -157,6 +228,14 @@ impl Core {
         };
         let snapshot = app::fresh_snapshot(&deps.app_version);
         let settings = settings::load(&store).map_err(BootError::Load)?;
+        let first_run = first_run::load(&store, &settings).map_err(BootError::Load)?;
+        let models_dir = deps
+            .models_dir
+            .clone()
+            .unwrap_or_else(|| data_dir.join("models"));
+        let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
+        let engine =
+            noter_engine_client::EngineClient::new(deps.engine.clone(), deps.engine_config.clone());
         let core = Core {
             deps,
             store,
@@ -167,6 +246,12 @@ impl Core {
             hotkeys: Mutex::new(hotkeys::fresh_list()),
             settings_hooks: Mutex::new(vec![]),
             glossary_hooks: Mutex::new(vec![]),
+            first_run: Mutex::new(first_run),
+            downloads: Mutex::new(downloads),
+            this: std::sync::OnceLock::new(),
+            runtime: std::sync::OnceLock::new(),
+            engine,
+            self_test_hub: std::sync::OnceLock::new(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -178,6 +263,7 @@ impl Core {
         for hub in self.hubs() {
             hub.end_all(StreamEndReason::Shutdown);
         }
+        self.engine.shutdown().await;
         self.store.close();
     }
 
@@ -262,6 +348,19 @@ impl Core {
         let _ = self.log.write(record, self.deps.clock.now().0);
     }
 
+    /// Spawns on the caller's runtime, or on the one first run started on (macOS notices
+    /// arrive on threads outside it); with neither, the work is dropped.
+    pub(crate) fn spawn(&self, work: impl std::future::Future<Output = ()> + Send + 'static) {
+        match tokio::runtime::Handle::try_current() {
+            Ok(runtime) => drop(runtime.spawn(work)),
+            Err(_) => {
+                if let Some(runtime) = self.runtime.get() {
+                    drop(runtime.spawn(work));
+                }
+            }
+        }
+    }
+
     fn app(&self) -> MutexGuard<'_, AppSnapshot> {
         self.app
             .lock()
@@ -318,6 +417,67 @@ pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl CoreApi for Core {
+    async fn setup_status(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        Ok(self.setup_now())
+    }
+
+    async fn setup_set_step(
+        &self,
+        ctx: &CommandCtx,
+        args: StepArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.set_step(ctx, args)
+    }
+
+    async fn setup_set_call_display(
+        &self,
+        ctx: &CommandCtx,
+        args: CallDisplayArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.set_call_display(ctx, args)
+    }
+
+    async fn setup_set_audio_storage(
+        &self,
+        ctx: &CommandCtx,
+        args: AudioStorageArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.set_audio_storage(ctx, args)
+    }
+
+    async fn permission_request(
+        &self,
+        ctx: &CommandCtx,
+        args: PermissionArgs,
+    ) -> Result<PermissionRow, CoreError> {
+        self.request_permission(ctx, args).await
+    }
+
+    async fn self_test_run(
+        &self,
+        ctx: &CommandCtx,
+        args: SelfTestArgs,
+        channel: Sink<SelfTestMsg>,
+    ) -> Result<SubscriptionHandle, CoreError> {
+        self.start_self_test(ctx, args, channel)
+    }
+
+    async fn models_download(
+        &self,
+        _ctx: &CommandCtx,
+        args: ModelsDownloadArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.download_models(args)
+    }
+
+    async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {
+        self.install_update().await
+    }
+
     async fn settings_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Settings, CoreError> {
         Ok(lock(&self.settings).clone())
     }

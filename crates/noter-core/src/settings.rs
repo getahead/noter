@@ -364,7 +364,7 @@ impl Core {
 
     /// One section and the next settings revision in one change-logged write; a stale `rev`
     /// is `conflict` with the current one.
-    fn write_section(
+    pub(crate) fn write_section(
         &self,
         ctx: &CommandCtx,
         settings: &Settings,
