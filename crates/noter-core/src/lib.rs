@@ -427,10 +427,10 @@ impl CoreApi for Core {
 
     async fn permission_request(
         &self,
-        _ctx: &CommandCtx,
+        ctx: &CommandCtx,
         args: PermissionArgs,
     ) -> Result<PermissionRow, CoreError> {
-        self.request_permission(args).await
+        self.request_permission(ctx, args).await
     }
 
     async fn self_test_run(
