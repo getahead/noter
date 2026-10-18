@@ -20,7 +20,7 @@ use std::time::Duration;
 use noter_protocol::{CoreError, ErrorCode};
 use rusqlite::{Connection, ErrorCode as SqliteCode, OpenFlags};
 
-pub use change::{ChangeMeta, Mutation, Written};
+pub use change::{ChangeMeta, Custom, Logged, Mutation, Written};
 pub use migrate::{Migration, MIGRATIONS};
 pub use rusqlite;
 
