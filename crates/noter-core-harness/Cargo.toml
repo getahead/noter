@@ -8,9 +8,11 @@ description = "Test binary: the Noter core without Tauri over JSON Lines on stdi
 publish = false
 
 [dependencies]
+noter-core = { path = "../noter-core" }
 noter-protocol = { path = "../noter-protocol" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync"] }
 
 [dev-dependencies]
