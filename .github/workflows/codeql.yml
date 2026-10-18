@@ -1,5 +1,9 @@
 # Static analysis with CodeQL (docs/DELIVERY.md). The `Default ruleset` blocks a
 # merge that introduces an error-level alert or a high/critical security alert.
+#
+# A pull request analyses only the languages it changes (`changes`, harness.toml [ci]);
+# `actions` always runs, so every PR has a CodeQL result for that rule. main and the
+# weekly run analyse everything, which keeps the base the PR results are compared with.
 name: CodeQL
 
 on:
@@ -16,11 +20,25 @@ permissions:
 
 concurrency:
   group: codeql-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: What this change runs
+    runs-on: ubuntu-24.04
+    outputs:
+      languages: ${{ steps.c.outputs.languages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: c
+        run: python3 scripts/harness/ci_changes.py --workflow codeql
+
   analyze:
     name: CodeQL (${{ matrix.language }})
+    needs: changes
     runs-on: ubuntu-24.04
     permissions:
       security-events: write
@@ -29,7 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         # No build needed: Rust and TypeScript are analysed from source.
-        language: [actions, javascript-typescript, rust]
+        language: ${{ fromJSON(needs.changes.outputs.languages) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

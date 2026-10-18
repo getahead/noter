@@ -4,7 +4,8 @@
 #   just gate        exit criteria of every FEATURE and what CI runs on every PR
 #                    (on macOS it also runs `just native`, the XCUITest suite; on Linux that step says it is skipped)
 #
-# CI runs the same recipes job by job (.github/workflows/ci.yml).
+# CI runs the same recipes job by job (.github/workflows/ci.yml), only the jobs a PR's changes
+# can affect (harness.toml [ci]; `just ci-plan` shows them for this branch).
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
@@ -33,9 +34,15 @@ fmt:
     cargo fmt --all
 
 # Formatting, lints and type checks (no warnings allowed)
-lint:
+lint: lint-rust lint-ui
+
+# Rust formatting and clippy
+lint-rust:
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets --locked -- -D warnings
+
+# TypeScript type check
+lint-ui:
     pnpm --dir apps/desktop typecheck
 
 # The contract: generated files up to date, contract tests, fake-core smoke
@@ -75,12 +82,20 @@ cov-unit:
 # End-to-end: conformance suite (+ UI flows), then the E2E coverage gate (60% of what is delivered)
 e2e: (_locked "_e2e")
 
-_e2e:
+_e2e: _e2e-tests e2e-coverage
+
+# The end-to-end suites only, writing their logs to coverage/e2e (CI judges coverage in its own job)
+e2e-tests: (_locked "_e2e-tests")
+
+_e2e-tests:
     rm -rf coverage/e2e
     pnpm --dir apps/desktop test:conformance
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance; fi
     pnpm --dir apps/desktop test:e2e
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e; fi
+
+# The E2E coverage gate over coverage/e2e and coverage/native (60% of what is delivered)
+e2e-coverage:
     python3 scripts/harness/e2e_coverage.py
 
 # Native macOS UI tests (XCUITest): the menu bar extra and its menu, tray glyphs, the non-activating
@@ -149,6 +164,10 @@ perf-wall:
 # Constructor Studio: artifacts and code traceability
 docs:
     python3 {{cfs}} validate --local-only
+
+# Which CI jobs this branch's pull request will run, and why (harness.toml [ci])
+ci-plan:
+    python3 scripts/harness/ci_changes.py --workflow ci --files $(git diff --name-only --no-renames $(git merge-base {{base}} HEAD))
 
 # Fails if this branch loosens a gate without the owner's label
 config-guard:

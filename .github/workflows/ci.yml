@@ -1,12 +1,15 @@
 # Quality gates on every pull request and on main (docs/ADR/0003, docs/HARNESS.md).
 # Branch protection requires the single `gate` job; it fails if any gate fails.
+#
+# A pull request runs only the jobs that check what it changes (`changes`, rules in
+# harness.toml [ci]); main, the nightly and dispatched runs of main run every job.
+# Labels never re-run this workflow: the label-gated checks live in pr.yml (`hygiene`).
 name: CI
 
 on:
   pull_request:
     branches: [main]
-    # labeled/unlabeled: an approval label takes effect without a new push
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
   workflow_dispatch: {}
@@ -21,7 +24,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A new push to a PR replaces its run; runs on main queue instead, so every merge is
+  # checked in full (one run waits, a newer one replaces it) and main's caches get saved.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -29,39 +34,55 @@ env:
   PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
 
 jobs:
-  detect:
-    name: Detect parts
+  changes:
+    name: What this change runs
     runs-on: ubuntu-24.04
     outputs:
-      engine: ${{ steps.d.outputs.engine }}
-      tauri: ${{ steps.d.outputs.tauri }}
-      core_harness: ${{ steps.d.outputs.core_harness }}
-      native_tests: ${{ steps.d.outputs.native_tests }}
+      jobs: ${{ steps.c.outputs.jobs }}
+      engine: ${{ steps.c.outputs.engine }}
+      tauri: ${{ steps.c.outputs.tauri }}
+      core_harness: ${{ steps.c.outputs.core_harness }}
+      native_tests: ${{ steps.c.outputs.native_tests }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - id: d
-        run: |
-          {
-            echo "engine=$([ -f engine/Package.swift ] && echo true || echo false)"
-            echo "tauri=$([ -f apps/desktop/src-tauri/Cargo.toml ] && echo true || echo false)"
-            echo "core_harness=$([ -f crates/noter-core-harness/Cargo.toml ] && echo true || echo false)"
-            echo "native_tests=$([ -d apps/desktop/tests/native/NoterNativeTests.xcodeproj ] && echo true || echo false)"
-          } >> "$GITHUB_OUTPUT"
+          fetch-depth: 0
+      - id: c
+        run: python3 scripts/harness/ci_changes.py --workflow ci
 
-  lint:
-    name: Lint and type checks
+  lint-rust:
+    name: Rust format and lints
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['lint-rust']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - run: just lint
+        with:
+          node: "false"
+      - run: just lint-rust
+
+  lint-ui:
+    name: TypeScript type check
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['lint-ui']
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          rust: "false"
+      - run: just lint-ui
 
   contract:
     name: Contract
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['contract']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,7 +92,9 @@ jobs:
       - run: just contract
 
   arch:
-    name: Architecture checks, trace coverage and gate config
+    name: Architecture checks and trace coverage
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['arch']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -85,15 +108,11 @@ jobs:
       - run: just arch
       - name: Trace coverage (never lower than main)
         run: just trace
-      - name: Gate config guard
-        if: github.ref != 'refs/heads/main'
-        env:
-          EVENT_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          GH_TOKEN: ${{ github.token }}
-        run: PR_LABELS="$(scripts/ci/pr-labels.sh)" just config-guard
 
   unit:
     name: Unit tests and coverage (80%)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['unit']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -114,42 +133,64 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    name: End-to-end and E2E coverage (60%)
-    # After the macos job: stories and commands its XCUITest run proves against the built
-    # app count toward the same bar, so the coverage is judged here over both (HARNESS.md).
-    needs: [detect, macos]
-    if: ${{ !cancelled() && needs.detect.result == 'success' && (needs.macos.result == 'success' || needs.macos.result == 'skipped') }}
+    name: End-to-end tests
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['e2e']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
-      - name: XCUITest results from the macos job
-        if: needs.detect.outputs.native_tests == 'true'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: coverage-native
-          path: coverage/native
       - name: Build the core harness (real core over stdio)
-        if: needs.detect.outputs.core_harness == 'true'
+        if: needs.changes.outputs.core_harness == 'true'
         run: |
           cargo build --locked -p noter-core-harness
           echo "NOTER_CORE_CMD=$PWD/target/debug/noter-core-harness --fixture world" >> "$GITHUB_ENV"
       - name: Browsers for the UI flows
         run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
-      - run: just e2e
-      - if: always()
+      - run: just e2e-tests
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-logs
+          path: coverage/e2e
+          if-no-files-found: error
+      - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: coverage-e2e
-          path: |
-            coverage/e2e
-            apps/desktop/playwright-report
+          name: playwright-report
+          path: apps/desktop/playwright-report
           if-no-files-found: ignore
+
+  e2e-coverage:
+    name: E2E coverage (60%)
+    # Judged over the Linux run and the macos job's XCUITest run together (stories and commands
+    # proven against the built app count too, HARNESS.md); the two test jobs run in parallel.
+    needs: [changes, e2e, macos]
+    if: >-
+      !cancelled() && fromJSON(needs.changes.outputs.jobs)['e2e-coverage'] && needs.e2e.result == 'success' &&
+      (needs.macos.result == 'success' || needs.macos.result == 'skipped')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: e2e-logs
+          path: coverage/e2e
+      - name: XCUITest results from the macos job
+        if: needs.changes.outputs.native_tests == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-native
+          path: coverage/native
+      - run: python3 scripts/harness/e2e_coverage.py
 
   visual:
     name: Screenshots (98% per pixel)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['visual']
     runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
@@ -159,23 +200,10 @@ jobs:
       HOME: /root
     steps:
       - run: command -v git >/dev/null || (apt-get update -q && apt-get install -y -q git)
+      # Baseline changes need the owner's `visual-change-approved` label: pr.yml › approvals.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - name: Baselines change only with the owner's approval
-        if: github.ref != 'refs/heads/main'
-        env:
-          EVENT_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          PR_LABELS="$(scripts/ci/pr-labels.sh)"
-          git rev-parse --verify --quiet origin/main >/dev/null || { echo "::error::origin/main not fetched"; exit 1; }
-          changed=$(git diff --name-only "origin/main...HEAD" -- '**/__screenshots__/**')
-          if [ -n "$changed" ] && ! echo ",$PR_LABELS," | grep -q ',visual-change-approved,'; then
-            echo "::error::Screenshot baselines changed without the 'visual-change-approved' label:"; echo "$changed"; exit 1
-          fi
       # pnpm pinned to the packageManager version; the container has no corepack-free alternative
       - run: npm install -g --silent pnpm@10.28.0 && pnpm install --frozen-lockfile # zizmor: ignore[adhoc-packages]
       - run: pnpm --dir apps/desktop test:visual
@@ -190,6 +218,8 @@ jobs:
 
   perf:
     name: Performance (60% scenarios, <= 10% regression)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['perf']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -210,6 +240,8 @@ jobs:
 
   docs:
     name: Constructor Studio validate
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['docs']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -226,8 +258,8 @@ jobs:
 
   macos:
     name: macOS (engine, Tauri host, native UI tests)
-    needs: detect
-    if: needs.detect.outputs.engine == 'true' || needs.detect.outputs.tauri == 'true'
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['macos']
     runs-on: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -237,15 +269,15 @@ jobs:
         with:
           tools: just,cargo-llvm-cov
       - name: Engine tests (WAV fixtures through the pipeline)
-        if: needs.detect.outputs.engine == 'true'
+        if: needs.changes.outputs.engine == 'true'
         run: swift test --package-path engine --enable-code-coverage
       - name: Tauri host tests (handler parity, window capabilities)
-        if: needs.detect.outputs.tauri == 'true'
+        if: needs.changes.outputs.tauri == 'true'
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: Native UI tests (XCUITest)
-        if: needs.detect.outputs.tauri == 'true'
+        if: needs.changes.outputs.tauri == 'true'
         run: just native
-      - if: always() && needs.detect.outputs.tauri == 'true'
+      - if: always() && needs.changes.outputs.tauri == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-native
@@ -255,18 +287,14 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [detect, lint, contract, arch, unit, e2e, visual, perf, docs, macos]
+    needs: [changes, lint-rust, lint-ui, contract, arch, unit, e2e, e2e-coverage, visual, perf, docs, macos]
     runs-on: ubuntu-24.04
     steps:
-      - name: Every gate passed
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Every gate this change needs passed
         env:
           RESULTS: ${{ toJSON(needs) }}
-        run: |
-          echo "$RESULTS" | python3 -c '
-          import json, sys
-          needs = json.load(sys.stdin)
-          bad = {k: v["result"] for k, v in needs.items() if v["result"] not in ("success", "skipped")}
-          skipped = [k for k, v in needs.items() if v["result"] == "skipped" and k != "macos"]
-          for k, r in bad.items(): print(f"::error::{k}: {r}")
-          for k in skipped: print(f"::error::{k} was skipped")
-          sys.exit(1 if bad or skipped else 0)'
+          EXPECTED: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/harness/ci_changes.py verdict
