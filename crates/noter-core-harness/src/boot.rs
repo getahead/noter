@@ -446,6 +446,26 @@ impl Controls for Harness {
                     self.models.corrupt_next.store(true, Ordering::SeqCst);
                     Ok(json!({}))
                 }
+                // `{ at_percent: 0..=99 }`: the next bundle fetch stops serving at that fraction
+                // until `release_download`, or until the core pauses it.
+                "hold_next_download" => {
+                    let pct = args["at_percent"]
+                        .as_u64()
+                        .filter(|p| *p < 100)
+                        .ok_or_else(|| {
+                            CoreError::new(
+                                ErrorCode::InvalidInput,
+                                "harness.hold_next_download needs { at_percent: 0..=99 }",
+                            )
+                        })?;
+                    *lock(&self.models.hold_at) = Some(pct);
+                    Ok(json!({}))
+                }
+                // `{}`: a held download serves the rest.
+                "release_download" => {
+                    self.models.released.store(true, Ordering::SeqCst);
+                    Ok(json!({}))
+                }
                 _ => Err(CoreError::new(
                     ErrorCode::InvalidInput,
                     format!("no control harness.{name}"),
@@ -586,7 +606,14 @@ struct TinyModels {
     native: Arc<ScriptedNative>,
     /// `harness.corrupt_next_download`: the next fetch serves wrong bytes, once.
     corrupt_next: AtomicBool,
+    /// `harness.hold_next_download`: the next fetch stops serving at this percent of the bundle.
+    hold_at: Mutex<Option<u64>>,
+    /// `harness.release_download`: a held fetch serves the rest.
+    released: AtomicBool,
 }
+
+/// The bundles capture needs are big enough to show a partial download in whole megabytes.
+const LIVE_BUNDLE_BYTES: usize = 4 << 20;
 
 impl TinyModels {
     fn new(models: &ModelsStatus, native: Arc<ScriptedNative>) -> Self {
@@ -594,9 +621,13 @@ impl TinyModels {
             .bundles
             .iter()
             .map(|b| {
-                let bytes = format!("noter-core-harness model bundle {}\n", b.name)
-                    .repeat(64)
-                    .into_bytes();
+                let line = format!("noter-core-harness model bundle {}\n", b.name);
+                let times = if b.required_for_capture {
+                    LIVE_BUNDLE_BYTES / line.len() + 1
+                } else {
+                    64
+                };
+                let bytes = line.repeat(times).into_bytes();
                 let spec = BundleSpec {
                     name: b.name.clone(),
                     url: format!(
@@ -614,6 +645,8 @@ impl TinyModels {
             specs,
             native,
             corrupt_next: AtomicBool::new(false),
+            hold_at: Mutex::new(None),
+            released: AtomicBool::new(false),
         }
     }
 
@@ -661,10 +694,27 @@ impl ModelSource for TinyModels {
             if self.corrupt_next.swap(false, Ordering::SeqCst) {
                 bytes.iter_mut().for_each(|b| *b ^= 0xff);
             }
-            for part in bytes[(from_byte as usize).min(bytes.len())..].chunks(256) {
-                if !chunk(part) {
+            let hold = lock(&self.hold_at)
+                .take()
+                .map(|pct| bytes.len() as u64 * pct / 100);
+            self.released.store(false, Ordering::SeqCst);
+            let mut at = (from_byte as usize).min(bytes.len());
+            while at < bytes.len() {
+                if hold.is_some_and(|limit| at as u64 >= limit)
+                    && !self.released.load(Ordering::SeqCst)
+                {
+                    // Held: an empty chunk tells the core's sink to say whether it was paused.
+                    if !chunk(&[]) {
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                    continue;
+                }
+                let end = (at + (16 << 10)).min(bytes.len());
+                if !chunk(&bytes[at..end]) {
                     break;
                 }
+                at = end;
             }
             Ok(())
         })

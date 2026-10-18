@@ -408,6 +408,89 @@ async fn a_download_that_resumes_online_is_not_world_set_drift() {
     r.finish().await;
 }
 
+/// The world with every bundle pending, the harness serving big enough bundles to show progress.
+async fn pending_models(r: &mut Runner) {
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for b in world["app"]["setup"]["models"]["bundles"]
+        .as_array_mut()
+        .unwrap()
+    {
+        b["state"] = json!("pending");
+    }
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+}
+
+async fn speech_model(r: &mut Runner) -> Value {
+    let setup = r.ok("first-run", "setup_status", json!({})).await;
+    setup["models"]["bundles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["required_for_capture"] == true)
+        .unwrap()
+        .clone()
+}
+
+async fn until_speech(r: &mut Runner, ok: impl Fn(&Value) -> bool) -> Value {
+    let mut model = json!({});
+    for _ in 0..200 {
+        model = speech_model(r).await;
+        if ok(&model) {
+            return model;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    panic!("the speech model never got there: {model}");
+}
+
+#[tokio::test]
+async fn hold_next_download_stops_at_the_fraction_until_released() {
+    let mut r = start().await;
+    pending_models(&mut r).await;
+    r.ok(
+        "main",
+        "harness.hold_next_download",
+        json!({ "at_percent": 50 }),
+    )
+    .await;
+    r.ok("first-run", "models_download", json!({ "action": "start" }))
+        .await;
+    let held = until_speech(&mut r, |m| m["done_mb"].as_u64().unwrap_or(0) >= 1).await;
+    assert_eq!(held["state"], "downloading", "{held}");
+    assert!(held["done_mb"].as_u64().unwrap() < held["size_mb"].as_u64().unwrap());
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    assert_eq!(
+        speech_model(&mut r).await["state"],
+        "downloading",
+        "still held"
+    );
+    r.ok("main", "harness.release_download", json!({})).await;
+    let done = until_speech(&mut r, |m| m["state"] == "ready").await;
+    assert_eq!(done["done_mb"], done["size_mb"]);
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn pausing_a_held_download_leaves_it_paused_with_its_progress() {
+    let mut r = start().await;
+    pending_models(&mut r).await;
+    r.ok(
+        "main",
+        "harness.hold_next_download",
+        json!({ "at_percent": 50 }),
+    )
+    .await;
+    r.ok("first-run", "models_download", json!({ "action": "start" }))
+        .await;
+    until_speech(&mut r, |m| m["done_mb"].as_u64().unwrap_or(0) >= 1).await;
+    r.ok("first-run", "models_download", json!({ "action": "pause" }))
+        .await;
+    let paused = until_speech(&mut r, |m| m["state"] == "paused").await;
+    assert!(paused["done_mb"].as_u64().unwrap() >= 1, "{paused}");
+    r.finish().await;
+}
+
 #[tokio::test]
 async fn world_set_changes_the_free_disk_and_the_notifications_state() {
     let mut r = start().await;
