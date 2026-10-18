@@ -34,7 +34,7 @@ crates/noter-core-harness/
 
 1. The reader loop parses each line and spawns one task per request, because the TS transport keeps several requests in flight and streams keep running after their result.
 2. Every output goes through one `mpsc<String>` to one writer task. That is the only `stdout` handle.
-3. For `channel: true` the task creates a `Sink<Value>` that pushes into a per-request buffer (`Mutex<Option<Vec<Value>>>`). After the result line is queued, the buffer is flushed in order and the sink switches to direct sends. This gives "channel messages after the result, in `seq` order" (AC2) even when the core sends during the call.
+3. For `channel: true` the task creates a `Sink<Value>` that pushes into a per-request buffer (`Mutex<Option<Vec<Value>>>`). After the result line is queued, the buffer is drained into the writer **and** the sink switched to direct sends under the sink's own lock, so a message sent meanwhile can neither be lost nor overtake the buffered ones. On an error result the buffered messages are dropped. This gives "channel messages after the result, in `seq` order" (AC2) even when the core sends during the call.
 4. The core's `EventEmitter` writes `{"event", "payload"}` through the same writer.
 5. When stdin reaches EOF: `Core::shutdown()` ends every stream with `shutdown`, the writer drains, and the process exits 0.
 6. Unparsable line: reply `{"id": <id or null>, "error": {code: "invalid_input", …}}` and keep reading. Unknown `cmd`: `invalid_input` too. The scope check runs before argument parsing, as the IPC host does.
