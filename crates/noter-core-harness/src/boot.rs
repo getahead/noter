@@ -386,11 +386,25 @@ impl Harness {
         // Derived fields are the core's to compute; a world that disagrees with it is a preset
         // that drifted from the core's rules (what was applied stays applied).
         let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
-        let drifted: Vec<String> = ["complete", "detection_enabled", "models"]
+        // Bundle sizes and progress come from the harness's tiny bundles, not from the preset:
+        // only which bundle is in which state is the world's to say.
+        let bundle_states = |w: &Value| -> Value {
+            w["app"]["setup"]["models"]["bundles"]
+                .as_array()
+                .map_or(Value::Null, |bs| {
+                    bs.iter()
+                        .map(|b| json!([b["name"], b["state"], b["required_for_capture"]]))
+                        .collect()
+                })
+        };
+        let mut drifted: Vec<String> = ["complete", "detection_enabled"]
             .into_iter()
             .filter(|f| after["app"]["setup"][f] != wanted["app"]["setup"][f])
             .map(|f| format!("app.setup.{f}"))
             .collect();
+        if bundle_states(&after) != bundle_states(&wanted) {
+            drifted.push("app.setup.models".to_string());
+        }
         if !drifted.is_empty() {
             return Err(CoreError::new(
                 ErrorCode::InvalidInput,

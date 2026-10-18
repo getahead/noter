@@ -351,6 +351,33 @@ async fn system_audio_the_world_denies_is_refused_without_a_second_prompt() {
 }
 
 #[tokio::test]
+async fn world_set_models_ignore_sizes_and_progress_the_core_derives() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for b in world["app"]["setup"]["models"]["bundles"]
+        .as_array_mut()
+        .unwrap()
+    {
+        b["state"] = json!("pending");
+        b["size_mb"] = json!(2100); // a preset's real sizes: the harness serves tiny bundles
+        b["done_mb"] = json!(0);
+    }
+    world["app"]["setup"]["models"]["total_mb"] = json!(8400);
+    world["app"]["setup"]["models"]["done_mb"] = json!(0);
+    let set = r
+        .ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(set, json!({}));
+    let setup = r.ok("first-run", "setup_status", json!({})).await;
+    assert!(setup["models"]["bundles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|b| b["state"] == "pending"));
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_changes_the_free_disk_and_the_notifications_state() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
