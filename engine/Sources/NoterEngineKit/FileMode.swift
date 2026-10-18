@@ -84,7 +84,8 @@ public enum Models {
         guard let container,
             let names = try? FileManager.default.contentsOfDirectory(atPath: container.appendingPathComponent("models").path)
         else { return [] }
-        return names.filter { !$0.hasPrefix(".") }.sorted()
+        // Hidden files and downloads still in progress (`<name>.partial`) are not installed.
+        return names.filter { !$0.hasPrefix(".") && !$0.hasSuffix(".partial") }.sorted()
     }
 
     public static func container(environment: [String: String]) -> URL? {
