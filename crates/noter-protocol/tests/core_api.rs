@@ -1,6 +1,6 @@
 //! `CoreApi` as the real core, the IPC host and `noter-core-harness` consume it
 //! (`cpt-noter-dod-core-contract-coreapi`): one method per command with the command's
-//! argument, result and Channel types, reached by name through `dispatch`.
+//! argument, result and Channel types, reached by name through `dispatch_json`.
 
 use std::future::Future;
 use std::pin::pin;
@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Wake, Waker};
 
 use noter_protocol::ipc::{
-    command, dispatch, Caller, CommandCtx, CoreApi, NativeSurface, Sink, COMMANDS,
+    command, dispatch_json, Caller, CommandCtx, CoreApi, NativeSurface, Sink, COMMANDS,
 };
 use noter_protocol::model::*;
 use noter_protocol::{Ack, AudioChannel, CoreError, ErrorCode, Seq, SubscriptionId};
@@ -104,7 +104,7 @@ fn every_command_reaches_its_own_core_api_method() {
     // parses into that command's type.
     for c in COMMANDS {
         let channel = c.channel.map(|_| collecting().0);
-        let err = block_on(dispatch(
+        let err = block_on(dispatch_json(
             &Early,
             &window(c.windows[0]),
             c.name,
@@ -130,8 +130,8 @@ fn every_command_reaches_its_own_core_api_method() {
 // @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-coreapi
 
 #[test]
-fn an_unknown_command_is_not_implemented() {
-    let err = block_on(dispatch(
+fn an_unknown_command_is_invalid_input() {
+    let err = block_on(dispatch_json(
         &Early,
         &window(WindowLabel::Main),
         "no_such_command",
@@ -139,12 +139,12 @@ fn an_unknown_command_is_not_implemented() {
         None,
     ))
     .unwrap_err();
-    assert_eq!(err.code, ErrorCode::NotImplemented);
+    assert_eq!(err.code, ErrorCode::InvalidInput);
 }
 
 #[test]
 fn a_window_outside_the_scope_is_refused_before_the_arguments_are_read() {
-    let err = block_on(dispatch(
+    let err = block_on(dispatch_json(
         &Answering::default(),
         &window(WindowLabel::CallScreen),
         "settings_update",
@@ -182,7 +182,7 @@ fn check_caller_applies_the_window_scope_and_lets_native_surfaces_through() {
 #[test]
 fn arguments_and_results_cross_as_json_with_the_caller() {
     let core = Answering::default();
-    let out = block_on(dispatch(
+    let out = block_on(dispatch_json(
         &core,
         &window(WindowLabel::Settings),
         "stream_ack",
@@ -196,7 +196,7 @@ fn arguments_and_results_cross_as_json_with_the_caller() {
             surface: NativeSurface::Hotkey,
         },
     };
-    block_on(dispatch(
+    block_on(dispatch_json(
         &core,
         &native,
         "stream_ack",
@@ -225,7 +225,7 @@ fn arguments_and_results_cross_as_json_with_the_caller() {
 
 #[test]
 fn unparsable_arguments_are_invalid_input_without_echoing_the_input() {
-    let err = block_on(dispatch(
+    let err = block_on(dispatch_json(
         &Answering::default(),
         &window(WindowLabel::Main),
         "stream_ack",
@@ -240,7 +240,7 @@ fn unparsable_arguments_are_invalid_input_without_echoing_the_input() {
 #[test]
 fn a_subscribing_command_streams_its_channel_messages_as_json() {
     let (sink, got) = collecting();
-    let out = block_on(dispatch(
+    let out = block_on(dispatch_json(
         &Answering::default(),
         &window(first_window("self_test_run")),
         "self_test_run",
@@ -257,7 +257,7 @@ fn a_subscribing_command_streams_its_channel_messages_as_json() {
 
 #[test]
 fn a_subscribing_command_without_a_channel_is_invalid_input() {
-    let err = block_on(dispatch(
+    let err = block_on(dispatch_json(
         &Answering::default(),
         &window(first_window("self_test_run")),
         "self_test_run",
@@ -272,7 +272,7 @@ fn a_subscribing_command_without_a_channel_is_invalid_input() {
 fn a_closed_channel_reports_false_to_the_core() {
     let core = Answering::default();
     let closed = Sink::new(|_: Value| false);
-    block_on(dispatch(
+    block_on(dispatch_json(
         &core,
         &window(first_window("self_test_run")),
         "self_test_run",
