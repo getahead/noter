@@ -28,7 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "scripts" / "models" / "manifest.json"
 API = "https://huggingface.co/api/models"
 
-# What Noter downloads: one entry per bundle, each at a pinned commit.
+# What Noter downloads: one entry per bundle, each at a pinned commit. M0 pins the capture model
+# only; WhisperKit Large v3, FluidAudio VAD and diarization (M1 capture) and bge-m3 (retrieval)
+# are added here with the features that use them.
 BUNDLES = [
     {
         "bundle": "whisper-turbo",
