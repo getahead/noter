@@ -67,7 +67,10 @@ fn boot(events: Arc<dyn EventEmitter>) -> Booted {
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
     };
-    match Core::open(&dir, CoreDeps::new(Arc::new(SystemClock), events)) {
+    // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
+    let deps =
+        CoreDeps::new(Arc::new(SystemClock), events).with_app_version(env!("CARGO_PKG_VERSION"));
+    match Core::open(&dir, deps) {
         Ok(core) => Booted(Ok(Arc::new(core))),
         Err(e) => {
             eprintln!("noter: {e}");
