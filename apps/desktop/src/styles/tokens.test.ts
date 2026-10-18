@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { checkContrast, contrastRatio, resolveTokens, rootBlocks, TEXT_PAIRS } from "./tokens";
+import { checkContrast, contrastRatio, NON_TEXT_PAIRS, RECDOT_PAIR, resolveTokens, rootBlocks, TEXT_PAIRS } from "./tokens";
 
 const css = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
 
@@ -56,8 +56,20 @@ describe("tokens.css", () => {
     expect(checkContrast(proto)).toEqual([
       "--accent-text on --sel-accent: 4.27 < 4.5",
       "--accent-text on --sel-accent over --card-bg: 3.77 < 4.5",
-      "--on-accent on --error-fill: 2.82 < 4.5"]);
+      "--on-accent on --error-fill: 2.82 < 4.5",
+      "--on-accent on --error-fill: 2.82 < 3"]); // the recording dot's warning glyph (RECDOT_PAIR)
     expect(checkContrast({ ...resolveTokens(css, "LIGHT_CONTRAST"), "--accent-text": "#0064D1" })).toEqual(["--accent-text on --sel-accent: 4.29 < 4.5", "--accent-text on --sel-accent over --card-bg: 4.29 < 4.5"]);
+  });
+
+  it("checks the white warning glyph of the recording dot, filled with --error-fill under Increase Contrast", () => {
+    expect(RECDOT_PAIR).toEqual(["--on-accent", "--error-fill"]);
+    expect(NON_TEXT_PAIRS).toContainEqual(RECDOT_PAIR);
+    // the prototype fills the dot with --rec: 2.82:1 under the white glyph in dark Increase Contrast
+    expect(checkContrast(resolveTokens(css, "DARK_CONTRAST"), [], [["--on-accent", "--rec"]])).toEqual(["--on-accent on --rec: 2.82 < 3"]);
+    const more = mediaBodies(css).filter(([q]) => q === "(prefers-contrast: more)").map(([, body]) => body).join("\n");
+    expect(more).toMatch(/:root:root \.np-recdot:not\(\.is-paused\)[^{]*\{[^}]*background:\s*var\(--error-fill\)/);
+    // the paused ring keeps --rec: the rule never reaches it
+    expect(more).not.toMatch(/\.np-recdot(?!:not\(\.is-paused\))[^{,]*[,{]/);
   });
 
   it("reports every pair below its target", () => {

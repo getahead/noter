@@ -8,6 +8,13 @@ export const en = {
   "announce.cards_held": { one: "{count} new card waiting", other: "{count} new cards waiting" },
   "announce.search_done": { one: "{count} result", other: "{count} results" },
   "announce.copied": "Copied for {target}",
+  "action.dismiss": "Dismiss",
+  "action.ok": "OK",
+  "banner.more": "+{count} More",
+  "progress.percent": "{value} percent",
+  "search.remove_token": "Remove {label}",
+  "source_list.needs_attention": "Needs attention",
+  "source_list.problem": "problem",
 } as const;
 
 export type MsgKey = keyof typeof en;

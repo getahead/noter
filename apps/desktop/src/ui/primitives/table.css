@@ -1,0 +1,2 @@
+/* A text cell tail-truncates (fit labels, docs/features/ui/primitives.md); its column width comes from the header. */
+.np-table td.np-td--trunc { max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

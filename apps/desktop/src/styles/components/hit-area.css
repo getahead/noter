@@ -1,0 +1,12 @@
+/* Hit targets (DESIGN 3.2 › Primitives inventory): every primitive keeps a hit area of at least
+   24 by 24 pt even where the visible control is smaller (20-pt buttons, 22-pt inline icon buttons,
+   disclosure triangles, 22-pt segments, the token's remove button, links, and the 14-pt box, dot and
+   small switch of checkboxes, radios and toggles, whose label passes a press on to the input). An invisible box centred on the control; it changes no layout.
+   The focus ring shows for keyboard focus only: the sheets above draw it on :focus-visible. */
+.np-btn--small, .np-ibtn, .np-disc, .np-seg__item, .np-token__x, .np-link,
+.np-check__box, .np-radio__dot, .np-toggle__track { position: relative; }
+.np-btn--small::after, .np-ibtn::after, .np-disc::after, .np-seg__item::after, .np-token__x::after, .np-link::after,
+.np-check__box::after, .np-radio__dot::after, .np-toggle__track::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: max(100%, 24px); height: max(100%, 24px);
+}

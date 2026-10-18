@@ -71,7 +71,8 @@
    Glass stays 94 % light / 96 % dark and the dark focus ring is #4DA3FF, as in the prototype (owner decision).
    Changed from the prototype to meet WCAG 2.2 AA (PRD AC5), smallest step on the same hue: accent text on the
    accent selection of token chips, light #0064D1 -> #0060C9 (4.29 -> 4.56:1) and dark #4DA3FF -> #6DB4FF
-   (4.27 -> 5.14:1, 3.77 -> 4.54:1 on a card); white on the dark error fill #FF6961 -> #C4514B (2.82 -> 4.54:1). */
+   (4.27 -> 5.14:1, 3.77 -> 4.54:1 on a card); white on the dark error fill #FF6961 -> #C4514B (2.82 -> 4.54:1),
+   which also fills the recording dot under its white warning glyph. */
 @media (prefers-contrast: more) {
   :root {
     --label: #1D1D1F; --label-2: #616161; --label-3: #616161; --label-dis: rgba(0,0,0,.40);
@@ -108,8 +109,10 @@
   :root:root .np-btn--primary { box-shadow: none; }
   :root:root .np-sidebar, :root:root .np-menu, :root:root .np-pop, :root:root .np-toolbar .np-btn, :root:root .np-toolbar__nav,
   :root:root .np-toolbar .np-search { -webkit-backdrop-filter: none; backdrop-filter: none; }
-  /* white text sits on --error-fill, which differs from --error in dark (see the token block above) */
-  :root:root .np-btn--destructive.np-btn--primary, :root:root .np-ibtn__badge, :root:root .f-steps__i.is-err .f-steps__dot { background: var(--error-fill); }
+  /* white text and the white warning glyph of the recording dot sit on --error-fill, which differs from --error and
+     --rec in dark (see the token block above); the paused dot is a ring and keeps --rec */
+  :root:root .np-btn--destructive.np-btn--primary, :root:root .np-ibtn__badge, :root:root .f-steps__i.is-err .f-steps__dot,
+  :root:root .np-recdot:not(.is-paused) { background: var(--error-fill); }
 }
 
 /* Reduce transparency (DESIGN; the prototype has no such state): every material opaque in the

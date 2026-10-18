@@ -1,0 +1,7 @@
+/* Help tag (DESIGN 3.2 › tooltip): the prototype has none of its own (it uses title), so this is the
+   smallest native-looking tag on the menu material: callout size, tag corners, below its control. */
+.np-helptag {
+  position: fixed; z-index: 60; max-width: 280px; padding: 3px 7px; pointer-events: none;
+  background: var(--glass-bg-strong); color: var(--label); border-radius: var(--r-tag); box-shadow: var(--shadow-pop);
+  font: 400 11px/14px var(--font);
+}
