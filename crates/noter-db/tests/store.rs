@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use noter_db::rusqlite::{Connection, MAIN_DB};
-use noter_db::{ChangeMeta, Migration, Mutation, OpenError, Store, StoreState, MIGRATIONS};
+use noter_db::{ChangeMeta, Insert, Migration, Mutation, OpenError, Store, StoreState, MIGRATIONS};
 use noter_protocol::ipc::NativeSurface;
 use noter_protocol::model::Actor;
 use noter_protocol::{
@@ -19,6 +19,11 @@ const NOTES: &[Migration] = &[Migration {
     // Not idempotent on purpose: running it twice fails. The trigger forces a failure after the row write.
     sql: "CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, body TEXT, score REAL, pinned INTEGER, rev INTEGER NOT NULL);
           CREATE TABLE prefs (id TEXT PRIMARY KEY, value TEXT);
+          CREATE TABLE calls (id TEXT PRIMARY KEY, title TEXT, rev INTEGER NOT NULL);
+          CREATE TABLE segments (id TEXT PRIMARY KEY, call_id TEXT NOT NULL REFERENCES calls (id) ON DELETE CASCADE,
+                                 start_ms INTEGER NOT NULL, text TEXT NOT NULL);
+          CREATE TABLE marks (id TEXT PRIMARY KEY, call_id TEXT NOT NULL REFERENCES calls (id) ON DELETE CASCADE,
+                              at_ms INTEGER NOT NULL, source TEXT NOT NULL);
           CREATE TRIGGER changes_boom AFTER INSERT ON changes WHEN NEW.reason = 'boom'
           BEGIN SELECT RAISE(ABORT, 'boom'); END;",
 }];
@@ -874,5 +879,196 @@ fn a_write_that_breaks_a_unique_index_is_a_duplicate() {
             ..
         })
     ));
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 1);
+}
+
+fn call(id: &str) -> Mutation {
+    Mutation {
+        entity_type: "call",
+        table: "calls",
+        id: id.into(),
+        base_rev: None,
+        bump_rev: true,
+        values: vec![("title", json!("Standup"))],
+    }
+}
+
+fn segment(id: &str, call_id: &str, text: &str) -> Insert {
+    Insert {
+        table: "segments",
+        values: vec![
+            ("id", json!(id)),
+            ("call_id", json!(call_id)),
+            ("start_ms", json!(1200)),
+            ("text", json!(text)),
+        ],
+    }
+}
+
+#[test]
+fn capture_data_is_inserted_in_one_batch_without_change_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    store.write(call("cal_1"), meta("start")).unwrap();
+    // Segments from the engine, and a mark the user pressed: capture data either way.
+    let mark = Insert {
+        table: "marks",
+        values: vec![
+            ("id", json!("mrk_1")),
+            ("call_id", json!("cal_1")),
+            ("at_ms", json!(3000)),
+            ("source", json!("user")),
+        ],
+    };
+    store
+        .insert_batch(vec![
+            segment("seg_1", "cal_1", "Hello"),
+            segment("seg_2", "cal_1", "Hi"),
+            mark,
+        ])
+        .unwrap();
+    assert_eq!(count(&store, "SELECT count(*) FROM segments"), 2);
+    assert_eq!(
+        count(&store, "SELECT count(*) FROM marks WHERE source = 'user'"),
+        1
+    );
+    assert_eq!(
+        count(&store, "SELECT count(*) FROM changes"),
+        1,
+        "only the call's own write"
+    );
+    let text: String = store
+        .read(|c| {
+            c.query_row("SELECT text FROM segments WHERE id = 'seg_2'", [], |r| {
+                r.get(0)
+            })
+        })
+        .unwrap();
+    assert_eq!(text, "Hi");
+    store.insert_batch(vec![]).unwrap();
+}
+
+#[test]
+fn one_bad_row_fails_the_whole_capture_batch() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    store.write(call("cal_1"), meta("start")).unwrap();
+    let duplicate = vec![
+        segment("seg_1", "cal_1", "Hello"),
+        segment("seg_1", "cal_1", "Again"),
+    ];
+    let orphan = vec![
+        segment("seg_1", "cal_1", "Hello"),
+        segment("seg_2", "cal_none", "x"),
+    ];
+    let mut bad_table = segment("seg_3", "cal_1", "x");
+    bad_table.table = "segments; DROP TABLE changes";
+    let mut bad_column = segment("seg_4", "cal_1", "x");
+    bad_column.values.push(("text = 1 --", json!(1)));
+    let mut empty = segment("seg_5", "cal_1", "x");
+    empty.values.clear();
+    for batch in [
+        duplicate,
+        orphan,
+        vec![segment("seg_1", "cal_1", "Hello"), bad_table],
+        vec![bad_column],
+        vec![empty],
+    ] {
+        assert_eq!(
+            store.insert_batch(batch).unwrap_err().code,
+            ErrorCode::Internal
+        );
+    }
+    assert_eq!(count(&store, "SELECT count(*) FROM segments"), 0);
+}
+
+#[test]
+fn deleting_calls_cascades_with_one_content_free_change_row_each() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    for id in ["cal_1", "cal_2", "cal_3"] {
+        store.write(call(id), meta("start")).unwrap();
+    }
+    store
+        .insert_batch(vec![
+            segment("seg_1", "cal_1", "Secret plan"),
+            segment("seg_2", "cal_2", "Budget"),
+            segment("seg_3", "cal_3", "Kept"),
+        ])
+        .unwrap();
+    let mut m = meta("calls_delete");
+    m.summary = "Deleted 2 calls".into();
+    // Asked for an undoable delete: a deletion never is.
+    m.undoable = true;
+    let ids = ["cal_1", "cal_2", "cal_gone"].map(String::from).to_vec();
+    let deleted = store.delete("call", "calls", ids, m).unwrap();
+    let deleted_ids: Vec<&str> = deleted.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(deleted_ids, ["cal_1", "cal_2"], "a missing id is skipped");
+    assert_eq!(count(&store, "SELECT count(*) FROM calls"), 1);
+    assert_eq!(
+        count(&store, "SELECT count(*) FROM segments"),
+        1,
+        "segments go with their call"
+    );
+    for (id, change_id) in deleted {
+        let change_id = change_id.0;
+        let row: (String, String, String, String, i64, String) = store
+            .read(move |c| {
+                c.query_row(
+                    "SELECT actor, entity_type, entity_id, summary, undoable, status FROM changes WHERE id = ?1",
+                    [change_id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+                )
+            })
+            .unwrap();
+        assert_eq!(
+            row,
+            (
+                "you".into(),
+                "call".into(),
+                id,
+                "Deleted 2 calls".into(),
+                0,
+                "applied".into()
+            )
+        );
+    }
+    assert_eq!(
+        count(
+            &store,
+            "SELECT count(*) FROM changes WHERE reason = 'calls_delete'
+               AND (field IS NOT NULL OR before IS NOT NULL OR after IS NOT NULL OR delta IS NOT NULL)"
+        ),
+        0,
+        "no record content"
+    );
+    assert!(store
+        .delete("call", "calls", vec![], meta("x"))
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn a_failed_delete_leaves_everything() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    store.write(call("cal_1"), meta("start")).unwrap();
+    let one = || vec!["cal_1".to_string()];
+    assert_eq!(
+        store
+            .delete("call", "calls", one(), meta("boom"))
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal,
+        "the change row failed: the delete rolls back"
+    );
+    assert_eq!(
+        store
+            .delete("call", "calls; DROP TABLE changes", one(), meta("x"))
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal
+    );
+    assert_eq!(count(&store, "SELECT count(*) FROM calls"), 1);
     assert_eq!(count(&store, "SELECT count(*) FROM changes"), 1);
 }
