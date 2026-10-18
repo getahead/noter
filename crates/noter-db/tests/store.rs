@@ -7,7 +7,9 @@ use noter_db::rusqlite::{Connection, MAIN_DB};
 use noter_db::{ChangeMeta, Migration, Mutation, OpenError, Store, StoreState, MIGRATIONS};
 use noter_protocol::ipc::NativeSurface;
 use noter_protocol::model::Actor;
-use noter_protocol::{ErrorCode, ErrorDetail, EvidenceId, JobId, LlmRunId, Rev, RuntimeChoice};
+use noter_protocol::{
+    CoreError, ErrorCode, ErrorDetail, EvidenceId, JobId, LlmRunId, Rev, RuntimeChoice,
+};
 use serde_json::json;
 
 const NOTES: &[Migration] = &[Migration {
@@ -743,4 +745,100 @@ fn a_write_that_does_not_bump_rev_leaves_it_alone() {
     let w = store.write(pref("b"), meta("setup")).unwrap();
     assert_eq!((w.rev, w.record["value"].clone()), (Rev(0), json!("b")));
     assert_eq!(count(&store, "SELECT count(*) FROM changes"), 4);
+}
+
+fn logged(id: &str, field: &str, before: Option<&str>, after: Option<&str>) -> noter_db::Logged {
+    noter_db::Logged {
+        entity_type: "note",
+        entity_id: id.into(),
+        field: Some(field.into()),
+        before: before.map(String::from),
+        after: after.map(String::from),
+        delta: None,
+    }
+}
+
+#[test]
+fn a_custom_write_commits_with_the_change_rows_it_reports() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    let done = store
+        .write_with(meta("custom"), |tx| {
+            tx.execute(
+                "INSERT INTO notes (id, title, rev) VALUES ('not_1', 'First', 1)",
+                [],
+            )
+            .map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))?;
+            Ok((7, vec![logged("not_1", "title", None, Some("First"))]))
+        })
+        .unwrap();
+    assert_eq!(
+        (done.value, done.change_ids.len(), done.batch_id),
+        (7, 1, None)
+    );
+    let row = change_row(&store, &done.change_ids[0].0);
+    assert_eq!(
+        row,
+        (Some("title".into()), None, Some("First".into()), None)
+    );
+    // Several rows share a new batch id; a delta is stored as JSON.
+    let mut several = logged("not_2", "x", None, None);
+    several.field = None;
+    several.delta = Some(json!({ "title": [null, "Two"], "body": [null, "b"] }));
+    let done = store
+        .write_with(meta("two"), move |_| {
+            Ok((
+                (),
+                vec![
+                    logged("not_1", "title", Some("First"), Some("One")),
+                    several,
+                ],
+            ))
+        })
+        .unwrap();
+    assert!(done
+        .batch_id
+        .as_ref()
+        .is_some_and(|b| b.as_str().starts_with("bat_")));
+    let delta = change_row(&store, &done.change_ids[1].0).3;
+    assert_eq!(
+        delta,
+        Some(json!({ "title": [null, "Two"], "body": [null, "b"] }))
+    );
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 3);
+}
+
+#[test]
+fn a_custom_write_that_logs_nothing_or_fails_leaves_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    let silent = store.write_with(meta("silent"), |tx| {
+        tx.execute("INSERT INTO notes (id, rev) VALUES ('not_1', 1)", [])
+            .map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))?;
+        Ok(((), vec![]))
+    });
+    assert_eq!(
+        silent.unwrap_err().code,
+        ErrorCode::Internal,
+        "every write has its change row"
+    );
+    let stale = store.write_with(
+        meta("stale"),
+        |tx| -> Result<((), Vec<noter_db::Logged>), CoreError> {
+            tx.execute("INSERT INTO notes (id, rev) VALUES ('not_2', 1)", [])
+                .map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))?;
+            Err(CoreError::new(ErrorCode::Conflict, "settings changed"))
+        },
+    );
+    assert_eq!(stale.unwrap_err().code, ErrorCode::Conflict);
+    let boom = store.write_with(meta("boom"), |_| {
+        Ok(((), vec![logged("not_3", "title", None, Some("x"))]))
+    });
+    assert_eq!(
+        boom.unwrap_err().code,
+        ErrorCode::Internal,
+        "the trigger refuses reason boom"
+    );
+    assert_eq!(count(&store, "SELECT count(*) FROM notes"), 0);
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 0);
 }
