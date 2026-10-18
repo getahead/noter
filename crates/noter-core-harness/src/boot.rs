@@ -17,11 +17,14 @@ use noter_core::{
     BoxFuture as CoreFuture, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
     EventEmitter, FetchError, ModelSource, NativeServices, SystemClock, Updater,
 };
-use noter_engine_client::scripted::ScriptedEngine;
+use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
+use noter_protocol::engine::{EngineErrorCode, EngineEvent};
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
-use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs};
+use noter_protocol::{
+    AudioChannel, CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
@@ -42,6 +45,7 @@ pub struct Harness {
     native: Arc<ScriptedNative>,
     updater: Arc<ScriptedUpdater>,
     models: Arc<TinyModels>,
+    engine: ScriptedEngine,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -81,10 +85,17 @@ impl Harness {
         // Boot and seeding go through the core's commands; a window's snapshot already holds their
         // result, so their events stay off the wire (`seeding` is cleared before `Ok`).
         let seeding = Arc::new(AtomicBool::new(true));
+        // The self-test takes a moment, so a window can watch it and a scenario can push into it.
+        let engine = ScriptedEngine::new().with_default(Behaviour {
+            self_test_pace_ms: 300,
+            self_test_line: Some("Welcome to Noter".into()),
+            ..Behaviour::default()
+        });
+        engine.set_system_audio(system_audio(&w.app.setup.permissions));
         let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
             .with_native(native.clone())
             .with_models(models.clone())
-            .with_engine(Arc::new(ScriptedEngine::new()))
+            .with_engine(Arc::new(engine.clone()))
             .with_updater(updater.clone());
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
@@ -97,6 +108,7 @@ impl Harness {
             native,
             updater,
             models,
+            engine,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -213,6 +225,84 @@ impl Harness {
         Ok(())
     }
 
+    /// `harness.push { cmd: "self_test_run", body: { event } }`: the scripted engine says it. The
+    /// core rebuilds the failure channel from the streams that arrived, so a silent channel
+    /// is pushed as the other channel's stream followed by a failed result. Returns the seq
+    /// the Channel message gets, which the core assigns, so always `null`.
+    async fn push(&self, args: Value) -> Result<Value, CoreError> {
+        let bad =
+            |what: &str| CoreError::new(ErrorCode::InvalidInput, format!("harness.push: {what}"));
+        if args["cmd"] != "self_test_run" {
+            return Err(CoreError::new(
+                ErrorCode::NotImplemented,
+                "harness.push: only self_test_run has a scripted stream in the M0 core",
+            ));
+        }
+        let mut body = args["body"]["event"].clone();
+        // The scenario says "no system audio" with null; the engine's levels are decibels.
+        if body["type"] == "levels" && body["sys_db"].is_null() {
+            body["sys_db"] = json!(-120.0);
+        }
+        let event: SelfTestEvent = serde_json::from_value(body).map_err(|e| bad(&e.to_string()))?;
+        let result = |passed, failure, own_sounds_leak| EngineEvent::SelfTestResult {
+            passed,
+            failure,
+            own_sounds_leak,
+        };
+        let events = match event {
+            SelfTestEvent::Levels { mic_db, sys_db } => vec![EngineEvent::Levels {
+                call_id: None,
+                mic_db,
+                sys_db,
+            }],
+            SelfTestEvent::Line { channel, text } => {
+                vec![EngineEvent::SelfTestLine { channel, text }]
+            }
+            SelfTestEvent::StreamArrived { channel } => {
+                vec![EngineEvent::SelfTestStream { channel }]
+            }
+            SelfTestEvent::Passed => vec![result(true, None, false)],
+            SelfTestEvent::Failed { reason } => match reason {
+                SelfTestFailure::OneStreamSilent { channel } => vec![
+                    EngineEvent::SelfTestStream {
+                        channel: match channel {
+                            AudioChannel::Mic => AudioChannel::Sys,
+                            AudioChannel::Sys => AudioChannel::Mic,
+                        },
+                    },
+                    result(false, Some(EngineErrorCode::Internal), false),
+                ],
+                SelfTestFailure::OwnSoundsLeak => vec![result(false, None, true)],
+                SelfTestFailure::ZeroBuffers => {
+                    vec![result(false, Some(EngineErrorCode::ZeroBuffers), false)]
+                }
+                SelfTestFailure::PermissionMissing { .. } => {
+                    vec![result(
+                        false,
+                        Some(EngineErrorCode::PermissionMissing),
+                        false,
+                    )]
+                }
+                _ => vec![result(false, Some(EngineErrorCode::Internal), false)],
+            },
+            // The core ends its stream itself when the self-test is over.
+            SelfTestEvent::Ended { .. } => vec![],
+        };
+        for e in events {
+            // The engine starts on the first command that needs it; a push that races the
+            // `self_test_run` call waits for it.
+            let mut tries = 0;
+            while !self.engine.inject(e.clone()) {
+                tries += 1;
+                if tries > 100 {
+                    return Err(bad("no engine is running"));
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        }
+        Ok(Value::Null)
+    }
+
     /// The world as the core holds it: the real read models for every slice a service owns,
     /// the snapshot's slices, and the last accepted value for everything else.
     async fn world_get(&self) -> Result<Value, CoreError> {
@@ -278,6 +368,8 @@ impl Harness {
             || current["app"]["setup"]["permissions"] != wanted["app"]["setup"]["permissions"]
         {
             self.native.set(env, &parsed.app.setup.permissions);
+            self.engine
+                .set_system_audio(system_audio(&parsed.app.setup.permissions));
             *lock(&self.updater.0) = env.update.clone();
             // The Mac says it changed: the core re-reads what was granted outside it.
             self.native.changed();
@@ -327,12 +419,7 @@ impl Controls for Harness {
             match name {
                 "world_get" => self.world_get().await,
                 "world_set" => self.world_set(args).await,
-                // shortcut: no M0 Channel has a scripted source yet (self_test_run is not in
-                // noter-core); push arrives with the scripted engine behind the self-test.
-                "push" => Err(CoreError::new(
-                    ErrorCode::NotImplemented,
-                    "harness.push: no scripted stream in the M0 core yet",
-                )),
+                "push" => self.push(args).await,
                 // `{}`: the next model download delivers bytes that fail their checksum.
                 "corrupt_next_download" => {
                     self.models.corrupt_next.store(true, Ordering::SeqCst);
@@ -578,5 +665,14 @@ impl Updater for ScriptedUpdater {
 
     fn install(&self) -> CoreFuture<'_, Result<(), CoreError>> {
         Box::pin(async { Ok(()) })
+    }
+}
+
+/// What the scripted engine's system-audio tap hears for the world's permission row; a row not
+/// asked yet is a prompt the user allows, as in `ScriptedNative::request_permission`.
+fn system_audio(rows: &[PermissionRow]) -> PermissionState {
+    match rows.iter().find(|r| r.kind == PermissionKind::SystemAudio) {
+        Some(r) if r.state == PermissionState::Denied => PermissionState::Denied,
+        _ => PermissionState::Granted,
     }
 }
