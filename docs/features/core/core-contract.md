@@ -125,21 +125,21 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 
 ### Contract tests
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-contract-tests`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-contract-tests`
 
 **Input**: The registry (`COMMANDS`, `EVENTS`), the argument and result types, `ErrorCode`, the fixture world.
 
 **Output**: Pass, or the first broken rule with the name it applies to.
 
 **Steps**:
-1. [ ] - `p1` - Check command, event and Channel names are unique and every group has at least one command - `inst-check-names`
-2. [ ] - `p1` - Check stability per name: the Copilot, Agents and Performance groups, `storage_move` and `copilot:status` are draft; everything else is frozen - `inst-check-stability`
-3. [ ] - `p1` - Check window scopes, including that the call window may not delete - `inst-check-scopes`
-4. [ ] - `p1` - Check every `Option` field of an argument type has `#[serde(default)]` - `inst-check-serde-default`
-5. [ ] - `p1` - Check `ErrorCode` is the closed list of DESIGN-core 3.3 and `DEFAULT_RETRYABLE` matches it - `inst-check-errors`
-6. [ ] - `p1` - Check the fixture world and every schema in `contracts/` round-trip through the types - `inst-check-roundtrip`
-7. [ ] - `p1` - Check `CoreApi` has one method per command with the command's argument, result and Channel types - `inst-check-coreapi`
-8. [ ] - `p1` - **RETURN** pass or the first failure - `inst-return-tests`
+1. [x] - `p1` - Check command, event and Channel names are unique and every group has at least one command - `inst-check-names`
+2. [x] - `p1` - Check stability per name: the Copilot, Agents and Performance groups, `storage_move` and `copilot:status` are draft; everything else is frozen - `inst-check-stability`
+3. [x] - `p1` - Check window scopes, including that the call window may not delete - `inst-check-scopes`
+4. [x] - `p1` - Check every `Option` field of an argument type has `#[serde(default)]` - `inst-check-serde-default`
+5. [x] - `p1` - Check `ErrorCode` is the closed list of DESIGN-core 3.3 and `DEFAULT_RETRYABLE` matches it - `inst-check-errors`
+6. [x] - `p1` - Check the fixture world round-trips through the types, and every generated file in `contracts/` matches them (`noter-contract-export --check`) - `inst-check-roundtrip`
+7. [x] - `p1` - Check `CoreApi` has one method per command with the command's argument, result and Channel types - `inst-check-coreapi`
+8. [x] - `p1` - **RETURN** pass or the first failure - `inst-return-tests`
 
 ### Version rule
 
@@ -175,7 +175,7 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 
 ### CoreApi fits the real core
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-contract-coreapi`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-contract-coreapi`
 
 The system **MUST** declare `CoreApi`, `CommandCtx` (with `Caller::Window { label }` and `Caller::Native { surface }`) and `Sink` so that `noter-core` implements them on a concrete type and both `apps/desktop/src-tauri` and `noter-core-harness` call them without adapters of their own beyond transport.
 
