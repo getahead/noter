@@ -713,6 +713,7 @@ dependencies = [
 name = "noter-llm"
 version = "0.1.0"
 dependencies = [
+ "noter-protocol",
  "reqwest",
  "serde_json",
  "tokio",

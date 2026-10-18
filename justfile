@@ -10,6 +10,9 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 base := env_var_or_default("NOTER_BASE_REF", "origin/main")
 playwright_image := "mcr.microsoft.com/playwright:v1.63.0-noble"
+# Port 5173 is shared between worktrees on one machine: when NOTER_E2E_LOCK names a lock file, the
+# Playwright recipes (e2e, visual, visual-update) run one at a time under it; nothing else takes it
+e2e_lock := env_var_or_default("NOTER_E2E_LOCK", "")
 cfs := ".cf-studio/.core/skills/studio/scripts/studio.py"
 
 # List recipes
@@ -70,7 +73,9 @@ cov-unit:
     python3 scripts/harness/coverage_gate.py --rust coverage/unit/rust.lcov --ui apps/desktop/coverage/unit/lcov.info --base {{base}}
 
 # End-to-end: conformance suite (+ UI flows), then the E2E coverage gate (60% of what is delivered)
-e2e:
+e2e: (_locked "_e2e")
+
+_e2e:
     rm -rf coverage/e2e
     pnpm --dir apps/desktop test:conformance
     if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance; fi
@@ -104,15 +109,25 @@ native:
     exit $status
 
 # Screenshot tests (98% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker
-visual:
+visual: (_locked "_visual")
+
+_visual:
     if [ "${NOTER_IN_PW_CONTAINER:-}" = "1" ]; then pnpm --dir apps/desktop test:visual; \
     elif command -v docker >/dev/null && docker info >/dev/null 2>&1; then just _in-playwright "pnpm --dir apps/desktop test:visual"; \
     else echo "visual: no running Docker; screenshots are checked in CI only"; fi
 
 # Refresh screenshot baselines in the pinned container (review the diff before committing)
-visual-update:
+visual-update: (_locked "_visual-update")
+
+_visual-update:
     just _in-playwright "pnpm --dir apps/desktop test:visual:update"
     @echo "Baselines updated. Commit them with NOTER_ALLOW_BASELINE=1 git commit … after reviewing every image."
+
+# Runs a recipe under the shared Playwright lock (see e2e_lock); waits up to an hour for it
+_locked recipe:
+    lock="{{e2e_lock}}"; if [ -z "$lock" ]; then just {{recipe}}; \
+    elif command -v lockf >/dev/null; then lockf -t 3600 "$lock" just {{recipe}}; \
+    else flock -w 3600 "$lock" just {{recipe}}; fi
 
 # The pinned container as CI runs it: linux/amd64 (emulated on Apple Silicon, so local renders match
 # the baselines), with its own node_modules and pnpm store so the host's macOS install stays intact
