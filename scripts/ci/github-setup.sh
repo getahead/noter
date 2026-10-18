@@ -43,11 +43,15 @@ try api -X PATCH "repos/$repo" --input - <<'JSON'
 JSON
 
 echo "• Actions: read-only GITHUB_TOKEN by default, actions pinned to a full commit SHA"
-# can_approve_pull_request_reviews also lets release-please open its release PR with GITHUB_TOKEN
-# when no RELEASE_PLEASE_TOKEN secret exists. No ruleset requires approvals, so it grants nothing more.
+# can_approve_pull_request_reviews also lets release-please open its Release PR with GITHUB_TOKEN.
+# No ruleset requires approvals, so it grants nothing more.
 run api -X PUT "repos/$repo/actions/permissions/workflow" \
   -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true
 try api -X PUT "repos/$repo/actions/permissions" -F enabled=true -f allowed_actions=all -F sha_pinning_required=true
+
+# A self-hosted runner (the Mac, label `noter`) serves this public repository: a workflow from
+# anyone outside the repository runs only after the owner approves it.
+try api -X PUT "repos/$repo/actions/permissions/fork-pr-contributor-approval" -f approval_policy=all_external_contributors
 
 echo "• Labels"
 label() { run label create "$1" --repo "$repo" --color "$2" --description "$3" --force; }
@@ -81,7 +85,7 @@ fi
 
 echo "• Optional secrets (names only; values are never read)"
 have=$(gh secret list --repo "$repo" --json name -q '.[].name' 2>/dev/null || true)
-for s in RELEASE_PLEASE_TOKEN CF_STUDIO_TOKEN \
+for s in CF_STUDIO_TOKEN \
          APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID \
          TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
   if printf '%s\n' "$have" | grep -qx "$s"; then echo "  ✓ $s"; else echo "  - $s (not set; see docs/DELIVERY.md)"; fi

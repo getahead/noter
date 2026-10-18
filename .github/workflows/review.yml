@@ -14,12 +14,19 @@ on:
   # Safe here: the job runs main's code only and reads the comment as data through the API.
   issue_comment: # zizmor: ignore[dangerous-triggers]
     types: [created, edited]
+  # The Release PR: release.yml dispatches this (the workflow token starts no runs).
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: review-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
   cancel-in-progress: false
 
 jobs:
@@ -29,6 +36,7 @@ jobs:
     # pull_request: same-repository heads only (a fork's token cannot write statuses; its
     # status comes from the issue_comment path). issue_comment: PR comments with the marker.
     if: >-
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
       (github.event.issue.pull_request && contains(github.event.comment.body, 'noter-self-review'))
     runs-on: ubuntu-24.04
@@ -48,7 +56,7 @@ jobs:
       - name: Set the `review` status from the self-review comment
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ ! -f scripts/harness/review.py ]; then
