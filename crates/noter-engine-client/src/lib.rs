@@ -11,7 +11,7 @@
 mod launch;
 pub mod scripted;
 
-pub use launch::{EngineIo, EngineLauncher, ProcessLauncher};
+pub use launch::{EngineIo, EngineLauncher, LaunchFuture, ProcessLauncher};
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -385,16 +385,22 @@ impl<L: EngineLauncher> EngineClient<L> {
         self.ensure_ready()
             .await
             .map_err(|_| CommandError::Unavailable)?;
+        let generation = self.shared().generation;
+        self.ping_connection(generation).await
+    }
+
+    /// Pings the engine process `generation` only: never starts one (the liveness task must
+    /// not relaunch an engine that was just shut down).
+    async fn ping_connection(&self, generation: u64) -> Result<(), CommandError> {
         let (tx, rx) = oneshot::channel();
-        let generation = {
+        {
             let mut conn = self.inner.conn.lock().await;
-            let Some(c) = conn.as_mut() else {
+            let Some(c) = conn.as_mut().filter(|c| c.generation == generation) else {
                 return Err(CommandError::Unavailable);
             };
             self.shared().pings.push_back(tx);
             let _ = write_line(&mut *c.stdin, self.next_id(), EngineCommand::Ping).await;
-            c.generation
-        };
+        }
         match timeout(self.inner.config.ping_timeout, rx).await {
             Ok(Ok(())) => Ok(()),
             Ok(Err(_)) => Err(CommandError::Unavailable),
@@ -557,7 +563,7 @@ impl<L: EngineLauncher> EngineClient<L> {
                         return;
                     }
                 }
-                if client.ping().await.is_err() {
+                if client.ping_connection(generation).await.is_err() {
                     return;
                 }
             }

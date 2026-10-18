@@ -21,9 +21,18 @@ pub struct EngineIo {
     pub stdout: Box<dyn AsyncRead + Unpin + Send>,
 }
 
+/// What `launch` returns: boxed, so the core can hold any launcher as `Arc<dyn EngineLauncher>`.
+pub type LaunchFuture<'a> = Pin<Box<dyn Future<Output = io::Result<EngineIo>> + Send + 'a>>;
+
 /// Starts one engine process (or a scripted stand-in) and hands back its pipes.
 pub trait EngineLauncher: Send + Sync + 'static {
-    fn launch(&self) -> impl Future<Output = io::Result<EngineIo>> + Send;
+    fn launch(&self) -> LaunchFuture<'_>;
+}
+
+impl<T: EngineLauncher + ?Sized> EngineLauncher for Arc<T> {
+    fn launch(&self) -> LaunchFuture<'_> {
+        (**self).launch()
+    }
 }
 
 /// The real engine: the bundled `noter-engine` binary run with `tokio::process`.
@@ -83,7 +92,15 @@ impl ProcessLauncher {
 
 impl EngineLauncher for ProcessLauncher {
     // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-spawn
-    async fn launch(&self) -> io::Result<EngineIo> {
+    fn launch(&self) -> LaunchFuture<'_> {
+        Box::pin(self.spawn())
+    }
+    // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-spawn
+}
+
+impl ProcessLauncher {
+    // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-spawn
+    async fn spawn(&self) -> io::Result<EngineIo> {
         let mut cmd = Command::new(&self.program);
         // stdout carries protocol only; stderr is drained and counted (see `stderr_lines`).
         cmd.args(&self.args)
