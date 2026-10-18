@@ -76,7 +76,7 @@ It implements the **Keyboard and VoiceOver** and **Localisation rules for contro
 
 ### Hear what changed
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-accessibility-l10n-announce`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-accessibility-l10n-announce`
 
 **Actor**: Primary user
 
@@ -88,17 +88,17 @@ It implements the **Keyboard and VoiceOver** and **Localisation rules for contro
 - The window is not key and is a panel: the WebView live region would not speak, so the announcement goes to the core as a native announcement
 
 **Steps**:
-1. [ ] - `p1` - UI: a screen reports an event from DESIGN's announcement table with its text - `inst-report-event`
-2. [ ] - `p1` - Algorithm: choose the route with `cpt-noter-algo-ui-accessibility-l10n-route-announcement` - `inst-route`
-3. [ ] - `p1` - **IF** the route is native - `inst-if-native`
-   1. [ ] - `p1` - API: `window_announce` (text, politeness) - `inst-api-announce`
-4. [ ] - `p1` - **ELSE** - `inst-else-live`
-   1. [ ] - `p1` - UI: write the text into the window's polite or assertive live region - `inst-live-region`
-5. [ ] - `p1` - **RETURN** spoken once - `inst-return-spoken`
+1. [x] - `p1` - UI: a screen reports an event from DESIGN's announcement table with its text - `inst-report-event`
+2. [x] - `p1` - Algorithm: choose the route with `cpt-noter-algo-ui-accessibility-l10n-route-announcement` - `inst-route`
+3. [x] - `p1` - **IF** the route is native - `inst-if-native`
+   1. [x] - `p1` - API: `window_announce` (text, politeness) - `inst-api-announce`
+4. [x] - `p1` - **ELSE** - `inst-else-live`
+   1. [x] - `p1` - UI: write the text into the window's polite or assertive live region - `inst-live-region`
+5. [x] - `p1` - **RETURN** spoken once - `inst-return-spoken`
 
 ### Move by keyboard
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-accessibility-l10n-keyboard`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-accessibility-l10n-keyboard`
 
 **Actor**: Primary user
 
@@ -111,84 +111,84 @@ It implements the **Keyboard and VoiceOver** and **Localisation rules for contro
 - A sticky header, the undo strip or a banner would cover the focused row: the list reserves padding so the row stays visible (WCAG 2.4.11)
 
 **Steps**:
-1. [ ] - `p1` - User presses Tab, an arrow key, Esc or a shortcut - `inst-user-key`
-2. [ ] - `p1` - **IF** the key is a single-key or ⌘ shortcut - `inst-if-shortcut`
-   1. [ ] - `p1` - Algorithm: match it with `cpt-noter-algo-ui-accessibility-l10n-physical-key` - `inst-match-key`
-3. [ ] - `p1` - **IF** the key closes a popover, sheet, menu or inspector - `inst-if-close`
-   1. [ ] - `p1` - UI: close it and return focus to the control that opened it - `inst-return-focus`
-4. [ ] - `p1` - UI: scroll the focused element into view below sticky parts - `inst-unobscure`
-5. [ ] - `p1` - **RETURN** focus on the intended control - `inst-return-focus-done`
+1. [x] - `p1` - User presses Tab, an arrow key, Esc or a shortcut - `inst-user-key`
+2. [x] - `p1` - **IF** the key is a single-key or ⌘ shortcut - `inst-if-shortcut`
+   1. [x] - `p1` - Algorithm: match it with `cpt-noter-algo-ui-accessibility-l10n-physical-key` - `inst-match-key`
+3. [x] - `p1` - **IF** the key closes a popover, sheet, menu or inspector - `inst-if-close`
+   1. [x] - `p1` - UI: close it and return focus to the control that opened it - `inst-return-focus`
+4. [x] - `p1` - UI: scroll the focused element into view below sticky parts - `inst-unobscure`
+5. [x] - `p1` - **RETURN** focus on the intended control - `inst-return-focus-done`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Route an announcement
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-accessibility-l10n-route-announcement`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-accessibility-l10n-route-announcement`
 
 **Input**: event kind, text, the window label and whether the window is key
 
 **Output**: the route (native or live region) and the politeness, or no announcement
 
 **Steps**:
-1. [ ] - `p1` - **IF** the event is a transcript line, a level meter value, a clock tick or countdown seconds - `inst-if-silent`
-   1. [ ] - `p1` - **RETURN** no announcement - `inst-return-silent`
-2. [ ] - `p1` - Set politeness: assertive for capture failures and capture decisions (call ended, new meeting); polite for everything else - `inst-politeness`
-3. [ ] - `p1` - **IF** the same event was announced already - `inst-if-repeat`
-   1. [ ] - `p1` - **RETURN** no announcement (at most once per event, D56) - `inst-return-once`
-4. [ ] - `p1` - **IF** the window is the record prompt or the call window and is not key - `inst-if-panel`
-   1. [ ] - `p1` - **RETURN** native, with the politeness (D55) - `inst-return-native`
-5. [ ] - `p1` - **RETURN** live region, with the politeness - `inst-return-live`
+1. [x] - `p1` - **IF** the event is a transcript line, a level meter value, a clock tick or countdown seconds - `inst-if-silent`
+   1. [x] - `p1` - **RETURN** no announcement - `inst-return-silent`
+2. [x] - `p1` - Set politeness: assertive for capture failures and capture decisions (call ended, new meeting); polite for everything else - `inst-politeness`
+3. [x] - `p1` - **IF** the same event was announced already - `inst-if-repeat`
+   1. [x] - `p1` - **RETURN** no announcement (at most once per event, D56) - `inst-return-once`
+4. [x] - `p1` - **IF** the window is the record prompt or the call window and is not key - `inst-if-panel`
+   1. [x] - `p1` - **RETURN** native, with the politeness (D55) - `inst-return-native`
+5. [x] - `p1` - **RETURN** live region, with the politeness - `inst-return-live`
 
 ### Match a shortcut by physical key
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-accessibility-l10n-physical-key`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-accessibility-l10n-physical-key`
 
 **Input**: a key event and the shortcut table of the focused region
 
 **Output**: the matched action, or none
 
 **Steps**:
-1. [ ] - `p1` - Read the physical key code, not the produced character - `inst-read-code`
-2. [ ] - `p1` - **IF** a text field has focus and the shortcut has no ⌘ or ⌃ - `inst-if-typing`
-   1. [ ] - `p1` - **RETURN** none (typing wins) - `inst-return-typing`
-3. [ ] - `p1` - Look up the code with its modifiers in the region's table, then in the window's table - `inst-lookup`
-4. [ ] - `p1` - **RETURN** the action, or none - `inst-return-action`
+1. [x] - `p1` - Read the physical key code, not the produced character - `inst-read-code`
+2. [x] - `p1` - **IF** a text field has focus and the shortcut has no ⌘ or ⌃ - `inst-if-typing`
+   1. [x] - `p1` - **RETURN** none (typing wins) - `inst-return-typing`
+3. [x] - `p1` - Look up the code with its modifiers in the region's table, then in the window's table - `inst-lookup`
+4. [x] - `p1` - **RETURN** the action, or none - `inst-return-action`
 
 ### Format a string
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-accessibility-l10n-format`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-accessibility-l10n-format`
 
 **Input**: a catalogue key, its arguments (counts, names, dates, durations, money) and the content language of any quoted user text
 
 **Output**: the display string and the language attribute of its parts
 
 **Steps**:
-1. [ ] - `p1` - Pick the English message (v1) from the catalogue; never concatenate fragments - `inst-pick-message`
-2. [ ] - `p1` - **FOR EACH** count argument: choose the plural form by the plural rules of the interface language - `inst-plural`
-3. [ ] - `p1` - Format dates and times by the macOS locale, with the 12- or 24-hour preference the core sends; call-relative times as HH:MM:SS; durations localised (**48 min**); money as US dollars in the locale format - `inst-format-values`
-4. [ ] - `p1` - Wrap quoted user text in “…” and give it its own language attribute - `inst-quote-user-text`
-5. [ ] - `p1` - **RETURN** the string - `inst-return-string`
+1. [x] - `p1` - Pick the English message (v1) from the catalogue; never concatenate fragments - `inst-pick-message`
+2. [x] - `p1` - **FOR EACH** count argument: choose the plural form by the plural rules of the interface language - `inst-plural`
+3. [x] - `p1` - Format dates and times by the macOS locale, with the 12- or 24-hour preference the core sends; call-relative times as HH:MM:SS; durations localised (**48 min**); money as US dollars in the locale format - `inst-format-values`
+4. [x] - `p1` - Wrap quoted user text in “…” and give it its own language attribute - `inst-quote-user-text`
+5. [x] - `p1` - **RETURN** the string - `inst-return-string`
 
 ## 4. States (CDSL)
 
 ### Focus return
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-accessibility-l10n-focus-return`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-accessibility-l10n-focus-return`
 
 **States**: IN_PAGE, IN_OVERLAY, RETURNED
 
 **Initial State**: IN_PAGE
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** IN_PAGE **TO** IN_OVERLAY **WHEN** a popover, sheet, menu or inspector opens; its first control takes focus and the opener is remembered - `inst-page-overlay`
-2. [ ] - `p1` - **FROM** IN_OVERLAY **TO** RETURNED **WHEN** it closes by Esc, a click outside or its action; focus goes back to the opener - `inst-overlay-returned`
-3. [ ] - `p1` - **FROM** RETURNED **TO** IN_PAGE **WHEN** the user moves on - `inst-returned-page`
+1. [x] - `p1` - **FROM** IN_PAGE **TO** IN_OVERLAY **WHEN** a popover, sheet, menu or inspector opens; its first control takes focus and the opener is remembered - `inst-page-overlay`
+2. [x] - `p1` - **FROM** IN_OVERLAY **TO** RETURNED **WHEN** it closes by Esc, a click outside or its action; focus goes back to the opener - `inst-overlay-returned`
+3. [x] - `p1` - **FROM** RETURNED **TO** IN_PAGE **WHEN** the user moves on - `inst-returned-page`
 
 ## 5. Definitions of Done
 
 ### Announcement service
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-announce`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-announce`
 
 The system **MUST** provide one announcement service that follows DESIGN's announcement table: nothing for transcript lines, meters, clocks and countdown seconds; assertive for capture failures and decisions; polite once for everything else; native through `window_announce` for the record prompt and the call window while they are not key.
 
@@ -204,7 +204,7 @@ The system **MUST** provide one announcement service that follows DESIGN's annou
 
 ### Keyboard and focus
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-keyboard`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-keyboard`
 
 The system **MUST** make every action reachable by keyboard, restore focus to the opener after every overlay, keep focused elements clear of sticky parts, and match single-key and ⌘ shortcuts by physical key.
 
@@ -221,7 +221,7 @@ The system **MUST** make every action reachable by keyboard, restore focus to th
 
 ### Translation-ready strings and checks
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-strings`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-strings`
 
 The system **MUST** take every interface string from a catalogue with plural rules and locale formats, put a language attribute on every content block, and run a pseudo-localisation build (+40 %, Cyrillic) and a German string pass on every screen in the screenshot suite, failing on truncated labels.
 
