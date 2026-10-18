@@ -11,6 +11,8 @@ mod log;
 mod models;
 mod self_test;
 mod settings;
+#[cfg(feature = "harness")]
+pub mod testing;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};

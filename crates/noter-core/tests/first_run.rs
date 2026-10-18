@@ -41,6 +41,8 @@ impl Clock for FixedClock {
     }
 }
 
+type Listener = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
+
 /// A scripted Mac: permission states, what a prompt answers, the environment, the login item.
 #[derive(Default)]
 struct FakeNative {
@@ -49,7 +51,7 @@ struct FakeNative {
     asked: Mutex<Vec<PermissionKind>>,
     login: Mutex<Vec<bool>>,
     /// The core's change listener, to send it a new reading as macOS would.
-    changed: Mutex<Option<Box<dyn Fn(EnvironmentReading) + Send + Sync>>>,
+    changed: Mutex<Option<Listener>>,
 }
 
 fn display(id: &str, main: bool) -> DisplayInfo {

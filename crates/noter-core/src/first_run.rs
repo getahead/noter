@@ -438,6 +438,15 @@ impl Core {
         // @cpt-end:cpt-noter-algo-core-first-run-status:p1:inst-emit-changes
     }
 
+    /// Sets the self-test state as `harness.world_set` seeds it (feature `harness`).
+    /// shortcut: in memory only, not stored under `setup`; store it if a harness restart needs it.
+    #[cfg(feature = "harness")]
+    pub(crate) fn seed_self_test(&self, state: SelfTestState) {
+        lock(&self.first_run).stored.self_test = state;
+        self.refresh_environment(self.deps.native.environment());
+        self.refresh_setup();
+    }
+
     // @cpt-dod:cpt-noter-dod-core-first-run-status:p1
     // @cpt-begin:cpt-noter-algo-core-first-run-status:p1:inst-return-status
     pub(crate) fn setup_now(&self) -> SetupStatus {
@@ -589,7 +598,15 @@ impl Core {
         let kind = args.kind;
         // @cpt-end:cpt-noter-flow-core-first-run-permission:p1:inst-permission-call
         // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-if-system-audio
-        let state = if kind == PermissionKind::SystemAudio {
+        // A permission already off is not asked again (macOS shows no second prompt).
+        let current = if kind == PermissionKind::SystemAudio {
+            system_audio(&lock(&self.first_run).stored)
+        } else {
+            self.deps.native.permission(kind)
+        };
+        let state = if current == PermissionState::Denied {
+            current
+        } else if kind == PermissionKind::SystemAudio {
             // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio
             // Decision F1: the engine opens the tap briefly (macOS prompts); what it heard is
             // the inference until a full self-test decides.
