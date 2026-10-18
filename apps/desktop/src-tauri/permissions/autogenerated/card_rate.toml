@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-card-rate"
+description = "Enables the card_rate command without any pre-configured scope."
+commands.allow = ["card_rate"]
+
+[[permission]]
+identifier = "deny-card-rate"
+description = "Denies the card_rate command without any pre-configured scope."
+commands.deny = ["card_rate"]

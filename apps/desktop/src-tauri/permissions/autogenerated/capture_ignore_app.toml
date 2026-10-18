@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-capture-ignore-app"
+description = "Enables the capture_ignore_app command without any pre-configured scope."
+commands.allow = ["capture_ignore_app"]
+
+[[permission]]
+identifier = "deny-capture-ignore-app"
+description = "Denies the capture_ignore_app command without any pre-configured scope."
+commands.deny = ["capture_ignore_app"]

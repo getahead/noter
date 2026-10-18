@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-capture-keep-recording"
+description = "Enables the capture_keep_recording command without any pre-configured scope."
+commands.allow = ["capture_keep_recording"]
+
+[[permission]]
+identifier = "deny-capture-keep-recording"
+description = "Denies the capture_keep_recording command without any pre-configured scope."
+commands.deny = ["capture_keep_recording"]

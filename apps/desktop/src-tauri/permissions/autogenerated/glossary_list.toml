@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-glossary-list"
+description = "Enables the glossary_list command without any pre-configured scope."
+commands.allow = ["glossary_list"]
+
+[[permission]]
+identifier = "deny-glossary-list"
+description = "Denies the glossary_list command without any pre-configured scope."
+commands.deny = ["glossary_list"]

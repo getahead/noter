@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ask-scope-presets"
+description = "Enables the ask_scope_presets command without any pre-configured scope."
+commands.allow = ["ask_scope_presets"]
+
+[[permission]]
+identifier = "deny-ask-scope-presets"
+description = "Denies the ask_scope_presets command without any pre-configured scope."
+commands.deny = ["ask_scope_presets"]

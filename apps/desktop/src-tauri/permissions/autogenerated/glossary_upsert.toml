@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-glossary-upsert"
+description = "Enables the glossary_upsert command without any pre-configured scope."
+commands.allow = ["glossary_upsert"]
+
+[[permission]]
+identifier = "deny-glossary-upsert"
+description = "Denies the glossary_upsert command without any pre-configured scope."
+commands.deny = ["glossary_upsert"]

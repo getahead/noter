@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-calls-export"
+description = "Enables the calls_export command without any pre-configured scope."
+commands.allow = ["calls_export"]
+
+[[permission]]
+identifier = "deny-calls-export"
+description = "Denies the calls_export command without any pre-configured scope."
+commands.deny = ["calls_export"]

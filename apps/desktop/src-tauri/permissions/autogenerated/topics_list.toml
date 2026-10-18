@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-topics-list"
+description = "Enables the topics_list command without any pre-configured scope."
+commands.allow = ["topics_list"]
+
+[[permission]]
+identifier = "deny-topics-list"
+description = "Denies the topics_list command without any pre-configured scope."
+commands.deny = ["topics_list"]

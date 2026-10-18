@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-job-run-now"
+description = "Enables the job_run_now command without any pre-configured scope."
+commands.allow = ["job_run_now"]
+
+[[permission]]
+identifier = "deny-job-run-now"
+description = "Denies the job_run_now command without any pre-configured scope."
+commands.deny = ["job_run_now"]

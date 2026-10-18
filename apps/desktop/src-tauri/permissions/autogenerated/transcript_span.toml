@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-transcript-span"
+description = "Enables the transcript_span command without any pre-configured scope."
+commands.allow = ["transcript_span"]
+
+[[permission]]
+identifier = "deny-transcript-span"
+description = "Denies the transcript_span command without any pre-configured scope."
+commands.deny = ["transcript_span"]

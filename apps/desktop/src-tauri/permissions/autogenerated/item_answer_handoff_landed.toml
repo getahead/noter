@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-item-answer-handoff-landed"
+description = "Enables the item_answer_handoff_landed command without any pre-configured scope."
+commands.allow = ["item_answer_handoff_landed"]
+
+[[permission]]
+identifier = "deny-item-answer-handoff-landed"
+description = "Denies the item_answer_handoff_landed command without any pre-configured scope."
+commands.deny = ["item_answer_handoff_landed"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-handoff-generate"
+description = "Enables the handoff_generate command without any pre-configured scope."
+commands.allow = ["handoff_generate"]
+
+[[permission]]
+identifier = "deny-handoff-generate"
+description = "Denies the handoff_generate command without any pre-configured scope."
+commands.deny = ["handoff_generate"]

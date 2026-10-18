@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-person-update"
+description = "Enables the person_update command without any pre-configured scope."
+commands.allow = ["person_update"]
+
+[[permission]]
+identifier = "deny-person-update"
+description = "Denies the person_update command without any pre-configured scope."
+commands.deny = ["person_update"]

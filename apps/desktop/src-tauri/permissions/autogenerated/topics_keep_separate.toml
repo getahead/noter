@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-topics-keep-separate"
+description = "Enables the topics_keep_separate command without any pre-configured scope."
+commands.allow = ["topics_keep_separate"]
+
+[[permission]]
+identifier = "deny-topics-keep-separate"
+description = "Denies the topics_keep_separate command without any pre-configured scope."
+commands.deny = ["topics_keep_separate"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-transcript-rename-speaker"
+description = "Enables the transcript_rename_speaker command without any pre-configured scope."
+commands.allow = ["transcript_rename_speaker"]
+
+[[permission]]
+identifier = "deny-transcript-rename-speaker"
+description = "Denies the transcript_rename_speaker command without any pre-configured scope."
+commands.deny = ["transcript_rename_speaker"]

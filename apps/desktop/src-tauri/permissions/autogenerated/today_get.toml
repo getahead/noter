@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-today-get"
+description = "Enables the today_get command without any pre-configured scope."
+commands.allow = ["today_get"]
+
+[[permission]]
+identifier = "deny-today-get"
+description = "Denies the today_get command without any pre-configured scope."
+commands.deny = ["today_get"]
