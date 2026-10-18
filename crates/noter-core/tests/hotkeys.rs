@@ -468,3 +468,86 @@ fn the_default_registrar_accepts_every_chord() {
     assert!(deps.shortcuts.register("Ctrl+Alt+Super+R").is_ok());
     deps.shortcuts.unregister("Ctrl+Alt+Super+R");
 }
+
+fn native_command(core: &Core, chord: &str) -> Result<(&'static str, Value), ErrorCode> {
+    match core.hotkey_command(chord) {
+        Ok((ctx, command, args)) => {
+            assert_eq!(
+                ctx.caller,
+                Caller::Native {
+                    surface: noter_protocol::ipc::NativeSurface::Hotkey
+                }
+            );
+            Ok((command, args))
+        }
+        Err(e) => Err(e.code),
+    }
+}
+
+#[tokio::test]
+async fn a_pressed_hotkey_asks_the_core_as_a_native_caller() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open_with(dir.path(), Arc::new(Shortcuts::default()));
+    assert_eq!(
+        native_command(&core, "Ctrl+Alt+Super+N"),
+        Ok(("window_show_call", json!({})))
+    );
+    assert_eq!(
+        native_command(&core, "super+ctrl+alt+n"),
+        Ok(("window_show_call", json!({}))),
+        "any spelling"
+    );
+    let start = json!({ "source": "hotkey", "sensitive": false });
+    assert_eq!(
+        native_command(&core, "Ctrl+Alt+Super+R"),
+        Ok(("capture_start", start))
+    );
+    let hide = json!({ "hidden": true });
+    assert_eq!(
+        native_command(&core, "Ctrl+Alt+Super+0"),
+        Ok(("app_set_hidden_for_presenting", hide))
+    );
+    // Nothing is recorded, so the call's own keys have nothing to act on.
+    for chord in [
+        "Ctrl+Alt+Super+P",
+        "Ctrl+Alt+Super+M",
+        "Ctrl+Alt+Super+C",
+        "Ctrl+Alt+Super+K",
+        "Ctrl+Alt+Super+Z",
+    ] {
+        assert_eq!(
+            native_command(&core, chord),
+            Err(ErrorCode::NotRecording),
+            "{chord}"
+        );
+    }
+    assert_eq!(
+        native_command(&core, "Ctrl+Alt+Super+A"),
+        Err(ErrorCode::NotImplemented),
+        "Ask needs its panel (M3)"
+    );
+    assert_eq!(
+        native_command(&core, "Ctrl+Alt+Super+Q"),
+        Err(ErrorCode::NotFound)
+    );
+    // A cleared hotkey no longer answers.
+    core.hotkey_set(&settings(), set(HotkeyAction::OpenCallScreen, None))
+        .await
+        .unwrap();
+    assert_eq!(
+        native_command(&core, "Ctrl+Alt+Super+N"),
+        Err(ErrorCode::NotFound)
+    );
+}
+
+#[tokio::test]
+async fn a_hotkey_press_runs_its_command_through_the_core() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open_with(dir.path(), Arc::new(Shortcuts::default()));
+    // M0 has no call window yet: the command itself answers not_implemented, nothing is faked.
+    let err = core.hotkey_pressed("Ctrl+Alt+Super+N").await.unwrap_err();
+    assert_eq!(
+        (err.code, err.message.as_str()),
+        (ErrorCode::NotImplemented, "window_show_call")
+    );
+}
