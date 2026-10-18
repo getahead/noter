@@ -62,12 +62,15 @@ def current_lane() -> str | None:
     return parts[1] if len(parts) >= 3 and parts[0] == "lane" else None
 
 
-def verdict(path: str, lane: str | None, cfg: dict, *, committing: bool = False) -> str | None:
+def verdict(path: str, lane: str | None, cfg: dict, *, committing: bool = False, screenshots_ok: bool = False) -> str | None:
     """None if allowed, else the reason it is not."""
     guard = cfg["guard"]
     if matches_any(path, guard["generated"]) and not committing:
         return f"{path} is generated from crates/noter-protocol. Change the Rust types and run `just contract-regen`."
-    if matches_any(path, guard["baselines"]) and os.environ.get("NOTER_ALLOW_BASELINE") != "1":
+    # The CI lane check passes screenshots_ok: there, changed screenshots are gated by `visual-change-approved` instead.
+    # Only the screenshot pattern is dropped, so golden data stays blocked even under a __screenshots__ directory.
+    baselines = [b for b in guard["baselines"] if not (screenshots_ok and "__screenshots__" in b)]
+    if matches_any(path, baselines) and os.environ.get("NOTER_ALLOW_BASELINE") != "1":
         return (f"{path} is a test baseline. Screenshot baselines are refreshed by the `update-screenshots` "
                 "workflow (PR label) or `just visual-update`; golden data changes need the owner.")
     if lane is None:
