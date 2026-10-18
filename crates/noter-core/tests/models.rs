@@ -610,3 +610,25 @@ async fn a_pause_the_user_asked_for_stays_paused_when_the_network_comes_back() {
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(source.fetches.lock().unwrap().is_empty());
 }
+
+/// macOS sends its notices on its own threads, outside any async runtime: the download still
+/// starts (on the runtime the core started on).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_back_online_notice_from_a_plain_thread_still_resumes() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = Arc::new(two_bundles());
+    let network = Arc::new(Network(false.into(), Mutex::new(None)));
+    let core = open_on(dir.path(), source.clone(), network.clone());
+    download(&core, DownloadAction::Start).await.unwrap_err();
+    let n = network.clone();
+    std::thread::spawn(move || n.set_online(true))
+        .join()
+        .unwrap();
+    until(&core, "ready once back online", |st| {
+        st.models
+            .bundles
+            .iter()
+            .all(|b| b.state == BundleState::Ready)
+    })
+    .await;
+}
