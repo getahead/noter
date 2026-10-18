@@ -582,3 +582,77 @@ async fn an_unreadable_settings_revision_stops_the_boot() {
     let err = Core::open(dir.path(), deps).err().expect("boot fails");
     assert!(err.to_string().contains("stored settings"));
 }
+
+#[tokio::test]
+async fn a_removed_term_logs_every_value_it_had() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    let w = settings_window();
+    let id = core.glossary_upsert(&w, term("VSTOR")).await.unwrap().terms[0]
+        .id
+        .clone();
+    core.glossary_remove(&w, GlossaryIdArgs { id })
+        .await
+        .unwrap();
+    let c = Connection::open(dir.path().join("noter.db")).unwrap();
+    let delta: Vec<u8> = c
+        .query_row(
+            "SELECT delta FROM changes WHERE reason = 'glossary_remove'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let delta: Value = serde_json::from_slice(&delta).unwrap();
+    let columns = [
+        "id",
+        "rev",
+        "term",
+        "variants_latin",
+        "variants_cyrillic",
+        "spoken_forms",
+        "lang",
+        "always_apply",
+        "added_from",
+    ];
+    for column in columns {
+        assert!(delta.get(column).is_some(), "{column} is not logged");
+        assert_eq!(delta[column][1], Value::Null, "{column} after the delete");
+    }
+    assert_eq!(delta["term"][0], json!("VSTOR"));
+    assert_eq!(delta["spoken_forms"][0], json!(r#"["v stor"]"#));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn the_same_new_term_from_two_windows_is_a_duplicate_not_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    let core = Arc::new(core);
+    let tries: Vec<_> = (0..8)
+        .map(|_| {
+            let core = core.clone();
+            tokio::spawn(async move {
+                core.glossary_upsert(&settings_window(), term("VSTOR"))
+                    .await
+            })
+        })
+        .collect();
+    for t in tries {
+        if let Err(err) = t.await.unwrap() {
+            assert_eq!(
+                rule(err),
+                (
+                    ErrorCode::InvalidInput,
+                    Some(("term".into(), ValidationRule::Duplicate))
+                )
+            );
+        }
+    }
+    assert_eq!(
+        core.glossary_list(&settings_window(), NoArgs {})
+            .await
+            .unwrap()
+            .terms
+            .len(),
+        1
+    );
+}

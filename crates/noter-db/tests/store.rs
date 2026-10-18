@@ -842,3 +842,37 @@ fn a_custom_write_that_logs_nothing_or_fails_leaves_nothing() {
     assert_eq!(count(&store, "SELECT count(*) FROM notes"), 0);
     assert_eq!(count(&store, "SELECT count(*) FROM changes"), 0);
 }
+
+#[test]
+fn a_write_that_breaks_a_unique_index_is_a_duplicate() {
+    let dir = tempfile::tempdir().unwrap();
+    let tags = &[Migration {
+        owner: "tags-test",
+        version: 1,
+        name: "tags",
+        sql: "CREATE TABLE tags (id TEXT PRIMARY KEY, name TEXT NOT NULL, rev INTEGER NOT NULL);
+              CREATE UNIQUE INDEX tags_name ON tags (lower(name));",
+    }];
+    let store = Store::open(&db_path(&dir), &[MIGRATIONS, NOTES, tags]).unwrap();
+    let tag = |id: &str, name: &str| Mutation {
+        entity_type: "tag",
+        table: "tags",
+        id: id.into(),
+        base_rev: None,
+        bump_rev: true,
+        values: vec![("name", json!(name))],
+    };
+    store.write(tag("tag_1", "Backend"), meta("add")).unwrap();
+    let err = store
+        .write(tag("tag_2", "backend"), meta("add"))
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::InvalidInput);
+    assert!(matches!(
+        err.detail,
+        Some(ErrorDetail::Validation {
+            rule: noter_protocol::error::ValidationRule::Duplicate,
+            ..
+        })
+    ));
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 1);
+}
