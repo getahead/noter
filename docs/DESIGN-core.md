@@ -169,7 +169,7 @@ The UI calls only the IPC host. Services hold the product logic and never talk t
 | Presentation | Not in this design: WebView windows (DESIGN.md). The native menu bar, notifications, panels and announcements are built by the core | Tauri 2 tray, menu, global-shortcut and dialog plugins; tauri-nspanel pinned to a commit; `UNUserNotificationCenter`, SMAppService and AppKit through objc2 in `noter-native` |
 | Application | The IPC host and the services: one Rust library crate `noter-core` that implements `CoreApi`, plus feature crates (copilot, retrieval, knowledge, handoff, jobs) | Rust 2021, tokio, tauri 2 (only in `apps/desktop/src-tauri`) |
 | Domain | Records, view models and their invariants; the contract types | `noter-protocol` (serde, specta, schemars); `noter-db` row types |
-| Infrastructure | SQLite single writer, engine client, LLM adapters and the egress gate, Keychain, EventKit, Launch Services, FSEvents, MCP client and the noter-mcp socket | rusqlite with FTS5 and sqlite-vec, refinery, `tokio::process`, security-framework, objc2, notify, rmcp |
+| Infrastructure | SQLite single writer, engine client, LLM adapters and the egress gate, Keychain, EventKit, Launch Services, FSEvents, MCP client and the noter-mcp socket | rusqlite with FTS5 and sqlite-vec, numbered migrations hand-rolled in `noter-db`, `tokio::process`, security-framework, objc2, notify, rmcp |
 
 **Technology risks.**
 
@@ -988,7 +988,7 @@ One file, one writer, one transaction for a call and its index; recoverable from
 
 ##### Responsibility scope
 
-Crate `noter-db`. A single writer task that owns the read-write connection (WAL, busy timeout, incremental auto-vacuum, nightly checkpoint) and a small pool of read-only connections for read models; stream snapshots read through the writer connection under the hub lock. Numbered migrations (refinery); FTS5 external-content tables over normalised text plus a trigram index; sqlite-vec tables: `chunk_vec` without a partition key (`call_id` and `started_at` as metadata columns), `doc_vec` partitioned by privacy class as the PRD says; backups through the SQLite backup API verified with `quick_check`; integrity checks and re-import from `transcript.jsonl`, `items.json`, `summary.md`.
+Crate `noter-db`. A single writer task that owns the read-write connection (WAL, busy timeout, incremental auto-vacuum, nightly checkpoint) and a small pool of read-only connections for read models; stream snapshots read through the writer connection under the hub lock. Numbered migrations, hand-rolled in `noter-db` (owner decision 18 Oct 2026, instead of refinery): each crate that owns tables numbers its own migrations, each migration and its history row commit in one transaction, and opening a database whose schema is ahead of the binary is refused; FTS5 external-content tables over normalised text plus a trigram index; sqlite-vec tables: `chunk_vec` without a partition key (`call_id` and `started_at` as metadata columns), `doc_vec` partitioned by privacy class as the PRD says; backups through the SQLite backup API verified with `quick_check`; integrity checks and re-import from `transcript.jsonl`, `items.json`, `summary.md`.
 
 ##### Responsibility boundaries
 
@@ -2565,7 +2565,7 @@ Knowledge sources; documents and chunks as in the PRD. Change from the PRD: adds
 
 **ID**: `cpt-noter-dbtable-changes`
 
-The change log; proposals are rows with status `proposed`. Change from the PRD: adds `summary`, `proposal_kind`, `undoable`, `redo_of`; actor `user` is written `you`.
+The change log; proposals are rows with status `proposed`. Change from the PRD: adds `summary`, `proposal_kind`, `undoable`, `redo_of`, `surface`; actor `user` is written `you`. A change to one column of one row is written as `field`, `before` and `after`; a change to several columns of one row, or a bulk edit of a batch, as `delta` `{"column": [before, after]}` over the columns that changed.
 
 **Schema**:
 
@@ -2575,8 +2575,8 @@ The change log; proposals are rows with status `proposed`. Change from the PRD: 
 | ts | INTEGER | Epoch ms |
 | actor | TEXT | `you`, `job:<id>`, `llm_run:<id>` |
 | entity_type, entity_id | TEXT | Target |
-| field, before, after | TEXT NULL | Single changes |
-| delta | BLOB NULL | Bulk edits of a batch |
+| field, before, after | TEXT NULL | One changed column |
+| delta | BLOB NULL | JSON `{"column": [before, after]}`: several changed columns of one row, or a bulk edit of a batch |
 | summary, reason | TEXT | Plain words |
 | evidence_ids | TEXT | JSON list |
 | confidence | TEXT NULL | Level |
@@ -2585,6 +2585,7 @@ The change log; proposals are rows with status `proposed`. Change from the PRD: 
 | proposal_kind | TEXT NULL | For proposals |
 | undoable | INTEGER | 0 for irreversible deletes and retention |
 | redo_of | TEXT NULL | For rows written by a redo: the undone row they re-apply |
+| surface | TEXT NULL | `menu`, `menu_bar`, `hotkey` or `notification` when a native surface sent the command (`Caller::Native`); NULL for a window, a job or a model run |
 
 **PK**: id
 
@@ -2735,12 +2736,12 @@ Typed settings sections and the account binding.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| key | TEXT | Section name, plus `rev` and `account.claude` / `account.chatgpt` |
+| key | TEXT | Section name, plus `rev`, `account.claude` / `account.chatgpt`, `hotkeys` and `setup` |
 | value | TEXT | JSON of the section type |
 
 **PK**: key
 
-**Constraints**: Writes guarded by the settings `rev`
+**Constraints**: Writes of the sections are guarded by the settings `rev`; `hotkeys` and `setup` have their own commands and do not bump `rev`
 
 **Additional info**: Account binding holds email and plan, never a token
 
