@@ -185,7 +185,7 @@ const SETUP_KEY: &str = "setup";
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Stored {
     steps: Vec<StepRow>,
-    self_test: SelfTestState,
+    pub(crate) self_test: SelfTestState,
 }
 
 impl Default for Stored {
@@ -206,8 +206,10 @@ impl Default for Stored {
 /// First run's own state: what is stored, plus the settings values it follows (cached so a
 /// settings hook never takes the settings lock again).
 pub(crate) struct State {
-    stored: Stored,
-    offer_to_record: bool,
+    pub(crate) stored: Stored,
+    /// A self-test is running (shown, never stored).
+    pub(crate) self_test_running: bool,
+    pub(crate) offer_to_record: bool,
     call_display: Option<DisplayId>,
     /// An install waits for the capture to stop.
     install_pending: bool,
@@ -231,6 +233,7 @@ pub(crate) fn load(store: &Store, settings: &Settings) -> Result<State, CoreErro
         .unwrap_or_default();
     Ok(State {
         stored,
+        self_test_running: false,
         offer_to_record: settings.general.offer_to_record,
         call_display: settings.call_screen.display_id.clone(),
         install_pending: false,
@@ -307,8 +310,17 @@ impl Core {
     fn settings_section_changed(&self, section: &SettingsSection) {
         match section {
             SettingsSection::General(g) => {
-                lock(&self.first_run).offer_to_record = g.offer_to_record;
+                let self_test = {
+                    let mut fr = lock(&self.first_run);
+                    fr.offer_to_record = g.offer_to_record;
+                    fr.stored.self_test.clone()
+                };
                 self.apply_login_item(g.launch_at_login);
+                // The engine hears the new detection rule (settings never calls first run back).
+                let (on, _) = detection(g.offer_to_record, &self_test);
+                if let Some(core) = self.this() {
+                    tokio::spawn(async move { core.send_detection(on).await });
+                }
             }
             SettingsSection::CallScreen(c) => {
                 lock(&self.first_run).call_display = c.display_id.clone();
@@ -376,7 +388,11 @@ impl Core {
     pub(crate) fn refresh_setup(&self) {
         let (stored, offer, call_display) = {
             let s = lock(&self.first_run);
-            (s.stored.clone(), s.offer_to_record, s.call_display.clone())
+            let mut stored = s.stored.clone();
+            if s.self_test_running {
+                stored.self_test = SelfTestState::Running;
+            }
+            (stored, s.offer_to_record, s.call_display.clone())
         };
         // @cpt-begin:cpt-noter-algo-core-first-run-status:p1:inst-build-setup
         let (detection_enabled, incomplete) = detection(offer, &stored.self_test);
@@ -428,7 +444,7 @@ impl Core {
 
     /// Writes the stored setup state (never the settings revision).
     /// The caller holds the first-run lock across its read-modify-write.
-    fn store_setup(
+    pub(crate) fn store_setup(
         &self,
         ctx: &CommandCtx,
         before: &Stored,
@@ -471,6 +487,15 @@ impl Core {
         for row in stored.steps.iter_mut().filter(|r| r.step == args.step) {
             row.state = args.state;
         }
+        // @cpt-begin:cpt-noter-state-core-first-run-self-test:p1:inst-st-skipped
+        // Skipping the Permissions step before any self-test skips the test (detection stays off).
+        if args.step == SetupStep::Permissions
+            && args.state == StepState::Skipped
+            && stored.self_test == SelfTestState::NotRun
+        {
+            stored.self_test = SelfTestState::Skipped;
+        }
+        // @cpt-end:cpt-noter-state-core-first-run-self-test:p1:inst-st-skipped
         // @cpt-end:cpt-noter-flow-core-first-run-choices:p2:inst-choice-call
         self.store_setup(ctx, &state.stored, &stored, "setup_set_step")?;
         state.stored = stored;
@@ -560,9 +585,11 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-permission:p1:inst-permission-call
         // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-if-system-audio
         let state = if kind == PermissionKind::SystemAudio {
-            // shortcut: the prompt comes from the engine opening the tap (self_test with
-            // play_clip false, decision F1) in the self-test part; until then the inferred state.
+            // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio
+            // Decision F1: the engine opens the tap briefly; the state follows the self-test.
+            self.prompt_system_audio().await;
             system_audio(&lock(&self.first_run).stored.self_test)
+            // @cpt-end:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio
         } else {
             self.deps.native.request_permission(kind).await
         };

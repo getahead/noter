@@ -9,6 +9,7 @@ mod hotkeys;
 mod hub;
 mod log;
 mod models;
+mod self_test;
 mod settings;
 
 use std::path::Path;
@@ -73,6 +74,9 @@ pub struct CoreDeps {
     pub updater: Arc<dyn Updater>,
     /// Where model bundles go (the App Group container's `models/`); `<data>/models` if unset.
     pub models_dir: Option<std::path::PathBuf>,
+    /// Starts the engine (`ProcessLauncher` in the app, a scripted engine in the harness, S12).
+    pub engine: Arc<dyn noter_engine_client::EngineLauncher>,
+    pub engine_config: noter_engine_client::Config,
 }
 
 impl CoreDeps {
@@ -87,7 +91,19 @@ impl CoreDeps {
             models: Arc::new(first_run::NoModels),
             updater: Arc::new(first_run::NoUpdater),
             models_dir: None,
+            engine: Arc::new(self_test::NoEngine),
+            engine_config: noter_engine_client::Config::default(),
         }
+    }
+
+    pub fn with_engine(mut self, engine: Arc<dyn noter_engine_client::EngineLauncher>) -> Self {
+        self.engine = engine;
+        self
+    }
+
+    pub fn with_engine_config(mut self, config: noter_engine_client::Config) -> Self {
+        self.engine_config = config;
+        self
     }
 
     pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
@@ -165,6 +181,10 @@ pub struct Core {
     downloads: Mutex<models::Downloads>,
     /// This core, for the tasks first run spawns (set by `start_first_run`).
     this: std::sync::OnceLock<std::sync::Weak<Core>>,
+    /// The engine supervisor; the engine starts on first need.
+    engine: self_test::Engine,
+    /// The self-test's Channel messages.
+    self_test_hub: std::sync::OnceLock<Arc<StreamHub<SelfTestMsg>>>,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -204,6 +224,8 @@ impl Core {
             .clone()
             .unwrap_or_else(|| data_dir.join("models"));
         let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
+        let engine =
+            noter_engine_client::EngineClient::new(deps.engine.clone(), deps.engine_config.clone());
         let core = Core {
             deps,
             store,
@@ -217,6 +239,8 @@ impl Core {
             first_run: Mutex::new(first_run),
             downloads: Mutex::new(downloads),
             this: std::sync::OnceLock::new(),
+            engine,
+            self_test_hub: std::sync::OnceLock::new(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -228,6 +252,7 @@ impl Core {
         for hub in self.hubs() {
             hub.end_all(StreamEndReason::Shutdown);
         }
+        self.engine.shutdown().await;
         self.store.close();
     }
 
@@ -406,6 +431,15 @@ impl CoreApi for Core {
         args: PermissionArgs,
     ) -> Result<PermissionRow, CoreError> {
         self.request_permission(args).await
+    }
+
+    async fn self_test_run(
+        &self,
+        ctx: &CommandCtx,
+        args: SelfTestArgs,
+        channel: Sink<SelfTestMsg>,
+    ) -> Result<SubscriptionHandle, CoreError> {
+        self.start_self_test(ctx, args, channel)
     }
 
     async fn models_download(

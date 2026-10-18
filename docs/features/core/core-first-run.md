@@ -122,7 +122,7 @@ The user should finish setup in one sitting before the first real call, and call
 **Steps**:
 1. [x] - `p1` - API: `permission_request { kind }` from the First run, Settings or main window - `inst-permission-call`
 2. [x] - `p1` - **IF** `kind` is `system_audio` - `inst-if-system-audio`
-   1. [ ] - `p1` - Ask the engine to open the tap briefly so macOS shows its prompt; the state comes from the next self-test - `inst-system-audio`
+   1. [x] - `p1` - Ask the engine to open the tap briefly so macOS shows its prompt; the state comes from the next self-test - `inst-system-audio`
 3. [ ] - `p1` - **ELSE** ask through `noter-native` (AVCaptureDevice for the microphone, EventKit for the calendar, `UNUserNotificationCenter` for notifications, the screen-capture check, Apple Events for automation) - `inst-native-ask`
 4. [x] - `p1` - Update the permission row and emit `env:changed` and `setup:changed` with new versions - `inst-emit-permission`
 5. [x] - `p1` - **IF** the result is denied **RETURN** `permission_denied` - `inst-if-denied`
@@ -130,7 +130,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Run the self-test
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-first-run-self-test`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-first-run-self-test`
 
 **Actor**: Primary user (First run › Permissions, or Settings, or main)
 
@@ -143,13 +143,13 @@ The user should finish setup in one sitting before the first real call, and call
 - One stream is silent or only zeros arrive: `failed` with that reason; detection stays off; capture is still allowed.
 
 **Steps**:
-1. [ ] - `p1` - API: `self_test_run { play_clip }` with a Channel - `inst-self-test-call`
-2. [ ] - `p1` - **IF** the live model is missing **RETURN** `model_missing` - `inst-if-model-missing`
-3. [ ] - `p1` - Register a one-off subscription with the stream hub and **RETURN** its `SubscriptionHandle` - `inst-register-stream`
-4. [ ] - `p1` - Run the engine self-test (`cpt-noter-flow-core-engine-foundation-self-test`) and map its events to `SelfTestMsg`: `stream_arrived`, `levels`, `line`, then `passed` or `failed { reason }`, then `ended` - `inst-map-events`
-5. [ ] - `p1` - DB: store the `SelfTestState` (passed with its time, or failed with its reason) through the change-log write path - `inst-store-result`
-6. [ ] - `p1` - Apply `cpt-noter-algo-core-first-run-detection-rule` and tell the engine `set_detection` - `inst-apply-detection`
-7. [ ] - `p1` - Emit `setup:changed` - `inst-emit-setup`
+1. [x] - `p1` - API: `self_test_run { play_clip }` with a Channel - `inst-self-test-call`
+2. [x] - `p1` - **IF** the live model is missing **RETURN** `model_missing` - `inst-if-model-missing`
+3. [x] - `p1` - Register a one-off subscription with the stream hub and **RETURN** its `SubscriptionHandle` - `inst-register-stream`
+4. [x] - `p1` - Run the engine self-test (`cpt-noter-flow-core-engine-foundation-self-test`) and map its events to `SelfTestMsg`: `stream_arrived`, `levels`, `line`, then `passed` or `failed { reason }`, then `ended` - `inst-map-events`
+5. [x] - `p1` - DB: store the `SelfTestState` (passed with its time, or failed with its reason) through the change-log write path - `inst-store-result`
+6. [x] - `p1` - Apply `cpt-noter-algo-core-first-run-detection-rule` and tell the engine `set_detection` - `inst-apply-detection`
+7. [x] - `p1` - Emit `setup:changed` - `inst-emit-setup`
 
 ### Choose call display, audio storage and step states
 
@@ -272,18 +272,18 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Self-test
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-first-run-self-test`
+- [x] `p1` - **ID**: `cpt-noter-state-core-first-run-self-test`
 
 **States**: not_run, running, passed, failed, skipped
 
 **Initial State**: not_run
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** not_run **TO** running **WHEN** `self_test_run` starts - `inst-st-run`
-2. [ ] - `p1` - **FROM** running **TO** passed **WHEN** both channels delivered non-zero buffers within 10 s - `inst-st-passed`
-3. [ ] - `p1` - **FROM** running **TO** failed **WHEN** a stream stayed silent, only zeros arrived, own sounds leaked, a permission or the model was missing, or 10 s passed - `inst-st-failed-test`
-4. [ ] - `p1` - **FROM** failed **TO** running **WHEN** the user runs it again - `inst-st-rerun`
-5. [ ] - `p1` - **FROM** not_run **TO** skipped **WHEN** the user skips the step (detection stays off) - `inst-st-skipped`
+1. [x] - `p1` - **FROM** not_run **TO** running **WHEN** `self_test_run` starts - `inst-st-run`
+2. [x] - `p1` - **FROM** running **TO** passed **WHEN** both channels delivered non-zero buffers within 10 s - `inst-st-passed`
+3. [x] - `p1` - **FROM** running **TO** failed **WHEN** a stream stayed silent, only zeros arrived, own sounds leaked, a permission or the model was missing, or 10 s passed - `inst-st-failed-test`
+4. [x] - `p1` - **FROM** failed **TO** running **WHEN** the user runs it again - `inst-st-rerun`
+5. [x] - `p1` - **FROM** not_run **TO** skipped **WHEN** the user skips the step (detection stays off) - `inst-st-skipped`
 
 ## 5. Definitions of Done
 
@@ -334,7 +334,7 @@ The system **MUST** ask for a permission only from `permission_request`, report 
 
 ### Self-test and detection
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-first-run-self-test`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-self-test`
 
 The system **MUST** stream the self-test over a Channel (`stream_arrived`, `levels`, `line`, `passed` or `failed`, `ended`) within 10 s, store its result, and turn detection on only when **Offer to record** is on and the test passed; nothing in this feature can refuse or gate a capture start.
 
