@@ -20,6 +20,11 @@ use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 use noter_protocol::ipc::Sink;
 
+/// `~/Library/Application Support/Noter`: where the app keeps `noter.db` and `logs/`.
+pub fn default_data_dir() -> Option<std::path::PathBuf> {
+    noter_db::default_path()?.parent().map(Path::to_path_buf)
+}
+
 /// Time as the core sees it (a fixed clock in tests and the harness).
 pub trait Clock: Send + Sync {
     fn now(&self) -> TimestampMs;
