@@ -128,14 +128,14 @@ describe("typed errors of M0/M1 commands: code, detail and retryable as the core
     typed(refused(await screen.captureMarkMoment({ call_id: W.LIVE_CALL })), "not_recording");
   });
 
-  it("environment refusals: offline and not_ready are retryable, disk_full carries the space", async () => {
+  it("environment refusals: offline is retryable, a missing update is not_found (F3)", async () => {
     await s.change((w) => {
       W.firstRun(w, { modelsReady: false });
       w.app.environment.online = false;
       w.app.environment.update = null;
     });
     typed(refused(await s.core("first-run").modelsDownload({ action: "start" })), "offline");
-    typed(refused(await s.core("settings").updateInstall({})), "not_ready");
+    typed(refused(await s.core("settings").updateInstall({})), "not_found"); // F3: checked before the recording state
     await s.change((w) => (w.app.environment.update = { version: "1.0.1", notes_md: "Fixes.", ready: true }));
     ok(await s.core("settings").updateInstall({}));
   });
