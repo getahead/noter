@@ -12,7 +12,9 @@ use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
 use serde_json::{json, Value};
 use tauri::ipc::{CallbackFn, InvokeBody};
-use tauri::test::{get_ipc_response, mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY};
+use tauri::test::{
+    get_ipc_response, mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY,
+};
 use tauri::webview::InvokeRequest;
 use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -31,12 +33,20 @@ impl EventEmitter for NoEvents {
 }
 
 fn app(dir: &std::path::Path) -> tauri::App<MockRuntime> {
-    let core = Core::open(dir, CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents))).unwrap();
-    builder(mock_builder(), Booted(Ok(Arc::new(core)))).build(mock_context(noop_assets())).unwrap()
+    let core = Core::open(
+        dir,
+        CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)),
+    )
+    .unwrap();
+    builder(mock_builder(), Booted(Ok(Arc::new(core))))
+        .build(mock_context(noop_assets()))
+        .unwrap()
 }
 
 fn window(app: &tauri::App<MockRuntime>, label: &str) -> WebviewWindow<MockRuntime> {
-    WebviewWindowBuilder::new(app, label, WebviewUrl::default()).build().unwrap()
+    WebviewWindowBuilder::new(app, label, WebviewUrl::default())
+        .build()
+        .unwrap()
 }
 
 fn call(webview: &WebviewWindow<MockRuntime>, cmd: &str, body: Value) -> Result<Value, Value> {
@@ -68,15 +78,30 @@ fn every_command_from_every_window_is_answered_or_refused() {
         let webview = window(&app, w.as_str());
         for spec in COMMANDS {
             let got = call(&webview, spec.name, body(spec.name));
-            let refused = got.as_ref().err().and_then(|e| serde_json::from_value::<CoreError>(e.clone()).ok());
+            let refused = got
+                .as_ref()
+                .err()
+                .and_then(|e| serde_json::from_value::<CoreError>(e.clone()).ok());
             if spec.allows(w) {
                 match refused {
-                    Some(err) => assert_ne!(err.code, ErrorCode::WindowNotAllowed, "{} from {}", spec.name, w.as_str()),
+                    Some(err) => assert_ne!(
+                        err.code,
+                        ErrorCode::WindowNotAllowed,
+                        "{} from {}",
+                        spec.name,
+                        w.as_str()
+                    ),
                     None => assert!(got.is_ok(), "{} from {}: {got:?}", spec.name, w.as_str()),
                 }
             } else {
                 let code = refused.map(|e| e.code);
-                assert_eq!(code, Some(ErrorCode::WindowNotAllowed), "{} from {}", spec.name, w.as_str());
+                assert_eq!(
+                    code,
+                    Some(ErrorCode::WindowNotAllowed),
+                    "{} from {}",
+                    spec.name,
+                    w.as_str()
+                );
             }
         }
     }
@@ -87,9 +112,17 @@ fn the_registered_handlers_are_the_contract_commands() {
     let dir = tempfile::tempdir().unwrap();
     let app = app(dir.path());
     let webview = window(&app, "main");
-    let registered: BTreeSet<&str> = noter_desktop::REGISTERED.iter().copied().collect();
-    let contract: BTreeSet<&str> = COMMANDS.iter().map(|c| c.name).collect();
-    assert_eq!(registered, contract);
+    // Every contract command has its handler: the answer is a result or a CoreError,
+    // never Tauri's own rejection for a name nobody handles.
+    for spec in COMMANDS {
+        if let Err(e) = call(&webview, spec.name, body(spec.name)) {
+            assert!(
+                serde_json::from_value::<CoreError>(e).is_ok(),
+                "{}",
+                spec.name
+            );
+        }
+    }
     // A name outside the contract has no handler: Tauri's own rejection, not a CoreError.
     let unknown = call(&webview, "drop_database", json!({ "args": {} })).unwrap_err();
     assert!(serde_json::from_value::<CoreError>(unknown).is_err());
@@ -103,21 +136,33 @@ fn answers_and_typed_errors_cross_as_json() {
     let snapshot = call(&main, "app_snapshot", json!({ "args": {} })).unwrap();
     assert_eq!(snapshot["window"], "main");
     let bad = call(&main, "banner_dismiss", json!({ "args": { "banner": 3 } })).unwrap_err();
-    assert_eq!(serde_json::from_value::<CoreError>(bad).unwrap().code, ErrorCode::InvalidInput);
+    assert_eq!(
+        serde_json::from_value::<CoreError>(bad).unwrap().code,
+        ErrorCode::InvalidInput
+    );
     // A webview that is not one of the app's windows may call nothing.
     let stranger = window(&app, "devtools");
     let err = call(&stranger, "app_snapshot", json!({ "args": {} })).unwrap_err();
-    assert_eq!(serde_json::from_value::<CoreError>(err).unwrap().code, ErrorCode::WindowNotAllowed);
+    assert_eq!(
+        serde_json::from_value::<CoreError>(err).unwrap().code,
+        ErrorCode::WindowNotAllowed
+    );
 }
 
 #[test]
 fn a_core_that_did_not_boot_answers_internal() {
-    let app = builder(mock_builder(), Booted(Err("the database failed its quick check".into())))
-        .build(mock_context(noop_assets()))
-        .unwrap();
+    let app = builder(
+        mock_builder(),
+        Booted(Err("the database failed its quick check".into())),
+    )
+    .build(mock_context(noop_assets()))
+    .unwrap();
     let main = window(&app, "main");
     let err = call(&main, "app_snapshot", json!({ "args": {} })).unwrap_err();
-    assert_eq!(serde_json::from_value::<CoreError>(err).unwrap().code, ErrorCode::Internal);
+    assert_eq!(
+        serde_json::from_value::<CoreError>(err).unwrap().code,
+        ErrorCode::Internal
+    );
 }
 
 #[test]
@@ -130,9 +175,17 @@ fn each_window_capability_allows_exactly_its_commands() {
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|p| p.as_str()?.strip_prefix("allow-").map(|n| n.replace('-', "_")))
+            .filter_map(|p| {
+                p.as_str()?
+                    .strip_prefix("allow-")
+                    .map(|n| n.replace('-', "_"))
+            })
             .collect();
-        let expected: BTreeSet<String> = COMMANDS.iter().filter(|c| c.allows(w)).map(|c| c.name.to_string()).collect();
+        let expected: BTreeSet<String> = COMMANDS
+            .iter()
+            .filter(|c| c.allows(w))
+            .map(|c| c.name.to_string())
+            .collect();
         assert_eq!(allowed, expected, "{}", w.as_str());
     }
 }

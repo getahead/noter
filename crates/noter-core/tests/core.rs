@@ -351,3 +351,13 @@ async fn the_snapshot_carries_the_app_version_the_host_gives() {
         .unwrap();
     assert_eq!(snap.app_version, "0.2.0");
 }
+
+#[test]
+fn the_app_keeps_its_data_under_application_support() {
+    let dir = noter_core::default_data_dir().expect("HOME is set");
+    assert!(
+        dir.ends_with("Library/Application Support/Noter"),
+        "{}",
+        dir.display()
+    );
+}
