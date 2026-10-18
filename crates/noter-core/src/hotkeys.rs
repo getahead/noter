@@ -5,10 +5,10 @@
 use std::sync::MutexGuard;
 
 use noter_protocol::error::ValidationRule;
-use noter_protocol::ipc::{event_names, CommandCtx};
+use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, NativeSurface};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 
 use crate::settings::{current_rev, default_card_keys, invalid, put, section_of};
 use crate::{internal, lock, Core};
@@ -411,6 +411,85 @@ impl Core {
     }
 }
 
+impl Core {
+    /// What a pressed hotkey asks of the core: its action's command and arguments, called as
+    /// `Caller::Native { surface: hotkey }`. Keys that act on the recorded call answer
+    /// `not_recording` while nothing is recorded.
+    // @cpt-dod:cpt-noter-dod-core-settings-hotkeys:p1
+    pub fn hotkey_command(
+        &self,
+        chord: &str,
+    ) -> Result<(CommandCtx, &'static str, Value), CoreError> {
+        let pressed = parse(chord);
+        let action = lock(&self.hotkeys)
+            .bindings
+            .iter()
+            .find(|b| b.shortcut.as_deref().map(parse) == Some(pressed.clone()))
+            .map(|b| b.action)
+            .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "no hotkey for this chord"))?;
+        let app = self.app();
+        let recording = matches!(
+            app.capture.phase,
+            CapturePhase::Starting | CapturePhase::Recording | CapturePhase::Paused
+        );
+        let live = app.capture.call_id.clone().filter(|_| recording);
+        let paused = app.capture.phase == CapturePhase::Paused;
+        let hidden = app.presenting.hidden;
+        drop(app);
+        let call = || {
+            live.clone()
+                .ok_or_else(|| CoreError::new(ErrorCode::NotRecording, action_name(action)))
+        };
+        let (command, args) = match action {
+            HotkeyAction::StartStop => match &live {
+                Some(call_id) => ("capture_stop", json!({ "call_id": call_id })),
+                None => (
+                    "capture_start",
+                    json!({ "source": "hotkey", "sensitive": false }),
+                ),
+            },
+            HotkeyAction::Pause => (
+                "capture_set_paused",
+                json!({ "call_id": call()?, "paused": !paused }),
+            ),
+            HotkeyAction::MarkMoment => ("capture_mark_moment", json!({ "call_id": call()? })),
+            HotkeyAction::CatchMeUp => ("copilot_catch_up", json!({ "call_id": call()? })),
+            // shortcut: the key only mutes; the contract has no unmute command yet (copilot, M4).
+            HotkeyAction::MuteCopilot => (
+                "copilot_mute",
+                json!({ "call_id": call()?, "scope": { "type": "this_call" } }),
+            ),
+            HotkeyAction::UndoCardAction => ("card_undo_last", json!({ "call_id": call()? })),
+            HotkeyAction::OpenCallScreen => ("window_show_call", json!({})),
+            HotkeyAction::HideForPresenting => (
+                "app_set_hidden_for_presenting",
+                json!({ "hidden": !hidden }),
+            ),
+            HotkeyAction::AskAboutCall => {
+                return Err(CoreError::new(
+                    ErrorCode::NotImplemented,
+                    "ask_about_call: the Ask panel comes with M3",
+                ));
+            }
+        };
+        Ok((
+            CommandCtx {
+                caller: Caller::Native {
+                    surface: NativeSurface::Hotkey,
+                },
+            },
+            command,
+            args,
+        ))
+    }
+
+    /// A pressed hotkey (the host's global-shortcut handler): its command through the core.
+    pub async fn hotkey_pressed(&self, chord: &str) -> Result<Value, CoreError> {
+        let (ctx, command, args) = self.hotkey_command(chord)?;
+        dispatch_json(self, &ctx, command, args, None).await
+    }
+}
+
 /// A chord macOS accepted: from not_set, from a conflict, or a new chord over a registered one.
 fn registered_from(old: &HotkeyStatus) -> HotkeyStatus {
     match old {
@@ -442,4 +521,65 @@ impl crate::app::WholeState for HotkeyList {
 
 pub(crate) fn fresh_list() -> HotkeyList {
     default_list(StateVersion(1))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::{CoreDeps, EventEmitter, SystemClock};
+
+    struct Quiet;
+
+    impl EventEmitter for Quiet {
+        fn emit(&self, _: &'static str, _: Value) {}
+    }
+
+    #[test]
+    fn the_call_keys_act_on_the_recorded_call() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Core::open(
+            dir.path(),
+            CoreDeps::new(Arc::new(SystemClock), Arc::new(Quiet)),
+        )
+        .unwrap();
+        {
+            let mut app = core.app();
+            app.capture.phase = CapturePhase::Paused;
+            app.capture.call_id = Some(CallId::new("call_live"));
+            app.presenting.hidden = true;
+        }
+        let command = |chord: &str| core.hotkey_command(chord).map(|(_, c, a)| (c, a)).unwrap();
+        let call = json!("call_live");
+        assert_eq!(
+            command("Ctrl+Alt+Super+R"),
+            ("capture_stop", json!({ "call_id": call }))
+        );
+        assert_eq!(
+            command("Ctrl+Alt+Super+P"),
+            (
+                "capture_set_paused",
+                json!({ "call_id": call, "paused": false })
+            )
+        );
+        assert_eq!(
+            command("Ctrl+Alt+Super+M"),
+            ("capture_mark_moment", json!({ "call_id": call }))
+        );
+        assert_eq!(
+            command("Ctrl+Alt+Super+C"),
+            ("copilot_catch_up", json!({ "call_id": call }))
+        );
+        let mute = json!({ "call_id": call, "scope": { "type": "this_call" } });
+        assert_eq!(command("Ctrl+Alt+Super+K"), ("copilot_mute", mute));
+        assert_eq!(
+            command("Ctrl+Alt+Super+Z"),
+            ("card_undo_last", json!({ "call_id": call }))
+        );
+        assert_eq!(
+            command("Ctrl+Alt+Super+0"),
+            ("app_set_hidden_for_presenting", json!({ "hidden": false }))
+        );
+    }
 }
