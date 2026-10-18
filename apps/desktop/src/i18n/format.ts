@@ -76,12 +76,18 @@ export const quote = (text: string, lang: string): Quoted => ({ quoted: `“${te
 // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-quote-user-text
 
 // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
-export const formatDateTime = (ms: number, prefs: UiPrefs): string =>
-  new Intl.DateTimeFormat(locale(), { dateStyle: "medium", timeStyle: "short", hourCycle: prefs.time_format === "h12" ? "h12" : "h23", timeZone: prefs.time_zone }).format(ms);
+export const formatDateTime = (ms: number, prefs: UiPrefs): string => {
+  const o: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short", hourCycle: prefs.time_format === "h12" ? "h12" : "h23" };
+  try {
+    return new Intl.DateTimeFormat(locale(), { ...o, timeZone: prefs.time_zone || undefined }).format(ms);
+  } catch {
+    return new Intl.DateTimeFormat(locale(), o).format(ms); // a zone this WebView does not know: the system zone
+  }
+};
 
 /** Call-relative time, always HH:MM:SS. */
 export const callTime = (seconds: number): string => {
-  const s = Math.floor(seconds);
+  const s = Math.max(0, Math.floor(seconds) || 0);
   return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map((n) => String(n).padStart(2, "0")).join(":");
 };
 

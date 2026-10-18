@@ -54,7 +54,21 @@ export function nextFocusable<T>(candidates: T[], current: unknown, back: boolea
 const shown = (el: Element) =>
   !el.closest("[inert],[hidden]") && el.getClientRects().length > 0 && el.ownerDocument?.defaultView?.getComputedStyle(el).visibility !== "hidden";
 
-const focusables = (scope: ParentNode) => [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(shown);
+const isRadio = (el: HTMLElement): el is HTMLInputElement => (el as HTMLInputElement).type === "radio" && !!(el as HTMLInputElement).name;
+
+/** A radio group is one Tab stop, as natively: its checked radio, else its first. */
+function oneStopPerRadioGroup(list: HTMLElement[]): HTMLElement[] {
+  const checked = new Set(list.filter((el) => isRadio(el) && el.checked).map((el) => (el as HTMLInputElement).name));
+  const seen = new Set<string>();
+  return list.filter((el) => {
+    if (!isRadio(el)) return true;
+    if (checked.has(el.name) ? !el.checked : seen.has(el.name)) return false;
+    seen.add(el.name);
+    return true;
+  });
+}
+
+const focusables = (scope: ParentNode) => oneStopPerRadioGroup([...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(shown));
 
 /** Tab and ⇧Tab move through every control; inside an open sheet focus stays in it. */
 export function installTabNavigation(root: Document): () => void {
@@ -128,7 +142,11 @@ export function useFocusReturn(open: boolean, overlayRef: RefObject<HTMLElement 
     const fr = createFocusReturn(() => document.activeElement as HTMLElement | null);
     fr.open(overlayRef.current ? focusables(overlayRef.current)[0] : undefined);
     const top = () => overlays.at(-1) === me;
-    const key = (e: KeyboardEvent) => top() && e.key === "Escape" && close.current();
+    const key = (e: KeyboardEvent) => {
+      if (!top() || e.key !== "Escape") return;
+      e.stopPropagation(); // window shortcuts never see the Esc that closed the overlay
+      close.current();
+    };
     const press = (e: PointerEvent) => top() && !overlayRef.current?.contains(e.target as Node) && close.current();
     document.addEventListener("keydown", key);
     document.addEventListener("pointerdown", press);

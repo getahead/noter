@@ -135,6 +135,19 @@ describe("installTabNavigation", () => {
     expect(focus.active).toBe(s1);
   });
 
+  it("stops once per radio group: on its checked radio, else its first", () => {
+    const radio = (name: string, group: string, checked = false) => Object.assign(el(name), { type: "radio", name: group, checked });
+    const [a, r1, r2, s1, s2, b] = [el("a"), radio("r1", "g"), radio("r2", "g", true), radio("s1", "h"), radio("s2", "h"), el("b")];
+    const { doc, l } = fakeDoc({ page: [a, r1, r2, s1, s2, b], active: a });
+    installTabNavigation(doc);
+    l.keydown!(tab() as never);
+    expect(focus.active).toBe(r2);
+    l.keydown!(tab() as never);
+    expect(focus.active).toBe(s1);
+    l.keydown!(tab() as never);
+    expect(focus.active).toBe(b);
+  });
+
   it("leaves a Tab that another handler already took", () => {
     const [a, b] = [el("a"), el("b")];
     const { doc, l } = fakeDoc({ page: [a, b], active: a });

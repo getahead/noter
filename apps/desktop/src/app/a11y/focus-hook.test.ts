@@ -39,7 +39,9 @@ describe("useFocusReturn", () => {
     t.l.keydown!({ key: "a" });
     t.l.pointerdown!({ target: t.inside });
     expect(t.onClose).not.toHaveBeenCalled();
-    t.l.keydown!({ key: "Escape" });
+    const esc = { key: "Escape", stopPropagation: vi.fn() };
+    t.l.keydown!(esc);
+    expect(esc.stopPropagation).toHaveBeenCalled(); // window shortcuts never see the Esc that closed the overlay
     t.l.pointerdown!({ target: {} });
     expect(t.onClose).toHaveBeenCalledTimes(2);
     cleanup();
@@ -54,13 +56,13 @@ describe("useFocusReturn", () => {
     const sheetPress = sheet.l.pointerdown!;
     const menu = setup(true);
     const closeMenu = menu.run()!;
-    sheetKey({ key: "Escape" });
+    sheetKey({ key: "Escape", stopPropagation: vi.fn() });
     sheetPress({ target: {} });
-    menu.l.keydown!({ key: "Escape" });
+    menu.l.keydown!({ key: "Escape", stopPropagation: vi.fn() });
     expect(sheet.onClose).not.toHaveBeenCalled();
     expect(menu.onClose).toHaveBeenCalledTimes(1);
     closeMenu();
-    sheetKey({ key: "Escape" });
+    sheetKey({ key: "Escape", stopPropagation: vi.fn() });
     expect(sheet.onClose).toHaveBeenCalledTimes(1);
     closeSheet();
   });

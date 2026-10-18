@@ -4,14 +4,14 @@ import { useEffect } from "react";
 /** Chord string → action, e.g. "KeyA", "Meta+KeyF", "Control+Alt+Meta+KeyR" (modifier order: Control, Alt, Shift, Meta). */
 export type ShortcutTable = Record<string, () => void>;
 
-type Mods = Pick<KeyboardEvent, "code" | "ctrlKey" | "altKey" | "shiftKey" | "metaKey">;
+type Mods = Pick<KeyboardEvent, "code" | "ctrlKey" | "altKey" | "shiftKey" | "metaKey"> & Partial<Pick<KeyboardEvent, "isComposing" | "repeat">>;
 export type ShortcutEvent = Mods & { target: EventTarget | null; preventDefault(): void; stopPropagation(): void };
 
 export function chord(e: Mods): string {
   return [e.ctrlKey && "Control", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Meta", e.code].filter(Boolean).join("+");
 }
 
-const TEXT_INPUTS = new Set(["", "text", "search", "email", "url", "tel", "password", "number"]);
+const TEXT_INPUTS = new Set(["", "text", "search", "email", "url", "tel", "password", "number", "date", "time", "datetime-local", "month", "week"]);
 
 export function isTyping(target: EventTarget | null): boolean {
   const el = target as Partial<HTMLInputElement> | null;
@@ -26,7 +26,8 @@ export function matchShortcut(e: Mods & { target: EventTarget | null }, tables: 
   const key = chord(e);
   // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-physical-key:p1:inst-read-code
   // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-physical-key:p1:inst-if-typing
-  if (isTyping(e.target) && !e.metaKey && !e.ctrlKey) {
+  // An IME composing a character, or a held key repeating, is typing too.
+  if (e.isComposing || e.repeat || (isTyping(e.target) && !e.metaKey && !e.ctrlKey)) {
     // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-physical-key:p1:inst-return-typing
     return null;
     // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-physical-key:p1:inst-return-typing

@@ -64,6 +64,8 @@ describe("value helpers", () => {
   it("callTime is always HH:MM:SS", () => {
     expect(callTime(0)).toBe("00:00:00");
     expect(callTime(3725.9)).toBe("01:02:05");
+    expect(callTime(-5)).toBe("00:00:00");
+    expect(callTime(Number.NaN)).toBe("00:00:00");
   });
   it("duration is a short localised duration", () => {
     expect(duration(2880)).toBe("48 min");
@@ -77,6 +79,9 @@ describe("value helpers", () => {
     const ms = Date.UTC(2026, 9, 18, 15, 30);
     expect(formatDateTime(ms, { time_format: "h12", first_weekday: 1, time_zone: "UTC" })).toMatch(/3:30\sPM/);
     expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "UTC" })).toContain("15:30");
+    // a zone the core sent that this WebView does not know falls back to the system zone instead of throwing
+    expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "Not/AZone" })).toMatch(/\d\d:30/);
+    expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "" })).toMatch(/\d\d:30/);
   });
   it("the catalogue has an entry for each v1 string", () => {
     expect(Object.keys(en)).toHaveLength(7);

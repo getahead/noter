@@ -43,6 +43,17 @@ describe("matchShortcut", () => {
     expect(matchShortcut(ev("KeyF", { target: input, metaKey: true }), [{ "Meta+KeyF": a }])).toBe(a);
     expect(matchShortcut(ev("KeyF", { target: input, ctrlKey: true }), [{ "Control+KeyF": a }])).toBe(a);
   });
+  it("treats date and time fields as typing", () => {
+    for (const type of ["date", "time", "datetime-local", "month", "week"])
+      expect(matchShortcut(ev("KeyA", { target: { tagName: "INPUT", type } as never }), [{ KeyA: vi.fn() }])).toBeNull();
+  });
+
+  it("ignores IME composition and key repeat", () => {
+    const table = { KeyA: vi.fn() };
+    expect(matchShortcut(ev("KeyA", { isComposing: true }), [table])).toBeNull();
+    expect(matchShortcut(ev("KeyA", { repeat: true }), [table])).toBeNull();
+  });
+
   it("prefers the region table over the window table, and returns null on no match", () => {
     expect(matchShortcut(ev("KeyA"), [{ KeyA: a }, { KeyA: z }])).toBe(a);
     expect(matchShortcut(ev("KeyA"), [{}, { KeyA: z }])).toBe(z);
