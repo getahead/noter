@@ -44,8 +44,6 @@ pub struct Harness {
     dir: PathBuf,
 }
 
-// @cpt-algo:cpt-noter-algo-core-harness-boot:p1
-// @cpt-dod:cpt-noter-dod-core-harness-fixture:p1
 impl Harness {
     /// Boots the core; `Err` with the reason when the data folder or the store cannot open.
     pub async fn start(options: Options, lines: Lines) -> Result<Arc<Harness>, String> {
@@ -64,7 +62,6 @@ impl Harness {
         } else {
             blank(world())
         };
-        // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-inject
         let native = Arc::new(ScriptedNative::new(&w.app.environment));
         let updater = Arc::new(ScriptedUpdater(Mutex::new(
             w.app.environment.update.clone(),
@@ -82,7 +79,6 @@ impl Harness {
             .with_native(native.clone())
             .with_models(models)
             .with_updater(updater.clone());
-        // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-inject
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
         let core = Arc::new(Core::open(&dir, deps).map_err(|e| e.to_string())?);
