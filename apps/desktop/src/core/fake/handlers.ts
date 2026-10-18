@@ -1329,7 +1329,7 @@ export const defaultHandlers: Handlers = {
     capture_test: !a.run_capture_test ? { type: "not_run" } : live(world.app.capture) ? { type: "blocked_by_call" } : { type: "passed", at: now() },
   }),
   update_install: (_a, { world }) => {
-    if (!world.app.environment.update?.ready) throw coreError("not_ready", "no downloaded update");
+    if (!world.app.environment.update?.ready) throw coreError("not_found", "no update is ready"); // F3: before the recording state
     return ack;
   },
   accounts_get: (_a, { world }) => world.app.accounts,
