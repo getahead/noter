@@ -81,6 +81,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           node: "false"
+          cache: "false" # only `cargo metadata --no-deps`; nothing to build
       - run: just arch
       - name: Trace coverage (never lower than main)
         run: just trace
