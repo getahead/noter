@@ -2,6 +2,7 @@
 // `not_implemented` only while the milestone that delivers it is later than the current one
 // (harness/harness.toml); such commands are listed as pending in the run summary, by milestone,
 // with the count of commands the core answers. Any other `not_implemented` fails, naming it.
+// @cpt-flow:cpt-noter-flow-core-contract-conformance:p1
 import { afterAll, describe, expect, it } from "vitest";
 
 import { COMMANDS, type CommandName, type WindowLabel } from "../../src/core/bindings";
@@ -29,13 +30,23 @@ describe("commands the core does not answer yet", () => {
       (e) => (e as { code?: string } | null)?.code,
     );
     if (code !== "not_implemented") return;
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-if-differs
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
     expect(isLater(name), `${name} answers not_implemented, but ${milestoneOf(name)} is not after the current ${CURRENT}`).toBe(true);
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-if-differs
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-if-later
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-record-pending
     const m = milestoneOf(name)!;
     pending.set(m, [...(pending.get(m) ?? []), name]);
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-record-pending
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-if-later
   });
 
   afterAll(() => {
     const unanswered = [...pending.values()].reduce((n, cmds) => n + cmds.length, 0);
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-return-conformance
     summary(target, names.length - unanswered, names.length, pending);
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-return-conformance
   });
 });
