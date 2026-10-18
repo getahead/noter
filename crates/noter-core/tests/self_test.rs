@@ -289,17 +289,27 @@ async fn only_zeros_and_one_silent_stream_fail_with_their_reasons() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn an_engine_that_never_answers_times_out() {
     let dir = tempfile::tempdir().unwrap();
-    let r = open(
-        dir.path(),
-        ScriptedEngine::new().with_default(Behaviour {
-            hang: true,
-            ..Behaviour::default()
-        }),
-        PermissionState::Granted,
-        None,
-    );
-    // Shortened by the core's test hook would hide the real path; the engine answers nothing,
-    // so the supervisor's command timeout ends it.
+    let engine = ScriptedEngine::new().with_default(Behaviour {
+        hang: true,
+        ..Behaviour::default()
+    });
+    let mac = Mac::default();
+    mac.states
+        .lock()
+        .unwrap()
+        .insert(PermissionKind::Microphone, PermissionState::Granted);
+    let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        .with_native(Arc::new(mac))
+        .with_engine(launcher)
+        .with_engine_config(noter_engine_client::Config {
+            command_timeout: Duration::from_millis(200),
+            ping_timeout: Duration::from_millis(100),
+            ..noter_engine_client::Config::default()
+        });
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    let r = Run { core, engine };
     let (_, events) = run_to_end(&r, false).await;
     assert_eq!(failed(&events), Some(SelfTestFailure::TimedOut));
 }
