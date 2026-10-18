@@ -246,12 +246,18 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
       w.app.setup.steps.find((s) => s.step === "models")!.state = "done";
     });
     const fr = scenario.core("first-run");
-    ok(await fr.modelsDownload({ action: "resume" }));
+    const speechState = async () => ok(await fr.setupStatus({})).models.bundles.find((b) => b.required_for_capture)?.state;
 
+    // D-21: Run Test waits for the speech model; the core refuses before the Channel opens.
     const run: SelfTestMsg[] = [];
-    ok(await fr.selfTestRun({ play_clip: false }, (m) => run.push(m))); // Waiting for the speech model · 62 %
+    expect(refused(await fr.selfTestRun({ play_clip: false }, (m) => run.push(m))).code).toBe("model_missing"); // Waiting for the speech model · 62 %
+    expect(run).toEqual([]);
+    expect(await speechState()).not.toBe("ready");
+
+    ok(await fr.modelsDownload({ action: "resume" }));
+    await until(async () => (await speechState()) === "ready", "the speech model in place", 10_000);
+    ok(await fr.selfTestRun({ play_clip: false }, (m) => run.push(m)));
     await until(() => run.some((m) => m.event.type === "passed"), "Self-test passed once the model is in", 10_000);
     expect(run.some((m) => m.event.type === "failed")).toBe(false);
-    expect(ok(await fr.setupStatus({})).models.bundles.find((b) => b.required_for_capture)?.state).toBe("ready");
   });
 });
