@@ -166,7 +166,7 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 ### Wire format
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-harness-wire`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-harness-wire`
 
 The system **MUST** speak exactly the request, result, error, channel-message and event lines of docs/HARNESS.md, apply the `window` field as the IPC host applies a window label, write Channel messages only after the result of their subscribing command, and write nothing but protocol lines to stdout (logs go to stderr).
 
