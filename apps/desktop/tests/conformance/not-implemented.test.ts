@@ -17,7 +17,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { COMMANDS, type CommandName, type WindowLabel } from "../../src/core/bindings";
-import { exercised, target } from "../support/core";
+import { target } from "../support/core";
 import { openScenario } from "../support/scenario";
 import { EXAMPLE_ARGS } from "./example-args";
 import { CURRENT, isLater, milestoneOf, ORDER, summary } from "./milestones";
@@ -41,7 +41,7 @@ describe("commands the core does not answer yet", () => {
   });
 
   it.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
-    const s = openScenario({ alsoRecord: exercised });
+    const s = openScenario(); // not recorded: the probe asserts no behaviour, so it must not count toward the E2E command gate
     const client = s.core(COMMANDS[name].windows[0] as WindowLabel) as unknown as Record<string, (a: unknown, m?: unknown) => Promise<{ status: string; error?: { code: string } }>>;
     const method = name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
     const res = await client[method](EXAMPLE_ARGS[name], COMMANDS[name].channel ? () => {} : undefined).finally(() => s.dispose());
