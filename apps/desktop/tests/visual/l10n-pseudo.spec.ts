@@ -11,7 +11,8 @@ for (const label of COMMANDS.app_snapshot.windows) {
   for (const mode of ["cyrillic", "german"]) {
     test(`${label} in ${mode} pseudo-localisation shows no truncated label`, async ({ page }) => {
       await page.goto(`/?window=${label}&pseudo=${mode}`);
-      await page.waitForSelector('[data-region="window"][data-state="ready"]');
+      // attached, not visible: a window whose screens are not built yet has no size
+      await page.waitForSelector('[data-region="window"][data-state="ready"]', { state: "attached" });
       const truncated = await page.$$eval(TRUNCATABLE, (els) =>
         els.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => (el.textContent ?? "").trim() || el.getAttribute("aria-label") || el.tagName),
       );
