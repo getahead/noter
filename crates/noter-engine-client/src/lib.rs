@@ -41,6 +41,10 @@ pub struct Config {
     pub failed_start_window: Duration,
     /// First restart delay; doubles per failed restart, up to five minutes.
     pub restart_backoff: Duration,
+    /// How long a command waits for its `ack` or `error` before the engine is pinged.
+    pub command_timeout: Duration,
+    /// How often the liveness task pings a ready engine.
+    pub liveness_interval: Duration,
 }
 
 impl Default for Config {
@@ -52,6 +56,8 @@ impl Default for Config {
             max_failed_starts: 3,
             failed_start_window: Duration::from_secs(60),
             restart_backoff: Duration::from_millis(500),
+            command_timeout: Duration::from_secs(10),
+            liveness_interval: Duration::from_secs(5),
         }
     }
 }
@@ -103,7 +109,14 @@ impl From<CommandError> for CoreError {
         match e {
             CommandError::Unavailable => unavailable("engine unavailable"),
             CommandError::Engine { code, message } => {
-                CoreError::new(ErrorCode::Internal, format!("engine {code:?}: {message}"))
+                // The contract's code where it has one; the rest are the engine's bugs.
+                let typed = match code {
+                    EngineErrorCode::PermissionMissing => ErrorCode::PermissionMissing,
+                    EngineErrorCode::ModelMissing => ErrorCode::ModelMissing,
+                    EngineErrorCode::DiskFull => ErrorCode::DiskFull,
+                    _ => ErrorCode::Internal,
+                };
+                CoreError::new(typed, format!("engine {code:?}: {message}"))
             }
         }
     }
@@ -312,6 +325,7 @@ impl<L: EngineLauncher> EngineClient<L> {
         };
         let _ = write_line(&mut *c.stdin, self.next_id(), cmd).await;
         // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-set-detection
+        self.spawn_liveness(generation);
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-return-ready
         Ok(info)
         // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-return-ready
@@ -355,7 +369,15 @@ impl<L: EngineLauncher> EngineClient<L> {
                 return Err(CommandError::Unavailable);
             }
         }
-        rx.await.unwrap_or(Err(CommandError::Unavailable))
+        match timeout(self.inner.config.command_timeout, rx).await {
+            Ok(reply) => reply.unwrap_or(Err(CommandError::Unavailable)),
+            Err(_) => {
+                // No reply in time: a missed ping ends this engine and restarts it.
+                self.shared().pending.remove(&id);
+                let _ = self.ping().await;
+                Err(CommandError::Unavailable)
+            }
+        }
     }
 
     /// Liveness: `ping` must be answered by `pong` in time, or the engine is restarted.
@@ -520,6 +542,26 @@ impl<L: EngineLauncher> EngineClient<L> {
         if restart {
             tokio::spawn(self.clone().restart());
         }
+    }
+
+    /// The supervisor schedules liveness itself: while this engine is ready it is pinged every
+    /// `liveness_interval`; a missed ping ends it and the restart takes over.
+    fn spawn_liveness(&self, generation: u64) {
+        let client = self.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(client.inner.config.liveness_interval).await;
+                {
+                    let s = client.shared();
+                    if s.state != EngineState::Ready || s.generation != generation {
+                        return;
+                    }
+                }
+                if client.ping().await.is_err() {
+                    return;
+                }
+            }
+        });
     }
 
     // @cpt-begin:cpt-noter-algo-core-engine-foundation-restart:p1:inst-backoff
