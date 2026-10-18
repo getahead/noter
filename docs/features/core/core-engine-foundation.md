@@ -77,7 +77,7 @@ First run needs a self-test that proves both streams arrive, and everything afte
 
 ### Start the engine
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-foundation-start`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-foundation-start`
 
 **Actor**: Engine supervisor (core)
 
@@ -90,14 +90,14 @@ First run needs a self-test that proves both streams arrive, and everything afte
 - No `ready` within the start timeout: the process is killed and counted as a failed start.
 
 **Steps**:
-1. [ ] - `p1` - Resolve the engine path (bundle, or `NOTER_ENGINE_PATH` in development) and the App Group container - `inst-resolve`
-2. [ ] - `p1` - Spawn with `tokio::process`, stdin and stdout piped, stderr to the log; pass the App Group container; never a database or network path - `inst-spawn`
-3. [ ] - `p1` - Start the reader task with `cpt-noter-algo-core-engine-foundation-read-events` - `inst-reader`
-4. [ ] - `p1` - Wait for `ready { protocol_version, engine_version, models, sandboxed }` - `inst-wait-ready`
-5. [ ] - `p1` - **IF** the major of `protocol_version` differs from `ENGINE_PROTOCOL_VERSION` - `inst-if-major`
-   1. [ ] - `p1` - Send `shutdown`, kill after a grace period, **RETURN** `engine_unavailable` - `inst-return-major`
-6. [ ] - `p1` - Send `set_detection` with the current detection rule (off until the self-test passed) - `inst-set-detection`
-7. [ ] - `p1` - **RETURN** a ready engine handle - `inst-return-ready`
+1. [x] - `p1` - Resolve the engine path (bundle, or `NOTER_ENGINE_PATH` in development) and the App Group container - `inst-resolve`
+2. [x] - `p1` - Spawn with `tokio::process`, stdin and stdout piped, stderr to the log; pass the App Group container; never a database or network path - `inst-spawn`
+3. [x] - `p1` - Start the reader task with `cpt-noter-algo-core-engine-foundation-read-events` - `inst-reader`
+4. [x] - `p1` - Wait for `ready { protocol_version, engine_version, models, sandboxed }` - `inst-wait-ready`
+5. [x] - `p1` - **IF** the major of `protocol_version` differs from `ENGINE_PROTOCOL_VERSION` - `inst-if-major`
+   1. [x] - `p1` - Send `shutdown`, kill after a grace period, **RETURN** `engine_unavailable` - `inst-return-major`
+6. [x] - `p1` - Send `set_detection` with the current detection rule (off until the self-test passed) - `inst-set-detection`
+7. [x] - `p1` - **RETURN** a ready engine handle - `inst-return-ready`
 
 ### Run the engine self-test
 
@@ -164,20 +164,20 @@ First run needs a self-test that proves both streams arrive, and everything afte
 
 ### Read engine events
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-foundation-read-events`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-foundation-read-events`
 
 **Input**: The engine's stdout, one `EngineEventLine { seq, at, event }` per line.
 
 **Output**: Events routed to their consumer; gaps and protocol errors reported.
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** line - `inst-for-lines`
-   1. [ ] - `p1` - Parse it; a line that does not parse is logged (without content) and counted - `inst-parse-event`
-   2. [ ] - `p1` - **IF** `seq` is not the previous `seq + 1`, record a gap; only `levels` and stale hypotheses may be missing - `inst-detect-gap`
-   3. [ ] - `p1` - **IF** the event is `ack`, `error` or `pong`, resolve the waiting command by id - `inst-correlate`
-   4. [ ] - `p1` - **ELSE** route the event to its subscriber (self-test, session, detection) - `inst-route`
-2. [ ] - `p1` - **IF** stdout closes, hand over to `cpt-noter-algo-core-engine-foundation-restart` - `inst-on-close`
-3. [ ] - `p1` - **RETURN** - `inst-return-read`
+1. [x] - `p1` - **FOR EACH** line - `inst-for-lines`
+   1. [x] - `p1` - Parse it; a line that does not parse is logged (without content) and counted - `inst-parse-event`
+   2. [x] - `p1` - **IF** `seq` is not the previous `seq + 1`, record a gap; only `levels` and stale hypotheses may be missing - `inst-detect-gap`
+   3. [x] - `p1` - **IF** the event is `ack`, `error` or `pong`, resolve the waiting command by id - `inst-correlate`
+   4. [x] - `p1` - **ELSE** route the event to its subscriber (self-test, session, detection) - `inst-route`
+2. [x] - `p1` - **IF** stdout closes, hand over to `cpt-noter-algo-core-engine-foundation-restart` - `inst-on-close`
+3. [x] - `p1` - **RETURN** - `inst-return-read`
 
 ### Restart a dead engine
 
@@ -188,29 +188,29 @@ First run needs a self-test that proves both streams arrive, and everything afte
 **Output**: A running engine again, or `engine_unavailable`.
 
 **Steps**:
-1. [ ] - `p1` - Fail every waiting command with `engine_unavailable` - `inst-fail-waiting`
+1. [x] - `p1` - Fail every waiting command with `engine_unavailable` - `inst-fail-waiting`
 2. [ ] - `p1` - **IF** a capture session was running, hand over to the capture-first restart (`cpt-noter-feature-core-engine-capture`, M1) - `inst-if-capture`
-3. [ ] - `p1` - **ELSE** restart with back-off; after three failed starts in a minute, stop trying until the next request - `inst-backoff`
-4. [ ] - `p1` - **RETURN** the new handle, or `engine_unavailable` - `inst-return-restart`
+3. [x] - `p1` - **ELSE** restart with back-off; after three failed starts in a minute, stop trying until the next request - `inst-backoff`
+4. [x] - `p1` - **RETURN** the new handle, or `engine_unavailable` - `inst-return-restart`
 
 ## 4. States (CDSL)
 
 ### Engine process
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-engine-foundation-process`
+- [x] `p1` - **ID**: `cpt-noter-state-core-engine-foundation-process`
 
 **States**: not_started, starting, ready, restarting, unavailable, stopped
 
 **Initial State**: not_started
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** not_started **TO** starting **WHEN** a component first needs the engine - `inst-st-start`
-2. [ ] - `p1` - **FROM** starting **TO** ready **WHEN** `ready` arrives with a matching protocol major - `inst-st-ready`
-3. [ ] - `p1` - **FROM** starting **TO** unavailable **WHEN** the major differs or no `ready` arrives in time - `inst-st-unavailable`
-4. [ ] - `p1` - **FROM** ready **TO** restarting **WHEN** the process exits or misses `ping` - `inst-st-restart`
-5. [ ] - `p1` - **FROM** restarting **TO** ready **WHEN** a new process sends a valid `ready` - `inst-st-restarted`
-6. [ ] - `p1` - **FROM** restarting **TO** unavailable **WHEN** three starts failed within a minute - `inst-st-giveup`
-7. [ ] - `p1` - **FROM** ready **TO** stopped **WHEN** the core shuts down and the engine acknowledged `shutdown` - `inst-st-stopped`
+1. [x] - `p1` - **FROM** not_started **TO** starting **WHEN** a component first needs the engine - `inst-st-start`
+2. [x] - `p1` - **FROM** starting **TO** ready **WHEN** `ready` arrives with a matching protocol major - `inst-st-ready`
+3. [x] - `p1` - **FROM** starting **TO** unavailable **WHEN** the major differs or no `ready` arrives in time - `inst-st-unavailable`
+4. [x] - `p1` - **FROM** ready **TO** restarting **WHEN** the process exits or misses `ping` - `inst-st-restart`
+5. [x] - `p1` - **FROM** restarting **TO** ready **WHEN** a new process sends a valid `ready` - `inst-st-restarted`
+6. [x] - `p1` - **FROM** restarting **TO** unavailable **WHEN** three starts failed within a minute - `inst-st-giveup`
+7. [x] - `p1` - **FROM** ready **TO** stopped **WHEN** the core shuts down and the engine acknowledged `shutdown` - `inst-st-stopped`
 
 ## 5. Definitions of Done
 
@@ -252,6 +252,8 @@ The system **MUST** sign the engine in the Swift build with its own entitlements
 
 **Implements**:
 - `cpt-noter-flow-core-engine-foundation-start`
+
+**Decision E1 (Teamlead, 18 Oct 2026)**: this definition is conditional on Q4. If the week-one spike keeps the engine sandboxed, App Sandbox with no network entitlement is the guarantee; if Q4 decides the engine ships unsandboxed, the guarantee is no network entitlement plus the CI network-monitor test.
 
 **Constraints**: `cpt-noter-constraint-core-engine-offline`
 
