@@ -93,8 +93,8 @@ harness = [
   ".claude/settings.json", "justfile", "rust-toolchain.toml",
   "apps/desktop/vitest.*.ts", "apps/desktop/playwright.config.ts",
 ]
-# Files every lane may touch (plans, FEATURE checkboxes, the decomposition).
-common = [".plans/**", "docs/features/**", "docs/DECOMPOSITION.md"]
+# Files every lane may touch (plans, PR reviews, FEATURE checkboxes, the decomposition).
+common = [".plans/**", ".prs/**", "docs/features/**", "docs/DECOMPOSITION.md"]
 
 # A lane is chosen with NOTER_LANE=<name> or a branch named lane/<name>/<topic>.
 # With no lane the owner rules apply: only `generated` and `baselines` are protected.
