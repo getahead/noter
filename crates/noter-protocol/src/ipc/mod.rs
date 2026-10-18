@@ -21,9 +21,10 @@ use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 
 use crate::common::*;
-use crate::error::CoreError;
+use crate::error::{CoreError, ErrorCode};
 use crate::model::*;
 
+// @cpt-state:cpt-noter-state-core-contract-stability:p2
 /// Whether the UI may build on a surface as final.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -77,6 +78,18 @@ pub struct CommandSpec {
 impl CommandSpec {
     pub fn allows(&self, w: WindowLabel) -> bool {
         self.windows.contains(&w)
+    }
+
+    /// The window-scope check the IPC host runs before any handler: a window must be listed
+    /// (`window_not_allowed` otherwise); a native surface of the core skips it.
+    pub fn check_caller(&self, caller: &Caller) -> Result<(), CoreError> {
+        match caller {
+            Caller::Window { label } if !self.allows(*label) => Err(CoreError::new(
+                ErrorCode::WindowNotAllowed,
+                format!("{} from {}", self.name, label.as_str()),
+            )),
+            _ => Ok(()),
+        }
     }
 }
 
@@ -142,6 +155,41 @@ impl<T> std::fmt::Debug for Sink<T> {
     }
 }
 
+/// Arguments for [`dispatch`]. serde's message can quote the input, which may hold transcript
+/// text, so the error names only the command and the type.
+fn parse_args<T: serde::de::DeserializeOwned>(
+    name: &str,
+    ty: &str,
+    args: serde_json::Value,
+) -> Result<T, CoreError> {
+    serde_json::from_value(args).map_err(|_| {
+        CoreError::new(
+            ErrorCode::InvalidInput,
+            format!("{name}: arguments do not parse as {ty}"),
+        )
+    })
+}
+
+/// The typed Channel of a subscribing command over the transport's JSON sink.
+fn typed_sink<T: Serialize + 'static>(
+    name: &str,
+    channel: Option<Sink<serde_json::Value>>,
+) -> Result<Sink<T>, CoreError> {
+    let out = channel.ok_or_else(|| {
+        CoreError::new(
+            ErrorCode::InvalidInput,
+            format!("{name}: a subscribing command needs a Channel"),
+        )
+    })?;
+    Ok(Sink::new(move |m: T| {
+        serde_json::to_value(m).is_ok_and(|v| out.send(v))
+    }))
+}
+
+fn to_json<T: Serialize>(v: T) -> Result<serde_json::Value, CoreError> {
+    serde_json::to_value(v).map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))
+}
+
 macro_rules! window_list {
     ($($w:ident)|+) => { &[$(WindowLabel::$w),+] };
 }
@@ -166,14 +214,45 @@ macro_rules! commands {
             },
         )*];
 
-        /// The core implements this trait; the Tauri layer (`apps/desktop/src-tauri/src/ipc.rs`)
-        /// wraps each method in a `#[tauri::command]` that checks the window scope first.
+        // @cpt-dod:cpt-noter-dod-core-contract-coreapi:p1
+        /// The core implements this trait on its composition root. The IPC host and
+        /// `noter-core-harness` reach it through [`dispatch`] (or call a method after
+        /// [`CommandSpec::check_caller`]). Every method answers `not_implemented` until the core
+        /// implements it, so an early core answers what its milestone delivers and the
+        /// conformance suite lists the rest as pending.
         pub trait CoreApi: Send + Sync + 'static {
             $(
                 $(#[doc = $doc])*
-                fn $name(&self, ctx: &CommandCtx, args: $args $(, channel: Sink<$chan>)?)
-                    -> impl Future<Output = Result<$ret, CoreError>> + Send;
+                fn $name(&self, _ctx: &CommandCtx, _args: $args $(, _channel: Sink<$chan>)?)
+                    -> impl Future<Output = Result<$ret, CoreError>> + Send {
+                    std::future::ready(Err(CoreError::new(ErrorCode::NotImplemented, stringify!($name))))
+                }
             )*
+        }
+
+        /// Runs one command by name with JSON arguments, as the IPC host and
+        /// `noter-core-harness` receive it: the window-scope check, then the Channel and the
+        /// arguments (`invalid_input` naming the command, never echoing the input), then the
+        /// [`CoreApi`] method; the result and every Channel message cross as JSON.
+        /// An unknown name answers `not_implemented`.
+        pub async fn dispatch<A: CoreApi>(
+            api: &A,
+            ctx: &CommandCtx,
+            name: &str,
+            args: serde_json::Value,
+            channel: Option<Sink<serde_json::Value>>,
+        ) -> Result<serde_json::Value, CoreError> {
+            if let Some(spec) = command(name) {
+                spec.check_caller(&ctx.caller)?;
+            }
+            match name {
+                $(stringify!($name) => {
+                    $( let channel = typed_sink::<$chan>(stringify!($name), channel)?; )?
+                    let args = parse_args::<$args>(stringify!($name), stringify!($args), args)?;
+                    to_json(api.$name(ctx, args $(, commands!(@channel channel $chan))?).await?)
+                })*
+                _ => Err(CoreError::new(ErrorCode::NotImplemented, format!("no command {name}"))),
+            }
         }
 
         /// Registers every argument type (and what it contains), for the contract tests.
@@ -193,6 +272,7 @@ macro_rules! commands {
     };
     (@chan $chan:ty) => { Some(stringify!($chan)) };
     (@chan) => { None };
+    (@channel $sink:ident $chan:ty) => { $sink };
 }
 
 macro_rules! events {

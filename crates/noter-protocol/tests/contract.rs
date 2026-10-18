@@ -1,5 +1,7 @@
 //! Contract tests: rules about the contract itself (DESIGN-core 4.1, Contract governance).
 
+// @cpt-algo:cpt-noter-algo-core-contract-tests:p1
+
 use std::collections::HashSet;
 
 use noter_protocol::engine::{EngineEvent, EngineEventLine};
@@ -259,12 +261,14 @@ fn option_fields_without_default(types: &specta::Types) -> Vec<String> {
     out
 }
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-serde-default
 #[test]
 fn every_option_field_of_an_argument_type_has_serde_default() {
     let types = noter_protocol::ipc::register_arg_types(specta::Types::default());
     let missing = option_fields_without_default(&types);
     assert!(missing.is_empty(), "add #[serde(default)] to: {missing:#?}");
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-serde-default
 
 #[test]
 fn option_fields_without_default_parse_when_absent() {
@@ -427,6 +431,7 @@ fn code_name(c: &ErrorCode) -> String {
         .to_string()
 }
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-names
 #[test]
 fn channel_message_types_are_unique() {
     let mut seen = HashSet::new();
@@ -436,7 +441,9 @@ fn channel_message_types_are_unique() {
         }
     }
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-names
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-stability
 #[test]
 fn draft_surfaces_are_exactly_copilot_agents_performance_and_storage_move() {
     // Everything not named draft by DESIGN-core 4.1 is frozen.
@@ -461,7 +468,9 @@ fn draft_surfaces_are_exactly_copilot_agents_performance_and_storage_move() {
         assert_eq!(e.stability, want, "{}", e.name);
     }
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-stability
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-scopes
 #[test]
 fn the_call_window_never_deletes() {
     for c in COMMANDS {
@@ -476,7 +485,9 @@ fn the_call_window_never_deletes() {
         );
     }
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-scopes
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-errors
 #[test]
 fn error_codes_are_the_closed_list_of_design_core() {
     // DESIGN-core 3.3 › Error codes: one table row per code and the retryable-by-default list.
@@ -520,10 +531,13 @@ fn error_codes_are_the_closed_list_of_design_core() {
         "default_retryable differs from DESIGN-core 3.3"
     );
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-errors
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-roundtrip
 #[test]
 fn the_fixture_file_round_trips_through_the_types() {
     let file: fixtures::FakeWorld =
         serde_json::from_str(&repo_file("contracts/fixtures/world.json")).unwrap();
     assert_eq!(file, fixtures::world());
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-roundtrip

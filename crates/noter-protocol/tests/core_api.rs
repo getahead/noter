@@ -95,6 +95,7 @@ fn collecting() -> (Sink<Value>, Arc<Mutex<Vec<Value>>>) {
     (sink, got)
 }
 
+// @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-check-coreapi
 #[test]
 fn every_command_reaches_its_own_core_api_method() {
     // `{}` parses for commands without required fields: the default method answers
@@ -120,10 +121,13 @@ fn every_command_reaches_its_own_core_api_method() {
                 c.name,
                 err.message
             ),
+            // @cpt-begin:cpt-noter-algo-core-contract-tests:p1:inst-return-tests
             other => panic!("{}: unexpected {other:?}", c.name),
+            // @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-return-tests
         }
     }
 }
+// @cpt-end:cpt-noter-algo-core-contract-tests:p1:inst-check-coreapi
 
 #[test]
 fn an_unknown_command_is_not_implemented() {
