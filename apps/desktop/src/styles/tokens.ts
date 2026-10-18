@@ -1,12 +1,34 @@
-// Reads the token stylesheet (tokens.css) and checks its colours against WCAG 2.2 AA.
-// The browser does the real resolution through the media queries; this module mirrors
-// it for the contrast check, which runs in the unit tests (docs/features/ui/tokens-theming.md).
+// The token stylesheet (tokens.css) and its WCAG 2.2 AA check (docs/features/ui/tokens-theming.md).
+// The app imports this module for the stylesheet: the WebView resolves its media queries and restyles
+// every open window when macOS changes appearance. resolveTokens mirrors that resolution so the
+// contrast check and the unit tests can run it on the stylesheet text.
 
+// @cpt-flow:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1
+// @cpt-dod:cpt-noter-dod-ui-tokens-theming-tokens:p1
+// @cpt-component:cpt-noter-component-ui-primitives:p1
+// The steps the WebView runs on the media queries of tokens.css itself: it re-evaluates them in every
+// open window when the user changes a macOS setting and restyles live; the Reduce motion rule is there too.
+// @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-user-changes
+// @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-media-change
+// @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-restyle
+// @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-return-appearance
+// @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-motion
+// @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-no-motion
+import "./tokens.css";
+// @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-no-motion
+// @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-motion
+// @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-return-appearance
+// @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-restyle
+// @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-media-change
+// @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-user-changes
+
+// @cpt-state:cpt-noter-state-ui-tokens-theming-appearance:p1
 export type Appearance = "LIGHT" | "DARK" | "LIGHT_CONTRAST" | "DARK_CONTRAST";
 export type Tokens = Record<string, string>;
 
 const DARK = "(prefers-color-scheme: dark)";
 const MORE = "(prefers-contrast: more)";
+const OPAQUE = "(prefers-reduced-transparency: reduce)";
 
 /** The custom properties of each `:root` rule, keyed by its enclosing media query ("" at top level). */
 export function rootBlocks(css: string): Record<string, Tokens> {
@@ -19,8 +41,11 @@ export function rootBlocks(css: string): Record<string, Tokens> {
   return blocks;
 }
 
-/** The tokens the browser resolves for `appearance` (tokens.css carries the resolve-tokens markers). */
-export function resolveTokens(css: string, appearance: Appearance): Tokens {
+/** The tokens the browser resolves for `appearance`, with Reduce transparency on or off. Reduce motion
+ *  changes no token: its rule in tokens.css zeroes the durations. */
+// @cpt-algo:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1
+export function resolveTokens(css: string, appearance: Appearance, reduceTransparency = false): Tokens {
+  // @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-resolve
   const blocks = rootBlocks(css);
   const block = (query: string) => {
     const tokens = blocks[query];
@@ -28,13 +53,55 @@ export function resolveTokens(css: string, appearance: Appearance): Tokens {
     return tokens;
   };
   const dark = appearance.startsWith("DARK");
+  // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-light-defaults
   const tokens = { ...block("") };
-  if (dark) Object.assign(tokens, block(DARK));
-  if (appearance.endsWith("CONTRAST")) {
-    Object.assign(tokens, block(MORE));
-    if (dark) Object.assign(tokens, block(`${MORE} and ${DARK}`));
+  // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-light-defaults
+  // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-dark
+  // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-dark
+  // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-light
+  if (dark) {
+    // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-dark-pairs
+    Object.assign(tokens, block(DARK));
+    // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-dark-pairs
   }
+  // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-light
+  // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-dark
+  // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-dark
+  // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-contrast
+  // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-contrast
+  // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-contrast
+  // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-light-off
+  // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-dark-off
+  if (appearance.endsWith("CONTRAST")) {
+    // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-light
+    Object.assign(tokens, block(MORE));
+    // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-light
+    // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-lc-dc
+    // @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dc-lc
+    // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-dark
+    if (dark) Object.assign(tokens, block(`${MORE} and ${DARK}`));
+    // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-dark
+    // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dc-lc
+    // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-lc-dc
+  }
+  // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-dark-off
+  // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-light-off
+  // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-contrast
+  // @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-contrast
+  // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-contrast
+  // Increase Contrast drops the blur in its own block above (--glass-blur: none).
+  // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-opaque
+  if (reduceTransparency) {
+    // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-opaque
+    Object.assign(tokens, block(OPAQUE));
+    if (dark) Object.assign(tokens, block(`${OPAQUE} and ${DARK}`));
+    // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-opaque
+  }
+  // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-opaque
+  // @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-return-tokens
   return tokens;
+  // @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-return-tokens
+  // @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-resolve
 }
 
 type Rgba = [number, number, number, number];

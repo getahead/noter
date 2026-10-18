@@ -182,7 +182,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Set the macOS 27 foundations once: colour tokens with their default, dark and Increase Contrast values, typography, spacing, radii, Liquid Glass materials, Reduce transparency and Reduce motion, so every window looks native and meets WCAG 2.2 AA under Increase Contrast.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/tokens-theming.md`](features/ui/tokens-theming.md). **Status**: IN_PROGRESS: the token stylesheet and its contrast check exist; the screenshot specs of the four appearance states are open.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/tokens-theming.md`](features/ui/tokens-theming.md). **Status**: IN_PROGRESS: the token stylesheet, its contrast check and the specs of the four appearance states exist; open: the owner's approval of the new screenshot baselines, and the check that no component holds a literal colour as components land.
 
 - **Depends On**: None
 

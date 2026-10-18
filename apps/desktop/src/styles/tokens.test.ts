@@ -55,19 +55,38 @@ describe("tokens.css", () => {
     expect(() => resolveTokens("", "LIGHT")).toThrow(/no :root block/);
   });
 
+  it("makes the materials opaque when Reduce transparency is on", () => {
+    const light = resolveTokens(css, "LIGHT", true);
+    expect(light["--glass-blur"]).toBe("none");
+    expect(light["--side-bg"]).toBe("#F3F3F3");
+    expect(light["--glass-bg"]).toBe("var(--card-bg)");
+    expect(resolveTokens(css, "DARK_CONTRAST", true)["--side-bg"]).toBe("#232323");
+    expect(resolveTokens(css, "DARK")["--glass-blur"]).toBe("blur(22px) saturate(185%)");
+  });
+
   it("keeps no prototype-only tokens or toggles", () => {
     expect(css).not.toMatch(/--(wall|desk|chrome)-|data-theme|data-contrast/);
   });
 
-  it("blurs only through --glass-blur", () => {
-    const filters = css.match(/backdrop-filter\s*:[^;]+/g) ?? [];
+  it("blurs only through --glass-blur, or turns the blur off", () => {
+    const filters = css.match(/backdrop-filter\s*:[^;}]+/g) ?? [];
     expect(filters.length).toBeGreaterThan(0);
-    for (const f of filters) expect(f).toMatch(/:\s*var\(--glass-blur\)$/);
+    for (const f of filters) expect(f).toMatch(/:\s*(var\(--glass-blur\)|none)\s*$/);
+  });
+
+  it("ports the component treatments of 02-contrast.css under Increase Contrast", () => {
+    const more = mediaBodies(css).filter(([q]) => q === "(prefers-contrast: more)").map(([, body]) => body).join("\n");
+    for (const c of ["np-badge", "np-lang", "np-agent", "np-prov--chip", "np-token"]) expect(more).toMatch(new RegExp(`\\.${c}\\b[^{]*\\{[^}]*inset 0 0 0 1px currentColor`));
+    expect(more).toMatch(/:focus-visible\s*\{\s*outline:\s*3px solid var\(--accent\)/);
+    for (const c of ["np-btn", "np-popup select", "np-field__input", "np-check__box", "np-radio__dot", "np-toggle__track"])
+      expect(more).toMatch(new RegExp(`\\.${c}\\b[^{]*\\{[^}]*inset 0 0 0 1px var\\(--ctrl-border\\)`));
+    expect(more).toMatch(/\.np-btn--primary\s*\{\s*box-shadow:\s*none/);
+    expect(more).toMatch(/\.np-sidebar[^{]*\.np-menu[^{]*\.np-pop[^{]*\{[^}]*backdrop-filter:\s*none/);
   });
 
   it.each(["(prefers-reduced-transparency: reduce)", "(prefers-contrast: more)"])("drops the blur and keeps no backdrop-filter under %s", (query) => {
     expect(rootBlocks(css)[query]["--glass-blur"]).toBe("none");
-    for (const [q, body] of mediaBodies(css)) if (q.includes(query)) expect(body).not.toMatch(/backdrop-filter\s*:\s*(?!none)/);
+    for (const [q, body] of mediaBodies(css)) if (q.includes(query)) expect(body).not.toMatch(/backdrop-filter\s*:(?!\s*none)/);
   });
 
   it("makes materials opaque under Reduce transparency", () => {

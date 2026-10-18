@@ -6,7 +6,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
 
-const css = readFileSync(fileURLToPath(new URL("../../src/styles/tokens.css", import.meta.url)), "utf8");
+const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
+const css = read("../../src/styles/tokens.css");
+// The prototype of record, with its own appearance blocks (docs/prototype/clickable/src/css).
+const prototype = ["00-base", "01-macos27", "02-contrast"].map((f) => read(`../../../../docs/prototype/clickable/src/css/${f}.css`)).join("\n");
 
 const colours = [
   "win-bg", "side-bg", "content-bg", "card-bg", "ctrl-bg", "label", "label-2", "label-3", "label-dis", "sep",
@@ -59,6 +62,32 @@ test.describe("cpt-noter-state-ui-tokens-theming-appearance token sheet", () => 
   }
 });
 
+/** Every custom property of the page's top-level `:root` rules, resolved for the current media. */
+const rootTokens = (page: Page) =>
+  page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const names = [...document.styleSheets].flatMap((s) => [...s.cssRules])
+      .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule && r.selectorText === ":root")
+      .flatMap((r) => [...r.style]).filter((n) => n.startsWith("--"));
+    return Object.fromEntries(names.map((n) => [n, root.getPropertyValue(n).trim()]));
+  });
+
+test.describe("cpt-noter-state-ui-tokens-theming-appearance matches the prototype", () => {
+  for (const [state, media] of Object.entries(states)) {
+    test(`every prototype token resolves to the prototype's value (${state})`, async ({ page }) => {
+      await page.emulateMedia(media);
+      await page.setContent(`<style>${prototype}</style>`);
+      const expected = Object.fromEntries(Object.entries(await rootTokens(page)).filter(([n]) => !/^--(wall|desk|chrome)-/.test(n)));
+      // Production drops the blur through --glass-blur; the prototype does it per surface (02-contrast.css).
+      if (media.contrast === "more") expected["--glass-blur"] = "none";
+      await page.setContent(`<style>${css}</style>`);
+      const actual = await rootTokens(page);
+      expect(Object.keys(expected).length).toBeGreaterThan(40);
+      expect(Object.fromEntries(Object.keys(expected).map((n) => [n, actual[n]]))).toEqual(expected);
+    });
+  }
+});
+
 test.describe("cpt-noter-flow-ui-tokens-theming-follow-appearance", () => {
   test("restyles an open page on every appearance transition without a reload", async ({ page }) => {
     await page.emulateMedia(states.light);
@@ -93,6 +122,20 @@ test.describe("cpt-noter-flow-ui-tokens-theming-follow-appearance", () => {
     }
     await page.emulateMedia(states.dark);
     expect(await blur()).toContain("blur(22px)");
+  });
+
+  test("Increase Contrast outlines tags and chips, draws a solid focus outline and borders controls", async ({ page }) => {
+    await page.setContent(`<style>${css}</style><span class="np-badge" style="color: rgb(1, 2, 3)">Draft</span>
+      <span class="np-btn" tabindex="0">Save</span><span class="np-btn np-btn--primary">Record</span>`); // a native <button> keeps WebKit's own look
+    const style = (sel: string, prop: string) => page.locator(sel).evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
+    await page.emulateMedia(states.light);
+    expect(await style(".np-badge", "box-shadow")).toBe("none");
+    await page.emulateMedia(states["light-contrast"]);
+    expect(await style(".np-badge", "box-shadow")).toBe("rgb(1, 2, 3) 0px 0px 0px 1px inset");
+    expect(await style(".np-btn:not(.np-btn--primary)", "box-shadow")).toBe("rgba(0, 0, 0, 0.6) 0px 0px 0px 1px inset");
+    expect(await style(".np-btn--primary", "box-shadow")).toBe("none");
+    await page.keyboard.press("Tab");
+    expect(await style(".np-btn:focus-visible", "outline")).toMatch(/3px solid rgb\(0, 100, 209\)|rgb\(0, 100, 209\) solid 3px/);
   });
 
   test("Reduce motion zeroes transitions and animations except the row spinner and level meters", async ({ page }) => {

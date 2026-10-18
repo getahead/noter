@@ -9,17 +9,11 @@
    Production follows the macOS media features only: prefers-color-scheme,
    prefers-contrast, prefers-reduced-transparency, prefers-reduced-motion.
    Components take every colour, size and material from these properties.
+   The @cpt markers are in tokens.ts, which owns this sheet and mirrors its resolution.
    ===================================================================== */
 
-/* @cpt-flow:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1 */
-/* @cpt-algo:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1 */
-/* @cpt-state:cpt-noter-state-ui-tokens-theming-appearance:p1 */
-/* @cpt-dod:cpt-noter-dod-ui-tokens-theming-tokens:p1 */
-/* @cpt-component:cpt-noter-component-ui-primitives:p1 */
 
 /* LIGHT (initial state): light defaults */
-/* @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-resolve */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-light-defaults */
 :root {
   --win-bg: #F5F5F5; --side-bg: rgba(242,242,244,.62); --content-bg: #FFFFFF; --card-bg: #FFFFFF; --ctrl-bg: #FFFFFF;
   --label: rgba(0,0,0,.85); --label-2: rgba(0,0,0,.50); --label-3: rgba(0,0,0,.30); --label-dis: rgba(0,0,0,.25);
@@ -48,13 +42,8 @@
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
 }
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-light-defaults */
 
 /* LIGHT <-> DARK (and LIGHT_CONTRAST <-> DARK_CONTRAST with the blocks below) follow the system appearance */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-dark */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-dark */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-light */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-dark-pairs */
 @media (prefers-color-scheme: dark) {
   :root {
     --win-bg: #262626; --side-bg: rgba(38,38,40,.58); --content-bg: #1E1E1E; --card-bg: #2A2A2A; --ctrl-bg: rgba(255,255,255,.12);
@@ -75,17 +64,9 @@
     color-scheme: dark;
   }
 }
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-dark-pairs */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-light */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-dark */
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-dark */
 
 /* Increase Contrast: the AA-checked values of 02-contrast.css; materials lose their blur.
    Glass stays 94 % light / 96 % dark and the dark focus ring is #4DA3FF, as in the prototype (owner decision). */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-contrast */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-contrast */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-light-off */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-light */
 @media (prefers-contrast: more) {
   :root {
     --label: #1D1D1F; --label-2: #616161; --label-3: #616161; --label-dis: rgba(0,0,0,.40);
@@ -98,14 +79,6 @@
     --focus-ring: 0 0 0 3px #0064D1;
   }
 }
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-light */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-light-off */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-light-contrast */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-contrast */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-dark-off */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-lc-dc */
-/* @cpt-begin:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dc-lc */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-dark */
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root {
     --label: #F2F2F2; --label-2: #AAAAAA; --label-3: #AAAAAA; --label-dis: rgba(255,255,255,.40);
@@ -117,17 +90,22 @@
     --focus-ring: 0 0 0 3px #4DA3FF;
   }
 }
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-contrast-dark */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dc-lc */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-lc-dc */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-contrast-dark-off */
-/* @cpt-end:cpt-noter-state-ui-tokens-theming-appearance:p1:inst-dark-contrast */
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-contrast */
+
+/* Component treatments of 02-contrast.css under Increase Contrast, without the prototype's toggle:
+   solid tag and chip outlines, a solid focus outline, control borders, and no blur on glass surfaces.
+   `:root` keeps them above the component rules, as the prototype's `:root:not(…)` does. */
+@media (prefers-contrast: more) {
+  :root .np-badge, :root .np-lang, :root .np-agent, :root .np-prov--chip, :root .np-token { box-shadow: inset 0 0 0 1px currentColor; }
+  :root :focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  :root .np-btn, :root .np-popup select, :root .np-field__input, :root .np-check__box,
+  :root .np-radio__dot, :root .np-toggle__track { box-shadow: inset 0 0 0 1px var(--ctrl-border); }
+  :root .np-btn--primary { box-shadow: none; }
+  :root .np-sidebar, :root .np-menu, :root .np-pop, :root .np-toolbar .np-btn, :root .np-toolbar__nav,
+  :root .np-toolbar .np-search { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 
 /* Reduce transparency (DESIGN; the prototype has no such state): every material opaque in the
    window or card colour, no blur. Placed after Increase Contrast so it wins when both are on. */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-opaque */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-opaque */
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --side-bg: #F3F3F3; --glass-bg: var(--card-bg); --glass-bg-strong: var(--card-bg);
@@ -137,13 +115,9 @@
 @media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
   :root { --side-bg: #232323; }
 }
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-opaque */
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-opaque */
 
 /* Reduce motion: zero durations rather than `none`, so transitionend and animationend still fire.
    The row spinner and the level meters carry state and keep moving (DESIGN › Motion). */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-motion */
-/* @cpt-begin:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-no-motion */
 @media (prefers-reduced-motion: reduce) {
   *:not(.np-spin):not(.np-meter):not(.np-meter *),
   *:not(.np-spin):not(.np-meter):not(.np-meter *)::before,
@@ -153,12 +127,8 @@
     scroll-behavior: auto !important;
   }
 }
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-no-motion */
-/* @cpt-end:cpt-noter-algo-ui-tokens-theming-resolve-tokens:p1:inst-if-motion */
-/* @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-resolve */
 
 /* Liquid Glass material helper (01-macos27.css); every blur goes through --glass-blur */
-/* @cpt-begin:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-restyle */
 .np-glass { background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
 
 /* Typography (00-base.css; call styles as in 20-b.css) */
@@ -176,4 +146,3 @@
 .t-call-card-floating { font: 400 13px/19px var(--font); }
 .np-mono { font-family: var(--mono); font-size: 12px; line-height: 18px; }
 .np-tnum { font-variant-numeric: tabular-nums; }
-/* @cpt-end:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1:inst-restyle */
