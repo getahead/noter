@@ -459,7 +459,13 @@ async fn refresh_models_rereads_the_models_folder() {
 }
 
 /// A Mac with plenty of disk whose network comes and goes.
-struct Network(std::sync::atomic::AtomicBool);
+struct Network(
+    std::sync::atomic::AtomicBool,
+    /// The core's change listener, to tell it the network came back.
+    Mutex<Option<Listener>>,
+);
+
+type Listener = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
 
 impl NativeServices for Network {
     fn permission(&self, _: PermissionKind) -> PermissionState {
@@ -475,8 +481,20 @@ impl NativeServices for Network {
             ..EnvironmentReading::default()
         }
     }
+    fn on_change(&self, on_change: Listener) {
+        *self.1.lock().unwrap() = Some(on_change);
+    }
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
+    }
+}
+
+impl Network {
+    /// The network comes back (or goes), and macOS says so.
+    fn set_online(&self, online: bool) {
+        self.0.store(online, std::sync::atomic::Ordering::SeqCst);
+        let reading = self.environment();
+        (self.1.lock().unwrap().as_ref().unwrap())(reading);
     }
 }
 
@@ -492,7 +510,7 @@ async fn starting_while_offline_answers_offline_at_once_and_works_once_online() 
         b"model",
         true,
     ));
-    let network = Arc::new(Network(false.into()));
+    let network = Arc::new(Network(false.into(), Mutex::new(None)));
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
         .with_native(network.clone())
         .with_models(source.clone());
@@ -515,4 +533,80 @@ async fn starting_while_offline_answers_offline_at_once_and_works_once_online() 
         state(st, "whisper-turbo") == BundleState::Ready
     })
     .await;
+}
+
+fn open_on(dir: &Path, source: Arc<Bundles>, network: Arc<Network>) -> Arc<Core> {
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        .with_native(network)
+        .with_models(source);
+    let core = Arc::new(Core::open(dir, deps).expect("core opens"));
+    core.start_first_run();
+    core
+}
+
+/// After an offline refusal, the download starts by itself once macOS says the network is
+/// back; a pause the user asked for never resumes by itself.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_offline_refusal_downloads_by_itself_once_back_online() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = Arc::new(two_bundles());
+    let network = Arc::new(Network(false.into(), Mutex::new(None)));
+    let core = open_on(dir.path(), source.clone(), network.clone());
+    let err = download(&core, DownloadAction::Start).await.unwrap_err();
+    assert_eq!(err.code, ErrorCode::Offline);
+    network.set_online(true);
+    until(&core, "ready once back online", |st| {
+        st.models
+            .bundles
+            .iter()
+            .all(|b| b.state == BundleState::Ready)
+    })
+    .await;
+}
+
+/// A transfer the network cut off resumes from its partial file once the network is back.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_download_cut_off_by_the_network_resumes_by_itself() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = Arc::new(two_bundles());
+    source
+        .drop_after
+        .lock()
+        .unwrap()
+        .insert("whisper-turbo".into(), 2 * CHUNK);
+    let network = Arc::new(Network(true.into(), Mutex::new(None)));
+    let core = open_on(dir.path(), source.clone(), network.clone());
+    download(&core, DownloadAction::Start).await.unwrap();
+    until(&core, "paused offline", |st| {
+        st.models.error == Some(ErrorCode::Offline)
+    })
+    .await;
+    network.set_online(false);
+    network.set_online(true);
+    until(&core, "ready after the network came back", |st| {
+        st.models
+            .bundles
+            .iter()
+            .all(|b| b.state == BundleState::Ready)
+    })
+    .await;
+    assert!(source
+        .fetches
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(name, from)| name == "whisper-turbo" && *from > 0));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_pause_the_user_asked_for_stays_paused_when_the_network_comes_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = Arc::new(two_bundles());
+    let network = Arc::new(Network(false.into(), Mutex::new(None)));
+    let core = open_on(dir.path(), source.clone(), network.clone());
+    download(&core, DownloadAction::Start).await.unwrap_err();
+    download(&core, DownloadAction::Pause).await.unwrap();
+    network.set_online(true);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(source.fetches.lock().unwrap().is_empty());
 }

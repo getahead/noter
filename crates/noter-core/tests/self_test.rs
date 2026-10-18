@@ -13,7 +13,7 @@ use noter_core::{
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
 use noter_protocol::engine::{EngineCommand, EngineErrorCode};
-use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
+use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::Value;
@@ -32,9 +32,13 @@ impl Clock for FixedClock {
     }
 }
 
+type Listener = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
+
 #[derive(Default)]
 struct Mac {
     states: Mutex<HashMap<PermissionKind, PermissionState>>,
+    /// The core's change listener, to send it a notice as macOS would.
+    changed: Mutex<Option<Listener>>,
 }
 
 impl NativeServices for Mac {
@@ -53,8 +57,20 @@ impl NativeServices for Mac {
     fn environment(&self) -> EnvironmentReading {
         EnvironmentReading::default()
     }
+    fn on_change(&self, on_change: Listener) {
+        *self.changed.lock().unwrap() = Some(on_change);
+    }
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Events(Mutex<Vec<&'static str>>);
+
+impl EventEmitter for Events {
+    fn emit(&self, event: &'static str, _: Value) {
+        self.0.lock().unwrap().push(event);
     }
 }
 
@@ -406,4 +422,187 @@ async fn the_system_audio_prompt_comes_from_a_short_engine_self_test() {
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::PermissionDenied);
+}
+
+/// A core whose events and Mac the test can see, with the microphone granted.
+struct Probing {
+    run: Run,
+    events: Arc<Events>,
+    mac: Arc<Mac>,
+}
+
+fn open_probing(dir: &Path, engine: ScriptedEngine) -> Probing {
+    let mac = Arc::new(Mac::default());
+    mac.states
+        .lock()
+        .unwrap()
+        .insert(PermissionKind::Microphone, PermissionState::Granted);
+    let events = Arc::new(Events::default());
+    let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
+        .with_native(mac.clone())
+        .with_engine(launcher)
+        .with_models(live_model(dir));
+    let core = Arc::new(Core::open(dir, deps).expect("core opens"));
+    core.start_first_run();
+    Probing {
+        run: Run { core, engine },
+        events,
+        mac,
+    }
+}
+
+fn system_audio_row(s: &SetupStatus) -> PermissionState {
+    s.permissions
+        .iter()
+        .find(|p| p.kind == PermissionKind::SystemAudio)
+        .unwrap()
+        .state
+}
+
+/// The re-check probes (D-19): the clip on, ended within about 3 s.
+fn probes(engine: &ScriptedEngine) -> usize {
+    engine
+        .commands()
+        .iter()
+        .filter(|c| {
+            matches!(
+                c,
+                EngineCommand::SelfTest {
+                    play_clip: true,
+                    timeout_ms: 3_000
+                }
+            )
+        })
+        .count()
+}
+
+/// A self-test that heard only zeros: the system-audio row reads denied.
+async fn denied_by_a_self_test(p: &Probing) {
+    p.run.engine.set_system_audio(PermissionState::Denied);
+    let (_, events) = run_to_end(&p.run, false).await;
+    assert_eq!(failed(&events), Some(SelfTestFailure::ZeroBuffers));
+    assert_eq!(
+        system_audio_row(&status(&p.run).await),
+        PermissionState::Denied
+    );
+}
+
+async fn until_probes(p: &Probing, n: usize) {
+    for _ in 0..500 {
+        if probes(&p.run.engine) >= n && !noter_core::testing::system_audio_probing(&p.run.core) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("no probe");
+}
+
+/// D-19: back from System Settings, the core re-checks a denied system-audio row by playing
+/// the test clip; the row becomes granted, and a later self-test that hears only zeros wins.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn back_from_system_settings_the_core_rechecks_system_audio_with_the_clip() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    denied_by_a_self_test(&p).await;
+
+    p.run.engine.set_system_audio(PermissionState::Granted);
+    p.events.0.lock().unwrap().clear();
+    p.run.core.app_activated();
+    until_probes(&p, 1).await;
+    assert_eq!(
+        system_audio_row(&status(&p.run).await),
+        PermissionState::Granted
+    );
+    assert!(p
+        .events
+        .0
+        .lock()
+        .unwrap()
+        .contains(&event_names::SETUP_CHANGED));
+
+    p.run.engine.set_system_audio(PermissionState::Denied);
+    run_to_end(&p.run, false).await;
+    assert_eq!(
+        system_audio_row(&status(&p.run).await),
+        PermissionState::Denied
+    );
+}
+
+/// Still off: the row stays denied, and `setup:changed` still ends the check (the UI leaves
+/// Checking…); a second activation right after does not probe again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_recheck_that_still_hears_nothing_keeps_the_row_denied_and_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    denied_by_a_self_test(&p).await;
+
+    p.events.0.lock().unwrap().clear();
+    p.run.core.app_activated();
+    until_probes(&p, 1).await;
+    p.run.core.app_activated();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(probes(&p.run.engine), 1, "once per activation");
+    assert_eq!(
+        system_audio_row(&status(&p.run).await),
+        PermissionState::Denied
+    );
+    assert!(p
+        .events
+        .0
+        .lock()
+        .unwrap()
+        .contains(&event_names::SETUP_CHANGED));
+}
+
+/// The native permission-change notice re-checks too.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_native_change_notice_rechecks_a_denied_system_audio_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    denied_by_a_self_test(&p).await;
+    p.run.engine.set_system_audio(PermissionState::Granted);
+    (p.mac.changed.lock().unwrap().as_ref().unwrap())(EnvironmentReading::default());
+    until_probes(&p, 1).await;
+    assert_eq!(
+        system_audio_row(&status(&p.run).await),
+        PermissionState::Granted
+    );
+}
+
+/// No probe unless the row reads denied during first run: not before it was ever checked,
+/// and not once setup is complete (Settings leaves it to Run Test).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn no_recheck_unless_first_run_shows_system_audio_denied() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    p.run.core.app_activated();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(probes(&p.run.engine), 0, "not asked yet");
+
+    denied_by_a_self_test(&p).await;
+    for step in [
+        SetupStep::Welcome,
+        SetupStep::Models,
+        SetupStep::Permissions,
+        SetupStep::CallDisplay,
+        SetupStep::AudioStorage,
+        SetupStep::Assistants,
+    ] {
+        p.run
+            .core
+            .setup_set_step(
+                &first_run(),
+                StepArgs {
+                    step,
+                    state: StepState::Skipped,
+                },
+            )
+            .await
+            .unwrap();
+    }
+    assert!(status(&p.run).await.complete);
+    p.run.core.app_activated();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(probes(&p.run.engine), 0, "setup complete");
 }
