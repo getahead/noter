@@ -86,7 +86,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Call a command from a window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-command`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-ipc-host-command`
 
 **Actor**: UI window (WebView)
 
@@ -99,15 +99,15 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 - The core is still starting: `not_ready`, retryable.
 
 **Steps**:
-1. [ ] - `p1` - Window invokes the command with `{ args }` (and `channel` for subscribing commands) - `inst-invoke`
-2. [ ] - `p1` - Host builds `CommandCtx` with `Caller::Window { label }` from the calling webview - `inst-build-ctx`
-3. [ ] - `p1` - Host runs `cpt-noter-algo-core-ipc-host-scope-check` - `inst-scope-check`
-4. [ ] - `p1` - **IF** the scope check refused - `inst-if-refused`
-   1. [ ] - `p1` - **RETURN** `CoreError { code: window_not_allowed }` - `inst-return-not-allowed`
-5. [ ] - `p1` - Host deserializes `args` into the command's argument type; a failure **RETURN** `invalid_input` - `inst-parse-args`
-6. [ ] - `p1` - **IF** the command subscribes, adapt the Tauri Channel into a contract `Sink` - `inst-adapt-sink`
-7. [ ] - `p1` - API: call the `CoreApi` method on the concrete core - `inst-call-core`
-8. [ ] - `p1` - **RETURN** the result, or the `CoreError` serialized as the rejection - `inst-return-result`
+1. [x] - `p1` - Window invokes the command with `{ args }` (and `channel` for subscribing commands) - `inst-invoke`
+2. [x] - `p1` - Host builds `CommandCtx` with `Caller::Window { label }` from the calling webview - `inst-build-ctx`
+3. [x] - `p1` - Host runs `cpt-noter-algo-core-ipc-host-scope-check` - `inst-scope-check`
+4. [x] - `p1` - **IF** the scope check refused - `inst-if-refused`
+   1. [x] - `p1` - **RETURN** `CoreError { code: window_not_allowed }` - `inst-return-not-allowed`
+5. [x] - `p1` - Host deserializes `args` into the command's argument type; a failure **RETURN** `invalid_input` - `inst-parse-args`
+6. [x] - `p1` - **IF** the command subscribes, adapt the Tauri Channel into a contract `Sink` - `inst-adapt-sink`
+7. [x] - `p1` - API: call the `CoreApi` method on the concrete core - `inst-call-core`
+8. [x] - `p1` - **RETURN** the result, or the `CoreError` serialized as the rejection - `inst-return-result`
 
 ### Open or reload a window
 
@@ -171,18 +171,18 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Window scope check
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scope-check`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-ipc-host-scope-check`
 
 **Input**: `CommandCtx.caller` and the command's window list from `COMMANDS`.
 
 **Output**: Allowed, or refused with `window_not_allowed`.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the caller is `Caller::Native { surface }` - `inst-if-native`
-   1. [ ] - `p1` - **RETURN** allowed; record the surface as the actor surface for any change the command writes - `inst-return-native`
-2. [ ] - `p1` - **IF** the window label is in the command's list - `inst-if-in-scope`
-   1. [ ] - `p1` - **RETURN** allowed - `inst-return-allowed`
-3. [ ] - `p1` - **RETURN** refused - `inst-return-refused`
+1. [x] - `p1` - **IF** the caller is `Caller::Native { surface }` - `inst-if-native`
+   1. [x] - `p1` - **RETURN** allowed; record the surface as the actor surface for any change the command writes - `inst-return-native`
+2. [x] - `p1` - **IF** the window label is in the command's list - `inst-if-in-scope`
+   1. [x] - `p1` - **RETURN** allowed - `inst-return-allowed`
+3. [x] - `p1` - **RETURN** refused - `inst-return-refused`
 
 ### Subscribe with a snapshot
 
@@ -276,7 +276,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 
 ### Scoped handlers with parity
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-handlers`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-handlers`
 
 The system **MUST** register one handler per entry of `COMMANDS` in `src-tauri`, generate `AppManifest::commands` and one capability per window in `build.rs`, map Tauri's denial to `window_not_allowed` and parse failures to `invalid_input`, and prove with `tauri::test::mock_builder` that the registered list equals `COMMANDS` and every command called from every window gets its answer or `window_not_allowed`.
 
@@ -334,7 +334,7 @@ The system **MUST** never write transcript, document or model text to `logs/`; a
 
 ## 6. Acceptance Criteria
 
-- [ ] The handler-parity test passes: registered handlers equal `COMMANDS`, and every command from every window is answered or refused with `window_not_allowed`.
+- [x] The handler-parity test passes: registered handlers equal `COMMANDS`, and every command from every window is answered or refused with `window_not_allowed`.
 - [ ] A Channel message published before the subscribing `invoke` resolves is delivered after the snapshot, and none with `seq ≤ last_seq` is delivered (conformance, against the real core).
 - [x] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
 - [ ] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
