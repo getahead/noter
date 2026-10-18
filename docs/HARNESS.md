@@ -168,7 +168,7 @@ Run by hand before each milestone gate and each release, on the development MacB
 
 | When | Piece |
 | --- | --- |
-| M0 | `noter-core-harness`; conformance against the real core in CI; handler-parity test in `src-tauri`; first core perf scenarios (`core_app_snapshot`, `core_cold_start`); change-log and log-scrubbing tests in `noter-core` |
+| M0 | `noter-core-harness`; conformance against the real core in CI; handler-parity test in `src-tauri`; first core perf scenarios (`core_app_snapshot`, `core_cold_start`); scripted engine (self-test only; golden replay stays M1); change-log and log-scrubbing tests in `noter-core` |
 | M1 | Fixture-parity test; scripted engine and golden-set replay through file mode; latency and footprint scenarios on the Mac runner; real-app E2E with WebdriverIO; the XCUITest suite in `apps/desktop/tests/native` and the app's E2E command log (`NOTER_E2E_LOG_DIR`) |
 | M2 | Skill evals in `evals/` with schema, citation and rubric scores, run on every skill change |
 | M3–M5 | Retrieval, copilot and maintenance scenarios as listed in `harness/perf.toml`; corruption and disk-full drills nightly |
