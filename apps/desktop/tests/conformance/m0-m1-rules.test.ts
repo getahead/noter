@@ -299,6 +299,33 @@ describe("M0 settings commands not covered by a story", () => {
     typed(refused(await settings.glossaryRemove({ id: term.id })), "not_found");
   });
 
+  // setup_set_call_display and hotkeys_reset change settings sections too (DESIGN-core › settings
+  // table, Constraints): they bump `rev` and emit settings:changed as well as their own event.
+  it("hotkeys_reset also restores the card keys: settings rev grows and settings:changed arrives", async () => {
+    const settings = s.core("settings");
+    const before = ok(await settings.settingsGet({}));
+    const card_keys = { enabled: true, modifiers: { control: true, option: true, command: false } };
+    const moved = ok(await settings.settingsUpdate({ rev: before.rev, section: { section: "copilot", value: { ...before.copilot, card_keys } } }));
+    const changes = await s.events("settings:changed");
+    ok(await settings.hotkeysReset({}));
+    const after = ok(await settings.settingsGet({}));
+    expect(after.copilot.card_keys).toEqual({ enabled: true, modifiers: { control: true, option: true, command: true } });
+    expect(after.rev).toBe(moved.rev + 1);
+    await until(() => changes.latest(), "settings:changed after the reset");
+    expect(changes.latest()!.rev).toBe(after.rev);
+  });
+
+  it("setup_set_call_display also writes the call-screen display: settings rev grows and settings:changed arrives", async () => {
+    const before = ok(await s.core("settings").settingsGet({}));
+    const changes = await s.events("settings:changed");
+    ok(await s.core("first-run").setupSetCallDisplay({ display_id: W.BUILTIN_DISPLAY }));
+    const after = ok(await s.core("settings").settingsGet({}));
+    expect(after.call_screen.display_id).toBe(W.BUILTIN_DISPLAY);
+    expect(after.rev).toBe(before.rev + 1);
+    await until(() => changes.latest(), "settings:changed after the display choice");
+    expect(changes.latest()!.rev).toBe(after.rev);
+  });
+
   it("log_ui accepts a UI error without transcript text", async () => {
     ok(await s.core("call-screen").logUi({ level: "error", screen: "call_screen", code: "engine_unavailable", message: "engine banner shown" }));
   });
