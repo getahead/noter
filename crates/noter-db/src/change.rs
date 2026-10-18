@@ -1,5 +1,6 @@
 //! The one write path: a mutation and its `changes` row commit in one transaction.
 
+use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::NativeSurface;
 use noter_protocol::model::Actor;
 use noter_protocol::{BatchId, ChangeId, CoreError, ErrorCode, ErrorDetail, EvidenceId, Rev};
@@ -152,7 +153,7 @@ fn change_tx(
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
         let new_rev = m.bump_rev.then(|| Rev(stored_rev.map_or(1, |r| r.0 + 1)));
-        write_row(&tx, m, new_rev, before.is_some()).map_err(internal)?;
+        write_row(&tx, m, new_rev, before.is_some()).map_err(|e| write_error(m, e))?;
         let after = select_row(&tx, m).map_err(internal)?.unwrap_or(Value::Null);
         let rev = rev_of(&after).unwrap_or(Rev(0));
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
@@ -322,6 +323,26 @@ fn as_text(v: &Value) -> Option<String> {
         Value::Null => None,
         Value::String(s) => Some(s.clone()),
         other => Some(other.to_string()),
+    }
+}
+
+/// A row the table's unique index refuses is a duplicate (two writers can race past a
+/// caller's own check); anything else is `internal`.
+fn write_error(m: &Mutation, e: rusqlite::Error) -> CoreError {
+    match &e {
+        rusqlite::Error::SqliteFailure(f, _)
+            if f.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        {
+            CoreError::new(
+                ErrorCode::InvalidInput,
+                format!("{} already has this value", m.table),
+            )
+            .with_detail(ErrorDetail::Validation {
+                field: m.table.into(),
+                rule: ValidationRule::Duplicate,
+            })
+        }
+        _ => internal(e),
     }
 }
 
