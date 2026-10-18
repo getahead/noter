@@ -74,7 +74,7 @@ async fn the_snapshot_answers_for_the_calling_window_with_every_slice_at_version
         .unwrap();
     assert_eq!(snap.window, WindowLabel::Settings);
     assert_eq!(snap.contract_version, CONTRACT_VERSION);
-    assert_eq!(snap.app_version, env!("CARGO_PKG_VERSION"));
+    assert_eq!(snap.app_version, "dev", "the host sets the app's version");
     let versions = [
         snap.setup.version,
         snap.capture.version,
@@ -221,15 +221,15 @@ fn log_text(dir: &Path) -> String {
 }
 
 #[tokio::test]
-async fn ui_logs_reach_the_private_log_without_content() {
+async fn ui_logs_reach_the_private_log_without_any_free_text() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open(dir.path());
-    let transcript = "Anna said the Q3 budget is 2.4 million ".repeat(10);
+    let message = "render failed: Anna said the Q3 budget is 2.4 million";
     let args = UiLogArgs {
         level: UiLogLevel::Error,
         screen: "call-page".into(),
         code: Some(ErrorCode::Conflict),
-        message: format!("render failed: {transcript}"),
+        message: message.into(),
     };
     let ack = core.log_ui(&from(WindowLabel::Main), args).await.unwrap();
     assert_eq!(ack, Ack {});
@@ -238,20 +238,32 @@ async fn ui_logs_reach_the_private_log_without_content() {
         std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
         0o600
     );
-    let line: Value = serde_json::from_str(log_text(dir.path()).lines().next().unwrap()).unwrap();
+    let text = log_text(dir.path());
+    for fragment in ["Anna said", "render failed", "budget", "2.4 million"] {
+        assert!(!text.contains(fragment), "{fragment} reached the log");
+    }
+    let line: Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
     assert_eq!(line["level"], "error");
     assert_eq!(line["module"], "ui");
     assert_eq!(line["window"], "main");
     assert_eq!(line["screen"], "call-page");
     assert_eq!(line["code"], "conflict");
+    assert_eq!(line["message_len"], json!(message.chars().count()));
     assert_eq!(line["ts"], 1_790_000_000_000_i64);
-    let message = line["message"].as_str().unwrap();
-    assert!(message.starts_with("render failed"));
-    assert!(message.chars().count() <= noter_core::LOG_MESSAGE_MAX);
-    assert!(
-        !log_text(dir.path()).contains(&transcript),
-        "free text is cut"
-    );
+    assert!(line.get("message").is_none());
+
+    // A screen that is not an identifier is free text too.
+    let args = UiLogArgs {
+        level: UiLogLevel::Warn,
+        screen: "Anna said hi".into(),
+        code: None,
+        message: String::new(),
+    };
+    core.log_ui(&from(WindowLabel::Main), args).await.unwrap();
+    let text = log_text(dir.path());
+    let line: Value = serde_json::from_str(text.lines().nth(1).unwrap()).unwrap();
+    assert!(line.get("screen").is_none());
+    assert!(!text.contains("Anna said"));
 }
 
 #[tokio::test]
@@ -271,6 +283,8 @@ async fn core_log_records_keep_only_the_allow_list() {
         "prompt": secret,
         "summary": secret,
         "nested": { "content": secret },
+        "message": secret,
+        "module_note": secret,
     });
     core.log(record.as_object().unwrap().clone());
     let text = log_text(dir.path());
@@ -291,6 +305,13 @@ async fn a_broken_database_is_a_boot_error() {
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
     let err = Core::open(dir.path(), deps).err().expect("boot fails");
     assert!(err.to_string().contains("database"), "{err}");
+    // The log names the kind of failure, never the error's text.
+    let line: Value = serde_json::from_str(log_text(dir.path()).lines().next().unwrap()).unwrap();
+    assert_eq!(
+        (line["module"].clone(), line["code"].clone()),
+        (json!("storage"), json!("corrupt"))
+    );
+    assert!(line.get("message").is_none());
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
     let file = dir.path().join("plain-file");
     std::fs::write(&file, b"x").unwrap();
@@ -316,4 +337,17 @@ async fn shutdown_closes_the_store_and_a_new_core_opens_the_same_folder() {
 fn the_system_clock_is_epoch_milliseconds() {
     let now = noter_core::SystemClock.now();
     assert!(now.0 > 1_700_000_000_000);
+}
+
+#[tokio::test]
+async fn the_snapshot_carries_the_app_version_the_host_gives() {
+    let dir = tempfile::tempdir().unwrap();
+    let deps =
+        CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default())).with_app_version("0.2.0");
+    let core = Core::open(dir.path(), deps).unwrap();
+    let snap = core
+        .app_snapshot(&from(WindowLabel::Main), NoArgs {})
+        .await
+        .unwrap();
+    assert_eq!(snap.app_version, "0.2.0");
 }
