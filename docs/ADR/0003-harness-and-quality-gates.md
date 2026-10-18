@@ -53,6 +53,8 @@ Chosen option: "One gate command with fixed bars, enforced in CI, in the agent l
 
 **Changed 17 Oct 2026** (owner: native macOS surfaces get automated tests, as the design documents first planned, instead of only a manual checklist): a native UI test layer joins the harness. An XCUITest suite drives the built app on the macOS runner and covers the native surfaces: the menu bar extra and its menu, the tray glyphs, the non-activating panels (call window, floating panel, record prompt), notifications, global hotkeys and card keys. These are functional tests, not timing, so the hosted `macos-15` runner is enough. Their results count toward the end-to-end bar exactly like the real-core runs; no bar changed. The manual macOS checklist keeps only what automation cannot judge: the look of Liquid Glass materials and translucency, system permission dialogs and TCC prompts, and real call apps. Screenshots of native surfaces are not part of the 98% pixel gate.
 
+**Changed 18 Oct 2026** (owner): every pull request is reviewed by the agent that delivers it, with Constructor Studio (`/cf-sdlc-pr-review`) and the ponytail review (`/ponytail-review`), locally in its own session, never in CI and never with an API token. The agent loops (fix, push, review again) until the verdict passes, publishes it with `just review-publish`, and turns on auto-merge. `.github/workflows/review.yml` turns the published verdict into the commit status `review`, which the `Default ruleset` requires next to `gate` and `hygiene`; a review stays valid while the PR's diff is unchanged. The same day the self-hosted Apple Silicon runner for wall-clock performance was registered on the development MacBook Pro.
+
 The bars are defined in `harness/harness.toml` and measured as follows. Where the owner's wording could not be measured reliably as stated, the measure below is the realistic equivalent; `docs/HARNESS.md` explains each.
 
 | Bar | Measure | Where it is a hard gate |
@@ -78,7 +80,7 @@ The same command (`just gate`) is the default exit criteria of every FEATURE, a 
 * Good, because the fake core becomes an executable specification: the conformance suite the fake passes today is the one the real core must pass from M0.
 * Good, because instruction counts make a hard performance limit (5%, 10% since 17 Oct 2026) enforceable on shared runners without flakes.
 * Bad, because the end-to-end and performance bars are relative to the milestone; until M0 delivers code they are trivially met, which is honest but easy to misread.
-* Bad, because wall-clock, latency and Neural Engine measurements need a self-hosted Apple Silicon runner; until it exists they are reported, not enforced.
+* Bad, because wall-clock, latency and Neural Engine measurements need a self-hosted Apple Silicon runner; since 18 Oct 2026 it is the owner's development MacBook Pro, not a dedicated machine, so nightly numbers carry the noise of a working laptop and the run waits while it sleeps.
 * Good, because native surfaces (menu bar, tray, panels, notifications, hotkeys, card keys) are tested on every PR by XCUITest instead of by hand before a milestone (since 17 Oct 2026).
 * Bad, because screenshots taken in a Linux WebKit container do not show native macOS materials (vibrancy behind Liquid Glass), native panels, the menu bar or the tray; their behaviour is covered by XCUITest, their look stays on the macOS checklist.
 * Bad, because the XCUITest run needs a macOS runner, which costs more minutes and is slower, and the end-to-end job waits for it so that it can count both.
@@ -86,7 +88,7 @@ The same command (`just gate`) is the default exit criteria of every FEATURE, a 
 
 ### Confirmation
 
-The `gate` job in `.github/workflows/ci.yml` is the required status check on `main` (the `Default ruleset` in `.github/rulesets/`, applied by `scripts/ci/github-setup.sh`); `scripts/harness/tests` cover the gate scripts themselves; `config_guard.py` fails a PR that loosens `harness/*.toml` (including removing the trace gate, turning its ratchet off or narrowing its ID kinds) without the `harness-change-approved` label; `trace_gate.py` fails a PR whose trace coverage falls below the base branch's; the `macos` job runs `just native` once the Tauri app exists and hands its results to the `e2e` job, which counts them with the other end-to-end runs; the lane guard runs as a Claude Code PreToolUse hook and as the git pre-commit hook.
+The `gate` job in `.github/workflows/ci.yml` is a required status check on `main`, next to `hygiene` and the self-review status `review` (the `Default ruleset` in `.github/rulesets/`, applied by `scripts/ci/github-setup.sh`); `scripts/harness/tests` cover the gate scripts themselves; `config_guard.py` fails a PR that loosens `harness/*.toml` (including removing the trace gate, turning its ratchet off or narrowing its ID kinds) without the `harness-change-approved` label; `trace_gate.py` fails a PR whose trace coverage falls below the base branch's; the `macos` job runs `just native` once the Tauri app exists and hands its results to the `e2e` job, which counts them with the other end-to-end runs; the lane guard runs as a Claude Code PreToolUse hook and as the git pre-commit hook.
 
 ## Pros and Cons of the Options
 

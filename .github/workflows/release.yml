@@ -25,21 +25,37 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      actions: write   # dispatch the Release PR's checks
     outputs:
       created: ${{ steps.rp.outputs.release_created }}
       tag: ${{ steps.rp.outputs.tag_name }}
       version: ${{ steps.rp.outputs.version }}
     steps:
-      # A PR opened with GITHUB_TOKEN starts no workflows, so the Release PR would never get
-      # its required checks. RELEASE_PLEASE_TOKEN (fine-grained PAT: contents + pull requests,
-      # read/write, this repository only) avoids that; without it, push any commit to the
-      # release branch to start CI (docs/DELIVERY.md).
       - id: rp
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # What the workflow token pushes starts no workflows, so the Release PR would get no checks.
+      # workflow_dispatch is the exception: run the required ones on its branch from here, once
+      # per head commit. No personal access token is needed (docs/DELIVERY.md › Releases).
+      - name: Run the required checks on the Release PR
+        if: steps.rp.outputs.releases_created != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --json number,headRefName,headRefOid \
+                 -q '[.[] | select(.headRefName | startswith("release-please--"))][0] // empty | "\(.number) \(.headRefName) \(.headRefOid)"')
+          if [ -z "$pr" ]; then echo "No open Release PR."; exit 0; fi
+          read -r n branch sha <<< "$pr"
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=gate" -q .total_count)
+          if [ "$runs" != "0" ]; then echo "Release PR #$n already has checks on $sha."; exit 0; fi
+          gh workflow run ci.yml -R "$GITHUB_REPOSITORY" --ref "$branch"
+          gh workflow run codeql.yml -R "$GITHUB_REPOSITORY" --ref "$branch"
+          gh workflow run pr.yml -R "$GITHUB_REPOSITORY" --ref "$branch" -f pr="$n"
+          gh workflow run review.yml -R "$GITHUB_REPOSITORY" --ref "$branch" -f pr="$n"
+          echo "Dispatched gate, CodeQL, hygiene and review for Release PR #$n ($sha)." >> "$GITHUB_STEP_SUMMARY"
 
   assets:
     name: Contracts and SBOM

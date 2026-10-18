@@ -1,6 +1,7 @@
 # Nightly: the full gate on main, plus the measurements that need real Apple
 # Silicon (wall-clock performance, golden-set latency, real-app E2E) on the
-# dedicated runner once it exists (set the repository variable NOTER_MAC_RUNNER=true).
+# self-hosted runner (the development MacBook Pro since 18 Oct 2026; docs/DEVELOPMENT.md ›
+# The Mac runner), while the repository variable NOTER_MAC_RUNNER is true.
 name: Nightly
 
 on:

@@ -70,12 +70,13 @@ Signing secrets are passed to the packaging job only, and only the ones that are
 
 Versions follow SemVer from the commit types since the last release: `fix` → patch, `feat` → minor, a breaking change (`feat!:` or a `BREAKING CHANGE:` footer) → minor while the version is 0.x, major from 1.0. `perf` and `revert` appear in the changelog too; `docs`, `test`, `ci`, `build`, `chore` and `refactor` do not trigger a release. The version lives in `package.json` and `apps/desktop/package.json` (`.release-please-manifest.json` remembers the last one); the Rust crates are internal (`publish = false`) and keep `0.1.0`.
 
-release-please opens the Release PR with `RELEASE_PLEASE_TOKEN` when that secret exists: a fine-grained personal access token for this repository only, with Contents and Pull requests read/write. A PR opened with the workflow's own token starts no workflows, so without the secret the Release PR shows no checks until someone pushes a commit to its branch (`git commit --allow-empty -m "ci: run checks" && git push`).
+No personal access token is involved (owner decision, 18 Oct 2026: no API tokens in the pipeline). release-please opens and updates the Release PR with the workflow's own token, and what that token pushes starts no workflows. A `workflow_dispatch` is the one exception, so the same `release.yml` run then dispatches `ci.yml`, `codeql.yml`, `pr.yml` and `review.yml` on the Release PR's branch, once per head commit; they report `gate`, CodeQL, `hygiene` and `review` (which passes by itself for a Release PR) on its head. If a Release PR still shows no checks, push one commit to its branch (`git commit --allow-empty -m "ci: run checks" && git push`).
 
-To ship: merge the Release PR when its checks are green. To release a specific version, put `Release-As: 1.0.0` in the body of a commit on `main`.
+To ship: merge the Release PR when its checks are green, or turn on auto-merge (`gh pr merge <N> --auto --squash`). To release a specific version, put `Release-As: 1.0.0` in the body of a commit on `main`.
 
 ## First-time setup
 
 1. Merge the PR that adds this page (it changes `.github/`, so it needs `harness-change-approved`).
 2. `scripts/ci/github-setup.sh` from the owner's Mac (GitHub CLI signed in as an admin). It ends by listing which optional secrets are set.
-3. Optional: `RELEASE_PLEASE_TOKEN`; the Apple and updater secrets once there is an app to sign.
+3. Optional: the Apple and updater secrets once there is an app to sign.
+4. The Mac runner for the nightly wall-clock job: docs/DEVELOPMENT.md › The Mac runner. Because this repository is public, `github-setup.sh` makes every workflow from someone outside the repository wait for the owner's approval, so nobody else's code reaches that Mac.

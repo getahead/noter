@@ -603,7 +603,10 @@ class SelfReviewTests(unittest.TestCase):
 
     def test_bot_prs_pass(self):
         self.assertEqual(review.evaluate(_pr(author="dependabot[bot]"), []).state, "success")
-        self.assertEqual(review.evaluate(_pr(ref="release-please--branches--main"), []).state, "success")
+        self.assertEqual(review.evaluate(_pr(author="github-actions[bot]", ref="release-please--branches--main"), []).state, "success")
+        # A branch name proves nothing: an agent's release-please-- or dependabot/ branch still needs its review.
+        self.assertEqual(review.evaluate(_pr(ref="release-please--branches--main"), []).state, "pending")
+        self.assertEqual(review.evaluate(_pr(ref="dependabot/npm/x"), []).state, "pending")
 
     def test_blocking_findings(self):
         found = review.blocking_findings(REVIEW_MD.format(icon="⚠️", verdict="REQUEST CHANGES"))

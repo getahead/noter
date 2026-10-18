@@ -106,6 +106,22 @@ are stale.
 
 The test plan per milestone is [TEST-PLAN.md](TEST-PLAN.md) when present.
 
+## The Mac runner
+
+The nightly wall-clock performance job (`nightly.yml` › `mac-perf`, `just perf-wall`) runs on a self-hosted GitHub Actions runner on the development MacBook Pro (runner `macbook-pro-m5` in `~/actions-runner-noter`, labels `self-hosted, macOS, ARM64, noter`, registered 18 Oct 2026; docs/DEVELOPMENT.md › The Mac runner). No pull request runs on it, and because the repository is public, every workflow from someone outside the repository waits for the owner's approval (`scripts/ci/github-setup.sh`). The job runs only while the repository variable `NOTER_MAC_RUNNER` is `true`.
+
+The runner was downloaded (checksum checked against the release notes) and registered on 18 Oct 2026. It runs as the owner's login service, which the owner starts once:
+
+```sh
+cd ~/actions-runner-noter
+# python3 must be 3.11+ for the harness; the Command Line Tools python3 is 3.9
+mkdir -p bin && ln -sf /opt/homebrew/bin/python3.14 bin/python3
+printf '%s' "$HOME/actions-runner-noter/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" > .path
+./svc.sh install && ./svc.sh start      # status: ./svc.sh status; stop: ./svc.sh stop
+```
+
+It shows as `macbook-pro-m5` (Idle) under Settings › Actions › Runners. To take it away: `./svc.sh uninstall`, then `./config.sh remove --token "$(gh api -X POST repos/getahead/noter/actions/runners/remove-token -q .token)"`, and set `NOTER_MAC_RUNNER` to `false`. A dedicated Mac (a Mac mini) would give steadier numbers; the steps are the same.
+
 ## Documents
 
 `docs/PRD.md` is synced from its living copy, never edited by hand: [scripts/prd-sync.md](../scripts/prd-sync.md).

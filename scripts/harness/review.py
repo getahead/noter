@@ -47,10 +47,10 @@ DIFF_MARKER_RE = re.compile(r"<!--\s*noter-self-review-diff\s+([0-9a-f]{64})\s*-
 VERDICT_RE = re.compile(r"^##\s*Verdict:\s*(?:\S+\s+)?(APPROVE|REQUEST CHANGES|COMMENT)\b", re.MULTILINE)
 PASSING = ("APPROVE", "COMMENT")
 WRITERS = ("OWNER", "MEMBER", "COLLABORATOR")
-# PRs no agent delivered: Dependabot updates and the release-please Release PR.
+# PRs no agent delivered: Dependabot updates and the release-please Release PR (opened with
+# the workflow token). Recognised by author only: an agent can name a branch anything.
 # They still need gate, hygiene and CodeQL.
 BOT_AUTHORS = ("dependabot[bot]", "github-actions[bot]")
-BOT_BRANCH_PREFIXES = ("release-please--", "dependabot/")
 COMMENT_LIMIT = 60000
 GH_TIMEOUT_S = 30
 
@@ -110,7 +110,7 @@ def evaluate(pr: dict, comments: list[dict], diff: str = "") -> Status:
     head = pr["head"]["sha"]
     short = head[:7]
     n = pr["number"]
-    if pr["user"]["login"] in BOT_AUTHORS or pr["head"]["ref"].startswith(BOT_BRANCH_PREFIXES):
+    if pr["user"]["login"] in BOT_AUTHORS:
         return Status("success", "Bot PR, no delivering agent: gate, hygiene and CodeQL apply")
     fp = diff_fingerprint(diff) if diff else None
     found = []
