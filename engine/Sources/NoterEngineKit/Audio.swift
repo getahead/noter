@@ -3,13 +3,40 @@
 
 import Foundation
 
+/// Mono samples of one channel at `sampleRate`.
 public struct AudioChunk: Sendable {
     public let channel: Channel
     public let samples: [Float]
+    public let sampleRate: Double
 
-    public init(channel: Channel, samples: [Float]) {
+    public init(channel: Channel, samples: [Float], sampleRate: Double = 16_000) {
         self.channel = channel
         self.samples = samples
+        self.sampleRate = sampleRate
+    }
+}
+
+public enum Mix {
+    /// Interleaved frames of `channels` channels averaged to mono.
+    public static func mono(_ interleaved: [Float], channels: Int) -> [Float] {
+        guard channels > 1 else { return interleaved }
+        return stride(from: 0, to: interleaved.count - channels + 1, by: channels).map { i in
+            interleaved[i..<i + channels].reduce(0, +) / Float(channels)
+        }
+    }
+
+    /// Linear-interpolation resampling (speech models want 16 kHz).
+    public static func resample(_ samples: [Float], from: Double, to: Double) -> [Float] {
+        guard from != to, !samples.isEmpty else { return samples }
+        let count = Int((Double(samples.count) * to / from).rounded())
+        let step = from / to
+        return (0..<count).map { i in
+            let x = Double(i) * step
+            let j = min(Int(x), samples.count - 1)
+            let k = min(j + 1, samples.count - 1)
+            let t = Float(x - Double(j))
+            return samples[j] * (1 - t) + samples[k] * t
+        }
     }
 }
 
@@ -138,8 +165,8 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
         let windows = FileAudioSource.windows(mic: mic, sys: sys)
         for (i, (m, s)) in windows.enumerated() {
             if isStopped { return i }
-            onChunk(AudioChunk(channel: .mic, samples: m))
-            onChunk(AudioChunk(channel: .sys, samples: s))
+            onChunk(AudioChunk(channel: .mic, samples: m, sampleRate: Double(mic.sampleRate)))
+            onChunk(AudioChunk(channel: .sys, samples: s, sampleRate: Double(sys.sampleRate)))
             if realtime { Thread.sleep(forTimeInterval: 0.1) }
         }
         return windows.count

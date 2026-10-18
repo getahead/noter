@@ -71,16 +71,18 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         var device = AudioObjectID(kAudioObjectUnknown)
         try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &device), "create the tap device")
         lock.withLock { self.device = device }
+        let format = try tapFormat(tap)
 
         var proc: AudioDeviceIOProcID?
         try check(
             AudioDeviceCreateIOProcIDWithBlock(&proc, device, nil) { _, input, _, _, _ in
-                // The tap is stereo, interleaved in one buffer; levels and silence need no split.
+                // The tap delivers interleaved float frames in one buffer.
                 let buffers = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input))
                 guard let first = buffers.first, let raw = first.mData else { return }
                 let count = Int(first.mDataByteSize) / MemoryLayout<Float>.size
-                let samples = Array(UnsafeBufferPointer(start: raw.assumingMemoryBound(to: Float.self), count: count))
-                onChunk(AudioChunk(channel: .sys, samples: samples))
+                let interleaved = Array(UnsafeBufferPointer(start: raw.assumingMemoryBound(to: Float.self), count: count))
+                let samples = Mix.mono(interleaved, channels: Int(format.mChannelsPerFrame))
+                onChunk(AudioChunk(channel: .sys, samples: samples, sampleRate: format.mSampleRate))
             }, "install the tap callback")
         lock.withLock { self.proc = proc }
         try check(AudioDeviceStart(device, proc), "start the tap")
@@ -92,10 +94,22 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         input.installTap(onBus: 0, bufferSize: 4096, format: input.outputFormat(forBus: 0)) { buffer, _ in
             guard let data = buffer.floatChannelData else { return }
             let samples = Array(UnsafeBufferPointer(start: data[0], count: Int(buffer.frameLength)))
-            onChunk(AudioChunk(channel: .mic, samples: samples))
+            onChunk(AudioChunk(channel: .mic, samples: samples, sampleRate: buffer.format.sampleRate))
         }
         lock.withLock { self.mic = engine }
         try engine.start()
+    }
+
+    /// The tap's stream format (sample rate and channels per frame).
+    private func tapFormat(_ tap: AudioObjectID) throws -> AudioStreamBasicDescription {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioTapPropertyFormat,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var format = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        try check(AudioObjectGetPropertyData(tap, &address, 0, nil, &size, &format), "read the tap format")
+        return format
     }
 
     /// The Core Audio object of a process, to leave it out of the tap.
