@@ -213,7 +213,7 @@ The UI is built on the rules of ADR-0002 (one `args` object, result or `CoreErro
 2. [x] - `p1` - **FOR EACH** subscription after a send - `inst-for-subs`
    1. [x] - `p1` - **IF** unacknowledged messages reach 2 000, end it with `ended { lagged }` and drop it - `inst-end-lagged`
 3. [x] - `p1` - On `stream_ack`, set the subscription's last acknowledged `seq` (never lower than before) - `inst-ack-update`
-4. [x] - `p1` - Levels are coalesced to at most one message per 100 ms per subscription; cards are never batched or delayed - `inst-coalesce`
+4. [x] - `p1` - Levels are coalesced per stream to at most one message per 100 ms, before a `seq` is assigned: a skipped level takes no `seq` and is not kept for replay, so every subscriber sees consecutive `seq`s (ADR-0002); cards are never batched or delayed - `inst-coalesce`
 5. [x] - `p1` - **RETURN** - `inst-return-publish`
 
 ### End subscriptions of a webview
