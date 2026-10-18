@@ -67,8 +67,8 @@ This decomposition splits `docs/DESIGN.md` (v1.1, the UI design, `cpt-noter-desi
 | --- | --- | --- |
 | M0 | `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-tokens-theming`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`, `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-first-run`, `cpt-noter-feature-ui-settings` | written |
 | M1 | `cpt-noter-feature-ui-dialogs-host`, `cpt-noter-feature-ui-record-prompt`, `cpt-noter-feature-ui-call-window`, `cpt-noter-feature-ui-live-transcript`, `cpt-noter-feature-ui-menu-bar`, `cpt-noter-feature-ui-library-calls`, `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-notifications` | written |
-| M2 | `cpt-noter-feature-ui-history-undo`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-page-outputs`, `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-today`, `cpt-noter-feature-ui-handoff` | written |
-| M3 | `cpt-noter-feature-ui-library-search-topics`, `cpt-noter-feature-ui-ask`, `cpt-noter-feature-ui-people`, `cpt-noter-feature-ui-accounts`, `cpt-noter-feature-ui-privacy-sources` | written |
+| M2 | `cpt-noter-feature-ui-history-undo`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-page-outputs`, `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-today`, `cpt-noter-feature-ui-handoff`; the API key and Runtime per task part of `cpt-noter-feature-ui-accounts` (discrepancy 9) | written |
+| M3 | `cpt-noter-feature-ui-library-search-topics`, `cpt-noter-feature-ui-ask`, `cpt-noter-feature-ui-people`, `cpt-noter-feature-ui-accounts` (completed), `cpt-noter-feature-ui-privacy-sources` | written |
 | M4 | `cpt-noter-feature-ui-copilot`, `cpt-noter-feature-ui-agents` | written |
 | M5 | `cpt-noter-feature-ui-activity`, `cpt-noter-feature-ui-performance` | written |
 
@@ -92,6 +92,7 @@ Every state in a screen's or component's States table must match a prototype sta
 6. `cpt-noter-seq-call-screen-stop-at-call-end` and `cpt-noter-seq-call-screen-hide-for-presenting` (M1) end with the **Summary ready** notification, which needs outputs (M2). M1 proves the paths up to the stop and the page loaded in the background.
 7. `cpt-noter-seq-call-screen-name-speaker` (M2) uses the person picker and the New person form, whose commands `people_list` and `person_create` are M3. M2 builds them against the fake core.
 8. `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) ends on Today's setup banner; Today is M2. In M0 and M1 the same banner shows in the main window's banner slot MW-R5, as the shell's States table allows.
+9. `accounts_get` and `api_key_set` are M2 (owner decision of 18 Oct; `docs/DECOMPOSITION-core.md` § 1, discrepancy 1), so the M2 post-call runtime can be configured from the app, while `cpt-noter-feature-ui-accounts` and its stories are M3. The feature is built in two stages and no ID moves. The owner approved this staging on 18 Oct as an exception to the rule in `.cf-studio/config/AGENTS.md` that keeps each FEATURE inside one milestone: splitting it would add a 31st feature for two commands and change every coverage count, while the backend stages `cpt-noter-feature-core-credentials-privacy` the same way. In M2 it delivers the key part against the real core: `cpt-noter-flow-ui-accounts-key` and `cpt-noter-dod-ui-accounts-keys`, that is the API-key rows of Settings › Models & Runtimes and of first-run step 6, the key sheet, and the states Key rejected, Key being verified, Keychain locked and No key and no local runtime. It also delivers **Runtime per task** (steps 2 and 3 of `cpt-noter-flow-ui-accounts-manage`, through `settings_update`, delivered in M0), where the account runtimes stay listed as not connected until M3. Within the key flow, **Remove…** (`api_key_remove`) and **Install Ollama…** (`cli_install`) are M3 commands: M2 builds them against the fake core. The own-account rows, the sign-in sheet, Test and sign-out stay M3. The stories stay M3 in milestones.toml, so the E2E story bar counts them from M3. In M2 the real-core E2E covers the key paths of `cpt-noter-seq-settings-replace-api-key` (happy path, Key rejected, Keychain locked) and of `cpt-noter-seq-first-run-connect-assistant` (happy path, API key rejected), and these tests already name those stories.
 
 **DESIGN.md versus the prototype (prototype followed).**
 
@@ -414,7 +415,7 @@ Every state in a screen's or component's States table must match a prototype sta
   - Resume at the step where setup stopped; closing mid-setup leaves Noter in the menu bar
 
 - **Out of scope**:
-  - Step 6 key fields and own-account sign-in rows (`cpt-noter-feature-ui-accounts`, M3)
+  - Step 6 key fields (`cpt-noter-feature-ui-accounts`, M2, discrepancy 9) and own-account sign-in rows (`cpt-noter-feature-ui-accounts`, M3)
   - The Today banner after a skipped self-test (`cpt-noter-feature-ui-today`, M2); the main window's MW-R5 banner shows it in M0 and M1
 
 - **Requirements Covered**: PRD › Live copilot › Surfaces › First run; PRD › Security, privacy and permissions.
@@ -482,7 +483,7 @@ Every state in a screen's or component's States table must match a prototype sta
   - The empty frames of Models & Runtimes, Repositories, Knowledge Sources and Maintenance, which later features fill
 
 - **Out of scope**:
-  - Models & Runtimes content (`cpt-noter-feature-ui-accounts`, M3)
+  - Models & Runtimes content (`cpt-noter-feature-ui-accounts`: the API keys and Runtime per task in M2, discrepancy 9; the rest in M3)
   - What left this Mac and Knowledge Sources (`cpt-noter-feature-ui-privacy-sources`, M3)
   - Repositories (`cpt-noter-feature-ui-handoff`, M2)
   - Maintenance jobs and evidence sources (`cpt-noter-feature-ui-activity`, M5)
@@ -1518,13 +1519,14 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Store or replace API keys and sign in separately with the user's own Claude and ChatGPT accounts through Claude Code and Codex, then choose which tasks and agents use them.
 
-- **Milestone**: M3. **Spec**: [`docs/features/ui/accounts.md`](features/ui/accounts.md). **Status**: NOT_STARTED.
+- **Milestone**: M3; the API key and Runtime per task part in M2 (discrepancy 9). **Spec**: [`docs/features/ui/accounts.md`](features/ui/accounts.md). **Status**: NOT_STARTED.
 
 - **Depends On**: `cpt-noter-feature-ui-settings`, `cpt-noter-feature-ui-first-run`, `cpt-noter-feature-ui-dialogs-host`
 
 - **Scope**:
   - `credential-row` (field and account-login forms)
   - Settings › Models & Runtimes; first-run step 6; the sign-in sheet (Prepare, Sign in, Check, Use) and the sign-out alert
+  - M2 (discrepancy 9): the API-key rows and the key sheet in Models & Runtimes and first-run step 6, and **Runtime per task**, on the real core; **Remove…** and **Install Ollama…** on the fake core until M3
 
 - **Out of scope**:
   - Agent runtime pop-up (`cpt-noter-feature-ui-agents`)
@@ -1546,9 +1548,9 @@ Every state in a screen's or component's States table must match a prototype sta
 
   - [ ] `p4` - `cpt-noter-component-ui-credential-row`
 
-- **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
-  - `accounts_get`
-  - `api_key_set`
+- **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it differs from the feature's):
+  - `accounts_get` (M2)
+  - `api_key_set` (M2)
   - `api_key_remove`
   - `account_signin_prepare`
   - `cli_install`
@@ -1881,9 +1883,10 @@ cpt-noter-feature-ui-accessibility-l10n        │
     └─→ cpt-noter-feature-ui-menu-bar (core bridge, dialogs-host)
 
 M2  history-undo → items → call-page-outputs;  live-transcript + call-page-frame → speakers;
-    items + call-window + first-run → today;  items + settings → handoff
+    items + call-window + first-run → today;  items + settings → handoff;
+    settings + first-run + dialogs-host → accounts (API key and Runtime per task part, discrepancy 9)
 M3  library-calls + items → library-search-topics;  shell + live-transcript → ask;
-    speakers + items + library-calls → people;  settings + first-run + dialogs-host → accounts;
+    speakers + items + library-calls → people;  accounts (completed);
     settings + dialogs-host → privacy-sources
 M4  call-window + items + menu-bar → copilot;  accounts + copilot → agents
 M5  history-undo + settings + items → activity;  shell + handoff + settings → performance

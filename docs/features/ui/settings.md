@@ -323,7 +323,7 @@ The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indi
 | No setting matches | `no-match` | this |
 | Calendar access off | `calendar-off` | this |
 | Screen share test, Capture test running, Screen Recording needed, Capture test failed, Capture test during a call | the `dlg-share-test` sheet | this (bound in M2) |
-| Key rejected, Key being verified, Keychain locked, No own account, Signing in, Account signed in, Both accounts signed in, Session ended, Sign out asked, Local model not ready | `key-rejected`, `keychain-locked`, `local-not-ready`, account states | `cpt-noter-feature-ui-accounts` (M3) |
+| Key rejected, Key being verified, Keychain locked, No own account, Signing in, Account signed in, Both accounts signed in, Session ended, Sign out asked, Local model not ready | `key-rejected`, `keychain-locked`, `local-not-ready`, account states | `cpt-noter-feature-ui-accounts` (key states M2, account states and Local model not ready M3) |
 | Nothing left this Mac, No knowledge sources, Source indexing, Source sync failed, Sign-in expired, Remove source asked | `nothing-left`, `no-sources`, `source-failed`, `sign-in-expired` | `cpt-noter-feature-ui-privacy-sources` (M3) |
 | No repository mapped | `no-repo` | `cpt-noter-feature-ui-handoff` (M2) |
 | Job failed, Job running or a call is live, Evidence tool missing | `job-failed`, `jobs-during-call`, `evidence-missing` | `cpt-noter-feature-ui-activity` (M5) |
@@ -332,4 +332,4 @@ The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indi
 
 **Milestone notes.** `share_test_run` is M2 in milestones.toml; the sheet is built and screenshot-tested in M0 against the fake core and its E2E proof counts from M2 (discrepancy 3).
 
-**Not applicable.** Keys and secrets: none in the panes of this feature (Models & Runtimes is M3). Data: settings live in the core's `settings` table; the UI keeps no copy beyond the store slice.
+**Not applicable.** Keys and secrets: none in the panes of this feature (Models & Runtimes belongs to `cpt-noter-feature-ui-accounts`: the API keys and Runtime per task in M2, the rest in M3). Data: settings live in the core's `settings` table; the UI keeps no copy beyond the store slice.
