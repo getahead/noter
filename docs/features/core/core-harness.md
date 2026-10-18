@@ -107,13 +107,13 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 **Output**: A running core composition root, or exit with an error.
 
 **Steps**:
-1. [ ] - `p1` - Create a fresh temporary data folder (database, App Group stand-in) - `inst-temp-dir`
-2. [ ] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
-3. [ ] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
-   1. [ ] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`
+1. [x] - `p1` - Create a fresh temporary data folder (database, App Group stand-in) - `inst-temp-dir`
+2. [x] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
+3. [x] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
+   1. [x] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`
 4. [ ] - `p1` - Inject the clock (fixed or real), the scripted engine (`cpt-noter-algo-core-harness-scripted-engine`) and the scripted runtime - `inst-inject`
-5. [ ] - `p1` - Build the `noter-core` composition root exactly as `src-tauri` does, with an event emitter that writes event lines - `inst-build-core`
-6. [ ] - `p1` - **RETURN** ready; log the start to stderr only - `inst-return-booted`
+5. [x] - `p1` - Build the `noter-core` composition root exactly as `src-tauri` does, with an event emitter that writes event lines - `inst-build-core`
+6. [x] - `p1` - **RETURN** ready; log the start to stderr only - `inst-return-booted`
 
 ### Dispatch a request line
 
@@ -150,17 +150,17 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 ### Harness process
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-harness-process`
+- [x] `p1` - **ID**: `cpt-noter-state-core-harness-process`
 
 **States**: booting, serving, shutting_down, exited
 
 **Initial State**: booting
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** booting **TO** serving **WHEN** the fixture is loaded and the core is built - `inst-st-serving`
-2. [ ] - `p1` - **FROM** booting **TO** exited **WHEN** the fixture or the store fails to load (non-zero exit) - `inst-st-boot-fail`
-3. [ ] - `p1` - **FROM** serving **TO** shutting_down **WHEN** stdin ends - `inst-st-shutdown`
-4. [ ] - `p1` - **FROM** shutting_down **TO** exited **WHEN** every stream ended and output is flushed - `inst-st-exited`
+1. [x] - `p1` - **FROM** booting **TO** serving **WHEN** the fixture is loaded and the core is built - `inst-st-serving`
+2. [x] - `p1` - **FROM** booting **TO** exited **WHEN** the fixture or the store fails to load (non-zero exit) - `inst-st-boot-fail`
+3. [x] - `p1` - **FROM** serving **TO** shutting_down **WHEN** stdin ends - `inst-st-shutdown`
+4. [x] - `p1` - **FROM** shutting_down **TO** exited **WHEN** every stream ended and output is flushed - `inst-st-exited`
 
 ## 5. Definitions of Done
 
