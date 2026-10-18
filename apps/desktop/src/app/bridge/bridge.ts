@@ -76,6 +76,7 @@ async function slowAfter<T>(p: Promise<T>, mark: (slow: boolean) => void): Promi
 }
 
 // @cpt-component:cpt-noter-component-app-core-bridge:p1
+// @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
 // @cpt-dod:cpt-noter-dod-ui-core-bridge-bridge:p1
 // @cpt-dod:cpt-noter-dod-ui-core-bridge-errors:p1
 export function createBridge(label: WindowLabel, transport: Transport) {

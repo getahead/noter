@@ -25,6 +25,7 @@ const bridge = createBridge(label, import.meta.env.VITE_FAKE_CORE ? new FakeCore
 addEventListener("pagehide", () => void bridge.close());
 // @cpt-end:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-user-closes
 
+// @cpt-tech:cpt-noter-tech-ui-stack:p1
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App bridge={bridge} />
