@@ -2,14 +2,14 @@
 //! # noter-llm — the egress gate
 //!
 //! The only crate allowed to reach the network (`just arch`, decision C12). In M0 it holds
-//! what model downloads need: the allow-list check over `contracts/egress-hosts.json`
-//! (`allow_without_audit.model_downloads`) and an HTTP range fetcher that never leaves it,
+//! what model downloads need: the allow-list check over `noter_protocol::egress`
+//! (`ALLOW_WITHOUT_AUDIT`, group `model_downloads`) and an HTTP range fetcher that never leaves it,
 //! not even through a redirect. The LLM runtimes and the audited provider path join it in M2.
 //! The caller (noter-core's download task) verifies each bundle's sha256.
 
-use std::sync::OnceLock;
 use std::time::Duration;
 
+use noter_protocol::egress::ALLOW_WITHOUT_AUDIT;
 use reqwest::header::{CONTENT_RANGE, RANGE};
 use reqwest::redirect::Policy;
 use reqwest::{StatusCode, Url};
@@ -17,19 +17,12 @@ use reqwest::{StatusCode, Url};
 #[cfg(test)]
 mod fetch_tests;
 
-fn model_hosts() -> &'static [String] {
-    static HOSTS: OnceLock<Vec<String>> = OnceLock::new();
-    HOSTS.get_or_init(|| {
-        let list: serde_json::Value =
-            serde_json::from_str(include_str!("../../../contracts/egress-hosts.json"))
-                .unwrap_or_default();
-        list["allow_without_audit"]["model_downloads"]["hosts"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|h| h.as_str().map(str::to_string))
-            .collect()
-    })
+fn model_hosts() -> &'static [&'static str] {
+    ALLOW_WITHOUT_AUDIT
+        .iter()
+        .find(|g| g.name == "model_downloads")
+        .expect("noter_protocol::egress names a model_downloads group")
+        .hosts
 }
 
 /// An https URL, without credentials, on a host the allow-list names for model downloads.
@@ -41,9 +34,7 @@ fn allowed(url: &Url) -> bool {
     url.scheme() == "https"
         && url.username().is_empty()
         && url.password().is_none()
-        && url
-            .host_str()
-            .is_some_and(|h| model_hosts().iter().any(|m| m == h))
+        && url.host_str().is_some_and(|h| model_hosts().contains(&h))
 }
 
 /// One file of a pinned model bundle: a bundle is the set of its files at a pinned Hugging
