@@ -204,7 +204,7 @@ export const defaultHandlers: Handlers = {
   // ── App ──────────────────────────────────────────────────────────────
   app_snapshot: (_a, { world, window }) => ({ ...world.app, copilot: world.app.copilot ? world.copilot : null, window }),
   stream_unsubscribe: (a, { fake }) => {
-    fake.closeChannel(a.subscription_id);
+    fake.closeChannel(a.subscription_id, "unsubscribed");
     return ack;
   },
   stream_ack: (a, { fake }) => {

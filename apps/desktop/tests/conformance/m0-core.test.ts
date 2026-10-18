@@ -59,7 +59,7 @@ describe("window scope of M0 commands with valid arguments: refused, and nothing
 });
 
 describe("self-test stream (R23/R24)", () => {
-  it("starts at seq 1, takes stream_ack, and sends nothing after stream_unsubscribe", async () => {
+  it("starts at seq 1, takes stream_ack, ends with ended { unsubscribed } on stream_unsubscribe, then sends nothing", async () => {
     await s.change(W.idle);
     const settings = s.core("settings");
     const got: SelfTestMsg[] = [];
@@ -73,10 +73,14 @@ describe("self-test stream (R23/R24)", () => {
     expect(got[0].seq).toBe(1);
     ok(await settings.streamAck({ subscription_id: sub.subscription_id, seq: got.at(-1)!.seq }));
     ok(await settings.streamUnsubscribe({ subscription_id: sub.subscription_id }));
+    // The hub ends the subscription with a reason (DESIGN-core 3.2 stream hub; StreamEndReason::Unsubscribed).
+    await until(() => got.some((m) => m.event.type === "ended"), "ended after stream_unsubscribe");
+    const ended = got.at(-1)!;
+    expect(ended.event).toEqual({ type: "ended", reason: "unsubscribed" });
+    expect(ended.seq).toBe(got.at(-2)!.seq + 1);
     const n = got.length;
     await sleep(2000); // longer than the whole self-test of the fake and of the scripted engine
     expect(got.length).toBe(n);
-    expect(got.some((m) => m.event.type === "ended")).toBe(false);
   });
 });
 
