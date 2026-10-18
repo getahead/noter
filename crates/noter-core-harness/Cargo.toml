@@ -18,3 +18,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time"] }
+
+# Perf scenarios (harness/perf.toml); `test = true` runs their one-round tests in `cargo test`.
+[[example]]
+name = "perf_app_snapshot"
+test = true
