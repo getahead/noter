@@ -65,7 +65,8 @@ Implement credential row, field and account-login variants, key sheets and remov
 - **Design**: [DESIGN.md](../../DESIGN.md) › Settings — Models & Runtimes; First-run step 6; Dialogs sign-in and sign-out; Component — Credential row
 - **Design elements**: `cpt-noter-component-ui-credential-row`; uses `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-first-run`, `cpt-noter-component-screen-dialogs`, `cpt-noter-component-ui-status-row`
 - **Stories (M3)**: `cpt-noter-seq-first-run-connect-assistant`, `cpt-noter-seq-settings-replace-api-key`, `cpt-noter-seq-settings-sign-in-account`
-- **Frozen commands delivered (M3)**: `accounts_get`, `api_key_set`, `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`
+- **Frozen commands delivered (M2, owner decision of 18 Oct)**: `accounts_get`, `api_key_set`
+- **Frozen commands delivered (M3)**: `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`
 - **Earlier commands reused**: `settings_get`, `settings_update` for task runtime, `models_download`, `open_external`, `change_undo` through History
 - **Events**: `accounts:changed`, `signin:progress`, `jobs:progress`, `settings:changed`, `privacy:changed`
 - **Data**: no UI tables; credentials and CLI sessions stay with the core and tools
@@ -78,6 +79,8 @@ Implement credential row, field and account-login variants, key sheets and remov
 ### Add, replace or remove an API key
 
 - [ ] `p1` - **ID**: `cpt-noter-flow-ui-accounts-key`
+
+Delivered in M2 (see Milestone notes). Steps 7, 8 and 9.1 call M3 commands: M2 builds them against the fake core, and they pass against the real core in M3.
 
 **Actor**: Primary user
 
@@ -144,6 +147,8 @@ Implement credential row, field and account-login variants, key sheets and remov
 
 - [ ] `p1` - **ID**: `cpt-noter-flow-ui-accounts-manage`
 
+Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes listed as not connected until M3; the other steps are M3 (see Milestone notes).
+
 **Actor**: Primary user
 
 **Success Scenarios**:
@@ -192,6 +197,8 @@ Implement credential row, field and account-login variants, key sheets and remov
 
 **Initial State**: SIGNED_OUT (until accounts_get supplies stored state)
 
+The key transitions 11 to 14 are M2; the account transitions 1 to 10 are M3. The state is ticked in M3.
+
 **Transitions**:
 1. [ ] - `p1` - **FROM** SIGNED_OUT **TO** PREPARE **WHEN** Sign In is selected - `inst-prepare`
 2. [ ] - `p1` - **FROM** PREPARE **TO** INSTALLING **WHEN** Install is chosen; successful job and prepare return to PREPARE - `inst-install`
@@ -223,8 +230,8 @@ The system **MUST** share row/field forms between Settings and Assistants, permi
 **Constraints**: `cpt-noter-constraint-local-only-ui`, `cpt-noter-constraint-accessibility-baseline`
 
 **Touches**:
-- Commands: `accounts_get`, `api_key_set`, `api_key_remove`, `cli_install`, `models_download`
-- Tests: unit tests for secret-draft clearing, duplicate submission, failed verification and masking; conformance for rejected keys, removal and accounts versions; E2E `cpt-noter-seq-first-run-connect-assistant`, `cpt-noter-seq-settings-replace-api-key`, including rejected, locked, local-not-ready and no-assistant paths
+- Commands: `accounts_get` (M2), `api_key_set` (M2), `api_key_remove` (M3), `cli_install` (M3), `models_download`
+- Tests: unit tests for secret-draft clearing, duplicate submission, failed verification and masking; conformance for rejected keys, removal and accounts versions; E2E `cpt-noter-seq-first-run-connect-assistant`, `cpt-noter-seq-settings-replace-api-key`, including rejected, locked, local-not-ready and no-assistant paths. In M2 the real-core E2E covers the key paths; the removal and local-not-ready paths join in M3
 
 ### Independent account sessions and explicit binding
 
@@ -240,7 +247,7 @@ The system **MUST** implement all four steps for each provider, correlation, ins
 **Constraints**: `cpt-noter-constraint-local-only-ui`, `cpt-noter-constraint-accessibility-baseline`
 
 **Touches**:
-- Commands: `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`; shared settings and Undo
+- Commands: `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`; shared settings (Runtime per task through `settings_update` from M2) and Undo
 - Tests: unit tests for independent sessions, confirmation guard, expiry and late events; conformance for every account command, cancellation and sign-out flags; E2E `cpt-noter-seq-settings-sign-in-account` with both providers, all errors and M3-owned paths; M4 owns per-agent editor paths
 
 **Completion gate**: `just gate` passes.
@@ -261,6 +268,6 @@ The system **MUST** implement all four steps for each provider, correlation, ins
 
 **Contract and fake gaps.** No verify-only command exists: `api_key_set` verifies and stores at once. The Verify/Save separation therefore cannot promise that Cancel after Verify leaves the old key unchanged; the flow above explicitly treats Verify as storage and Save as dismissal. This needs owner resolution before matching that promise. `account_use_existing` carries no personal-use acknowledgment; enforce the UI guard, but core cannot verify it from that request. Recovering a signing-in row after full reload yields only a session id, not its URL/code/expiry; Show must not invent them. The Use sheet lacks a delivered agent-candidate list in AccountsView (it lists existing users only); Agents commands are M4. Preselecting unavailable candidates needs upstream data. `models_download` accepts only start/pause/resume/retry for setup model bundles, not a local runtime model id; the Qwen download action needs a defined core path and must not be presented as implemented by a speech-bundle download. Spend per week and detailed test-request latency in Check are not in AccountsView/progress. Do not copy fixture amounts or durations. The fake does not fully implement default-for-new-agents, sign-out fallback or also_in_cli effects; conformance must prove these against the real core.
 
-**Milestone notes.** The M3 stories contain agent quick fixes and per-agent runtime/model selection; the editor and `agent_update` are M4 under `cpt-noter-feature-ui-agents`. M3 delivers account rows, task choices and explicit binding, not a claim that those M4 paths passed.
+**Milestone notes.** `accounts_get` and `api_key_set` are M2 (owner decision of 18 Oct; DECOMPOSITION.md § 1, discrepancy 9), so the API key and Runtime per task part ships in M2 and the post-call runtime can be configured from the app. M2 delivers `cpt-noter-flow-ui-accounts-key`, `cpt-noter-dod-ui-accounts-keys`, the key transitions of `cpt-noter-state-ui-accounts-credentials` and **Runtime per task** (steps 2 and 3 of `cpt-noter-flow-ui-accounts-manage`, `settings_update`) on the real core. In **Runtime per task** the account runtimes stay visible and disabled as not connected until M3. **Remove…** and **Install Ollama…** run on the fake core until their commands arrive in M3. In M2, **Your own accounts** shows its frame and says it arrives in M3, as Settings does for the panes it leaves to later features. The sign-in flow, the rest of the manage flow (Test and sign-out), the session algorithm and the stories stay M3; `cpt-noter-flow-ui-accounts-manage` and `cpt-noter-dod-ui-accounts-sign-in` are ticked in M3. The M3 stories contain agent quick fixes and per-agent runtime/model selection; the editor and `agent_update` are M4 under `cpt-noter-feature-ui-agents`. M3 delivers account rows, task choices and explicit binding, not a claim that those M4 paths passed.
 
 **Not applicable.** OAuth protocol, plan verification, CLI installation implementation, Keychain encryption, network access, schema migrations and deployment are core/tool responsibilities. UI observes safe typed status, never stores the supplied key beyond the live field and never logs credentials or sign-in links.
