@@ -175,6 +175,7 @@ impl Core {
         send: &impl Fn(SelfTestEvent),
     ) -> Result<(), SelfTestFailure> {
         let mut events = self.engine.events();
+        // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-send-self-test
         let run = EngineCommand::SelfTest {
             play_clip,
             timeout_ms: WINDOW_MS,
@@ -182,6 +183,7 @@ impl Core {
         if self.engine.command(run).await.is_err() {
             return Err(SelfTestFailure::TimedOut);
         }
+        // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-send-self-test
         let mut arrived = Vec::new();
         let deadline =
             tokio::time::Instant::now() + Duration::from_millis(WINDOW_MS.into()) + MARGIN;
