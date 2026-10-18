@@ -3,22 +3,27 @@
 //! Every later feature plugs its service in through [`CoreDeps`] and this crate.
 
 mod app;
+mod glossary;
+mod hotkeys;
 mod hub;
 mod log;
+mod settings;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use noter_db::{OpenError, Store};
+use noter_db::{ChangeMeta, Migration, OpenError, Store};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
+pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 use noter_protocol::ipc::Sink;
+pub use settings::default_settings;
 
 /// `~/Library/Application Support/Noter`: where the app keeps `noter.db` and `logs/`.
 pub fn default_data_dir() -> Option<std::path::PathBuf> {
@@ -56,6 +61,8 @@ pub struct CoreDeps {
     pub events: Arc<dyn EventEmitter>,
     /// The app's version as the host knows it (`app_snapshot.app_version`); `dev` until set.
     pub app_version: String,
+    /// Global shortcuts; accepts every chord until the host sets its own (`with_shortcuts`).
+    pub shortcuts: Arc<dyn ShortcutRegistrar>,
 }
 
 impl CoreDeps {
@@ -64,11 +71,17 @@ impl CoreDeps {
             clock,
             events,
             app_version: "dev".into(),
+            shortcuts: Arc::new(hotkeys::AcceptAll),
         }
     }
 
     pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
         self.app_version = version.into();
+        self
+    }
+
+    pub fn with_shortcuts(mut self, shortcuts: Arc<dyn ShortcutRegistrar>) -> Self {
+        self.shortcuts = shortcuts;
         self
     }
 }
@@ -80,6 +93,8 @@ pub enum BootError {
     Io(std::io::Error),
     /// The database did not open (corrupt, migration failed, newer than this app).
     Store(OpenError),
+    /// Stored state could not be read.
+    Load(CoreError),
 }
 
 impl std::fmt::Display for BootError {
@@ -87,6 +102,7 @@ impl std::fmt::Display for BootError {
         match self {
             Self::Io(e) => write!(f, "cannot prepare the data folder: {e}"),
             Self::Store(e) => write!(f, "{e}"),
+            Self::Load(e) => write!(f, "cannot read the stored settings: {e}"),
         }
     }
 }
@@ -102,14 +118,35 @@ pub struct Core {
     app: Mutex<AppSnapshot>,
     /// One stream hub per Channel message type, for routing acks, reloads and shutdown.
     hubs: Mutex<Vec<Arc<dyn AnyHub>>>,
+    /// The settings as stored; writes hold this lock, so they apply one at a time.
+    settings: Mutex<Settings>,
+    /// App hotkeys and their registration status; writes hold this lock, then `settings`.
+    hotkeys: Mutex<HotkeyList>,
+    settings_hooks: Hooks<SettingsSection>,
+    glossary_hooks: Hooks<GlossaryList>,
 }
+
+/// Other features' callbacks for a change, run after it committed.
+type Hooks<T> = Mutex<Vec<Box<dyn Fn(&T) + Send + Sync>>>;
+
+/// noter-core's own tables: settings and the glossary.
+// @cpt-dbtable:cpt-noter-dbtable-settings:p1
+pub const MIGRATIONS: &[Migration] = &[Migration {
+    owner: "noter-core",
+    version: 1,
+    name: "settings and glossary",
+    sql: include_str!("../migrations/0001_settings_glossary.sql"),
+}];
 
 impl Core {
     /// Opens the core on `data_dir` (`noter.db`, `logs/`): the same call for the app, the
     /// harness and the tests.
     pub fn open(data_dir: &Path, deps: CoreDeps) -> Result<Core, BootError> {
         let log = log::Logger::open(data_dir).map_err(BootError::Io)?;
-        let store = match Store::open(&data_dir.join("noter.db"), &[noter_db::MIGRATIONS]) {
+        let store = match Store::open(
+            &data_dir.join("noter.db"),
+            &[noter_db::MIGRATIONS, MIGRATIONS],
+        ) {
             Ok(store) => store,
             Err(e) => {
                 let record =
@@ -119,13 +156,20 @@ impl Core {
             }
         };
         let snapshot = app::fresh_snapshot(&deps.app_version);
-        Ok(Core {
+        let settings = settings::load(&store).map_err(BootError::Load)?;
+        let core = Core {
             deps,
             store,
             log,
             app: Mutex::new(snapshot),
             hubs: Mutex::new(vec![]),
-        })
+            settings: Mutex::new(settings),
+            hotkeys: Mutex::new(hotkeys::fresh_list()),
+            settings_hooks: Mutex::new(vec![]),
+            glossary_hooks: Mutex::new(vec![]),
+        };
+        core.start_hotkeys().map_err(BootError::Load)?;
+        Ok(core)
     }
 
     /// Ends the core: every stream ends with `shutdown`, then the writer drains its queue and
@@ -245,7 +289,103 @@ impl Core {
 }
 
 // @cpt-interface:cpt-noter-interface-core-ipc:p1
+impl Core {
+    /// Who wrote, for the change row: the user, through a window or a native surface.
+    pub(crate) fn change_meta(
+        &self,
+        ctx: &CommandCtx,
+        summary: String,
+        reason: &str,
+    ) -> ChangeMeta {
+        let surface = match ctx.caller {
+            Caller::Native { surface } => Some(surface),
+            Caller::Window { .. } => None,
+        };
+        ChangeMeta {
+            actor: Actor::You,
+            summary,
+            reason: reason.into(),
+            evidence_ids: vec![],
+            batch_id: None,
+            undoable: true,
+            surface,
+        }
+    }
+}
+
+pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 impl CoreApi for Core {
+    async fn settings_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Settings, CoreError> {
+        Ok(lock(&self.settings).clone())
+    }
+
+    async fn settings_update(
+        &self,
+        ctx: &CommandCtx,
+        args: SettingsUpdateArgs,
+    ) -> Result<Settings, CoreError> {
+        self.update_settings(ctx, args)
+    }
+
+    async fn settings_unignore_app(
+        &self,
+        ctx: &CommandCtx,
+        args: AppIdArgs,
+    ) -> Result<Settings, CoreError> {
+        self.unignore_app(ctx, args)
+    }
+
+    async fn hotkeys_list(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<HotkeyList, CoreError> {
+        Ok(lock(&self.hotkeys).clone())
+    }
+
+    async fn hotkey_set(
+        &self,
+        ctx: &CommandCtx,
+        args: HotkeySetArgs,
+    ) -> Result<HotkeyList, CoreError> {
+        self.set_hotkey(ctx, args)
+    }
+
+    async fn hotkeys_reset(
+        &self,
+        ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<HotkeyList, CoreError> {
+        self.reset_hotkeys(ctx)
+    }
+
+    async fn glossary_list(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<GlossaryList, CoreError> {
+        self.glossary()
+    }
+
+    async fn glossary_upsert(
+        &self,
+        ctx: &CommandCtx,
+        args: GlossaryUpsertArgs,
+    ) -> Result<GlossaryList, CoreError> {
+        self.upsert_term(ctx, args)
+    }
+
+    async fn glossary_remove(
+        &self,
+        ctx: &CommandCtx,
+        args: GlossaryIdArgs,
+    ) -> Result<GlossaryList, CoreError> {
+        self.remove_term(ctx, args)
+    }
+
     async fn app_snapshot(
         &self,
         ctx: &CommandCtx,
@@ -363,4 +503,9 @@ fn object(v: Value) -> Map<String, Value> {
         Value::Object(map) => map,
         _ => Map::new(),
     }
+}
+
+/// `internal`: developer text for the log only, never record text.
+pub(crate) fn internal(e: impl std::fmt::Display) -> CoreError {
+    CoreError::new(ErrorCode::Internal, e.to_string())
 }
