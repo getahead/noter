@@ -374,18 +374,6 @@ impl Harness {
             // The Mac says it changed: the core re-reads what was granted outside it.
             self.native.changed();
         }
-        if current["app"]["setup"]["models"] != wanted["app"]["setup"]["models"] {
-            self.models
-                .place(&self.dir.join("models"), &parsed.app.setup.models)
-                .map_err(crate::internal)?;
-            self.core.refresh_models();
-        }
-        if current["app"]["banners"]["banners"] != wanted["app"]["banners"]["banners"] {
-            self.core.set_banners(parsed.app.banners.banners.clone());
-        }
-        // Derived fields are the core's to compute; a world that disagrees with it is a preset
-        // that drifted from the core's rules (what was applied stays applied).
-        let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
         // Bundle sizes and progress come from the harness's tiny bundles, not from the preset:
         // only which bundle is in which state is the world's to say.
         let bundle_states = |w: &Value| -> Value {
@@ -397,13 +385,32 @@ impl Harness {
                         .collect()
                 })
         };
+        let models_set = bundle_states(&current) != bundle_states(&wanted);
+        if models_set {
+            self.models
+                .place(&self.dir.join("models"), &parsed.app.setup.models)
+                .map_err(crate::internal)?;
+            self.core.refresh_models();
+        }
+        if current["app"]["banners"]["banners"] != wanted["app"]["banners"]["banners"] {
+            self.core.set_banners(parsed.app.banners.banners.clone());
+        }
+        // Derived fields are the core's to compute; a world that disagrees with it is a preset
+        // that drifted from the core's rules (what was applied stays applied).
+        let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
         let mut drifted: Vec<String> = ["complete", "detection_enabled"]
             .into_iter()
             .filter(|f| after["app"]["setup"][f] != wanted["app"]["setup"][f])
             .map(|f| format!("app.setup.{f}"))
             .collect();
-        if bundle_states(&after) != bundle_states(&wanted) {
-            drifted.push("app.setup.models".to_string());
+        // Unchanged models are not the world's to enforce: the core moves them itself (a
+        // download resumes once the Mac is online again).
+        if models_set && bundle_states(&after) != bundle_states(&wanted) {
+            drifted.push(format!(
+                "app.setup.models (the core has {}, the world says {})",
+                bundle_states(&after),
+                bundle_states(&wanted)
+            ));
         }
         if !drifted.is_empty() {
             return Err(CoreError::new(
