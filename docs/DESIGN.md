@@ -2466,7 +2466,7 @@ Some actions need the user's decision before anything can go on: an irreversible
 | **Screen Share Test…** | sheet, 640 wide, in the Settings window | The table **What a share would show**; **Run Capture Test** with **On your screen** and **What the share sees**; one result row per surface; the limits line; **Done** (default); the rows are described in `cpt-noter-component-screen-settings` (D96) |
 | **Add MCP Server…** and source details | sheet, 560 wide, `cpt-noter-component-ui-primitives` | **Server** pop-up, **Mode** **Live** (**Looked up after calls and in Ask; nothing is copied. Runs only in Cloud allowed, and each lookup is logged in Privacy**, PM-68) or **Indexed** (**Copied into the local index; sign-in opens in your browser**), **Schedule**, **Privacy class** with the note **Sensitive sources are answered by the local model only**, **Scope**; **Cancel** · **Add Source**; details add **Re-index**, **Revoke Token…**, **Remove Source…**; from Settings › Knowledge Sources |
 | **Add Mapping…** and **Edit Mapping** | sheet, 520 wide, `cpt-noter-component-ui-primitives` | **Jira project or component**, **Folder** with **Choose…** (system open panel), **Default tool** segmented **Claude Code** · **Codex**; **Cancel** · **Add Mapping**; from Settings › Repositories and the Handoff drawer, where the subtitle reads **From the Handoff drawer** and the key is filled in |
-| **Add…** and **Replace…** for an API key | sheet, 480 wide, `cpt-noter-component-ui-primitives` | Title **Replace Anthropic API Key** (or **Add …**); secure field with the note **Paste works; the key goes to the Keychain only**; **Verify**, then **Verified · Claude Code can use this key**; **Cancel** · **Save**, enabled once verified; afterwards the row shows **••••••••  Stored in the Keychain**; from Settings › Models & Runtimes and the sign-in sheet's **Use an API Key Instead** |
+| **Add…** and **Replace…** for an API key | sheet, 480 wide, `cpt-noter-component-ui-primitives` | Title **Replace Anthropic API Key** (or **Add …**); secure field with the note **Paste works; the key goes to the Keychain only**; **Verify** checks the key and stores it in the Keychain in one step (`api_key_set`), replacing the old key at that moment, then shows **Verified · Claude Code can use this key**; **Cancel** · **Save**, enabled once verified: **Save** closes the sheet without sending the key again, **Cancel** before **Verify** leaves the old key unchanged and after a successful **Verify** only closes (HoD decision D-3); afterwards the row shows **••••••••  Stored in the Keychain**; from Settings › Models & Runtimes and the sign-in sheet's **Use an API Key Instead** |
 | **Run Audio Self-Test…** | sheet, 560 wide, `cpt-noter-component-ui-self-test-panel` | Subtitle **Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.**; the self-test with **Play Test Clip**, **Run Test** and the four result lines (D99); **Cancel** · **Done**; from Settings › Audio & Transcription and **Run Audio Self-Test…** on Today |
 | Speaker label, owner chip | popover, `cpt-noter-component-ui-person-picker` | Rename: **Whole call** or **Only this line**, **Also update the voice profile**, **New Person…** (D33) |
 | New person form | popover, `cpt-noter-component-ui-person-picker` | Replaces the picker's list in the same popover: **Name**, **Email**, **Role**; **Back** and **Create and Name**, **Create and Assign** or **Create**; never a sheet, so it works in the call window (D92, D93) |
@@ -3481,7 +3481,7 @@ The **Hotkeys** pane:
 | Audio & Transcription › **Microphone** and **System audio recording** permissions | `cpt-noter-component-ui-permission-check-row`, status only | **Open System Settings…** when denied |
 | Audio & Transcription › **Run Audio Self-Test…** | Push button | Sheet with `cpt-noter-component-ui-self-test-panel` (`cpt-noter-component-screen-dialogs`); with **Exclude Noter's own sounds** on, the test also checks that Noter's own sounds stay out, which replay while recording needs (D99) |
 | Audio & Transcription › **Models** | `cpt-noter-component-ui-status-row`, model | Size; **Downloaded**, **Updating** or **Previous version kept**; progress while downloading |
-| Models & Runtimes › **API keys**: **Anthropic API key**, **Codex API key** | `cpt-noter-component-ui-credential-row`, row | Use lines **Claude Code for the live copilot, summaries and Ask** and **Codex for role reviews and handoffs; optional**; **Configured** with ••••••••  **Stored in the Keychain**, **Replace…**, **Remove…**; or **Not set** with **Add…**; the key sheet has a secure field that accepts paste, **Verify** and **Save** (WCAG 3.3.8) |
+| Models & Runtimes › **API keys**: **Anthropic API key**, **Codex API key** | `cpt-noter-component-ui-credential-row`, row | Use lines **Claude Code for the live copilot, summaries and Ask** and **Codex for role reviews and handoffs; optional**; **Configured** with ••••••••  **Stored in the Keychain**, **Replace…**, **Remove…**; or **Not set** with **Add…**; the key sheet has a secure field that accepts paste, **Verify**, which stores the key once it is accepted, and **Save**, which closes the sheet (D-3; WCAG 3.3.8) |
 | Models & Runtimes › **Your own accounts**: **Your Claude account**, **Your ChatGPT account** | `cpt-noter-component-ui-credential-row`, account login | Two separate rows; either, both or neither can be signed in. Signed out: **Sign In with Claude…** or **Sign In with ChatGPT…** opens the sign-in sheet (`cpt-noter-component-screen-dialogs`); signed in: the account, plan and tool, which agents use it, **Test** and **Sign Out…**; the group's footnote reads **Add either account, or both. Noter never sees your password: Claude Code and Codex keep the sign-in in your Keychain.** (PM-58) |
 | Models & Runtimes › **Local runtime** | `cpt-noter-component-ui-status-row`, runtime | **Ollama detected · Qwen3 8B ready** with **Local fallback for every task**, or **Install Ollama…** |
 | Models & Runtimes › **Runtime per task** | Table with a pop-up per row | **Live copilot**, **Post-call analysis** and **Search answers**; each pop-up lists the runtimes in the agent editor's order, **Claude Code · your Claude account**, **Codex · your ChatGPT account**, **Claude Code · Anthropic API key**, **Codex · Codex API key**, **Local model · Ollama**; a runtime that is not connected stays in the list, disabled, with **— not connected** (PM-58) |
@@ -3526,7 +3526,7 @@ The **Hotkeys** pane:
 | State | Region | What the user sees | Source | Story |
 | --- | --- | --- | --- | --- |
 | Key rejected | Models & Runtimes | **Rejected** · **Anthropic rejected this key (invalid key)** · **Replace…** | UX B.13 | `cpt-noter-seq-settings-replace-api-key` (Error — Key rejected) |
-| Key being verified | Key sheet | A spinner on **Verify**; after **Save** the row reads **Configured** and shows **Saved** | UX C.2 | Transient; no path |
+| Key being verified | Key sheet | A spinner on **Verify**; once accepted the key is stored; after **Save** the row reads **Configured** and shows **Saved** | UX C.2 | Transient; no path |
 | Keychain locked | ST-R3 | `cpt-noter-component-ui-inline-banner`, error: **Keychain is locked** · **Try Again** | UX B.13 | `cpt-noter-seq-settings-replace-api-key` (Error — Keychain locked) |
 | No own account | Models & Runtimes, **Your own accounts** | Both rows **Not signed in**, with **Use your Claude Pro or Max plan through Claude Code. Personal use only.** and **Use your ChatGPT plan through Codex.**, and **Sign In with Claude…** and **Sign In with ChatGPT…** | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Happy path) |
 | Signing in | Account row | **Finishing in your browser…** with a small spinner, **Show** and **Cancel**, while the sign-in sheet is closed | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Other — Sheet closed while the browser is open) |
@@ -3562,7 +3562,7 @@ The **Hotkeys** pane:
 | Evidence tool missing | Maintenance, **Evidence sources** | **Not configured · install bkt** beside **Bitbucket (bkt)** | PRD › Maintenance jobs, evidence collection and history | `cpt-noter-seq-activity-review-proposals` (Error — Evidence tool missing) |
 | Update ready | Updates | **Version 1.2 installs on next launch** · **Restart Now** | UX B.13 | `cpt-noter-seq-settings-check-privacy` (Other — Install an update) |
 | Storage folder in iCloud or Dropbox | General, **Storage location** | Warning line under the path: **This folder is in iCloud Drive, so your recordings sync off this Mac. Choose a local folder.** | PRD › Feature specification › 14 | `cpt-noter-seq-settings-check-privacy` (Error — Storage folder in iCloud Drive) |
-| No setting matches | ST-R1 | **No settings match “zoom”** in place of the pane list | UX B.13 | `cpt-noter-seq-settings-set-hotkeys` (Empty — No setting matches the search) |
+| No setting matches | ST-R1 | **No settings match “zoom calls”** in place of the pane list | UX B.13 | `cpt-noter-seq-settings-set-hotkeys` (Empty — No setting matches the search) |
 
 #### Screen — Performance
 
@@ -7656,7 +7656,7 @@ The Anthropic and Codex API keys live in the Keychain, and the Settings page sho
 4. Keychain line: "••••••••  Stored in the Keychain" (configured only).
 5. Actions at the trailing end.
 
-The field form has a label, the secure field, **Verify**, and a result line under the field.
+The field form has a label, the secure field, **Verify**, and a result line under the field. **Verify** checks and stores the key in one step (`api_key_set`); the sheet's **Save** only closes it (D-3).
 
 The account-login row has the provider mark, the title **Your Claude account** or **Your ChatGPT account**, the state tag, a detail line (the use line when signed out; **mikhail@example.com · Claude Max · through Claude Code** and the agents line when signed in; the reason when the provider ended the session) and the actions.
 
@@ -9303,7 +9303,7 @@ User:
 User:
 
 1. Sees **Assistants** with **Anthropic API key** and **Codex API key**, **Your Claude account** and **Your ChatGPT account** under **Or use your own account**, **Local runtime** and **Privacy mode**
-2. Types or pastes the key into **Anthropic API key** and clicks **Verify**
+2. Types or pastes the key into **Anthropic API key** and clicks **Verify**, which checks the key and stores it (D-3)
 3. Sees **••••••••  Stored in the Keychain** under the field
 4. Sees **Local runtime** report Ollama as detected, and **Privacy mode** set to **Cloud with redaction**
 5. Clicks **Finish** and gets Today, with **Idle · API key · local fallback ready** at the bottom of the sidebar
@@ -11790,8 +11790,8 @@ User:
 2. Sees the Settings window on **Models & Runtimes**, with **Anthropic API key** at **Rejected** and **Anthropic rejected this key (invalid key)**
 3. Clicks **Replace…** and sees a sheet with an empty key field, **Verify** and **Save**
 4. Presses ⌘V in the key field
-5. Clicks **Verify** and sees the key accepted
-6. Clicks **Save**
+5. Clicks **Verify** and sees the key accepted; it is stored in the Keychain from this moment (D-3)
+6. Clicks **Save**, which closes the sheet
 7. Gets **Configured** and **••••••••  Stored in the Keychain** on the row, and **Idle · API key · local fallback ready** in the sidebar footer
 
 **Error path — Key rejected**
@@ -11812,7 +11812,7 @@ User:
 1. Opens the Settings window with ⌘, and selects **Models & Runtimes**
 2. Sees **Keychain is locked** at the top of the pane
 3. Clicks **Replace…** on **Anthropic API key** and presses ⌘V in the key field
-4. Clicks **Save** and sees macOS ask for the keychain password
+4. Clicks **Verify** and sees macOS ask for the keychain password
 5. Types the password in the macOS prompt
 6. Gets **Configured** on the row and the banner gone
 
@@ -12164,8 +12164,8 @@ User:
 
 User:
 
-1. Types “zoom” in the search field of the Settings window
-2. Sees **No settings match “zoom”** in place of the pane list
+1. Types “zoom calls” in the search field of the Settings window
+2. Sees **No settings match “zoom calls”** in place of the pane list
 3. Clicks × in the search field and sees the eleven panes again
 4. Selects **Hotkeys** and gets the same shortcuts for every call app, Zoom included
 

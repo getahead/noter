@@ -88,7 +88,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 - Error — Shortcut used by VoiceOver: **Used by VoiceOver** under the row; a different chord clears it
 - Error — Card key used by another app: **Card key** ⌃⌥⌘3 **is used by another app** under **Pin a card**; reopening **Hotkeys** after freeing it clears it
 - Error — Shortcut without a modifier: **Add Command, Option or Control**; the old chord stays
-- Empty — No setting matches the search: the search field's empty state in place of the pane list
+- Empty — No setting matches the search: “zoom calls”, which matches no pane name or keyword (HoD decision D-2; plain “zoom” finds Privacy and Call Screen & Menu Bar), shows the search field's empty state **No settings match “zoom calls”** in place of the pane list; the E2E test types the same words
 
 **Steps**:
 1. [ ] - `p1` - User opens Settings and selects **Hotkeys** - `inst-open-hotkeys`
@@ -328,7 +328,7 @@ The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indi
 | No repository mapped | `no-repo` | `cpt-noter-feature-ui-handoff` (M2) |
 | Job failed, Job running or a call is live, Evidence tool missing | `job-failed`, `jobs-during-call`, `evidence-missing` | `cpt-noter-feature-ui-activity` (M5) |
 
-**DESIGN versus prototype.** The story `cpt-noter-seq-settings-set-hotkeys` (Empty — No setting matches the search) uses the word “zoom”, which the prototype's keyword search matches to Privacy and Call Screen & Menu Bar; the prototype's empty state uses “zoom calls”. This feature follows the prototype's keyword search, and the E2E test of that path uses a word that matches no pane (listed in `docs/DECOMPOSITION.md`).
+**DESIGN versus prototype.** The story `cpt-noter-seq-settings-set-hotkeys` (Empty — No setting matches the search) used the word “zoom”, which the prototype's keyword search matches to Privacy and Call Screen & Menu Bar. HoD decision D-2 keeps the prototype's keyword search and changes the story to the prototype's own empty-state words, “zoom calls”, which match no pane; the E2E test of that path types them (listed in `docs/DECOMPOSITION.md`).
 
 **Milestone notes.** `share_test_run` is M2 in milestones.toml; the sheet is built and screenshot-tested in M0 against the fake core and its E2E proof counts from M2 (discrepancy 3).
 
