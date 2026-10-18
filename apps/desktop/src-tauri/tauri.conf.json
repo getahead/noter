@@ -8,7 +8,9 @@
   },
   "app": {
     "windows": [{ "label": "main", "title": "Noter", "width": 1200, "height": 800 }],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost"
+    }
   },
   "bundle": { "active": false }
 }
