@@ -120,7 +120,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 **Steps**:
 1. [ ] - `p1` - API: `levels_subscribe { call_id? }` with a Channel - `inst-levels-call`
 2. [ ] - `p1` - **RETURN** a `SubscriptionHandle` - `inst-levels-handle`
-3. [ ] - `p1` - Forward engine `levels` as `LevelsMsg { seq, at_ms, mic_db, sys_db }`, coalesced to one per 100 ms per subscription - `inst-levels-forward`
+3. [ ] - `p1` - Forward engine `levels` as `LevelsMsg { seq, at_ms, mic_db, sys_db }`, coalesced to one per 100 ms per stream, before a `seq` is assigned - `inst-levels-forward`
 4. [ ] - `p1` - End with `stream_unsubscribe` or a webview reload - `inst-levels-end`
 
 ### Preview a span

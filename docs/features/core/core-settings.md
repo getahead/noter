@@ -80,7 +80,7 @@ Every component reads settings, and two windows (Settings and First run) write t
 
 ### Change a settings section
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-settings-update`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-settings-update`
 
 **Actor**: Primary user (Settings or First run window)
 
@@ -93,18 +93,18 @@ Every component reads settings, and two windows (Settings and First run) write t
 - The call is made from a window outside the scope (only Settings and First run may write): `window_not_allowed`.
 
 **Steps**:
-1. [ ] - `p1` - API: `settings_update { rev, section }` - `inst-update-call`
-2. [ ] - `p1` - Validate the section with `cpt-noter-algo-core-settings-validate`; a failure **RETURN** `invalid_input` - `inst-validate`
-3. [ ] - `p1` - DB: replace the section row and bump the settings `rev` through `cpt-noter-algo-core-storage-change-tx` (actor `you`, before and after the section) - `inst-write-section`
-4. [ ] - `p1` - **IF** the write returned `conflict` - `inst-if-conflict`
-   1. [ ] - `p1` - **RETURN** `conflict` with `detail.current_rev` - `inst-return-conflict`
-5. [ ] - `p1` - Apply side effects of the section (for example `launch_at_login` through the native login item, `offer_to_record` to the detection rule) - `inst-side-effects`
-6. [ ] - `p1` - Emit `settings:changed` with the whole `Settings` and a new `version` - `inst-emit-settings`
-7. [ ] - `p1` - **RETURN** the whole `Settings` - `inst-return-settings`
+1. [x] - `p1` - API: `settings_update { rev, section }` - `inst-update-call`
+2. [x] - `p1` - Validate the section with `cpt-noter-algo-core-settings-validate`; a failure **RETURN** `invalid_input` - `inst-validate`
+3. [x] - `p1` - DB: replace the section row and bump the settings `rev` through `cpt-noter-algo-core-storage-custom-write` (actor `you`, before and after the section) - `inst-write-section`
+4. [x] - `p1` - **IF** the write returned `conflict` - `inst-if-conflict`
+   1. [x] - `p1` - **RETURN** `conflict` with `detail.current_rev` - `inst-return-conflict`
+5. [x] - `p1` - Call the section-changed hook with the new section; first run subscribes to it and applies `launch_at_login` (native login item) and `offer_to_record` (detection rule), so settings never calls into first-run code - `inst-side-effects`
+6. [x] - `p1` - Emit `settings:changed` with the whole `Settings` and a new `version` - `inst-emit-settings`
+7. [x] - `p1` - **RETURN** the whole `Settings` - `inst-return-settings`
 
 ### Set a global hotkey
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-settings-hotkey-set`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-settings-hotkey-set`
 
 **Actor**: Primary user (Settings › Hotkeys)
 
@@ -119,19 +119,19 @@ Every component reads settings, and two windows (Settings and First run) write t
 - Another Noter action already uses the chord: `hotkey_conflict` naming that action.
 
 **Steps**:
-1. [ ] - `p1` - API: `hotkey_set { action, shortcut }` from the Settings window - `inst-hotkey-call`
-2. [ ] - `p1` - **IF** `shortcut` is null - `inst-if-clear`
-   1. [ ] - `p1` - Unregister the action's chord, store `null`, go to step 6 - `inst-clear`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-settings-hotkey-check`; **RETURN** its error if any - `inst-run-check`
-4. [ ] - `p1` - Register the new chord with the global-shortcut plugin; on refusal **RETURN** `hotkey_conflict` and keep the old chord registered - `inst-register-new`
-5. [ ] - `p1` - Unregister the old chord - `inst-unregister-old`
-6. [ ] - `p1` - DB: store the binding through the change-log write path - `inst-store-binding`
-7. [ ] - `p1` - Emit `hotkeys:changed` with the whole `HotkeyList` and a new `version` - `inst-emit-hotkeys`
-8. [ ] - `p1` - **RETURN** the `HotkeyList` - `inst-return-hotkeys`
+1. [x] - `p1` - API: `hotkey_set { action, shortcut }` from the Settings window - `inst-hotkey-call`
+2. [x] - `p1` - **IF** `shortcut` is null - `inst-if-clear`
+   1. [x] - `p1` - Unregister the action's chord, store `null`, go to step 6 - `inst-clear`
+3. [x] - `p1` - Run `cpt-noter-algo-core-settings-hotkey-check`; **RETURN** its error if any - `inst-run-check`
+4. [x] - `p1` - Register the new chord with the global-shortcut plugin; on refusal **RETURN** `hotkey_conflict` and keep the old chord registered - `inst-register-new`
+5. [x] - `p1` - Unregister the old chord - `inst-unregister-old`
+6. [x] - `p1` - DB: store the binding through `cpt-noter-algo-core-storage-custom-write` - `inst-store-binding`
+7. [x] - `p1` - Emit `hotkeys:changed` with the whole `HotkeyList` and a new `version` - `inst-emit-hotkeys`
+8. [x] - `p1` - **RETURN** the `HotkeyList` - `inst-return-hotkeys`
 
 ### Reset hotkeys and card keys
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-settings-hotkeys-reset`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-settings-hotkeys-reset`
 
 **Actor**: Primary user (Settings › Hotkeys)
 
@@ -142,15 +142,15 @@ Every component reads settings, and two windows (Settings and First run) write t
 - A default chord is now held by another app: that action is listed with status `conflict` and `HotkeyNotRegistered` joins the degraded set; the others register.
 
 **Steps**:
-1. [ ] - `p1` - API: `hotkeys_reset {}` - `inst-reset-call`
-2. [ ] - `p1` - Unregister every app hotkey - `inst-unregister-all`
-3. [ ] - `p1` - DB: write the default bindings and the default `CardKeySettings` in one batch - `inst-write-defaults`
-4. [ ] - `p1` - Run `cpt-noter-algo-core-settings-register-hotkeys` - `inst-register-defaults`
-5. [ ] - `p1` - **RETURN** the `HotkeyList`; emit `hotkeys:changed` - `inst-return-reset`
+1. [x] - `p1` - API: `hotkeys_reset {}` - `inst-reset-call`
+2. [x] - `p1` - Unregister every app hotkey - `inst-unregister-all`
+3. [x] - `p1` - DB: write the default bindings and the default `CardKeySettings` in one batch through `cpt-noter-algo-core-storage-custom-write` - `inst-write-defaults`
+4. [x] - `p1` - Run `cpt-noter-algo-core-settings-register-hotkeys` - `inst-register-defaults`
+5. [x] - `p1` - **RETURN** the `HotkeyList`; emit `hotkeys:changed` - `inst-return-reset`
 
 ### Edit the glossary and ignored apps
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-settings-glossary`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-settings-glossary`
 
 **Actor**: Primary user (Settings, or the main window when fixing a term)
 
@@ -163,80 +163,81 @@ Every component reads settings, and two windows (Settings and First run) write t
 - An empty term: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `glossary_upsert { id?, rev?, term, variants, spoken_forms }`, `glossary_remove { id }` or `settings_unignore_app { bundle_id }` - `inst-glossary-call`
-2. [ ] - `p1` - Validate; an empty term **RETURN** `invalid_input` - `inst-glossary-validate`
-3. [ ] - `p1` - DB: write the term (with `rev`) or the ignored-apps list through the change-log write path - `inst-glossary-write`
-4. [ ] - `p1` - **IF** a call is being captured, send the new glossary to the engine (`set_glossary`, once capture exists in M1) - `inst-glossary-live`
-5. [ ] - `p1` - **RETURN** the `GlossaryList`, or the `Settings` for an unignore (with `settings:changed`) - `inst-glossary-return`
+1. [x] - `p1` - API: `glossary_upsert { id?, rev?, term, variants_latin, variants_cyrillic, spoken_forms, lang?, always_apply }`, `glossary_remove { id }` or `settings_unignore_app { bundle_id }` - `inst-glossary-call`
+2. [x] - `p1` - Validate; an empty term **RETURN** `invalid_input` - `inst-glossary-validate`
+3. [x] - `p1` - DB: write the term (with `rev`) through `cpt-noter-algo-core-storage-change-tx`, or the removal of a term or the ignored-apps list through `cpt-noter-algo-core-storage-custom-write` - `inst-glossary-write`
+4. [x] - `p1` - Call the glossary-changed hook with the new list; while a call is captured the capture session sends it to the engine (`set_glossary`, M1) - `inst-glossary-live`
+5. [x] - `p1` - **RETURN** the `GlossaryList`, or the `Settings` for an unignore (with `settings:changed`) - `inst-glossary-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Load and validate sections
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-settings-validate`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-settings-validate`
 
 **Input**: A stored or submitted section.
 
 **Output**: A valid section of the current shape, or `invalid_input` for a submitted one.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the section is missing (fresh install), **RETURN** its defaults - `inst-defaults`
-2. [ ] - `p1` - **IF** a stored section has an older shape, migrate it to the current shape and keep unknown fields out - `inst-migrate-shape`
-3. [ ] - `p1` - Check every value against its type's range and enum - `inst-check-values`
-4. [ ] - `p1` - **RETURN** the section, or `invalid_input` naming the field - `inst-return-section`
+1. [x] - `p1` - **IF** the section is missing (fresh install), **RETURN** its defaults - `inst-defaults`
+2. [x] - `p1` - **IF** a stored section has an older shape, migrate it to the current shape and keep unknown fields out - `inst-migrate-shape`
+3. [x] - `p1` - Check every value against its type's range and enum - `inst-check-values`
+4. [x] - `p1` - **RETURN** the section, or `invalid_input` naming the field - `inst-return-section`
 
 ### Check a hotkey chord
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-settings-hotkey-check`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-settings-hotkey-check`
 
 **Input**: Action and chord in Tauri accelerator syntax.
 
 **Output**: Ok, or `invalid_input`, `hotkey_reserved` or `hotkey_conflict`.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the chord has no modifier **RETURN** `invalid_input` with `rule: no_modifier` - `inst-no-modifier`
-2. [ ] - `p1` - **IF** the chord is on the reserved list (VoiceOver, system chords) **RETURN** `hotkey_reserved` - `inst-reserved`
-3. [ ] - `p1` - **IF** another Noter action or the card-key chords use it **RETURN** `hotkey_conflict` naming that action - `inst-internal-conflict`
-4. [ ] - `p1` - **RETURN** ok - `inst-return-ok`
+1. [x] - `p1` - **IF** the chord has no modifier **RETURN** `invalid_input` with `rule: no_modifier` - `inst-no-modifier`
+2. [x] - `p1` - **IF** the chord is on the reserved list (VoiceOver, system chords) **RETURN** `hotkey_reserved` - `inst-reserved`
+3. [x] - `p1` - **IF** another Noter action or the card-key chords use it **RETURN** `hotkey_conflict` naming that action - `inst-internal-conflict`
+4. [x] - `p1` - **RETURN** ok - `inst-return-ok`
 
 ### Register app hotkeys at launch
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-settings-register-hotkeys`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-settings-register-hotkeys`
 
-**Input**: Stored bindings.
+**Input**: Stored bindings over the defaults (`DEFAULT_HOTKEYS`, PRD › 14: ⌃⌥⌘K mute the copilot, ⌃⌥⌘Z undo the last card action, ⌃⌥⌘0 Hide for Presenting, the others ⌃⌥⌘ + a letter; the fake core's world uses the same).
 
 **Output**: Every bound app hotkey registered, or its status set to `conflict`.
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** app hotkey binding with a chord - `inst-for-bindings`
-   1. [ ] - `p1` - **TRY** register it with the global-shortcut plugin; its press calls `CoreApi` as `Caller::Native { surface: hotkey }` - `inst-try-register`
-   2. [ ] - `p1` - **CATCH** a refusal: status `conflict`; add `HotkeyNotRegistered` to the degraded set - `inst-catch-register`
-2. [ ] - `p1` - Card keys are not registered here; the copilot registers them while capture runs (M4) - `inst-skip-card-keys`
-3. [ ] - `p1` - **RETURN** the `HotkeyList` - `inst-return-registered`
+1. [x] - `p1` - **FOR EACH** app hotkey binding with a chord - `inst-for-bindings`
+   1. [x] - `p1` - **TRY** register it through the host's `ShortcutRegistrar` in `CoreDeps` (the Tauri global-shortcut plugin in the app, a scripted one in the harness), unless the chord is now on the reserved list (status `reserved_by_system`); its press calls `CoreApi` as `Caller::Native { surface: hotkey }` - `inst-try-register`
+   2. [x] - `p1` - **CATCH** a refusal: status `conflict`; add `HotkeyNotRegistered` to the degraded set - `inst-catch-register`
+2. [x] - `p1` - Card keys (`undo_card_action`) are not registered here and are listed as `registered_during_capture`; the copilot registers them while capture runs (M4) - `inst-skip-card-keys`
+3. [x] - `p1` - **RETURN** the `HotkeyList` - `inst-return-registered`
 
 ## 4. States (CDSL)
 
 ### Hotkey binding
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-settings-hotkey`
+- [x] `p1` - **ID**: `cpt-noter-state-core-settings-hotkey`
 
 **States**: not_set, registered, conflict, reserved_by_system, registered_during_capture
 
 **Initial State**: registered for actions with a default chord, not_set otherwise
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** not_set **TO** registered **WHEN** a chord is set and macOS accepts it - `inst-st-register`
-2. [ ] - `p1` - **FROM** registered **TO** registered **WHEN** a new chord is accepted (the old one is released) - `inst-st-rebind`
-3. [ ] - `p1` - **FROM** registered **TO** conflict **WHEN** registration at launch is refused because another app holds the chord - `inst-st-conflict`
-4. [ ] - `p1` - **FROM** conflict **TO** registered **WHEN** a new chord or a reset registers - `inst-st-resolve`
-5. [ ] - `p1` - **FROM** registered **TO** not_set **WHEN** the chord is cleared - `inst-st-clear`
-6. [ ] - `p2` - **FROM** not_set **TO** registered_during_capture **WHEN** card keys are enabled (registration itself belongs to the copilot, M4) - `inst-st-card-keys`
+1. [x] - `p1` - **FROM** not_set **TO** registered **WHEN** a chord is set and macOS accepts it - `inst-st-register`
+2. [x] - `p1` - **FROM** registered **TO** registered **WHEN** a new chord is accepted (the old one is released) - `inst-st-rebind`
+3. [x] - `p1` - **FROM** registered **TO** conflict **WHEN** registration at launch is refused because another app holds the chord - `inst-st-conflict`
+4. [x] - `p1` - **FROM** conflict **TO** registered **WHEN** a new chord or a reset registers - `inst-st-resolve`
+5. [x] - `p1` - **FROM** registered **TO** not_set **WHEN** the chord is cleared - `inst-st-clear`
+6. [x] - `p2` - **FROM** not_set **TO** registered_during_capture **WHEN** card keys are enabled (registration itself belongs to the copilot, M4) - `inst-st-card-keys`
+7. [x] - `p1` - **FROM** registered **TO** reserved_by_system **WHEN** a stored chord is on the reserved list at launch; it is not registered - `inst-st-reserved`
 
 ## 5. Definitions of Done
 
 ### Typed sections with one revision
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-settings-sections`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-settings-sections`
 
 The system **MUST** store each `Settings` section in `settings`, serve defaults on a fresh install, migrate older shapes, replace a whole section per `settings_update` guarded by the settings `rev`, log every change, and emit `settings:changed` with the whole state and a new `version`.
 
@@ -251,7 +252,7 @@ The system **MUST** store each `Settings` section in `settings`, serve defaults 
 
 ### Hotkeys
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-settings-hotkeys`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-settings-hotkeys`
 
 The system **MUST** register app hotkeys at launch and keep them registered, refuse chords without a modifier, reserved chords and conflicts with the codes above while keeping the old chord, call the core as `Caller::Native { surface: hotkey }` when a hotkey fires, and restore defaults with `hotkeys_reset`.
 
@@ -269,7 +270,7 @@ The system **MUST** register app hotkeys at launch and keep them registered, ref
 
 ### Glossary
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-settings-glossary`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-settings-glossary`
 
 The system **MUST** keep glossary terms with `rev`, variants and spoken forms, refuse empty terms and stale revisions, and hand the glossary to a live engine session when one exists.
 
@@ -278,13 +279,13 @@ The system **MUST** keep glossary terms with `rev`, variants and spoken forms, r
 
 **Touches**:
 - API: `glossary_list`, `glossary_upsert`, `glossary_remove`
-- DB: glossary (PRD table, with `rev`)
+- DB: `glossary` (PRD table, with `rev`; its migration belongs to this feature in M0)
 - Entities: `GlossaryTerm`
 
 ## 6. Acceptance Criteria
 
 - [ ] E2E against the real core, story `cpt-noter-seq-settings-set-hotkeys`: setting a chord without a modifier shows "Shortcut without a modifier", a VoiceOver chord shows "Shortcut used by VoiceOver", a valid chord is listed as registered.
-- [ ] Two windows editing settings: the second write with the old `rev` gets `conflict` and nothing is lost.
+- [x] Two windows editing settings: the second write with the old `rev` gets `conflict` and nothing is lost.
 - [ ] Every M0 settings command succeeds at least once in E2E runs against the real core.
-- [ ] A fresh install answers `settings_get` with every section at its default.
+- [x] A fresh install answers `settings_get` with every section at its default.
 - [ ] `just gate` passes.

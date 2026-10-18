@@ -25,6 +25,7 @@ design: docs/DESIGN-core.md
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Run migrations](#run-migrations)
   - [Commit a mutation with its change row](#commit-a-mutation-with-its-change-row)
+  - [Commit a custom write with its change rows](#commit-a-custom-write-with-its-change-rows)
   - [Read for a snapshot](#read-for-a-snapshot)
 - [4. States (CDSL)](#4-states-cdsl)
   - [Store lifecycle](#store-lifecycle)
@@ -157,6 +158,24 @@ Every later feature writes records. If each wrote its own way, "every write is a
 6. [x] - `p1` - Commit; on failure roll back both writes and **RETURN** `internal` - `inst-commit`
 7. [x] - `p1` - **RETURN** the row, its `rev` and the change id - `inst-return-tx`
 
+### Commit a custom write with its change rows
+
+- [x] `p1` - **ID**: `cpt-noter-algo-core-storage-custom-write`
+
+**Input**: A write the mutation shape of `cpt-noter-algo-core-storage-change-tx` does not fit, limited to key/value rows (the `settings` sections and their `rev`) and deletes; actor, reason, summary and optional batch id.
+
+**Output**: The write's own result, its change ids and batch id; or `internal`.
+
+**Steps**:
+1. [x] - `p1` - Begin an immediate transaction on the writer connection - `inst-begin`
+2. [x] - `p1` - Run the caller's write in that transaction; it reports each change it made (entity, id, and field with before and after, or a delta) - `inst-run-write`
+3. [x] - `p1` - **IF** it reports no change - `inst-if-unlogged`
+   1. [x] - `p1` - Roll back; **RETURN** `internal` (every write logs what it changed) - `inst-return-unlogged`
+4. [x] - `p1` - **IF** it reports several changes, give them one batch id (the caller's, or a new `bat_` ULID) - `inst-batch-id`
+5. [x] - `p1` - DB: INSERT one `changes` row per reported change (id `chg_` ULID, ts, actor, entity, field, before, after or delta, summary, reason, evidence ids, status `applied`, batch id, undoable, surface) - `inst-insert-changes`
+6. [x] - `p1` - Commit; on failure roll back the write and its change rows and **RETURN** `internal` - `inst-commit`
+7. [x] - `p1` - **RETURN** the write's result, the change ids and the batch id - `inst-return-custom`
+
 ### Read for a snapshot
 
 - [x] `p2` - **ID**: `cpt-noter-algo-core-storage-snapshot-read`
@@ -225,7 +244,7 @@ The system **MUST** apply numbered migrations in order, each in its own transact
 
 - [ ] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
 
-The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test. Capture data the engine produces (confirmed segments, live speakers, gaps and marks written by capture) is the exception: it is inserted in batches through `insert_batch` without change rows, and a delete (`capture_discard`, `calls_delete`) writes one change row per deletion, not undoable (Backend Teamlead M1 decision, 18 Oct 2026).
+The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test. Capture data the engine produces (confirmed segments, live speakers, gaps and marks written by capture, including user-pressed marks and pause gaps) is the exception: it is inserted in batches through `insert_batch` without change rows, and a delete (`capture_discard`, `calls_delete`) writes one change row per deleted call, not undoable, and that row carries no record content (PRD › Deletion) (Backend Teamlead M1 decision, 18 Oct 2026).
 
 **Implements**:
 - `cpt-noter-flow-core-storage-write`
