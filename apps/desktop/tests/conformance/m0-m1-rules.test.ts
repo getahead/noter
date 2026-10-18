@@ -280,7 +280,11 @@ describe("snapshot, then stream (R23/R24)", () => {
   });
 
   it("self-test: refused with model_missing while the speech bundle is not ready (D-21), then it runs", async () => {
-    await s.change((w) => W.firstRun(w, { modelsReady: false }));
+    await s.change((w) => {
+      W.firstRun(w, { modelsReady: false });
+      W.permission(w, "microphone", "granted"); // the self-test needs both grants once the model is in
+      W.permission(w, "system_audio", "granted");
+    });
     const got: { event: { type: string } }[] = [];
     typed(refused(await s.core("settings").selfTestRun({ play_clip: false }, (m) => got.push(m))), "model_missing");
     expect(got).toEqual([]); // the Channel never opened
