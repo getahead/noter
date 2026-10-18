@@ -52,7 +52,7 @@ the core crates add themselves.
 | `core_app_snapshot` | `crates/noter-core-harness/examples/perf_app_snapshot.rs` | `cargo build --release -p noter-core-harness --example perf_app_snapshot` |
 
 Both answer `app_snapshot`, which only the `noter-core` composition root can do. The
-snapshot scenario lives in `noter-core-harness` (#57, Teamlead decision on 18 Oct), because
+snapshot scenario lives in `noter-core-harness` (Teamlead decision on 18 Oct), because
 the only fixture seeding is the harness's: `boot::Harness::start(Options { fixture: true,
 fixed_clock: true })` seeds the world through the core's own commands.
 
@@ -116,7 +116,7 @@ fixture), so nothing here exists only for perf.
 | `noter-db` | `Store::shutdown(self)` (or a `Drop` that blocks until the writer drained and checkpointed) | Cold start rounds must not leak writer threads between rounds |
 | `noter-core` | Composition root without Tauri: e.g. `Core::new(store, CoreDeps { clock, emitter })` with a no-op / test event emitter | Same root as `src-tauri` and the harness |
 | `noter-core` | `impl CoreApi for Core` with `app_snapshot(&CommandCtx, NoArgs) -> Result<AppSnapshot, CoreError>` | The measured call |
-| `noter-core-harness` | `boot::Harness::start(Options { fixture, fixed_clock }, lines)` and `core()`: seeds the fixture world through the core's commands (#47) | `core_app_snapshot` setup |
+| `noter-core-harness` | `boot::Harness::start(Options { fixture, fixed_clock }, lines)` and `core()`: seeds the fixture world through the core's commands (#26) | `core_app_snapshot` setup |
 
 Dependencies the examples use: `noter-protocol` (fixtures, `CommandCtx`), `tokio` (already
 in `noter-core`), `tempfile` as a dev-dependency of `noter-core` (or `std::env::temp_dir`
@@ -124,7 +124,7 @@ plus a unique name).
 
 Order: `core_cold_start` can be written as soon as `Store::open`, the composition root and
 `app_snapshot` exist (the first M0 PRs of core-storage and core-ipc-host).
-`core_app_snapshot` also needs the harness boot (#47).
+`core_app_snapshot` also needs the harness boot (#26).
 
 ## 6. TOML blocks for the owner (`harness/perf.toml`, append after `protocol_fixtures_roundtrip`)
 
@@ -146,12 +146,12 @@ modes = ["ir", "wall"]
 
 1. Now: this plan; Teamlead passes §5 to be-eng-1.
 2. When `noter-db` `Store::open` + migrations and the `noter-core` root with `app_snapshot`
-   land: PR `perf(core): core_cold_start scenario` (#45, `lane/core/perf-m0`: example + a
-   unit test that it runs one round, no marker), then ask the Teamlead for the
-   `[scenarios.core_cold_start]` block. The `cpt-noter-dod-core-storage-cold-start` marker
+   land: `core_cold_start` (example + a unit test that it runs one round, no marker), then
+   ask the Teamlead for the `[scenarios.core_cold_start]` block. The `cpt-noter-dod-core-storage-cold-start` marker
    comes with ticking that DoD, once the block is on `main` and measured (a scope marker on
    an unticked ID fails `cfs validate`).
-3. `core_app_snapshot`: #57 (`lane/core/perf-app-snapshot`, stacked on #47), an example of
-   `noter-core-harness`; same steps.
+3. `core_app_snapshot`, an example of `noter-core-harness`: same steps. Both are in one PR,
+   #45 (`perf(core): M0 scenarios core_cold_start and core_app_snapshot`, on #26; #57 was
+   folded into it).
 4. Before the owner moves `[milestone].current` to M0: confirm coverage 3/3 with
    `perf_gate.py coverage`.
