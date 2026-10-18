@@ -394,6 +394,8 @@ impl Harness {
                 .place(&self.dir.join("models"), &parsed.app.setup.models)
                 .map_err(crate::internal)?;
             self.core.refresh_models();
+            // The files say ready or pending; the world's other states live in the core.
+            noter_core::testing::seed_models(&self.core, &parsed.app.setup.models);
         }
         if current["app"]["banners"]["banners"] != wanted["app"]["banners"]["banners"] {
             self.core.set_banners(parsed.app.banners.banners.clone());
