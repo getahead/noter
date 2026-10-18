@@ -12727,7 +12727,7 @@ Every MUST HAVE item of the DESIGN checklist is listed once. "Not applicable bec
 - **PRD**: [PRD.md](./PRD.md), referenced by section name because it is not a registered kit artifact.
 - **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates` (quality gates, including XCUITest for native surfaces); other decisions are recorded in PRD › Decision log and in 4.1 (see 4.5, SEM-DESIGN-003).
 - **Code**: traceability is FULL. `@cpt-*` markers in `apps/desktop/src` are validated against the IDs of this document by `cfs validate`, and `just trace` fails a PR that lowers the share of component, interface and seq IDs with a marker (ADR-0003).
-- **Features**: Not applicable yet because no FEATURE specs exist; they will reference the component and sequence IDs in this document.
+- **Features**: [DECOMPOSITION.md](DECOMPOSITION.md) splits this design into 30 UI features by milestone (M0 to M5); each has a FEATURE spec in [features/ui/](features/ui/) that references the component and sequence IDs in this document.
 - **Review**: [REVIEW-2026-10-16.md](./REVIEW-2026-10-16.md), cited as "REVIEW › finding".
 - **Backend design review**: [REVIEW-2026-10-17-design-core.md](./REVIEW-2026-10-17-design-core.md); its owner decisions and UI-visible resolutions are PM-60 to PM-68.
 - **UI prototype of record**: [prototype/clickable/README.md](./prototype/clickable/README.md), the clickable prototype (PM-59); every element carries `data-component` with the IDs of 3.2.
