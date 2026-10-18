@@ -15,6 +15,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import arch_check  # noqa: E402
+import ci_changes  # noqa: E402
 import common  # noqa: E402
 import config_guard  # noqa: E402
 import coverage_gate  # noqa: E402
@@ -653,3 +654,155 @@ class SelfReviewTests(unittest.TestCase):
     def test_stop_check_has_no_opinion_offline(self):
         with mock.patch.object(review, "_run", side_effect=review.Unavailable("offline")):
             self.assertIsNone(review.stop_check())
+
+
+class CiChangesTests(unittest.TestCase):
+    """Path filtering of the PR workflows: a skipped job must be one nothing changed for."""
+
+    WORKFLOWS = {"ci": ("ci.yml", "gate"), "hygiene": ("pr.yml", "hygiene")}
+
+    @staticmethod
+    def _jobs_of(workflow: str) -> dict[str, str]:
+        """Top-level job id -> its block of the workflow file."""
+        text = (common.ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+        body = text.split("\njobs:\n", 1)[1]
+        parts = re.split(r"(?m)^  ([a-z0-9-]+):\n", body)
+        return {parts[i]: parts[i + 1] for i in range(1, len(parts), 2)}
+
+    def run_jobs(self, files, workflow="ci"):
+        p = ci_changes.plan(files, CFG, workflow)
+        return {j for j, run in p.jobs.items() if run}
+
+    def test_rules_name_exactly_the_jobs_of_each_workflow(self):
+        for key, (wf, aggregator) in self.WORKFLOWS.items():
+            jobs = self._jobs_of(wf)
+            self.assertEqual(set(CFG["ci"]["jobs"][key]), set(jobs) - {"changes", aggregator}, wf)
+            needs = re.search(r"needs: \[([^\]]+)\]", jobs[aggregator]).group(1).split(", ")
+            self.assertEqual(set(needs), set(jobs) - {aggregator}, f"{wf}: {aggregator} must wait for every job")
+            for job in CFG["ci"]["jobs"][key]:
+                areas = CFG["ci"]["jobs"][key][job]
+                if areas != ["always"]:
+                    self.assertIn(f"fromJSON(needs.changes.outputs.jobs)['{job}']", jobs[job], f"{wf}: {job} is not filtered")
+        self.assertEqual(set(CFG["ci"]["jobs"]["codeql"]), {"actions", "javascript-typescript", "rust"})
+        self.assertEqual(CFG["ci"]["jobs"]["codeql"]["actions"], ["always"])
+
+    def test_the_repository_layout_is_classified(self):
+        # One file per kind the repository holds today; a file no rule knows runs everything (fail safe).
+        known = [
+            "README.md", "AGENTS.md", "CHANGELOG.md", ".gitignore", ".idea/.gitignore", ".claude/settings.json",
+            ".githooks/pre-commit", ".plans/x.md", ".release-please-manifest.json", "release-please-config.json",
+            "Cargo.toml", "Cargo.lock", "deny.toml", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+            ".github/dependabot.yml", ".github/CODEOWNERS", ".github/ISSUE_TEMPLATE/bug.yml", ".github/SECURITY.md",
+            ".github/rulesets/default-branch.json", ".github/workflows/nightly.yml", ".github/zizmor.yml",
+            ".cf-studio/config/artifacts.toml", "docs/diagrams/architecture.png", "scripts/dev/setup.sh",
+            "crates/noter-core/src/lib.rs", "contracts/fixtures/world.json", "engine/Package.swift",
+            "apps/desktop/index.html", "apps/desktop/src-tauri/tauri.conf.json", "apps/desktop/tests/visual/__screenshots__/a.png",
+        ]
+        unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
+        self.assertEqual(unknown, [])
+
+    def test_ui_change_skips_rust_lints_contract_and_macos(self):
+        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"]),
+                         {"lint-ui", "arch", "unit", "e2e", "e2e-coverage", "visual", "perf", "docs"})
+
+    def test_rust_change_skips_typecheck_and_screenshots(self):
+        self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs"]),
+                         {"lint-rust", "arch", "unit", "e2e", "e2e-coverage", "perf", "docs", "macos"})
+
+    def test_contract_runs_for_the_protocol_and_the_generated_files(self):
+        for f in ["crates/noter-protocol/src/lib.rs", "contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
+            self.assertIn("contract", self.run_jobs([f]), f)
+        self.assertNotIn("contract", self.run_jobs(["apps/desktop/src/App.tsx"]))
+
+    def test_docs_change_runs_only_docs_and_trace(self):
+        self.assertEqual(self.run_jobs(["docs/PRD.md"]), {"arch", "docs"})
+        self.assertIn("e2e-coverage", self.run_jobs(["docs/DESIGN.md"]), "DESIGN.md stories feed the E2E bar")
+
+    def test_tauri_host_is_not_ui(self):
+        jobs = self.run_jobs(["apps/desktop/src-tauri/src/main.rs"])
+        self.assertIn("macos", jobs)
+        self.assertNotIn("visual", jobs)
+        self.assertNotIn("lint-ui", jobs)
+
+    def test_harness_and_unknown_files_run_everything(self):
+        every = set(CFG["ci"]["jobs"]["ci"])
+        for f in ["justfile", "harness/harness.toml", ".github/workflows/ci.yml", "skills/new/prompt.txt"]:
+            self.assertEqual(self.run_jobs([f]), every, f)
+            self.assertEqual(self.run_jobs([f], "hygiene"), set(CFG["ci"]["jobs"]["hygiene"]), f)
+
+    def test_inert_files_run_nothing_but_the_always_checks(self):
+        self.assertEqual(self.run_jobs([".github/dependabot.yml", ".plans/notes.txt"]), set())
+        self.assertEqual(self.run_jobs([".github/dependabot.yml"], "hygiene"), {"title", "approvals"})
+        self.assertEqual(self.run_jobs([".github/dependabot.yml"], "codeql"), {"actions"})
+
+    def test_hygiene_checks_follow_their_files(self):
+        self.assertEqual(self.run_jobs(["deny.toml"], "hygiene"), {"title", "approvals", "rust-deps"})
+        self.assertEqual(self.run_jobs(["pnpm-lock.yaml"], "hygiene"), {"title", "approvals", "dependencies"})
+        self.assertEqual(self.run_jobs([".github/workflows/nightly.yml"], "hygiene"),
+                         {"title", "approvals", "dependencies", "workflows"})
+        self.assertEqual(self.run_jobs([".github/workflows/nightly.yml"]), set(), "CI does not run for another workflow")
+
+    def test_codeql_analyses_the_changed_languages(self):
+        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"], "codeql"), {"actions", "javascript-typescript"})
+        self.assertEqual(self.run_jobs(["engine/Sources/x.swift", "docs/PRD.md"], "codeql"), {"actions"})
+
+    def test_not_a_pull_request_runs_everything(self):
+        p = ci_changes.plan(None, CFG, "ci", "a push run of main checks everything")
+        self.assertTrue(all(p.jobs.values()))
+        self.assertIn("push", p.summary())
+
+    def test_unknown_area_in_a_rule_is_an_error(self):
+        cfg = {"ci": {"areas": {"a": ["x/**"]}, "jobs": {"ci": {"j": ["b"]}}}}
+        with self.assertRaises(common.HarnessError):
+            ci_changes.plan([], cfg, "ci")
+
+    def test_native_tests_tie_e2e_and_macos_together(self):
+        p = ci_changes.plan(["apps/desktop/src/App.tsx"], CFG, "ci")
+        tied = ci_changes.apply_repo(p, ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True))
+        self.assertTrue(tied.jobs["macos"])
+        p = ci_changes.plan(["apps/desktop/src-tauri/src/main.rs"], CFG, "ci")
+        tied = ci_changes.apply_repo(p, ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True))
+        self.assertTrue(tied.jobs["e2e"] and tied.jobs["e2e-coverage"])
+        loose = ci_changes.apply_repo(p, ci_changes.Repo(engine=False, tauri=False, core_harness=False, native_tests=False))
+        self.assertFalse(loose.jobs["macos"], "nothing to build on macOS")
+
+    def test_verdict(self):
+        ok, skipped, failed = {"result": "success"}, {"result": "skipped"}, {"result": "failure"}
+        expected = json.dumps({"a": True, "b": False})
+        self.assertEqual(ci_changes.verdict({"changes": ok, "a": ok, "b": skipped}, expected), [])
+        self.assertEqual(ci_changes.verdict({"changes": ok, "a": ok, "b": ok}, expected), [])
+        self.assertEqual(ci_changes.verdict({"changes": ok, "a": skipped, "b": skipped}, expected), ["a: skipped"])
+        self.assertEqual(ci_changes.verdict({"changes": ok, "a": ok, "b": failed}, expected), ["b: failure"])
+        self.assertTrue(ci_changes.verdict({"changes": failed, "a": skipped, "b": skipped}, ""))
+        self.assertTrue(ci_changes.verdict({"changes": ok, "a": ok, "b": skipped, "c": ok}, expected), "unlisted job")
+        self.assertTrue(ci_changes.verdict({"changes": ok, "a": ok, "b": skipped}, "not json"))
+
+    def test_changed_files_from_git(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+
+        def g(*args):
+            return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=root,
+                                  capture_output=True, text=True, check=True).stdout.strip()
+        g("init", "-q", "-b", "main")
+        (root / "a.txt").write_text("a")
+        g("add", "-A"); g("commit", "-qm", "base")
+        g("checkout", "-qb", "topic")
+        (root / "b.rs").write_text("b")
+        g("add", "-A"); g("commit", "-qm", "topic")
+        g("checkout", "-q", "main")
+        (root / "c.md").write_text("c")
+        g("add", "-A"); g("commit", "-qm", "main moves on")
+        g("update-ref", "refs/remotes/origin/main", "main")
+        g("checkout", "-q", "topic")
+        files, why = ci_changes.changed_files("workflow_dispatch", "topic", "origin/main", root)
+        self.assertEqual((files, why), (["b.rs"], ""))
+        files, why = ci_changes.changed_files("pull_request", "1/merge", "origin/main", root)
+        self.assertIsNone(files)
+        self.assertIn("merge commit", why)
+        g("checkout", "-q", "--detach", "main")
+        g("merge", "-q", "--no-ff", "-m", "merge", "topic")
+        files, _ = ci_changes.changed_files("pull_request", "1/merge", "origin/main", root)
+        self.assertEqual(files, ["b.rs"], "the merge commit against main as merged, not main's own changes")
+        self.assertIsNone(ci_changes.changed_files("push", "main", "origin/main", root)[0])
+        self.assertIsNone(ci_changes.changed_files("workflow_dispatch", "main", "origin/main", root)[0])

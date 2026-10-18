@@ -55,6 +55,8 @@ Chosen option: "One gate command with fixed bars, enforced in CI, in the agent l
 
 **Changed 18 Oct 2026** (owner): every pull request is reviewed by the agent that delivers it, with Constructor Studio (`/cf-sdlc-pr-review`) and the ponytail review (`/ponytail-review`), locally in its own session, never in CI and never with an API token. The agent loops (fix, push, review again) until the verdict passes, publishes it with `just review-publish`, and turns on auto-merge. `.github/workflows/review.yml` turns the published verdict into the commit status `review`, which the `Default ruleset` requires next to `gate` and `hygiene`; a review stays valid while the PR's diff is unchanged. The same day the self-hosted Apple Silicon runner for wall-clock performance was registered on the development MacBook Pro.
 
+**Changed 18 Oct 2026** (owner): a pull request runs only the CI jobs its changes can affect, by the path rules in `harness.toml [ci]` (`scripts/harness/ci_changes.py`); a harness file or a file no rule knows runs everything, and `gate` fails if a job that should run did not pass. The `Default ruleset` no longer requires the branch to be up to date with `main` (GitHub asks for an update only on a conflict), and labels re-run only `hygiene`, which now carries the config guard and the baseline approval. `main` still runs every job on every push, so the cost is that a conflict between two PRs that each passed is found on `main` after the merge rather than before it.
+
 The bars are defined in `harness/harness.toml` and measured as follows. Where the owner's wording could not be measured reliably as stated, the measure below is the realistic equivalent; `docs/HARNESS.md` explains each.
 
 | Bar | Measure | Where it is a hard gate |
