@@ -199,7 +199,7 @@ Every boundary (UI ↔ core, core ↔ engine, runtime ↔ noter-mcp, core ↔ sk
 
 - [ ] `p1` - **ID**: `cpt-noter-principle-core-single-writer`
 
-The core is the only process that writes the database, and every write that a user, a job or a model makes is a change-log row in the same transaction, with actor, before, after, reason and evidence. Undo is the change log played backwards; there is no second history. Capture data the engine produces (confirmed segments, live speakers, gaps and marks written by capture, including user-pressed marks and pause gaps) is inserted in batches without change rows, because capture writes it as it happens, not as an edit of a record; the user's later edits to it are logged. Deleting calls (`capture_discard`, `calls_delete`) writes one change row per deleted call, not undoable, and that row carries no record content (PRD › Deletion) (Backend Teamlead M1 decision, 18 Oct 2026).
+The core is the only process that writes the database, and every write that a user, a job or a model makes is a change-log row in the same transaction, with actor, before, after, reason and evidence. Undo is the change log played backwards; there is no second history. Capture data (confirmed segments, live speakers, gaps and marks written by capture, including user-pressed marks and pause gaps) is inserted in batches without change rows, because capture writes it as it happens, not as an edit of a record; the user's later edits to it are logged. Deleting calls (`capture_discard`, `calls_delete`) writes one change row per deleted call, not undoable, and that row carries no record content (PRD › Deletion) (Backend Teamlead M1 decision, 18 Oct 2026).
 
 **ADRs**: PRD › Decision log (core is the only SQLite writer; change log with undo).
 
