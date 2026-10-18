@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use noter_db::rusqlite::{Connection, MAIN_DB};
 use noter_db::{ChangeMeta, Migration, Mutation, OpenError, Store, StoreState, MIGRATIONS};
+use noter_protocol::ipc::NativeSurface;
 use noter_protocol::model::Actor;
 use noter_protocol::{ErrorCode, ErrorDetail, EvidenceId, JobId, LlmRunId, Rev, RuntimeChoice};
 use serde_json::json;
@@ -15,6 +16,7 @@ const NOTES: &[Migration] = &[Migration {
     name: "notes",
     // Not idempotent on purpose: running it twice fails. The trigger forces a failure after the row write.
     sql: "CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, body TEXT, score REAL, pinned INTEGER, rev INTEGER NOT NULL);
+          CREATE TABLE prefs (id TEXT PRIMARY KEY, value TEXT);
           CREATE TRIGGER changes_boom AFTER INSERT ON changes WHEN NEW.reason = 'boom'
           BEGIN SELECT RAISE(ABORT, 'boom'); END;",
 }];
@@ -33,6 +35,7 @@ fn note(id: &str, base_rev: Option<u32>, title: &str) -> Mutation {
         table: "notes",
         id: id.into(),
         base_rev: base_rev.map(Rev),
+        bump_rev: true,
         values: vec![("title", json!(title))],
     }
 }
@@ -45,6 +48,7 @@ fn meta(reason: &str) -> ChangeMeta {
         evidence_ids: vec![],
         batch_id: None,
         undoable: true,
+        surface: None,
     }
 }
 
@@ -585,4 +589,61 @@ fn the_default_path_is_under_application_support() {
         "{}",
         p.display()
     );
+}
+
+#[test]
+fn a_native_surface_is_recorded_on_the_change_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    let mut m = meta("hotkey");
+    m.surface = Some(NativeSurface::MenuBar);
+    let id = store
+        .write(note("not_1", None, "First"), m)
+        .unwrap()
+        .change_id
+        .0;
+    let first = store
+        .write(note("not_2", None, "Second"), meta("ui"))
+        .unwrap()
+        .change_id
+        .0;
+    let surfaces: Vec<Option<String>> = store
+        .read(move |c| {
+            let mut s = c.prepare(
+                "SELECT surface FROM changes WHERE id IN (?1, ?2) ORDER BY id = ?1 DESC",
+            )?;
+            let rows = s.query_map([id, first], |r| r.get(0))?;
+            rows.collect()
+        })
+        .unwrap();
+    assert_eq!(surfaces, [Some("menu_bar".to_string()), None]);
+}
+
+#[test]
+fn a_write_that_does_not_bump_rev_leaves_it_alone() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    store
+        .write(note("not_1", None, "First"), meta("create"))
+        .unwrap();
+    let mut keep = note("not_1", Some(1), "Renamed");
+    keep.bump_rev = false;
+    let w = store.write(keep, meta("hotkeys")).unwrap();
+    assert_eq!(
+        (w.rev, w.record["title"].clone()),
+        (Rev(1), json!("Renamed"))
+    );
+    // A table without a rev column.
+    let pref = |value: &str| Mutation {
+        entity_type: "pref",
+        table: "prefs",
+        id: "hotkeys".into(),
+        base_rev: None,
+        bump_rev: false,
+        values: vec![("value", json!(value))],
+    };
+    assert_eq!(store.write(pref("a"), meta("setup")).unwrap().rev, Rev(0));
+    let w = store.write(pref("b"), meta("setup")).unwrap();
+    assert_eq!((w.rev, w.record["value"].clone()), (Rev(0), json!("b")));
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 4);
 }
