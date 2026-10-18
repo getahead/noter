@@ -150,11 +150,11 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 **Output**: The version bump to apply.
 
 **Steps**:
-1. [ ] - `p1` - **IF** only draft surfaces changed - `inst-if-draft`
-   1. [ ] - `p1` - **RETURN** minor - `inst-return-draft-minor`
-2. [ ] - `p1` - **IF** every frozen change is additive (new optional field, new command, new enum variant the UI can ignore) - `inst-if-additive`
+1. [x] - `p1` - **IF** only draft surfaces changed - `inst-if-draft`
+   1. [x] - `p1` - **RETURN** minor - `inst-return-draft-minor`
+2. [ ] - `p1` - **IF** every frozen change is additive (new optional field, new command, new enum variant the UI can ignore) - `inst-if-additive`. Enforced so far at the manifest level only (commands, events, windows, error codes); a field change inside an argument or result type is not enforced yet and rests on `noter-contract-export --check` and the two reviews. Follow-up: diff the exported declarations per frozen surface
    1. [ ] - `p1` - **RETURN** minor - `inst-return-additive-minor`
-3. [ ] - `p1` - **RETURN** major, with sign-off from both sides - `inst-return-major`
+3. [x] - `p1` - **RETURN** major, with sign-off from both sides - `inst-return-major`
 
 ## 4. States (CDSL)
 
@@ -167,9 +167,9 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 **Initial State**: draft for Copilot, Agents, Performance, `storage_move` and `copilot:status`; frozen for everything else
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** draft **TO** frozen **WHEN** the surface's milestone gate passes (Copilot and Agents at M4, Performance at M5) - `inst-st-freeze`
+1. [x] - `p1` - **FROM** draft **TO** frozen **WHEN** the surface's milestone gate passes (Copilot and Agents at M4, Performance at M5) - `inst-st-freeze`
 2. [ ] - `p1` - **FROM** frozen **TO** frozen **WHEN** an additive change lands with a minor version - `inst-st-additive`
-3. [ ] - `p1` - **FROM** draft **TO** draft **WHEN** any change lands with a minor version - `inst-st-draft-change`
+3. [x] - `p1` - **FROM** draft **TO** draft **WHEN** any change lands with a minor version - `inst-st-draft-change`
 
 ## 5. Definitions of Done
 
