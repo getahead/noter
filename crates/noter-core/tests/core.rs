@@ -171,7 +171,7 @@ async fn the_scope_check_runs_before_the_core() {
     let later = dispatch_json(
         &core,
         &from(WindowLabel::Main),
-        "settings_get",
+        "today_get",
         json!({}),
         None,
     )
