@@ -1,7 +1,7 @@
 // Performance scenario `ui_stream_flush` (harness/perf.toml, docs/ADR/0003): a 60-minute live call
 // replayed through the window store's 100 ms Channel flush (core-bridge feature, `reduceStream`), the
 // work the bridge does on every flush of the transcript, levels and cards Channels.
-// Deterministic: fixed workload, no clock, no randomness. Bundled by Vite and run with `node --jitless` (see
+// Deterministic: fixed workload, no clock, no randomness. Bundled by Vite and run with `node --jitless --predictable` (see
 // the perf.toml snippet): plain interpreted JavaScript keeps instruction counts stable under cachegrind.
 // Exits non-zero when the replay loses or doubles a message, so a fast but wrong flush cannot pass.
 
