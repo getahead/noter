@@ -176,8 +176,8 @@ impl Harness {
         Ok(())
     }
 
-    /// Step states and the call display; a step the core refuses (Assistants done in M0) is
-    /// left as the core has it, and `world_get` reports what the core holds.
+    /// Step states and the call display, through the first-run commands; a refusal is the
+    /// caller's to see (the core accepts every step state since decision D10).
     async fn write_setup(&self, wanted: &Value) -> Result<(), CoreError> {
         let current = self
             .call(WindowLabel::FirstRun, "setup_status", json!({}))
@@ -189,9 +189,8 @@ impl Harness {
                 .flatten()
                 .find(|s| s["step"] == step["step"]);
             if now.map(|s| &s["state"]) != Some(&step["state"]) {
-                let _ = self
-                    .call(WindowLabel::FirstRun, "setup_set_step", step.clone())
-                    .await;
+                self.call(WindowLabel::FirstRun, "setup_set_step", step.clone())
+                    .await?;
             }
         }
         if current["call_display"] != wanted["call_display"] {
@@ -277,6 +276,23 @@ impl Harness {
         }
         if current["app"]["banners"]["banners"] != wanted["app"]["banners"]["banners"] {
             self.core.set_banners(parsed.app.banners.banners.clone());
+        }
+        // Derived fields are the core's to compute; a world that disagrees with it is a preset
+        // that drifted from the core's rules (what was applied stays applied).
+        let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
+        let drifted: Vec<String> = ["complete", "detection_enabled"]
+            .into_iter()
+            .filter(|f| after["app"]["setup"][f] != wanted["app"]["setup"][f])
+            .map(|f| format!("app.setup.{f}"))
+            .collect();
+        if !drifted.is_empty() {
+            return Err(CoreError::new(
+                ErrorCode::InvalidInput,
+                format!(
+                    "harness.world_set: the core computes {} differently",
+                    drifted.join(", ")
+                ),
+            ));
         }
         *lock(&self.world) = parsed;
         Ok(json!({}))
