@@ -214,18 +214,6 @@ async fn steps_are_marked_and_setup_completes_when_every_step_is_done_or_skipped
         rev
     );
 
-    // Decision D10: connecting an assistant is M3, but marking the step is M0.
-    s.core
-        .setup_set_step(
-            &first_run(),
-            StepArgs {
-                step: SetupStep::Assistants,
-                state: StepState::Done,
-            },
-        )
-        .await
-        .unwrap();
-
     let mut last = after;
     for step in [
         SetupStep::Models,
@@ -250,9 +238,10 @@ async fn steps_are_marked_and_setup_completes_when_every_step_is_done_or_skipped
         .core
         .setup_set_step(
             &first_run(),
+            // Decision D10: connecting an assistant is M3, but marking the step is M0.
             StepArgs {
                 step: SetupStep::Assistants,
-                state: StepState::Skipped,
+                state: StepState::Done,
             },
         )
         .await
