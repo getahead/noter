@@ -394,9 +394,12 @@ impl EventEmitter for EventLines {
 }
 
 /// The Mac, as the world says: permission states, displays, output, reachability and disk.
+/// The core's listener for the Mac's change notices.
+type OnChange = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
+
 struct ScriptedNative(
     Mutex<(HashMap<PermissionKind, PermissionState>, EnvironmentReading)>,
-    Mutex<Option<Box<dyn Fn(EnvironmentReading) + Send + Sync>>>,
+    Mutex<Option<OnChange>>,
 );
 
 impl ScriptedNative {
@@ -460,7 +463,7 @@ impl NativeServices for ScriptedNative {
         lock(&self.0).1.clone()
     }
 
-    fn on_change(&self, on_change: Box<dyn Fn(EnvironmentReading) + Send + Sync>) {
+    fn on_change(&self, on_change: OnChange) {
         *lock(&self.1) = Some(on_change);
     }
 
