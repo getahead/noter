@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -567,6 +568,34 @@ class SelfReviewTests(unittest.TestCase):
         self.assertEqual(review.evaluate(_pr(), [newer, older]).state, "failure")
         older, newer = _comment("REQUEST_CHANGES", at="2026-10-18T10:00:00Z"), _comment("APPROVE", at="2026-10-18T11:00:00Z")
         self.assertEqual(review.evaluate(_pr(), [older, newer]).state, "success")
+
+    def test_same_diff_on_a_new_head_keeps_the_review(self):
+        diff = "diff --git a/x b/x\nindex 111..222 100644\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n"
+        md = REVIEW_MD.format(icon="✅", verdict="APPROVE")
+        c = {"body": review.comment_body(md, OLD, "APPROVE", diff), "author_association": "OWNER",
+             "updated_at": "2026-10-18T10:00:00Z", "html_url": "u"}
+        rebased = diff.replace("index 111..222", "index 333..444")
+        self.assertEqual(review.evaluate(_pr(), [c], rebased).state, "success")
+        changed = diff.replace("+b", "+c")
+        self.assertEqual(review.evaluate(_pr(), [c], changed).state, "pending")
+        self.assertEqual(review.evaluate(_pr(), [c]).state, "pending")
+
+    def test_marker_without_fingerprint_still_parses(self):
+        body = "<!-- noter-self-review head=" + HEAD + " verdict=APPROVE -->\n## Verdict: ✅ APPROVE"
+        c = {"body": body, "author_association": "OWNER", "updated_at": "t", "html_url": "u"}
+        self.assertEqual(review.evaluate(_pr(), [c], "any diff").state, "success")
+
+    def test_head_marker_unchanged_for_older_evaluators(self):
+        body = review.comment_body("## Verdict: ✅ APPROVE", HEAD, "APPROVE", "diff --git a/x b/x\n+a\n")
+        old_style = re.compile(r"<!--\s*noter-self-review\s+head=([0-9a-f]{40})\s+verdict=(APPROVE|COMMENT|REQUEST_CHANGES)\s*-->")
+        self.assertEqual(old_style.search(body).group(2), "APPROVE")
+        self.assertTrue(review.DIFF_MARKER_RE.search(body))
+
+    def test_unavailable_diff_falls_back_to_head_matching(self):
+        with mock.patch.object(review, "_run", side_effect=review.Unavailable("too_large")), \
+                mock.patch("sys.stderr", new=__import__("io").StringIO()):
+            self.assertEqual(review._pr_diff("o/r", 7), "")
+        self.assertEqual(review.evaluate(_pr(), [_comment("APPROVE")], "").state, "success")
 
     def test_marker_must_match_the_verdict_line(self):
         st = review.evaluate(_pr(), [_comment("APPROVE", body_verdict="REQUEST_CHANGES")])

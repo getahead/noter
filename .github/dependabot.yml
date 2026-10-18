@@ -27,7 +27,8 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: npm
-    directories: ["/", "/apps/desktop"]
+    # The pnpm workspace root covers apps/desktop; listing both opened duplicate PRs (#8, #9).
+    directory: /
     schedule:
       interval: weekly
       day: monday
