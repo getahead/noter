@@ -3,6 +3,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import "./styles/tokens";
+
 import { App } from "./app/App";
 import { createBridge } from "./app/bridge/bridge";
 import { COMMANDS, type WindowLabel } from "./core/bindings";
