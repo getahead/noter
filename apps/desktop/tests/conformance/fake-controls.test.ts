@@ -8,12 +8,11 @@ describe.skipIf(!isFake)("fake core controls", () => {
   it("failNext makes the next call fail with that typed error, once", async () => {
     const fake = fakeFor("main");
     const core = createCore(fake);
-    fake.failNext("search", "index_rebuilding");
-    const filter = { people: [], call_types: [], tags: [], languages: [] };
-    const first = await core.search({ query: "drawer", filter, limit: null });
+    fake.failNext("glossary_list", "offline");
+    const first = await core.glossaryList({});
     expect(first.status).toBe("error");
     if (first.status === "error") expect(ERROR_CODES).toContain(first.error.code);
-    const second = await core.search({ query: "drawer", filter, limit: null });
+    const second = await core.glossaryList({});
     expect(second.status).toBe("ok");
   });
 

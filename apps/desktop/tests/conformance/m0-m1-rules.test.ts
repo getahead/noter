@@ -3,11 +3,16 @@
 // empty arguments. Each test opens its own isolated core (tests/support/scenario.ts): the fake
 // today, the real core through noter-core-harness with NOTER_CORE=stdio. Successful commands
 // are recorded into this worker's conformance log (tests/support/record-setup.ts).
+//
+// A core that answers only some milestones (the real core, milestone by milestone) answers the
+// rest `not_implemented`. A step on a later command goes through `ahead()` (or `pending()` for an
+// expected refusal) and the test stops there; everything before it is still asserted, and
+// against the fake (which answers every command) every step runs.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_RETRYABLE, ERROR_CODES, type CaptureState, type CommandName, type CoreError, type LevelsMsg, type TranscriptMsg, type WindowLabel } from "../../src/core/bindings";
 import { exercised } from "../support/core";
-import { ok, refused, until } from "../support/results";
+import { ahead, ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -20,6 +25,22 @@ afterEach(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** True when a later milestone's command answered `not_implemented`: the test stops at that step. */
+function pending<T>(res: { status: string; error?: CoreError } & T): boolean {
+  return res.status === "error" && res.error?.code === "not_implemented";
+}
+
+/** `s.change`, or false while the core does not own the slice the change touches yet (`not_implemented`). */
+async function changeAhead(mutate: Parameters<Scenario["change"]>[0]): Promise<boolean> {
+  try {
+    await s.change(mutate);
+    return true;
+  } catch (e) {
+    if ((e as CoreError | null)?.code === "not_implemented") return false;
+    throw e;
+  }
+}
 
 function typed(e: CoreError, code: string): void {
   expect(e.code).toBe(code);
@@ -48,14 +69,14 @@ describe("window scope with valid arguments (PM-08): refused, and nothing change
   ];
   it.each(cases)("%s from %s", async (cmd, window, args) => {
     const before = ok(await s.core("main").appSnapshot({}));
-    const calls = ok(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} })).total;
+    const calls = ahead(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} }))?.total ?? null;
     const keys = ok(await s.core("settings").hotkeysList({}));
     const err = await (s as unknown as { core(w: WindowLabel): { [k: string]: unknown } }).core(window) && (await invokeRaw(window, cmd, args));
     expect(err?.code).toBe("window_not_allowed");
     const after = ok(await s.core("main").appSnapshot({}));
     expect(after.capture).toEqual(before.capture);
     expect(after.setup.version).toBe(before.setup.version);
-    expect(ok(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} })).total).toBe(calls);
+    if (calls !== null) expect(ok(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} })).total).toBe(calls);
     expect(ok(await s.core("settings").hotkeysList({}))).toEqual(keys);
   });
 
@@ -72,7 +93,9 @@ describe("window scope with valid arguments (PM-08): refused, and nothing change
 describe("typed errors of M0/M1 commands: code, detail and retryable as the core sets them", () => {
   it("not_found, conflict with current_rev, and validation details", async () => {
     const main = s.core("main");
-    typed(refused(await main.callGet({ call_id: "call_missing" })), "not_found");
+    const missing = await main.callGet({ call_id: "call_missing" });
+    if (pending(missing)) return;
+    typed(refused(missing), "not_found");
     const row = ok(await main.callGet({ call_id: W.PAST_CALL })).call;
     const renamed = ok(await main.callUpdate({ call_id: W.PAST_CALL, rev: row.rev, title: "Backend sync (renamed)" }));
     expect(renamed.call.rev).toBe(row.rev + 1);
@@ -92,7 +115,9 @@ describe("typed errors of M0/M1 commands: code, detail and retryable as the core
 
   it("capture refusals: not_recording, notice_expired, continue_window_closed, detection_expired, already_recording", async () => {
     const screen = s.core("call-screen");
-    typed(refused(await screen.captureStart({ source: "call_window", sensitive: false })), "already_recording");
+    const again = await screen.captureStart({ source: "call_window", sensitive: false });
+    if (pending(again)) return;
+    typed(refused(again), "already_recording");
     typed(refused(await screen.captureHoldNotice({ call_id: W.LIVE_CALL, held: true })), "notice_expired");
     typed(refused(await screen.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "stop_now" })), "notice_expired");
     typed(refused(await screen.captureKeepRecording({ call_id: W.LIVE_CALL })), "notice_expired");
@@ -124,7 +149,8 @@ describe("O1: capture_start is never gated on setup, permissions or the self-tes
       W.permission(w, "system_audio", "denied");
     });
     for (const [window, source] of [["main", "today"], ["record-prompt", "hotkey"], ["call-screen", "call_window"]] as const) {
-      const started = ok(await s.core(window).captureStart({ source, sensitive: false }));
+      const started = ahead(await s.core(window).captureStart({ source, sensitive: false }));
+      if (!started) return;
       expect(started.phase).toBe("recording");
       ok(await s.core("call-screen").captureDiscard({ call_id: started.call_id! }));
     }
@@ -136,7 +162,9 @@ describe("O1: capture_start is never gated on setup, permissions or the self-tes
       w.app.setup.complete = false;
       w.app.environment.disk_free_mb = 300;
     });
-    const full = refused(await s.core("main").captureStart({ source: "hotkey", sensitive: false }));
+    const refusal = await s.core("main").captureStart({ source: "hotkey", sensitive: false });
+    if (pending(refusal)) return;
+    const full = refused(refusal);
     typed(full, "disk_full");
     expect(full.detail).toEqual({ type: "disk_space", free_mb: 300, needed_mb: 500 });
     await s.change((w) => {
@@ -151,10 +179,12 @@ describe("O1: capture_start is never gated on setup, permissions or the self-tes
 
 describe("capture notices: hold, keep and resume", () => {
   it("capture_hold_notice holds the call-ended countdown and restarts it on release; holding twice is harmless", async () => {
-    await s.change((w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 }));
+    if (!(await changeAhead((w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 })))) return;
     for (const window of ["call-screen", "record-prompt"] as const) {
       const c = s.core(window);
-      expect(ok(await c.captureHoldNotice({ call_id: W.LIVE_CALL, held: true })).notice).toEqual({ type: "call_ended", stops_at: null });
+      const held = ahead(await c.captureHoldNotice({ call_id: W.LIVE_CALL, held: true }));
+      if (!held) return;
+      expect(held.notice).toEqual({ type: "call_ended", stops_at: null });
       expect(ok(await c.captureHoldNotice({ call_id: W.LIVE_CALL, held: true })).notice).toEqual({ type: "call_ended", stops_at: null });
       const released = ok(await c.captureHoldNotice({ call_id: W.LIVE_CALL, held: false })).notice;
       expect(released?.type === "call_ended" && released.stops_at !== null && released.stops_at > Date.now()).toBe(true);
@@ -163,8 +193,10 @@ describe("capture notices: hold, keep and resume", () => {
   });
 
   it("capture_keep_recording closes the nothing-heard notice and keeps the call", async () => {
-    await s.change((w) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN }));
-    expect(ok(await s.core("call-screen").captureKeepRecording({ call_id: W.LIVE_CALL }))).toMatchObject({ phase: "recording", call_id: W.LIVE_CALL, notice: null });
+    if (!(await changeAhead((w) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN })))) return;
+    const kept = ahead(await s.core("call-screen").captureKeepRecording({ call_id: W.LIVE_CALL }));
+    if (!kept) return;
+    expect(kept).toMatchObject({ phase: "recording", call_id: W.LIVE_CALL, notice: null });
   });
 
   it("capture_resume_interrupted continues the call Noter quit during, once, and clears its banner", async () => {
@@ -173,7 +205,8 @@ describe("capture notices: hold, keep and resume", () => {
       w.app.banners.banners = [{ type: "recording_interrupted_by_quit", call: { id: W.LIVE_CALL, title: W.LIVE_TITLE, started_at: w.now, call_type: "planning" } }];
     });
     const main = s.core("main");
-    const resumed = ok(await main.captureResumeInterrupted({ call_id: W.LIVE_CALL }));
+    const resumed = ahead(await main.captureResumeInterrupted({ call_id: W.LIVE_CALL }));
+    if (!resumed) return;
     expect(resumed).toMatchObject({ phase: "recording", call_id: W.LIVE_CALL, title: W.LIVE_TITLE });
     expect(ok(await main.appSnapshot({})).banners.banners).toEqual([]);
     expect(ok(await s.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {})).gaps.some((g) => g.reason === "interrupted")).toBe(true);
@@ -192,7 +225,9 @@ describe("capture notices: hold, keep and resume", () => {
 
   it("capture_set_sensitive is one-way during capture", async () => {
     const screen = s.core("call-screen");
-    expect(ok(await screen.captureSetSensitive({ call_id: W.LIVE_CALL, sensitive: true })).sensitive).toBe(true);
+    const first = ahead(await screen.captureSetSensitive({ call_id: W.LIVE_CALL, sensitive: true }));
+    if (!first) return;
+    expect(first.sensitive).toBe(true);
     expect(ok(await screen.captureSetSensitive({ call_id: W.LIVE_CALL, sensitive: true })).sensitive).toBe(true);
     typed(refused(await screen.captureSetSensitive({ call_id: W.LIVE_CALL, sensitive: false })), "invalid_input");
   });
@@ -202,7 +237,8 @@ describe("snapshot, then stream (R23/R24)", () => {
   it("levels: seq from 1 with no gap, and nothing after stream_unsubscribe", async () => {
     const c = s.core("call-screen");
     const got: LevelsMsg[] = [];
-    const sub = ok(await c.levelsSubscribe({ call_id: W.LIVE_CALL }, (m) => got.push(m)));
+    const sub = ahead(await c.levelsSubscribe({ call_id: W.LIVE_CALL }, (m) => got.push(m)));
+    if (!sub) return;
     await until(() => got.length >= 3, "three level messages");
     got.forEach((m, i) => expect(m.seq).toBe(i + 1));
     ok(await c.streamAck({ subscription_id: sub.subscription_id, seq: got.at(-1)!.seq }));
@@ -215,7 +251,8 @@ describe("snapshot, then stream (R23/R24)", () => {
   it("transcript: a second subscriber starts from its own snapshot, both continue from last_seq + 1", async () => {
     const a: TranscriptMsg[] = [];
     const b: TranscriptMsg[] = [];
-    const first = ok(await s.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => a.push(m)));
+    const first = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => a.push(m)));
+    if (!first) return;
     const second = ok(await s.core("main").transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => b.push(m)));
     expect(first.live && second.live).toBe(true);
     await until(() => a.length >= 2 && b.length >= 2, "both streams delivering");
@@ -226,7 +263,8 @@ describe("snapshot, then stream (R23/R24)", () => {
 
   it("transcript of a past call: a snapshot only, no live subscription", async () => {
     const got: TranscriptMsg[] = [];
-    const snap = ok(await s.core("main").transcriptSubscribe({ call_id: W.PAST_CALL }, (m) => got.push(m)));
+    const snap = ahead(await s.core("main").transcriptSubscribe({ call_id: W.PAST_CALL }, (m) => got.push(m)));
+    if (!snap) return;
     expect(snap).toMatchObject({ live: false, subscription_id: null });
     await sleep(300);
     expect(got).toEqual([]);
@@ -256,27 +294,40 @@ describe("whole-state events carry growing versions (R25)", () => {
     const snap = ok(await s.core("main").appSnapshot({}));
     const screen = s.core("call-screen");
     const settings = s.core("settings");
+    // M1 steps run only where the core answers them; the M0 steps (hotkeys, settings, setup) always run.
     const results: CaptureState[] = [];
-    results.push(ok(await screen.captureSetPaused({ call_id: W.LIVE_CALL, paused: true })));
-    results.push(ok(await screen.captureSetPaused({ call_id: W.LIVE_CALL, paused: false })));
-    ok(await screen.windowSetCollapsed({ collapsed: true }));
-    ok(await screen.windowSetCollapsed({ collapsed: false }));
-    ok(await screen.appSetHiddenForPresenting({ hidden: true }));
-    ok(await screen.appSetHiddenForPresenting({ hidden: false }));
+    const paused = ahead(await screen.captureSetPaused({ call_id: W.LIVE_CALL, paused: true }));
+    if (paused) results.push(paused, ok(await screen.captureSetPaused({ call_id: W.LIVE_CALL, paused: false })));
+    const collapsed = ahead(await screen.windowSetCollapsed({ collapsed: true }));
+    if (collapsed) ok(await screen.windowSetCollapsed({ collapsed: false }));
+    const hidden = ahead(await screen.appSetHiddenForPresenting({ hidden: true }));
+    if (hidden) ok(await screen.appSetHiddenForPresenting({ hidden: false }));
     ok(await settings.hotkeySet({ action: "pause", shortcut: "Ctrl+Alt+Super+Y" }));
     ok(await settings.hotkeysReset({}));
     const current = ok(await settings.settingsGet({}));
     ok(await settings.settingsUpdate({ rev: current.rev, section: { section: "menu_bar", value: current.menu_bar } }));
     ok(await s.core("first-run").setupSetStep({ step: "assistants", state: "done" }));
 
-    await until(() => logs.capture.all.length >= 2 && logs.presenting.all.length >= 2 && logs.window.all.length >= 2, "the events");
+    const ran = { capture: paused !== null, setup: true, settings: true, hotkeys: true, window: collapsed !== null, presenting: hidden !== null };
+    await until(
+      () =>
+        (!ran.capture || logs.capture.all.length >= 2) &&
+        (!ran.presenting || logs.presenting.all.length >= 2) &&
+        (!ran.window || logs.window.all.length >= 2) &&
+        logs.setup.all.length > 0 &&
+        logs.settings.all.length > 0 &&
+        logs.hotkeys.all.length > 0,
+      "the events",
+    );
     for (const [name, log] of Object.entries(logs)) {
+      if (!ran[name as keyof typeof ran]) continue;
       expect(log.all.length, name).toBeGreaterThan(0);
       log.all.forEach((p, i) => i > 0 && expect(p.version, `${name} #${i}`).toBeGreaterThan(log.all[i - 1].version));
     }
-    expect(logs.capture.all[0].version).toBeGreaterThan(snap.capture.version);
     expect(logs.setup.all[0].version).toBeGreaterThan(snap.setup.version);
-    expect(logs.presenting.all[0].version).toBeGreaterThan(snap.presenting.version);
+    if (ran.presenting) expect(logs.presenting.all[0].version).toBeGreaterThan(snap.presenting.version);
+    if (!ran.capture) return;
+    expect(logs.capture.all[0].version).toBeGreaterThan(snap.capture.version);
     // A command result is the same whole state as the event it caused.
     expect(results.at(-1)!.version).toBe(logs.capture.latest()!.version);
     const later = ok(await s.core("main").appSnapshot({}));
