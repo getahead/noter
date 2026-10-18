@@ -82,7 +82,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - Native macOS (`cpt-noter-component-core-native`): permissions, environment, login item and updates in M0; panels, menu bar, notifications and windows in M1; launch, clipboard, save panels and the screen-share test in M2.
 - The transcript (`cpt-noter-component-core-transcript`): live persistence, streams and replay in M1; corrections in M2.
 - The change log (`cpt-noter-component-core-changelog`): the write path in M0, undo, redo and History in M2, proposals in M5. Storage (`cpt-noter-component-core-storage`): writer and migrations in M0, backups, integrity and recovery in M5. Jobs (`cpt-noter-component-core-jobs`): scheduler and pipeline jobs in M2, maintenance and evidence in M5.
-- Keys and runtime availability (`cpt-noter-flow-core-credentials-privacy-keys`, `cpt-noter-algo-core-credentials-privacy-availability`, `cpt-noter-state-core-credentials-privacy-key`): `accounts_get` and `api_key_set` (steps 1 to 5 of the flow, the availability algorithm, the key state except removal) in M2 with the LLM gate; `api_key_remove` and the rest in M3 with credentials (discrepancy 1).
+- Keys and runtime availability (`cpt-noter-flow-core-credentials-privacy-keys`, `cpt-noter-algo-core-credentials-privacy-availability`, `cpt-noter-algo-core-credentials-privacy-secret-boundary`, `cpt-noter-state-core-credentials-privacy-key`, and the component `cpt-noter-component-core-credentials`): `accounts_get` and `api_key_set` (steps 1 to 5 of the flow, the availability algorithm, the secret boundary for API keys, the key state except removal) in M2 with the LLM gate; `api_key_remove` and the rest in M3 with credentials (discrepancy 1).
 - Two sequences are split at a seam: `cpt-noter-seq-core-call-end-outputs` (the stop half in M1, the outputs half in M2) and `cpt-noter-seq-core-live-tick` (the transcript half in M1, the tick half in M4).
 - Interfaces are declared once by the contract feature and implemented elsewhere: `cpt-noter-interface-core-ipc` is served by the IPC host and run over stdio by the harness; `cpt-noter-interface-engine-stdio` is spoken by the three engine features; `cpt-noter-interface-skill-outputs` is validated by the LLM router and the post-call pipeline.
 
@@ -908,6 +908,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
   - [ ] `p3` - `cpt-noter-component-core-llm-router`
   - [ ] `p3` - `cpt-noter-component-core-privacy`
+  - [ ] `p3` - `cpt-noter-component-core-credentials` (shared with `cpt-noter-feature-core-credentials-privacy`; the M2 part is the Keychain code behind `api_key_set` and the availability behind `accounts_get`)
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `accounts_get`, `api_key_set`
