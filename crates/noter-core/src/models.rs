@@ -177,7 +177,13 @@ impl Core {
                 return;
             }
             for b in &wanted.bundles {
-                d.set(&b.name, b.state, Some(u64::from(b.done_mb) * MB));
+                // Only a download part-way has progress; a world that held the bundle ready still
+                // carries its full `done_mb`, which a pending or failed bundle must not show.
+                let done = match b.state {
+                    BundleState::Downloading | BundleState::Paused => u64::from(b.done_mb) * MB,
+                    _ => 0,
+                };
+                d.set(&b.name, b.state, Some(done));
             }
             d.error = wanted.error;
         }
