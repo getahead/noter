@@ -164,3 +164,19 @@ fn watch_reports_a_change_and_stops_when_dropped() {
     std::thread::sleep(Duration::from_millis(30));
     assert_eq!(*seen.lock().unwrap(), after, "no callback after drop");
 }
+
+#[test]
+fn the_environment_watcher_runs_and_stops() {
+    let w = watch(std::env::temp_dir(), Duration::from_millis(5), |_| {});
+    std::thread::sleep(Duration::from_millis(20));
+    drop(w);
+}
+
+#[test]
+fn turning_the_login_item_off_never_registers_anything() {
+    // A test binary is not an app bundle: SMAppService answers an error or "not found".
+    match set_login_item(false) {
+        Ok(state) => assert_ne!(state, LoginItem::Enabled),
+        Err(message) => assert!(!message.is_empty()),
+    }
+}
