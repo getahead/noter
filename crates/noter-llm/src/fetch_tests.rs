@@ -5,11 +5,14 @@
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::thread;
+use std::time::Duration;
 
 use crate::{allowed_download_url, FetchError, RangeFetcher};
 
 /// Serves until the test ends. Routes: /file (honours Range), /norange (ignores Range),
-/// /redirect-ok (to /file), /redirect-off (to another host), /missing (404), /done (416).
+/// /redirect-ok (to /file), /redirect-off (to another host), /missing (404), /done (416),
+/// /early (206 from the start, not the asked byte), /late (206 three bytes past it),
+/// /stall (sends part of the body, then nothing while keeping the connection open).
 fn server(body: &'static [u8]) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -39,8 +42,25 @@ fn server(body: &'static [u8]) -> u16 {
                 r.extend_from_slice(body);
                 r
             };
+            let range = |start: usize| {
+                format!(
+                    "Content-Range: bytes {start}-{}/{}\r\n",
+                    body.len() - 1,
+                    body.len()
+                )
+            };
+            if path == "/stall" {
+                let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
+                let _ = out.write_all(head.as_bytes());
+                let _ = out.write_all(&body[..5]);
+                let _ = out.flush();
+                thread::sleep(Duration::from_secs(5));
+                continue;
+            }
             let reply = match path.as_str() {
-                "/file" if from > 0 => response("206 Partial Content", "", &body[from..]),
+                "/file" if from > 0 => response("206 Partial Content", &range(from), &body[from..]),
+                "/early" => response("206 Partial Content", &range(0), body),
+                "/late" => response("206 Partial Content", &range(from + 3), &body[from + 3..]),
                 "/file" | "/norange" => response("200 OK", "", body),
                 "/redirect-ok" => response(
                     "302 Found",
@@ -177,5 +197,63 @@ fn every_pinned_file_is_on_the_allow_list_with_a_sha256() {
             f.url
         );
         assert!(f.size_bytes > 0 && !f.bundle.is_empty(), "{}", f.url);
+    }
+}
+
+#[tokio::test]
+async fn a_206_from_an_earlier_byte_is_skipped_to_the_asked_one_and_a_later_one_refused() {
+    let port = server(BODY);
+    assert_eq!(get(port, "/early", 10).await, (Ok(()), BODY[10..].to_vec()));
+    let (r, got) = get(port, "/late", 10).await;
+    assert!(matches!(r, Err(FetchError::Io(_))), "{r:?}");
+    assert!(got.is_empty());
+}
+
+#[tokio::test]
+async fn a_transfer_that_stalls_mid_body_ends_offline() {
+    let port = server(BODY);
+    let (r, got) = get(port, "/stall", 0).await;
+    assert_eq!((r, got), (Err(FetchError::Offline), BODY[..5].to_vec()));
+}
+
+#[test]
+fn the_fetcher_reaches_only_the_model_download_hosts() {
+    let list: serde_json::Value =
+        serde_json::from_str(include_str!("../../../contracts/egress-hosts.json")).unwrap();
+    let model = &list["allow_without_audit"]["model_downloads"]["hosts"];
+    let model: Vec<&str> = model
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|h| h.as_str())
+        .collect();
+    assert!(!model.is_empty());
+    assert_eq!(crate::model_hosts(), model.as_slice());
+    // Every other host the contract names is out of reach.
+    let mut others = Vec::new();
+    collect_hosts(&list["provider_hosts"], &mut others);
+    for (name, group) in list["allow_without_audit"].as_object().unwrap() {
+        if name != "model_downloads" {
+            collect_hosts(group, &mut others);
+        }
+    }
+    for host in others.iter().filter(|h| !model.contains(h)) {
+        assert!(
+            !allowed_download_url(&format!("https://{host}/x")),
+            "{host}"
+        );
+    }
+    assert!(others.len() > 5);
+}
+
+fn collect_hosts<'a>(v: &'a serde_json::Value, out: &mut Vec<&'a str>) {
+    match v {
+        serde_json::Value::String(s) if !s.contains(' ') => out.push(s),
+        serde_json::Value::Array(a) => a.iter().for_each(|x| collect_hosts(x, out)),
+        serde_json::Value::Object(o) => o
+            .iter()
+            .filter(|(k, _)| *k != "$comment" && *k != "note")
+            .for_each(|(_, x)| collect_hosts(x, out)),
+        _ => {}
     }
 }
