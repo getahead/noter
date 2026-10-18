@@ -7,7 +7,7 @@ downloaded once and hashed, since their git oid is not a sha256). The core's dow
 verifies every file against it; nothing here is ever edited by hand.
 
     scripts/models/pin_manifest.py              # write scripts/models/manifest.json
-    scripts/models/pin_manifest.py --check      # also check where each LFS file redirects
+    scripts/models/pin_manifest.py --check      # also check every download and redirect
 
 `--check` fails when a download would leave the model-download hosts of
 contracts/egress-hosts.json; the fix is an owner change to that list, never a wider fetcher.
@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -85,20 +86,36 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def redirect_host(url: str) -> str:
+def redirect_host(url: str, allowed: set[str]) -> str:
     opener = urllib.request.build_opener(NoRedirect)
-    request = urllib.request.Request(url, method="HEAD")
-    try:
-        opener.open(request, timeout=60)
-    except urllib.error.HTTPError as e:  # 3xx surfaces as an error without a redirect handler
-        location = urllib.parse.urljoin(url, e.headers.get("Location", ""))
-        return urllib.parse.urlsplit(location).hostname or ""
-    return urllib.parse.urlsplit(url).hostname or ""
+    for hop in range(11):
+        parsed = urllib.parse.urlsplit(url)
+        if (parsed.scheme != "https" or parsed.hostname not in allowed
+                or parsed.username is not None or parsed.password is not None
+                or parsed.port not in (None, 443)):
+            raise ValueError("download URL leaves the HTTPS model-download allow-list")
+        request = urllib.request.Request(url, method="HEAD")
+        try:
+            with opener.open(request, timeout=60):
+                return parsed.hostname
+        except urllib.error.HTTPError as error:
+            try:
+                if error.code not in (301, 302, 303, 307, 308):
+                    raise ValueError(f"download returned HTTP {error.code}") from None
+                location = error.headers.get("Location")
+                if not location or not location.strip():
+                    raise ValueError("download redirect has no Location")
+                if hop == 10:
+                    raise ValueError("download exceeded ten redirects")
+                url = urllib.parse.urljoin(url, location)
+            finally:
+                error.close()
+    raise ValueError("download exceeded ten redirects")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--check", action="store_true", help="check every LFS redirect host against the allow-list")
+    parser.add_argument("--check", action="store_true", help="check every download and redirect against the allow-list")
     args = parser.parse_args(argv)
 
     files = [f for spec in BUNDLES for f in files_of(spec)]
@@ -107,18 +124,15 @@ def main(argv: list[str] | None = None) -> int:
     if bad:
         print(f"download URLs leave the allow-list: {bad}", file=sys.stderr)
         return 1
+    if args.check:
+        try:
+            for file in files:
+                redirect_host(file["url"], allowed)
+        except (ValueError, urllib.error.URLError) as error:
+            print(f"download URL check failed: {error}", file=sys.stderr)
+            return 2
     OUT.write_text(json.dumps({"files": files}, indent=1) + "\n")
     print(f"wrote {len(files)} files of {len(BUNDLES)} bundle(s) to {OUT.relative_to(ROOT)}")
-    if args.check:
-        redirects = {redirect_host(f["url"]) for f in files if f["size_bytes"] > 1_000_000}
-        off = sorted(redirects - allowed)
-        if off:
-            print(
-                "LFS downloads redirect to hosts not in contracts/egress-hosts.json "
-                f"allow_without_audit.model_downloads: {off} (owner change needed)",
-                file=sys.stderr,
-            )
-            return 2
     return 0
 
 
