@@ -1,0 +1,186 @@
+//! The thin Tauri host (DESIGN-core › IPC host): a handler for every contract command (and no
+//! other name), forwarding to the core through `dispatch_json`. No product logic and no state
+//! beyond the booted core.
+
+// @cpt-component:cpt-noter-component-core-ipc-host:p1
+
+use std::sync::{Arc, OnceLock};
+
+use noter_core::{Core, CoreDeps, EventEmitter, SystemClock};
+use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
+use noter_protocol::model::WindowLabel;
+use noter_protocol::{CoreError, ErrorCode};
+use serde_json::Value;
+use tauri::ipc::{Channel, Invoke, InvokeBody, InvokeError, JavaScriptChannelId};
+use tauri::webview::PageLoadEvent;
+use tauri::{Emitter, Manager, RunEvent, Runtime, Webview, WindowEvent};
+
+const WINDOWS: [WindowLabel; 5] = [
+    WindowLabel::Main,
+    WindowLabel::CallScreen,
+    WindowLabel::RecordPrompt,
+    WindowLabel::Settings,
+    WindowLabel::FirstRun,
+];
+
+/// The core, or why it did not start (then every command answers `internal`).
+pub struct Booted(pub Result<Arc<Core>, String>);
+
+/// The host around a booted core: handlers, the core as state, and webview reloads and closes
+/// reported to the stream hub.
+pub fn builder<R: Runtime>(builder: tauri::Builder<R>, booted: Booted) -> tauri::Builder<R> {
+    builder
+        .manage(booted)
+        .invoke_handler(invoke::<R>)
+        .on_page_load(|webview, payload| {
+            if payload.event() == PageLoadEvent::Started {
+                reset(webview.label(), &webview.state::<Booted>());
+            }
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::Destroyed = event {
+                reset(window.label(), &window.state::<Booted>());
+            }
+        })
+}
+
+/// Runs the app: opens the core on Application Support, serves the windows, shuts the core down on exit.
+pub fn run() {
+    let events = Arc::new(TauriEvents::default());
+    let booted = boot(events.clone());
+    let core = booted.0.clone().ok();
+    let app = builder(tauri::Builder::default(), booted)
+        .setup(move |app| {
+            let _ = events.0.set(app.handle().clone());
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("Noter could not build its windows");
+    app.run(move |_, event| {
+        if let (RunEvent::Exit, Some(core)) = (event, &core) {
+            tauri::async_runtime::block_on(core.shutdown());
+        }
+    });
+}
+
+fn boot(events: Arc<dyn EventEmitter>) -> Booted {
+    let Some(dir) = noter_core::default_data_dir() else {
+        return Booted(Err("no home folder".into()));
+    };
+    match Core::open(&dir, CoreDeps::new(Arc::new(SystemClock), events)) {
+        Ok(core) => Booted(Ok(Arc::new(core))),
+        Err(e) => {
+            eprintln!("noter: {e}");
+            Booted(Err(e.to_string()))
+        }
+    }
+}
+
+/// Tauri's invoke handler: a name in `COMMANDS` is answered (one handler per command, with
+/// `{ args, channel? }` as the generated transport sends it); any other name is not handled.
+fn invoke<R: Runtime>(invoke: Invoke<R>) -> bool {
+    let Some(spec) = noter_protocol::ipc::command(invoke.message.command()) else {
+        return false;
+    };
+    let webview = invoke.message.webview();
+    let body = match invoke.message.payload() {
+        InvokeBody::Json(body) => body.clone(),
+        InvokeBody::Raw(_) => Value::Null,
+    };
+    let args = body.get("args").cloned().unwrap_or(Value::Null);
+    let channel = spec
+        .channel
+        .and_then(|_| body.get("channel").cloned())
+        .and_then(|id| serde_json::from_value::<JavaScriptChannelId>(id).ok())
+        .map(|id| id.channel_on(webview.clone()));
+    let booted = Booted(webview.state::<Booted>().0.clone());
+    invoke.resolver.respond_async(async move {
+        let answer = handle(&webview, &booted, spec.name, args, channel).await;
+        answer.map_err(InvokeError::from)
+    });
+    true
+}
+
+/// One contract command from a window.
+// @cpt-flow:cpt-noter-flow-core-ipc-host-command:p1
+// @cpt-dod:cpt-noter-dod-core-ipc-host-handlers:p1
+pub async fn handle<R: Runtime>(
+    webview: &Webview<R>,
+    booted: &Booted,
+    name: &str,
+    args: Value,
+    channel: Option<Channel<Value>>,
+) -> Result<Value, CoreError> {
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-invoke
+    let core = booted
+        .0
+        .as_ref()
+        .map_err(|why| CoreError::new(ErrorCode::Internal, why.clone()))?;
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-invoke
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-build-ctx
+    let label = window_label(webview.label()).ok_or_else(|| {
+        CoreError::new(
+            ErrorCode::WindowNotAllowed,
+            format!("{name} from {}", webview.label()),
+        )
+    })?;
+    let ctx = CommandCtx {
+        caller: Caller::Window { label },
+    };
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-build-ctx
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-adapt-sink
+    let sink = channel.map(|c| Sink::new(move |m: Value| c.send(m).is_ok()));
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-adapt-sink
+    // `dispatch_json` (noter-protocol) runs the scope check (`CommandSpec::check_caller`: a native
+    // caller passes, a listed window passes, anything else is refused), then parses the arguments
+    // and calls the core, so every transport shares one scope check and one parse path.
+    // @cpt-algo:cpt-noter-algo-core-ipc-host-scope-check:p1
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-scope-check
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-if-refused
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-return-not-allowed
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-parse-args
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-call-core
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-if-native
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-native
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-if-in-scope
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-allowed
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-refused
+    let result = dispatch_json(core.as_ref(), &ctx, name, args, sink).await;
+    // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-refused
+    // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-allowed
+    // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-if-in-scope
+    // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-native
+    // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-if-native
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-call-core
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-parse-args
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-return-not-allowed
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-if-refused
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-scope-check
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-command:p1:inst-return-result
+    result
+    // @cpt-end:cpt-noter-flow-core-ipc-host-command:p1:inst-return-result
+}
+
+/// The app's windows by label; any other webview (devtools, a stray page) is no window.
+fn window_label(label: &str) -> Option<WindowLabel> {
+    WINDOWS.into_iter().find(|w| w.as_str() == label)
+}
+
+/// A webview loaded a page or closed: its subscriptions end and the page subscribes again.
+fn reset(label: &str, booted: &Booted) {
+    if let (Some(label), Ok(core)) = (window_label(label), &booted.0) {
+        core.webview_reset(label);
+    }
+}
+
+/// Core events to every window, through Tauri's `emit`, once the app exists.
+#[derive(Default)]
+struct TauriEvents(OnceLock<tauri::AppHandle>);
+
+impl EventEmitter for TauriEvents {
+    fn emit(&self, event: &'static str, payload: Value) {
+        if let Some(app) = self.0.get() {
+            let _ = app.emit(event, payload);
+        }
+    }
+}
