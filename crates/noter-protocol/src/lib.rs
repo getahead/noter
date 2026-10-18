@@ -17,6 +17,7 @@
 //! engine team can all build against it from day one.
 
 pub mod common;
+pub mod egress;
 pub mod engine;
 pub mod error;
 pub mod fixtures;
