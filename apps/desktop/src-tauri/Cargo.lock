@@ -2001,6 +2001,7 @@ name = "noter-desktop"
 version = "0.2.0"
 dependencies = [
  "noter-core",
+ "noter-engine-client",
  "noter-protocol",
  "serde_json",
  "tauri",
