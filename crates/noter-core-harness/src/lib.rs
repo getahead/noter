@@ -9,11 +9,16 @@
 //! ← {"event": "entity:changed", "payload": <whole state>}
 //! ```
 
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+
+pub mod boot;
 
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, CoreApi, Sink};
 use noter_protocol::model::WindowLabel;
-use noter_protocol::{CoreError, ErrorCode};
+use noter_protocol::{CoreError, ErrorCode, ErrorDetail};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
@@ -92,6 +97,54 @@ pub async fn serve<C: CoreApi, R: AsyncRead + Unpin>(
     input: R,
     output: Output,
 ) -> std::io::Result<()> {
+    serve_with(core, Arc::new(NoControls), input, output).await
+}
+
+/// A boxed future, so [`Controls`] stays object-safe.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// What the harness adds around a core: the scenario controls (`harness.<name>` requests,
+/// docs/TEST-PLAN.md › The scenario layer) and the shutdown at the end of input.
+pub trait Controls: Send + Sync + 'static {
+    /// `harness.<name>` with its arguments; `harness.fail_next` is handled by [`serve_with`].
+    fn control<'a>(&'a self, name: &'a str, args: Value)
+        -> BoxFuture<'a, Result<Value, CoreError>>;
+    /// Runs once stdin has ended and every answer is written, before the output ends, so the
+    /// core can still end its streams with `shutdown`.
+    fn shutdown(&self) -> BoxFuture<'_, ()>;
+}
+
+struct NoControls;
+
+impl Controls for NoControls {
+    fn control<'a>(&'a self, name: &'a str, _: Value) -> BoxFuture<'a, Result<Value, CoreError>> {
+        Box::pin(async move { Err(invalid(&format!("no control harness.{name}"))) })
+    }
+    fn shutdown(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async {})
+    }
+}
+
+/// `harness.fail_next`: the next call of a command from a window fails with this error, once.
+type FailNext = Arc<Mutex<HashMap<(WindowLabel, String), CoreError>>>;
+
+#[derive(Deserialize)]
+struct FailNextArgs {
+    window: WindowLabel,
+    cmd: String,
+    code: ErrorCode,
+    #[serde(default)]
+    detail: Option<ErrorDetail>,
+}
+
+/// [`serve`] with the harness's controls.
+pub async fn serve_with<C: CoreApi, R: AsyncRead + Unpin>(
+    core: Arc<C>,
+    controls: Arc<dyn Controls>,
+    input: R,
+    output: Output,
+) -> std::io::Result<()> {
+    let fails: FailNext = Arc::default();
     let mut input = BufReader::new(input);
     let mut tasks = JoinSet::new();
     let mut buf = Vec::new();
@@ -103,10 +156,16 @@ pub async fn serve<C: CoreApi, R: AsyncRead + Unpin>(
         if line.is_empty() {
             continue;
         }
-        let (core, out) = (core.clone(), output.lines());
-        tasks.spawn(async move { dispatch(&*core, &line, &out).await });
+        let (core, controls, fails, out) = (
+            core.clone(),
+            controls.clone(),
+            fails.clone(),
+            output.lines(),
+        );
+        tasks.spawn(async move { dispatch(&*core, &*controls, &fails, &line, &out).await });
     }
     while tasks.join_next().await.is_some() {}
+    controls.shutdown().await;
     output.lines.0.send(None).ok();
     output.writer.await.map_err(std::io::Error::other)?
 }
@@ -114,7 +173,13 @@ pub async fn serve<C: CoreApi, R: AsyncRead + Unpin>(
 // @cpt-algo:cpt-noter-algo-core-harness-dispatch:p1
 /// One request line: parse it, run the command as the IPC host would for that window (scope
 /// check, then arguments), write the result or error line, then release held Channel messages.
-async fn dispatch<C: CoreApi>(core: &C, line: &str, out: &Lines) {
+async fn dispatch<C: CoreApi>(
+    core: &C,
+    controls: &dyn Controls,
+    fails: &FailNext,
+    line: &str,
+    out: &Lines,
+) {
     let raw: Value = match serde_json::from_str(line) {
         Ok(v) => v,
         Err(_) => {
@@ -134,15 +199,24 @@ async fn dispatch<C: CoreApi>(core: &C, line: &str, out: &Lines) {
         caller: Caller::Window { label: req.window },
     };
     let held = req.channel.then(|| Held::new(req.id, out.clone()));
-    match dispatch_json(
-        core,
-        &ctx,
-        &req.cmd,
-        req.args,
-        held.as_ref().map(Held::sink),
-    )
-    .await
-    {
+    let failed = lock(fails).remove(&(req.window, req.cmd.clone()));
+    let result = if req.cmd == "harness.fail_next" {
+        fail_next(fails, req.args)
+    } else if let Some(name) = req.cmd.strip_prefix("harness.") {
+        controls.control(name, req.args).await
+    } else if let Some(error) = failed {
+        Err(error)
+    } else {
+        dispatch_json(
+            core,
+            &ctx,
+            &req.cmd,
+            req.args,
+            held.as_ref().map(Held::sink),
+        )
+        .await
+    };
+    match result {
         Ok(ok) => {
             out.send(json!({ "id": req.id, "ok": ok }));
             if let Some(h) = held {
@@ -156,6 +230,23 @@ async fn dispatch<C: CoreApi>(core: &C, line: &str, out: &Lines) {
             }
         }
     }
+}
+
+fn fail_next(fails: &FailNext, args: Value) -> Result<Value, CoreError> {
+    let a: FailNextArgs = serde_json::from_value(args)
+        .map_err(|_| invalid("harness.fail_next needs window, cmd and code"))?;
+    let mut error = CoreError::new(a.code, "harness.fail_next");
+    error.detail = a.detail;
+    lock(fails).insert((a.window, a.cmd), error);
+    Ok(json!({}))
+}
+
+pub(crate) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+pub(crate) fn internal(e: impl std::fmt::Display) -> CoreError {
+    CoreError::new(ErrorCode::Internal, e.to_string())
 }
 
 fn invalid(message: &str) -> CoreError {
@@ -211,8 +302,4 @@ impl Held {
     fn close(self) {
         *lock(&self.gate) = Gate::Closed;
     }
-}
-
-fn lock(gate: &Mutex<Gate>) -> std::sync::MutexGuard<'_, Gate> {
-    gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }

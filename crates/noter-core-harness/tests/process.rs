@@ -50,6 +50,7 @@ fn eof_answers_every_request_and_exits_zero() {
         .unwrap()
         .lines()
         .map(|l| serde_json::from_str::<Value>(l).unwrap()["id"].clone())
+        .filter(|id| !id.is_null()) // the event lines of seeding and shutdown carry no id
         .collect();
     assert_eq!(ids.len(), 2);
     assert!(ids.contains(&1.into()) && ids.contains(&2.into()));
@@ -61,7 +62,10 @@ fn stdout_holds_only_protocol_lines() {
     let out = run(&[], "not json\n{\"id\":1,\"window\":\"call-screen\",\"cmd\":\"hotkeys_list\"}\n\n{\"id\":2,\"window\":\"main\",\"cmd\":\"nope\"}\n");
     assert_eq!(out.status.code(), Some(0));
     let stdout = String::from_utf8(out.stdout).unwrap();
-    assert_eq!(stdout.lines().count(), 3);
+    let replies = stdout
+        .lines()
+        .filter(|l| serde_json::from_str::<Value>(l).is_ok_and(|v| v.get("id").is_some()));
+    assert_eq!(replies.count(), 3);
     for line in stdout.lines() {
         let v: Value =
             serde_json::from_str(line).unwrap_or_else(|_| panic!("not a protocol line: {line}"));
