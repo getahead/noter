@@ -11,7 +11,7 @@ const notImplemented = (message: string): Result<number> => ({
 describe("pending and ahead judge not_implemented by milestone", () => {
   it("waits for a command of a later milestone", () => {
     expect(pending(notImplemented("capture_start"), "M0")).toBe(true); // M1
-    expect(ahead(notImplemented("today_get"))).toBeNull(); // M2, later than the harness's current
+    expect(ahead(notImplemented("harness.push: no scripted stream"))).toBeNull(); // whatever the harness's current milestone
   });
 
   it("fails once the command's milestone is current or past", () => {
