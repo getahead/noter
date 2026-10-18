@@ -195,7 +195,7 @@ test.describe("cpt-noter-flow-ui-tokens-theming-follow-appearance", () => {
     expect(await fills()).toEqual(Array(3).fill(["rgb(255, 69, 58)", white]));
   });
 
-  test("Reduce motion zeroes transitions and animations except the row spinner and level meters", async ({ page }) => {
+  test("Reduce motion zeroes transitions and animations except the level meters; the row spinner stands still", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setContent(`<style>${css} @keyframes s { to { transform: rotate(1turn); } }
       div { transition: opacity .3s; animation: s 1s infinite; }</style>
@@ -206,7 +206,7 @@ test.describe("cpt-noter-flow-ui-tokens-theming-follow-appearance", () => {
         return [s.transitionDuration, s.animationDuration];
       });
     expect(await timing("plain")).toEqual(["0s", "0s"]);
-    expect(await timing("spin")).toEqual(["0.3s", "1s"]);
+    expect(await timing("spin")).toEqual(["0s", "0s"]); // stationary, as in the prototype (00-base.css)
     expect(await timing("meter")).toEqual(["0.3s", "1s"]);
   });
 });

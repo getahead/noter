@@ -138,11 +138,11 @@ describe("tokens.css", () => {
     for (const t of ["--side-bg", "--glass-bg", "--glass-bg-strong"]) expect(rt[t]).not.toMatch(/rgba|transparent/);
   });
 
-  it("stops motion under Reduce motion except the row spinner and level meters", () => {
+  it("stops motion under Reduce motion except the level meters; the row spinner stands still", () => {
     const body = mediaBodies(css).find(([q]) => q === "(prefers-reduced-motion: reduce)")?.[1] ?? "";
     expect(body).toMatch(/transition-duration:\s*0s !important/);
     expect(body).toMatch(/animation-duration:\s*0s !important/);
-    expect(body).toMatch(/:not\(\.np-spin\)/);
+    expect(body).not.toMatch(/np-spin/);
     expect(body).toMatch(/:not\(\.np-meter \*\)/);
   });
 });

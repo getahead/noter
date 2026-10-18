@@ -64,15 +64,16 @@
 
 /* ---------- push buttons: capsules; mini 16 · small 20 · regular 24 · large 28 ---------- */
 .np-btn { border-radius: var(--r-capsule); border: 0; background: var(--ctrl-bg); color: var(--label); box-shadow: 0 0 0 .5px var(--ctrl-border), 0 1px 1.5px rgba(0,0,0,.07); font-weight: 400; padding: 0 12px; min-width: 56px; }
-.np-btn:hover { filter: none; background-image: linear-gradient(var(--sel-unemph), var(--sel-unemph)); }
+/* hover only on enabled controls: a disabled control takes no hover (DESIGN 3.2; the prototype hovers it) */
+.np-btn:hover:not(:disabled) { filter: none; background-image: linear-gradient(var(--sel-unemph), var(--sel-unemph)); }
 .np-btn:active { filter: brightness(.94); }
 .np-btn--small { height: 20px; font-size: 11px; padding: 0 9px; }
 .np-btn--regular { height: 24px; }
 .np-btn--large { height: 28px; padding: 0 16px; }
 .np-btn--primary { background: var(--accent-fill); color: var(--on-accent); box-shadow: 0 1px 2px rgba(0,0,0,.14), inset 0 .5px 0 rgba(255,255,255,.25); }
-.np-btn--primary:hover { background-image: linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)); }
+.np-btn--primary:hover:not(:disabled) { background-image: linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)); }
 .np-btn--quiet { background: transparent; box-shadow: none; color: var(--accent-text); }
-.np-btn--quiet:hover { background-image: none; background-color: var(--sel-unemph); }
+.np-btn--quiet:hover:not(:disabled) { background-image: none; background-color: var(--sel-unemph); }
 .np-btn--destructive { color: var(--error); }
 .np-btn--destructive.np-btn--primary { background: var(--error); color: #fff; }
 .np-btn .np-kbd { border: 0; background: var(--sel-unemph); }
@@ -82,7 +83,7 @@
 .np-ibtn { border-radius: var(--r-capsule); color: var(--label-2); }
 .np-ibtn--toolbar { width: 30px; height: 30px; }
 .np-ibtn--inline { width: 22px; height: 22px; }
-.np-ibtn:hover { background: var(--sel-unemph); }
+.np-ibtn:hover:not(:disabled) { background: var(--sel-unemph); }
 
 /* key caps */
 .np-kbd { border: 0; background: var(--sel-unemph); border-radius: 5px; color: var(--label-2); }

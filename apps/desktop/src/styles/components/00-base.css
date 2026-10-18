@@ -75,7 +75,8 @@ h1, h2, h3, h4, p { margin: 0; }
 
 /* ---------------- Primitives ---------------- */
 .np-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 64px; border-radius: 6px; border: 1px solid var(--ctrl-border-soft); background: var(--ctrl-bg); color: var(--label); padding: 0 12px; cursor: pointer; white-space: nowrap; box-shadow: 0 .5px 1px rgba(0,0,0,.12); transition: background-color 120ms, filter 120ms; flex: none; }
-.np-btn:hover { filter: brightness(.97); }
+/* hover only on enabled controls: a disabled control takes no hover (DESIGN 3.2; the prototype hovers it) */
+.np-btn:hover:not(:disabled) { filter: brightness(.97); }
 .np-btn:active { filter: brightness(.92); }
 .np-btn--small { height: 22px; font-size: 12px; padding: 0 9px; min-width: 0; }
 .np-btn--regular { height: 28px; }
@@ -83,7 +84,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .np-btn--primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); }
 .np-btn--primary:focus-visible { outline-offset: 2px; }
 .np-btn--quiet { background: transparent; border-color: transparent; box-shadow: none; color: var(--accent-text); min-width: 0; }
-.np-btn--quiet:hover { background: var(--sel-unemph); filter: none; }
+.np-btn--quiet:hover:not(:disabled) { background: var(--sel-unemph); filter: none; }
 .np-btn--destructive { color: var(--error); }
 .np-btn--destructive.np-btn--primary { background: var(--error); border-color: var(--error); color: #fff; }
 .np-btn[disabled] { opacity: .45; cursor: default; filter: none; }
@@ -95,7 +96,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .np-ibtn { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--label-2); border-radius: 6px; cursor: pointer; position: relative; flex: none; }
 .np-ibtn--toolbar { width: 28px; height: 28px; }
 .np-ibtn--inline { width: 22px; height: 22px; }
-.np-ibtn:hover { background: var(--sel-unemph); color: var(--label); }
+.np-ibtn:hover:not(:disabled) { background: var(--sel-unemph); color: var(--label); }
 .np-ibtn.is-on, .np-ibtn[aria-pressed="true"] { color: var(--accent-text); background: var(--sel-accent); }
 .np-ibtn[disabled] { opacity: .35; cursor: default; background: transparent; }
 .np-ibtn__badge { position: absolute; top: 0; right: 0; font: 600 9px/12px var(--font); background: var(--error); color: #fff; border-radius: 6px; padding: 0 3px; }

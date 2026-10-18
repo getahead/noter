@@ -75,4 +75,21 @@ test.describe("cpt-noter-dod-ui-primitives-controls primitives page", () => {
       expect(hits, visible).toEqual([true, true, true, true]);
     }
   });
+
+  test("a disabled button takes no hover feedback", async ({ page }) => {
+    await open(page);
+    await page.addStyleTag({ content: "* { transition: none !important; }" }); // read the hover look at once, not mid-ease
+    const look = (el: Element) => {
+      const s = getComputedStyle(el);
+      return [s.backgroundColor, s.backgroundImage, s.filter];
+    };
+    const disabled = page.locator(".np-btn[disabled], .np-ibtn[disabled]");
+    expect(await disabled.count()).toBeGreaterThanOrEqual(5);
+    for (const button of await disabled.all()) {
+      await page.mouse.move(0, 0);
+      const before = await button.evaluate(look);
+      await button.hover({ force: true });
+      expect(await button.evaluate(look)).toEqual(before);
+    }
+  });
 });
