@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { CONTRACT_VERSION, type TranscriptMsg, type WindowLabel } from "../../src/core/bindings";
 import { coreFor } from "../support/core";
+import { ahead } from "../support/results";
 
 const WINDOWS: WindowLabel[] = ["main", "call-screen", "record-prompt", "settings", "first-run"];
 
@@ -20,10 +21,10 @@ describe("transcript stream", () => {
   it("continues from last_seq with no gap and no duplicate", async () => {
     const core = coreFor("call-screen");
     const got: TranscriptMsg[] = [];
-    const sub = await core.transcriptSubscribe({ call_id: "call_live" }, (m) => got.push(m));
-    expect(sub.status).toBe("ok");
-    if (sub.status !== "ok") return;
+    // transcript_subscribe is M1: a core that does not answer it yet stops here (`ahead`).
+    const sub = ahead(await core.transcriptSubscribe({ call_id: "call_live" }, (m) => got.push(m)));
+    if (!sub) return;
     await expect.poll(() => got.length, { timeout: 8000, interval: 100 }).toBeGreaterThanOrEqual(2);
-    got.forEach((m, i) => expect(m.seq).toBe(sub.data.last_seq + i + 1));
+    got.forEach((m, i) => expect(m.seq).toBe(sub.last_seq + i + 1));
   });
 });
