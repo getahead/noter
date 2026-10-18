@@ -1,0 +1,16 @@
+[package]
+name = "noter-engine-client"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The engine supervisor: launches the Swift engine (or a scripted one), speaks the JSON Lines protocol, checks the protocol major, correlates replies and restarts a dead engine. No Tauri dependency."
+publish = false
+
+[dependencies]
+noter-protocol = { path = "../noter-protocol" }
+serde_json = "1"
+tokio = { version = "1", features = ["io-util", "macros", "process", "rt", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["io-util", "macros", "process", "rt", "sync", "test-util", "time"] }
