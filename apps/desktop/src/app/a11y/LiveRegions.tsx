@@ -7,7 +7,7 @@ export function LiveRegions() {
   return (
     <>
       <div data-live="polite" role="status" aria-live="polite" aria-atomic="true" style={hidden} />
-      <div data-live="assertive" role="alert" aria-live="assertive" aria-atomic="true" style={hidden} />
+      <div data-live="assertive" aria-live="assertive" aria-atomic="true" style={hidden} />
     </>
   );
 }

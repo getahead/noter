@@ -101,11 +101,12 @@ describe("announcerFor", () => {
 });
 
 describe("LiveRegions", () => {
-  it("renders a polite status and an assertive alert region", () => {
+  it("renders a polite status region and an assertive live region that is not an alert", () => {
     const html = renderToString(<LiveRegions />);
     expect(html).toContain('data-live="polite"');
     expect(html).toContain('role="status"');
     expect(html).toContain('data-live="assertive"');
-    expect(html).toContain('role="alert"');
+    expect(html).toContain('aria-live="assertive"');
+    expect(html).not.toContain('role="alert"'); // an empty region must not read as an error alert
   });
 });
