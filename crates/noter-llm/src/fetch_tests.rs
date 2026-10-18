@@ -140,11 +140,13 @@ async fn the_real_fetcher_refuses_anything_off_the_allow_list_without_a_request(
         "https://evil.example/x",
         "not a url",
     ] {
-        let r = fetcher.fetch(url, 0, &mut |_| {
-            called = true;
-            true
-        });
-        assert_eq!(r.await, Err(FetchError::NotAllowed), "{url}");
+        let r = fetcher
+            .fetch(url, 0, &mut |_| {
+                called = true;
+                true
+            })
+            .await;
+        assert_eq!(r, Err(FetchError::NotAllowed), "{url}");
     }
     assert!(!called);
 }
@@ -163,4 +165,17 @@ fn only_https_urls_of_the_model_download_hosts_are_allowed() {
     assert!(!allowed_download_url("https://user@huggingface.co/x"));
     assert!(!allowed_download_url("https://api.anthropic.com/v1"));
     assert!(!allowed_download_url("not a url"));
+}
+
+#[test]
+fn every_pinned_file_is_on_the_allow_list_with_a_sha256() {
+    for f in crate::MANIFEST {
+        assert!(allowed_download_url(f.url), "{}", f.url);
+        assert!(
+            f.sha256.len() == 64 && f.sha256.chars().all(|c| c.is_ascii_hexdigit()),
+            "{}",
+            f.url
+        );
+        assert!(f.size_bytes > 0 && !f.bundle.is_empty(), "{}", f.url);
+    }
 }
