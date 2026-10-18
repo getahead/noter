@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/noter-protocol", "crates/noter-db", "crates/noter-engine-client"]
+members = ["crates/noter-protocol", "crates/noter-db", "crates/noter-llm", "crates/noter-engine-client"]
 
 [workspace.package]
 edition = "2021"
