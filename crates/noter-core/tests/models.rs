@@ -458,10 +458,10 @@ async fn refresh_models_rereads_the_models_folder() {
     assert_eq!(state(&st, "whisper-turbo"), BundleState::Ready);
 }
 
-/// A Mac with no network and plenty of disk.
-struct OfflineMac;
+/// A Mac with plenty of disk whose network comes and goes.
+struct Network(std::sync::atomic::AtomicBool);
 
-impl NativeServices for OfflineMac {
+impl NativeServices for Network {
     fn permission(&self, _: PermissionKind) -> PermissionState {
         PermissionState::NotAsked
     }
@@ -470,7 +470,7 @@ impl NativeServices for OfflineMac {
     }
     fn environment(&self) -> EnvironmentReading {
         EnvironmentReading {
-            online: false,
+            online: self.0.load(std::sync::atomic::Ordering::SeqCst),
             disk_free_mb: 100_000,
             ..EnvironmentReading::default()
         }
@@ -481,9 +481,9 @@ impl NativeServices for OfflineMac {
 }
 
 /// Like the fake core: with no connection a start answers `offline` (retryable) at once and
-/// nothing is fetched; pausing still works.
-#[tokio::test]
-async fn starting_while_offline_answers_offline_at_once() {
+/// nothing is fetched; pausing still works; once online, a start downloads the bundle.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn starting_while_offline_answers_offline_at_once_and_works_once_online() {
     let dir = tempfile::tempdir().unwrap();
     let source = Arc::new(Bundles::default().with(
         "whisper-turbo",
@@ -492,8 +492,9 @@ async fn starting_while_offline_answers_offline_at_once() {
         b"model",
         true,
     ));
+    let network = Arc::new(Network(false.into()));
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
-        .with_native(Arc::new(OfflineMac))
+        .with_native(network.clone())
         .with_models(source.clone());
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     core.start_first_run();
@@ -507,4 +508,11 @@ async fn starting_while_offline_answers_offline_at_once() {
     }
     assert!(source.fetches.lock().unwrap().is_empty());
     assert!(download(&core, DownloadAction::Pause).await.is_ok());
+
+    network.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    download(&core, DownloadAction::Start).await.unwrap();
+    until(&core, "ready once online", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
 }

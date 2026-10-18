@@ -728,6 +728,7 @@ dependencies = [
 name = "noter-core"
 version = "0.1.0"
 dependencies = [
+ "noter-core",
  "noter-db",
  "noter-engine-client",
  "noter-protocol",

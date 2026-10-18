@@ -48,6 +48,8 @@ struct FakeNative {
     answers: Mutex<HashMap<PermissionKind, PermissionState>>,
     asked: Mutex<Vec<PermissionKind>>,
     login: Mutex<Vec<bool>>,
+    /// The core's change listener, to send it a new reading as macOS would.
+    changed: Mutex<Option<Box<dyn Fn(EnvironmentReading) + Send + Sync>>>,
 }
 
 fn display(id: &str, main: bool) -> DisplayInfo {
@@ -94,6 +96,9 @@ impl NativeServices for FakeNative {
     }
     fn environment(&self) -> EnvironmentReading {
         reading()
+    }
+    fn on_change(&self, on_change: Box<dyn Fn(EnvironmentReading) + Send + Sync>) {
+        *self.changed.lock().unwrap() = Some(on_change);
     }
     fn set_login_item(&self, on: bool) -> Result<(), CoreError> {
         self.login.lock().unwrap().push(on);
@@ -663,4 +668,93 @@ async fn setup_writes_record_the_callers_surface() {
         .map(Result::unwrap)
         .collect();
     assert_eq!(surfaces, vec![None, Some("menu_bar".to_string())]);
+}
+
+/// Like the fake core: a permission already denied is refused with `permission_denied` and its
+/// kind, without asking again (macOS shows no second prompt).
+#[tokio::test]
+async fn a_denied_permission_is_refused_without_asking_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    s.native
+        .states
+        .lock()
+        .unwrap()
+        .insert(PermissionKind::Calendar, PermissionState::Denied);
+    // A scripted Mac that would not report the denial from a prompt.
+    s.native
+        .answers
+        .lock()
+        .unwrap()
+        .insert(PermissionKind::Calendar, PermissionState::NotAsked);
+    let err = s
+        .core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::Calendar,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::PermissionDenied);
+    assert_eq!(
+        err.detail,
+        Some(ErrorDetail::Permission {
+            kind: PermissionKind::Calendar
+        })
+    );
+    assert!(s.native.asked.lock().unwrap().is_empty());
+}
+
+/// A permission granted outside Noter (System Settings) shows on the next change notice.
+#[tokio::test]
+async fn an_external_grant_is_rechecked_on_the_next_change_notice() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    s.events.names();
+    s.native
+        .states
+        .lock()
+        .unwrap()
+        .insert(PermissionKind::Microphone, PermissionState::Granted);
+    (s.native.changed.lock().unwrap().as_ref().unwrap())(reading());
+    let names = s.events.names();
+    assert!(
+        names.contains(&event_names::ENV_CHANGED) && names.contains(&event_names::SETUP_CHANGED)
+    );
+    let status = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert!(status
+        .permissions
+        .iter()
+        .any(|p| p.kind == PermissionKind::Microphone && p.state == PermissionState::Granted));
+}
+
+/// The harness seeds the self-test state as `harness.world_set` asks; the setup status and the
+/// system-audio row follow it.
+#[tokio::test]
+async fn the_harness_seeds_the_self_test_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    let failed = SelfTestState::Failed {
+        reason: SelfTestFailure::ZeroBuffers,
+    };
+    noter_core::testing::seed_self_test(&s.core, failed.clone());
+    let status = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert_eq!(status.self_test, failed);
+    assert!(status
+        .permissions
+        .iter()
+        .any(|p| p.kind == PermissionKind::SystemAudio && p.state == PermissionState::Denied));
+    let err = s
+        .core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::SystemAudio,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::PermissionDenied);
 }

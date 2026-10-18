@@ -22,6 +22,8 @@ tokio = { version = "1", features = ["rt"] }
 ulid = "3"
 
 [dev-dependencies]
+# The harness hooks (`noter_core::testing`) are tested here too.
+noter-core = { path = ".", features = ["harness"] }
 tempfile = "3"
 sha2 = "0.10"
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
