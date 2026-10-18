@@ -7,7 +7,6 @@
 //! a field change inside an argument or result type is left to the export check and the two
 //! reviews. Upgrade by comparing the exported TypeScript types per frozen surface.
 
-// @cpt-dod:cpt-noter-dod-core-contract-tests:p1
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::Command;
@@ -44,7 +43,6 @@ fn windows(e: &Value) -> BTreeSet<String> {
         .collect()
 }
 
-// @cpt-state:cpt-noter-state-core-contract-stability:p2
 /// The bump one command or event asks for, from its entry on the base and on the head.
 fn surface_bump(old: Option<&Value>, new: Option<&Value>) -> Bump {
     match (old, new) {
@@ -64,21 +62,15 @@ fn surface_bump(old: Option<&Value>, new: Option<&Value>) -> Bump {
         // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-freeze
         // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-draft-change
         // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-if-draft
-        // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-if-additive
-        // @cpt-begin:cpt-noter-state-core-contract-stability:p2:inst-st-additive
         // A frozen surface may only open to more windows.
         (Some(o), Some(n)) => {
             let mut widened = o.clone();
             widened["windows"] = n["windows"].clone();
             if widened == *n && windows(n).is_superset(&windows(o)) {
-                // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-return-additive-minor
                 return Bump::Minor;
-                // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-return-additive-minor
             }
             Bump::Major
         }
-        // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-additive
-        // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-if-additive
         // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-return-major
         // A frozen surface removed.
         (Some(_), None) => Bump::Major,
@@ -95,7 +87,6 @@ fn codes(manifest: &Value, key: &str) -> BTreeSet<String> {
         .collect()
 }
 
-// @cpt-algo:cpt-noter-algo-core-contract-version-rule:p2
 /// The bump the change from `old` to `new` (two `ipc.manifest.json` values) needs.
 fn required_bump(old: &Value, new: &Value) -> Bump {
     let mut bump = Bump::None;
@@ -108,8 +99,18 @@ fn required_bump(old: &Value, new: &Value) -> Bump {
     let (o, n) = (codes(old, "error_codes"), codes(new, "error_codes"));
     if !n.is_superset(&o) {
         bump = bump.max(Bump::Major);
-    } else if n != o || codes(old, "default_retryable") != codes(new, "default_retryable") {
+    } else if n != o {
         // A new error code is a variant the UI can ignore.
+        bump = bump.max(Bump::Minor);
+    }
+    let (o, n) = (
+        codes(old, "default_retryable"),
+        codes(new, "default_retryable"),
+    );
+    if !n.is_superset(&o) {
+        // The UI stops offering Try Again where it did.
+        bump = bump.max(Bump::Major);
+    } else if n != o {
         bump = bump.max(Bump::Minor);
     }
     bump
@@ -143,6 +144,20 @@ fn git(root: &Path, args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).trim_end().to_string())
 }
 
+/// The base manifest, or `None` after a notice where there is nothing to compare: locally
+/// without the ref, and in CI's shallow checkouts (the Contract job). A CI checkout with the full
+/// history (the unit-coverage job) must have the ref, so there it fails.
+fn base_or_report(base: Option<String>, base_ref: &str, ci: bool, shallow: bool) -> Option<String> {
+    if base.is_none() {
+        assert!(
+            !ci || shallow,
+            "version rule: {base_ref} is missing from a full CI checkout"
+        );
+        eprintln!("version rule: {base_ref} not available, nothing to compare");
+    }
+    base
+}
+
 #[test]
 fn the_contract_version_carries_the_bump_the_change_needs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -152,15 +167,15 @@ fn the_contract_version_carries_the_bump_the_change_needs() {
     .unwrap();
     assert_eq!(head["contract_version"], noter_protocol::CONTRACT_VERSION);
     let base_ref = std::env::var("NOTER_BASE_REF").unwrap_or_else(|_| "origin/main".into());
-    // As the trace gate: without the base ref (a shallow checkout) there is nothing to compare;
-    // CI's unit-coverage job has the full history and enforces the rule.
-    let Some(base) = git(&root, &["merge-base", "HEAD", &base_ref]).and_then(|sha| {
+    let base = git(&root, &["merge-base", "HEAD", &base_ref]).and_then(|sha| {
         git(
             &root,
             &["show", &format!("{sha}:contracts/ipc.manifest.json")],
         )
-    }) else {
-        eprintln!("version rule: {base_ref} not available, nothing to compare");
+    });
+    let shallow = git(&root, &["rev-parse", "--is-shallow-repository"]).as_deref() == Some("true");
+    let Some(base) = base_or_report(base, &base_ref, std::env::var_os("CI").is_some(), shallow)
+    else {
         return;
     };
     let base: Value = serde_json::from_str(&base).unwrap();
