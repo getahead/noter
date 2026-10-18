@@ -342,7 +342,9 @@ async fn the_system_audio_prompt_comes_from_a_short_engine_self_test() {
         PermissionState::Granted,
         None,
     );
-    r.core
+    // System audio arrived in the short test: granted, and the row keeps it.
+    let row = r
+        .core
         .permission_request(
             &first_run(),
             PermissionArgs {
@@ -351,6 +353,7 @@ async fn the_system_audio_prompt_comes_from_a_short_engine_self_test() {
         )
         .await
         .unwrap();
+    assert_eq!(row.state, PermissionState::Granted);
     assert!(r.engine.commands().iter().any(|c| matches!(
         c,
         EngineCommand::SelfTest {
@@ -358,4 +361,28 @@ async fn the_system_audio_prompt_comes_from_a_short_engine_self_test() {
             ..
         }
     )));
+    let s = status(&r).await;
+    assert!(s
+        .permissions
+        .iter()
+        .any(|p| p.kind == PermissionKind::SystemAudio && p.state == PermissionState::Granted));
+
+    // Only digital zeros: the recording permission is off.
+    let dir = tempfile::tempdir().unwrap();
+    let zeros = ScriptedEngine::new().with_default(Behaviour {
+        self_test_failure: Some(EngineErrorCode::ZeroBuffers),
+        ..Behaviour::default()
+    });
+    let r = open(dir.path(), zeros, PermissionState::Granted, None);
+    let err = r
+        .core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::SystemAudio,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::PermissionDenied);
 }
