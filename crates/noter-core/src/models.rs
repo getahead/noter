@@ -227,10 +227,12 @@ impl Core {
         d.running = true;
         d.pause.store(false, Ordering::SeqCst);
         drop(d);
+        // The answer shows the bundles `downloading` before the task can move them on.
+        let started = self.setup_now();
         tokio::spawn(async move { core.run_downloads().await });
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-start-task
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-return-started
-        Ok(self.setup_now())
+        Ok(started)
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-return-started
     }
 
