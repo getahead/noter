@@ -281,6 +281,90 @@ async fn world_set_seeds_the_self_test_state() {
 }
 
 #[tokio::test]
+async fn an_external_grant_is_read_again_after_world_set() {
+    let mut r = start().await;
+    let set_mic = |world: &mut Value, state: &str| {
+        for path in ["setup", "environment"] {
+            for row in world["app"][path]["permissions"].as_array_mut().unwrap() {
+                if row["kind"] == "microphone" {
+                    row["state"] = json!(state);
+                }
+            }
+        }
+    };
+    let mic = |setup: &Value| {
+        setup["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["kind"] == "microphone")
+            .unwrap()["state"]
+            .clone()
+    };
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    set_mic(&mut world, "denied");
+    r.ok(
+        "main",
+        "harness.world_set",
+        json!({ "world": world.clone() }),
+    )
+    .await;
+    assert_eq!(
+        mic(&r.ok("first-run", "setup_status", json!({})).await),
+        "denied"
+    );
+    set_mic(&mut world, "granted");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(
+        mic(&r.ok("first-run", "setup_status", json!({})).await),
+        "granted"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn system_audio_the_world_denies_is_refused_without_a_second_prompt() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for path in ["setup", "environment"] {
+        for row in world["app"][path]["permissions"].as_array_mut().unwrap() {
+            if row["kind"] == "system_audio" {
+                row["state"] = json!("denied");
+            }
+        }
+    }
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    for _ in 0..2 {
+        assert_eq!(
+            r.code(
+                "first-run",
+                "permission_request",
+                json!({ "kind": "system_audio" })
+            )
+            .await,
+            "permission_denied"
+        );
+    }
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_changes_the_free_disk_and_the_notifications_state() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["environment"]["disk_free_mb"] = json!(300);
+    world["app"]["environment"]["notifications"] = json!("denied");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(snap["environment"]["disk_free_mb"], 300);
+    assert_eq!(snap["environment"]["notifications"], "denied");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn corrupt_next_download_fails_one_check_then_the_retry_passes() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
@@ -385,15 +469,57 @@ async fn update_install_answers_and_the_harness_keeps_serving() {
 
 // W15
 #[tokio::test]
-async fn push_is_not_implemented_until_the_core_has_a_scripted_stream() {
+async fn push_reaches_the_running_self_test_as_an_engine_fact() {
     let mut r = start().await;
-    let (pushed, _) = r
+    let id = r.next;
+    r.next += 1;
+    let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
+    r.input
+        .write_all(format!("{req}\n").as_bytes())
+        .await
+        .unwrap();
+    let push = r
         .call(
             "main",
             "harness.push",
-            json!({ "cmd": "self_test_run", "body": {} }),
+            json!({ "cmd": "self_test_run", "body": { "event": { "type": "failed", "reason": { "type": "one_stream_silent", "channel": "sys" } } } }),
         )
         .await;
-    assert_eq!(pushed["error"]["code"], "not_implemented");
+    assert!(push.0.get("ok").is_some(), "{push:?}");
+    let mut failed = None;
+    while failed.is_none() {
+        let line = r.line().await;
+        if line["event"] == "setup:changed" {
+            failed = Some(line["payload"]["self_test"].clone());
+        }
+    }
+    let failed = failed.unwrap();
+    assert_eq!(failed["type"], "failed", "{failed}");
+    assert_eq!(failed["reason"]["type"], "one_stream_silent");
+    assert_eq!(failed["reason"]["channel"], "sys");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn system_audio_the_world_denies_is_denied_by_the_engine() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for path in ["setup", "environment"] {
+        for row in world["app"][path]["permissions"].as_array_mut().unwrap() {
+            if row["kind"] == "system_audio" {
+                row["state"] = json!("denied");
+            }
+        }
+    }
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let (reply, _) = r
+        .call(
+            "first-run",
+            "permission_request",
+            json!({ "kind": "system_audio" }),
+        )
+        .await;
+    assert_eq!(reply["error"]["code"], "permission_denied", "{reply}");
     r.finish().await;
 }
