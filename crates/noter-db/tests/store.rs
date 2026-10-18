@@ -251,8 +251,7 @@ fn an_insert_commits_the_row_at_rev_1_with_its_change_row() {
     assert_eq!((row.1.as_str(), row.2.as_str()), ("note", "not_1"));
     assert_eq!(row.3.as_deref(), Some("title"));
     assert_eq!(row.4, None, "no before for an insert");
-    let after: serde_json::Value = serde_json::from_str(row.5.as_deref().unwrap()).unwrap();
-    assert_eq!(after["title"], json!("First"));
+    assert_eq!(row.5.as_deref(), Some("First"), "the new value, as text");
     assert_eq!(
         (row.6.as_str(), row.7.as_str()),
         ("Renamed the note", "user edit")
@@ -263,47 +262,99 @@ fn an_insert_commits_the_row_at_rev_1_with_its_change_row() {
 }
 
 #[test]
-fn an_update_bumps_rev_and_records_before_and_after() {
+fn an_update_bumps_rev_and_records_only_what_changed() {
     let dir = tempfile::tempdir().unwrap();
     let store = open(&db_path(&dir));
     store
         .write(note("not_1", None, "First"), meta("create"))
         .unwrap();
+    // Two columns change, one is written with its old value.
     let mut two = note("not_1", Some(1), "Second");
+    two.values.push(("score", json!(4.5)));
     two.values.push(("body", json!(null)));
     let w = store.write(two, meta("edit")).unwrap();
     assert_eq!(w.rev, Rev(2));
     assert_eq!(w.record["title"], json!("Second"));
-    let id = w.change_id.0.clone();
-    let (field, before, after): (Option<String>, String, String) = store
+    let row = change_row(&store, &w.change_id.0);
+    assert_eq!(
+        (row.0, row.1, row.2),
+        (None, None, None),
+        "several columns: delta only"
+    );
+    assert_eq!(
+        row.3,
+        Some(json!({ "title": ["First", "Second"], "score": [null, 4.5] }))
+    );
+    // One column: field, before and after; no delta.
+    let w = store
+        .write(note("not_1", None, "Third"), meta("job"))
+        .unwrap();
+    assert_eq!(w.rev, Rev(3), "without a base rev the write goes through");
+    let row = change_row(&store, &w.change_id.0);
+    let one = (
+        Some("title".to_string()),
+        Some("Second".to_string()),
+        Some("Third".to_string()),
+        None,
+    );
+    assert_eq!(row, one);
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 3);
+}
+
+/// `field`, `before`, `after` and `delta` (as JSON) of one change row.
+fn change_row(
+    store: &Store,
+    id: &str,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<serde_json::Value>,
+) {
+    let id = id.to_string();
+    store
         .read(move |c| {
             c.query_row(
-                "SELECT field, before, after FROM changes WHERE id = ?1",
+                "SELECT field, before, after, delta FROM changes WHERE id = ?1",
                 [id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                |r| {
+                    let delta: Option<Vec<u8>> = r.get(3)?;
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        delta.map(|d| serde_json::from_slice(&d).unwrap()),
+                    ))
+                },
             )
         })
+        .unwrap()
+}
+
+#[test]
+fn single_values_are_stored_as_text_and_null_stays_null() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    store
+        .write(note("not_1", None, "First"), meta("create"))
         .unwrap();
-    assert_eq!(field, None, "several columns changed");
-    let before: serde_json::Value = serde_json::from_str(&before).unwrap();
-    let after: serde_json::Value = serde_json::from_str(&after).unwrap();
-    assert_eq!(
-        (before["title"].clone(), before["rev"].clone()),
-        (json!("First"), json!(1))
-    );
-    assert_eq!(
-        (after["title"].clone(), after["rev"].clone()),
-        (json!("Second"), json!(2))
-    );
-    // Without a base rev (a record that is not user-editable) the write goes through.
-    assert_eq!(
-        store
-            .write(note("not_1", None, "Third"), meta("job"))
+    let mut score = note("not_1", None, "unused");
+    score.values = vec![("score", json!(2.5))];
+    let row = change_row(
+        &store,
+        &store
+            .write(score.clone(), meta("score"))
             .unwrap()
-            .rev,
-        Rev(3)
+            .change_id
+            .0,
     );
-    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 3);
+    assert_eq!(row, (Some("score".into()), None, Some("2.5".into()), None));
+    score.values = vec![("score", json!(null))];
+    let row = change_row(
+        &store,
+        &store.write(score, meta("clear")).unwrap().change_id.0,
+    );
+    assert_eq!(row, (Some("score".into()), Some("2.5".into()), None, None));
 }
 
 #[test]
@@ -415,6 +466,13 @@ fn a_batch_commits_together_under_one_batch_id() {
     assert_eq!(written[1].record["score"], json!(2.5));
     assert_eq!(written[1].record["pinned"], json!(1));
     assert_eq!(written[1].record["body"], json!(r#"["a"]"#));
+    let delta = change_row(&store, &written[1].change_id.0).3;
+    let inserted = json!({ "title": [null, "Two"], "score": [null, 2.5], "pinned": [null, 1], "body": [null, r#"["a"]"#] });
+    assert_eq!(
+        delta,
+        Some(inserted),
+        "an insert of several columns: delta from null"
+    );
     let actors: Vec<String> = store
         .read(|c| {
             let mut s = c.prepare("SELECT actor FROM changes ORDER BY id")?;
@@ -504,37 +562,76 @@ fn the_read_pool_is_read_only_and_sees_commits() {
         }
     });
     assert!(store.read(|c| c.is_readonly(MAIN_DB)).unwrap());
-    assert!(!store.read_snapshot(|c| c.is_readonly(MAIN_DB)).unwrap());
 }
 
 #[test]
 fn fts5_and_sqlite_vec_are_loaded() {
     let dir = tempfile::tempdir().unwrap();
-    let store = open(&db_path(&dir));
-    let (hit, nearest) = store
+    let search = &[Migration {
+        owner: "search-test",
+        version: 1,
+        name: "fts and vec",
+        sql: "CREATE VIRTUAL TABLE t_fts USING fts5(body);
+              INSERT INTO t_fts (body) VALUES ('quarterly roadmap review'), ('lunch');
+              CREATE VIRTUAL TABLE t_vec USING vec0(embedding float[2]);
+              INSERT INTO t_vec (rowid, embedding) VALUES (1, '[0.0, 1.0]'), (2, '[1.0, 0.0]');",
+    }];
+    let store = Store::open(&db_path(&dir), &[MIGRATIONS, search]).unwrap();
+    let hit: String = store
         .read_snapshot(|c| {
-            c.execute_batch(
-                "CREATE VIRTUAL TABLE t_fts USING fts5(body);
-                 INSERT INTO t_fts (body) VALUES ('quarterly roadmap review'), ('lunch');
-                 CREATE VIRTUAL TABLE t_vec USING vec0(embedding float[2]);
-                 INSERT INTO t_vec (rowid, embedding) VALUES (1, '[0.0, 1.0]'), (2, '[1.0, 0.0]');",
-            )?;
-            let hit: String =
-                c.query_row("SELECT body FROM t_fts WHERE t_fts MATCH 'roadmap'", [], |r| r.get(0))?;
-            let nearest: i64 = c.query_row(
-                "SELECT rowid FROM t_vec WHERE embedding MATCH '[0.9, 0.1]' ORDER BY distance LIMIT 1",
+            c.query_row(
+                "SELECT body FROM t_fts WHERE t_fts MATCH 'roadmap'",
                 [],
                 |r| r.get(0),
-            )?;
-            Ok((hit, nearest))
+            )
         })
         .unwrap();
     assert_eq!(hit, "quarterly roadmap review");
+    let nearest: i64 = store
+        .read(|c| {
+            c.query_row(
+                "SELECT rowid FROM t_vec WHERE embedding MATCH '[0.9, 0.1]' ORDER BY distance LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+        })
+        .unwrap();
     assert_eq!(nearest, 2);
     let version: String = store
         .read(|c| c.query_row("SELECT vec_version()", [], |r| r.get(0)))
         .unwrap();
     assert!(version.starts_with('v'));
+}
+
+#[test]
+fn a_snapshot_read_cannot_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    let err = store
+        .read_snapshot(|c| c.execute("INSERT INTO notes (id, rev) VALUES ('not_x', 1)", []))
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::Internal);
+    assert_eq!(count(&store, "SELECT count(*) FROM notes"), 0);
+    // The writer writes again afterwards.
+    store
+        .write(note("not_1", None, "First"), meta("create"))
+        .unwrap();
+    assert_eq!(count(&store, "SELECT count(*) FROM notes"), 1);
+}
+
+#[test]
+fn a_panicking_job_does_not_stop_the_writer() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&db_path(&dir));
+    let err = store
+        .read_snapshot(|_| -> noter_db::rusqlite::Result<i64> { panic!("bug in a read model") })
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::Internal);
+    assert_eq!(store.state(), StoreState::Ready);
+    store
+        .write(note("not_1", None, "First"), meta("after the panic"))
+        .unwrap();
+    assert_eq!(count(&store, "SELECT count(*) FROM changes"), 1);
 }
 
 #[test]
