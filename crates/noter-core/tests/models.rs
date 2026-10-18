@@ -393,3 +393,47 @@ async fn pause_stops_the_download_and_keeps_the_partial_file() {
         big
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn offline_keeps_the_progress_of_the_partial_file_and_it_is_private() {
+    let dir = tempfile::tempdir().unwrap();
+    let big = vec![4u8; 3 * 1024 * 1024];
+    let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
+    let s = open(dir.path(), source, 90_000);
+    s.source
+        .drop_after
+        .lock()
+        .unwrap()
+        .insert("whisper-turbo".into(), 2 * 1024 * 1024 + 100);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let paused = until(&s.core, "paused offline", |st| {
+        state(st, "whisper-turbo") == BundleState::Paused
+    })
+    .await;
+    let bundle = &paused.models.bundles[0];
+    assert_eq!(bundle.done_mb, 2, "the partial file's progress is kept");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let partial = dir.path().join("models").join("whisper-turbo.partial");
+        assert_eq!(
+            std::fs::metadata(partial).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn resume_right_after_pause_keeps_the_running_download_going() {
+    let dir = tempfile::tempdir().unwrap();
+    let big = vec![6u8; 64 * 4000];
+    let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
+    let s = open(dir.path(), source, 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    download(&s.core, DownloadAction::Pause).await.unwrap();
+    download(&s.core, DownloadAction::Resume).await.unwrap();
+    until(&s.core, "ready", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
+}
