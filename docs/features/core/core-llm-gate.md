@@ -44,7 +44,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-`noter-llm` implements the runtime interface and its three adapters, task routing, schema and citation validation, redaction and the audit-before-send gate. It records model runs and locks down every CLI process. Key/account UI commands, the Privacy pane and noter-mcp arrive in M3. M2 uses a key already in the Keychain or local Ollama; deterministic E2E uses the scripted runtime. No tools from a later feature are silently enabled.
+`noter-llm` implements the runtime interface and its three adapters, task routing, schema and citation validation, redaction and the audit-before-send gate. It records model runs and locks down every CLI process. It also answers `accounts_get` and `api_key_set` (owner decision, 18 Oct), so the M2 runtime can be configured from the app: a verified key goes to the Keychain, or local Ollama is used. Key removal, own accounts, CLI install, the Privacy pane and noter-mcp arrive in M3. Deterministic E2E uses the scripted runtime. No tools from a later feature are silently enabled.
 
 ### 1.2 Purpose
 
@@ -55,7 +55,7 @@ Post-call and handoff can call a model without creating another path for user te
 **Principles**: `cpt-noter-principle-core-egress-gate`
 
 **Delivers**:
-- Frozen IPC commands (M2): none.
+- Frozen IPC commands (M2): `accounts_get`, `api_key_set`, with event `accounts:changed`. Their behaviour is specified in [core-credentials-privacy.md](core-credentials-privacy.md) and delivered here: steps 1 to 5 of `cpt-noter-flow-core-credentials-privacy-keys`, `cpt-noter-algo-core-credentials-privacy-availability`, `cpt-noter-algo-core-credentials-privacy-secret-boundary` for API keys, and `cpt-noter-state-core-credentials-privacy-key` except removal. The IDs stay in that spec. Their `@cpt-*` markers land when the whole flow is checked with the credentials feature (M3), unless `cfs validate` accepts markers on its instruction blocks earlier.
 - DESIGN.md stories (M2): none owned here; used by post-call and handoff stories.
 - Interfaces: `cpt-noter-interface-llm-runtime`, `cpt-noter-interface-skill-outputs`; event `privacy:changed` when effective privacy state changes.
 - `llm_runs` and `audit_log` from the first cloud run, even before the M3 audit commands exist.
@@ -71,7 +71,7 @@ Post-call and handoff can call a model without creating another path for user te
 
 ### 1.4 References
 
-- **Decomposition**: [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md), entry `cpt-noter-feature-core-llm-gate`; overview discrepancies 1 and 7
+- **Decomposition**: [DECOMPOSITION-core.md](../../DECOMPOSITION-core.md), entry `cpt-noter-feature-core-llm-gate`; overview discrepancies 1 (decided: `accounts_get` and `api_key_set` in M2) and 7
 - **Design**: [DESIGN-core.md](../../DESIGN-core.md): `cpt-noter-component-core-llm-router`, `cpt-noter-component-core-privacy`, `cpt-noter-interface-llm-runtime`, `cpt-noter-interface-skill-outputs`, `cpt-noter-dbtable-llm-runs`, `cpt-noter-dbtable-audit-log`
 - **Contract**: `crates/noter-protocol/src/skills.rs`, `common.rs`, `error.rs`; `contracts/skills/`, `contracts/egress-hosts.json`
 - **Dependencies**: `cpt-noter-feature-core-storage`, `cpt-noter-feature-core-settings`
