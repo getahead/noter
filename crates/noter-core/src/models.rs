@@ -107,12 +107,14 @@ impl Downloads {
         }
     }
 
-    /// The models capture needs are downloaded (an empty manifest needs none).
+    /// The live model is downloaded: at least one bundle capture needs, and all of them ready.
     pub(crate) fn capture_ready(&self) -> bool {
-        self.bundles
+        let mut needed = self
+            .bundles
             .iter()
             .filter(|b| b.required_for_capture)
-            .all(|b| b.state == BundleState::Ready)
+            .peekable();
+        needed.peek().is_some() && needed.all(|b| b.state == BundleState::Ready)
     }
 
     fn set(&mut self, name: &str, state: BundleState, done_bytes: Option<u64>) {
