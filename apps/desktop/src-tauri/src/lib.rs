@@ -6,14 +6,15 @@
 
 use std::sync::{Arc, OnceLock};
 
-use noter_core::{Core, CoreDeps, EventEmitter, SystemClock};
+use noter_core::{Core, CoreDeps, EventEmitter, ShortcutRegistrar, ShortcutTaken, SystemClock};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
 use serde_json::Value;
 use tauri::ipc::{Channel, Invoke, InvokeBody, InvokeError, JavaScriptChannelId};
 use tauri::webview::PageLoadEvent;
-use tauri::{Emitter, Manager, RunEvent, Runtime, Webview, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, Webview, WindowEvent};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const WINDOWS: [WindowLabel; 5] = [
     WindowLabel::Main,
@@ -26,50 +27,54 @@ const WINDOWS: [WindowLabel; 5] = [
 /// The core, or why it did not start (then every command answers `internal`).
 pub struct Booted(pub Result<Arc<Core>, String>);
 
-/// The host around a booted core: handlers, the core as state, and webview reloads and closes
-/// reported to the stream hub.
-pub fn builder<R: Runtime>(builder: tauri::Builder<R>, booted: Booted) -> tauri::Builder<R> {
+/// The host's handlers and webview reloads and closes reported to the stream hub. The core is
+/// managed as `Booted` once it started; until then every command answers `not_ready`.
+pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
-        .manage(booted)
         .invoke_handler(invoke::<R>)
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
-                reset(webview.label(), &webview.state::<Booted>());
+                reset(webview.label(), webview.try_state::<Booted>().as_deref());
             }
         })
         .on_window_event(|window, event| {
             if let WindowEvent::Destroyed = event {
-                reset(window.label(), &window.state::<Booted>());
+                reset(window.label(), window.try_state::<Booted>().as_deref());
             }
         })
 }
 
-/// Runs the app: opens the core on Application Support, serves the windows, shuts the core down on exit.
+/// Runs the app: opens the core on Application Support once the app exists (its hotkeys need the
+/// global-shortcut plugin), serves the windows, shuts the core down on exit.
 pub fn run() {
     let events = Arc::new(TauriEvents::default());
-    let booted = boot(events.clone());
-    let core = booted.0.clone().ok();
-    let app = builder(tauri::Builder::default(), booted)
+    let app = builder(tauri::Builder::default())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(move |app| {
             let _ = events.0.set(app.handle().clone());
+            let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
+            app.manage(boot(events.clone(), shortcuts));
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("Noter could not build its windows");
-    app.run(move |_, event| {
-        if let (RunEvent::Exit, Some(core)) = (event, &core) {
-            tauri::async_runtime::block_on(core.shutdown());
+    app.run(move |app, event| {
+        if let RunEvent::Exit = event {
+            if let Some(Ok(core)) = app.try_state::<Booted>().map(|b| b.0.clone()) {
+                tauri::async_runtime::block_on(core.shutdown());
+            }
         }
     });
 }
 
-fn boot(events: Arc<dyn EventEmitter>) -> Booted {
+fn boot(events: Arc<dyn EventEmitter>, shortcuts: Arc<dyn ShortcutRegistrar>) -> Booted {
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
     };
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
-    let deps =
-        CoreDeps::new(Arc::new(SystemClock), events).with_app_version(env!("CARGO_PKG_VERSION"));
+    let deps = CoreDeps::new(Arc::new(SystemClock), events)
+        .with_app_version(env!("CARGO_PKG_VERSION"))
+        .with_shortcuts(shortcuts);
     match Core::open(&dir, deps) {
         Ok(core) => Booted(Ok(Arc::new(core))),
         Err(e) => {
@@ -96,7 +101,13 @@ fn invoke<R: Runtime>(invoke: Invoke<R>) -> bool {
         .and_then(|_| body.get("channel").cloned())
         .and_then(|id| serde_json::from_value::<JavaScriptChannelId>(id).ok())
         .map(|id| id.channel_on(webview.clone()));
-    let booted = Booted(webview.state::<Booted>().0.clone());
+    let Some(booted) = webview.try_state::<Booted>().map(|b| Booted(b.0.clone())) else {
+        let starting = CoreError::new(ErrorCode::NotReady, "the core is starting");
+        invoke
+            .resolver
+            .respond_async(async move { Err::<Value, _>(InvokeError::from(starting)) });
+        return true;
+    };
     invoke.resolver.respond_async(async move {
         let answer = handle(&webview, &booted, spec.name, args, channel).await;
         answer.map_err(InvokeError::from)
@@ -170,10 +181,55 @@ fn window_label(label: &str) -> Option<WindowLabel> {
 }
 
 /// A webview loaded a page or closed: its subscriptions end and the page subscribes again.
-fn reset(label: &str, booted: &Booted) {
-    if let (Some(label), Ok(core)) = (window_label(label), &booted.0) {
+fn reset(label: &str, booted: Option<&Booted>) {
+    if let (Some(label), Some(Booted(Ok(core)))) = (window_label(label), booted) {
         core.webview_reset(label);
     }
+}
+
+/// The app's global shortcuts, through the Tauri global-shortcut plugin: each registered chord's
+/// press goes to the core as `Caller::Native { surface: hotkey }`.
+struct TauriShortcuts<R: Runtime>(AppHandle<R>);
+
+impl<R: Runtime> ShortcutRegistrar for TauriShortcuts<R> {
+    fn register(&self, chord: &str) -> Result<(), ShortcutTaken> {
+        let pressed = chord.to_string();
+        let handler =
+            move |app: &AppHandle<R>,
+                  _: &tauri_plugin_global_shortcut::Shortcut,
+                  event: tauri_plugin_global_shortcut::ShortcutEvent| {
+                if event.state() == ShortcutState::Pressed {
+                    hotkey_pressed(app, &pressed);
+                }
+            };
+        // macOS refuses a chord another app holds without naming that app.
+        self.0
+            .global_shortcut()
+            .on_shortcut(chord, handler)
+            .map_err(|_| ShortcutTaken { owner: None })
+    }
+
+    fn unregister(&self, chord: &str) {
+        let _ = self.0.global_shortcut().unregister(chord);
+    }
+}
+
+/// A pressed hotkey: the core runs its action's command as `Caller::Native { surface: hotkey }`
+/// (commands of later milestones answer `not_implemented`). `None` while the core is not up.
+pub fn hotkey_pressed<R: Runtime>(
+    app: &AppHandle<R>,
+    chord: &str,
+) -> Option<tauri::async_runtime::JoinHandle<Result<Value, CoreError>>> {
+    let core = app.try_state::<Booted>()?.0.clone().ok()?;
+    let chord = chord.to_string();
+    Some(tauri::async_runtime::spawn(async move {
+        let answer = core.hotkey_pressed(&chord).await;
+        // Refusals (not_recording, not_implemented) are expected; a failure leaves a trace without content.
+        if matches!(&answer, Err(e) if e.code == ErrorCode::Internal) {
+            eprintln!("noter: the hotkey {chord} failed (internal)");
+        }
+        answer
+    }))
 }
 
 /// Core events to every window, through Tauri's `emit`, once the app exists.
