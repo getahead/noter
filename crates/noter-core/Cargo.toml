@@ -27,3 +27,8 @@ noter-core = { path = ".", features = ["harness"] }
 tempfile = "3"
 sha2 = "0.10"
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+
+# Perf scenarios (harness/perf.toml); `test = true` runs their one-round tests in `cargo test`.
+[[example]]
+name = "perf_cold_start"
+test = true
