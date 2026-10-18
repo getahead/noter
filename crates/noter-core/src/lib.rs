@@ -3,6 +3,7 @@
 //! Every later feature plugs its service in through [`CoreDeps`] and this crate.
 
 mod app;
+mod first_run;
 mod glossary;
 mod hotkeys;
 mod hub;
@@ -19,6 +20,10 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
+pub use first_run::{
+    detection, BoxFuture, BundleSpec, ChunkSink, EnvironmentReading, FetchError, ModelSource,
+    NativeServices, Updater,
+};
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
@@ -63,15 +68,25 @@ pub struct CoreDeps {
     pub app_version: String,
     /// Global shortcuts; accepts every chord until the host sets its own (`with_shortcuts`).
     pub shortcuts: Arc<dyn ShortcutRegistrar>,
+    /// Permissions, environment and the login item (`noter-native` in the app).
+    pub native: Arc<dyn NativeServices>,
+    /// Model bundles to download (the pinned manifest in the app).
+    pub models: Arc<dyn ModelSource>,
+    /// Downloaded app updates (`tauri-plugin-updater` in the app).
+    pub updater: Arc<dyn Updater>,
 }
 
 impl CoreDeps {
+    /// The clock and events; every other seam starts empty (no Mac, no models, no updater).
     pub fn new(clock: Arc<dyn Clock>, events: Arc<dyn EventEmitter>) -> Self {
         Self {
             clock,
             events,
             app_version: "dev".into(),
             shortcuts: Arc::new(hotkeys::AcceptAll),
+            native: Arc::new(first_run::NoNative),
+            models: Arc::new(first_run::NoModels),
+            updater: Arc::new(first_run::NoUpdater),
         }
     }
 
@@ -82,6 +97,21 @@ impl CoreDeps {
 
     pub fn with_shortcuts(mut self, shortcuts: Arc<dyn ShortcutRegistrar>) -> Self {
         self.shortcuts = shortcuts;
+        self
+    }
+
+    pub fn with_native(mut self, native: Arc<dyn NativeServices>) -> Self {
+        self.native = native;
+        self
+    }
+
+    pub fn with_models(mut self, models: Arc<dyn ModelSource>) -> Self {
+        self.models = models;
+        self
+    }
+
+    pub fn with_updater(mut self, updater: Arc<dyn Updater>) -> Self {
+        self.updater = updater;
         self
     }
 }
@@ -124,6 +154,8 @@ pub struct Core {
     hotkeys: Mutex<HotkeyList>,
     settings_hooks: Hooks<SettingsSection>,
     glossary_hooks: Hooks<GlossaryList>,
+    /// First run's stored setup state and the settings values it follows.
+    first_run: Mutex<first_run::State>,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -157,6 +189,7 @@ impl Core {
         };
         let snapshot = app::fresh_snapshot(&deps.app_version);
         let settings = settings::load(&store).map_err(BootError::Load)?;
+        let first_run = first_run::load(&store, &settings).map_err(BootError::Load)?;
         let core = Core {
             deps,
             store,
@@ -167,6 +200,7 @@ impl Core {
             hotkeys: Mutex::new(hotkeys::fresh_list()),
             settings_hooks: Mutex::new(vec![]),
             glossary_hooks: Mutex::new(vec![]),
+            first_run: Mutex::new(first_run),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -318,6 +352,50 @@ pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl CoreApi for Core {
+    async fn setup_status(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        Ok(self.setup_now())
+    }
+
+    async fn setup_set_step(
+        &self,
+        ctx: &CommandCtx,
+        args: StepArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.set_step(ctx, args)
+    }
+
+    async fn setup_set_call_display(
+        &self,
+        ctx: &CommandCtx,
+        args: CallDisplayArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.set_call_display(ctx, args)
+    }
+
+    async fn setup_set_audio_storage(
+        &self,
+        ctx: &CommandCtx,
+        args: AudioStorageArgs,
+    ) -> Result<SetupStatus, CoreError> {
+        self.set_audio_storage(ctx, args)
+    }
+
+    async fn permission_request(
+        &self,
+        _ctx: &CommandCtx,
+        args: PermissionArgs,
+    ) -> Result<PermissionRow, CoreError> {
+        self.request_permission(args).await
+    }
+
+    async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {
+        self.install_update().await
+    }
+
     async fn settings_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Settings, CoreError> {
         Ok(lock(&self.settings).clone())
     }
