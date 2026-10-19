@@ -721,6 +721,7 @@ dependencies = [
  "noter-core",
  "noter-db",
  "noter-engine-client",
+ "noter-llm",
  "noter-protocol",
  "serde",
  "serde_json",
@@ -770,6 +771,7 @@ version = "0.1.0"
 dependencies = [
  "noter-protocol",
  "reqwest",
+ "serde",
  "serde_json",
  "tokio",
 ]

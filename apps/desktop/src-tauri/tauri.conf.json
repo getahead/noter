@@ -7,10 +7,31 @@
     "frontendDist": "placeholder"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "Noter", "width": 1200, "height": 800 }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "Noter",
+        "width": 1200,
+        "height": 800
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost"
     }
   },
-  "bundle": { "active": false, "macOS": { "entitlements": "Noter.entitlements" } }
+  "bundle": {
+    "active": false,
+    "macOS": {
+      "entitlements": "Noter.entitlements",
+      "files": {
+        "MacOS/noter-engine": "../../../engine/.build/release/noter-engine"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
+    }
+  }
 }

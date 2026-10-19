@@ -189,8 +189,10 @@ fn only_https_urls_of_the_model_download_hosts_are_allowed() {
 
 #[test]
 fn every_pinned_file_is_on_the_allow_list_with_a_sha256() {
-    for f in crate::MANIFEST {
-        assert!(allowed_download_url(f.url), "{}", f.url);
+    let pinned = crate::manifest();
+    assert!(!pinned.is_empty());
+    for f in &pinned {
+        assert!(allowed_download_url(&f.url), "{}", f.url);
         assert!(
             f.sha256.len() == 64 && f.sha256.chars().all(|c| c.is_ascii_hexdigit()),
             "{}",

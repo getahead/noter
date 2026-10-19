@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
-    BoxFuture, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter,
-    FetchError, ModelSource, NativeServices,
+    BoxFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
+    EventEmitter, FetchError, ModelSource, NativeServices,
 };
 use noter_db::rusqlite::Connection;
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
@@ -93,15 +93,18 @@ impl ModelSource for Whisper {
     fn manifest(&self) -> Vec<BundleSpec> {
         vec![BundleSpec {
             name: "whisper-turbo".into(),
-            url: "https://huggingface.co/x".into(),
-            size_bytes: 10,
-            sha256: "0".repeat(64),
+            files: vec![BundleFile {
+                path: "model.bin".into(),
+                url: "https://huggingface.co/x".into(),
+                size_bytes: 10,
+                sha256: "0".repeat(64),
+            }],
             required_for_capture: true,
         }]
     }
     fn fetch<'a>(
         &'a self,
-        _: &'a BundleSpec,
+        _: &'a BundleFile,
         _: u64,
         _: ChunkSink<'a>,
     ) -> BoxFuture<'a, Result<(), FetchError>> {

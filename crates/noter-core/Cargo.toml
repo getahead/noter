@@ -14,6 +14,7 @@ harness = []
 [dependencies]
 noter-db = { path = "../noter-db" }
 noter-engine-client = { path = "../noter-engine-client" }
+noter-llm = { path = "../noter-llm" }
 noter-protocol = { path = "../noter-protocol" }
 serde = "1"
 serde_json = "1"
@@ -22,6 +23,8 @@ tokio = { version = "1", features = ["rt"] }
 ulid = "3"
 
 [dev-dependencies]
+# The localhost-only fetcher for the model-source tests; never in a release build.
+noter-llm = { path = "../noter-llm", features = ["local-tests"] }
 # The harness hooks (`noter_core::testing`) are tested here too.
 noter-core = { path = ".", features = ["harness"] }
 tempfile = "3"
