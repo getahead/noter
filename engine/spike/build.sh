@@ -15,7 +15,17 @@ cp "$bin/noter-spike" build/noter-spike
 # WhisperKit's resources ship as a bundle next to the binary.
 for b in "$bin"/*.bundle; do [ -e "$b" ] && cp -R "$b" build/ && cp -R "$b" build/SpikeHost.app/Contents/MacOS/; done
 id="${SIGN_IDENTITY:--}"
-codesign --force --options runtime --timestamp=none --entitlements Resources/helper.entitlements --sign "$id" build/SpikeHost.app/Contents/MacOS/noter-spike
-codesign --force --options runtime --timestamp=none --entitlements Resources/host.entitlements --sign "$id" build/SpikeHost.app
+# Q4 variants (Q4_VARIANT): `own` (default) gives a sandboxed host's child its own sandbox, which
+# libsecinit refuses with SIGTRAP before main (exit 5); `inherit` signs the child with exactly
+# app-sandbox + inherit, so it runs in the host's sandbox; `unsandboxed-host` leaves the host
+# unsandboxed (hardened runtime only) and the child keeps its own sandbox and entitlements.
+case "${Q4_VARIANT:-own}" in
+  own) helper=helper.entitlements host=host.entitlements ;;
+  inherit) helper=helper-inherit.entitlements host=host.entitlements ;;
+  unsandboxed-host) helper=helper.entitlements host=host-unsandboxed.entitlements ;;
+  *) echo "Q4_VARIANT is own, inherit or unsandboxed-host" >&2; exit 2 ;;
+esac
+codesign --force --options runtime --timestamp=none --entitlements "Resources/$helper" --sign "$id" build/SpikeHost.app/Contents/MacOS/noter-spike
+codesign --force --options runtime --timestamp=none --entitlements "Resources/$host" --sign "$id" build/SpikeHost.app
 codesign --force --timestamp=none --sign "$id" build/noter-spike
 echo "built: $here/build/SpikeHost.app and $here/build/noter-spike"
