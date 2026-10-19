@@ -12,5 +12,5 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost"
     }
   },
-  "bundle": { "active": false }
+  "bundle": { "active": false, "macOS": { "entitlements": "Noter.entitlements" } }
 }

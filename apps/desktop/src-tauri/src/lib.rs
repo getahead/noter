@@ -4,6 +4,8 @@
 
 // @cpt-component:cpt-noter-component-core-ipc-host:p1
 
+mod native;
+
 use std::sync::{Arc, OnceLock};
 
 use noter_core::{Core, CoreDeps, EventEmitter, ShortcutRegistrar, ShortcutTaken, SystemClock};
@@ -16,6 +18,8 @@ use tauri::ipc::{Channel, Invoke, InvokeBody, InvokeError, JavaScriptChannelId};
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, Webview, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+pub use native::Mac;
 
 const WINDOWS: [WindowLabel; 5] = [
     WindowLabel::Main,
@@ -79,18 +83,23 @@ fn boot(events: Arc<dyn EventEmitter>, shortcuts: Arc<dyn ShortcutRegistrar>) ->
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
     };
+    // D14: the App Group container the sandboxed engine shares (its models/); unsigned
+    // development runs have none and use the data folder.
+    let group = noter_native::app_group_container().unwrap_or_else(|| dir.clone());
     // The engine sits next to the app binary (Contents/MacOS) or at NOTER_ENGINE_PATH in
-    // development; it shares the data folder (its models/) with the core.
+    // development.
     let bundled = std::env::current_exe()
         .ok()
         .and_then(|exe| Some(exe.parent()?.join("noter-engine")))
         .unwrap_or_else(|| "noter-engine".into());
-    let engine = ProcessLauncher::from_env(bundled).app_group(&dir);
+    let engine = ProcessLauncher::from_env(bundled).app_group(&group);
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
     let deps = CoreDeps::new(Arc::new(SystemClock), events)
         .with_app_version(env!("CARGO_PKG_VERSION"))
         .with_shortcuts(shortcuts)
-        .with_engine(Arc::new(engine));
+        .with_engine(Arc::new(engine))
+        .with_native(Arc::new(Mac::new(&group)))
+        .with_models_dir(group.join("models"));
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
