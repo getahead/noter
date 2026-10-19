@@ -1,7 +1,7 @@
 //! The macOS calls behind the crate's API. Reads never prompt; `request_permission` does.
 
 use std::ffi::c_void;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -18,13 +18,14 @@ use objc2_core_audio::{
     kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject, AudioObjectGetPropertyData,
     AudioObjectID, AudioObjectPropertyAddress,
 };
-use objc2_core_foundation::{CFRetained, CFString, CFUUID};
+use objc2_core_foundation::{CFArray, CFRetained, CFString, CFType, CFUUID};
 use objc2_core_graphics::{
     CGDirectDisplayID, CGDisplayBounds, CGDisplayIsBuiltin, CGGetActiveDisplayList,
     CGMainDisplayID, CGPreflightScreenCaptureAccess, CGRequestScreenCaptureAccess,
 };
 use objc2_event_kit::{EKEntityType, EKEventStore};
-use objc2_foundation::{NSBundle, NSError};
+use objc2_foundation::{NSBundle, NSError, NSFileManager, NSString};
+use objc2_security::SecTask;
 use objc2_service_management::SMAppService;
 use objc2_user_notifications::{
     UNAuthorizationOptions, UNNotificationSettings, UNUserNotificationCenter,
@@ -331,6 +332,32 @@ pub fn set_login_item(on: bool) -> Result<LoginItem, String> {
         (Ok(()), state) => Ok(state),
         (Err(e), _) => Err(e.localizedDescription().to_string()),
     }
+}
+
+// ── App Group container ────────────────────────────────────────────────────
+
+/// The groups in this process's `com.apple.security.application-groups` entitlement.
+pub fn entitled_app_groups() -> Vec<String> {
+    let Some(task) = (unsafe { SecTask::from_self(None) }) else {
+        return Vec::new();
+    };
+    let key = CFString::from_static_str("com.apple.security.application-groups");
+    let value = unsafe { task.value_for_entitlement(&key, std::ptr::null_mut()) };
+    let Some(Ok(groups)) = value.map(|v| v.downcast::<CFArray>()) else {
+        return Vec::new();
+    };
+    // SAFETY: every element of a CFArray is a CF object; each is checked to be a string below.
+    let groups = unsafe { CFRetained::cast_unchecked::<CFArray<CFType>>(groups) };
+    groups
+        .iter()
+        .filter_map(|g| g.downcast_ref::<CFString>().map(|s| s.to_string()))
+        .collect()
+}
+
+pub fn group_container(id: &str) -> Option<PathBuf> {
+    NSFileManager::defaultManager()
+        .containerURLForSecurityApplicationGroupIdentifier(&NSString::from_str(id))?
+        .to_file_path()
 }
 
 pub fn login_item() -> LoginItem {

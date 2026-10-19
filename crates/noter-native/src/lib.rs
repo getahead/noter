@@ -10,6 +10,7 @@
 //! * [`environment`] reads displays, the output device and route, notification
 //!   authorization, reachability and free disk; [`watch`] reports changes.
 //! * [`set_login_item`] / [`login_item`] use SMAppService.
+//! * [`app_group_container`] finds the App Group container shared with the engine (D14).
 //!
 //! The request functions block until macOS answers: call them off the async runtime. On other
 //! systems nothing is granted and the environment is empty, so the workspace builds and tests
@@ -132,6 +133,28 @@ pub fn disk_free_mb(path: &Path) -> u32 {
     }
     let bytes = s.f_bavail as u64 * s.f_frsize as u64;
     u32::try_from(bytes / (1024 * 1024)).unwrap_or(u32::MAX)
+}
+
+/// The App Group the app shares with the sandboxed engine is `<TEAMID>.ai.noter`.
+const APP_GROUP_SUFFIX: &str = ".ai.noter";
+
+/// Decision D14: the App Group container the app shares with the sandboxed engine (audio,
+/// `models/`, `engine-io/`, the capture ring). None when this process has no
+/// `<TEAMID>.ai.noter` application-groups entitlement (unsigned development runs, which use
+/// the data folder) or macOS gives no folder for it.
+pub fn app_group_container() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    return app_group_id(&mac::entitled_app_groups()).and_then(mac::group_container);
+    #[cfg(not(target_os = "macos"))]
+    None
+}
+
+/// The app's group among a process's `com.apple.security.application-groups` entitlement.
+pub fn app_group_id(entitled: &[String]) -> Option<&str> {
+    entitled.iter().map(String::as_str).find(|id| {
+        id.strip_suffix(APP_GROUP_SUFFIX)
+            .is_some_and(|team| !team.is_empty())
+    })
 }
 
 // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-native-ask
