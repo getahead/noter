@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/getahead/noter/compare/v0.4.0...v0.5.0) (2026-10-19)
+
+
+### Features
+
+* **core:** model downloads, updater and bundled engine in the Tauri host ([#107](https://github.com/getahead/noter/issues/107)) ([9e1d922](https://github.com/getahead/noter/commit/9e1d9226b46d42ebb3debdd28915e74853f9db60))
+* **core:** the Tauri host uses the App Group container and native services ([#106](https://github.com/getahead/noter/issues/106)) ([3482bc2](https://github.com/getahead/noter/commit/3482bc2def069bcc0c7ef4ad8f68e85efea7090f))
+* **engine:** the App Group container and login-item approval in noter-native ([#104](https://github.com/getahead/noter/issues/104)) ([302d446](https://github.com/getahead/noter/commit/302d4464546e902a485d1885f6132e6fbc0811e5))
+
+
+### Bug fixes
+
+* **deps:** bump system-configuration from 0.6.1 to 0.8.0 ([#94](https://github.com/getahead/noter/issues/94)) ([1ec80f2](https://github.com/getahead/noter/commit/1ec80f25d79b54e8f64579e1cbba548d0f8ed005))
+
 ## [0.4.0](https://github.com/getahead/noter/compare/v0.3.0...v0.4.0) (2026-10-18)
 
 
