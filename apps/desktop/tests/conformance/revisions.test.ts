@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { coreFor } from "../support/core";
 import { ahead } from "../support/results";
 
+// @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-for-groups
+// @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-group
 describe("optimistic concurrency", () => {
   it("rejects an edit based on a stale revision with conflict and current_rev", async () => {
     const core = coreFor("main");
@@ -17,3 +19,5 @@ describe("optimistic concurrency", () => {
     expect(stale.error.detail?.type).toBe("conflict");
   });
 });
+// @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-group
+// @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-for-groups

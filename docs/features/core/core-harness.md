@@ -199,7 +199,7 @@ The system **MUST** load `contracts/fixtures/world.json` into a fresh database w
 
 ### Conformance and E2E against the real core
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-harness-conformance`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-harness-conformance`
 
 The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playwright flows run against the harness for every M0 command, so that the E2E gate counts them; the CI step that builds the binary and sets `NOTER_CORE_CMD` is the owner's (DevOps), this feature only provides the binary and its contract.
 
@@ -211,8 +211,8 @@ The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playw
 
 ## 6. Acceptance Criteria
 
-- [ ] `cargo run -p noter-core-harness -- --fixture world` answers `app_snapshot` from the `main` window and refuses a settings-only command from the `call-screen` window with `window_not_allowed`.
-- [ ] A subscribing command's Channel messages always follow its result line, in `seq` order.
-- [ ] Closing stdin ends every open stream with `shutdown` and exits with code 0; stdout holds only protocol lines.
-- [ ] The conformance suite passes with `NOTER_CORE=stdio` for every M0 command.
+- [x] `cargo run -p noter-core-harness -- --fixture world` answers `app_snapshot` from the `main` window and refuses a settings-only command from the `call-screen` window with `window_not_allowed`.
+- [x] A subscribing command's Channel messages always follow its result line, in `seq` order.
+- [x] Closing stdin ends every open stream with `shutdown` and exits with code 0; stdout holds only protocol lines.
+- [x] The conformance suite passes with `NOTER_CORE=stdio` for every M0 command.
 - [ ] `just gate` passes.

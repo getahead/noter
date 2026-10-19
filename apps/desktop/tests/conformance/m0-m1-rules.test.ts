@@ -297,6 +297,8 @@ describe("snapshot, then stream (R23/R24)", () => {
   });
 });
 
+// @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-for-groups
+// @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-group
 describe("whole-state events carry growing versions (R25)", () => {
   it("capture:state, setup:changed, settings:changed, hotkeys:changed, window:call and app:presenting only grow", async () => {
     const logs = {
@@ -350,6 +352,8 @@ describe("whole-state events carry growing versions (R25)", () => {
     expect(later.capture.version).toBe(logs.capture.latest()!.version);
   });
 });
+// @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-group
+// @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-for-groups
 
 describe("M0 settings commands not covered by a story", () => {
   it("glossary: list, add, rename with rev, duplicate and unknown refused, remove", async () => {
