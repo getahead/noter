@@ -36,6 +36,20 @@ describe("commands the core does not answer yet", () => {
     expect(isLater("no_such_command", "pre-M0")).toBe(false);
   });
 
+  // @cpt-dod:cpt-noter-dod-core-contract-conformance:p1
+  // @cpt-dod:cpt-noter-dod-core-harness-conformance:p1
+  it("runs against the core NOTER_CORE selects: the fake, or the real core through noter-core-harness", () => {
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-fake
+    if (target === "fake") {
+      expect(process.env.NOTER_CORE ?? "fake").toBe("fake");
+      return;
+    }
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-fake
+    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-stdio
+    expect(process.env.NOTER_CORE_CMD).toMatch(/noter-core-harness/);
+    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-stdio
+  });
+
   it("has example arguments for exactly the commands of the contract", () => {
     expect(Object.keys(EXAMPLE_ARGS).sort()).toEqual([...names].sort());
   });

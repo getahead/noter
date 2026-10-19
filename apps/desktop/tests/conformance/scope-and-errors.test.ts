@@ -11,6 +11,8 @@ function codeOf(e: unknown): string | undefined {
   return (e as { code?: string } | null)?.code;
 }
 
+// @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-for-groups
+// @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-group
 describe("window scope (PM-08)", () => {
   it.each(names)("%s is refused from every window it does not list", async (name) => {
     const allowed = COMMANDS[name].windows as readonly WindowLabel[];
@@ -39,3 +41,5 @@ describe("typed errors", () => {
     }
   });
 });
+// @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-group
+// @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-for-groups
