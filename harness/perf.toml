@@ -101,3 +101,13 @@ scenario = "jobs_integrity_recovery"
 build = ["cargo", "build", "--release", "--quiet", "-p", "noter-protocol", "--example", "perf_fixtures_roundtrip"]
 run = ["{target}/release/examples/perf_fixtures_roundtrip"]
 modes = ["ir", "wall"]
+
+[scenarios.core_cold_start]
+build = ["cargo", "build", "--release", "--quiet", "-p", "noter-core", "--example", "perf_cold_start"]
+run = ["{target}/release/examples/perf_cold_start"]
+modes = ["ir", "wall"]
+
+[scenarios.core_app_snapshot]
+build = ["cargo", "build", "--release", "--quiet", "-p", "noter-core-harness", "--example", "perf_app_snapshot"]
+run = ["{target}/release/examples/perf_app_snapshot"]
+modes = ["ir", "wall"]
