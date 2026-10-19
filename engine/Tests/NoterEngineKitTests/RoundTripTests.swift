@@ -3,62 +3,147 @@ import XCTest
 
 @testable import NoterEngineKit
 
-/// Lines exactly as noter-protocol's serde writes them (`EngineCommandLine`, `EngineEventLine`
-/// from crates/noter-protocol/src/engine.rs, printed with serde_json), so the Swift side is
-/// checked against the Rust source of truth, not against itself.
-private let rustCommands = [
-    #"{"id":1,"cmd":{"type":"ping"}}"#,
-    #"{"id":2,"cmd":{"type":"set_detection","enabled":true,"known_bundle_ids":["us.zoom.xos"]}}"#,
-    #"{"id":3,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":10000}}"#,
-    #"{"id":4,"cmd":{"type":"shutdown"}}"#,
-    #"{"id":5,"cmd":{"type":"stop","call_id":"call_1"}}"#,
-]
+/// Every example line of the protocol as noter-protocol's serde writes them, generated into
+/// `contracts/fixtures/engine-lines.json` by `just contract-regen`. The hand-written Swift types are
+/// checked against them (D13), so the Rust source of truth, not the Swift side, says what a line is.
+private let fixture: [String: [[String: Any]]] = {
+    let url = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("contracts/fixtures/engine-lines.json")
+    let json = try? JSONSerialization.jsonObject(with: Data(contentsOf: url))
+    return json as? [String: [[String: Any]]] ?? [:]
+}()
 
-private let rustEvents = [
-    #"{"seq":1,"at":1790000000000,"event":{"type":"ready","protocol_version":"2.0","engine_version":"0.1.0","models":["whisper-turbo"],"sandboxed":true}}"#,
-    #"{"seq":2,"at":1790000000000,"event":{"type":"ack","cmd_id":2}}"#,
-    #"{"seq":3,"at":1790000000000,"event":{"type":"error","cmd_id":null,"code":"device_unavailable","message":"mic.wav"}}"#,
-    #"{"seq":4,"at":1790000000000,"event":{"type":"pong"}}"#,
-    #"{"seq":5,"at":1790000000000,"event":{"type":"levels","call_id":null,"mic_db":-20.5,"sys_db":-160.0}}"#,
-    #"{"seq":6,"at":1790000000000,"event":{"type":"self_test_stream","channel":"sys"}}"#,
-    #"{"seq":7,"at":1790000000000,"event":{"type":"self_test_result","passed":false,"failure":"zero_buffers","own_sounds_leak":false}}"#,
-    #"{"seq":8,"at":1790000000000,"event":{"type":"session_stopped","call_id":"call_file","timeline_path":"","mic_path":"mic.wav","sys_path":null}}"#,
-]
+private func typeOf(_ line: [String: Any], _ key: String) -> String {
+    (line[key] as? [String: Any])?["type"] as? String ?? ""
+}
+
+private func object(_ data: Data) throws -> NSDictionary {
+    NSDictionary(dictionary: try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any]))
+}
+
+// The directions the engine itself never needs (it reads commands and writes events), test-only,
+// so that every fixture line goes through the Swift types both ways.
+
+extension EngineCommandLine: Encodable {
+    private enum Keys: String, CodingKey { case id, cmd }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(cmd, forKey: .cmd)
+    }
+}
+
+extension EngineCommand: Encodable {
+    private enum Keys: String, CodingKey { case type, enabled, known_bundle_ids, play_clip, timeout_ms }
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: Keys.self)
+        switch self {
+        case .ping: try c.encode("ping", forKey: .type)
+        case .shutdown: try c.encode("shutdown", forKey: .type)
+        case let .setDetection(enabled, knownBundleIds):
+            try c.encode("set_detection", forKey: .type)
+            try c.encode(enabled, forKey: .enabled)
+            try c.encode(knownBundleIds, forKey: .known_bundle_ids)
+        case let .selfTest(playClip, timeoutMs):
+            try c.encode("self_test", forKey: .type)
+            try c.encode(playClip, forKey: .play_clip)
+            try c.encode(timeoutMs, forKey: .timeout_ms)
+        case let .other(type):
+            throw EncodingError.invalidValue(type, .init(codingPath: [], debugDescription: "a command the engine does not answer"))
+        }
+    }
+}
+
+/// An event type the engine does not write yet (capture, offline, embeddings: M1 and later).
+private struct NotWritten: Error {}
+
+extension EngineEvent: Decodable {
+    private enum Keys: String, CodingKey {
+        case type, protocol_version, engine_version, models, sandboxed, cmd_id, code, message, call_id, mic_db, sys_db
+        case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        switch try c.decode(String.self, forKey: .type) {
+        case "ready":
+            self = .ready(
+                protocolVersion: try c.decode(String.self, forKey: .protocol_version),
+                engineVersion: try c.decode(String.self, forKey: .engine_version),
+                models: try c.decode([String].self, forKey: .models), sandboxed: try c.decode(Bool.self, forKey: .sandboxed))
+        case "ack": self = .ack(cmdId: try c.decode(UInt64.self, forKey: .cmd_id))
+        case "error":
+            self = .error(
+                cmdId: try c.decode(UInt64?.self, forKey: .cmd_id), code: try c.decode(EngineErrorCode.self, forKey: .code),
+                message: try c.decode(String.self, forKey: .message))
+        case "pong": self = .pong
+        case "levels":
+            self = .levels(
+                callId: try c.decode(String?.self, forKey: .call_id), micDb: try c.decode(Float.self, forKey: .mic_db),
+                sysDb: try c.decode(Float.self, forKey: .sys_db))
+        case "self_test_stream": self = .selfTestStream(channel: try c.decode(Channel.self, forKey: .channel))
+        case "self_test_result":
+            self = .selfTestResult(
+                passed: try c.decode(Bool.self, forKey: .passed), failure: try c.decode(EngineErrorCode?.self, forKey: .failure),
+                ownSoundsLeak: try c.decode(Bool.self, forKey: .own_sounds_leak))
+        case "session_stopped":
+            self = .sessionStopped(
+                callId: try c.decode(String.self, forKey: .call_id), timelinePath: try c.decode(String.self, forKey: .timeline_path),
+                micPath: try c.decode(String?.self, forKey: .mic_path), sysPath: try c.decode(String?.self, forKey: .sys_path))
+        default: throw NotWritten()
+        }
+    }
+}
+
+/// The event line as `EventWriter` writes it.
+private struct EventLine: Codable {
+    let seq: UInt64
+    let at: Int64
+    let event: EngineEvent
+}
 
 final class RoundTripTests: XCTestCase {
-    func testRustCommandLinesDecode() throws {
-        let decoded = try rustCommands.map { try JSONDecoder().decode(EngineCommandLine.self, from: Data($0.utf8)) }
-        XCTAssertEqual(
-            decoded.map(\.cmd),
-            [
-                .ping, .setDetection(enabled: true, knownBundleIds: ["us.zoom.xos"]),
-                .selfTest(playClip: false, timeoutMs: 10_000), .shutdown, .other(type: "stop"),
-            ])
-        XCTAssertEqual(decoded.map(\.id), [1, 2, 3, 4, 5])
+    func testEveryFixtureCommandDecodesAndEveryAnsweredOneReencodesEqual() throws {
+        let lines = try XCTUnwrap(fixture["commands"], "the engine-lines fixture has commands")
+        var answered: [String] = []
+        for line in lines {
+            let type = typeOf(line, "cmd")
+            let data = try JSONSerialization.data(withJSONObject: line)
+            let decoded = try JSONDecoder().decode(EngineCommandLine.self, from: data)
+            if decoded.cmd == .other(type: type) { continue } // refused with bad_command
+            answered.append(type)
+            XCTAssertEqual(try object(JSONEncoder().encode(decoded)), try object(data), type)
+        }
+        // The commands the engine answers: each has a fixture line, and none decoded as `.other`.
+        XCTAssertEqual(answered.sorted(), ["ping", "self_test", "set_detection", "shutdown"])
     }
 
-    func testSwiftEventsEncodeAsRustWritesThem() throws {
+    func testEveryFixtureEventTheEngineWritesDecodesAndReencodesEqual() throws {
+        let lines = try XCTUnwrap(fixture["events"], "the engine-lines fixture has events")
+        var written: [String] = []
+        for line in lines {
+            let type = typeOf(line, "event")
+            let data = try JSONSerialization.data(withJSONObject: line)
+            let decoded: EventLine
+            do {
+                decoded = try JSONDecoder().decode(EventLine.self, from: data)
+            } catch is NotWritten {
+                continue
+            }
+            written.append(type)
+            XCTAssertEqual(try object(JSONEncoder().encode(decoded)), try object(data), type)
+        }
+        // Every case of `EngineEvent` has a fixture line.
+        XCTAssertEqual(
+            written.sorted(),
+            ["ack", "error", "levels", "pong", "ready", "self_test_result", "self_test_stream", "session_stopped"])
+    }
+
+    func testEventWriterWritesTheLineShapeOfTheFixture() throws {
         let lines = Lines()
-        let w = EventWriter(clock: { 1_790_000_000_000 }, out: lines.write)
-        let events: [EngineEvent] = [
-            .ready(protocolVersion: engineProtocolVersion, engineVersion: "0.1.0", models: ["whisper-turbo"], sandboxed: true),
-            .ack(cmdId: 2),
-            .error(cmdId: nil, code: .deviceUnavailable, message: "mic.wav"),
-            .pong,
-            .levels(callId: nil, micDb: -20.5, sysDb: -160),
-            .selfTestStream(channel: .sys),
-            .selfTestResult(passed: false, failure: .zeroBuffers, ownSoundsLeak: false),
-            .sessionStopped(callId: "call_file", timelinePath: "", micPath: "mic.wav", sysPath: nil),
-        ]
-        events.forEach(w.emit)
-        let ours = lines.objects.map { NSDictionary(dictionary: $0) }
-        let theirs = try rustEvents.map {
-            NSDictionary(dictionary: try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any]))
-        }
-        XCTAssertEqual(ours.count, theirs.count)
-        for (i, (a, b)) in zip(ours, theirs).enumerated() {
-            XCTAssertEqual(a, b, "line \(i + 1)")
-        }
+        EventWriter(clock: { 1_790_000_000_000 }, out: lines.write).emit(.pong)
+        let pong = try XCTUnwrap(fixture["events"]?.first { typeOf($0, "event") == "pong" })
+        XCTAssertEqual(Set(try XCTUnwrap(lines.objects.first).keys), Set(pong.keys))
     }
 }
 

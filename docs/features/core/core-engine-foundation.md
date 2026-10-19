@@ -218,9 +218,9 @@ The tap and the microphone on one clock, and `self_test_line` per channel when t
 
 ### Engine package and codec
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-package`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-package`
 
-The system **MUST** build `noter-engine` from the Swift package `engine/` with protocol types generated from `contracts/engine.schema.json`, answering `ping`, `shutdown`, `set_detection` and `self_test`, and running in file mode; Swift tests replay WAV fixtures through file mode.
+The system **MUST** build `noter-engine` from the Swift package `engine/` with hand-written Swift protocol types checked against the generated example lines `contracts/fixtures/engine-lines.json` (decision D13), answering `ping`, `shutdown`, `set_detection` and `self_test`, and running in file mode; Swift tests replay WAV fixtures through file mode.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-foundation-self-test`
