@@ -14,8 +14,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    BoxFuture as CoreFuture, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
-    EventEmitter, FetchError, ModelSource, NativeServices, SystemClock, Updater,
+    BoxFuture as CoreFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, SystemClock,
+    Updater,
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_protocol::engine::{EngineErrorCode, EngineEvent};
@@ -630,6 +631,9 @@ struct TinyModels {
     released: AtomicBool,
 }
 
+/// Each tiny bundle is one file in its folder.
+const TINY_FILE: &str = "model.bin";
+
 /// The bundles capture needs are big enough to show a partial download in whole megabytes.
 const LIVE_BUNDLE_BYTES: usize = 4 << 20;
 
@@ -648,12 +652,15 @@ impl TinyModels {
                 let bytes = line.repeat(times).into_bytes();
                 let spec = BundleSpec {
                     name: b.name.clone(),
-                    url: format!(
-                        "https://huggingface.co/noter-harness/{}",
-                        b.name.replace(' ', "-")
-                    ),
-                    size_bytes: bytes.len() as u64,
-                    sha256: hex(&Sha256::digest(&bytes)),
+                    files: vec![BundleFile {
+                        path: TINY_FILE.into(),
+                        url: format!(
+                            "https://huggingface.co/noter-harness/{}",
+                            b.name.replace(' ', "-")
+                        ),
+                        size_bytes: bytes.len() as u64,
+                        sha256: hex(&Sha256::digest(&bytes)),
+                    }],
                     required_for_capture: b.required_for_capture,
                 };
                 (spec, bytes)
@@ -676,8 +683,9 @@ impl TinyModels {
                 .iter()
                 .any(|b| b.name == spec.name && b.state == BundleState::Ready)
             {
-                std::fs::write(dir.join(&spec.name), bytes)?;
-            } else if let Err(e) = std::fs::remove_file(dir.join(&spec.name)) {
+                std::fs::create_dir_all(dir.join(&spec.name))?;
+                std::fs::write(dir.join(&spec.name).join(TINY_FILE), bytes)?;
+            } else if let Err(e) = std::fs::remove_dir_all(dir.join(&spec.name)) {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     return Err(e);
                 }
@@ -694,7 +702,7 @@ impl ModelSource for TinyModels {
 
     fn fetch<'a>(
         &'a self,
-        bundle: &'a BundleSpec,
+        file: &'a BundleFile,
         from_byte: u64,
         mut chunk: ChunkSink<'a>,
     ) -> CoreFuture<'a, Result<(), FetchError>> {
@@ -705,7 +713,7 @@ impl ModelSource for TinyModels {
             let bytes = &self
                 .specs
                 .iter()
-                .find(|(s, _)| s.name == bundle.name)
+                .find(|(s, _)| s.files.iter().any(|f| f.url == file.url))
                 .ok_or(FetchError::Http(404))?
                 .1;
             let mut bytes = bytes.clone();

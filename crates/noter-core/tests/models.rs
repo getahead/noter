@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
-    allowed_download_url, BoxFuture, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
+    allowed_download_url, BoxFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
     EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices,
 };
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -56,31 +56,59 @@ impl NativeServices for Disk {
 /// Tiny bundles served from memory; each fetch can be told to fail part-way.
 #[derive(Default)]
 struct Bundles {
+    /// File bytes by `<bundle>/<path>`.
     content: HashMap<String, Vec<u8>>,
     specs: Vec<BundleSpec>,
-    /// Per bundle: fail with `Offline` after this many bytes on the next fetch.
+    /// Per file (`<bundle>/<path>`): fail with `Offline` after this many bytes on the next fetch.
     drop_after: Mutex<HashMap<String, usize>>,
-    /// Every fetch, as (bundle, from_byte).
+    /// Every fetch, as (`<bundle>/<path>`, from_byte).
     fetches: Mutex<Vec<(String, u64)>>,
 }
 
 const CHUNK: usize = 64;
 
 impl Bundles {
+    /// A bundle of one file, `model.bin`.
     fn with(
-        mut self,
+        self,
         name: &str,
         bytes: &[u8],
         url_host: &str,
         checksum_of: &[u8],
         required: bool,
     ) -> Self {
-        self.content.insert(name.into(), bytes.to_vec());
+        self.with_files(
+            name,
+            &[("model.bin", bytes, checksum_of)],
+            url_host,
+            required,
+        )
+    }
+
+    /// A bundle of several files: (path in the bundle, bytes served, bytes the checksum is of).
+    fn with_files(
+        mut self,
+        name: &str,
+        files: &[(&str, &[u8], &[u8])],
+        url_host: &str,
+        required: bool,
+    ) -> Self {
+        let files = files
+            .iter()
+            .map(|(path, bytes, checksum_of)| {
+                self.content
+                    .insert(format!("{name}/{path}"), bytes.to_vec());
+                BundleFile {
+                    path: (*path).into(),
+                    url: format!("https://{url_host}/{name}/{path}"),
+                    size_bytes: bytes.len() as u64,
+                    sha256: hex(&Sha256::digest(checksum_of)),
+                }
+            })
+            .collect();
         self.specs.push(BundleSpec {
             name: name.into(),
-            url: format!("https://{url_host}/{name}.zip"),
-            size_bytes: bytes.len() as u64,
-            sha256: hex(&Sha256::digest(checksum_of)),
+            files,
             required_for_capture: required,
         });
         self
@@ -97,17 +125,16 @@ impl ModelSource for Bundles {
     }
     fn fetch<'a>(
         &'a self,
-        bundle: &'a BundleSpec,
+        file: &'a BundleFile,
         from_byte: u64,
         mut chunk: ChunkSink<'a>,
     ) -> BoxFuture<'a, Result<(), FetchError>> {
         Box::pin(async move {
-            self.fetches
-                .lock()
-                .unwrap()
-                .push((bundle.name.clone(), from_byte));
-            let data = &self.content[&bundle.name][from_byte as usize..];
-            let drop_after = self.drop_after.lock().unwrap().remove(&bundle.name);
+            // `https://<host>/<bundle>/<path>` → `<bundle>/<path>`
+            let key = file.url.splitn(4, '/').nth(3).unwrap().to_string();
+            self.fetches.lock().unwrap().push((key.clone(), from_byte));
+            let data = &self.content[&key][from_byte as usize..];
+            let drop_after = self.drop_after.lock().unwrap().remove(&key);
             for (i, part) in data.chunks(CHUNK).enumerate() {
                 if drop_after.is_some_and(|n| i * CHUNK >= n) {
                     return Err(FetchError::Offline);
@@ -240,7 +267,7 @@ async fn bundles_download_verify_and_become_ready_while_the_user_does_other_step
     assert_eq!(done.models.done_mb, done.models.total_mb);
     assert!(done.models.error.is_none());
     for name in ["whisper-turbo", "bge-m3"] {
-        let path = dir.path().join("models").join(name);
+        let path = dir.path().join("models").join(name).join("model.bin");
         assert!(path.is_file(), "{name} in models/");
         #[cfg(unix)]
         {
@@ -298,7 +325,7 @@ async fn a_checksum_mismatch_deletes_the_partial_file_and_retry_downloads_again(
     assert!(!dir
         .path()
         .join("models")
-        .join("whisper-turbo.partial")
+        .join("whisper-turbo.partial/model.bin.part")
         .exists());
     // Retry fetches from the first byte again.
     download(&s.core, DownloadAction::Retry).await.unwrap();
@@ -310,7 +337,10 @@ async fn a_checksum_mismatch_deletes_the_partial_file_and_retry_downloads_again(
     let fetches = s.source.fetches.lock().unwrap().clone();
     assert_eq!(
         fetches,
-        vec![("whisper-turbo".into(), 0), ("whisper-turbo".into(), 0)]
+        vec![
+            ("whisper-turbo/model.bin".into(), 0),
+            ("whisper-turbo/model.bin".into(), 0)
+        ]
     );
 }
 
@@ -322,7 +352,7 @@ async fn offline_pauses_with_the_partial_file_and_resume_continues_from_it() {
         .drop_after
         .lock()
         .unwrap()
-        .insert("whisper-turbo".into(), 256);
+        .insert("whisper-turbo/model.bin".into(), 256);
     download(&s.core, DownloadAction::Start).await.unwrap();
     let paused = until(&s.core, "paused offline", |st| {
         state(st, "whisper-turbo") == BundleState::Paused
@@ -337,7 +367,7 @@ async fn offline_pauses_with_the_partial_file_and_resume_continues_from_it() {
     let fetches = s.source.fetches.lock().unwrap().clone();
     let speech: Vec<u64> = fetches
         .iter()
-        .filter(|(n, _)| n == "whisper-turbo")
+        .filter(|(n, _)| n == "whisper-turbo/model.bin")
         .map(|(_, f)| *f)
         .collect();
     assert_eq!(speech, vec![0, 256], "resumed from the partial file");
@@ -389,7 +419,7 @@ async fn pause_stops_the_download_and_keeps_the_partial_file() {
     })
     .await;
     assert_eq!(
-        std::fs::read(dir.path().join("models").join("whisper-turbo")).unwrap(),
+        std::fs::read(dir.path().join("models/whisper-turbo/model.bin")).unwrap(),
         big
     );
 }
@@ -404,7 +434,7 @@ async fn offline_keeps_the_progress_of_the_partial_file_and_it_is_private() {
         .drop_after
         .lock()
         .unwrap()
-        .insert("whisper-turbo".into(), 2 * 1024 * 1024 + 100);
+        .insert("whisper-turbo/model.bin".into(), 2 * 1024 * 1024 + 100);
     download(&s.core, DownloadAction::Start).await.unwrap();
     let paused = until(&s.core, "paused offline", |st| {
         state(st, "whisper-turbo") == BundleState::Paused
@@ -415,7 +445,9 @@ async fn offline_keeps_the_progress_of_the_partial_file_and_it_is_private() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let partial = dir.path().join("models").join("whisper-turbo.partial");
+        let partial = dir
+            .path()
+            .join("models/whisper-turbo.partial/model.bin.part");
         assert_eq!(
             std::fs::metadata(partial).unwrap().permissions().mode() & 0o777,
             0o600
@@ -451,7 +483,7 @@ async fn refresh_models_rereads_the_models_folder() {
     })
     .await;
     // The folder changed outside the core (a restore, the harness's world_set).
-    std::fs::remove_file(dir.path().join("models").join("bge-m3")).unwrap();
+    std::fs::remove_dir_all(dir.path().join("models").join("bge-m3")).unwrap();
     s.core.refresh_models();
     let st = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
     assert_eq!(state(&st, "bge-m3"), BundleState::Pending);
@@ -666,7 +698,7 @@ async fn a_download_cut_off_by_the_network_resumes_by_itself() {
         .drop_after
         .lock()
         .unwrap()
-        .insert("whisper-turbo".into(), 2 * CHUNK);
+        .insert("whisper-turbo/model.bin".into(), 2 * CHUNK);
     let network = Arc::new(Network(true.into(), Mutex::new(None)));
     let core = open_on(dir.path(), source.clone(), network.clone());
     download(&core, DownloadAction::Start).await.unwrap();
@@ -688,7 +720,7 @@ async fn a_download_cut_off_by_the_network_resumes_by_itself() {
         .lock()
         .unwrap()
         .iter()
-        .any(|(name, from)| name == "whisper-turbo" && *from > 0));
+        .any(|(name, from)| name == "whisper-turbo/model.bin" && *from > 0));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -724,4 +756,121 @@ async fn a_back_online_notice_from_a_plain_thread_still_resumes() {
             .all(|b| b.state == BundleState::Ready)
     })
     .await;
+}
+
+/// The capture model as three files; the second is big enough to stop part-way.
+fn three_files(bad: Option<&str>) -> Bundles {
+    let (a, b, c) = (vec![1u8; 300], vec![2u8; 64 * 40], vec![3u8; 200]);
+    let sum = |path: &str, bytes: &[u8]| -> Vec<u8> {
+        if bad == Some(path) {
+            b"not these bytes".to_vec()
+        } else {
+            bytes.to_vec()
+        }
+    };
+    let (sa, sb, sc) = (sum("a.bin", &a), sum("dir/b.bin", &b), sum("c.json", &c));
+    Bundles::default().with_files(
+        "whisper-turbo",
+        &[
+            ("a.bin", &a, &sa),
+            ("dir/b.bin", &b, &sb),
+            ("c.json", &c, &sc),
+        ],
+        "huggingface.co",
+        true,
+    )
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_bundle_of_files_resumes_the_half_done_file_and_keeps_the_verified_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), three_files(None), 90_000);
+    s.source
+        .drop_after
+        .lock()
+        .unwrap()
+        .insert("whisper-turbo/dir/b.bin".into(), 640);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let paused = until(&s.core, "paused offline", |st| {
+        state(st, "whisper-turbo") == BundleState::Paused
+    })
+    .await;
+    assert_eq!(paused.models.error, Some(ErrorCode::Offline));
+    let partial = dir.path().join("models/whisper-turbo.partial");
+    assert!(partial.join("a.bin").is_file(), "the verified file stays");
+    assert_eq!(
+        std::fs::metadata(partial.join("dir/b.bin.part"))
+            .unwrap()
+            .len(),
+        640
+    );
+    assert!(!dir.path().join("models/whisper-turbo").exists());
+    // A restart reads the half-done bundle as paused.
+    drop(s);
+    let s = open(dir.path(), three_files(None), 90_000);
+    let st = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert_eq!(state(&st, "whisper-turbo"), BundleState::Paused);
+    download(&s.core, DownloadAction::Resume).await.unwrap();
+    until(&s.core, "ready", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
+    // Only the half-done file is fetched again, from where it stopped.
+    let fetches = s.source.fetches.lock().unwrap().clone();
+    assert_eq!(
+        fetches,
+        vec![
+            ("whisper-turbo/dir/b.bin".into(), 640),
+            ("whisper-turbo/c.json".into(), 0)
+        ]
+    );
+    let ready = dir.path().join("models/whisper-turbo");
+    assert_eq!(
+        std::fs::read(ready.join("dir/b.bin")).unwrap(),
+        vec![2u8; 64 * 40]
+    );
+    assert!(ready.join("a.bin").is_file() && ready.join("c.json").is_file());
+    assert!(!partial.exists());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn one_bad_file_fails_the_bundle_and_deletes_only_its_partial_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), three_files(Some("dir/b.bin")), 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let failed = until(&s.core, "checksum_failed", |st| {
+        state(st, "whisper-turbo") == BundleState::ChecksumFailed
+    })
+    .await;
+    assert_eq!(failed.models.error, Some(ErrorCode::ChecksumFailed));
+    let partial = dir.path().join("models/whisper-turbo.partial");
+    assert!(partial.join("a.bin").is_file(), "the verified file stays");
+    assert!(!partial.join("dir/b.bin.part").exists());
+    assert!(!partial.join("dir/b.bin").exists());
+    assert!(
+        !partial.join("c.json").exists(),
+        "nothing after the bad file"
+    );
+    // Never renamed into place while a file is unverified.
+    assert!(!dir.path().join("models/whisper-turbo").exists());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_bundle_file_outside_the_bundle_folder_fails_without_a_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = vec![3u8; 100];
+    let source = Bundles::default().with_files(
+        "whisper-turbo",
+        &[("../escape.bin", &bytes, &bytes)],
+        "huggingface.co",
+        true,
+    );
+    let s = open(dir.path(), source, 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    until(&s.core, "failed", |st| {
+        state(st, "whisper-turbo") == BundleState::Failed
+    })
+    .await;
+    assert!(s.source.fetches.lock().unwrap().is_empty());
+    assert!(!dir.path().join("models/escape.bin").exists());
 }

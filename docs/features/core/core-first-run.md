@@ -177,7 +177,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Install a downloaded update
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-first-run-update`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-first-run-update`
 
 **Actor**: Primary user (Settings or main window, from the update banner)
 
@@ -192,25 +192,25 @@ The user should finish setup in one sitting before the first real call, and call
 1. [x] - `p1` - API: `update_install {}` - `inst-update-call`
 2. [x] - `p1` - **IF** no verified update is ready **RETURN** `not_found` (checked first, decision F3) - `inst-if-no-update`
 3. [x] - `p1` - **IF** a capture is running, schedule the install for the next stop and **RETURN** `Ack` - `inst-if-recording`
-4. [ ] - `p1` - Let `tauri-plugin-updater` install the update; on success shut the core down in order (streams end with `shutdown`, the writer drains) and relaunch, on failure keep running - `inst-install`
+4. [x] - `p1` - Let `tauri-plugin-updater` install the update; on success shut the core down in order (streams end with `shutdown`, the writer drains) and relaunch, on failure keep running - `inst-install`
 5. [x] - `p1` - **RETURN** `Ack` before the relaunch - `inst-return-update`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Download task
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-first-run-download-task`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-first-run-download-task`
 
-**Input**: The pinned model manifest (bundle name, URL, size, checksum), compiled into the app; hosts listed in `contracts/egress-hosts.json`.
+**Input**: The pinned model manifest (bundle name and its files: path, URL, size, checksum; decision D12), compiled into the app; hosts listed in `contracts/egress-hosts.json`.
 
 **Output**: Each bundle `ready` in `models/`, or its failure state.
 
 **Steps**:
 1. [x] - `p1` - **FOR EACH** bundle not `ready`, required-for-capture bundles first - `inst-for-bundles`
-   1. [ ] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second; the HTTP fetcher is noter-llm's `RangeFetcher`, the egress gate, since noter-core opens no connection (backend decision D11) - `inst-try-download`
+   1. [x] - `p1` - **TRY** download into a partial file with HTTP range resume, publishing progress at most twice a second; the HTTP fetcher is noter-llm's `RangeFetcher`, the egress gate, since noter-core opens no connection (backend decision D11) - `inst-try-download`
    2. [x] - `p1` - **CATCH** a network failure: state `paused`, error `offline` - `inst-catch-offline`
-   3. [x] - `p1` - Verify the checksum (`verifying`); on mismatch delete the partial file, state `checksum_failed` - `inst-verify`
-   4. [x] - `p1` - Move the verified file into `models/` (0600) and mark the bundle `ready` - `inst-move-ready`
+   3. [x] - `p1` - Verify each file's checksum (`verifying`); on mismatch delete that file's partial file, state `checksum_failed` - `inst-verify`
+   4. [x] - `p1` - Once every file of the bundle verified, move its folder into `models/` (files 0600) and mark the bundle `ready` - `inst-move-ready`
 2. [x] - `p1` - Emit `setup:changed` after each state change - `inst-emit-progress`
 3. [x] - `p1` - **RETURN** when every bundle is `ready` or a failure stops the task - `inst-return-task`
 
@@ -311,7 +311,7 @@ The system **MUST** answer `setup_status`, `setup_set_call_display`, `setup_set_
 
 ### Resumable, verified model downloads
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-first-run-models`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-models`
 
 The system **MUST** download the pinned bundles with range resume, verify each checksum before use, report `offline`, `checksum_failed` and `disk_full` as typed errors and bundle states, and reach only hosts listed in `contracts/egress-hosts.json`.
 
@@ -356,9 +356,9 @@ The system **MUST** stream the self-test over a Channel (`stream_arrived`, `leve
 
 ### Login item and update install
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-first-run-login-update`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-first-run-login-update`
 
-The system **MUST** apply `launch_at_login` through SMAppService and install a verified update with `update_install`, deferring the restart while a capture runs.
+The system **MUST** apply `launch_at_login` through SMAppService and install a verified update with `update_install`, deferring the restart while a capture runs. In M0 the updater is wired and tested against a local feed; not released (no feed URL or signing key in M0, owner decision 19 Oct 2026).
 
 **Implements**:
 - `cpt-noter-flow-core-first-run-update`

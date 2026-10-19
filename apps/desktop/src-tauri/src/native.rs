@@ -60,6 +60,7 @@ impl NativeServices for Mac {
         *self.watch.lock().unwrap_or_else(|e| e.into_inner()) = Some(watch);
     }
 
+    // @cpt-dod:cpt-noter-dod-core-first-run-login-update:p2
     fn set_login_item(&self, on: bool) -> Result<(), CoreError> {
         noter_native::set_login_item(on)
             .map(drop)

@@ -3,8 +3,9 @@
 //! `contracts/egress-hosts.json` allows for model downloads (decision D8 F4). A setup task in
 //! M0; it moves onto the job scheduler in M2.
 //!
-//! A bundle's state follows its files: `models/<name>` is ready, `models/<name>.partial`
-//! resumes from its length.
+//! A bundle is the folder of its files (decision D12) and its state follows the folders:
+//! `models/<name>` is ready; `models/<name>.partial` holds the files verified so far and the
+//! one in progress as `<path>.part`, which resumes from its length.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -16,7 +17,8 @@ use noter_protocol::model::*;
 use noter_protocol::*;
 use sha2::{Digest, Sha256};
 
-use crate::first_run::{BundleSpec, FetchError};
+use crate::allowed_download_url;
+use crate::first_run::{BoxFuture, BundleFile, BundleSpec, ChunkSink, FetchError, ModelSource};
 use crate::{lock, Core};
 
 const MB: u64 = 1024 * 1024;
@@ -24,20 +26,6 @@ const MB: u64 = 1024 * 1024;
 const MARGIN_MB: u32 = 500;
 /// Progress goes out at most twice a second.
 const PROGRESS_EVERY: Duration = Duration::from_millis(500);
-
-/// Whether `url` is an https URL on a host the egress allow-list (`noter_protocol::egress`,
-/// the source of `contracts/egress-hosts.json`) names for model downloads.
-pub fn allowed_download_url(url: &str) -> bool {
-    let mut hosts = noter_protocol::egress::ALLOW_WITHOUT_AUDIT
-        .iter()
-        .filter(|g| g.name == "model_downloads")
-        .flat_map(|g| g.hosts.iter());
-    let Some(rest) = url.strip_prefix("https://") else {
-        return false;
-    };
-    let host = rest.split(['/', ':', '?', '#']).next().unwrap_or("");
-    hosts.any(|h| *h == host)
-}
 
 fn ceil_mb(bytes: u64) -> u32 {
     u32::try_from(bytes.div_ceil(MB)).unwrap_or(u32::MAX)
@@ -62,9 +50,9 @@ impl Downloads {
         let bundles = specs
             .iter()
             .map(|s| {
-                let partial = std::fs::metadata(partial_path(&dir, &s.name)).map_or(0, |m| m.len());
-                let (state, done) = if dir.join(&s.name).is_file() {
-                    (BundleState::Ready, s.size_bytes)
+                let partial = dir_len(&partial_path(&dir, &s.name));
+                let (state, done) = if dir.join(&s.name).exists() {
+                    (BundleState::Ready, s.size_bytes())
                 } else if partial > 0 {
                     (BundleState::Paused, partial)
                 } else {
@@ -72,7 +60,7 @@ impl Downloads {
                 };
                 ModelBundle {
                     name: s.name.clone(),
-                    size_mb: ceil_mb(s.size_bytes),
+                    size_mb: ceil_mb(s.size_bytes()),
                     done_mb: if state == BundleState::Ready {
                         ceil_mb(done)
                     } else {
@@ -129,6 +117,35 @@ impl Downloads {
 
 fn partial_path(dir: &Path, name: &str) -> PathBuf {
     dir.join(format!("{name}.partial"))
+}
+
+/// The bytes held under `dir`, files of every subfolder included.
+fn dir_len(dir: &Path) -> u64 {
+    std::fs::read_dir(dir).map_or(0, |entries| {
+        entries
+            .flatten()
+            .map(|e| match e.file_type() {
+                Ok(t) if t.is_dir() => dir_len(&e.path()),
+                _ => e.metadata().map_or(0, |m| m.len()),
+            })
+            .sum()
+    })
+}
+
+/// A relative path that stays inside the bundle's folder.
+fn inside_bundle(path: &str) -> bool {
+    !path.is_empty()
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)))
+}
+
+fn private_dir(dir: &Path) -> std::io::Result<()> {
+    let mut builder = std::fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(dir)
 }
 
 fn sha256_hex(path: &Path) -> std::io::Result<String> {
@@ -223,7 +240,7 @@ impl Core {
             .iter()
             .zip(&d.bundles)
             .filter(|(_, b)| b.state != BundleState::Ready)
-            .map(|(s, b)| s.size_bytes.saturating_sub(u64::from(b.done_mb) * MB))
+            .map(|(s, b)| s.size_bytes().saturating_sub(u64::from(b.done_mb) * MB))
             .sum();
         let needed_mb = ceil_mb(remaining) + MARGIN_MB;
         let free_mb = self.deps.native.environment().disk_free_mb;
@@ -300,7 +317,7 @@ impl Core {
                 let mut d = lock(&self.downloads);
                 match outcome {
                     Outcome::Ready => {
-                        d.set(&spec.name, BundleState::Ready, Some(spec.size_bytes));
+                        d.set(&spec.name, BundleState::Ready, Some(spec.size_bytes()));
                         false
                     }
                     Outcome::Paused(done) => {
@@ -345,86 +362,166 @@ impl Core {
         // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-return-task
     }
 
+    // @cpt-dod:cpt-noter-dod-core-first-run-models:p1
     async fn download_one(&self, spec: &BundleSpec, dir: &Path) -> Outcome {
-        if !allowed_download_url(&spec.url) {
+        if spec
+            .files
+            .iter()
+            .any(|f| !allowed_download_url(&f.url) || !inside_bundle(&f.path))
+        {
             return Outcome::Stop(BundleState::Failed, ErrorCode::Internal);
         }
         let partial = partial_path(dir, &spec.name);
-        let opened = std::fs::create_dir_all(dir).and_then(|_| {
-            let mut options = std::fs::OpenOptions::new();
-            options.create(true).append(true);
-            #[cfg(unix)]
-            std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-            options.open(&partial)
-        });
-        let Ok(mut file) = opened else {
-            // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
-            return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
-            // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
-        };
-        let mut done = file.metadata().map_or(0, |m| m.len());
+        let mut done = dir_len(&partial);
         let pause = lock(&self.downloads).pause.clone();
-        let mut write_failed = false;
-        let mut last = Instant::now();
-        let name = spec.name.clone();
-        let from = done;
-        let fetched = {
-            let sink = Box::new(|bytes: &[u8]| {
-                if pause.load(Ordering::SeqCst) {
-                    return false;
-                }
-                if file.write_all(bytes).is_err() {
-                    write_failed = true;
-                    return false;
-                }
-                done += bytes.len() as u64;
-                if last.elapsed() >= PROGRESS_EVERY {
-                    last = Instant::now();
-                    lock(&self.downloads).set(&name, BundleState::Downloading, Some(done));
-                    self.refresh_setup();
-                }
-                true
+        for file in &spec.files {
+            let verified = partial.join(&file.path);
+            if verified.is_file() {
+                continue;
+            }
+            // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
+            let part = partial.join(format!("{}.part", file.path));
+            let opened = private_dir(part.parent().unwrap_or(&partial)).and_then(|_| {
+                let mut options = std::fs::OpenOptions::new();
+                options.create(true).append(true);
+                #[cfg(unix)]
+                std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+                options.open(&part)
             });
-            self.deps.models.fetch(spec, from, sink).await
-        };
-        if write_failed {
-            return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+            let Ok(mut out) = opened else {
+                // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
+                return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+                // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
+            };
+            let from = out.metadata().map_or(0, |m| m.len());
+            let mut write_failed = false;
+            let mut last = Instant::now();
+            let name = spec.name.clone();
+            let fetched = {
+                let sink = Box::new(|bytes: &[u8]| {
+                    if pause.load(Ordering::SeqCst) {
+                        return false;
+                    }
+                    if out.write_all(bytes).is_err() {
+                        write_failed = true;
+                        return false;
+                    }
+                    done += bytes.len() as u64;
+                    if last.elapsed() >= PROGRESS_EVERY {
+                        last = Instant::now();
+                        lock(&self.downloads).set(&name, BundleState::Downloading, Some(done));
+                        self.refresh_setup();
+                    }
+                    true
+                });
+                self.deps.models.fetch(file, from, sink).await
+            };
+            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
+            if write_failed {
+                return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+            }
+            match fetched {
+                // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
+                // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
+                Err(FetchError::Offline) => return Outcome::Offline(done),
+                // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
+                // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
+                Err(_) => return Outcome::Stop(BundleState::Failed, ErrorCode::Internal),
+                Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused(done),
+                Ok(()) => {}
+            }
+            // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
+            // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-verify
+            lock(&self.downloads).set(&spec.name, BundleState::Verifying, Some(done));
+            self.refresh_setup();
+            // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-verify
+            if sha256_hex(&part).ok().as_deref() != Some(file.sha256.as_str()) {
+                // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-checksum
+                let _ = std::fs::remove_file(&part);
+                return Outcome::Stop(BundleState::ChecksumFailed, ErrorCode::ChecksumFailed);
+                // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-checksum
+            }
+            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
+            if std::fs::rename(&part, &verified).is_err() {
+                return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+            }
         }
-        match fetched {
-            // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
-            // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
-            Err(FetchError::Offline) => return Outcome::Offline(done),
-            // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
-            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
-            Err(_) => return Outcome::Stop(BundleState::Failed, ErrorCode::Internal),
-            Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused(done),
-            Ok(()) => {}
-        }
-        // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
-        // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-verify
-        lock(&self.downloads).set(&spec.name, BundleState::Verifying, Some(done));
-        self.refresh_setup();
-        // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-verify
-        if sha256_hex(&partial).ok().as_deref() != Some(spec.sha256.as_str()) {
-            // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-checksum
-            let _ = std::fs::remove_file(&partial);
-            return Outcome::Stop(BundleState::ChecksumFailed, ErrorCode::ChecksumFailed);
-            // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-checksum
-        }
-        // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
         // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-move-ready
         // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-ready
-        let ready = dir.join(&spec.name);
-        if std::fs::rename(&partial, &ready).is_err() {
+        // Every file verified: the folder moves into place at once.
+        if std::fs::rename(&partial, dir.join(&spec.name)).is_err() {
             return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&ready, std::fs::Permissions::from_mode(0o600));
         }
         Outcome::Ready
         // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-ready
         // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-move-ready
+    }
+}
+
+/// The app's model source: the pinned manifest compiled into noter-llm, its files grouped into
+/// bundles in manifest order (decision D12), each file fetched through noter-llm's
+/// `RangeFetcher`, the egress gate (D11).
+pub struct PinnedModels {
+    files: Vec<noter_llm::PinnedFile>,
+    fetcher: noter_llm::RangeFetcher,
+}
+
+impl PinnedModels {
+    pub fn new() -> Self {
+        Self::with(noter_llm::manifest(), noter_llm::RangeFetcher::new())
+    }
+
+    pub fn with(files: Vec<noter_llm::PinnedFile>, fetcher: noter_llm::RangeFetcher) -> Self {
+        Self { files, fetcher }
+    }
+}
+
+impl Default for PinnedModels {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ModelSource for PinnedModels {
+    fn manifest(&self) -> Vec<BundleSpec> {
+        let mut bundles: Vec<BundleSpec> = Vec::new();
+        for f in &self.files {
+            let file = BundleFile {
+                path: f.path.clone(),
+                url: f.url.clone(),
+                size_bytes: f.size_bytes,
+                sha256: f.sha256.clone(),
+            };
+            match bundles.iter_mut().find(|b| b.name == f.bundle) {
+                Some(b) => b.files.push(file),
+                None => bundles.push(BundleSpec {
+                    name: f.bundle.clone(),
+                    files: vec![file],
+                    required_for_capture: f.required_for_capture,
+                }),
+            }
+        }
+        bundles
+    }
+
+    fn fetch<'a>(
+        &'a self,
+        file: &'a BundleFile,
+        from_byte: u64,
+        mut chunk: ChunkSink<'a>,
+    ) -> BoxFuture<'a, Result<(), FetchError>> {
+        Box::pin(async move {
+            // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
+            let fetched = self.fetcher.fetch(&file.url, from_byte, &mut *chunk).await;
+            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
+            fetched.map_err(|e| match e {
+                noter_llm::FetchError::Offline => FetchError::Offline,
+                noter_llm::FetchError::Http(code) => FetchError::Http(code),
+                noter_llm::FetchError::NotAllowed => {
+                    FetchError::Io("off the model-download allow-list".into())
+                }
+                noter_llm::FetchError::Io(e) => FetchError::Io(e),
+            })
+        })
     }
 }

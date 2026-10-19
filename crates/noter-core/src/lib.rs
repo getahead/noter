@@ -25,13 +25,15 @@ use serde_json::{json, Map, Value};
 
 use app::WholeState;
 pub use first_run::{
-    detection, BoxFuture, BundleSpec, ChunkSink, EnvironmentReading, FetchError, ModelSource,
-    NativeServices, Updater,
+    detection, BoxFuture, BundleFile, BundleSpec, ChunkSink, EnvironmentReading, FetchError,
+    ModelSource, NativeServices, Updater,
 };
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
-pub use models::allowed_download_url;
+pub use models::PinnedModels;
+/// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
+pub use noter_llm::allowed_download_url;
 use noter_protocol::ipc::Sink;
 pub use settings::default_settings;
 

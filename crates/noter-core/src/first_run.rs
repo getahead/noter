@@ -60,14 +60,28 @@ pub trait NativeServices: Send + Sync {
     fn set_login_item(&self, on: bool) -> Result<(), CoreError>;
 }
 
-/// One pinned model bundle of the compiled-in manifest.
+/// One pinned model bundle of the compiled-in manifest: the files of one model folder at a
+/// pinned commit, each verified by its own sha256 (decision D12).
 #[derive(Debug, Clone, PartialEq)]
 pub struct BundleSpec {
     pub name: String,
+    pub files: Vec<BundleFile>,
+    pub required_for_capture: bool,
+}
+
+/// One file of a bundle, at `path` inside the bundle's folder.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BundleFile {
+    pub path: String,
     pub url: String,
     pub size_bytes: u64,
     pub sha256: String,
-    pub required_for_capture: bool,
+}
+
+impl BundleSpec {
+    pub fn size_bytes(&self) -> u64 {
+        self.files.iter().map(|f| f.size_bytes).sum()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,10 +97,10 @@ pub type ChunkSink<'a> = Box<dyn FnMut(&[u8]) -> bool + Send + 'a>;
 /// Where model bundles come from (pinned URLs in the app, tiny bundles in the harness).
 pub trait ModelSource: Send + Sync {
     fn manifest(&self) -> Vec<BundleSpec>;
-    /// Streams `bundle` from `from_byte`; `chunk` returns false to stop (pause).
+    /// Streams one file of a bundle from `from_byte`; `chunk` returns false to stop (pause).
     fn fetch<'a>(
         &'a self,
-        bundle: &'a BundleSpec,
+        file: &'a BundleFile,
         from_byte: u64,
         chunk: ChunkSink<'a>,
     ) -> BoxFuture<'a, Result<(), FetchError>>;
@@ -128,7 +142,7 @@ impl ModelSource for NoModels {
     }
     fn fetch<'a>(
         &'a self,
-        _: &'a BundleSpec,
+        _: &'a BundleFile,
         _: u64,
         _: ChunkSink<'a>,
     ) -> BoxFuture<'a, Result<(), FetchError>> {
@@ -698,9 +712,11 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-if-recording
         // Install first: a failed install leaves the core running. Then shut down in order
         // and relaunch into the new version.
+        // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-install
         self.deps.updater.install().await?;
         self.shutdown().await;
         self.deps.updater.relaunch();
+        // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-install
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-return-update
         Ok(Ack {})
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-return-update

@@ -5,10 +5,13 @@
 // @cpt-component:cpt-noter-component-core-ipc-host:p1
 
 mod native;
+pub mod updater;
 
 use std::sync::{Arc, OnceLock};
 
-use noter_core::{Core, CoreDeps, EventEmitter, ShortcutRegistrar, ShortcutTaken, SystemClock};
+use noter_core::{
+    Core, CoreDeps, EventEmitter, PinnedModels, ShortcutRegistrar, ShortcutTaken, SystemClock,
+};
 use noter_engine_client::ProcessLauncher;
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
 use noter_protocol::model::WindowLabel;
@@ -62,10 +65,16 @@ pub fn run() {
     let events = Arc::new(TauriEvents::default());
     let app = builder(tauri::Builder::default())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let _ = events.0.set(app.handle().clone());
             let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
-            app.manage(boot(events.clone(), shortcuts));
+            let updater = Arc::new(updater::TauriUpdater::new(app.handle().clone()));
+            app.manage(boot(events.clone(), shortcuts, updater.clone()));
+            // Without a feed (M0) the check ends at once and nothing is ever ready.
+            tauri::async_runtime::spawn(async move {
+                let _ = updater.check().await;
+            });
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -79,7 +88,11 @@ pub fn run() {
     });
 }
 
-fn boot(events: Arc<dyn EventEmitter>, shortcuts: Arc<dyn ShortcutRegistrar>) -> Booted {
+fn boot(
+    events: Arc<dyn EventEmitter>,
+    shortcuts: Arc<dyn ShortcutRegistrar>,
+    updater: Arc<dyn noter_core::Updater>,
+) -> Booted {
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
     };
@@ -99,7 +112,9 @@ fn boot(events: Arc<dyn EventEmitter>, shortcuts: Arc<dyn ShortcutRegistrar>) ->
         .with_shortcuts(shortcuts)
         .with_engine(Arc::new(engine))
         .with_native(Arc::new(Mac::new(&group)))
-        .with_models_dir(group.join("models"));
+        .with_models_dir(group.join("models"))
+        .with_models(Arc::new(PinnedModels::new()))
+        .with_updater(updater);
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);

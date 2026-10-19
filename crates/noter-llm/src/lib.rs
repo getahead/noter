@@ -5,7 +5,7 @@
 //! what model downloads need: the allow-list check over `noter_protocol::egress`
 //! (`ALLOW_WITHOUT_AUDIT`, group `model_downloads`) and an HTTP range fetcher that never leaves it,
 //! not even through a redirect. The LLM runtimes and the audited provider path join it in M2.
-//! The caller (noter-core's download task) verifies each bundle's sha256.
+//! The caller (noter-core's download task) verifies each file's sha256.
 
 use std::time::Duration;
 
@@ -38,20 +38,29 @@ fn allowed(url: &Url) -> bool {
 }
 
 /// One file of a pinned model bundle: a bundle is the set of its files at a pinned Hugging
-/// Face commit, each verified by its sha256 (the file's LFS oid).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Face commit, each verified by its sha256 (the file's LFS oid), at `path` in its folder.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct PinnedFile {
-    pub bundle: &'static str,
-    pub url: &'static str,
+    pub bundle: String,
+    pub path: String,
+    pub url: String,
     pub size_bytes: u64,
-    pub sha256: &'static str,
+    pub sha256: String,
     pub required_for_capture: bool,
 }
 
-/// The pinned model files, compiled in. shortcut: empty until the generator under
-/// scripts/models/ writes the entries from the Hugging Face API (decision D11, option A);
-/// never hand-written.
-pub const MANIFEST: &[PinnedFile] = &[];
+/// The pinned model files, compiled in from what scripts/models/pin_manifest.py writes
+/// (decision D12, option A); never hand-written.
+pub fn manifest() -> Vec<PinnedFile> {
+    #[derive(serde::Deserialize)]
+    struct Manifest {
+        files: Vec<PinnedFile>,
+    }
+    let json = include_str!("../../../scripts/models/manifest.json");
+    serde_json::from_str::<Manifest>(json)
+        .expect("scripts/models/manifest.json is the generator's output")
+        .files
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FetchError {
@@ -82,8 +91,10 @@ impl RangeFetcher {
         Self::with_allow(allowed, Duration::from_secs(30))
     }
 
-    #[cfg(test)]
-    pub(crate) fn for_local_tests() -> Self {
+    /// Reaches only 127.0.0.1, for tests against a local server (feature `local-tests`, a
+    /// dev-dependency only: never in the app).
+    #[cfg(any(test, feature = "local-tests"))]
+    pub fn for_local_tests() -> Self {
         Self::with_allow(
             |u| u.host_str() == Some("127.0.0.1"),
             Duration::from_millis(500),
