@@ -189,6 +189,8 @@ The system **MUST** speak exactly the request, result, error, channel-message an
 
 The system **MUST** load `contracts/fixtures/world.json` into a fresh database with `--fixture world`, inject a fixed clock on request, and replace the engine and the runtime with scripted ones behind the same seams the app uses; it is never shipped in the app bundle.
 
+The scripted runtime arrives with the LLM runtime in M2 (decision D8); in M0 the harness scripts the engine.
+
 **Implements**:
 - `cpt-noter-algo-core-harness-boot`
 - `cpt-noter-algo-core-harness-scripted-engine`
