@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-harness`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-harness`
 
-- [ ] `p1` - `cpt-noter-feature-core-harness`
+- [x] `p1` - `cpt-noter-feature-core-harness`
 
 ## 1. Feature Context
 
@@ -217,4 +217,4 @@ The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playw
 - [x] A subscribing command's Channel messages always follow its result line, in `seq` order.
 - [x] Closing stdin ends every open stream with `shutdown` and exits with code 0; stdout holds only protocol lines.
 - [x] The conformance suite passes with `NOTER_CORE=stdio` for every M0 command.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.

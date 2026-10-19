@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-contract`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-contract`
 
-- [ ] `p1` - `cpt-noter-feature-core-contract`
+- [x] `p1` - `cpt-noter-feature-core-contract`
 
 ## 1. Feature Context
 
@@ -224,4 +224,4 @@ The system **MUST** run the conformance suite with `NOTER_CORE=fake` and with `N
 - [x] The contract tests fail when a draft surface is marked frozen, an optional argument field lacks `#[serde(default)]`, or an error code is missing from `DEFAULT_RETRYABLE` handling.
 - [x] The conformance suite passes against the fake and, for every M0 command, against the real core through `noter-core-harness`.
 - [x] The run summary lists the commands the real core does not answer yet, by milestone.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.

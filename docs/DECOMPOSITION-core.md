@@ -107,7 +107,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.1 [Contract crate and conformance](features/core/core-contract.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-contract`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-contract`
 
 - **Milestone**: M0 · **Lane**: contract · **Status**: IN_PROGRESS: the crate, the generated files and the fake core exist; M0 adds what the real core needs from them. FEATURE spec: [features/core/core-contract.md](features/core/core-contract.md)
 
@@ -131,11 +131,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-contract-first`
+  - `cpt-noter-principle-core-contract-first`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-contract-tooling`
+  - `cpt-noter-constraint-core-contract-tooling`
 
 - **Domain Model Entities**:
   - CoreError and ErrorCode
@@ -143,7 +143,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-core-protocol`
+  - `cpt-noter-component-core-protocol`
 
 - **API**:
   - Interface `cpt-noter-interface-core-ipc`
@@ -269,7 +269,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.4 [noter-core-harness and real-core conformance](features/core/core-harness.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-harness`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-harness`
 
 - **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-harness.md](features/core/core-harness.md)
 
@@ -292,11 +292,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-fakes`
+  - `cpt-noter-principle-core-fakes`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-small-team`
+  - `cpt-noter-constraint-core-small-team`
 
 - **Domain Model Entities**:
   - Harness request, result, error, channel message and event lines
