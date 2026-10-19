@@ -57,6 +57,7 @@ struct Committed {
 
 impl Store {
     /// Write one row with its change row.
+    // @cpt-dod:cpt-noter-dod-core-storage-change-log:p1
     pub fn write(&self, mutation: Mutation, meta: ChangeMeta) -> Result<Written, CoreError> {
         let mut written = self.commit(vec![mutation], meta)?;
         Ok(written.remove(0))

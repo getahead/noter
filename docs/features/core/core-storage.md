@@ -242,7 +242,7 @@ The system **MUST** apply numbered migrations in order, each in its own transact
 
 ### Every write has its change row
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-storage-change-log`
 
 The system **MUST** commit every mutation and its `changes` row in one transaction, with actor, before, after (or a delta for a batch), summary, reason and undoable flag, and **MUST** refuse a stale `rev` with `conflict` and `detail.current_rev`. A test writes through every write entry point of M0 and finds one change row per write; each later feature that adds a write entry point extends the same test. Capture data the engine produces (confirmed segments, live speakers, gaps and marks written by capture, including user-pressed marks and pause gaps) is the exception: it is inserted in batches through `insert_batch` without change rows, and a delete (`capture_discard`, `calls_delete`) writes one change row per deleted call, not undoable, and that row carries no record content (PRD › Deletion) (Backend Teamlead M1 decision, 18 Oct 2026).
 
@@ -270,7 +270,7 @@ The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (
 
 - [x] A fresh start creates `noter.db` with mode 0600 and the schema at the newest version; a second start runs no migration.
 - [x] A failed migration leaves the database at the previous version and the core accepts no writes.
-- [ ] Every write made through M0 commands produces exactly one `changes` row in the same transaction (each later feature extends the test with its own commands); a forced failure after the row write leaves neither.
+- [x] Every write made through M0 commands produces exactly one `changes` row in the same transaction (each later feature extends the test with its own commands); a forced failure after the row write leaves neither.
 - [x] A write with a stale `rev` returns `conflict` with `detail.current_rev` and changes nothing.
 - [x] `just arch` passes: no crate other than `noter-db` depends on an SQLite crate.
 - [x] `just gate` passes, with unit line coverage of `noter-db` at 80 % or more.

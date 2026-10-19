@@ -1,7 +1,7 @@
 //! FEATURE cpt-noter-feature-core-first-run (part 3): self_test_run through the engine
 //! supervisor (S12) with a scripted engine (D3), streamed over the hub.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -10,6 +10,7 @@ use noter_core::{
     BoxFuture, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter,
     FetchError, ModelSource, NativeServices,
 };
+use noter_db::rusqlite::Connection;
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
 use noter_protocol::engine::{EngineCommand, EngineErrorCode};
@@ -55,7 +56,11 @@ impl NativeServices for Mac {
         Box::pin(async move { s })
     }
     fn environment(&self) -> EnvironmentReading {
-        EnvironmentReading::default()
+        // Room for the models, so models_download can start.
+        EnvironmentReading {
+            disk_free_mb: 10_000,
+            ..EnvironmentReading::default()
+        }
     }
     fn on_change(&self, on_change: Listener) {
         *self.changed.lock().unwrap() = Some(on_change);
@@ -605,4 +610,205 @@ async fn no_recheck_unless_first_run_shows_system_audio_denied() {
     p.run.core.app_activated();
     tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(probes(&p.run.engine), 0, "setup complete");
+}
+
+/// reason, entity_type, field, before, after, delta and batch_id of every change row, in order.
+type ChangeRow = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<Vec<u8>>,
+    Option<String>,
+);
+
+fn change_rows(dir: &Path) -> Vec<ChangeRow> {
+    let c = Connection::open(dir.join("noter.db")).unwrap();
+    let mut s = c
+        .prepare(
+            "SELECT reason, entity_type, field, before, after, delta, batch_id \
+             FROM changes ORDER BY rowid",
+        )
+        .unwrap();
+    let rows = s
+        .query_map([], |r| {
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+                r.get(6)?,
+            ))
+        })
+        .unwrap();
+    rows.map(Result::unwrap).collect()
+}
+
+/// D5, `cpt-noter-dod-core-storage-change-log`: every M0 write entry point leaves exactly one
+/// change row per record it writes, committed with the record; reads write none. A later
+/// feature that adds a write entry point extends this test.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn every_m0_write_leaves_one_change_row_per_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    let core = &p.run.core;
+    let fr = first_run();
+    let settings = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Settings,
+        },
+    };
+    let mut want: Vec<&str> = Vec::new();
+    let mut wrote = |reason: &'static str, rows: usize| {
+        want.extend(std::iter::repeat_n(reason, rows));
+        let got: Vec<String> = change_rows(dir.path()).into_iter().map(|r| r.0).collect();
+        assert_eq!(got, want, "after {reason}");
+    };
+
+    // Model state lives in the files, not in the database.
+    core.setup_status(&fr, NoArgs {}).await.unwrap();
+    core.models_download(
+        &fr,
+        ModelsDownloadArgs {
+            action: DownloadAction::Start,
+        },
+    )
+    .await
+    .unwrap();
+    wrote("models_download", 0);
+
+    // Permission and self-test results.
+    core.permission_request(
+        &fr,
+        PermissionArgs {
+            kind: PermissionKind::SystemAudio,
+        },
+    )
+    .await
+    .unwrap();
+    wrote("permission_request", 1);
+    denied_by_a_self_test(&p).await;
+    wrote("self_test_run", 1);
+    p.run.engine.set_system_audio(PermissionState::Granted);
+    core.app_activated();
+    until_probes(&p, 1).await;
+    wrote("system_audio_recheck", 1);
+
+    // Setup steps, and the choices kept in settings sections.
+    core.setup_set_step(
+        &fr,
+        StepArgs {
+            step: SetupStep::Permissions,
+            state: StepState::Done,
+        },
+    )
+    .await
+    .unwrap();
+    wrote("setup_set_step", 1);
+    core.setup_set_call_display(&fr, CallDisplayArgs { display_id: None })
+        .await
+        .unwrap();
+    wrote("setup_set_call_display", 1);
+    core.setup_set_audio_storage(
+        &fr,
+        AudioStorageArgs {
+            never_store_audio: true,
+            retention: AudioRetention::NeverStore,
+        },
+    )
+    .await
+    .unwrap();
+    wrote("setup_set_audio_storage", 1);
+
+    // Settings, hotkeys and the glossary.
+    let current = core.settings_get(&settings, NoArgs {}).await.unwrap();
+    let mut general = current.general.clone();
+    general.ignored_apps = vec![IgnoredApp {
+        bundle_id: "us.zoom.xos".into(),
+        app_name: "Zoom".into(),
+    }];
+    core.settings_update(
+        &settings,
+        SettingsUpdateArgs {
+            rev: current.rev,
+            section: SettingsSection::General(general),
+        },
+    )
+    .await
+    .unwrap();
+    wrote("settings_update", 1);
+    core.settings_unignore_app(
+        &settings,
+        AppIdArgs {
+            bundle_id: "us.zoom.xos".into(),
+        },
+    )
+    .await
+    .unwrap();
+    wrote("settings_unignore_app", 1);
+    core.hotkey_set(
+        &settings,
+        HotkeySetArgs {
+            action: HotkeyAction::AskAboutCall,
+            shortcut: Some("Ctrl+Alt+Super+I".into()),
+        },
+    )
+    .await
+    .unwrap();
+    wrote("hotkey_set", 1);
+    // Two records (the bindings and the card keys): a row each, under one batch id.
+    core.hotkeys_reset(&settings, NoArgs {}).await.unwrap();
+    wrote("hotkeys_reset", 2);
+    let id = core
+        .glossary_upsert(
+            &settings,
+            GlossaryUpsertArgs {
+                id: None,
+                rev: None,
+                term: "VSTOR".into(),
+                variants_latin: vec![],
+                variants_cyrillic: vec![],
+                spoken_forms: vec![],
+                lang: None,
+                always_apply: false,
+            },
+        )
+        .await
+        .unwrap()
+        .terms[0]
+        .id
+        .clone();
+    wrote("glossary_upsert", 1);
+    core.glossary_remove(&settings, GlossaryIdArgs { id })
+        .await
+        .unwrap();
+    wrote("glossary_remove", 1);
+
+    let rows = change_rows(dir.path());
+    let batched: Vec<&ChangeRow> = rows.iter().filter(|r| r.6.is_some()).collect();
+    assert_eq!(batched.len(), 2);
+    assert!(batched
+        .iter()
+        .all(|r| r.0 == "hotkeys_reset" && r.6 == batched[0].6));
+    // Every row says what the write left.
+    assert!(rows.iter().all(|r| r.4.is_some() || r.5.is_some()));
+    // Each settings key holds the `after` of its last change row.
+    let c = Connection::open(dir.path().join("noter.db")).unwrap();
+    let keys: BTreeSet<&str> = rows
+        .iter()
+        .filter(|r| r.1 == "setting")
+        .filter_map(|r| r.2.as_deref())
+        .collect();
+    for key in keys {
+        let last = rows.iter().rev().find(|r| r.2.as_deref() == Some(key));
+        let stored: String = c
+            .query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(last.unwrap().4.as_deref(), Some(stored.as_str()), "{key}");
+    }
 }

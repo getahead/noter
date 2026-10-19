@@ -368,9 +368,9 @@ The system **MUST** apply `launch_at_login` through SMAppService and install a v
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core, story `cpt-noter-seq-first-run-download-models`: the download starts, progress arrives on `setup:changed`, the user completes other steps meanwhile, and the bundles become ready (scripted download source in the harness).
-- [ ] E2E against the real core, story `cpt-noter-seq-first-run-complete-setup`: permissions requested, the self-test passes with the scripted engine, the call display and audio storage are chosen, `SetupStatus.complete` is true and detection is on.
-- [ ] A failed or skipped self-test leaves detection off and adds `SetupIncomplete`, and nothing else changes (capture start is never refused for it; checked again in M1).
-- [ ] A checksum mismatch deletes the partial file and reports `checksum_failed`.
-- [ ] Every M0 first-run command succeeds at least once in E2E runs against the real core.
+- [x] E2E against the real core, story `cpt-noter-seq-first-run-download-models`: the download starts, progress arrives on `setup:changed`, the user completes other steps meanwhile, and the bundles become ready (scripted download source in the harness).
+- [x] E2E against the real core, story `cpt-noter-seq-first-run-complete-setup`: permissions requested, the self-test passes with the scripted engine, the call display and audio storage are chosen, `SetupStatus.complete` is true and detection is on.
+- [x] A failed or skipped self-test leaves detection off and adds `SetupIncomplete`, and nothing else changes (capture start is never refused for it; checked again in M1).
+- [x] A checksum mismatch deletes the partial file and reports `checksum_failed`.
+- [x] Every M0 first-run command succeeds at least once in E2E runs against the real core.
 - [ ] `just gate` passes.

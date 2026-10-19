@@ -337,6 +337,6 @@ The system **MUST** never write transcript, document or model text to `logs/`; a
 - [x] The handler-parity test passes: registered handlers equal `COMMANDS`, and every command from every window is answered or refused with `window_not_allowed`.
 - [ ] A Channel message published before the subscribing `invoke` resolves is delivered after the snapshot, and none with `seq ≤ last_seq` is delivered (conformance, against the real core).
 - [x] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
-- [ ] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
+- [x] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
 - [x] No log file contains transcript text after the log-scrubbing test.
 - [ ] `just gate` passes.
