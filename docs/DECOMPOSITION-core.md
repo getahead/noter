@@ -60,7 +60,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - **Then by component and lane.** Inside a milestone a feature groups one component (or two that cannot be built apart, such as the IPC host and the stream hub) and stays in one lane of `docs/HARNESS.md` where it can. Features that touch both `apps/desktop/src-tauri` (core lane) and `noter-native` (engine lane) say so; they land as two pull requests.
 - **Not too small.** A feature is a few weeks of work for one builder with agents, not a task. Every feature, M0 to M5, has a FEATURE spec under `docs/features/core/`; the M2 to M5 specs are revisited before their milestone starts.
 
-**Status words.** NOT_STARTED: nothing of the feature exists. IN_PROGRESS: part of it exists on `main`. A feature's checkbox is checked only when all its FEATURE items are implemented and `just gate` passes (traceability FULL: a checked flow, algorithm, state or definition of done needs its `@cpt-*` markers in code).
+**Status words.** NOT_STARTED: nothing of the feature exists. IN_PROGRESS: part of it exists on `main`. IMPLEMENTED: every FEATURE item is on `main` and the box is checked. A feature's checkbox is checked only when all its FEATURE items are implemented and `just gate` passes (traceability FULL: a checked flow, algorithm, state or definition of done needs its `@cpt-*` markers in code).
 
 **Milestones at a glance.**
 
@@ -109,7 +109,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p1` - **ID**: `cpt-noter-feature-core-contract`
 
-- **Milestone**: M0 · **Lane**: contract · **Status**: IN_PROGRESS: the crate, the generated files and the fake core exist; M0 adds what the real core needs from them. FEATURE spec: [features/core/core-contract.md](features/core/core-contract.md)
+- **Milestone**: M0 · **Lane**: contract · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-contract.md](features/core/core-contract.md)
 
 - **Purpose**: Keep `noter-protocol` the single source of every boundary while the real core starts to answer it: `CoreApi` and `CommandCtx` fit the IPC host, the contract tests cover what the core relies on, and the conformance suite can run against the fake and the real core.
 
@@ -162,7 +162,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p1` - **ID**: `cpt-noter-feature-core-storage`
 
-- **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-storage.md](features/core/core-storage.md)
+- **Milestone**: M0 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-storage.md](features/core/core-storage.md)
 
 - **Purpose**: Give the core one SQLite file with one writer, numbered migrations and a write API that commits every mutation together with its change-log row, so every later feature writes through the same door.
 
@@ -215,7 +215,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p1` - **ID**: `cpt-noter-feature-core-ipc-host`
 
-- **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-ipc-host.md](features/core/core-ipc-host.md)
+- **Milestone**: M0 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-ipc-host.md](features/core/core-ipc-host.md)
 
 - **Purpose**: Open the one typed door between the windows and the core: scoped commands, typed errors, whole-state events with versions, and Channels that start after a snapshot, are acknowledged and survive a reload.
 
@@ -271,7 +271,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p1` - **ID**: `cpt-noter-feature-core-harness`
 
-- **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-harness.md](features/core/core-harness.md)
+- **Milestone**: M0 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-harness.md](features/core/core-harness.md)
 
 - **Purpose**: Run the real `CoreApi` without Tauri over JSON Lines, with a fixture database, a scripted engine and a scripted runtime, so the conformance suite and the UI E2E flows can count against the real core from M0.
 
@@ -373,7 +373,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p1` - **ID**: `cpt-noter-feature-core-engine-foundation`
 
-- **Milestone**: M0 · **Lane**: engine · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-engine-foundation.md](features/core/core-engine-foundation.md)
+- **Milestone**: M0 · **Lane**: engine · **Status**: IN_PROGRESS: everything but the week-one spike (Q4), the offline guarantee that depends on it, and the owner's Mac self-test and codesign check. FEATURE spec: [features/core/core-engine-foundation.md](features/core/core-engine-foundation.md)
 
 - **Purpose**: Stand up the sandboxed Swift engine and its Rust supervisor: spawn, handshake, liveness, the self-test, detection on and off, file mode and restart, with the signing and entitlement checks that keep the engine offline.
 
@@ -425,9 +425,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.7 [First run, permissions and environment](features/core/core-first-run.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-first-run`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-first-run`
 
-- **Milestone**: M0 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-first-run.md](features/core/core-first-run.md)
+- **Milestone**: M0 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-first-run.md](features/core/core-first-run.md)
 
 - **Purpose**: Make first run real: setup status, resumable model downloads with checksums, permission requests at the step that needs them, the self-test stream, the call display and audio storage choices, the environment state, launch at login and update install. None of it ever gates a start (owner decision O1).
 
@@ -451,11 +451,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-degrade`
+  - `cpt-noter-principle-core-degrade`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-macos`
+  - `cpt-noter-constraint-core-macos`
 
 - **Domain Model Entities**:
   - SetupStatus
@@ -464,7 +464,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-core-native`
+  - `cpt-noter-component-core-native`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `setup_status`, `models_download`, `permission_request`, `self_test_run`, `setup_set_call_display`, `setup_set_audio_storage`, `setup_set_step`, `update_install`

@@ -43,9 +43,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-first-run`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-first-run`
 
-- [ ] `p1` - `cpt-noter-feature-core-first-run`
+- [x] `p1` - `cpt-noter-feature-core-first-run`
 
 ## 1. Feature Context
 
@@ -375,4 +375,4 @@ The system **MUST** apply `launch_at_login` through SMAppService and install a v
 - [x] A failed or skipped self-test leaves detection off and adds `SetupIncomplete`, and nothing else changes (capture start is never refused for it; checked again in M1).
 - [x] A checksum mismatch deletes the partial file and reports `checksum_failed`.
 - [x] Every M0 first-run command succeeds at least once in E2E runs against the real core.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.
