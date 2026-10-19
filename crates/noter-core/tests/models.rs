@@ -486,8 +486,12 @@ async fn seed_models_sets_the_states_the_files_cannot_say() {
     let again = download(&s.core, DownloadAction::Retry).await.unwrap();
     assert_eq!(state(&again, "whisper-turbo"), BundleState::Downloading);
     assert_eq!(again.models.error, None);
-    until(&s.core, "ready", |st| {
-        state(st, "whisper-turbo") == BundleState::Ready
+    // The download task ignores a seed while it runs: wait until it has fetched every bundle.
+    until(&s.core, "every bundle ready", |st| {
+        st.models
+            .bundles
+            .iter()
+            .all(|b| b.state == BundleState::Ready)
     })
     .await;
 
@@ -500,9 +504,15 @@ async fn seed_models_sets_the_states_the_files_cannot_say() {
     speech.state = BundleState::Downloading;
     speech.done_mb = 1;
     wanted.error = None;
-    noter_core::testing::seed_models(&s.core, &wanted);
-    let st = s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
-    assert_eq!(state(&st, "whisper-turbo"), BundleState::Downloading);
+    // The task may still be ending after the last bundle: seed again until the status shows it.
+    let st = until(&s.core, "the seeded download", |st| {
+        let seeded = state(st, "whisper-turbo") == BundleState::Downloading;
+        if !seeded {
+            noter_core::testing::seed_models(&s.core, &wanted);
+        }
+        seeded
+    })
+    .await;
     assert_eq!(
         st.models
             .bundles
