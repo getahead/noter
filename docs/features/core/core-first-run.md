@@ -244,7 +244,7 @@ The user should finish setup in one sitting before the first real call, and call
 
 ### Launch at login
 
-- [ ] `p2` - **ID**: `cpt-noter-algo-core-first-run-login-item`
+- [x] `p2` - **ID**: `cpt-noter-algo-core-first-run-login-item`
 
 **Input**: `GeneralSettings.launch_at_login` after a settings change.
 
@@ -252,8 +252,10 @@ The user should finish setup in one sitting before the first real call, and call
 
 **Steps**:
 1. [x] - `p1` - **IF** on, register the main app with SMAppService; **ELSE** unregister it - `inst-login-apply`
-2. [ ] - `p1` - **IF** macOS needs approval in System Settings, keep the setting on and report it in `EnvironmentState` - `inst-login-approval`
-3. [ ] - `p1` - **RETURN** - `inst-login-return`
+2. [x] - `p1` - **IF** macOS needs approval in System Settings, keep the setting on and return `requires_approval` to the caller - `inst-login-approval`
+3. [x] - `p1` - **RETURN** - `inst-login-return`
+
+No M0 screen shows the approval state (DESIGN.md › Settings › General), so it is not in `EnvironmentState` yet; showing it needs an additive contract field (Teamlead decision, 19 Oct 2026).
 
 ## 4. States (CDSL)
 

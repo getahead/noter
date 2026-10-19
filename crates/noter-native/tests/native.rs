@@ -91,6 +91,43 @@ fn login_item_statuses_map() {
 }
 
 #[test]
+fn the_app_group_is_the_entitled_team_ai_noter_group() {
+    let entitled = |ids: &[&str]| ids.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert_eq!(
+        app_group_id(&entitled(&["ABCDE12345.ai.other", "ABCDE12345.ai.noter"])),
+        Some("ABCDE12345.ai.noter")
+    );
+    assert_eq!(app_group_id(&entitled(&[".ai.noter", "ai.noter"])), None);
+    assert_eq!(app_group_id(&[]), None);
+}
+
+#[test]
+fn an_unsigned_process_has_no_app_group_container() {
+    // A test binary carries no application-groups entitlement: dev runs use the data dir.
+    assert_eq!(app_group_container(), None);
+}
+
+#[test]
+fn a_login_item_awaiting_approval_keeps_the_setting_on() {
+    assert_eq!(
+        login_outcome(Err("needs approval".into()), LoginItem::RequiresApproval),
+        Ok(LoginItem::RequiresApproval)
+    );
+    assert_eq!(
+        login_outcome(Ok(()), LoginItem::RequiresApproval),
+        Ok(LoginItem::RequiresApproval)
+    );
+    assert_eq!(
+        login_outcome(Ok(()), LoginItem::Enabled),
+        Ok(LoginItem::Enabled)
+    );
+    assert_eq!(
+        login_outcome(Err("denied".into()), LoginItem::Disabled),
+        Err("denied".to_string())
+    );
+}
+
+#[test]
 fn free_disk_is_read_from_the_storage_volume() {
     assert!(disk_free_mb(Path::new("/")) > 0);
     assert_eq!(disk_free_mb(Path::new("/nonexistent/noter")), 0);
