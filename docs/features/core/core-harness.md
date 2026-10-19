@@ -135,18 +135,18 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 > Delivered by `ScriptedEngine` in `crates/noter-engine-client` (engine lane, #67); the harness injects it in `inst-inject` above. The steps below are ticked in the engine lane's change, not in this core-lane PR.
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-harness-scripted-engine`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-harness-scripted-engine`
 
 **Input**: An engine script: timed `EngineEventLine`s, or a recording of the engine's file mode over golden-set audio.
 
 **Output**: The same events the supervisor would read from a live engine, answered commands acknowledged.
 
 **Steps**:
-1. [ ] - `p1` - Answer `ready` with the current `ENGINE_PROTOCOL_VERSION` - `inst-ready`
-2. [ ] - `p1` - **FOR EACH** command the supervisor sends - `inst-for-commands`
-   1. [ ] - `p1` - Write `ack` (or the scripted `error`) with the command id - `inst-ack-command`
-   2. [ ] - `p1` - Start the script section bound to that command (for example `start_session` → `session_started`, segments, levels) on the injected clock - `inst-start-section`
-3. [ ] - `p1` - **RETURN** when the script ends or `shutdown` arrives - `inst-return-engine`
+1. [x] - `p1` - Answer `ready` with the current `ENGINE_PROTOCOL_VERSION` - `inst-ready`
+2. [x] - `p1` - **FOR EACH** command the supervisor sends - `inst-for-commands`
+   1. [x] - `p1` - Write `ack` (or the scripted `error`) with the command id - `inst-ack-command`
+   2. [x] - `p1` - Start the script section bound to that command (for example `start_session` → `session_started`, segments, levels) on the injected clock - `inst-start-section`
+3. [x] - `p1` - **RETURN** when the script ends or `shutdown` arrives - `inst-return-engine`
 
 ## 4. States (CDSL)
 
@@ -185,7 +185,7 @@ The system **MUST** speak exactly the request, result, error, channel-message an
 
 ### Fixture world and seams
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-harness-fixture`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-harness-fixture`
 
 The system **MUST** load `contracts/fixtures/world.json` into a fresh database with `--fixture world`, inject a fixed clock on request, and replace the engine and the runtime with scripted ones behind the same seams the app uses; it is never shipped in the app bundle.
 

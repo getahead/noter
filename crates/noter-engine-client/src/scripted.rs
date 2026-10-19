@@ -143,6 +143,7 @@ impl ScriptedEngine {
     }
 }
 
+// @cpt-dod:cpt-noter-dod-core-harness-fixture:p1
 impl EngineLauncher for ScriptedEngine {
     fn launch(&self) -> LaunchFuture<'_> {
         Box::pin(self.start())
@@ -199,6 +200,7 @@ impl<W: AsyncWrite + Unpin> Out<W> {
     }
 }
 
+// @cpt-algo:cpt-noter-algo-core-harness-scripted-engine:p1
 async fn run(
     engine: ScriptedEngine,
     b: Behaviour,
@@ -208,6 +210,7 @@ async fn run(
 ) {
     let (r, w) = tokio::io::split(io);
     let mut out = Out { w, seq: 0 };
+    // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ready
     if let Some(version) = &b.protocol_version {
         out.emit(EngineEvent::Ready {
             protocol_version: version.clone(),
@@ -217,6 +220,7 @@ async fn run(
         })
         .await;
     }
+    // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ready
     for raw in &b.raw_after_ready {
         if let Ok(line) = serde_json::from_str::<EngineEventLine>(raw) {
             out.seq = line.seq;
@@ -226,6 +230,7 @@ async fn run(
     let mut lines = BufReader::new(r).lines();
     // Paced self-test events, each due at its instant, in order.
     let mut due: VecDeque<(Instant, EngineEvent)> = VecDeque::new();
+    // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-for-commands
     loop {
         let next_due = due.front().map(|(at, _)| *at);
         let next = tokio::select! {
@@ -243,7 +248,9 @@ async fn run(
             }
             next = lines.next_line() => next,
         };
+        // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-return-engine
         let Ok(Some(line)) = next else { return };
+        // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-return-engine
         let Ok(EngineCommandLine { id, cmd }) = serde_json::from_str(&line) else {
             continue;
         };
@@ -251,6 +258,7 @@ async fn run(
         if b.hang {
             continue;
         }
+        // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ack-command
         let ack = EngineEvent::Ack { cmd_id: id };
         match cmd {
             EngineCommand::Ping => {
@@ -258,10 +266,12 @@ async fn run(
                     out.emit(EngineEvent::Pong).await;
                 }
             }
+            // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-return-engine
             EngineCommand::Shutdown => {
                 out.emit(ack).await;
                 return;
             }
+            // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-return-engine
             _ if b.reject => {
                 out.emit(EngineEvent::Error {
                     cmd_id: Some(id),
@@ -272,6 +282,7 @@ async fn run(
             }
             EngineCommand::SelfTest { .. } => {
                 out.emit(ack).await;
+                // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
                 let failure = b.self_test_failure.or(match engine.lock().system_audio {
                     PermissionState::Granted => None,
                     PermissionState::Denied => Some(EngineErrorCode::ZeroBuffers),
@@ -326,8 +337,11 @@ async fn run(
                     timed.sort_by_key(|(t, _)| *t); // stable: a stream comes before a level at its instant
                     due.extend(timed.into_iter().map(|(t, e)| (now + t, e)));
                 }
+                // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
             }
             _ => out.emit(ack).await,
         }
+        // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ack-command
     }
+    // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-for-commands
 }

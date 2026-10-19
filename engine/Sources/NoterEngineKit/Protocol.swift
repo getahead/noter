@@ -3,8 +3,9 @@
 // The source of truth is `crates/noter-protocol/src/engine.rs` and its export
 // `contracts/engine.schema.json`. These are the M0 messages the engine answers;
 // commands it does not implement yet decode as `.other` and are refused with `bad_command`.
-// shortcut: hand-written for the M0 subset; generate them from contracts/engine.schema.json
-// when capture (M1) needs the full set.
+// The types are hand-written (D13); RoundTripTests decodes and re-encodes every line of
+// `contracts/fixtures/engine-lines.json` with them, so a drift from the Rust types fails there.
+// shortcut: the M0 subset only; capture (M1) adds its commands and events the same way.
 
 import Foundation
 
@@ -27,6 +28,7 @@ public enum EngineErrorCode: String, Codable, Sendable {
     case `internal` = "internal"
 }
 
+// @cpt-dod:cpt-noter-dod-core-engine-foundation-package:p1
 public enum EngineCommand: Equatable, Sendable {
     case ping
     case shutdown
