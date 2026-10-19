@@ -1,6 +1,7 @@
 //! Contract tests: rules about the contract itself (DESIGN-core 4.1, Contract governance).
 
 // @cpt-algo:cpt-noter-algo-core-contract-tests:p1
+// @cpt-dod:cpt-noter-dod-core-contract-tests:p1
 
 use std::collections::HashSet;
 

@@ -47,8 +47,14 @@ fn windows(e: &Value) -> BTreeSet<String> {
 fn surface_bump(old: Option<&Value>, new: Option<&Value>) -> Bump {
     match (old, new) {
         (None, None) => Bump::None,
+        // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-if-additive
+        // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-return-additive-minor
+        // @cpt-begin:cpt-noter-state-core-contract-stability:p2:inst-st-additive
         // A new command or event is additive.
         (None, Some(_)) => Bump::Minor,
+        // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-additive
+        // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-return-additive-minor
+        // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-if-additive
         (Some(o), _) if new == Some(o) => Bump::None,
         // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-if-draft
         // @cpt-begin:cpt-noter-state-core-contract-stability:p2:inst-st-draft-change
@@ -62,15 +68,21 @@ fn surface_bump(old: Option<&Value>, new: Option<&Value>) -> Bump {
         // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-freeze
         // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-draft-change
         // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-if-draft
+        // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-if-additive
+        // @cpt-begin:cpt-noter-state-core-contract-stability:p2:inst-st-additive
         // A frozen surface may only open to more windows.
         (Some(o), Some(n)) => {
             let mut widened = o.clone();
             widened["windows"] = n["windows"].clone();
             if widened == *n && windows(n).is_superset(&windows(o)) {
+                // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-return-additive-minor
                 return Bump::Minor;
+                // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-return-additive-minor
             }
             Bump::Major
         }
+        // @cpt-end:cpt-noter-state-core-contract-stability:p2:inst-st-additive
+        // @cpt-end:cpt-noter-algo-core-contract-version-rule:p2:inst-if-additive
         // @cpt-begin:cpt-noter-algo-core-contract-version-rule:p2:inst-return-major
         // A frozen surface removed.
         (Some(_), None) => Bump::Major,

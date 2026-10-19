@@ -74,7 +74,7 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 
 ### Change a contract surface
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-contract-change-surface`
+The contract-lane agents' process, not product code, so it carries no ID and no marker. Its rules are enforced by `cpt-noter-algo-core-contract-tests`, `cpt-noter-algo-core-contract-version-rule`, the lane guard, the harness self-tests and PR review (Teamlead decision, 19 Oct 2026).
 
 **Actor**: Contract-lane agent
 
@@ -88,14 +88,14 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 - A new command is not placed in `harness/milestones.toml`: the harness self-tests fail.
 
 **Steps**:
-1. [ ] - `p1` - Agent changes the Rust types and the registry entry in `noter-protocol` - `inst-edit-types`
-2. [ ] - `p1` - Agent runs `just contract-regen`; `bindings.ts`, `contracts/*.json` and the fixtures are regenerated - `inst-regen`
-3. [ ] - `p1` - Agent applies `cpt-noter-algo-core-contract-version-rule` and bumps `CONTRACT_VERSION` (or `ENGINE_PROTOCOL_VERSION`) - `inst-bump`
-4. [ ] - `p1` - **IF** a frozen surface changed - `inst-if-frozen`
-   1. [ ] - `p1` - Agent updates the fake handlers and the conformance assertions in the same pull request - `inst-update-fake`
-5. [ ] - `p1` - Agent places every new command in `harness/milestones.toml` - `inst-place-milestone`
-6. [ ] - `p1` - CI runs `just gate`; the export check, `cpt-noter-algo-core-contract-tests` and the conformance suite in both modes must pass - `inst-ci`
-7. [ ] - `p1` - **RETURN** a pull request with one core and one UI approval - `inst-return-pr`
+1. Agent changes the Rust types and the registry entry in `noter-protocol`
+2. Agent runs `just contract-regen`; `bindings.ts`, `contracts/*.json` and the fixtures are regenerated
+3. Agent applies `cpt-noter-algo-core-contract-version-rule` and bumps `CONTRACT_VERSION` (or `ENGINE_PROTOCOL_VERSION`)
+4. **IF** a frozen surface changed
+   1. Agent updates the fake handlers and the conformance assertions in the same pull request
+5. Agent places every new command in `harness/milestones.toml`
+6. CI runs `just gate`; the export check, `cpt-noter-algo-core-contract-tests` and the conformance suite in both modes must pass
+7. **RETURN** a pull request with one core and one UI approval
 
 ### Run conformance against a core
 
@@ -143,7 +143,7 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 
 ### Version rule
 
-- [ ] `p2` - **ID**: `cpt-noter-algo-core-contract-version-rule`
+- [x] `p2` - **ID**: `cpt-noter-algo-core-contract-version-rule`
 
 **Input**: The diff of a contract change and the stability of each changed surface.
 
@@ -152,15 +152,17 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 **Steps**:
 1. [x] - `p1` - **IF** only draft surfaces changed - `inst-if-draft`
    1. [x] - `p1` - **RETURN** minor - `inst-return-draft-minor`
-2. [ ] - `p1` - **IF** every frozen change is additive (new optional field, new command, new enum variant the UI can ignore) - `inst-if-additive`. Enforced so far at the manifest level only (commands, events, windows, error codes); a field change inside an argument or result type is not enforced yet and rests on `noter-contract-export --check` and the two reviews. Follow-up: diff the exported declarations per frozen surface
-   1. [ ] - `p1` - **RETURN** minor - `inst-return-additive-minor`
+2. [x] - `p1` - **IF** every frozen change is additive at the manifest level (a new command, event or error code, a frozen command opened to more windows) - `inst-if-additive`
+   1. [x] - `p1` - **RETURN** minor - `inst-return-additive-minor`
 3. [x] - `p1` - **RETURN** major, with sign-off from both sides - `inst-return-major`
+
+M0 judges what `contracts/ipc.manifest.json` records: a removed or renamed command, event or error code is major. A field change inside an argument or result type (a new optional field, a new enum variant the UI can ignore) rests on `noter-contract-export --check` and the two reviews until M1 diffs the exported declarations per frozen surface.
 
 ## 4. States (CDSL)
 
 ### Contract surface stability
 
-- [ ] `p2` - **ID**: `cpt-noter-state-core-contract-stability`
+- [x] `p2` - **ID**: `cpt-noter-state-core-contract-stability`
 
 **States**: draft, frozen
 
@@ -168,7 +170,7 @@ From M0 the UI stops trusting only the fake. A difference between the fake and t
 
 **Transitions**:
 1. [x] - `p1` - **FROM** draft **TO** frozen **WHEN** the surface's milestone gate passes (Copilot and Agents at M4, Performance at M5) - `inst-st-freeze`
-2. [ ] - `p1` - **FROM** frozen **TO** frozen **WHEN** an additive change lands with a minor version - `inst-st-additive`
+2. [x] - `p1` - **FROM** frozen **TO** frozen **WHEN** an additive change (at the manifest level in M0, as in `cpt-noter-algo-core-contract-version-rule`) lands with a minor version - `inst-st-additive`
 3. [x] - `p1` - **FROM** draft **TO** draft **WHEN** any change lands with a minor version - `inst-st-draft-change`
 
 ## 5. Definitions of Done
@@ -190,14 +192,13 @@ The system **MUST** declare `CoreApi`, `CommandCtx` (with `Caller::Window { labe
 
 ### Contract tests complete
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-contract-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-contract-tests`
 
 The system **MUST** fail `cargo test -p noter-protocol` on every rule of the contract tests above, and `noter-contract-export --check` on any generated file that differs from the types.
 
 **Implements**:
 - `cpt-noter-algo-core-contract-tests`
 - `cpt-noter-algo-core-contract-version-rule`
-- `cpt-noter-flow-core-contract-change-surface`
 - `cpt-noter-state-core-contract-stability`
 
 **Constraints**: `cpt-noter-constraint-core-contract-tooling`

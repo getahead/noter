@@ -170,6 +170,7 @@ struct Inner<L> {
 }
 
 /// The engine supervisor. Cheap to clone; every clone talks to the same engine.
+// @cpt-dod:cpt-noter-dod-core-engine-foundation-supervisor:p1
 pub struct EngineClient<L> {
     inner: Arc<Inner<L>>,
 }
