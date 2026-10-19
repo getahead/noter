@@ -546,6 +546,7 @@ impl CoreApi for Core {
         self.remove_term(ctx, args)
     }
 
+    // @cpt-dod:cpt-noter-dod-core-ipc-host-snapshot:p1
     async fn app_snapshot(
         &self,
         ctx: &CommandCtx,

@@ -58,6 +58,7 @@ fn snapshots(rounds: usize) -> usize {
     })
 }
 
+// @cpt-dod:cpt-noter-dod-core-ipc-host-snapshot:p1
 fn main() {
     println!("{}", snapshots(ROUNDS));
 }

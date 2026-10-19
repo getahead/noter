@@ -42,9 +42,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-ipc-host`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-ipc-host`
 
-- [ ] `p1` - `cpt-noter-feature-core-ipc-host`
+- [x] `p1` - `cpt-noter-feature-core-ipc-host`
 
 ## 1. Feature Context
 
@@ -308,7 +308,7 @@ The system **MUST** start every Channel at `last_seq + 1` after a snapshot taken
 
 ### App snapshot, banners and versions
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-snapshot`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-ipc-host-snapshot`
 
 The system **MUST** answer `app_snapshot` with every slice the current milestone provides (each with its `version`, defaults for slices whose feature comes later), keep `banner_dismiss` and `banners:changed` whole-state, and stamp every whole-state payload with a monotonic `version` per kind; the `core_app_snapshot` perf scenario is built and measured.
 
@@ -339,4 +339,4 @@ The system **MUST** never write transcript, document or model text to `logs/`; a
 - [x] A subscriber that stops acknowledging is ended with `lagged` at 2 000 messages; a reloaded webview's subscriptions end.
 - [x] `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss` and `log_ui` succeed in E2E runs against the real core.
 - [x] No log file contains transcript text after the log-scrubbing test.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.
