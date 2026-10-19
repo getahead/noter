@@ -38,9 +38,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-settings`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-settings`
 
-- [ ] `p1` - `cpt-noter-feature-core-settings`
+- [x] `p1` - `cpt-noter-feature-core-settings`
 
 ## 1. Feature Context
 
@@ -284,8 +284,8 @@ The system **MUST** keep glossary terms with `rev`, variants and spoken forms, r
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core, story `cpt-noter-seq-settings-set-hotkeys`: setting a chord without a modifier shows "Shortcut without a modifier", a VoiceOver chord shows "Shortcut used by VoiceOver", a valid chord is listed as registered.
+- [x] E2E against the real core, story `cpt-noter-seq-settings-set-hotkeys`: setting a chord without a modifier shows "Shortcut without a modifier", a VoiceOver chord shows "Shortcut used by VoiceOver", a valid chord is listed as registered.
 - [x] Two windows editing settings: the second write with the old `rev` gets `conflict` and nothing is lost.
-- [ ] Every M0 settings command succeeds at least once in E2E runs against the real core.
+- [x] Every M0 settings command succeeds at least once in E2E runs against the real core.
 - [x] A fresh install answers `settings_get` with every section at its default.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.

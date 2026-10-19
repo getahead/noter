@@ -318,9 +318,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.5 [Settings, hotkeys and glossary](features/core/core-settings.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-settings`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-settings`
 
-- **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-settings.md](features/core/core-settings.md)
+- **Milestone**: M0 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-settings.md](features/core/core-settings.md)
 
 - **Purpose**: Own the typed settings every component reads: sections with defaults and a revision, global hotkeys with conflict detection, ignored apps and the glossary, written from two windows without losing an edit.
 
@@ -342,7 +342,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-intent-commands`
+  - `cpt-noter-principle-core-intent-commands`
 
 - **Design Constraints Covered**:
 
@@ -355,7 +355,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-core-settings`
+  - `cpt-noter-component-core-settings`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `settings_get`, `settings_update`, `settings_unignore_app`, `hotkeys_list`, `hotkey_set`, `hotkeys_reset`, `glossary_list`, `glossary_upsert`, `glossary_remove`
