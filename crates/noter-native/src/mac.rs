@@ -33,8 +33,8 @@ use objc2_user_notifications::{
 use system_configuration::network_reachability::{ReachabilityFlags, SCNetworkReachability};
 
 use crate::{
-    classify_route, disk_free_mb, map_av_status, map_calendar_status, map_login_status,
-    map_notification_status, notification_permission, LoginItem, Reading,
+    classify_route, disk_free_mb, login_outcome, map_av_status, map_calendar_status,
+    map_login_status, map_notification_status, notification_permission, LoginItem, Reading,
 };
 
 /// How long a prompt may stay open before the answer counts as not given.
@@ -326,12 +326,10 @@ pub fn set_login_item(on: bool) -> Result<LoginItem, String> {
     } else {
         unsafe { service.unregisterAndReturnError() }
     };
-    // Registered but awaiting approval in System Settings is not a failure: the setting stays on.
-    match (result, login_item()) {
-        (_, LoginItem::RequiresApproval) => Ok(LoginItem::RequiresApproval),
-        (Ok(()), state) => Ok(state),
-        (Err(e), _) => Err(e.localizedDescription().to_string()),
-    }
+    login_outcome(
+        result.map_err(|e| e.localizedDescription().to_string()),
+        login_item(),
+    )
 }
 
 // ── App Group container ────────────────────────────────────────────────────

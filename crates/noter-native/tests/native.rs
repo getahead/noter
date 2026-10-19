@@ -108,6 +108,26 @@ fn an_unsigned_process_has_no_app_group_container() {
 }
 
 #[test]
+fn a_login_item_awaiting_approval_keeps_the_setting_on() {
+    assert_eq!(
+        login_outcome(Err("needs approval".into()), LoginItem::RequiresApproval),
+        Ok(LoginItem::RequiresApproval)
+    );
+    assert_eq!(
+        login_outcome(Ok(()), LoginItem::RequiresApproval),
+        Ok(LoginItem::RequiresApproval)
+    );
+    assert_eq!(
+        login_outcome(Ok(()), LoginItem::Enabled),
+        Ok(LoginItem::Enabled)
+    );
+    assert_eq!(
+        login_outcome(Err("denied".into()), LoginItem::Disabled),
+        Err("denied".to_string())
+    );
+}
+
+#[test]
 fn free_disk_is_read_from_the_storage_volume() {
     assert!(disk_free_mb(Path::new("/")) > 0);
     assert_eq!(disk_free_mb(Path::new("/nonexistent/noter")), 0);

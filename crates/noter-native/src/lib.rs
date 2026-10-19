@@ -254,6 +254,22 @@ pub fn set_login_item(on: bool) -> Result<LoginItem, String> {
 }
 // @cpt-end:cpt-noter-algo-core-first-run-login-item:p2:inst-login-apply
 
+/// What [`set_login_item`] answers once SMAppService ran (`registered`) and reports `state`.
+pub fn login_outcome(
+    registered: Result<(), String>,
+    state: LoginItem,
+) -> Result<LoginItem, String> {
+    // @cpt-begin:cpt-noter-algo-core-first-run-login-item:p2:inst-login-approval
+    // Awaiting approval in System Settings is not a failure: the setting stays on.
+    if state == LoginItem::RequiresApproval {
+        return Ok(state);
+    }
+    // @cpt-end:cpt-noter-algo-core-first-run-login-item:p2:inst-login-approval
+    // @cpt-begin:cpt-noter-algo-core-first-run-login-item:p2:inst-login-return
+    registered.map(|()| state)
+    // @cpt-end:cpt-noter-algo-core-first-run-login-item:p2:inst-login-return
+}
+
 pub fn login_item() -> LoginItem {
     #[cfg(target_os = "macos")]
     return mac::login_item();
