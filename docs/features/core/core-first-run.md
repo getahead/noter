@@ -326,7 +326,7 @@ The system **MUST** download the pinned bundles with range resume, verify each c
 
 ### Permissions only where asked
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-first-run-permissions`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-permissions`
 
 The system **MUST** ask for a permission only from `permission_request`, report each as `not_asked`, `granted`, `denied` or `needs_relaunch` (System Audio Recording inferred from the self-test), and never read a permission in `capture_start`.
 
