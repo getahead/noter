@@ -38,9 +38,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-storage`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-storage`
 
-- [ ] `p1` - `cpt-noter-feature-core-storage`
+- [x] `p1` - `cpt-noter-feature-core-storage`
 
 ## 1. Feature Context
 
@@ -256,7 +256,7 @@ The system **MUST** commit every mutation and its `changes` row in one transacti
 
 ### Cold start measured
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-storage-cold-start`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-storage-cold-start`
 
 The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (open the database, run migrations, answer `app_snapshot`) built and measured in CI, with `cpt-noter-feature-core-ipc-host` providing the snapshot half.
 

@@ -107,7 +107,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.1 [Contract crate and conformance](features/core/core-contract.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-contract`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-contract`
 
 - **Milestone**: M0 · **Lane**: contract · **Status**: IN_PROGRESS: the crate, the generated files and the fake core exist; M0 adds what the real core needs from them. FEATURE spec: [features/core/core-contract.md](features/core/core-contract.md)
 
@@ -131,11 +131,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-contract-first`
+  - `cpt-noter-principle-core-contract-first`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-contract-tooling`
+  - `cpt-noter-constraint-core-contract-tooling`
 
 - **Domain Model Entities**:
   - CoreError and ErrorCode
@@ -143,7 +143,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-core-protocol`
+  - `cpt-noter-component-core-protocol`
 
 - **API**:
   - Interface `cpt-noter-interface-core-ipc`
@@ -160,7 +160,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.2 [Storage and the change-log write path](features/core/core-storage.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-storage`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-storage`
 
 - **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-storage.md](features/core/core-storage.md)
 
@@ -185,19 +185,19 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-single-writer`
+  - `cpt-noter-principle-core-single-writer`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-local-data`
+  - `cpt-noter-constraint-core-local-data`
 
 - **Domain Model Entities**:
   - Change
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-core-storage`
-  - [ ] `p1` - `cpt-noter-component-core-changelog`
+  - `cpt-noter-component-core-storage`
+  - `cpt-noter-component-core-changelog`
 
 - **API**:
   - None
@@ -208,12 +208,12 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Data**:
 
-  - [ ] `p1` - `cpt-noter-db-core-library`
+  - `cpt-noter-db-core-library`
   - `cpt-noter-dbtable-changes`
 
 ### 2.3 [IPC host, app snapshot and stream hub](features/core/core-ipc-host.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-ipc-host`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-ipc-host`
 
 - **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-ipc-host.md](features/core/core-ipc-host.md)
 
@@ -237,12 +237,12 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-snapshot-stream`
-  - [ ] `p1` - `cpt-noter-principle-core-intent-commands`
+  - `cpt-noter-principle-core-snapshot-stream`
+  - `cpt-noter-principle-core-intent-commands`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-stack`
+  - `cpt-noter-constraint-core-stack`
 
 - **Domain Model Entities**:
   - AppSnapshot
@@ -251,8 +251,8 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-core-ipc-host`
-  - [ ] `p1` - `cpt-noter-component-core-stream-hub`
+  - `cpt-noter-component-core-ipc-host`
+  - `cpt-noter-component-core-stream-hub`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `app_snapshot`, `stream_unsubscribe`, `stream_ack`, `banner_dismiss`, `log_ui`
@@ -269,7 +269,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.4 [noter-core-harness and real-core conformance](features/core/core-harness.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-harness`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-harness`
 
 - **Milestone**: M0 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-harness.md](features/core/core-harness.md)
 
@@ -292,11 +292,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-fakes`
+  - `cpt-noter-principle-core-fakes`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-small-team`
+  - `cpt-noter-constraint-core-small-team`
 
 - **Domain Model Entities**:
   - Harness request, result, error, channel message and event lines

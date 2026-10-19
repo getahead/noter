@@ -57,6 +57,7 @@ fn cold_start(rounds: usize) -> usize {
     bytes
 }
 
+// @cpt-dod:cpt-noter-dod-core-storage-cold-start:p2
 fn main() {
     println!("{}", cold_start(ROUNDS));
 }
