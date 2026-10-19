@@ -101,7 +101,7 @@ First run needs a self-test that proves both streams arrive, and everything afte
 
 ### Run the engine self-test
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-foundation-self-test`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-foundation-self-test`
 
 **Actor**: Engine supervisor (on behalf of `self_test_run`)
 
@@ -111,7 +111,7 @@ First run needs a self-test that proves both streams arrive, and everything afte
 **Error Scenarios**:
 - One stream stays silent: `failed` with `OneStreamSilent { channel }`.
 - Only exact digital zeros arrive: `failed` with `ZeroBuffers` (the System Audio Recording permission is off, inferred).
-- The engine's own clip leaks into the tap: `failed` with `OwnSoundsLeak`.
+- The engine's own clip leaks into the tap: `failed` with `OwnSoundsLeak` (the check arrives with capture in M1, D-12).
 - Nothing within 10 s: `failed` with `TimedOut`.
 - The live model is not downloaded: `failed` with `ModelMissing`.
 
@@ -120,11 +120,10 @@ First run needs a self-test that proves both streams arrive, and everything afte
 2. [x] - `p1` - Engine opens the tap (excluding its own and the app's PIDs) and the microphone - `inst-open-taps`
 3. [x] - `p1` - **FOR EACH** channel whose first non-zero buffer arrives, engine emits `self_test_stream` - `inst-stream-arrived`
 4. [x] - `p1` - Engine emits levels - `inst-levels-lines`
-5. [ ] - `p1` - **IF** `play_clip`, engine plays its clip and checks the tap does not hear it - `inst-play-clip`
-6. [x] - `p1` - Engine emits `self_test_result { passed, failure, own_sounds_leak }` and closes the taps - `inst-result`
-7. [x] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test`
+5. [x] - `p1` - Engine emits `self_test_result { passed, failure, own_sounds_leak }` and closes the taps - `inst-result`
+6. [x] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test`
 
-The tap and the microphone on one clock, and `self_test_line` per channel when the model is present, are delivered with capture in M1: `cpt-noter-flow-core-engine-capture-self-test` (decision D-12).
+The tap and the microphone on one clock, `self_test_line` per channel when the model is present, and the `play_clip` check that the tap does not hear the engine's own clip (`OwnSoundsLeak`) are delivered with capture in M1: `cpt-noter-flow-core-engine-capture-self-test` (decision D-12).
 
 ### Replay a recording in file mode
 
@@ -183,7 +182,7 @@ The tap and the microphone on one clock, and `self_test_line` per channel when t
 
 ### Restart a dead engine
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-foundation-restart`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-foundation-restart`
 
 **Input**: The engine exited or stopped answering `ping`.
 
@@ -191,9 +190,10 @@ The tap and the microphone on one clock, and `self_test_line` per channel when t
 
 **Steps**:
 1. [x] - `p1` - Fail every waiting command with `engine_unavailable` - `inst-fail-waiting`
-2. [ ] - `p1` - **IF** a capture session was running, hand over to the capture-first restart (`cpt-noter-feature-core-engine-capture`, M1) - `inst-if-capture`
-3. [x] - `p1` - **ELSE** restart with back-off; after three failed starts in a minute, stop trying until the next request - `inst-backoff`
-4. [x] - `p1` - **RETURN** the new handle, or `engine_unavailable` - `inst-return-restart`
+2. [x] - `p1` - Restart with back-off; after three failed starts in a minute, stop trying until the next request - `inst-backoff`
+3. [x] - `p1` - **RETURN** the new handle, or `engine_unavailable` - `inst-return-restart`
+
+A dead engine during a capture session takes the capture-first restart instead, delivered with capture in M1: `cpt-noter-flow-core-engine-capture-recover` (decision D-12).
 
 ## 4. States (CDSL)
 
@@ -233,7 +233,7 @@ The system **MUST** build `noter-engine` from the Swift package `engine/` with p
 
 ### Supervisor crate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-supervisor`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-supervisor`
 
 The system **MUST** provide `noter-engine-client` without a Tauri dependency: spawn with `tokio::process`, protocol-major check on `ready`, `seq` gap detection, `ack` and `error` correlation, liveness by `ping`, and restart with back-off; unit tests run against a scripted engine.
 
@@ -276,9 +276,9 @@ The system **MUST** have the week-one spike run and its results recorded: sandbo
 
 ## 6. Acceptance Criteria
 
-- [ ] The supervisor starts the engine, gets `ready`, and refuses an engine reporting another protocol major with `engine_unavailable`.
-- [ ] Killing the engine while idle leads to a restart; three failed starts within a minute stop the retries.
+- [x] The supervisor starts the engine, gets `ready`, and refuses an engine reporting another protocol major with `engine_unavailable`.
+- [x] Killing the engine while idle leads to a restart; three failed starts within a minute stop the retries.
 - [ ] The self-test passes on a Mac with both channels producing sound and fails with the right reason when one channel is silent or only zeros arrive.
-- [ ] File mode replays a WAV pair and speaks the same protocol.
+- [x] File mode replays a WAV pair and speaks the same protocol.
 - [ ] `just arch` finds no network entitlement for the engine; the codesign check of the built engine shows its own entitlements.
 - [ ] `just gate` passes (engine tests on the macOS runner).

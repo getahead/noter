@@ -137,7 +137,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The engine cannot be restarted: `CaptureFailed { call_id, since }` for the session manager (phase `failed`, NT-3); nothing more is recorded, the call is not ended.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sees the process exit or miss `ping` while a session runs - `inst-see-crash`
+1. [ ] - `p1` - Supervisor sees the process exit or miss `ping` while a session runs, instead of the idle restart of `cpt-noter-algo-core-engine-foundation-restart` (moved from its `inst-if-capture`, decision D-12) - `inst-see-crash`
 2. [ ] - `p1` - Supervisor respawns the engine and sends `start_session` with the same `call_id` and `resume_from_ms` = the ring's last written offset - `inst-respawn`
 3. [ ] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
 4. [ ] - `p1` - Supervisor reports a gap `engine_restart` from the last confirmed audio to the resumed offset - `inst-report-gap`
@@ -178,7 +178,8 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Steps**:
 1. [ ] - `p1` - Engine opens the tap and the microphone for the self-test on one clock, as for a session - `inst-self-test-one-clock`
 2. [ ] - `p1` - **IF** the live model is present, engine emits `self_test_line` per channel - `inst-self-test-lines`
-3. [ ] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
+3. [ ] - `p1` - **IF** `play_clip`, engine plays its clip and checks the tap does not hear it; a leak fails with `OwnSoundsLeak` (moved from `cpt-noter-flow-core-engine-foundation-self-test`, decision D-12) - `inst-play-clip`
+4. [ ] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
 
 ## 3. Processes / Business Logic (CDSL)
 
