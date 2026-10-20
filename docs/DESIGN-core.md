@@ -267,7 +267,9 @@ Platform, data residency and licensing constraints come from the PRD; this desig
 
 - [ ] `p1` - **ID**: `cpt-noter-constraint-core-engine-offline`
 
-**Type**: Security. The engine runs in the App Sandbox with audio input and no network entitlement, so audio cannot leave through it. It shares the App Group container `<TEAMID>.ai.noter` with the app for audio, models, bulky payloads and the capture ring, and it is signed in the Swift build with its own entitlements. If week one shows the sandboxed child does not get the System Audio Recording prompt attributed to Noter, the sandbox is dropped and the CI network-monitor test becomes the guarantee (PRD › Open decisions; Q4).
+**Type**: Security. The engine runs in the App Sandbox with audio input and no network entitlement, so audio cannot leave through it. It shares the App Group container `<TEAMID>.ai.noter` with the app for audio, models, bulky payloads and the capture ring, and it is signed in the Swift build with its own entitlements. Q4 (decided 20 Oct 2026, owner): this holds as designed. Noter.app is a Developer ID app with the hardened runtime and is **not** sandboxed; it spawns the sandboxed `noter-engine` with its own entitlements. The week-one spike showed both channels capture in this layout and the System Audio Recording and Microphone prompts are attributed to the app that launches the engine, not to the engine process. The reverse layout does not work: a sandboxed parent cannot start a child that asks for its own, different sandbox (it traps in `libsecinit` before `main`); a child of a sandboxed app must carry `com.apple.security.inherit` and then shares the app's sandbox and network entitlement.
+
+**Future: Mac App Store (fallback A).** The App Store needs the app itself in the App Sandbox. If Noter ever ships there: (1) sandbox Noter.app and give the engine `com.apple.security.app-sandbox` plus `com.apple.security.inherit` only (spike variant A, proven to capture and prompt on the owner's Mac); (2) the engine then inherits the app's network entitlement, so "no network entitlement" can no longer be the guarantee, and the CI network-monitor test becomes it (adjust this constraint, E1, C18 and the CI codesign check); (3) check that the design's needs survive App Review and the sandbox: running the user's own `claude` and `codex` CLIs, reading arbitrary folders as knowledge sources, opening Terminal for handoffs, the local noter-mcp socket and the App Group container; expect to rework or drop some of them; (4) `storage_move` (below) would also need rethinking. Evidence: `.plans/backend/spike-q4-evidence.md`.
 
 **Source**: PRD › Audio capture › Entitlements and signing; review resolutions R21, R22.
 
@@ -2856,14 +2858,14 @@ Decisions this design takes beyond the PRD, each with a one-line reason. Decisio
 
 ### 4.3 Open questions
 
-Questions this design could not settle alone. Q1, Q2 and Q5 were answered by the owner on 17 October and are backported to the PRD (Decision log); Q3, Q4, Q6, Q7 and Q8 stay open.
+Questions this design could not settle alone. Q1, Q2 and Q5 were answered by the owner on 17 October and are backported to the PRD (Decision log); Q4 was decided by the owner on 20 October (below); Q3, Q6, Q7 and Q8 stay open.
 
 | # | Question | For | Blocks |
 | --- | --- | --- | --- |
 | Q1 | PRD scope cut: full v1 or the Review's MVP? **Decided 17 Oct: full v1.** The contract keeps the full Copilot and Agents groups; they stay draft until the M4 gate | Owner | Nothing (decided) |
 | Q2 | Replay during capture on speakers with echo cancellation on? **Decided 17 Oct: no, headphones only.** Noter has no speakers mode or echo cancellation, and even with one, it would clean only Noter's recording; the meeting app's own microphone path would still carry the replay to the call (`replay_needs_headphones`) | Owner | Nothing (decided) |
 | Q3 | Does the per-turn `structured_output` arrive in a long-lived Claude Code session (M1 prototype)? If not, `emit_card` on noter-mcp becomes the live path, and its stability changes to stable | Core | Copilot latency path |
-| Q4 | Week one: does the sandboxed engine get the System Audio Recording prompt attributed to Noter? If not, the engine runs unsandboxed and the CI network test is the guarantee | Core | Engine entitlements; whether `storage_move` ships |
+| Q4 | Week one: does the sandboxed engine get the System Audio Recording prompt attributed to Noter? **Decided 20 Oct: yes, as designed.** Noter.app is unsandboxed (Developer ID); the engine runs sandboxed with its own entitlements and the prompts name the app. The engine stays sandboxed, so `storage_move` does not ship. Mac App Store, if ever wanted, is fallback A (see the engine constraint above) | Owner | Nothing (decided) |
 | Q5 | Where do call types come from in v1? **Decided 17 Oct: the built-in list plus skill folders the user adds.** `CallTypeInfo` carries `builtin` and `skill_path` | Owner | Nothing (decided) |
 | Q6 | Should the UI or the core compute version diffs for very long summaries? This design says the UI (C7); revisit if diffs of role reviews become slow | UI | Nothing now |
 | Q7 | Should capture run in its own minimal process, apart from the ML models? The capture ring in a memory-mapped file and the capture-first restart keep a crash gap at about 2 s; the M1 week-one test (engine kills during capture) decides whether that holds the 99 % no-dropout target | Core | Engine process layout; no contract change |
