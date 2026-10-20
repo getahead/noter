@@ -238,7 +238,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Build the 26 primitives and the three feedback components once, as React components that behave like their AppKit counterparts and carry the prototype's data attributes, so every screen is assembled from one tested set.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/primitives.md`](features/ui/primitives.md). **Status**: NOT_STARTED.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/primitives.md`](features/ui/primitives.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-tokens-theming`
 

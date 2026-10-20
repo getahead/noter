@@ -236,9 +236,9 @@ The system **MUST** take every interface string from a catalogue with plural rul
 
 ## 6. Acceptance Criteria
 
-- [ ] No transcript line, meter value or clock tick is ever announced; each listed event is announced once with the listed politeness
+- [x] No transcript line, meter value or clock tick is ever announced; each listed event is announced once with the listed politeness
 - [ ] Every screen passes a keyboard-only run and a VoiceOver label check in its component tests
-- [ ] Single-key actions work with the Russian and German keyboard layouts
+- [x] Single-key actions work with the Russian and German keyboard layouts
 - [ ] The pseudo-localised build shows no truncated button, menu item or sidebar label on any screen
 - [ ] Every content block carries a `lang` attribute
 
