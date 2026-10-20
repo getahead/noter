@@ -1,4 +1,5 @@
 import "./app.css";
+import { SettingsWindow } from "../features/settings/SettingsWindow";
 import { FirstRun } from "../features/first-run/first-run";
 import { MainWindow } from "../features/shell/main-window";
 import { t } from "../i18n/format";
@@ -22,6 +23,7 @@ export function App({ bridge }: { bridge: Bridge }) {
       )}
       {bridge.label === "main" && !error && <MainWindow bridge={bridge} />}
       {bridge.label === "first-run" && !error && <FirstRun bridge={bridge} />}
+      {bridge.label === "settings" && status === "READY" && <SettingsWindow bridge={bridge} />}
     </div>
   );
 }

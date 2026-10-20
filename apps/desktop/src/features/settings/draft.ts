@@ -21,7 +21,8 @@ const isPlain = (v: unknown): v is Record<string, unknown> => typeof v === "obje
 function merge<T>(base: T, edits: unknown): T {
   if (!isPlain(base) || !isPlain(edits)) return edits as T;
   const out: Record<string, unknown> = { ...base };
-  for (const [k, v] of Object.entries(edits)) out[k] = k in base ? merge(base[k], v) : v;
+  // an explicit `undefined` is an untouched leaf: it never overwrites a stored value
+  for (const [k, v] of Object.entries(edits)) if (v !== undefined) out[k] = k in base ? merge(base[k], v) : v;
   return out as T;
 }
 

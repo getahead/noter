@@ -1,0 +1,66 @@
+/* Settings window: the prototype's .st-* (50-e.css) and .hk-* (10-a.css) rules, ported as-is except the window now fills its WebView. */
+.st-win { max-width: 100%; }
+.st-body { display: flex; flex: 1 1 auto; min-height: 0; height: 100vh; }
+.st-panes { width: 200px; flex: none; background: var(--side-bg); border-right: 1px solid var(--sep); padding: 10px 8px; display: grid; align-content: start; gap: 8px; overflow: auto; }
+.st-panelist { display: grid; gap: 1px; }
+.st-pane-item { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: var(--r-control); color: var(--label); text-decoration: none; white-space: nowrap; }
+.st-pane-item .np-ic { color: var(--accent-text); }
+.st-pane-item:hover { background: var(--sel-unemph); }
+.st-pane-item.is-sel { background: var(--sel-accent); font-weight: 600; }
+.st-nomatch { color: var(--label-2); font-size: 12px; padding: 8px; }
+.st-main { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 16px 22px 28px; background: var(--content-bg); }
+.st-banner { margin-bottom: 12px; max-width: 560px; }
+.st-pane { display: grid; gap: 16px; max-width: 560px; }
+.st-pane__title { margin-bottom: 2px; }
+.st-group { display: grid; gap: 6px; }
+.st-group__h { font: 600 12px/16px var(--font); color: var(--label-2); }
+.st-group__box { border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); display: grid; overflow: hidden; }
+.st-group__box > * + * { border-top: 1px solid var(--sep); }
+.st-group__box > .np-table-wrap { border: 0; border-radius: 0; }
+.st-group__box > .e-list { border: 0; border-radius: 0; }
+.st-group__foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+.st-row { display: grid; grid-template-columns: 40% minmax(0, 1fr); gap: 12px; padding: 9px 12px; align-items: start; }
+.st-row.is-stack { grid-template-columns: minmax(0, 1fr); }
+.st-row__label { padding-top: 5px; }
+.st-row__label:empty { display: none; }
+.st-row__label:empty + .st-row__ctl { grid-column: 1 / -1; }
+.st-row__ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.st-row__note { flex-basis: 100%; font-size: 12px; color: var(--label-3); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.st-warnline { color: var(--warning); display: inline-flex; gap: 4px; align-items: center; font-size: 12px; }
+.st-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.st-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.st-path { color: var(--label-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-applist { display: flex; align-items: center; gap: 10px; padding: 9px 12px; flex-wrap: wrap; }
+.st-app { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; }
+.st-empty { padding: 4px 12px; }
+.st-modenow { flex-basis: 100%; font-size: 12px; color: var(--label-2); display: flex; align-items: center; gap: 4px; }
+.st-audit-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.st-kv { padding: 10px 12px; }
+.st-kv dd { text-align: right; }
+.st-conflict { color: var(--warning); font-size: 12px; display: flex; gap: 6px; align-items: center; padding: 6px 12px; }
+.st-hint { font-size: 12px; color: var(--label-3); margin-top: 4px; }
+.st-launch { font-size: 12px; color: var(--label-2); }
+.st-time { width: 72px; }
+.st-num { width: 80px; }
+.st-group__box > [data-component="cpt-noter-component-ui-permission-check-row"] { padding: 9px 12px; border: 0; border-radius: 0; }
+.st-group__box .np-table td:nth-child(3), .st-group__box .np-table td:nth-child(4) { white-space: nowrap; }
+.st-group__box > [data-component="cpt-noter-component-ui-hotkey-recorder"] { padding: 7px 12px; }
+@media (max-width: 760px) { .st-body { flex-direction: column; height: auto; } .st-panes { width: 100%; border-right: 0; border-bottom: 1px solid var(--sep); } .st-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+/* Audio & Transcription › Output devices (PM-67): headphones marked per device */
+.st-devlist { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.st-dev { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-dev__name { font-weight: 600; }
+.st-dev__route { color: var(--label-2); font-size: 12px; }
+
+.hk-row { display: grid; grid-template-columns: minmax(160px, 1fr) auto; gap: 4px 12px; align-items: center; padding: 6px 0; }
+.hk-row.is-disabled { opacity: .5; }
+.hk-label { min-width: 0; }
+.hk-ctl { display: inline-flex; align-items: center; gap: 6px; justify-self: end; }
+.hk-field { min-width: 110px; height: 26px; border: 1px solid var(--ctrl-border-soft); border-radius: var(--r-control); background: var(--ctrl-bg); display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; cursor: pointer; color: var(--label); }
+.hk-field.is-rec { outline: 2px solid var(--accent); outline-offset: 0; }
+.hk-field.is-ro { cursor: default; background: transparent; }
+.hk-field .np-kbd { font-size: 12px; color: var(--label); border: 0; }
+.hk-err { grid-column: 1 / -1; display: inline-flex; gap: 5px; align-items: center; color: var(--warning); font-size: 12px; }
+
+.hk-live { grid-column: 1 / -1; }
+.hk-live:empty { display: none; }

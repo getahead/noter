@@ -1,4 +1,6 @@
 import type { SettingsPane } from "../../core/bindings";
+import type { MsgKey } from "../../i18n/en";
+import { t } from "../../i18n/format";
 
 export interface PaneEntry {
   id: SettingsPane;
@@ -35,3 +37,9 @@ export function searchPanes(text: string): SearchResult {
   const panes = PANES.filter((p) => `${p.label} ${p.keywords}`.toLowerCase().includes(q));
   return panes.length ? { kind: "matches", panes } : { kind: "none", panes: [], text: text.trim() };
 }
+
+/** A pane's name, as the pane list and the pane title show it. */
+export const paneLabel = (id: SettingsPane): string => t(`settings.pane.${id}` satisfies MsgKey);
+
+/** What a pane that a later feature fills says instead of a blank area. */
+export const laterNote = (id: "models_and_runtimes" | "repositories" | "knowledge_sources" | "maintenance"): string => t(`settings.later.${id}` satisfies MsgKey);

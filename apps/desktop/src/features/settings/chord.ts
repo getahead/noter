@@ -1,4 +1,5 @@
-import type { HotkeyStatus } from "../../core/bindings";
+import type { CoreError, HotkeyStatus } from "../../core/bindings";
+import { t } from "../../i18n/format";
 
 export interface ChordModifiers {
   control: boolean;
@@ -29,22 +30,32 @@ export type ChordResult =
   /** A single chord got only a modifier keydown: keep recording until a non-modifier key arrives. */
   | { type: "wait" };
 
-const MODIFIER_CODES = new Set(["Control", "Alt", "Meta", "Shift"].flatMap((m) => [`${m}Left`, `${m}Right`]));
+// Fn and CapsLock are never a chord's key: like a modifier keydown, they keep a single chord recording.
+const MODIFIER_CODES = new Set([...["Control", "Alt", "Meta", "Shift"].flatMap((m) => [`${m}Left`, `${m}Right`]), "Fn", "CapsLock"]);
 
 // @cpt-algo:cpt-noter-algo-ui-settings-check-chord:p1
 export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInput): ChordResult {
   if (code === "Escape") return { type: "cancel" };
   const hasModifier = m.control || m.option || m.command;
+  // a chord may start with any modifier, Shift included: only the completing key is judged
+  if (variant === "single" && MODIFIER_CODES.has(code)) return { type: "wait" };
   // a modifier set is never empty: the core refuses it (`no_modifier`)
   if (code === "Backspace" && variant === "single") return { type: "clear" };
-  if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: "Add Command, Option or Control" };
-  if (variant === "single" && MODIFIER_CODES.has(code)) return { type: "wait" };
-  if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: "Used by VoiceOver" };
+  if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: t("settings.hotkeys.no_modifier") };
+  if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: t("settings.hotkeys.used_by", { owner: "VoiceOver" }) };
   return { type: "accept", code, modifiers: m };
 }
 
 /** The line under a row the core reports a refusal for; null when the row has none. */
 export function conflictLine(status: HotkeyStatus): string | null {
-  if (status.type === "conflict") return `Used by ${status.owner ?? "another app"}`;
-  return status.type === "reserved_by_system" ? "Used by macOS" : null;
+  if (status.type === "conflict") return t("settings.hotkeys.used_by", { owner: status.owner ?? "another app" });
+  return status.type === "reserved_by_system" ? t("settings.hotkeys.used_by_macos") : null;
+}
+
+/** The line a `hotkey_set` refusal (`hotkey_conflict`, `hotkey_reserved`) shows under the row; null for any other error. */
+export function refusalLine(error: CoreError): string | null {
+  if (error.code !== "hotkey_conflict" && error.code !== "hotkey_reserved") return null;
+  const owner = error.detail?.type === "hotkey_owner" ? error.detail.owner : null;
+  if (owner) return t("settings.hotkeys.used_by", { owner });
+  return error.code === "hotkey_reserved" ? t("settings.hotkeys.used_by_macos") : t("settings.hotkeys.used_by", { owner: "another app" });
 }
