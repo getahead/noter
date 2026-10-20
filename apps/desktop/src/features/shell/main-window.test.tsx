@@ -147,6 +147,22 @@ describe("MainWindow controls", () => {
   });
 });
 
+describe("MainWindow dismissals", () => {
+  it("answers false when the core refused banner_dismiss, so the slot shows the banner again, and shows the failure", async () => {
+    const fake = new FakeCore({ window: "main" });
+    (fake.world as unknown as World).app.banners.banners = [{ type: "update_ready", version: "1.2" }] as never;
+    bridge = createBridge("main", fake);
+    await bridge.open();
+    const slot = find(rendered(MainWindow, { bridge }), (_, type) => type === BannerSlot).props as never as Parameters<typeof BannerSlot>[0];
+    fake.failNext("banner_dismiss", "offline");
+    expect(await slot.onDismiss!("update_ready")).toBe(false);
+    const html = renderToString(<App bridge={bridge} />);
+    expect(html).toContain("Noter could not finish that action");
+    expect(html).toContain("Try Again");
+    expect(await slot.onDismiss!("update_ready")).toBe(true);
+  });
+});
+
 describe("pages", () => {
   it("falls back to an empty state naming the section, and lets a later feature register its page", () => {
     expect(pageFor("people").title({ section: "people", key: "root" })).toBe("People");

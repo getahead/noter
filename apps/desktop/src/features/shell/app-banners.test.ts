@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { orderBanners } from "../../ui/feedback/banners";
-import { appBanners, isBannerKind, type BannerActions } from "./app-banners";
+import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
 
 const actions = (over: Partial<BannerActions> = {}): BannerActions => ({
   runSelfTest: vi.fn(),
@@ -10,6 +10,7 @@ const actions = (over: Partial<BannerActions> = {}): BannerActions => ({
   openCall: vi.fn(),
   resumeRecording: vi.fn(),
   restart: { loading: false, tryAgain: false },
+  retry: vi.fn(),
   ...over,
 });
 const setup = (type: string) => ({ self_test: { type } }) as never;
@@ -72,5 +73,31 @@ describe("appBanners", () => {
   it("knows which ids are core banner kinds", () => {
     expect(["update_ready", "roll_up_failed", "recording_interrupted_by_quit"].every(isBannerKind)).toBe(true);
     expect(isBannerKind("self-test")).toBe(false);
+  });
+
+  it("shows a failed command as an error banner with Try Again only when the error is retryable, and the failure outranks the others", () => {
+    const a = actions();
+    const list = appBanners({ banners: banners({ type: "update_ready", version: "1.2" }) }, a, [{ key: "banner_dismiss", tryAgain: true }, { key: "window_navigate", tryAgain: false }]);
+    const [retryable, final] = list.filter((b) => b.severity === "error");
+    expect(retryable).toMatchObject({ id: "error:banner_dismiss", text: "Noter could not finish that action", dismissible: true });
+    retryable!.actions![0]!.onAction!();
+    expect(a.retry).toHaveBeenCalledWith("banner_dismiss");
+    expect(final!.actions).toEqual([]);
+    expect(orderBanners(list).first!.severity).toBe("error");
+  });
+
+  it("finds the failed commands of the frame, and ignores update_install and the commands that did not fail", () => {
+    expect(
+      commandFailures({
+        window_navigate: { state: "ERROR", error: { tryAgain: true } },
+        banner_dismiss: { state: "ERROR", error: null },
+        window_show_call: { state: "WAITING", error: null },
+        update_install: { state: "ERROR", error: { tryAgain: true } },
+      }),
+    ).toEqual([
+      { key: "window_navigate", tryAgain: true },
+      { key: "banner_dismiss", tryAgain: false },
+    ]);
+    expect(commandFailures({})).toEqual([]);
   });
 });

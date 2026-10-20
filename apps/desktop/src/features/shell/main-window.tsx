@@ -6,13 +6,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, u
 import { useWindowShortcuts } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { CommandName, NavTarget, Result } from "../../core/bindings";
+import type { BannerKind, CommandName, NavTarget, Result } from "../../core/bindings";
 import type { WholeName } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
 import { SplitDivider } from "../../ui/primitives/split-divider";
-import { appBanners, isBannerKind, type BannerActions } from "./app-banners";
-import { collapse } from "./collapse";
+import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
 import { frameState } from "./frame";
 import { InspectorSlot } from "./inspector";
 import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
@@ -21,7 +20,7 @@ import { modeIndicator } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
 import { shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
-import { actionEvent, createScrollMemory, escapeEvent, focusEffect, navEffect, scrollEffect, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
+import { actionEvent, createScrollMemory, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
 import { Sidebar } from "./sidebar";
 import { MainToolbar } from "./toolbar";
@@ -61,6 +60,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const snapshotApplied = useWindow(bridge, (s) => s.app !== null);
   const slow = useWindow(bridge, (s) => s.slow);
   const updateInstall = useWindow(bridge, (s) => s.commands["update_install"]);
+  const commands = useWindow(bridge, (s) => s.commands);
 
   const shellRef = useRef(shell);
   shellRef.current = shell;
@@ -76,13 +76,16 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   useEffect(() => watchWidth(window, setViewport), []);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-resize:p1:inst-user-resize
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-resize:p1:inst-collapse
-  const layout = collapse({
-    windowWidth: viewport / zoom,
-    zoom: shell.zoom,
-    sidebarWidth: shell.sidebarWidth,
-    inspectorWidth: shell.history.inspectorOpen && page.inspector ? page.inspector.width : null,
-    need: page.need ?? NO_NEED,
-  });
+  const layout = layoutFor(
+    {
+      windowWidth: viewport / zoom,
+      zoom: shell.zoom,
+      sidebarWidth: shell.sidebarWidth,
+      inspectorWidth: shell.history.inspectorOpen && page.inspector ? page.inspector.width : null,
+      need: page.need ?? NO_NEED,
+    },
+    !shell.sidebar,
+  );
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-resize:p1:inst-collapse
   const overlay = layout.sidebar === "overlay";
   const sidebarShown = overlay ? shell.overlayOpen : shell.sidebar;
@@ -92,6 +95,8 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const run = useCallback(<T,>(cmd: CommandName, f: () => Promise<Result<T>>, into?: WholeName) => void bridge.act(cmd, cmd, f, { screen: "main-window-shell", slice: into }), [bridge]);
   // @cpt-end:cpt-noter-flow-ui-core-bridge-act:p1:inst-user-acts
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-api-banner
+  // a dismissal the core refused answers false, so the slot shows the banner again (the failure shows as its own banner)
+  const dismissBanner = useCallback(async (banner: BannerKind) => (await bridge.act("banner_dismiss", "banner_dismiss", () => bridge.core.bannerDismiss({ banner }), { screen: "main-window-shell", slice: "banners" })).status === "ok", [bridge]);
   const navigate = useCallback((target: NavTarget) => run("window_navigate", () => bridge.core.windowNavigate({ target })), [bridge, run]);
 
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-api-banner
@@ -115,7 +120,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-nav-request
   // A navigation request of the core (the Call page loaded in the background after a stop) shows its page without
   // moving focus: the heading is not focused for it, and the core decides whether the window activates.
-  const flags = useRef<NavFlags>({ first: true, quiet: false });
+  const flags = useRef<NavFlags>({ first: true, quiet: null });
   useEffect(() => navEffect(nav, flags.current, dispatch), [nav]);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-nav-request
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-nav
@@ -125,7 +130,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   useLayoutEffect(() => scrollEffect(contentRef.current, scrolls.current, routeId), [routeId]);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-render-page
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-focus-heading
-  useEffect(() => focusEffect(flags.current, contentRef.current), [routeId]);
+  useEffect(() => focusEffect(flags.current, contentRef.current, routeId), [routeId]);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-focus-heading
 
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-capture
@@ -151,9 +156,10 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     resumeRecording: (id) => run("capture_resume_interrupted", () => bridge.core.captureResumeInterrupted({ call_id: id })),
     // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banner-action
     restart: { loading: updateInstall?.state === "WAITING", tryAgain: updateInstall?.state === "ERROR" && updateInstall.error?.tryAgain === true },
+    retry: (key) => void bridge.retry(key),
   };
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banners
-  const bannerList = appBanners({ banners, setup }, bannerActions);
+  const bannerList = appBanners({ banners, setup }, bannerActions, commandFailures(commands));
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banners
 
   const inspector = shell.history.inspectorOpen ? page.inspector : undefined;
@@ -213,7 +219,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-empty */}
-        <BannerSlot banners={bannerList} region="MW-R5" onDismiss={(id) => isBannerKind(id) && run("banner_dismiss", () => bridge.core.bannerDismiss({ banner: id }), "banners")} />
+        <BannerSlot banners={bannerList} region="MW-R5" onDismiss={(id) => (isBannerKind(id) ? dismissBanner(id) : undefined)} />
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-empty */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}

@@ -3,6 +3,7 @@
 // the component so each one is tested on its own (the unit environment has no DOM).
 import { createFocusReturn, type FocusTarget } from "../../app/a11y/focus";
 import type { NavTarget } from "../../core/bindings";
+import { collapse, type CollapseInput, type CollapseResult } from "./collapse";
 import type { History, HistoryMove } from "./history";
 import type { ShellAction } from "./menu-model";
 import { navRoute } from "./sections";
@@ -63,14 +64,16 @@ export function watchWidth(win: WidthSource, set: (width: number) => void): () =
 /** Flags the navigation effects share: the first render moves no focus, and neither does a page the core asked for. */
 export interface NavFlags {
   first: boolean;
-  quiet: boolean;
+  /** The page (section/key) the core asked for, whose heading stays unfocused; null when none is waiting. */
+  quiet: string | null;
 }
 
 /** A `nav:request` of the core moves the history; the heading is not focused for it. */
 export function navEffect(nav: NavTarget | null, flags: NavFlags, dispatch: (e: ShellEvent) => void): void {
+  const route = nav && navRoute(nav);
   const move = nav && navMove(nav);
-  if (!move) return;
-  flags.quiet = true;
+  if (!route || !move) return;
+  flags.quiet = `${route.section}/${route.key}`;
   dispatch({ type: "move", move });
 }
 
@@ -81,9 +84,12 @@ export function scrollEffect(el: { scrollTop: number } | null, memory: ReturnTyp
 }
 
 /** After navigation the page heading takes focus, except on the first render and for a page the core asked for. */
-export function focusEffect(flags: NavFlags, root: Parameters<typeof focusHeading>[0]): void {
+export function focusEffect(flags: NavFlags, root: Parameters<typeof focusHeading>[0], routeId: string): void {
   if (flags.first) return void (flags.first = false);
-  if (flags.quiet) return void (flags.quiet = false);
+  // a request that moved nowhere leaves its mark behind: it only silences the page it named, once
+  const quiet = flags.quiet;
+  flags.quiet = null;
+  if (quiet === routeId) return;
   focusHeading(root);
 }
 
@@ -103,6 +109,15 @@ export function openFocus(open: boolean, inspector: Parameters<ReturnType<typeof
   const fr = createFocusReturn(getActive);
   fr.open(inspector);
   return () => fr.close();
+}
+
+/**
+ * The collapse step for the window as it is drawn: a sidebar that is hidden, or collapsed into an overlay, gives its
+ * width back to the content, so a window with the sidebar hidden is not judged Narrow by space it no longer uses.
+ */
+export function layoutFor(input: CollapseInput, sidebarHidden: boolean): CollapseResult {
+  const first = collapse(input);
+  return first.sidebar === "docked" && !sidebarHidden ? first : collapse({ ...input, sidebarWidth: 0 });
 }
 
 /** Calls `set` with the time every second while `on`; returns the cleanup. */

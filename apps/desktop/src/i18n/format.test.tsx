@@ -84,6 +84,6 @@ describe("value helpers", () => {
     expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "" })).toMatch(/\d\d:30/);
   });
   it("the catalogue has an entry for each v1 string", () => {
-    expect(Object.keys(en)).toHaveLength(82);
+    expect(Object.keys(en)).toHaveLength(83);
   });
 });

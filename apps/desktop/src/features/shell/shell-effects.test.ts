@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, tickWhile, watchWidth } from "./shell-effects";
+import { layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, tickWhile, watchWidth } from "./shell-effects";
 
 describe("shell actions", () => {
   it("turns each action into its view-state event", () => {
@@ -68,13 +68,13 @@ describe("watchWidth", () => {
 describe("effects", () => {
   it("a nav request moves the history and keeps focus where it is; no request or another window's target does nothing", () => {
     const dispatch = vi.fn();
-    const flags = { first: false, quiet: false };
+    const flags = { first: false, quiet: null as string | null };
     navEffect(null, flags, dispatch);
     navEffect({ type: "settings", pane: "general" }, flags, dispatch);
     expect(dispatch).not.toHaveBeenCalled();
     navEffect({ type: "activity" }, flags, dispatch);
     expect(dispatch).toHaveBeenCalledWith({ type: "move", move: { type: "section", section: "activity" } });
-    expect(flags.quiet).toBe(true);
+    expect(flags.quiet).toBe("activity/root");
   });
 
   it("restores the scroll position on arrival and saves it on leaving", () => {
@@ -89,17 +89,27 @@ describe("effects", () => {
     scrollEffect(null, memory, "x")(); // no content element yet
   });
 
-  it("focuses the heading after navigation, but not on the first render or for a page the core asked for", () => {
+  it("focuses the heading after navigation, but not on the first render or for the page the core asked for", () => {
     const heading = { tabIndex: 0, focus: vi.fn() };
     const root = { querySelector: () => heading as never };
-    const flags = { first: true, quiet: false };
-    focusEffect(flags, root);
+    const flags = { first: true, quiet: null as string | null };
+    focusEffect(flags, root, "today/root");
     expect(heading.focus).not.toHaveBeenCalled();
-    flags.quiet = true;
-    focusEffect(flags, root);
+    flags.quiet = "library/call:1:summary";
+    focusEffect(flags, root, "library/call:1:summary");
     expect(heading.focus).not.toHaveBeenCalled();
-    focusEffect(flags, root);
+    focusEffect(flags, root, "people/root");
     expect(heading.focus).toHaveBeenCalledOnce();
+  });
+
+  it("a request that moved nowhere does not swallow the next heading focus the user earns", () => {
+    const heading = { tabIndex: 0, focus: vi.fn() };
+    const root = { querySelector: () => heading as never };
+    const flags = { first: false, quiet: null as string | null };
+    navEffect({ type: "today" }, flags, vi.fn()); // already on Today: the history does not move, no focus effect runs
+    focusEffect(flags, root, "library/root"); // the user opens Calls next
+    expect(heading.focus).toHaveBeenCalledOnce();
+    expect(flags.quiet).toBeNull();
   });
 
   it("ticks every second while recording and stops on cleanup", () => {
@@ -149,5 +159,20 @@ describe("inspector exit (D-13)", () => {
     expect(opener.focus).not.toHaveBeenCalled();
     close();
     expect(opener.focus).toHaveBeenCalledOnce();
+  });
+});
+
+describe("layoutFor", () => {
+  const input = { windowWidth: 1170, zoom: 100, sidebarWidth: 220, inspectorWidth: null, need: { full: 0, singleColumn: 0, fewerColumns: 0 } };
+
+  it("takes the sidebar's width from the content only while it is docked and shown", () => {
+    expect(layoutFor(input, false).widthClass).toBe("medium"); // 1170 − 220 = 950 pt of content
+    expect(layoutFor(input, true).widthClass).toBe("wide"); // hidden: all 1170 pt are content
+  });
+
+  it("gives the width back when the sidebar collapsed into an overlay", () => {
+    const r = layoutFor({ ...input, windowWidth: 800 }, false);
+    expect(r.sidebar).toBe("overlay");
+    expect(r.widthClass).toBe("medium"); // 800 pt of content, not 580 (Narrow)
   });
 });

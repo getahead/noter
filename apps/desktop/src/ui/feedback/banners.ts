@@ -33,6 +33,14 @@ export function pruneDismissed(dismissed: ReadonlySet<string>, banners: readonly
   return kept.length === dismissed.size ? dismissed : new Set(kept);
 }
 
+/** A dismissal the owner's command refused is taken back, so the banner shows again. Returns the same set when it held no such id. */
+export function restoreDismissed(dismissed: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  if (!dismissed.has(id)) return dismissed;
+  const next = new Set(dismissed);
+  next.delete(id);
+  return next;
+}
+
 // @cpt-state:cpt-noter-state-ui-primitives-inline-banner:p1
 export type BannerState = "SHOWN" | "WORKING" | "STACKED" | "DISMISSED" | "RESOLVED";
 /** action: the owner's command runs; failed: it failed and the cause remains; more/less: **+N More** opens/closes;

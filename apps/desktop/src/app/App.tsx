@@ -1,3 +1,4 @@
+import "./app.css";
 import { MainWindow } from "../features/shell/main-window";
 import { t } from "../i18n/format";
 import { InlineBanner } from "../ui/feedback/inline-banner";

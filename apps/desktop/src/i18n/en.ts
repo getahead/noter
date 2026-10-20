@@ -82,6 +82,7 @@ export const en = {
   "banner.quit_recording": "Noter quit during {title}",
   "banner.open_call": "Open Call",
   "banner.resume_recording": "Resume Recording",
+  "banner.command_failed": "Noter could not finish that action",
   "banner.roll_up_failed": "The performance roll-up did not finish",
 } as const;
 
