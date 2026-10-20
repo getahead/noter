@@ -271,6 +271,9 @@ jobs:
       - name: Engine tests (WAV fixtures through the pipeline)
         if: needs.changes.outputs.engine == 'true'
         run: swift test --package-path engine --enable-code-coverage
+      - name: Built engine signature (sandbox, audio input, no network entitlement)
+        if: needs.changes.outputs.engine == 'true'
+        run: scripts/ci/check-engine-signature.sh
       - name: Tauri host tests (handler parity, window capabilities)
         if: needs.changes.outputs.tauri == 'true'
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
