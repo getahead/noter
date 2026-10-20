@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
+import { createWizard } from "../first-run/wizard";
 import { ShareTestSheet } from "./ShareTestSheet";
 
 let bridge: Bridge;
@@ -42,5 +43,19 @@ describe("ShareTestSheet", () => {
     const done = find(rendered(ShareTestSheet, { bridge, onClose }), (p) => p.label === "Done" || (p.defaultButton as { props?: { label?: string } } | undefined)?.props?.label === "Done");
     ((done.props.defaultButton as { props: { onAction: () => void } }).props.onAction)();
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("the controller as the Settings self-test sheet uses it", () => {
+  it("starts no model download and no level stream", async () => {
+    const fake = await open((w) => (w.app.setup.models.bundles[0]!.state = "pending"));
+    const seen: string[] = [];
+    const invoke = fake.invoke.bind(fake);
+    fake.invoke = ((cmd: string, ...rest: unknown[]) => (seen.push(cmd), (invoke as (...a: unknown[]) => unknown)(cmd, ...rest))) as typeof fake.invoke;
+    const stop = createWizard(bridge, () => {}).start({ downloads: false, levels: false });
+    await new Promise((r) => setTimeout(r));
+    stop();
+    expect(seen).not.toContain("models_download");
+    expect(seen).not.toContain("levels_subscribe");
   });
 });

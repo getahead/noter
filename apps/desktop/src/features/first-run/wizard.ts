@@ -286,7 +286,8 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
   return {
     store,
     /** Load the settings the steps show, start the downloads and follow the microphone level. Call once; returns the cleanup. */
-    start(): () => void {
+    start(opts: { downloads?: boolean; levels?: boolean } = {}): () => void {
+      const { downloads = true, levels = true } = opts; // the Settings self-test sheet starts neither
       if (started) return () => {};
       started = true;
       generation++;
@@ -294,17 +295,17 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       lastAction = loadSettings;
       void loadSettings();
       // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
-      if (!requested && setup().models.bundles.some((b) => b.state === "pending")) void download("start");
+      if (downloads && !requested && setup().models.bundles.some((b) => b.state === "pending")) void download("start");
       requested = true; // a remount does not start them again
       // @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
       refreshSelfTest();
       // the microphone meter needs the levels stream (M1 on the real core): without it the row shows no meter
-      void bridge.subscribe("levels_subscribe", { call_id: null }, { not_implemented: "unavailable" });
+      if (levels) void bridge.subscribe("levels_subscribe", { call_id: null }, { not_implemented: "unavailable" });
       return () => {
         started = false;
         generation++; // a settings read still on its way is dropped
         unsubscribeStore();
-        void bridge.unsubscribe("levels_subscribe");
+        if (levels) void bridge.unsubscribe("levels_subscribe");
         void bridge.unsubscribe("self_test_run");
       };
     },

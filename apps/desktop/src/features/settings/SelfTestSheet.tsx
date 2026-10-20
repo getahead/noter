@@ -12,7 +12,8 @@ import { createWizard, speechPercent } from "../first-run/wizard";
 export function SelfTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
   const announce = useAnnounce(bridge);
   const [wizard] = useState(() => createWizard(bridge, (text, key) => void announce({ kind: "self_test", text, key })));
-  useEffect(() => wizard.start(), [wizard]);
+  // Settings only runs the test: no model downloads and no microphone level stream
+  useEffect(() => wizard.start({ downloads: false, levels: false }), [wizard]);
   const w = useSyncExternalStore(wizard.store.subscribe, wizard.store.getState, wizard.store.getState);
   const models = useSyncExternalStore(bridge.store.subscribe, () => bridge.store.getState().whole.setup?.models.bundles ?? [], () => []);
   return (
