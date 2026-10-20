@@ -8,7 +8,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { Toggle } from "../../ui/primitives/toggle";
-import { saveSection, unignoreKey } from "./actions";
+import { saveSection, unignoreKey, useRowError } from "./actions";
 import { SelfTestSheet } from "./SelfTestSheet";
 import { Group, Row } from "./form";
 import { choices, type PaneProps } from "./pane-props";
@@ -28,14 +28,16 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
   const { general, today } = settings;
   const selfTestPassed = useWindow(bridge, (s) => s.whole.setup?.self_test.type === "passed");
   const [selfTest, setSelfTest] = useState(false);
+  const generalError = useRowError(bridge, "general");
+  const todayError = useRowError(bridge, "today");
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
   return (
     <>
       <Group>
-        <Row label={t("settings.general.launch")}>
+        <Row label={t("settings.general.launch")} error={generalError}>
           <Toggle on={general.launch_at_login} size="small" ariaLabel={t("settings.general.launch")} onAction={(launch_at_login) => general_({ launch_at_login })} />
         </Row>
-        <Row label={t("settings.general.offer")} note={selfTestPassed ? t("settings.general.offer_note") : <><Warn>{t("settings.general.needs_self_test")}</Warn> <PushButton label={t("settings.general.run_self_test")} size="small" onAction={() => setSelfTest(true)} /></>}>
+        <Row label={t("settings.general.offer")} error={generalError} note={selfTestPassed ? t("settings.general.offer_note") : <><Warn>{t("settings.general.needs_self_test")}</Warn> <PushButton label={t("settings.general.run_self_test")} size="small" onAction={() => setSelfTest(true)} /></>}>
           <Toggle on={selfTestPassed && general.offer_to_record} size="small" disabled={!selfTestPassed} ariaLabel={t("settings.general.offer")} onAction={(offer_to_record) => general_({ offer_to_record })} />
         </Row>
         {!general.notifications_enabled && (
@@ -68,7 +70,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         )}
       </Group>
       <Group title={t("settings.general.outputs")}>
-        <Row label={t("settings.general.summary_language")} note={t("settings.general.summary_language_note")}>
+        <Row label={t("settings.general.summary_language")} error={generalError} note={t("settings.general.summary_language_note")}>
           <PopupButton options={LANGUAGES} value={general.summary_language} label={t("settings.general.summary_language")} onAction={(v) => general_({ summary_language: v as typeof general.summary_language })} />
         </Row>
         <Row label={t("settings.general.storage")} note={general.storage_in_cloud_folder && <Warn>{t("settings.general.storage_cloud")}</Warn>}>
@@ -78,10 +80,10 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         </Row>
       </Group>
       <Group title={t("settings.general.today")}>
-        <Row label={t("settings.general.horizon")}>
+        <Row label={t("settings.general.horizon")} error={todayError}>
           <SegmentedControl variant="option" label={t("settings.general.horizon")} items={HORIZON} value={today.horizon} onAction={(v) => void saveSection(bridge, "today", { horizon: v as typeof today.horizon })} />
         </Row>
-        <Row label={t("settings.general.ranking")} note={t("settings.general.ranking_note")}>
+        <Row label={t("settings.general.ranking")} error={todayError} note={t("settings.general.ranking_note")}>
           <PopupButton options={RANKING} value={today.ranking} label={t("settings.general.ranking")} onAction={(v) => void saveSection(bridge, "today", { ranking: v as typeof today.ranking })} />
         </Row>
       </Group>

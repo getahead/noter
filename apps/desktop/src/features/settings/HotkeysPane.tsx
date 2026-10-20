@@ -4,11 +4,12 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { HotkeyAction } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Toggle } from "../../ui/primitives/toggle";
 import { modifierCaps, toAccelerator } from "./accelerator";
-import { loadHotkeys, resetHotkeys, saveSection, setHotkey, type HotkeyAnswer } from "./actions";
+import { loadHotkeys, resetHotkeys, saveSection, setHotkey, useRowError, type HotkeyAnswer } from "./actions";
 import { Group, Row } from "./form";
 import { cardKeyRows } from "./card-keys";
 import { cardKeyConflictCaps, hotkeyRows, undoRow } from "./hotkey-rows";
@@ -30,6 +31,8 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
   const list = useWindow(bridge, (s) => s.whole.hotkeys);
   const settings = useWindow(bridge, (s) => s.whole.settings);
   const cardConflicts = useWindow(bridge, (s) => s.whole.copilot?.card_keys.conflicts);
+  const listFailed = useWindow(bridge, (s) => s.commands["hotkeys:list"]?.state === "ERROR" && !s.whole.hotkeys);
+  const copilotError = useRowError(bridge, "copilot");
   const restoring = useWindow(bridge, (s) => s.commands[RESTORE_KEY]?.state === "WAITING");
   if (!settings) return null;
 
@@ -51,6 +54,9 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-return-hotkeys
   return (
     <>
+      {listFailed && (
+        <InlineBanner banner={{ id: "hotkeys-list", severity: "error", text: t("settings.error.hotkeys_read"), actions: [{ label: t("action.try_again"), onAction: () => void bridge.retry("hotkeys:list") }] }} />
+      )}
       <Group title={t("settings.hotkeys.global")}>
         {hotkeyRows(list).map((r) => (
           <HotkeyRecorder key={r.action} id={`hk-${r.action}`} label={t(r.label)} caps={r.caps} conflict={r.conflict} onRecord={record(r.action)} onClear={clear(r.action)} />
@@ -66,7 +72,7 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
           </>
         }
       >
-        <Row label={t("settings.hotkeys.use_card_keys")}>
+        <Row label={t("settings.hotkeys.use_card_keys")} error={copilotError}>
           <Toggle on={copilot.card_keys.enabled} size="small" ariaLabel={t("settings.hotkeys.use_card_keys")} onAction={(enabled) => void cardKeys({ card_keys: { enabled } })} />
         </Row>
         <HotkeyRecorder id="hk-pin" variant="modifier-set" label={t("settings.hotkeys.pin")} caps={modifierCaps(pin!.modifiers!)} disabled={pin!.disabled} onRecord={recordModifiers} />
@@ -76,7 +82,7 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
             {t("settings.hotkeys.card_conflict", { chord: caps })}
           </div>
         ))}
-        <Row label={t("settings.hotkeys.dismiss_keys")}>
+        <Row label={t("settings.hotkeys.dismiss_keys")} error={copilotError}>
           <Toggle on={copilot.dismiss_with_keys} size="small" disabled={!copilot.card_keys.enabled} ariaLabel={t("settings.hotkeys.dismiss_keys")} onAction={(v) => void saveSection(bridge, "copilot", { dismiss_with_keys: v })} />
         </Row>
         <HotkeyRecorder id="hk-dismiss" variant="derived" label={t("settings.hotkeys.dismiss")} caps={modifierCaps(dismiss!.modifiers!)} disabled={dismiss!.disabled} />

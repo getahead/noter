@@ -1,4 +1,4 @@
-import { useEffect, useReducer, type KeyboardEvent } from "react";
+import { useEffect, useReducer, useRef, type KeyboardEvent } from "react";
 
 import { t } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
@@ -7,7 +7,7 @@ import { KeyCap } from "../../ui/primitives/key-cap";
 import type { HotkeyAnswer } from "./actions";
 import type { ChordModifiers } from "./chord";
 import { IDLE_RECORDER, recorderReduce, type RecorderState } from "./recorder";
-import { onRecordKey } from "./recorder-key";
+import { holdMore, onRecordKey, releasedSet } from "./recorder-key";
 
 export interface HotkeyRecorderProps {
   id: string;
@@ -34,6 +34,7 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
   useEffect(() => dispatch({ type: disabled ? "disable" : "enable" }), [disabled]);
   useEffect(() => void (conflict && dispatch({ type: "refused", message: conflict })), [conflict]);
 
+  const held = useRef<ChordModifiers | null>(null); // a modifier set collects its keys until they are released
   const recording = state.type === "RECORDING";
   const message = state.type === "CONFLICT" || state.type === "INVALID" ? state.message : null;
   const settle = async (answer: Promise<HotkeyAnswer> | undefined) => {
@@ -54,12 +55,19 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
     e.preventDefault();
     e.stopPropagation();
     dispatch(out.event);
+    held.current = out.send?.type === "hold" ? holdMore(held.current, out.send.modifiers) : null;
     // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
     if (out.send?.type === "record") void settle(onRecord?.({ code: out.send.code, modifiers: out.send.modifiers }));
     else if (out.send?.type === "clear") void settle(onClear?.());
     // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
   };
   // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
+  const onKeyUp = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const done = recording ? releasedSet(held.current, e) : null;
+    if (!done) return;
+    held.current = null;
+    void settle(onRecord?.({ code: e.code, modifiers: done }));
+  };
 
   return (
     <div
@@ -84,6 +92,7 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
             onClick={(e) => (e.currentTarget.focus(), dispatch({ type: "start" }))}
             // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-start-record
             onKeyDown={onKeyDown}
+            onKeyUp={onKeyUp}
             // the field never traps the keyboard: leaving it ends recording
             onBlur={() => recording && dispatch({ type: "chord", result: { type: "cancel" } })}
           >

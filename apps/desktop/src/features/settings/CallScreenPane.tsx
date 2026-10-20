@@ -3,7 +3,7 @@ import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { Toggle } from "../../ui/primitives/toggle";
-import { saveSection } from "./actions";
+import { saveSection, useRowError } from "./actions";
 import { DisplayPicker } from "../../ui/setup/display-picker";
 import { AUTO_DISPLAY, defaultDisplay } from "../first-run/default-display";
 import { useWindow } from "../../app/use-window";
@@ -21,6 +21,8 @@ const QUICK: { action: HotkeyAction; label: string }[] = [
 
 export function CallScreenPane({ bridge, settings }: PaneProps) {
   const { call_screen: call, menu_bar: bar } = settings;
+  const callError = useRowError(bridge, "call_screen");
+  const barError = useRowError(bridge, "menu_bar");
   const displays = useWindow(bridge, (s) => s.whole.environment?.displays) ?? [];
   return (
     <>
@@ -35,18 +37,18 @@ export function CallScreenPane({ bridge, settings }: PaneProps) {
           />
         </Row>
         {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-display */}
-        <Row label={t("settings.call.layout")}>
+        <Row label={t("settings.call.layout")} error={callError}>
           <PopupButton options={LAYOUT} value={call.layout} label={t("settings.call.layout")} onAction={(v) => void saveSection(bridge, "call_screen", { layout: v as typeof call.layout })} />
         </Row>
-        <Row label={t("settings.call.auto_open")} note={t("settings.call.auto_open_note")}>
+        <Row label={t("settings.call.auto_open")} error={callError} note={t("settings.call.auto_open_note")}>
           <Toggle on={call.open_automatically} size="small" ariaLabel={t("settings.call.auto_open")} onAction={(open_automatically) => void saveSection(bridge, "call_screen", { open_automatically })} />
         </Row>
       </Group>
       <Group title={t("settings.call.menu_bar")}>
-        <Row label={t("settings.call.menu_title")} note={t("settings.call.menu_title_note")}>
+        <Row label={t("settings.call.menu_title")} error={barError} note={t("settings.call.menu_title_note")}>
           <PopupButton options={TITLE} value={bar.title} label={t("settings.call.menu_title")} onAction={(v) => void saveSection(bridge, "menu_bar", { title: v as typeof bar.title })} />
         </Row>
-        <Row label={t("settings.call.quick_actions")}>
+        <Row label={t("settings.call.quick_actions")} error={barError}>
           <div className="st-checks">
             {QUICK.map(({ action: a, label }) => (
               <Checkbox key={a} label={label} checked={!bar.hidden_actions.includes(a)} onAction={(on) => void saveSection(bridge, "menu_bar", { hidden_actions: on ? bar.hidden_actions.filter((x) => x !== a) : [...bar.hidden_actions, a] })} />

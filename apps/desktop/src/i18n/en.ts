@@ -423,6 +423,10 @@ export const en = {
   "settings.selftest.title": "Run Audio Self-Test",
   "settings.selftest.sub": "Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.",
   "settings.call.display_label": "Call screen display",
+  "settings.error.loading_retry": "Couldn’t read your settings.",
+  "settings.error.row": "Couldn’t save this change. The stored value is shown.",
+  "settings.updates.check_failed": "Couldn’t check for updates.",
+  "settings.error.hotkeys_read": "Couldn’t read your hotkeys.",
 } as const;
 
 export type MsgKey = keyof typeof en;

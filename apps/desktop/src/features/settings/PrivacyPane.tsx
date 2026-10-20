@@ -10,7 +10,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
 import { Toggle } from "../../ui/primitives/toggle";
 import { modeIndicator } from "../shell/mode-indicator";
-import { saveSection } from "./actions";
+import { saveSection, useRowError } from "./actions";
 import { Group, Row } from "./form";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { rowState } from "./permissions";
@@ -31,17 +31,19 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
   const inForce = modeIndicator({ mode: privacy.mode, degraded, sensitiveCall: false });
   const due = audio.retention_next_run_deletes;
   const [sheet, setSheet] = useState(false);
+  const privacyError = useRowError(bridge, "privacy");
+  const audioError = useRowError(bridge, "audio");
   const calendar = rowState("calendar", useWindow(bridge, (s) => s.whole.setup?.permissions));
   return (
     <>
       <Group>
-        <Row label={t("settings.privacy.mode")}>
+        <Row label={t("settings.privacy.mode")} error={privacyError}>
           <RadioGroup name="st-pmode" label={t("settings.privacy.mode")} options={MODES} value={privacy.mode} onAction={(mode) => void saveSection(bridge, "privacy", { mode: mode as PrivacyMode })} />
           <div className="st-modenow">
             {t("settings.privacy.in_force")} <Badge text={inForce.word} tone={inForce.warning ? "warning" : "info"} />
           </div>
         </Row>
-        <Row label={t("settings.privacy.retention")} note={due ? t("settings.privacy.retention_due", { count: due }) : t("settings.privacy.retention_none")}>
+        <Row label={t("settings.privacy.retention")} error={audioError} note={due ? t("settings.privacy.retention_due", { count: due }) : t("settings.privacy.retention_none")}>
           <PopupButton options={RETENTION} value={audio.retention} label={t("settings.privacy.retention")} onAction={(v) => void saveSection(bridge, "audio", { retention: v as typeof audio.retention })} />
         </Row>
         {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-calendar */}
@@ -55,7 +57,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
           onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "calendar" } })}
         />
         {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-calendar */}
-        <Row label={t("settings.privacy.metrics")} note={t("settings.privacy.metrics_note")}>
+        <Row label={t("settings.privacy.metrics")} error={privacyError} note={t("settings.privacy.metrics_note")}>
           <Toggle on={privacy.behaviour_metrics} size="small" ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
         </Row>
         <Row label={t("settings.privacy.voice_profiles")}>

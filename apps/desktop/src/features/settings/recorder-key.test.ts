@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { onRecordKey, type RecorderKey } from "./recorder-key";
+import { holdMore, onRecordKey, releasedSet, type RecorderKey } from "./recorder-key";
 
 const key = (over: Partial<RecorderKey> = {}): RecorderKey => ({ code: "KeyU", ctrlKey: true, altKey: true, metaKey: true, shiftKey: false, repeat: false, ...over });
 
@@ -26,7 +26,29 @@ describe("onRecordKey", () => {
     expect(onRecordKey(true, key({ ...bare, code: "KeyN" }), "single")).toMatchObject({ event: { result: { type: "keep", reason: "no_modifier" } }, send: null });
   });
 
-  it("records a modifier set on the modifiers alone", () => {
-    expect(onRecordKey(true, key({ code: "ControlLeft" }), "modifier-set")?.send).toMatchObject({ type: "record" });
+  it("holds a modifier set instead of sending it on the first modifier", () => {
+    expect(onRecordKey(true, key({ code: "ControlLeft", altKey: false, metaKey: false }), "modifier-set")?.send).toEqual({
+      type: "hold",
+      modifiers: { control: true, option: false, command: false, shift: false },
+    });
   });
+});
+
+describe("a modifier set is saved once, when the keys are released", () => {
+  const down = (code: string, over: Partial<RecorderKey>) => key({ code, ctrlKey: false, altKey: false, metaKey: false, ...over });
+  const up = { ctrlKey: false, altKey: false, metaKey: false, shiftKey: false };
+
+  it("collects Control, Option and Command pressed one after another and saves ⌃⌥⌘ on the last release", () => {
+    let held = null as ReturnType<typeof holdMore> | null;
+    for (const e of [down("ControlLeft", { ctrlKey: true }), down("AltLeft", { ctrlKey: true, altKey: true }), down("MetaLeft", { ctrlKey: true, altKey: true, metaKey: true })]) {
+      const out = onRecordKey(true, e, "modifier-set");
+      expect(out?.send?.type).toBe("hold");
+      held = holdMore(held, (out!.send as { modifiers: Parameters<typeof holdMore>[1] }).modifiers);
+      expect(releasedSet(held, e)).toBeNull(); // keys still down
+    }
+    expect(releasedSet(held, { ...up, ctrlKey: true })).toBeNull(); // one key let go, others still down
+    expect(releasedSet(held, up)).toEqual({ control: true, option: true, command: true, shift: false });
+  });
+
+  it("saves nothing when nothing was held", () => expect(releasedSet(null, up)).toBeNull());
 });

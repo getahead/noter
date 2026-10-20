@@ -1,4 +1,7 @@
 import type { Bridge } from "../../app/bridge/bridge";
+import { useWindow } from "../../app/use-window";
+import { applySnapshot } from "../../app/store/window-store";
+import { t } from "../../i18n/format";
 import type { HotkeyAction, Settings } from "../../core/bindings";
 import { refusalLine } from "./chord";
 import { editDraft, newDraft, toUpdateArgs, type DeepPartial, type SectionKey } from "./draft";
@@ -63,3 +66,15 @@ export function resetHotkeys(bridge: Bridge) {
 
 /** The control key of **Remove** under **Apps Noter doesn't ask about**. */
 export const unignoreKey = (bundleId: string) => `unignore:${bundleId}`;
+
+/** The line a section's rows show when its last save was refused; null once a save succeeds. */
+export const useRowError = (bridge: Bridge, section: SectionKey): string | null =>
+  useWindow(bridge, (s) => (s.commands[sectionKey(section)]?.state === "ERROR" ? t("settings.error.row") : null));
+
+/** **Check Now**: read the core's current state again; true when no update is waiting, false when the core could not be read. */
+export async function checkForUpdate(bridge: Bridge): Promise<"current" | "waiting" | "failed"> {
+  const res = await bridge.core.appSnapshot({});
+  if (res.status !== "ok") return "failed";
+  bridge.store.setState((s) => applySnapshot(s, res.data));
+  return res.data.environment.update?.ready ? "waiting" : "current";
+}

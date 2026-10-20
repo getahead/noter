@@ -6,6 +6,7 @@ import type { SettingsPane } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { Icon, type IconName } from "../../ui/icons";
+import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { loadSettings } from "./actions";
 import { AudioPane } from "./AudioPane";
@@ -43,7 +44,9 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   const [win, dispatch] = useReducer(windowReduce, INITIAL_WINDOW);
   const settings = useWindow(bridge, (s) => s.whole.settings);
   const nav = useWindow(bridge, (s) => s.nav);
-  const failed = useWindow(bridge, (s) => Object.entries(s.commands).some(([k, c]) => k.startsWith("settings:") && k !== "settings:get" && c.state === "ERROR"));
+  // ST-R3 is for pane-level errors only: the initial read failing. A refused change shows under its own row.
+  const readFailed = useWindow(bridge, (s) => s.commands["settings:get"]?.state === "ERROR");
+  const retryable = useWindow(bridge, (s) => !!s.commands["settings:get"]?.error?.tryAgain);
   const scroll = useRef<Partial<Record<SettingsPane, number>>>({});
   const main = useRef<HTMLDivElement>(null);
   const asked = useRef(false);
@@ -57,7 +60,9 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   useEffect(() => void (main.current && (main.current.scrollTop = scroll.current[win.pane] ?? 0)), [win.pane]);
 
   const found = searchPanes(win.search);
-  const kind = windowKind(win);
+  const kind = windowKind({ ...win, error: readFailed ? "settings:get" : win.error });
+  // one result is always a tab stop: the open pane, or the first match when the open pane is filtered out
+  const tabStop = found.panes.some((p) => p.id === win.pane) ? win.pane : found.panes[0]?.id;
   // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-open-pane
   const open = (pane: SettingsPane) => {
     if (main.current) scroll.current[win.pane] = main.current.scrollTop;
@@ -68,6 +73,8 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   const onListKey = (e: KeyboardEvent<HTMLElement>) => {
     const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=listitem]")];
     const at = items.indexOf(document.activeElement as HTMLElement);
+    // ↓ in the search field moves into the results
+    if (e.key === "ArrowDown" && (e.target as HTMLElement).tagName === "INPUT") return void (e.preventDefault(), items[0]?.focus());
     const to = listStep(e.key, at, items.length);
     if (to !== null) (e.preventDefault(), items[to]?.focus());
     else if (e.key === "Enter" && at >= 0) (e.preventDefault(), items[at]!.click());
@@ -79,16 +86,16 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   return (
     <div className="st-win" data-component="cpt-noter-component-screen-settings" data-variant={win.pane} data-state={kind.toLowerCase()}>
       <div className="st-body">
-        <nav className="st-panes" aria-label={t("settings.panes")} data-region="ST-R1">
+        <nav className="st-panes" aria-label={t("settings.panes")} data-region="ST-R1" onKeyDown={onListKey}>
           <SearchField placeholder={t("settings.search")} value={win.search} onChange={(text) => dispatch({ type: "search", text })} />
           {found.kind === "none" ? (
             <div className="st-nomatch" role="status">
               {t("settings.no_match", { text: found.text })}
             </div>
           ) : (
-            <div className="st-panelist" role="list" data-variant="settings-panes" onKeyDown={onListKey}>
+            <div className="st-panelist" role="list" data-variant="settings-panes">
               {found.panes.map((p) => (
-                <a key={p.id} href="#" role="listitem" tabIndex={p.id === win.pane ? 0 : -1} className={p.id === win.pane ? "st-pane-item is-sel" : "st-pane-item"} aria-current={p.id === win.pane ? "page" : "false"} onClick={(e) => (e.preventDefault(), open(p.id))}>
+                <a key={p.id} href="#" role="listitem" tabIndex={p.id === tabStop ? 0 : -1} className={p.id === win.pane ? "st-pane-item is-sel" : "st-pane-item"} aria-current={p.id === win.pane ? "page" : "false"} onClick={(e) => (e.preventDefault(), open(p.id))}>
                   <Icon name={ICONS[p.id]} size={15} />
                   <span>{paneLabel(p.id)}</span>
                 </a>
@@ -97,9 +104,10 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
           )}
         </nav>
         <div className="st-main" ref={main}>
-          {failed && (
+          {readFailed && (
             <div className="st-banner" data-region="ST-R3" role="alert">
-              {t("settings.error.rejected")}
+              {t("settings.error.loading_retry")}
+              {retryable && <PushButton label={t("action.try_again")} size="small" onAction={() => void bridge.retry("settings:get")} />}
             </div>
           )}
           <section className="st-pane" data-region="ST-R2" aria-label={paneLabel(win.pane)}>

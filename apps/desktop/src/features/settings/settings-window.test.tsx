@@ -5,7 +5,7 @@ import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { Settings } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
-import { loadHotkeys, loadSettings, saveSection, setHotkey, resetHotkeys, unignoreKey } from "./actions";
+import { checkForUpdate, loadHotkeys, loadSettings, saveSection, setHotkey, resetHotkeys, unignoreKey } from "./actions";
 import { AudioPane } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
@@ -242,5 +242,16 @@ describe("panes built on the first-run components", () => {
     const html = renderToString(<CallScreenPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Call screen display");
     expect(html).toContain('data-component="cpt-noter-component-ui-display-picker"');
+  });
+});
+
+describe("checkForUpdate", () => {
+  it("reads the core again and says only what that read shows", async () => {
+    await ready();
+    expect(await checkForUpdate(bridge)).toBe("current");
+    fake.world.app.environment.update = { version: "1.2", notes_md: "", ready: true };
+    expect(await checkForUpdate(bridge)).toBe("waiting");
+    fake.failNext("app_snapshot", "offline");
+    expect(await checkForUpdate(bridge)).toBe("failed");
   });
 });
