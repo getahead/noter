@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { useWindow } from "../../app/use-window";
 import type { PrivacyMode } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -10,6 +12,7 @@ import { Toggle } from "../../ui/primitives/toggle";
 import { modeIndicator } from "../shell/mode-indicator";
 import { saveSection } from "./actions";
 import { Group, Row } from "./form";
+import { ShareTestSheet } from "./ShareTestSheet";
 import { choices, type PaneProps } from "./pane-props";
 
 const RETENTION = choices({ days7: "settings.privacy.retention_7", days30: "settings.privacy.retention_30", days90: "settings.privacy.retention_90", forever: "settings.privacy.retention_forever", never_store: "settings.privacy.retention_never" });
@@ -25,6 +28,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
   const degraded = useWindow(bridge, (s) => s.whole.degraded?.states ?? []);
   const inForce = modeIndicator({ mode: privacy.mode, degraded, sensitiveCall: false });
   const due = audio.retention_next_run_deletes;
+  const [sheet, setSheet] = useState(false);
   return (
     <>
       <Group>
@@ -41,9 +45,12 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
           <Toggle on={privacy.behaviour_metrics} size="small" ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
         </Row>
       </Group>
-      <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" /><PushButton label={t("settings.privacy.share_test")} disabled /></>}>
+      <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
+<PushButton label={t("settings.privacy.share_test")} onAction={() => setSheet(true)} />
+{/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}</>}>
         <EmptyState variant="section" title={t("settings.privacy.left_mac_later")} />
       </Group>
+      {sheet && <ShareTestSheet bridge={bridge} onClose={() => setSheet(false)} />}
     </>
   );
 }

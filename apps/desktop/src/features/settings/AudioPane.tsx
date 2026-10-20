@@ -4,6 +4,8 @@ import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { saveSection } from "./actions";
 import { Group, Row } from "./form";
+import { GlossaryGroup } from "./GlossaryGroup";
+import { ModelsGroup } from "./ModelsGroup";
 import { choices, type PaneProps } from "./pane-props";
 
 const BACKENDS = choices({
@@ -43,6 +45,8 @@ export function AudioPane({ bridge, settings }: PaneProps) {
           <PopupButton options={BACKENDS} value={audio.offline_backend} label={t("settings.audio.archive")} onAction={(v) => save({ offline_backend: v as typeof audio.offline_backend })} />
         </Row>
       </Group>
+      <GlossaryGroup bridge={bridge} />
+      <ModelsGroup bridge={bridge} />
     </>
   );
 }

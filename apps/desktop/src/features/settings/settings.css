@@ -64,3 +64,17 @@
 
 .hk-live { grid-column: 1 / -1; }
 .hk-live:empty { display: none; }
+.st-win { position: relative; }
+/* Screen Share Test sheet: the prototype's .dlg-* rules (30-c.css) */
+.dlg-warn { color: var(--warning); display: inline-flex; gap: 4px; align-items: center; }
+.dlg-capture { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dlg-capture__h { font: 600 11px/14px var(--font); color: var(--label-3); margin-bottom: 4px; }
+.dlg-capture__img { height: 110px; border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--win-bg); display: grid; place-content: center; justify-items: center; gap: 6px; color: var(--label-3); font-size: 12px; }
+.dlg-perm { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 8px 10px; border-radius: var(--r-row, 9px); background: var(--fill-2, rgba(0,0,0,.04)); font-size: 12px; }
+.dlg-results { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 4px; font-size: 12px; }
+.st-glossary-form { padding: 8px 12px; }
+.st-group__box > .e-status + .e-status { border-top: 1px solid var(--sep); }
+.e-status { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
+.e-status__main { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+.e-status__title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.e-status__sub { font-size: 12px; color: var(--label-2); }
