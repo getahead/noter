@@ -13,6 +13,7 @@ const props = (over: Partial<SidebarProps> = {}): SidebarProps => ({
   mode: modeIndicator({ mode: "cloud_redacted", degraded: [], sensitiveCall: false }),
   footer: "Idle · API key · local fallback ready",
   overlay: false,
+  width: 220,
   onSelect: vi.fn(),
   onShowCall: vi.fn(),
   onToggle: vi.fn(),
@@ -65,6 +66,10 @@ describe("Sidebar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(p.onToggle).toHaveBeenCalledOnce();
     (find(tree, (x) => typeof x.onOpenPrivacy === "function").props.onOpenPrivacy as () => void)();
     expect(p.onOpenPrivacy).toHaveBeenCalledOnce();
+  });
+
+  it("takes its width from the split divider", () => {
+    expect(renderToString(<Sidebar {...props({ width: 260 })} />)).toContain('style="width:260px"');
   });
 
   it("marks the collapsed sidebar opened as an overlay", () => {

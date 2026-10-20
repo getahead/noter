@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, tickWhile, watchWidth } from "./shell-effects";
+import { exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, tickWhile, watchWidth } from "./shell-effects";
 
 describe("shell actions", () => {
   it("turns each action into its view-state event", () => {
@@ -114,5 +114,40 @@ describe("effects", () => {
     vi.advanceTimersByTime(3000);
     expect(set).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
+  });
+});
+
+describe("inspector exit (D-13)", () => {
+  it("slides out for 250 ms, and not at all under Reduce Motion", () => {
+    expect(exitMs()).toBe(250); // no matchMedia in the unit environment
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    expect(exitMs()).toBe(0);
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    expect(exitMs()).toBe(250);
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the layer drawn for the slide, then lets it go; nothing runs while it is open", () => {
+    vi.useFakeTimers();
+    const done = vi.fn();
+    expect(leaveTimer(false, done)).toBeUndefined();
+    const cancel = leaveTimer(true, done, 250)!;
+    vi.advanceTimersByTime(249);
+    expect(done).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(done).toHaveBeenCalledOnce();
+    cancel();
+    vi.useRealTimers();
+  });
+
+  it("returns focus to the opener the moment the inspector closes, without waiting for the slide", () => {
+    const opener = { focus: vi.fn(), isConnected: true };
+    const inspector = { focus: vi.fn() };
+    expect(openFocus(false, inspector, () => opener)).toBeUndefined();
+    const close = openFocus(true, inspector, () => opener)!;
+    expect(inspector.focus).toHaveBeenCalledOnce();
+    expect(opener.focus).not.toHaveBeenCalled();
+    close();
+    expect(opener.focus).toHaveBeenCalledOnce();
   });
 });

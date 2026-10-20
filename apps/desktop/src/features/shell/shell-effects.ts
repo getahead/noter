@@ -1,6 +1,7 @@
 // The window's behaviour that is not drawing: what each shell action does to the view state, how a navigation request
 // of the core moves the history, the page's scroll memory, focus after navigation and the width watcher. Kept out of
 // the component so each one is tested on its own (the unit environment has no DOM).
+import { createFocusReturn, type FocusTarget } from "../../app/a11y/focus";
 import type { NavTarget } from "../../core/bindings";
 import type { History, HistoryMove } from "./history";
 import type { ShellAction } from "./menu-model";
@@ -84,6 +85,24 @@ export function focusEffect(flags: NavFlags, root: Parameters<typeof focusHeadin
   if (flags.first) return void (flags.first = false);
   if (flags.quiet) return void (flags.quiet = false);
   focusHeading(root);
+}
+
+/** The inspector's exit slide, in ms: purely visual, and none under Reduce Motion (D-13). */
+export const exitMs = (): number => (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 250);
+
+/** While the inspector leaves, keeps it drawn for the slide and then calls `done`; returns the cleanup. */
+export function leaveTimer(leaving: boolean, done: () => void, ms: number = exitMs()): (() => void) | undefined {
+  if (!leaving) return undefined;
+  const id = setTimeout(done, ms);
+  return () => clearTimeout(id);
+}
+
+/** The inspector took focus when it opened: closing it returns focus to the control that opened it, at once. */
+export function openFocus(open: boolean, inspector: Parameters<ReturnType<typeof createFocusReturn>["open"]>[0], getActive: () => FocusTarget | null): (() => void) | undefined {
+  if (!open) return undefined;
+  const fr = createFocusReturn(getActive);
+  fr.open(inspector);
+  return () => fr.close();
 }
 
 /** Calls `set` with the time every second while `on`; returns the cleanup. */

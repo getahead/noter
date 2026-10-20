@@ -1,6 +1,6 @@
 /* The main window as a real window (the prototype draws it on a desk): it fills the WebView, the OS draws
    the shadow and the 26-pt corners (DESIGN › Shell — Main window › Size behaviour). */
-.np-win--main { min-width: 0; max-width: none; min-height: 0; margin: 0; box-shadow: none; }
+.np-win--main { height: 100vh; min-width: 0; max-width: none; min-height: 0; margin: 0; box-shadow: none; }
 .np-win--main .np-main { min-width: 0; }
 
 /* Sidebar collapsed (narrower than 900 pt or zoomed 175 % or more): it opens as an overlay from the leading edge. */
@@ -10,10 +10,12 @@
 /* MW-R4: the inspector overlays the content from the trailing edge when the page needs the room (collapse step 1);
    its 250 ms slide is purely visual (D-13) and zero under Reduce Motion (tokens.css). */
 .np-inspector { position: relative; animation: np-slide-trail 250ms ease-out; }
+.np-inspector.is-leaving { animation: np-slide-out 250ms ease-in forwards; pointer-events: none; }
 .np-inspector.is-overlay { position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; box-shadow: var(--shadow-pop); }
 .np-inspector__close { position: absolute; top: 8px; right: 8px; z-index: 1; }
 @media (max-width: 1180px) { .np-inspector { position: relative; box-shadow: none; } .np-inspector.is-overlay { position: absolute; box-shadow: var(--shadow-pop); } }
 @keyframes np-slide-trail { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes np-slide-out { from { transform: none; opacity: 1; } to { transform: translateX(24px); opacity: 0; } }
 @keyframes np-slide-lead { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* Window reloaded: skeleton rows after 300 ms (the prototype's Library › Loading rows). */

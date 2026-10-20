@@ -39,6 +39,7 @@ for (let round = 0; round < ROUNDS; round++) {
         mode={mode}
         footer="Idle"
         overlay={false}
+        width={220}
         onSelect={() => {}}
         onShowCall={() => {}}
         onToggle={() => {}}

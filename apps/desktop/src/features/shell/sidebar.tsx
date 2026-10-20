@@ -21,15 +21,17 @@ export interface SidebarProps {
   footer: string;
   /** The collapsed sidebar opened as an overlay. */
   overlay: boolean;
+  /** pt; 220 by default, 180 to 320 at the split divider. */
+  width: number;
   onSelect: (section: SectionKey) => void;
   onShowCall: () => void;
   onToggle: () => void;
   onOpenPrivacy: () => void;
 }
 
-export function Sidebar({ selected, waiting, problems, live, mode, footer, overlay, onSelect, onShowCall, onToggle, onOpenPrivacy }: SidebarProps) {
+export function Sidebar({ selected, waiting, problems, live, mode, footer, overlay, width, onSelect, onShowCall, onToggle, onOpenPrivacy }: SidebarProps) {
   return (
-    <aside className={overlay ? "np-sidebar is-overlay" : "np-sidebar"} data-region="MW-R2" aria-label={t("shell.sidebar")}>
+    <aside className={overlay ? "np-sidebar is-overlay" : "np-sidebar"} data-region="MW-R2" style={{ width }} aria-label={t("shell.sidebar")}>
       <div className="np-sidebar__top">
         <IconButton icon="sidebar" label={t("shell.hide_sidebar")} help={t("shell.hide_sidebar_help")} cls="np-sidebar__toggle" onAction={onToggle} />
       </div>

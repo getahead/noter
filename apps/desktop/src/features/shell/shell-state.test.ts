@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { INITIAL_SHELL, ZOOM_STEPS, currentRoute, shellReduce, zoomStyle, type ShellEvent, type ShellState } from "./shell-state";
+import { INITIAL_SHELL, SIDEBAR, ZOOM_STEPS, currentRoute, shellReduce, zoomStyle, type ShellEvent, type ShellState } from "./shell-state";
 
 const run = (events: ShellEvent[], from: ShellState = INITIAL_SHELL) => events.reduce(shellReduce, from);
 const go = (section: "library" | "people"): ShellEvent => ({ type: "move", move: { type: "section", section } });
@@ -37,6 +37,13 @@ describe("shell state", () => {
     expect(z(["in", "in", "in", "in", "in", "in"])).toBe(200);
     expect(z(["out"])).toBe(100);
     expect(z(["in", "in", "reset"])).toBe(100);
+  });
+
+  it("resizes the sidebar between 180 and 320 pt from its 220-pt default", () => {
+    expect(INITIAL_SHELL.sidebarWidth).toBe(220);
+    expect(run([{ type: "resize-sidebar", width: 260 }]).sidebarWidth).toBe(260);
+    expect(run([{ type: "resize-sidebar", width: 100 }]).sidebarWidth).toBe(SIDEBAR.min);
+    expect(run([{ type: "resize-sidebar", width: 900 }]).sidebarWidth).toBe(SIDEBAR.max);
   });
 
   it("sizes the zoomed window so it still fills the viewport", () => {

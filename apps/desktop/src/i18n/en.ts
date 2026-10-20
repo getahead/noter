@@ -36,6 +36,7 @@ export const en = {
   "shell.show_sidebar": "Show Sidebar",
   "shell.hide_sidebar_help": "Hide Sidebar (⌃⌘S)",
   "shell.show_sidebar_help": "Show Sidebar (⌃⌘S)",
+  "shell.resize_sidebar": "Resize Sidebar",
   "shell.back": "Back",
   "shell.back_help": "Back (⌘[)",
   "shell.forward": "Forward",

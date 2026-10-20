@@ -59,4 +59,20 @@ test.describe("cpt-noter-flow-ui-main-window-shell-resize", () => {
     await expect(page.locator('[data-region="MW-R2"] [aria-current="page"]')).toContainText("Activity");
     await expect(page.getByRole("button", { name: "Forward" })).toBeDisabled();
   });
+
+  test("UI — keyboard only: the split divider resizes the sidebar from 220 pt to the 180 to 320 pt limits", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await openWindow(page, "main");
+    const width = () => page.locator('[data-region="MW-R2"]').evaluate((el) => el.getBoundingClientRect().width);
+    expect(await width()).toBe(220);
+    await page.getByRole("separator").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(width).toBe(230);
+    await page.keyboard.press("End");
+    await expect.poll(width).toBe(320);
+    await page.keyboard.press("Home");
+    await expect.poll(width).toBe(180);
+    const bottom = await page.locator('[data-region="MW-R2"]').evaluate((el) => el.getBoundingClientRect().bottom);
+    expect(bottom).toBe(820); // the window fills the viewport, the footer reaches its bottom edge
+  });
 });

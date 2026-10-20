@@ -10,11 +10,12 @@ import type { CommandName, NavTarget, Result } from "../../core/bindings";
 import type { WholeName } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
-import { IconButton } from "../../ui/primitives/icon-button";
+import { SplitDivider } from "../../ui/primitives/split-divider";
 import { appBanners, isBannerKind, type BannerActions } from "./app-banners";
 import { collapse } from "./collapse";
 import { frameState } from "./frame";
-import { currentRoute, INITIAL_SHELL, shellReduce, zoomStyle } from "./shell-state";
+import { InspectorSlot } from "./inspector";
+import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
 import { elapsedSeconds, isLive, shortTitle } from "./live-row";
 import { modeIndicator } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
@@ -26,7 +27,6 @@ import { Sidebar } from "./sidebar";
 import { MainToolbar } from "./toolbar";
 import "./shell.css";
 
-const SIDEBAR_WIDTH = 220;
 const NO_NEED = { full: 0, singleColumn: 0, fewerColumns: 0 };
 
 // @cpt-component:cpt-noter-component-shell-main-window:p1
@@ -79,7 +79,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const layout = collapse({
     windowWidth: viewport / zoom,
     zoom: shell.zoom,
-    sidebarWidth: SIDEBAR_WIDTH,
+    sidebarWidth: shell.sidebarWidth,
     inspectorWidth: shell.history.inspectorOpen && page.inspector ? page.inspector.width : null,
     need: page.need ?? NO_NEED,
   });
@@ -176,12 +176,17 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             mode={mode}
             footer={footer}
             overlay={overlay}
+            width={shell.sidebarWidth}
             onSelect={(section) => act({ type: "section", section })}
             onShowCall={() => run("window_show_call", () => bridge.core.windowShowCall({}))}
             onToggle={() => act({ type: "toggle-sidebar" })}
             onOpenPrivacy={() => navigate({ type: "settings", pane: "privacy" })}
           />
-          {overlay && <div className="np-sidebar-scrim" aria-hidden="true" onClick={() => dispatch({ type: "close-overlay" })} />}
+          {overlay ? (
+            <div className="np-sidebar-scrim" aria-hidden="true" onClick={() => dispatch({ type: "close-overlay" })} />
+          ) : (
+            <SplitDivider value={shell.sidebarWidth} min={SIDEBAR.min} max={SIDEBAR.max} step={10} label={t("shell.resize_sidebar")} onChange={(width) => dispatch({ type: "resize-sidebar", width })} onCollapse={() => act({ type: "toggle-sidebar" })} />
+          )}
         </>
       )}
       <div className="np-main">
@@ -231,14 +236,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             )}
             {/* @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
           </div>
-          {inspector && (
-            <aside className={layout.inspector === "overlay" ? "np-inspector is-overlay" : "np-inspector"} data-region="MW-R4" style={{ width: inspector.width }} aria-label={t(inspector.label)}>
-              <div className="np-inspector__close">
-                <IconButton icon="x" label={t("shell.close_inspector")} size="inline" onAction={() => dispatch({ type: "close-inspector" })} />
-              </div>
-              {inspector.render()}
-            </aside>
-          )}
+          <InspectorSlot def={inspector} overlay={layout.inspector === "overlay"} onClose={() => dispatch({ type: "close-inspector" })} />
         </div>
       </div>
     </div>
