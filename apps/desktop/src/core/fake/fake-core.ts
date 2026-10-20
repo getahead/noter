@@ -141,6 +141,13 @@ export class FakeCore implements Transport {
     this.callWindow = { version: 1, visible: cap.phase === "recording", key: false, layout: "dedicated", collapsed: false, display_id: this.world.settings.call_screen.display_id ?? null, chosen_display_missing: false, show_share_warning: false };
   }
 
+  /** The next `models_download` start/resume ends in `checksum_failed` once, like `harness.corrupt_next_download` on the real core. */
+  corruptDownload = false;
+  corruptNextDownload(): this {
+    this.corruptDownload = true;
+    return this;
+  }
+
   /** The next call of `cmd` rejects with this error (stories: "Key rejected", "Search failed", …). */
   failNext(cmd: CommandName, code: ErrorCode, detail: ErrorDetail | null = null): this {
     const list = this.failures.get(cmd) ?? [];

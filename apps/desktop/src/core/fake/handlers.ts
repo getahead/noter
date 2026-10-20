@@ -1547,6 +1547,9 @@ export const defaultHandlers: Handlers = {
   models_download: (a, { world, fake, publish }) => {
     const m = world.app.setup.models;
     if (a.action !== "pause" && !world.app.environment.online) throw coreError("offline");
+    const corrupt = a.action !== "pause" && fake.corruptDownload; // one shot: the speech bundle fails its check
+    if (corrupt) fake.corruptDownload = false;
+    if (a.action !== "pause") m.error = null;
     m.bundles.forEach((b) => {
       if (b.state === "ready") return;
       b.state = a.action === "pause" ? "paused" : "downloading";
@@ -1554,7 +1557,13 @@ export const defaultHandlers: Handlers = {
     publish("setup:changed");
     if (a.action !== "pause") {
       fake.later(800, () => {
-        m.bundles.forEach((b) => b.state === "downloading" && Object.assign(b, { state: "ready", done_mb: b.size_mb }));
+        m.bundles.forEach((b) => {
+          if (b.state !== "downloading") return;
+          if (corrupt && b.required_for_capture) {
+            b.state = "checksum_failed";
+            m.error = "checksum_failed";
+          } else Object.assign(b, { state: "ready", done_mb: b.size_mb });
+        });
         m.done_mb = m.bundles.reduce((n, b) => n + b.done_mb, 0);
         publish("setup:changed");
       });
