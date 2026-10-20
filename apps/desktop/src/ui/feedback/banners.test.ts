@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bannerNext, orderBanners, pruneDismissed, visibleBanners, type BannerState, type Severity } from "./banners";
+import { bannerNext, orderBanners, pruneDismissed, restoreDismissed, visibleBanners, type BannerState, type Severity } from "./banners";
 
 const b = (id: string, severity: Severity) => ({ id, severity });
 
@@ -59,5 +59,14 @@ describe("bannerNext (cpt-noter-state-ui-primitives-inline-banner)", () => {
     expect(bannerNext("WORKING", "dismiss", true)).toBe("WORKING");
     expect(bannerNext("DISMISSED", "more", true)).toBe("DISMISSED");
     expect(bannerNext("RESOLVED", "failed", true)).toBe("RESOLVED");
+  });
+});
+
+describe("restoreDismissed", () => {
+  it("takes back a dismissal the owner's command refused, and leaves the set alone when it held none", () => {
+    const held = new Set(["update_ready", "roll_up_failed"]);
+    expect([...restoreDismissed(held, "update_ready")]).toEqual(["roll_up_failed"]);
+    expect(held.has("update_ready")).toBe(true); // the old set is not changed
+    expect(restoreDismissed(held, "other")).toBe(held);
   });
 });

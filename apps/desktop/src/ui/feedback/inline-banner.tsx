@@ -10,7 +10,7 @@ import { IconButton } from "../primitives/icon-button";
 import { Link } from "../primitives/link";
 import { Progress } from "../primitives/progress";
 import { PushButton } from "../primitives/push-button";
-import { orderBanners, pruneDismissed, visibleBanners, type Severity } from "./banners";
+import { orderBanners, pruneDismissed, restoreDismissed, visibleBanners, type Severity } from "./banners";
 
 export interface BannerAction {
   label: string;
@@ -108,8 +108,8 @@ export interface BannerSlotProps {
   // @cpt-end:cpt-noter-flow-ui-primitives-banner:p1:inst-receive
   /** The layout region, such as MW-R5. */
   region?: string;
-  /** For app-level banners the owner also sends banner_dismiss. */
-  onDismiss?: (id: string) => void;
+  /** For app-level banners the owner also sends banner_dismiss; answering `false` (the command failed) shows the banner again. */
+  onDismiss?: (id: string) => void | Promise<boolean | void>;
 }
 
 // @cpt-flow:cpt-noter-flow-ui-primitives-banner:p1
@@ -125,7 +125,7 @@ export function BannerSlot({ banners, region, onDismiss }: BannerSlotProps) {
   const dismiss = (id: string) => {
     // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-dismiss
     setDismissed(new Set(kept).add(id));
-    onDismiss?.(id);
+    void Promise.resolve(onDismiss?.(id)).then((ok) => ok === false && setDismissed((now) => restoreDismissed(now, id)));
     // @cpt-end:cpt-noter-flow-ui-primitives-banner:p1:inst-dismiss
   };
   // @cpt-end:cpt-noter-flow-ui-primitives-banner:p1:inst-if-dismiss

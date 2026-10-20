@@ -25,12 +25,14 @@ export interface SourceListItemProps {
   warn?: boolean;
   /** Help tag, with the item's shortcut. */
   help?: string;
+  /** What VoiceOver reads when the count or the warning changes it: **Activity, 3 waiting, 1 problem**. */
+  ariaLabel?: string;
   onSelect?: () => void;
   /** Trailing content such as a row spinner. */
   children?: ReactNode;
 }
 
-export function SourceListItem({ icon, label, selected, badge, warn, help, onSelect, children }: SourceListItemProps) {
+export function SourceListItem({ icon, label, selected, badge, warn, help, ariaLabel, onSelect, children }: SourceListItemProps) {
   return (
     <a
       href="#"
@@ -40,6 +42,7 @@ export function SourceListItem({ icon, label, selected, badge, warn, help, onSel
       data-state={selected ? "selected" : "default"}
       aria-current={selected ? "page" : "false"}
       title={help}
+      aria-label={ariaLabel}
       onClick={(e: MouseEvent) => {
         e.preventDefault();
         onSelect?.();

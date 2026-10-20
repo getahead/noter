@@ -21,6 +21,10 @@ describe("SourceList (cpt-noter-dod-ui-primitives-controls)", () => {
     expect(html).toContain('<span class="np-srclist__warn" title="Needs attention"><svg class="np-ic" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="problem"');
   });
 
+  it("reads the item with the label the owner sets", () => {
+    expect(renderToString(<SourceListItem icon="inbox" label="Activity" badge={3} warn ariaLabel="Activity, 3 waiting, 1 problem" />)).toContain('aria-label="Activity, 3 waiting, 1 problem"');
+  });
+
   it("selects without following the link", () => {
     const onSelect = vi.fn();
     const preventDefault = vi.fn();
