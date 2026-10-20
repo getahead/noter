@@ -467,7 +467,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.7 [Settings window](features/ui/settings.md) — M0 · HIGH
 
-- [x] `p1` - **ID**: `cpt-noter-feature-ui-settings`
+- [ ] `p1` - **ID**: `cpt-noter-feature-ui-settings`
 
 - **Purpose**: Give every setting one home in a separate Settings window with 11 panes and a search field, applied at once, with each failure's fix beside it, and make hotkeys and card keys safe to change before a call.
 
@@ -496,15 +496,15 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [x] `p1` - `cpt-noter-constraint-behaviour-metrics-off`
+  - [ ] `p1` - `cpt-noter-constraint-behaviour-metrics-off`
 
 - **Domain Model Entities**:
   - Setting, hotkey, glossary term, display, model bundle, permission
 
 - **Design Components**:
 
-  - [x] `p1` - `cpt-noter-component-screen-settings`
-  - [x] `p1` - `cpt-noter-component-ui-hotkey-recorder`
+  - [ ] `p1` - `cpt-noter-component-screen-settings`
+  - [ ] `p1` - `cpt-noter-component-ui-hotkey-recorder`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `settings_get`
