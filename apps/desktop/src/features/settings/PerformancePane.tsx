@@ -9,12 +9,18 @@ import type { PaneProps } from "./pane-props";
 
 const KEEP = [90, 365].map((n) => ({ value: String(n), label: t("settings.perf.keep_days", { count: n }) }));
 
+/** The percentage to save for typed text; null when nothing was typed, it is not positive or it did not change. */
+export const thresholdCommit = (text: string | null, stored: number): number | null => {
+  const n = Number(text);
+  return text !== null && n > 0 && n !== stored ? n : null;
+};
+
 /** A percentage that applies when the user leaves the field or presses Return; a non-positive value is dropped. */
 function Threshold({ label, stored, onCommit }: { label: string; stored: number; onCommit: (n: number) => void }) {
   const [text, setText] = useState<string | null>(null);
   const commit = () => {
-    const n = Number(text);
-    if (text !== null && n > 0 && n !== stored) onCommit(n);
+    const n = thresholdCommit(text, stored);
+    if (n !== null) onCommit(n);
     setText(null);
   };
   return (

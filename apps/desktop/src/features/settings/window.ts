@@ -43,3 +43,9 @@ export function windowKind(s: WindowState): WindowKind {
   if (found !== "all") return found === "none" ? "NO_MATCH" : "SEARCH_RESULTS";
   return s.error === null ? "PANE" : "PANE_ERROR";
 }
+
+/** The pane-list item that ↑ or ↓ moves focus to; null for any other key or when focus is outside the list. */
+export function listStep(key: string, at: number, length: number): number | null {
+  const step = key === "ArrowDown" ? 1 : key === "ArrowUp" ? -1 : 0;
+  return step && at >= 0 ? Math.min(length - 1, Math.max(0, at + step)) : null;
+}

@@ -10,7 +10,7 @@ import { AudioPane } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
 import { HotkeysPane } from "./HotkeysPane";
-import { PerformancePane } from "./PerformancePane";
+import { PerformancePane, thresholdCommit } from "./PerformancePane";
 import { PrivacyPane } from "./PrivacyPane";
 import { SettingsWindow } from "./SettingsWindow";
 import { UpdatesPane } from "./UpdatesPane";
@@ -91,6 +91,16 @@ describe("hotkey actions", () => {
   });
 
   it("names the control key of Remove", () => expect(unignoreKey("com.apple.Safari")).toBe("unignore:com.apple.Safari"));
+});
+
+describe("thresholdCommit", () => {
+  it("saves a changed positive percentage only", () => {
+    expect(thresholdCommit("95", 90)).toBe(95);
+    expect(thresholdCommit("90", 90)).toBeNull();
+    expect(thresholdCommit("0", 90)).toBeNull();
+    expect(thresholdCommit("abc", 90)).toBeNull();
+    expect(thresholdCommit(null, 90)).toBeNull();
+  });
 });
 
 describe("panes", () => {
@@ -176,6 +186,20 @@ describe("panes", () => {
     expect(stored().audio.output.headphones_devices).toContain("uid-1");
     expect(stored().audio.exclude_own_sounds).toBe(false);
     expect(stored().audio.live_backend).toBe("parakeet_tdt_v3");
+  });
+
+  it("Hotkeys: a recorded chord goes to hotkey_set, a refused key stays local, the card key modifiers save", async () => {
+    await props();
+    await loadHotkeys(bridge);
+    const tree = rendered(HotkeysPane, { bridge });
+    const row = (id: string) => find(tree, (pr) => pr.id === id && typeof pr.onRecord === "function" || pr.id === id && typeof pr.onClear === "function").props;
+    const none = { control: true, option: true, command: true, shift: false };
+    expect(await (row("hk-catch_me_up").onRecord as (c: unknown) => Promise<unknown>)({ code: "KeyU", modifiers: none })).toEqual({ ok: true });
+    expect(await (row("hk-catch_me_up").onRecord as (c: unknown) => Promise<unknown>)({ code: "IntlBackslash", modifiers: none })).toEqual({ ok: false, message: "This key can’t be a shortcut" });
+    expect(await (row("hk-catch_me_up").onClear as () => Promise<unknown>)()).toEqual({ ok: true });
+    expect(await (row("hk-pin").onRecord as (c: unknown) => Promise<unknown>)({ code: "ControlLeft", modifiers: { control: true, option: false, command: false, shift: false } })).toEqual({ ok: true });
+    expect(stored().copilot.card_keys.modifiers).toEqual({ control: true, option: false, command: false });
+    expect(await (row("hk-undo").onRecord as (c: unknown) => Promise<unknown>)({ code: "KeyZ", modifiers: none })).toEqual({ ok: true });
   });
 
   it("Hotkeys: one row per global hotkey, the card keys group and Restore Defaults", async () => {

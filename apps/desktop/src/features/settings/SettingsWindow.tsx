@@ -17,7 +17,7 @@ import { PerformancePane } from "./PerformancePane";
 import { PrivacyPane } from "./PrivacyPane";
 import { laterNote, paneLabel, searchPanes } from "./search";
 import { UpdatesPane } from "./UpdatesPane";
-import { INITIAL_WINDOW, windowKind, windowReduce } from "./window";
+import { INITIAL_WINDOW, listStep, windowKind, windowReduce } from "./window";
 
 const ICONS: Record<SettingsPane, IconName> = {
   general: "gear", audio_and_transcription: "mic", models_and_runtimes: "agent", privacy: "lock", call_screen_and_menu_bar: "display", hotkeys: "keyboard",
@@ -66,8 +66,8 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   const onListKey = (e: KeyboardEvent<HTMLElement>) => {
     const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=listitem]")];
     const at = items.indexOf(document.activeElement as HTMLElement);
-    const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
-    if (step && at >= 0) (e.preventDefault(), items[Math.min(items.length - 1, Math.max(0, at + step))]?.focus());
+    const to = listStep(e.key, at, items.length);
+    if (to !== null) (e.preventDefault(), items[to]?.focus());
     else if (e.key === "Enter" && at >= 0) (e.preventDefault(), items[at]!.click());
   };
 
