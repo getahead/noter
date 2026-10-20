@@ -37,6 +37,9 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         {!general.notifications_enabled && (
           <Row label={t("settings.general.notifications")} note={t("settings.general.notifications_note")}>
             <Warn>{t("settings.general.notifications_off")}</Warn>
+            {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}
+            <PushButton label={t("settings.general.open_system_settings")} size="small" onAction={() => void bridge.act("open:notifications", "open_external", () => bridge.core.openExternal({ target: { type: "system_settings", permission: "notifications" } }))} />
+            {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}
           </Row>
         )}
       </Group>
