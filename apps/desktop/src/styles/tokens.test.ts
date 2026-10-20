@@ -1,7 +1,7 @@
 // Contrast and material checks of the token stylesheet (docs/features/ui/tokens-theming.md).
 // Reads tokens.css as text: Playwright cannot emulate Reduce transparency, so the
 // opaque-material rule is checked here on the stylesheet itself.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { checkContrast, contrastRatio, NON_TEXT_PAIRS, RECDOT_PAIR, resolveTokens, rootBlocks, TEXT_PAIRS } from "./tokens";
@@ -40,6 +40,16 @@ describe("tokens.css", () => {
   it("is loaded by the app through tokens.ts, where its @cpt markers are", () => {
     const main = readFileSync(fileURLToPath(new URL("../main.tsx", import.meta.url)), "utf8");
     expect(main).toMatch(/^import "\.\/styles\/tokens";$/m);
+  });
+
+  // no component file holds a literal colour: every colour comes from a token (docs/features/ui/tokens-theming.md › acceptance)
+  it("no component file holds a literal colour", () => {
+    const src = fileURLToPath(new URL("..", import.meta.url));
+    const files = (readdirSync(src, { recursive: true }) as string[]).filter((f) => /\.(css|tsx)$/.test(f) && !/\.test\.|(^|\/)tokens\.css$/.test(f));
+    expect(files).toContain("styles/components/00-base.css");
+    const literal = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|hsl)a?\(/;
+    const offenders = files.filter((f) => literal.test(readFileSync(`${src}/${f}`, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
+    expect(offenders).toEqual([]);
   });
 
   // cpt-noter-dod-ui-tokens-theming-contrast-check

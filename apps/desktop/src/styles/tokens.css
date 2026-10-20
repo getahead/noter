@@ -43,6 +43,30 @@
   --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
+
+  /* Fixed colours of the component sheets: the same in every appearance state, so no component holds a literal colour. */
+  --grey-04: rgba(127,127,127,.04);
+  --ink-04: rgba(0,0,0,.04);
+  --ink-06: rgba(0,0,0,.06);
+  --ink-07: rgba(0,0,0,.07);
+  --ink-08: rgba(0,0,0,.08);
+  --ink-10: rgba(0,0,0,.1);
+  --ink-12: rgba(0,0,0,.12);
+  --ink-14: rgba(0,0,0,.14);
+  --ink-15: rgba(0,0,0,.15);
+  --ink-18: rgba(0,0,0,.18);
+  --ink-25: rgba(0,0,0,.25);
+  --ink-30: rgba(0,0,0,.3);
+  --light-close: #FF5F57;
+  --light-min: #FEBC2E;
+  --light-zoom: #28C840;
+  --paper-08: rgba(255,255,255,.08);
+  --paper-20: rgba(255,255,255,.2);
+  --paper-25: rgba(255,255,255,.25);
+  --paper-35: rgba(255,255,255,.35);
+  --paper-50: rgba(255,255,255,.5);
+  --paper-80: rgba(255,255,255,.8);
+  --white: #fff;
 }
 
 /* LIGHT <-> DARK (and LIGHT_CONTRAST <-> DARK_CONTRAST with the blocks below) follow the system appearance */
