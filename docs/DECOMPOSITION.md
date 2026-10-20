@@ -496,15 +496,15 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [x] `p1` - `cpt-noter-constraint-behaviour-metrics-off`
+  - [ ] `p1` - `cpt-noter-constraint-behaviour-metrics-off`
 
 - **Domain Model Entities**:
   - Setting, hotkey, glossary term, display, model bundle, permission
 
 - **Design Components**:
 
-  - [x] `p1` - `cpt-noter-component-screen-settings`
-  - [x] `p1` - `cpt-noter-component-ui-hotkey-recorder`
+  - [ ] `p1` - `cpt-noter-component-screen-settings`
+  - [ ] `p1` - `cpt-noter-component-ui-hotkey-recorder`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `settings_get`
