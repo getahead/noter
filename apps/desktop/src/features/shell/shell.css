@@ -4,7 +4,7 @@
 .np-win--main .np-main { min-width: 0; }
 
 /* Sidebar collapsed (narrower than 900 pt or zoomed 175 % or more): it opens as an overlay from the leading edge. */
-.np-win--main .np-sidebar.is-overlay { position: absolute; left: 0; top: 0; bottom: 0; z-index: 20; box-shadow: var(--shadow-pop); animation: np-slide-lead 250ms ease-out; }
+.np-win--main .np-sidebar.is-overlay { position: absolute; left: 0; top: 0; bottom: 0; z-index: 20; background: var(--content-bg); -webkit-backdrop-filter: none; backdrop-filter: none; border-right: 1px solid var(--sep); box-shadow: var(--shadow-pop); animation: np-slide-lead 250ms ease-out; }
 .np-sidebar-scrim { position: absolute; inset: 0; z-index: 10; background: transparent; }
 
 /* MW-R4: the inspector overlays the content from the trailing edge when the page needs the room (collapse step 1);
