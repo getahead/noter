@@ -32,8 +32,8 @@ test.describe("cpt-noter-flow-ui-main-window-shell-resize", () => {
     await expect(win(page)).toHaveAttribute("data-collapse", "none");
   });
 
-  test("UI — a window narrower than 900 pt collapses the sidebar, Narrow content overflows the toolbar search into an icon", async ({ page }) => {
-    await page.setViewportSize({ width: 820, height: 700 });
+  test("UI — a window narrower than 900 pt collapses the sidebar; below 760 pt of content the toolbar search becomes an icon", async ({ page }) => {
+    await page.setViewportSize({ width: 740, height: 700 }); // the collapsed sidebar takes no width: 740 pt of content is Narrow
     await openWindow(page, "main");
     await expect(win(page)).toHaveAttribute("data-collapse", "sidebar");
     await expect(win(page)).toHaveAttribute("data-width", "narrow");
