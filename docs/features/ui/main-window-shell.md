@@ -40,11 +40,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-main-window-shell`
+- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-main-window-shell`
 
 ## 1. Feature Context
 
-- [x] `p1` - `cpt-noter-feature-ui-main-window-shell`
+- [ ] `p1` - `cpt-noter-feature-ui-main-window-shell`
 
 ### 1.1 Overview
 

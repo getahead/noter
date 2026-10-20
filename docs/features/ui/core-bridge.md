@@ -39,11 +39,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-core-bridge`
+- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-core-bridge`
 
 ## 1. Feature Context
 
-- [x] `p1` - `cpt-noter-feature-ui-core-bridge`
+- [ ] `p1` - `cpt-noter-feature-ui-core-bridge`
 
 ### 1.1 Overview
 
