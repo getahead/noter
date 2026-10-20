@@ -10,8 +10,10 @@ import "./setup.css";
 
 export interface PermissionCheckRowProps {
   /** Which row: it decides the Allow… button (the microphone has a macOS prompt, system audio has not). */
-  id: "mic" | "sys";
+  id: "mic" | "sys" | "cal";
   label: string;
+  /** The Allow… button's label when it differs (Settings › Privacy: **Allow Calendar Access**). */
+  allowLabel?: string;
   state: PermissionRowState;
   /** setup (first run, with the reason), status (Settings: nothing once granted) or test-only (the self-test sheet). */
   variant?: "setup" | "status" | "test-only";
@@ -36,12 +38,12 @@ const WORD: Record<PermissionRowState, MsgKey> = {
 // @cpt-dod:cpt-noter-dod-ui-first-run-components:p1
 // @cpt-component:cpt-noter-component-ui-permission-check-row:p1
 /** permission-check-row: one macOS permission with its state word, the reason, the how-to and the one button that moves it on. */
-export function PermissionCheckRow({ id, label, state, variant = "setup", detail, why, howto, hearing, onAllow, onOpenSettings }: PermissionCheckRowProps) {
+export function PermissionCheckRow({ id, label, allowLabel, state, variant = "setup", detail, why, howto, hearing, onAllow, onOpenSettings }: PermissionCheckRowProps) {
   const icon =
     state === "GRANTED" ? <Icon name="checkCircle" size={15} /> : state === "CHECKING" ? <Progress variant="spinner" label={t("permission.checking_label")} /> : state === "NOT_ASKED" ? <Icon name="info" size={15} /> : <Icon name="warning" size={15} />;
   let action: React.ReactNode = null;
   // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-allow-mic
-  if (state === "NOT_ASKED" && id === "mic") action = <PushButton label={t("permission.allow")} onAction={onAllow} />;
+  if (state === "NOT_ASKED" && id !== "sys") action = <PushButton label={allowLabel ?? t("permission.allow")} onAction={onAllow} />;
   // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-allow-mic
   else if (variant === "test-only" && state === "NOT_ASKED") action = <PushButton label={t("permission.continue")} variant="primary" onAction={onAllow} />;
   // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-else-mic-denied

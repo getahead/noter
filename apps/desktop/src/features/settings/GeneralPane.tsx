@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
@@ -7,6 +9,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { Toggle } from "../../ui/primitives/toggle";
 import { saveSection, unignoreKey } from "./actions";
+import { SelfTestSheet } from "./SelfTestSheet";
 import { Group, Row } from "./form";
 import { choices, type PaneProps } from "./pane-props";
 
@@ -24,6 +27,7 @@ const Warn = ({ children }: { children: string }) => (
 export function GeneralPane({ bridge, settings }: PaneProps) {
   const { general, today } = settings;
   const selfTestPassed = useWindow(bridge, (s) => s.whole.setup?.self_test.type === "passed");
+  const [selfTest, setSelfTest] = useState(false);
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
   return (
     <>
@@ -31,7 +35,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.general.launch")}>
           <Toggle on={general.launch_at_login} size="small" ariaLabel={t("settings.general.launch")} onAction={(launch_at_login) => general_({ launch_at_login })} />
         </Row>
-        <Row label={t("settings.general.offer")} note={selfTestPassed ? t("settings.general.offer_note") : <Warn>{t("settings.general.needs_self_test")}</Warn>}>
+        <Row label={t("settings.general.offer")} note={selfTestPassed ? t("settings.general.offer_note") : <><Warn>{t("settings.general.needs_self_test")}</Warn> <PushButton label={t("settings.general.run_self_test")} size="small" onAction={() => setSelfTest(true)} /></>}>
           <Toggle on={selfTestPassed && general.offer_to_record} size="small" disabled={!selfTestPassed} ariaLabel={t("settings.general.offer")} onAction={(offer_to_record) => general_({ offer_to_record })} />
         </Row>
         {!general.notifications_enabled && (
@@ -81,6 +85,12 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
           <PopupButton options={RANKING} value={today.ranking} label={t("settings.general.ranking")} onAction={(v) => void saveSection(bridge, "today", { ranking: v as typeof today.ranking })} />
         </Row>
       </Group>
+      <Group>
+        <Row label={t("settings.general.setup")} note={t("settings.general.setup_note")}>
+          <PushButton label={t("settings.general.run_setup")} onAction={() => void bridge.core.windowNavigate({ target: { type: "first_run" } })} />
+        </Row>
+      </Group>
+      {selfTest && <SelfTestSheet bridge={bridge} onClose={() => setSelfTest(false)} />}
     </>
   );
 }

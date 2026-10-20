@@ -1,9 +1,15 @@
+import { useState } from "react";
+
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { saveSection } from "./actions";
+import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
+import { PushButton } from "../../ui/primitives/push-button";
 import { Group, Row } from "./form";
+import { rowState } from "./permissions";
+import { SelfTestSheet } from "./SelfTestSheet";
 import { GlossaryGroup } from "./GlossaryGroup";
 import { ModelsGroup } from "./ModelsGroup";
 import { choices, type PaneProps } from "./pane-props";
@@ -19,6 +25,8 @@ const BACKENDS = choices({
 export function AudioPane({ bridge, settings }: PaneProps) {
   const { audio } = settings;
   const device = useWindow(bridge, (s) => s.whole.environment?.output_device);
+  const permissions = useWindow(bridge, (s) => s.whole.setup?.permissions);
+  const [selfTest, setSelfTest] = useState(false);
   const headphones = device ? audio.output.headphones_devices.includes(device.uid) : false;
   const save = (edits: Partial<typeof audio>) => void saveSection(bridge, "audio", edits);
   return (
@@ -46,7 +54,17 @@ export function AudioPane({ bridge, settings }: PaneProps) {
         </Row>
       </Group>
       <GlossaryGroup bridge={bridge} />
+      <Group title={t("settings.audio.permissions")}>
+        <PermissionCheckRow id="mic" variant="status" label={t("permission.mic")} state={rowState("microphone", permissions)} onAllow={() => void bridge.act("permission:microphone", "permission_request", () => bridge.core.permissionRequest({ kind: "microphone" }))} onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "microphone" } })} />
+        <PermissionCheckRow id="sys" variant="status" label={t("permission.sys")} state={rowState("system_audio", permissions)} onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "system_audio" } })} />
+        <Row label={t("settings.audio.self_test")} note={t("settings.audio.self_test_note")}>
+          {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-selftest */}
+          <PushButton label={t("settings.general.run_self_test")} onAction={() => setSelfTest(true)} />
+          {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-selftest */}
+        </Row>
+      </Group>
       <ModelsGroup bridge={bridge} />
+      {selfTest && <SelfTestSheet bridge={bridge} onClose={() => setSelfTest(false)} />}
     </>
   );
 }

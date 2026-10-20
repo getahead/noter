@@ -218,3 +218,29 @@ describe("panes", () => {
     expect(stored().copilot.dismiss_with_keys).toBe(true);
   });
 });
+
+describe("panes built on the first-run components", () => {
+  it("Privacy: the Calendar row asks through permission_request and offers Manage on Person Pages", async () => {
+    await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "calendar" && (p.state = "not_asked")));
+    const html = renderToString(<PrivacyPane bridge={bridge} settings={stored()} />);
+    expect(html).toContain("Calendar");
+    expect(html).toContain("Allow Calendar Access");
+    expect(html).toContain("Manage on Person Pages");
+  });
+
+  it("Audio: permission rows and the self-test button; General: Run Setup Again", async () => {
+    await ready();
+    const audio = renderToString(<AudioPane bridge={bridge} settings={stored()} />);
+    expect(audio).toContain("Permissions");
+    expect(audio).toContain("Run Audio Self-Test…");
+    expect(audio).toContain("Microphone");
+    expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Run Setup Again…");
+  });
+
+  it("Call screen: the display picker and a pick runs setup_set_call_display", async () => {
+    await ready();
+    const html = renderToString(<CallScreenPane bridge={bridge} settings={stored()} />);
+    expect(html).toContain("Call screen display");
+    expect(html).toContain('data-component="cpt-noter-component-ui-display-picker"');
+  });
+});

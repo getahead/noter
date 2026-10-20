@@ -413,6 +413,16 @@ export const en = {
   "settings.models.update": "Update",
   "settings.models.resume": "Resume",
   "settings.models.empty": "No models are listed yet.",
+  "settings.privacy.calendar": "Calendar",
+  "settings.privacy.allow_calendar": "Allow Calendar Access",
+  "settings.privacy.calendar_note": "The macOS prompt follows. Noter never asks during a recording.",
+  "settings.privacy.voice_profiles_manage": "Manage on Person Pages",
+  "settings.audio.permissions": "Permissions",
+  "settings.audio.self_test": "Audio self-test",
+  "settings.audio.self_test_note": "With Exclude Noter’s own sounds on, the test also checks that Noter’s own sounds stay out.",
+  "settings.selftest.title": "Run Audio Self-Test",
+  "settings.selftest.sub": "Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.",
+  "settings.call.display_label": "Call screen display",
 } as const;
 
 export type MsgKey = keyof typeof en;

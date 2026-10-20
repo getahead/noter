@@ -4,6 +4,9 @@ import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { Toggle } from "../../ui/primitives/toggle";
 import { saveSection } from "./actions";
+import { DisplayPicker } from "../../ui/setup/display-picker";
+import { AUTO_DISPLAY, defaultDisplay } from "../first-run/default-display";
+import { useWindow } from "../../app/use-window";
 import { Group, Row } from "./form";
 import { choices, type PaneProps } from "./pane-props";
 
@@ -18,9 +21,20 @@ const QUICK: { action: HotkeyAction; label: string }[] = [
 
 export function CallScreenPane({ bridge, settings }: PaneProps) {
   const { call_screen: call, menu_bar: bar } = settings;
+  const displays = useWindow(bridge, (s) => s.whole.environment?.displays) ?? [];
   return (
     <>
       <Group title={t("settings.call.screen")}>
+        {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-display */}
+        <Row label={t("settings.call.display")} stack>
+          <DisplayPicker
+            name="st-display"
+            picker={defaultDisplay(displays, call.display_id ?? null)}
+            displays={displays}
+            onSelect={(v) => void bridge.act("display:set", "setup_set_call_display", () => bridge.core.setupSetCallDisplay({ display_id: v === AUTO_DISPLAY ? null : v }), { slice: "setup" })}
+          />
+        </Row>
+        {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-display */}
         <Row label={t("settings.call.layout")}>
           <PopupButton options={LAYOUT} value={call.layout} label={t("settings.call.layout")} onAction={(v) => void saveSection(bridge, "call_screen", { layout: v as typeof call.layout })} />
         </Row>

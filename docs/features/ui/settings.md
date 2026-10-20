@@ -131,10 +131,10 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 5. [x] - `p1` - **MATCH** the pane-specific control - `inst-match-control`
    - [x] - `p1` - **CASE** **Apps Noter doesn't ask about** › **Remove**: `settings_unignore_app` (bundle id) - `inst-case-unignore`
    - [x] - `p1` - **CASE** Glossary **+**, edit or **−**: `glossary_upsert` or `glossary_remove`; a new term leads to proposals in Activity (M5) - `inst-case-glossary`
-   - [ ] - `p1` - **CASE** **Run Audio Self-Test…**: open the self-test sheet with the self-test panel (sheet variant, `self_test_run`) - `inst-case-selftest`
+   - [x] - `p1` - **CASE** **Run Audio Self-Test…**: open the self-test sheet with the self-test panel (sheet variant, `self_test_run`) - `inst-case-selftest`
    - [x] - `p1` - **CASE** Models › download or update: `models_download` - `inst-case-models`
-   - [ ] - `p1` - **CASE** **Call screen display**: the display picker, `setup_set_call_display` - `inst-case-display`
-   - [ ] - `p1` - **CASE** **Allow Calendar Access** (Privacy): `permission_request` (calendar) - `inst-case-calendar`
+   - [x] - `p1` - **CASE** **Call screen display**: the display picker, `setup_set_call_display` - `inst-case-display`
+   - [x] - `p1` - **CASE** **Allow Calendar Access** (Privacy): `permission_request` (calendar) - `inst-case-calendar`
    - [x] - `p1` - **CASE** **Open System Settings…**: `open_external` (M1) - `inst-case-open`
    - [x] - `p1` - **CASE** **Restart Now**: `update_install` - `inst-case-update`
 6. [x] - `p1` - Store: `settings:changed` replaces the slice; the control shows the stored value - `inst-store-settings`

@@ -12,6 +12,8 @@ import { Toggle } from "../../ui/primitives/toggle";
 import { modeIndicator } from "../shell/mode-indicator";
 import { saveSection } from "./actions";
 import { Group, Row } from "./form";
+import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
+import { rowState } from "./permissions";
 import { ShareTestSheet } from "./ShareTestSheet";
 import { choices, type PaneProps } from "./pane-props";
 
@@ -29,6 +31,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
   const inForce = modeIndicator({ mode: privacy.mode, degraded, sensitiveCall: false });
   const due = audio.retention_next_run_deletes;
   const [sheet, setSheet] = useState(false);
+  const calendar = rowState("calendar", useWindow(bridge, (s) => s.whole.setup?.permissions));
   return (
     <>
       <Group>
@@ -41,8 +44,22 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.privacy.retention")} note={due ? t("settings.privacy.retention_due", { count: due }) : t("settings.privacy.retention_none")}>
           <PopupButton options={RETENTION} value={audio.retention} label={t("settings.privacy.retention")} onAction={(v) => void saveSection(bridge, "audio", { retention: v as typeof audio.retention })} />
         </Row>
+        {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-calendar */}
+        <PermissionCheckRow
+          id="cal"
+          variant="status"
+          label={t("settings.privacy.calendar")}
+          allowLabel={t("settings.privacy.allow_calendar")}
+          state={calendar}
+          onAllow={() => void bridge.act("permission:calendar", "permission_request", () => bridge.core.permissionRequest({ kind: "calendar" }))}
+          onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "calendar" } })}
+        />
+        {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-calendar */}
         <Row label={t("settings.privacy.metrics")} note={t("settings.privacy.metrics_note")}>
           <Toggle on={privacy.behaviour_metrics} size="small" ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
+        </Row>
+        <Row label={t("settings.privacy.voice_profiles")}>
+          <PushButton label={t("settings.privacy.voice_profiles_manage")} size="small" onAction={() => void bridge.core.windowNavigate({ target: null })} />
         </Row>
       </Group>
       <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
