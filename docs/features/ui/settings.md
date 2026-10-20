@@ -37,11 +37,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-settings`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-settings`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-settings`
+- [x] `p1` - `cpt-noter-feature-ui-settings`
 
 ### 1.1 Overview
 
@@ -295,11 +295,11 @@ The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indi
 
 ## 6. Acceptance Criteria
 
-- [ ] Every Settings state of the prototype's `ST` State menu for the panes this feature builds renders identically (General, Audio & Transcription, Privacy rows, Call Screen & Menu Bar, Hotkeys, Updates, search)
-- [ ] A change applies without a Save button and survives a window reload (it comes back from `settings_get`)
-- [ ] No hotkey can be set without a modifier; Esc always ends recording
-- [ ] Searching for a word in a pane's keywords lists that pane; a word in none shows **No settings match “…”**
-- [ ] The Models & Runtimes, Repositories, Knowledge Sources and Maintenance panes show their frames and state their later milestone instead of a blank area
+- [x] Every Settings state of the prototype's `ST` State menu for the panes this feature builds renders identically (General, Audio & Transcription, Privacy rows, Call Screen & Menu Bar, Hotkeys, Updates, search)
+- [x] A change applies without a Save button and survives a window reload (it comes back from `settings_get`)
+- [x] No hotkey can be set without a modifier; Esc always ends recording
+- [x] Searching for a word in a pane's keywords lists that pane; a word in none shows **No settings match “…”**
+- [x] The Models & Runtimes, Repositories, Knowledge Sources and Maintenance panes show their frames and state their later milestone instead of a blank area
 
 ## 7. Additional Context
 

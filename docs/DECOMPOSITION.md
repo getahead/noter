@@ -467,7 +467,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.7 [Settings window](features/ui/settings.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-settings`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-settings`
 
 - **Purpose**: Give every setting one home in a separate Settings window with 11 panes and a search field, applied at once, with each failure's fix beside it, and make hotkeys and card keys safe to change before a call.
 
