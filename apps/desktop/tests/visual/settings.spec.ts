@@ -97,7 +97,7 @@ test.describe("states of the prototype's Settings › State menu", () => {
   });
 
   test("share-test sheet", async ({ page }) => {
-    await show(page, "privacy");
+    await show(page, "privacy", { world: (w) => (w.app.capture.phase = "idle") });
     await page.getByRole("button", { name: "Screen Share Test…" }).click();
     await expect(page.getByRole("dialog", { name: "Screen Share Test" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Call window" })).toBeVisible();
@@ -105,7 +105,7 @@ test.describe("states of the prototype's Settings › State menu", () => {
   });
 
   test("share-test sheet: capture test ran, with Screen Recording granted", async ({ page }) => {
-    await show(page, "privacy", { world: (w) => w.app.environment.permissions.forEach((p) => p.kind === "screen_recording" && (p.state = "granted")) });
+    await show(page, "privacy", { world: (w) => ((w.app.capture.phase = "idle"), w.app.environment.permissions.forEach((p) => p.kind === "screen_recording" && (p.state = "granted"))) });
     await page.getByRole("button", { name: "Screen Share Test…" }).click();
     await page.getByRole("button", { name: "Run Capture Test" }).click();
     await expect(page.getByText("On your screen")).toBeVisible();
@@ -113,7 +113,7 @@ test.describe("states of the prototype's Settings › State menu", () => {
   });
 
   test("share-test sheet: Screen Recording asked once", async ({ page }) => {
-    await show(page, "privacy", { world: (w) => w.app.environment.permissions.forEach((p) => p.kind === "screen_recording" && (p.state = "not_asked")) });
+    await show(page, "privacy", { world: (w) => ((w.app.capture.phase = "idle"), w.app.environment.permissions.forEach((p) => p.kind === "screen_recording" && (p.state = "not_asked"))) });
     await page.getByRole("button", { name: "Screen Share Test…" }).click();
     await page.getByRole("button", { name: "Run Capture Test" }).click();
     await expect(page.getByText("Screen Recording · needed for this test only")).toBeVisible();
