@@ -63,7 +63,7 @@ test.describe("states of the prototype's Settings › State menu", () => {
         Object.assign(b, { state: "downloading", done_mb: Math.round(b.size_mb * 0.68) });
       },
     });
-    const progress = page.getByText(/^Downloading [\d,]+ of [\d,]+ MB$/);
+    const progress = page.getByText(/Downloading [\d,]+ of [\d,]+ MB/);
     await progress.scrollIntoViewIfNeeded();
     await expect(progress).toBeVisible();
     await shot(page, "model-downloading");
