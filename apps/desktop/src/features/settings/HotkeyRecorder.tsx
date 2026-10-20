@@ -5,8 +5,9 @@ import { Icon } from "../../ui/icons";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { KeyCap } from "../../ui/primitives/key-cap";
 import type { HotkeyAnswer } from "./actions";
-import { checkChord, type ChordModifiers } from "./chord";
+import type { ChordModifiers } from "./chord";
 import { IDLE_RECORDER, recorderReduce, type RecorderState } from "./recorder";
+import { onRecordKey } from "./recorder-key";
 
 export interface HotkeyRecorderProps {
   id: string;
@@ -42,17 +43,15 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
 
   // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
-    if (!recording || e.repeat) return;
+    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
+    const out = onRecordKey(recording, e, variant === "modifier-set" ? "modifier-set" : "single");
+    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
+    if (!out) return;
     e.preventDefault();
     e.stopPropagation();
-    const modifiers = { control: e.ctrlKey, option: e.altKey, command: e.metaKey, shift: e.shiftKey };
-    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
-    // the core owns the VoiceOver state: it refuses the chord with `hotkey_reserved`, so it is not read here
-    const result = checkChord({ code: e.code, modifiers, variant: variant === "modifier-set" ? "modifier-set" : "single", voiceOver: false });
-    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
-    dispatch({ type: "chord", result });
-    if (result.type === "accept") void settle(onRecord?.({ code: result.code, modifiers: result.modifiers }));
-    else if (result.type === "clear") void settle(onClear?.());
+    dispatch(out.event);
+    if (out.send?.type === "record") void settle(onRecord?.({ code: out.send.code, modifiers: out.send.modifiers }));
+    else if (out.send?.type === "clear") void settle(onClear?.());
   };
   // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
 
