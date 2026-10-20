@@ -39,11 +39,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-core-bridge`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-core-bridge`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-core-bridge`
+- [x] `p1` - `cpt-noter-feature-ui-core-bridge`
 
 ### 1.1 Overview
 
@@ -85,7 +85,7 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 
 ### Open or reload a window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-open-window`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-open-window`
 
 **Actor**: Primary user
 
@@ -108,12 +108,12 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 7. [x] - `p1` - Algorithm: apply each slice with `cpt-noter-algo-ui-core-bridge-apply-whole-state` - `inst-apply-snapshot`
 8. [x] - `p1` - UI: the screen the window shows calls its own read commands and Channels through `cpt-noter-algo-ui-core-bridge-snapshot-then-stream` - `inst-screen-reads`
 9. [x] - `p1` - **IF** a read takes longer than 300 ms - `inst-if-slow`
-   1. [ ] - `p1` - UI: the region shows skeleton rows until the data arrives (DESIGN state "Window reloaded") - `inst-skeleton`
+   1. [x] - `p1` - UI: the region shows skeleton rows until the data arrives (DESIGN state "Window reloaded") - `inst-skeleton`
 10. [x] - `p1` - **RETURN** a window rendering only what the core sent - `inst-return-window`
 
 ### Act on a record
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-act`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-act`
 
 **Actor**: Primary user
 
@@ -126,7 +126,7 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 - The window may not call the command (`window_not_allowed`): the screen shows its section-level error; this is a bug and is logged
 
 **Steps**:
-1. [ ] - `p1` - User acts on a control (click, key, menu item) - `inst-user-acts`
+1. [x] - `p1` - User acts on a control (click, key, menu item) - `inst-user-acts`
 2. [x] - `p1` - UI: the control enters its loading state; nothing in the store changes yet (no optimistic writes) - `inst-loading`
 3. [x] - `p1` - API: the screen calls the bridge method for the command with the wanted state (never a toggle) and the record's `rev` for edits - `inst-api-command`
 4. [x] - `p1` - **IF** the result is `ok` - `inst-if-ok`

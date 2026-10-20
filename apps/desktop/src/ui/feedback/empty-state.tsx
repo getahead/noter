@@ -13,12 +13,14 @@ export interface EmptyStateProps {
   onAction?: () => void;
   linkLabel?: string;
   onLink?: () => void;
+  /** The title is the page's heading: an h2 the shell moves focus to after navigation. */
+  heading?: boolean;
 }
 
 const root = (variant: string) => ({ "data-component": "cpt-noter-component-ui-empty-state", "data-variant": variant });
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
-export function EmptyState({ variant = "first-use", title, body, icon = "inbox", actionLabel, onAction, linkLabel, onLink }: EmptyStateProps) {
+export function EmptyState({ variant = "first-use", title, body, icon = "inbox", actionLabel, onAction, linkLabel, onLink, heading }: EmptyStateProps) {
   if (variant === "section") return <div {...root(variant)} className="np-empty np-empty--section">{title}</div>;
   return (
     <div {...root(variant)} className={`np-empty np-empty--${variant}`}>
@@ -27,7 +29,13 @@ export function EmptyState({ variant = "first-use", title, body, icon = "inbox",
           <Icon name={icon} size={28} />
         </div>
       )}
-      <div className="np-empty__title">{title}</div>
+      {heading ? (
+        <h2 className="np-empty__title" tabIndex={-1}>
+          {title}
+        </h2>
+      ) : (
+        <div className="np-empty__title">{title}</div>
+      )}
       {body && <div className="np-empty__body">{body}</div>}
       {actionLabel && (
         <div className="np-empty__act">

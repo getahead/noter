@@ -14,7 +14,21 @@ export interface FrameInput {
 // and the window "comes back exactly as it was".
 // @cpt-state:cpt-noter-state-ui-main-window-shell-frame:p1
 export function frameState({ snapshotApplied, phase, hidden }: FrameInput): FrameState {
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-loading-ready
   if (!snapshotApplied) return "LOADING";
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-loading-ready
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-ready-hidden
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-capturing-hidden
   if (hidden) return "HIDDEN_FOR_PRESENTING";
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-capturing-hidden
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-ready-hidden
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-ready-capturing
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-capturing-ready
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-hidden-ready
+  // @cpt-begin:cpt-noter-state-ui-main-window-shell-frame:p1:inst-hidden-capturing
   return phase === "recording" || phase === "paused" ? "CAPTURING" : "READY";
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-hidden-capturing
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-hidden-ready
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-capturing-ready
+  // @cpt-end:cpt-noter-state-ui-main-window-shell-frame:p1:inst-ready-capturing
 }

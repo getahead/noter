@@ -59,4 +59,13 @@ describe("collapse", () => {
   it("keeps the earlier steps when the sidebar collapses", () => {
     expect(run({ windowWidth: 800, need: { full: 900, singleColumn: 800, fewerColumns: 500 } })).toMatchObject({ step: "sidebar", sidebar: "overlay", columns: "reduced", grid: "single" });
   });
+
+  it("takes the width the page sees at the zoom in force: 200 % of a 1440-pt window is 720 pt of layout (QA Q-1)", () => {
+    const zoom = 200;
+    const r = collapse({ windowWidth: 1440 / (zoom / 100), zoom, sidebarWidth: 220, inspectorWidth: null, need: { full: 900, singleColumn: 480, fewerColumns: 320 } });
+    // 720 − 220 = 500 pt of content: Narrow, and a page that needs 900 pt goes to one column; the sidebar is an overlay
+    expect(r).toMatchObject({ widthClass: "narrow", grid: "single", sidebar: "overlay", step: "sidebar" });
+    // the same window at 100 % keeps everything docked
+    expect(collapse({ windowWidth: 1440, zoom: 100, sidebarWidth: 220, inspectorWidth: null, need: { full: 900, singleColumn: 480, fewerColumns: 320 } })).toMatchObject({ widthClass: "wide", grid: "multi", sidebar: "docked", step: "none" });
+  });
 });

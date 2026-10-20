@@ -34,6 +34,10 @@ describe("EmptyState (cpt-noter-dod-ui-primitives-feedback)", () => {
     expect(onLink).toHaveBeenCalledOnce();
   });
 
+  it("a page's empty state makes its title a focusable heading", () => {
+    expect(renderToString(<EmptyState variant="large" heading title="Calls is not built yet" />)).toContain('<h2 class="np-empty__title" tabindex="-1">Calls is not built yet</h2>');
+  });
+
   it("the action runs the owner's handler", () => {
     const onAction = vi.fn();
     const button = find(rendered(EmptyState, { title: "No calls", actionLabel: "Record", onAction }), (p) => p.label === "Record");

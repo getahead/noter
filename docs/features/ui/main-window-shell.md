@@ -40,11 +40,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-main-window-shell`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-main-window-shell`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-main-window-shell`
+- [x] `p1` - `cpt-noter-feature-ui-main-window-shell`
 
 ### 1.1 Overview
 
@@ -79,7 +79,7 @@ It implements `cpt-noter-component-shell-main-window`, the main-window row of `c
 
 ### Navigate between sections
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-navigate`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-navigate`
 
 **Actor**: Primary user
 
@@ -91,16 +91,16 @@ It implements `cpt-noter-component-shell-main-window`, the main-window row of `c
 - The section's feature has not shipped yet: the page shows an empty state naming the section, never a blank area
 
 **Steps**:
-1. [ ] - `p1` - User selects a sidebar item, presses ⌘1 to ⌘8, uses Back or Forward (⌘[ and ⌘]), or opens a row - `inst-user-nav`
-2. [ ] - `p1` - Algorithm: update the history with `cpt-noter-algo-ui-main-window-shell-history` - `inst-history`
-3. [ ] - `p1` - UI: render the page registered for the route in MW-R3; restore its view state (scroll, selection) from the store's view state - `inst-render-page`
-4. [ ] - `p1` - UI: mark the section selected in the sidebar; disable Back or Forward at the ends of the history - `inst-mark-section`
-5. [ ] - `p1` - UI: move focus to the page heading - `inst-focus-heading`
-6. [ ] - `p1` - **RETURN** the page - `inst-return-page`
+1. [x] - `p1` - User selects a sidebar item, presses ⌘1 to ⌘8, uses Back or Forward (⌘[ and ⌘]), or opens a row - `inst-user-nav`
+2. [x] - `p1` - Algorithm: update the history with `cpt-noter-algo-ui-main-window-shell-history` - `inst-history`
+3. [x] - `p1` - UI: render the page registered for the route in MW-R3; restore its view state (scroll, selection) from the store's view state - `inst-render-page`
+4. [x] - `p1` - UI: mark the section selected in the sidebar; disable Back or Forward at the ends of the history - `inst-mark-section`
+5. [x] - `p1` - UI: move focus to the page heading - `inst-focus-heading`
+6. [x] - `p1` - **RETURN** the page - `inst-return-page`
 
 ### React to app-level state
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-app-state`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-app-state`
 
 **Actor**: Noter core
 
@@ -114,22 +114,22 @@ It implements `cpt-noter-component-shell-main-window`, the main-window row of `c
 - Several banners wait: the most severe shows with **+2 More**
 
 **Steps**:
-1. [ ] - `p1` - Core: sends `banners:changed`, `capture:state`, `privacy:changed`, `proposals:counts`, `degraded:changed`, `app:presenting` or `nav:request` - `inst-core-event`
-2. [ ] - `p1` - Store: apply the whole state with the bridge's version rule - `inst-apply`
-3. [ ] - `p1` - **IF** banners changed - `inst-if-banners`
-   1. [ ] - `p1` - UI: fill MW-R5 through the inline banner's slot ordering (error, warning, degraded, info) - `inst-fill-banner`
-4. [ ] - `p1` - **IF** capture is recording or paused - `inst-if-capture`
-   1. [ ] - `p1` - UI: show the live-call row at the top of the source list (recording indicator, live-row variant); a click calls `window_show_call` without making the call window key and keeps the sidebar selection - `inst-live-row`
-5. [ ] - `p1` - UI: the status footer shows the mode indicator's sidebar variant: **Idle · API key · local fallback ready**, **Recording · Planning**, **Local only**, **Switched to local** or **No assistant** - `inst-footer`
-6. [ ] - `p1` - **IF** a navigation request arrives (`nav:request`, M1) - `inst-if-nav`
-   1. [ ] - `p2` - UI: navigate to its target without activating the window when the request says so (the Call page loaded in the background after a stop, D81) - `inst-nav-request`
-7. [ ] - `p1` - **IF** the user chooses a banner action - `inst-if-banner-action`
-   1. [ ] - `p1` - API: run the action's command (`update_install`, `banner_dismiss`, or the action owned by another feature) - `inst-api-banner`
-8. [ ] - `p1` - **RETURN** the frame showing the core's state - `inst-return-frame`
+1. [x] - `p1` - Core: sends `banners:changed`, `capture:state`, `privacy:changed`, `proposals:counts`, `degraded:changed`, `app:presenting` or `nav:request` - `inst-core-event`
+2. [x] - `p1` - Store: apply the whole state with the bridge's version rule - `inst-apply`
+3. [x] - `p1` - **IF** banners changed - `inst-if-banners`
+   1. [x] - `p1` - UI: fill MW-R5 through the inline banner's slot ordering (error, warning, degraded, info) - `inst-fill-banner`
+4. [x] - `p1` - **IF** capture is recording or paused - `inst-if-capture`
+   1. [x] - `p1` - UI: show the live-call row at the top of the source list (recording indicator, live-row variant); a click calls `window_show_call` without making the call window key and keeps the sidebar selection - `inst-live-row`
+5. [x] - `p1` - UI: the status footer shows the mode indicator's sidebar variant: **Idle · API key · local fallback ready**, **Recording · Planning**, **Local only**, **Switched to local** or **No assistant** - `inst-footer`
+6. [x] - `p1` - **IF** a navigation request arrives (`nav:request`, M1) - `inst-if-nav`
+   1. [x] - `p2` - UI: navigate to its target without activating the window when the request says so (the Call page loaded in the background after a stop, D81) - `inst-nav-request`
+7. [x] - `p1` - **IF** the user chooses a banner action - `inst-if-banner-action`
+   1. [x] - `p1` - API: run the action's command (`update_install`, `banner_dismiss`, or the action owned by another feature) - `inst-api-banner`
+8. [x] - `p1` - **RETURN** the frame showing the core's state - `inst-return-frame`
 
 ### Resize, zoom and collapse
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-resize`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-resize`
 
 **Actor**: Primary user
 
@@ -141,14 +141,14 @@ It implements `cpt-noter-component-shell-main-window`, the main-window row of `c
 - None
 
 **Steps**:
-1. [ ] - `p1` - User resizes the window, zooms (⌘+, ⌘−, ⌘0) or hides the sidebar (⌃⌘S) - `inst-user-resize`
-2. [ ] - `p1` - Algorithm: compute the width class and the collapse step with `cpt-noter-algo-ui-main-window-shell-collapse` - `inst-collapse`
-3. [ ] - `p1` - UI: apply the width class to the page and the toolbar overflow » at Narrow; Back, the page title and the primary action never overflow - `inst-apply-width`
-4. [ ] - `p1` - **RETURN** the reflowed frame - `inst-return-reflow`
+1. [x] - `p1` - User resizes the window, zooms (⌘+, ⌘−, ⌘0) or hides the sidebar (⌃⌘S) - `inst-user-resize`
+2. [x] - `p1` - Algorithm: compute the width class and the collapse step with `cpt-noter-algo-ui-main-window-shell-collapse` - `inst-collapse`
+3. [x] - `p1` - UI: apply the width class to the page and the toolbar overflow » at Narrow; Back, the page title and the primary action never overflow - `inst-apply-width`
+4. [x] - `p1` - **RETURN** the reflowed frame - `inst-return-reflow`
 
 ### Read the privacy mode
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-mode`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-main-window-shell-mode`
 
 **Actor**: Primary user
 
@@ -160,104 +160,104 @@ It implements `cpt-noter-component-shell-main-window`, the main-window row of `c
 - The mode is degraded (**Switched to local**, **No assistant**): the indicator uses the warning glyph and word; the reason is in the copilot banner or the menu bar line, not here
 
 **Steps**:
-1. [ ] - `p1` - Core: sends the privacy status (`privacy:changed`, also in `app_snapshot`) with the mode in force and the runtime - `inst-core-privacy`
-2. [ ] - `p1` - UI: render the variant of the host (sidebar footer, call header, floating mode line, glyph only, Ask toolbar, Call info, Settings, menu bar text) with glyph and word, plus the runtime name where the variant has one - `inst-render-mode`
-3. [ ] - `p1` - User presses the indicator (Space, Return or click) - `inst-user-mode`
-4. [ ] - `p1` - UI: open the popover with the mode's explanation; **Open Privacy Settings** calls `window_navigate` to Settings › Privacy (M1; in M0 the Settings window opens through the app menu ⌘,) - `inst-mode-popover`
-5. [ ] - `p1` - **RETURN** the popover, closed by Esc with focus back on the indicator - `inst-return-mode`
+1. [x] - `p1` - Core: sends the privacy status (`privacy:changed`, also in `app_snapshot`) with the mode in force and the runtime - `inst-core-privacy`
+2. [x] - `p1` - UI: render the variant of the host (sidebar footer, call header, floating mode line, glyph only, Ask toolbar, Call info, Settings, menu bar text) with glyph and word, plus the runtime name where the variant has one - `inst-render-mode`
+3. [x] - `p1` - User presses the indicator (Space, Return or click) - `inst-user-mode`
+4. [x] - `p1` - UI: open the popover with the mode's explanation; **Open Privacy Settings** calls `window_navigate` to Settings › Privacy (M1; in M0 the Settings window opens through the app menu ⌘,) - `inst-mode-popover`
+5. [x] - `p1` - **RETURN** the popover, closed by Esc with focus back on the indicator - `inst-return-mode`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Keep one history
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-main-window-shell-history`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-main-window-shell-history`
 
 **Input**: the current history (list and index), each section's last location, and the requested move (section, push, back, forward, replace)
 
 **Output**: the new history and the route to show
 
 **Steps**:
-1. [ ] - `p1` - **MATCH** the move - `inst-match-move`
-   - [ ] - `p1` - **CASE** section: route to that section's last location, or its root; push it - `inst-case-section`
-   - [ ] - `p1` - **CASE** push: drop the entries after the index, append the route - `inst-case-push`
-   - [ ] - `p1` - **CASE** back or forward: move the index by one when possible - `inst-case-back`
-   - [ ] - `p1` - **CASE** replace: replace the entry at the index - `inst-case-replace`
-2. [ ] - `p1` - Remember the route as its section's last location - `inst-remember-section`
-3. [ ] - `p1` - Close the inspector unless the move keeps it (an inspector opened for an item on the same page) - `inst-close-inspector`
-4. [ ] - `p1` - **RETURN** the history and the route - `inst-return-history`
+1. [x] - `p1` - **MATCH** the move - `inst-match-move`
+   - [x] - `p1` - **CASE** section: route to that section's last location, or its root; push it - `inst-case-section`
+   - [x] - `p1` - **CASE** push: drop the entries after the index, append the route - `inst-case-push`
+   - [x] - `p1` - **CASE** back or forward: move the index by one when possible - `inst-case-back`
+   - [x] - `p1` - **CASE** replace: replace the entry at the index - `inst-case-replace`
+2. [x] - `p1` - Remember the route as its section's last location - `inst-remember-section`
+3. [x] - `p1` - Close the inspector unless the move keeps it (an inspector opened for an item on the same page) - `inst-close-inspector`
+4. [x] - `p1` - **RETURN** the history and the route - `inst-return-history`
 
 ### Width class and collapse order
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-main-window-shell-collapse`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-main-window-shell-collapse`
 
 **Input**: window width, zoom, sidebar width (180 to 320 pt) and whether an inspector is docked
 
 **Output**: width class and collapse step
 
 **Steps**:
-1. [ ] - `p1` - Content width = window width − sidebar − docked inspector - `inst-content-width`
-2. [ ] - `p1` - Class: Wide at 1100 pt or more, Medium 760 to 1099 pt, Narrow below 760 pt - `inst-class`
-3. [ ] - `p1` - **IF** the content is below the page's need with the inspector docked: the inspector overlays from the trailing edge - `inst-step-inspector`
-4. [ ] - `p1` - **IF** still short: multi-column grids become one column - `inst-step-grid`
-5. [ ] - `p1` - **IF** still short: low-priority table columns hide, as each screen names them - `inst-step-columns`
-6. [ ] - `p1` - **IF** the window is narrower than 900 pt or the zoom is 175 % or more: the sidebar collapses and opens as an overlay from the leading edge - `inst-step-sidebar`
-7. [ ] - `p1` - **RETURN** the class and the step - `inst-return-class`
+1. [x] - `p1` - Content width = window width − sidebar − docked inspector - `inst-content-width`
+2. [x] - `p1` - Class: Wide at 1100 pt or more, Medium 760 to 1099 pt, Narrow below 760 pt - `inst-class`
+3. [x] - `p1` - **IF** the content is below the page's need with the inspector docked: the inspector overlays from the trailing edge - `inst-step-inspector`
+4. [x] - `p1` - **IF** still short: multi-column grids become one column - `inst-step-grid`
+5. [x] - `p1` - **IF** still short: low-priority table columns hide, as each screen names them - `inst-step-columns`
+6. [x] - `p1` - **IF** the window is narrower than 900 pt or the zoom is 175 % or more: the sidebar collapses and opens as an overlay from the leading edge - `inst-step-sidebar`
+7. [x] - `p1` - **RETURN** the class and the step - `inst-return-class`
 
 ## 4. States (CDSL)
 
 ### Main window frame
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-main-window-shell-frame`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-main-window-shell-frame`
 
 **States**: LOADING, READY, CAPTURING, HIDDEN_FOR_PRESENTING
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** READY **WHEN** the app snapshot is applied (skeleton rows show after 300 ms until then, "Window reloaded") - `inst-loading-ready`
-2. [ ] - `p1` - **FROM** READY **TO** CAPTURING **WHEN** capture is recording or paused; the live-call row shows, **Paused** instead of the time while paused - `inst-ready-capturing`
-3. [ ] - `p1` - **FROM** CAPTURING **TO** READY **WHEN** capture stops; the row goes away - `inst-capturing-ready`
-4. [ ] - `p1` - **FROM** READY **TO** HIDDEN_FOR_PRESENTING **WHEN** `app:presenting` reports hidden; the core hides the window - `inst-ready-hidden`
-5. [ ] - `p1` - **FROM** CAPTURING **TO** HIDDEN_FOR_PRESENTING **WHEN** `app:presenting` reports hidden - `inst-capturing-hidden`
-6. [ ] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** READY **WHEN** any show action restores Noter and nothing records; the window comes back exactly as it was - `inst-hidden-ready`
-7. [ ] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** CAPTURING **WHEN** any show action restores Noter while a call records - `inst-hidden-capturing`
+1. [x] - `p1` - **FROM** LOADING **TO** READY **WHEN** the app snapshot is applied (skeleton rows show after 300 ms until then, "Window reloaded") - `inst-loading-ready`
+2. [x] - `p1` - **FROM** READY **TO** CAPTURING **WHEN** capture is recording or paused; the live-call row shows, **Paused** instead of the time while paused - `inst-ready-capturing`
+3. [x] - `p1` - **FROM** CAPTURING **TO** READY **WHEN** capture stops; the row goes away - `inst-capturing-ready`
+4. [x] - `p1` - **FROM** READY **TO** HIDDEN_FOR_PRESENTING **WHEN** `app:presenting` reports hidden; the core hides the window - `inst-ready-hidden`
+5. [x] - `p1` - **FROM** CAPTURING **TO** HIDDEN_FOR_PRESENTING **WHEN** `app:presenting` reports hidden - `inst-capturing-hidden`
+6. [x] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** READY **WHEN** any show action restores Noter and nothing records; the window comes back exactly as it was - `inst-hidden-ready`
+7. [x] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** CAPTURING **WHEN** any show action restores Noter while a call records - `inst-hidden-capturing`
 
 ### Banner slot MW-R5
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-main-window-shell-banner-slot`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-main-window-shell-banner-slot`
 
 **States**: EMPTY, ONE, SEVERAL
 
 **Initial State**: EMPTY
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** EMPTY **TO** ONE **WHEN** the core sends one app banner (self-test, calendar access off, keyword-only search, update ready, quit during a recording) - `inst-empty-one`
-2. [ ] - `p1` - **FROM** ONE **TO** SEVERAL **WHEN** another banner waits; **+2 More** appears - `inst-one-several`
-3. [ ] - `p1` - **FROM** SEVERAL **TO** ONE **WHEN** all but one are resolved or dismissed - `inst-several-one`
-4. [ ] - `p1` - **FROM** ONE **TO** EMPTY **WHEN** it is resolved, or dismissed where its variant allows (the quit banner's × ends its **Resume Recording** offer, PM-67) - `inst-one-empty`
+1. [x] - `p1` - **FROM** EMPTY **TO** ONE **WHEN** the core sends one app banner (self-test, calendar access off, keyword-only search, update ready, quit during a recording) - `inst-empty-one`
+2. [x] - `p1` - **FROM** ONE **TO** SEVERAL **WHEN** another banner waits; **+2 More** appears - `inst-one-several`
+3. [x] - `p1` - **FROM** SEVERAL **TO** ONE **WHEN** all but one are resolved or dismissed - `inst-several-one`
+4. [x] - `p1` - **FROM** ONE **TO** EMPTY **WHEN** it is resolved, or dismissed where its variant allows (the quit banner's × ends its **Resume Recording** offer, PM-67) - `inst-one-empty`
 
 ### Mode indicator
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-main-window-shell-mode-indicator`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-main-window-shell-mode-indicator`
 
 **States**: CLOUD, CLOUD_REDACTED, LOCAL_ONLY, SENSITIVE_LOCAL, SWITCHED_TO_LOCAL, NO_ASSISTANT
 
 **Initial State**: CLOUD_REDACTED
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** CLOUD_REDACTED **TO** CLOUD **WHEN** the user picks **Cloud allowed** in Settings › Privacy - `inst-redacted-cloud`
-2. [ ] - `p1` - **FROM** CLOUD_REDACTED **TO** LOCAL_ONLY **WHEN** the user picks **Local only** - `inst-redacted-local`
-3. [ ] - `p1` - **FROM** CLOUD_REDACTED **TO** SENSITIVE_LOCAL **WHEN** the call in view is sensitive (call surfaces only) - `inst-redacted-sensitive`
-4. [ ] - `p1` - **FROM** CLOUD_REDACTED **TO** SWITCHED_TO_LOCAL **WHEN** the core reports `switched_to_local` in the degraded set; warning glyph and word - `inst-redacted-switched`
-5. [ ] - `p1` - **FROM** SWITCHED_TO_LOCAL **TO** CLOUD_REDACTED **WHEN** the degraded state clears - `inst-switched-redacted`
-6. [ ] - `p1` - **FROM** CLOUD_REDACTED **TO** NO_ASSISTANT **WHEN** the core reports `no_assistant`; warning glyph and word; recording and transcription still work - `inst-redacted-none`
-7. [ ] - `p1` - **FROM** NO_ASSISTANT **TO** CLOUD_REDACTED **WHEN** a key, an account or a local runtime becomes available - `inst-none-redacted`
+1. [x] - `p1` - **FROM** CLOUD_REDACTED **TO** CLOUD **WHEN** the user picks **Cloud allowed** in Settings › Privacy - `inst-redacted-cloud`
+2. [x] - `p1` - **FROM** CLOUD_REDACTED **TO** LOCAL_ONLY **WHEN** the user picks **Local only** - `inst-redacted-local`
+3. [x] - `p1` - **FROM** CLOUD_REDACTED **TO** SENSITIVE_LOCAL **WHEN** the call in view is sensitive (call surfaces only) - `inst-redacted-sensitive`
+4. [x] - `p1` - **FROM** CLOUD_REDACTED **TO** SWITCHED_TO_LOCAL **WHEN** the core reports `switched_to_local` in the degraded set; warning glyph and word - `inst-redacted-switched`
+5. [x] - `p1` - **FROM** SWITCHED_TO_LOCAL **TO** CLOUD_REDACTED **WHEN** the degraded state clears - `inst-switched-redacted`
+6. [x] - `p1` - **FROM** CLOUD_REDACTED **TO** NO_ASSISTANT **WHEN** the core reports `no_assistant`; warning glyph and word; recording and transcription still work - `inst-redacted-none`
+7. [x] - `p1` - **FROM** NO_ASSISTANT **TO** CLOUD_REDACTED **WHEN** a key, an account or a local runtime becomes available - `inst-none-redacted`
 
 ## 5. Definitions of Done
 
 ### Frame, sidebar and toolbar
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-frame`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-frame`
 
 The system **MUST** render MW-R1 to MW-R5 as the prototype's `S.window`, `sidebar()`, `toolbar()`, `bannerSlot()` and `inspectorSlot()` do, with the same regions, classes and data attributes: the glass sidebar with the live-call row, eight sections in three groups with badges (**Activity, 3 waiting, 1 problem** for VoiceOver), the status footer, the 56-pt unified toolbar with Back and Forward in one capsule, the 240 to 360 pt search field, and the inspector slot at 280, 320 or 400 pt.
 
@@ -275,7 +275,7 @@ The system **MUST** render MW-R1 to MW-R5 as the prototype's `S.window`, `sideba
 
 ### History, routing and app menu
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-navigation`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-navigation`
 
 The system **MUST** keep one Back and Forward history across sections with per-section last locations, route ⌘1 to ⌘8, ⌘[, ⌘], ⌃⌘S, ⌥⌘I, ⌘F, ⌘, and ⌘W, let later features register their pages, and publish the app menu model (Noter, File, Edit, View, Call, Window, Help with their shortcuts) for the core to build natively.
 
@@ -291,7 +291,7 @@ The system **MUST** keep one Back and Forward history across sections with per-s
 
 ### Collapse order and zoom
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-collapse`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-collapse`
 
 The system **MUST** apply the Wide, Medium and Narrow classes and the one collapse order to every page, overflow toolbar items into » from the trailing side, and reflow up to 200 % zoom without horizontal scrolling.
 
@@ -306,7 +306,7 @@ The system **MUST** apply the Wide, Medium and Narrow classes and the one collap
 
 ### Mode indicator
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-mode-indicator`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-mode-indicator`
 
 The system **MUST** provide the mode indicator in its eight variants with glyph and word (never colour alone), the warning form for **Switched to local** and **No assistant**, and the explanation popover with **Open Privacy Settings** (and, in the call window, **Make This Call Sensitive**), as `C.modeIndicator` and `overlay('mode-info')` render them; council-mode words never appear in it.
 
