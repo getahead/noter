@@ -20,13 +20,17 @@ const HIDE_DEFAULT = "Ctrl+Alt+Super+0";
 export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
   const [state, dispatch] = useReducer(shareTestReduce, "TABLE");
   const [result, setResult] = useState<ShareTestResult | null>(null);
+  // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-if-call
   const call = useWindow(bridge, (s) => s.whole.capture?.phase === "recording" || s.whole.capture?.phase === "paused");
+  // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-if-call
   const permission = useWindow(bridge, (s) => s.whole.environment?.permissions.find((p) => p.kind === "screen_recording")?.state ?? "not_asked");
   const display = useWindow(bridge, (s) => s.whole.environment?.displays.find((d) => !d.holds_call_app)?.name ?? s.whole.environment?.displays[0]?.name ?? "");
   const hide = useWindow(bridge, (s) => s.whole.hotkeys?.bindings.find((b) => b.action === "hide_for_presenting")?.shortcut ?? HIDE_DEFAULT);
 
   const run = async (capture: boolean) => {
+    // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-api-share
     const res = await bridge.act("share:run", "share_test_run", () => bridge.core.shareTestRun({ run_capture_test: capture }));
+    // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-api-share
     if (res.status === "ok") {
       setResult(res.data);
       if (capture) dispatch({ type: "outcome", outcome: res.data.capture_test });
@@ -52,9 +56,14 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
   };
   // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-run-capture
 
+  // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-share-done
+  // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-return-share
+  const done = onClose; // Done closes the sheet and the Privacy pane is back
+  // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-return-share
+  // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-share-done
   const running = state === "RUNNING";
   return (
-    <Sheet title={t("settings.share.title")} width={640} busy={running} onCancel={onClose} onDefault={onClose}>
+    <Sheet title={t("settings.share.title")} width={640} busy={running} onCancel={done} onDefault={done}>
       <div className="np-sheet__head">
         <div className="np-sheet__title">{t("settings.share.title")}</div>
       </div>
@@ -104,6 +113,7 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
             <span>{t("settings.share.running", { display })}</span>
           </div>
         )}
+        {/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-share-result */}
         {state === "RAN" && result && (
           <>
             <div className="dlg-capture">
@@ -125,6 +135,7 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
             </ul>
           </>
         )}
+        {/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-share-result */}
         {state === "FAILED" && (
           <div className="dlg-perm dlg-warn" role="alert">
             <Icon name="warning" size={13} />
@@ -136,7 +147,7 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
         <InlineBanner banner={{ id: "share-limits", severity: "info", dismissible: false, text: t("settings.share.limits", { chord: capsOf(hide) }) }} />
       </div>
       <SheetFooter
-        defaultButton={<PushButton label={t("settings.share.done")} variant="primary" onAction={onClose} />}
+        defaultButton={<PushButton label={t("settings.share.done")} variant="primary" onAction={done} />}
       >
         {/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-capture-disabled */}
         <PushButton label={state === "RAN" ? t("settings.share.run_again") : t("settings.share.run")} loading={running} disabled={call} onAction={start} />

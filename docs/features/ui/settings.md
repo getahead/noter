@@ -157,13 +157,13 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 **Steps**:
 1. [x] - `p1` - User clicks **Screen Share Test…** in Privacy - `inst-open-share-test`
 2. [x] - `p1` - UI: the 640-pt sheet with the table and the limits line ending **Share a window, not a display, or press** ⌃⌥⌘0 **to hide Noter.** - `inst-share-table`
-3. [ ] - `p1` - **IF** a call is being recorded - `inst-if-call`
+3. [x] - `p1` - **IF** a call is being recorded - `inst-if-call`
    1. [x] - `p1` - UI: **Run Capture Test** disabled with its reason - `inst-capture-disabled`
 4. [x] - `p1` - User clicks **Run Capture Test**; the test-only permission row asks once (**Continue**) - `inst-run-capture`
-5. [ ] - `p2` - API: `share_test_run` (M2); while it runs, **Showing test windows on Display 2…** with a spinner - `inst-api-share`
-6. [ ] - `p2` - UI: the two images and one status row per surface (**Call window: hidden**, **Main window: visible: hide it before presenting**) - `inst-share-result`
-7. [ ] - `p1` - User clicks **Done** - `inst-share-done`
-8. [ ] - `p1` - **RETURN** the Privacy pane - `inst-return-share`
+5. [x] - `p2` - API: `share_test_run` (M2); while it runs, **Showing test windows on Display 2…** with a spinner - `inst-api-share`
+6. [x] - `p2` - UI: the two images and one status row per surface (**Call window: hidden**, **Main window: visible: hide it before presenting**) - `inst-share-result`
+7. [x] - `p1` - User clicks **Done** - `inst-share-done`
+8. [x] - `p1` - **RETURN** the Privacy pane - `inst-return-share`
 
 ## 3. Processes / Business Logic (CDSL)
 
