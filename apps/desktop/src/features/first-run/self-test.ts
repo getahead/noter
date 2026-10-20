@@ -1,6 +1,8 @@
 // Self-test panel: the state machine and the reducer that renders each core message
 // (docs/features/ui/first-run.md § 3 › Render a self-test message, § 4 › Self-test panel).
 import type { AudioChannel, PermissionState, SelfTestEvent } from "../../core/bindings";
+import type { MsgKey } from "../../i18n/en";
+import { t } from "../../i18n/format";
 
 export type SelfTestState = "IDLE" | "WAITING_FOR_MODEL" | "PERMISSION_MISSING" | "RUNNING" | "PASSED" | "FAILED";
 export type SelfTestInput =
@@ -64,23 +66,21 @@ export type SelfTestPanel = {
   ownSounds: OwnSounds;
   /** Settings › Audio: whether the test also checks that Noter's own sounds stay out. */
   excludeOwnSounds: boolean;
-  failure: string | null;
+  /** The catalogue message that names why the test failed. */
+  failure: MsgKey | null;
   runEnabled: boolean;
 };
 
-export const OWN_SOUNDS_MESSAGE: Record<OwnSounds, string> = {
-  pending: "",
-  excluded: "Noter's own sounds stay out of the recording",
-  off: "Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.",
-  leaked: "Noter's own sounds reached the recording. Replay while recording stays off until this passes.",
-};
-export const ONE_STREAM_SILENT: Record<AudioChannel, string> = {
-  sys: "We hear your microphone but not system audio. Play any sound in another app and try again.",
-  mic: "We hear system audio but not your microphone. Speak and try again.",
-};
-export const SYSTEM_AUDIO_MISSING = "System audio recording is not allowed yet.";
-export const TIMED_OUT = "The test didn't finish. Check that sound is playing, then try again.";
+export const OWN_SOUNDS_MESSAGE: Record<OwnSounds, MsgKey | null> = { pending: null, excluded: "self_test.own_excluded", off: "self_test.own_off", leaked: "self_test.own_leaked" };
+export const ONE_STREAM_SILENT: Record<AudioChannel, MsgKey> = { sys: "self_test.silent_sys", mic: "self_test.silent_mic" };
+export const SYSTEM_AUDIO_MISSING: MsgKey = "self_test.sys_missing";
+export const TIMED_OUT: MsgKey = "self_test.timed_out";
 export const LEVELS_MIN_INTERVAL_MS = 100;
+
+/** A dB reading as 0 to 10 lit meter segments (-60 dB and below is silent, 0 dB is full). */
+export const dbToLevel = (db: number | null) => (db === null ? 0 : Math.max(0, Math.min(10, Math.round(((db + 60) / 60) * 10))));
+/** The microphone reaches Noter when its level is above the noise floor. */
+export const hearing = (db: number | null | undefined) => db !== undefined && db !== null && db > -60;
 
 // Run Test is dimmed only while waiting for the model, with the permission missing, or while a test runs
 const runEnabled = (s: SelfTestState) => s === "IDLE" || s === "FAILED" || s === "PASSED";
@@ -147,11 +147,12 @@ export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): Self
 
 /** Result lines newly ticked by a step, in order, for the polite live region; the transcript line is never among them. */
 export function newAnnouncements(prev: SelfTestPanel, next: SelfTestPanel): string[] {
-  const out: string[] = [];
-  if (!prev.arrived.sys && next.arrived.sys) out.push("System audio arrives");
-  if (!prev.arrived.mic && next.arrived.mic) out.push("Your microphone arrives");
-  if (!prev.aligned && next.aligned) out.push("Both streams line up");
-  if (prev.ownSounds === "pending" && next.ownSounds !== "pending") out.push(OWN_SOUNDS_MESSAGE[next.ownSounds]);
-  if (prev.state !== "PASSED" && next.state === "PASSED") out.push("Self-test passed");
-  return out;
+  const out: MsgKey[] = [];
+  if (!prev.arrived.sys && next.arrived.sys) out.push("self_test.sys_arrives");
+  if (!prev.arrived.mic && next.arrived.mic) out.push("self_test.mic_arrives");
+  if (!prev.aligned && next.aligned) out.push("self_test.aligned");
+  const own = OWN_SOUNDS_MESSAGE[next.ownSounds];
+  if (prev.ownSounds === "pending" && own) out.push(own);
+  if (prev.state !== "PASSED" && next.state === "PASSED") out.push("self_test.passed");
+  return out.map((k) => t(k));
 }

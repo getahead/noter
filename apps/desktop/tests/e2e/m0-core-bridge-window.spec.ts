@@ -25,7 +25,11 @@ test.describe("cpt-noter-seq-core-window-open", () => {
       const snapshot = log.findIndex((c) => c.kind === "invoke" && c.name === "app_snapshot");
       const listened = log.slice(0, snapshot).filter((c) => c.kind === "listen").map((c) => c.name);
       expect(new Set(listened)).toEqual(new Set(Object.keys(EVENTS))); // no change between the two is lost
-      expect(log.filter((c) => c.kind === "invoke").map((c) => c.name)).toEqual(["app_snapshot"]); // no retries, no logs
+      // the snapshot is the first and only one, with no retries and no logs; a window with a screen (first-run) then sends that screen's commands
+      const invoked = log.filter((c) => c.kind === "invoke").map((c) => c.name);
+      expect(invoked[0]).toBe("app_snapshot");
+      expect(invoked.filter((n) => n === "app_snapshot")).toHaveLength(1);
+      expect(invoked).not.toContain("log_ui");
       expect(errors).toEqual([]);
     });
   }

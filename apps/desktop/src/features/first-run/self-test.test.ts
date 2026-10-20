@@ -1,3 +1,4 @@
+import { t } from "../../i18n/format";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCore, type SelfTestEvent, type SelfTestMsg } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
@@ -106,7 +107,7 @@ describe("applySelfTestEvent (cpt-noter-algo-ui-first-run-self-test-result)", ()
     const p = fold(running(), { type: "failed", reason: { type: "zero_buffers" } }, { type: "ended", reason: "call_stopped" });
     expect(p).toMatchObject({ state: "PERMISSION_MISSING", failure: null, runEnabled: false });
     expect(selfTestNext(p.state, { type: "system_audio", state: "granted" })).toBe("IDLE");
-    expect(SYSTEM_AUDIO_MISSING).toBe("System audio recording is not allowed yet.");
+    expect(t(SYSTEM_AUDIO_MISSING)).toBe("System audio recording is not allowed yet.");
   });
 
   it("drops messages that arrive when no test runs, except the meters going quiet", () => {
@@ -150,7 +151,7 @@ describe("newAnnouncements", () => {
       said.push(...out);
       p = next;
     }
-    expect(said).toEqual(["Your microphone arrives", "System audio arrives", "Both streams line up", OWN_SOUNDS_MESSAGE.excluded, "Self-test passed"]);
+    expect(said).toEqual(["Your microphone arrives", "System audio arrives", "Both streams line up", t(OWN_SOUNDS_MESSAGE.excluded!), "Self-test passed"]);
   });
 
   it("announces nothing on a failure", () => {

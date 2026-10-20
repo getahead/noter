@@ -1,4 +1,5 @@
 import "./app.css";
+import { FirstRun } from "../features/first-run/first-run";
 import { MainWindow } from "../features/shell/main-window";
 import { t } from "../i18n/format";
 import { InlineBanner } from "../ui/feedback/inline-banner";
@@ -20,6 +21,7 @@ export function App({ bridge }: { bridge: Bridge }) {
         </section>
       )}
       {bridge.label === "main" && !error && <MainWindow bridge={bridge} />}
+      {bridge.label === "first-run" && !error && <FirstRun bridge={bridge} />}
     </div>
   );
 }
