@@ -185,8 +185,8 @@ The system **MUST** run a unit test that reads the Increase Contrast values of t
 
 ## 6. Acceptance Criteria
 
-- [ ] Every custom property used by a component is defined in the token stylesheet; no component file holds a literal colour
-- [ ] In each of the four appearance states every token of the prototype resolves to the prototype's value, and the token sheet renders identically to its baseline (screenshot match ≥ 98 % in the pinned container). The primitives page compared with the prototype's renderings is an acceptance criterion of `cpt-noter-feature-ui-primitives`, which builds that page
+- [x] Every custom property used by a component is defined in the token stylesheet; no component file holds a literal colour
+- [x] In each of the four appearance states every token of the prototype resolves to the prototype's value, and the token sheet renders identically to its baseline (screenshot match ≥ 98 % in the pinned container). The primitives page compared with the prototype's renderings is an acceptance criterion of `cpt-noter-feature-ui-primitives`, which builds that page
 - [x] With Reduce transparency or Increase Contrast on, no element uses `backdrop-filter`
 - [x] With Reduce motion on, no transition or animation runs except row spinners and level meters
 - [x] The contrast test passes for light and dark Increase Contrast values

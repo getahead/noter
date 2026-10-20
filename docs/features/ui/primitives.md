@@ -280,12 +280,12 @@ The system **MUST** render transcript, document, model and user text as plain te
 
 ## 6. Acceptance Criteria
 
-- [ ] Each primitive renders the same `data-*` attributes as the prototype for the same variant and state
-- [ ] Every interactive primitive is reachable and operable by keyboard and exposes the role in DESIGN's table
-- [ ] Every hit area is at least 24 by 24 pt, including 20-pt buttons and 22-pt inline icon buttons
-- [ ] A banner slot never shows two banners at once; **+2 More** lists the rest by severity
-- [ ] Hostile strings render as text in every primitive
-- [ ] The primitives page renders identically to the prototype's light, dark and Increase Contrast renderings in the four appearance states of `cpt-noter-state-ui-tokens-theming-appearance` (screenshot match ≥ 98 % in the pinned container); the harness self-test fixture `apps/desktop/tests/visual/fixtures/primitives.html` becomes this page. Moved here from `cpt-noter-feature-ui-tokens-theming`, which checks the tokens themselves against the prototype
+- [x] Each primitive renders the same `data-*` attributes as the prototype for the same variant and state
+- [x] Every interactive primitive is reachable and operable by keyboard and exposes the role in DESIGN's table
+- [x] Every hit area is at least 24 by 24 pt, including 20-pt buttons and 22-pt inline icon buttons
+- [x] A banner slot never shows two banners at once; **+2 More** lists the rest by severity
+- [x] Hostile strings render as text in every primitive
+- [x] The primitives page renders identically to the prototype's light, dark and Increase Contrast renderings in the four appearance states of `cpt-noter-state-ui-tokens-theming-appearance` (screenshot match ≥ 98 % in the pinned container); the harness self-test fixture `apps/desktop/tests/visual/fixtures/primitives.html` becomes this page. Moved here from `cpt-noter-feature-ui-tokens-theming`, which checks the tokens themselves against the prototype
 
 ## 7. Additional Context
 
