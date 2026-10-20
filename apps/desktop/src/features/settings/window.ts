@@ -38,10 +38,24 @@ export function windowReduce(s: WindowState, e: WindowEvent): WindowState {
 // The state is derived from what the window holds, so hiding for presenting "comes back as it was".
 // @cpt-state:cpt-noter-state-ui-settings-window:p1
 export function windowKind(s: WindowState): WindowKind {
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-pane-hidden
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-hidden-pane
   if (s.hidden) return "HIDDEN_FOR_PRESENTING";
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-hidden-pane
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-pane-hidden
   const found = searchPanes(s.search).kind;
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-pane-search
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-search-nomatch
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-nomatch-pane
   if (found !== "all") return found === "none" ? "NO_MATCH" : "SEARCH_RESULTS";
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-nomatch-pane
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-search-nomatch
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-pane-search
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-pane-error
+  // @cpt-begin:cpt-noter-state-ui-settings-window:p1:inst-error-pane
   return s.error === null ? "PANE" : "PANE_ERROR";
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-error-pane
+  // @cpt-end:cpt-noter-state-ui-settings-window:p1:inst-pane-error
 }
 
 /** The pane-list item that ↑ or ↓ moves focus to; null for any other key or when focus is outside the list. */

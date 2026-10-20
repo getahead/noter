@@ -25,24 +25,50 @@ export function recorderReduce(s: RecorderState, e: RecorderEvent): RecorderStat
   const recording = s.type === "RECORDING";
   switch (e.type) {
     case "start":
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-recording
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-conflict-recording
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-invalid-recording
       return s.type === "DISABLED" || recording ? s : { type: "RECORDING", from: s.type === "CLEARED" ? "CLEARED" : "IDLE" };
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-invalid-recording
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-conflict-recording
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-recording
     case "chord": {
       if (!recording) return s;
       const r = e.result;
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-idle
       if (r.type === "cancel") return { type: s.from };
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-idle
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
       if (r.type === "clear") return { type: "CLEARED" };
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-invalid
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-conflict
       if (r.type === "keep") return { type: r.reason === "no_modifier" ? "INVALID" : "CONFLICT", message: r.message };
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-conflict
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-invalid
       return s; // accepted: wait for the core's answer; `wait`: the chord is not complete yet
     }
     case "registered":
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-idle
       return recording ? { type: "IDLE" } : s;
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-idle
     case "refused":
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-conflict
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-conflict
       return s.type === "RECORDING" || s.type === "IDLE" ? { type: "CONFLICT", message: e.message } : s;
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-conflict
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-conflict
     case "clear":
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
       return recording || s.type === "IDLE" ? { type: "CLEARED" } : s;
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
     case "disable":
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-disabled
       return s.type === "IDLE" ? { type: "DISABLED" } : s;
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-disabled
     case "enable":
+      // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-disabled-idle
       return s.type === "DISABLED" ? { type: "IDLE" } : s;
+      // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-disabled-idle
   }
 }

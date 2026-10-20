@@ -47,6 +47,8 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
     return res?.status === "ok" ? { ok: true } : { ok: false, message: t("settings.error.rejected") };
   };
 
+  // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-render-hotkeys
+  // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-return-hotkeys
   return (
     <>
       <Group title={t("settings.hotkeys.global")}>
@@ -83,4 +85,6 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
       <p className="st-hint">{t("settings.hotkeys.vo_note")}</p>
     </>
   );
+  // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-return-hotkeys
+  // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-render-hotkeys
 }

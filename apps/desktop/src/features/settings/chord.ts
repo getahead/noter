@@ -35,15 +35,35 @@ const MODIFIER_CODES = new Set([...["Control", "Alt", "Meta", "Shift"].flatMap((
 
 // @cpt-algo:cpt-noter-algo-ui-settings-check-chord:p1
 export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInput): ChordResult {
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-esc
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-cancel
   if (code === "Escape") return { type: "cancel" };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-cancel
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-esc
   const hasModifier = m.control || m.option || m.command;
   // a chord may start with any modifier, Shift included: only the completing key is judged
   if (variant === "single" && MODIFIER_CODES.has(code)) return { type: "wait" };
   // a modifier set is never empty: the core refuses it (`no_modifier`)
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-delete
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-clear
   if (code === "Backspace" && variant === "single") return { type: "clear" };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-clear
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-delete
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-nomod
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-nomod
   if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: t("settings.hotkeys.no_modifier") };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-nomod
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-nomod
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-vo
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-vo
   if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: t("settings.hotkeys.used_by", { owner: "VoiceOver" }) };
-  return { type: "accept", code, modifiers: m };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-vo
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-vo
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-physical
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-accept
+  return { type: "accept", code, modifiers: m }; // `code` is the physical KeyboardEvent.code, not the layout's character
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-accept
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-physical
 }
 
 /** The line under a row the core reports a refusal for; null when the row has none. */

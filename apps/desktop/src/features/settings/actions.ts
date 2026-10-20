@@ -19,8 +19,12 @@ export function loadSettings(bridge: Bridge) {
  * the touched leaves, so a newer sibling is never overwritten; a refusal leaves the stored value showing.
  */
 export function saveSection<K extends SectionKey>(bridge: Bridge, section: K, edits: DeepPartial<Settings[K]>) {
+  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
+  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-match-control
   const settings = bridge.store.getState().whole.settings;
   if (!settings) return Promise.resolve(null);
+  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-match-control
+  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
   // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
   const args = toUpdateArgs(settings, editDraft(newDraft(section), edits));
   return bridge.act(sectionKey(section), "settings_update", () => bridge.core.settingsUpdate(args), { slice: "settings" });
@@ -50,9 +54,11 @@ export async function setHotkey(bridge: Bridge, action: HotkeyAction, shortcut: 
 
 /** **Restore Defaults**: the core resets the set and checks it again. */
 export function resetHotkeys(bridge: Bridge) {
+  // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-restore
   // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-api-reset
   return bridge.act("hotkeys:reset", "hotkeys_reset", () => bridge.core.hotkeysReset({}), { slice: "hotkeys" });
   // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-api-reset
+  // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-restore
 }
 
 /** The control key of **Remove** under **Apps Noter doesn't ask about**. */

@@ -38,7 +38,11 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
   const message = state.type === "CONFLICT" || state.type === "INVALID" ? state.message : null;
   const settle = async (answer: Promise<HotkeyAnswer> | undefined) => {
     const r = await answer;
+    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-conflict
+    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-new-chord
     if (r) dispatch(r.ok ? { type: "registered" } : { type: "refused", message: r.message });
+    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-new-chord
+    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-conflict
   };
 
   // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
@@ -50,8 +54,10 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
     e.preventDefault();
     e.stopPropagation();
     dispatch(out.event);
+    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
     if (out.send?.type === "record") void settle(onRecord?.({ code: out.send.code, modifiers: out.send.modifiers }));
     else if (out.send?.type === "clear") void settle(onClear?.());
+    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
   };
   // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
 

@@ -58,10 +58,12 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
 
   const found = searchPanes(win.search);
   const kind = windowKind(win);
+  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-open-pane
   const open = (pane: SettingsPane) => {
     if (main.current) scroll.current[win.pane] = main.current.scrollTop;
     dispatch({ type: "pane", pane });
   };
+  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-open-pane
   // ↑ and ↓ move between the panes; Return opens the one in focus
   const onListKey = (e: KeyboardEvent<HTMLElement>) => {
     const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=listitem]")];
@@ -72,6 +74,8 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   };
 
   const pane = PANES[win.pane];
+  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-store-settings
+  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-return-pane
   return (
     <div className="st-win" data-component="cpt-noter-component-screen-settings" data-variant={win.pane} data-state={kind.toLowerCase()}>
       <div className="st-body">
@@ -110,4 +114,6 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
       </div>
     </div>
   );
+  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-return-pane
+  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-store-settings
 }
