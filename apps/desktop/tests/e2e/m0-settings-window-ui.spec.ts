@@ -61,4 +61,30 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
     await expect.poll(async () => (await sent(page, "settings_update")).length).toBe(1);
     expect((await sent(page, "settings_update"))[0]).toMatchObject({ section: { section: "copilot", value: { card_keys: { modifiers: { control: true, option: true, command: false } } } } });
   });
+
+  test("Esc takes away the red hint of an invalid attempt and the old chord stays", async ({ page }) => {
+    await openWindow(page, "settings");
+    await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();
+    const field = page.getByRole("button", { name: /^Mark moment: / });
+    await field.click();
+    await page.keyboard.press("KeyN");
+    await expect(pane(page)).toContainText("Add Command, Option or Control");
+    await page.keyboard.press("Escape");
+    await expect(pane(page)).not.toContainText("Add Command, Option or Control");
+    await expect(field).toContainText("⌃⌥⌘M");
+  });
+
+  test("modifiers held when the field loses focus are not saved later", async ({ page }) => {
+    await openWindow(page, "settings");
+    await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();
+    await page.getByRole("button", { name: /^Pin a card: / }).click();
+    await page.keyboard.down("Control");
+    await page.getByRole("button", { name: /^Mark moment: / }).focus(); // focus leaves while Control is down
+    await page.keyboard.up("Control");
+    await page.getByRole("button", { name: /^Pin a card: / }).click();
+    await page.keyboard.down("Alt");
+    await page.keyboard.up("Alt");
+    await expect.poll(async () => (await sent(page, "settings_update")).length).toBe(1);
+    expect((await sent(page, "settings_update"))[0]).toMatchObject({ section: { value: { card_keys: { modifiers: { control: false, option: true, command: false } } } } });
+  });
 });

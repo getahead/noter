@@ -20,7 +20,7 @@ export function ModelsGroup({ bridge }: { bridge: Bridge }) {
             <div className="e-status__main">
               <span className="e-status__title">{b.name}</span>
               <span className="e-status__sub">
-                {t("settings.models.size", { size: b.size_mb })} · {b.state === "downloading" ? t("settings.models.downloading", { done: b.done_mb, total: b.size_mb }) : t(statusKey(b.state))}
+                {t("settings.models.size", { size: b.size_mb })} · {b.state === "downloading" ? t("settings.models.downloading", { done: Math.min(b.done_mb, b.size_mb), total: b.size_mb }) : t(statusKey(b.state))}
               </span>
               {b.state === "downloading" && <Progress value={Math.round((100 * b.done_mb) / Math.max(b.size_mb, 1))} label={b.name} />}
             </div>

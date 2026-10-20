@@ -15,6 +15,8 @@ export type RecorderEvent =
   | { type: "refused"; message: string }
   /** The **Clear shortcut** button. */
   | { type: "clear" }
+  /** Esc on a field that shows a hint of the user's own attempt: the hint goes, the old chord stays. */
+  | { type: "dismiss" }
   | { type: "disable" }
   | { type: "enable" };
 
@@ -62,6 +64,8 @@ export function recorderReduce(s: RecorderState, e: RecorderEvent): RecorderStat
       // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
       return recording || s.type === "IDLE" ? { type: "CLEARED" } : s;
       // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
+    case "dismiss":
+      return s.type === "INVALID" || s.type === "CONFLICT" ? { type: "IDLE" } : s;
     case "disable":
       // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-disabled
       return s.type === "IDLE" ? { type: "DISABLED" } : s;

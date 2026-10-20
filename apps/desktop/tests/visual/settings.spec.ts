@@ -57,8 +57,15 @@ test.describe("states of the prototype's Settings › State menu", () => {
 
   test("model-downloading", async ({ page }) => {
     await show(page, "audio_and_transcription", {
-      world: (w) => Object.assign(w.app.setup.models.bundles[0]!, { state: "downloading", done_mb: 1100 }),
+      // an in-progress amount below the bundle's own size, never a fixed number
+      world: (w) => {
+        const b = w.app.setup.models.bundles[0]!;
+        Object.assign(b, { state: "downloading", done_mb: Math.round(b.size_mb * 0.68) });
+      },
     });
+    const progress = page.getByText(/^Downloading [\d,]+ of [\d,]+ MB$/);
+    await progress.scrollIntoViewIfNeeded();
+    await expect(progress).toBeVisible();
     await shot(page, "model-downloading");
   });
 

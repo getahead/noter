@@ -48,6 +48,8 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
 
   // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    // Esc on the red hint of the user's own attempt takes the hint away (a hint the core reports for the row stays)
+    if (!recording && e.key === "Escape" && (state.type === "INVALID" || (state.type === "CONFLICT" && state.message !== conflict))) dispatch({ type: "dismiss" });
     // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
     const out = onRecordKey(recording, e, variant === "modifier-set" ? "modifier-set" : "single");
     // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
@@ -89,12 +91,15 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
             aria-label={t("settings.hotkeys.field", { label, chord: caps || t("settings.hotkeys.none") })}
             // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-start-record
             // Safari does not focus a button on click, and the chord is read from the focused field
-            onClick={(e) => (e.currentTarget.focus(), dispatch({ type: "start" }))}
+            onClick={(e) => ((held.current = null), e.currentTarget.focus(), dispatch({ type: "start" }))}
             // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-start-record
             onKeyDown={onKeyDown}
             onKeyUp={onKeyUp}
             // the field never traps the keyboard: leaving it ends recording
-            onBlur={() => recording && dispatch({ type: "chord", result: { type: "cancel" } })}
+            onBlur={() => {
+              held.current = null; // modifiers held when focus leaves belong to no combination
+              if (recording) dispatch({ type: "chord", result: { type: "cancel" } });
+            }}
           >
             {/* @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-recording */}
             {recording ? <span className="np-dim">{t("settings.hotkeys.type_shortcut")}</span> : caps ? <KeyCap keys={caps} /> : <span className="np-dim">{t("settings.hotkeys.none")}</span>}

@@ -65,7 +65,7 @@ describe("saveSection", () => {
     fake.failNext("settings_update", "conflict");
     await saveSection(bridge, "general", { launch_at_login: !before.general.launch_at_login });
     expect(stored().general.launch_at_login).toBe(before.general.launch_at_login);
-    expect(bridge.store.getState().commands["settings:general"]?.state).toBe("ERROR");
+    expect(bridge.store.getState().commands["settings:general:launch_at_login"]?.state).toBe("ERROR");
   });
 
   it("does nothing before settings_get answered", async () => {
@@ -253,5 +253,27 @@ describe("checkForUpdate", () => {
     expect(await checkForUpdate(bridge)).toBe("waiting");
     fake.failNext("app_snapshot", "offline");
     expect(await checkForUpdate(bridge)).toBe("failed");
+  });
+});
+
+describe("a refusal belongs to the row that sent it", () => {
+  it("shows the line under Launch at login only, and clears it when that setting saves", async () => {
+    await ready();
+    fake.failNext("settings_update", "conflict");
+    await saveSection(bridge, "general", { launch_at_login: false });
+    const err = () => (renderToString(<GeneralPane bridge={bridge} settings={stored()} />).match(/Couldn’t save this change/g) ?? []).length;
+    expect(err()).toBe(1);
+    await saveSection(bridge, "general", { offer_to_record: false }); // another row: the first line stays
+    expect(err()).toBe(1);
+    await saveSection(bridge, "general", { launch_at_login: true });
+    expect(err()).toBe(0);
+  });
+
+  it("names a row by the leaf it edits", async () => {
+    const { rowPath } = await import("./actions");
+    expect(rowPath({ launch_at_login: true })).toBe("launch_at_login");
+    expect(rowPath({ card_keys: { enabled: true } })).toBe("card_keys.enabled");
+    expect(rowPath({ card_keys: { modifiers: { control: true, option: false, command: true } } })).toBe("card_keys.modifiers");
+    expect(rowPath({ output: { headphones_devices: ["a"] } })).toBe("output.headphones_devices");
   });
 });

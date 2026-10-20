@@ -7,7 +7,7 @@ import { InlineStatus } from "../../ui/feedback/inline-status";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
-import { checkForUpdate, saveSection, useRowError } from "./actions";
+import { checkForUpdate, saveSection, useRowErrors } from "./actions";
 import { Group, Row } from "./form";
 import { choices, type PaneProps } from "./pane-props";
 
@@ -23,7 +23,7 @@ export function UpdatesPane({ bridge, settings }: PaneProps) {
   const update = useWindow(bridge, (s) => s.whole.environment?.update);
   const [checked, setChecked] = useState<"current" | "waiting" | "failed" | null>(null);
   const [checking, setChecking] = useState(false);
-  const error = useRowError(bridge, "updates");
+  const rowError = useRowErrors(bridge);
   const ready = update?.ready ? update : null;
   return (
     <>
@@ -44,10 +44,10 @@ export function UpdatesPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.updates.version")}>
           <span className="np-tnum">{t("settings.updates.version_value", { version: version ?? "" })}</span>
         </Row>
-        <Row label={t("settings.updates.channel")} error={error}>
+        <Row label={t("settings.updates.channel")} error={rowError("updates", "channel")}>
           <PopupButton options={CHANNEL} value={u.channel} label={t("settings.updates.channel")} onAction={(v) => void saveSection(bridge, "updates", { channel: v as typeof u.channel })} />
         </Row>
-        <Row label={t("settings.updates.install")} error={error}>
+        <Row label={t("settings.updates.install")} error={rowError("updates", "install_automatically")}>
           <RadioGroup name="st-install" label={t("settings.updates.install")} options={INSTALL} value={u.install_automatically ? "auto" : "ask"} onAction={(v) => void saveSection(bridge, "updates", { install_automatically: v === "auto" })} />
         </Row>
         <Row>

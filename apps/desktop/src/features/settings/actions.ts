@@ -6,8 +6,20 @@ import type { HotkeyAction, Settings } from "../../core/bindings";
 import { refusalLine } from "./chord";
 import { editDraft, newDraft, toUpdateArgs, type DeepPartial, type SectionKey } from "./draft";
 
-/** The key under which a section's last save is tracked in the store's `commands`. */
-export const sectionKey = (section: SectionKey) => `settings:${section}`;
+/** The dotted path of the setting an edit touches: down to the leaf, or the object that holds several (`card_keys.modifiers`). */
+export function rowPath(edits: unknown): string {
+  const path: string[] = [];
+  let at = edits as Record<string, unknown> | null;
+  while (at && typeof at === "object" && !Array.isArray(at) && Object.keys(at).length === 1) {
+    const [key] = Object.keys(at);
+    path.push(key!);
+    at = at[key!] as Record<string, unknown> | null;
+  }
+  return path.length ? path.join(".") : Object.keys((edits ?? {}) as object).join(",");
+}
+
+/** The key under which the last save of one setting is tracked in the store's `commands`: a refusal belongs to the row that sent it. */
+export const rowKey = (section: SectionKey, path: string) => `settings:${section}:${path}`;
 
 // @cpt-flow:cpt-noter-flow-ui-settings-change-setting:p1
 /** `settings_get` once per window; the panes render from the settings slice. */
@@ -30,7 +42,7 @@ export function saveSection<K extends SectionKey>(bridge: Bridge, section: K, ed
   // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
   // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
   const args = toUpdateArgs(settings, editDraft(newDraft(section), edits));
-  return bridge.act(sectionKey(section), "settings_update", () => bridge.core.settingsUpdate(args), { slice: "settings" });
+  return bridge.act(rowKey(section, rowPath(edits)), "settings_update", () => bridge.core.settingsUpdate(args), { slice: "settings" });
   // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
 }
 
@@ -67,9 +79,11 @@ export function resetHotkeys(bridge: Bridge) {
 /** The control key of **Remove** under **Apps Noter doesn't ask about**. */
 export const unignoreKey = (bundleId: string) => `unignore:${bundleId}`;
 
-/** The line a section's rows show when its last save was refused; null once a save succeeds. */
-export const useRowError = (bridge: Bridge, section: SectionKey): string | null =>
-  useWindow(bridge, (s) => (s.commands[sectionKey(section)]?.state === "ERROR" ? t("settings.error.row") : null));
+/** The line a row shows when the last save of its own setting was refused; null once a later save of it succeeds. */
+export function useRowErrors(bridge: Bridge): (section: SectionKey, path: string) => string | null {
+  const commands = useWindow(bridge, (s) => s.commands);
+  return (section, path) => (commands[rowKey(section, path)]?.state === "ERROR" ? t("settings.error.row") : null);
+}
 
 /** **Check Now**: read the core's current state again; true when no update is waiting, false when the core could not be read. */
 export async function checkForUpdate(bridge: Bridge): Promise<"current" | "waiting" | "failed"> {

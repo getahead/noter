@@ -3,7 +3,7 @@ import { useState } from "react";
 import { t } from "../../i18n/format";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { TextField } from "../../ui/primitives/text-field";
-import { saveSection, useRowError } from "./actions";
+import { saveSection, useRowErrors } from "./actions";
 import { Group, Row } from "./form";
 import type { PaneProps } from "./pane-props";
 
@@ -34,17 +34,17 @@ function Threshold({ label, stored, error, onCommit }: { label: string; stored: 
 
 export function PerformancePane({ bridge, settings }: PaneProps) {
   const p = settings.performance;
-  const error = useRowError(bridge, "performance");
+  const rowError = useRowErrors(bridge);
   return (
     <>
       <Group>
-        <Row label={t("settings.perf.keep")} error={error}>
+        <Row label={t("settings.perf.keep")} error={rowError("performance", "retention_days")}>
           <PopupButton options={KEEP} value={String(p.retention_days)} label={t("settings.perf.keep")} onAction={(v) => void saveSection(bridge, "performance", { retention_days: Number(v) })} />
         </Row>
       </Group>
       <Group title={t("settings.perf.thresholds")} foot={<span className="np-dim">{t("settings.perf.note")}</span>}>
-        <Threshold label={t("settings.perf.near")} error={error} stored={p.near_pct} onCommit={(near_pct) => void saveSection(bridge, "performance", { near_pct })} />
-        <Threshold label={t("settings.perf.over")} error={error} stored={p.over_pct} onCommit={(over_pct) => void saveSection(bridge, "performance", { over_pct })} />
+        <Threshold label={t("settings.perf.near")} error={rowError("performance", "near_pct")} stored={p.near_pct} onCommit={(near_pct) => void saveSection(bridge, "performance", { near_pct })} />
+        <Threshold label={t("settings.perf.over")} error={rowError("performance", "over_pct")} stored={p.over_pct} onCommit={(over_pct) => void saveSection(bridge, "performance", { over_pct })} />
       </Group>
     </>
   );
