@@ -36,11 +36,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-accessibility-l10n`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-accessibility-l10n`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-accessibility-l10n`
+- [x] `p1` - `cpt-noter-feature-ui-accessibility-l10n`
 
 ### 1.1 Overview
 
@@ -240,7 +240,7 @@ The system **MUST** take every interface string from a catalogue with plural rul
 - [x] Every screen passes a keyboard-only run and a VoiceOver label check in its component tests
 - [x] Single-key actions work with the Russian and German keyboard layouts
 - [x] The pseudo-localised build shows no truncated button, menu item or sidebar label on any screen
-- [ ] Every content block carries a `lang` attribute
+- [x] Every content block carries a `lang` attribute
 
 ## 7. Additional Context
 

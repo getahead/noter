@@ -6,6 +6,7 @@
 import type { Page } from "@playwright/test";
 
 import { setPseudo, t, type Pseudo } from "../../src/i18n/format";
+import * as W from "../support/world-presets";
 import { openWindow } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
@@ -217,14 +218,30 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-pseudo", () => {
 });
 
 test.describe("cpt-noter-flow-ui-accessibility-l10n-lang", () => {
-  test("UI — Settings: the document is English and every Cyrillic content cell of the glossary carries its own lang", async ({ page }) => {
+  test("UI — Settings: the document is English and every content cell of the glossary carries a lang", async ({ page }) => {
     await openWindow(page, "settings");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await page.getByRole("navigation", { name: t("settings.panes") }).getByRole("listitem").filter({ hasText: t("settings.pane.audio_and_transcription") }).click();
     const rows = page.locator("table tbody tr");
     await expect(rows.first()).toBeVisible();
-    const cyrillic = rows.locator("td:nth-child(3)");
-    expect(await cyrillic.count()).toBeGreaterThan(0);
-    for (const cell of await cyrillic.all()) await expect(cell).toHaveAttribute("lang", "ru");
+    const cells = rows.locator("td");
+    expect(await cells.count()).toBeGreaterThan(0);
+    for (const cell of await cells.all()) await expect(cell).toHaveAttribute("lang", /^(ru|und)$/); // glossary terms are content: Cyrillic is ru, the rest und
+    for (const cell of await rows.locator("td:nth-child(3)").all()) await expect(cell).toHaveAttribute("lang", "ru");
+  });
+
+  test("UI — first-run: every sentence of the self-test's live transcript line carries a lang (und where the core sends none)", async ({ page }) => {
+    await openWindow(page, "first-run", {
+      world: (w) => {
+        W.firstRun(w);
+        W.permission(w, "microphone", "granted");
+        W.permission(w, "system_audio", "granted");
+      },
+    });
+    await page.getByRole("button", { name: "Run Test", exact: true }).click();
+    await expect(page.locator(".fr-st__passed")).toBeVisible();
+    const sentences = page.locator(".fr-st__live > span:not(.np-dim)");
+    expect(await sentences.count(), "the self-test showed a transcript line").toBeGreaterThan(0);
+    for (const sentence of await sentences.all()) await expect(sentence).toHaveAttribute("lang", /^(ru|und)$/);
   });
 });

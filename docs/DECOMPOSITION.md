@@ -287,11 +287,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.4 [Accessibility, keyboard and localisation](features/ui/accessibility-l10n.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-accessibility-l10n`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-accessibility-l10n`
 
 - **Purpose**: Make keyboard-first operation, VoiceOver, the announcement policy and translation-ready text a shared service that every screen uses, and gate them with automated checks, so WCAG 2.2 AA and the three content languages hold on every surface.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/accessibility-l10n.md`](features/ui/accessibility-l10n.md). **Status**: IN_PROGRESS.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/accessibility-l10n.md`](features/ui/accessibility-l10n.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-primitives`
 
@@ -311,13 +311,13 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-accessible-multilingual`
+  - [x] `p1` - `cpt-noter-principle-accessible-multilingual`
   - [x] `p1` - `cpt-noter-principle-keyboard-first`
 
 - **Design Constraints Covered**:
 
   - [x] `p1` - `cpt-noter-constraint-accessibility-baseline`
-  - [ ] `p1` - `cpt-noter-constraint-three-languages`
+  - [x] `p1` - `cpt-noter-constraint-three-languages`
 
 - **Domain Model Entities**:
   - None

@@ -22,12 +22,12 @@ export interface SelfTestPanelProps {
   onOpenSettings?: () => void;
 }
 
-/** The sentences of the live transcript line, each in its own language where the script tells it (Cyrillic is Russian). */
-export function lineParts(text: string): { text: string; lang?: string }[] {
+/** The sentences of the live transcript line, each a content block with a lang: Cyrillic is Russian, the rest "und" (the core sends no language). */
+export function lineParts(text: string): { text: string; lang: string }[] {
   return text
     .split(/(?<=[.!?])\s+/)
     .filter(Boolean)
-    .map((s) => (/\p{Script=Cyrillic}/u.test(s) ? { text: s, lang: "ru" } : { text: s }));
+    .map((s) => ({ text: s, lang: /\p{Script=Cyrillic}/u.test(s) ? "ru" : "und" }));
 }
 
 function ResultLine({ kind, icon, text }: { kind: "ok" | "pending" | "info" | "warn"; icon: IconName; text: string }) {
