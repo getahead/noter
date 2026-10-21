@@ -10,8 +10,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FakeWorld } from "../../src/core/bindings";
 import worldJson from "../../../../contracts/fixtures/world.json";
 import { exercised } from "../support/core";
-import { ahead } from "../support/results";
+import { ahead, refused } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
+import { PAST_CALL } from "../support/world-presets";
 
 const fixture = worldJson as unknown as FakeWorld;
 
@@ -52,5 +53,14 @@ describe.each(fixture.calls.map((c) => [c.id, c] as const))("fixture parity of %
     // @cpt-begin:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-return
     expect(served).toEqual(stored);
     // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-return
+  });
+});
+
+describe("a deleted call", () => {
+  it("is gone from call_get and the transcript snapshot, with everything recorded in it", async () => {
+    const deleted = ahead(await s.core("main").callsDelete({ call_ids: [PAST_CALL] }));
+    if (!deleted) return;
+    expect(refused(await s.core("main").callGet({ call_id: PAST_CALL })).code).toBe("not_found");
+    expect(refused(await s.core("main").transcriptSubscribe({ call_id: PAST_CALL }, () => {})).code).toBe("not_found");
   });
 });
