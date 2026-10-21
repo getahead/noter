@@ -217,7 +217,7 @@ Every failure has a visible state where the affected function lives, and that st
 
 #### Accessible in every language
 
-- [x] `p1` - **ID**: `cpt-noter-principle-accessible-multilingual`
+- [ ] `p1` - **ID**: `cpt-noter-principle-accessible-multilingual`
 
 Every control works with the keyboard and VoiceOver, meets the WCAG 2.2 AA target size, and respects Reduce motion and Increase Contrast. The default appearance uses Apple's macOS system colours; when the user turns on Increase Contrast in macOS, every text and control colour switches to values checked against WCAG 2.2 AA (4.5:1 for text, 3:1 for control outlines and focus), so AA contrast is met in that mode (owner decision, PM-57). Layouts take German text about 30 % longer and Cyrillic without truncating labels. When this principle conflicts with a quieter or more native look, accessibility wins, except for the default colours, which follow Apple's system colours.
 
@@ -351,7 +351,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Three content languages, English interface
 
-- [x] `p1` - **ID**: `cpt-noter-constraint-three-languages`
+- [ ] `p1` - **ID**: `cpt-noter-constraint-three-languages`
 
 **Type**: Language. Transcripts, summaries, cards and search are English, Russian and German, often mixed in one call, and every content block carries its own language. The interface itself is English in v1 and built ready for translation: no string concatenation, plural rules for counts, and layouts that take German text about 30 % longer and Cyrillic (PM-02).
 

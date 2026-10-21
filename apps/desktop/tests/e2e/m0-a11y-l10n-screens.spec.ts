@@ -53,25 +53,110 @@ const focusedName = (page: Page) =>
     return { tag: el.tagName.toLowerCase(), role: el.getAttribute("role"), name, key: `${el.tagName}|${el.id}|${el.className}|${name}` };
   });
 
+/** Every control a user can reach by Tab: natively focusable or tabindex >= 0, enabled, drawn. Each gets a marker to be told apart. */
+const markTabbable = (page: Page) =>
+  page.evaluate(() => {
+    const sel = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable="true"], [tabindex]';
+    const els = [...document.querySelectorAll<HTMLElement>(sel)].filter((el) => {
+      const r = el.getBoundingClientRect();
+      const st = getComputedStyle(el);
+      // a radio group is one Tab stop (the checked radio, or the first); arrows move inside it
+      const radios = el instanceof HTMLInputElement && el.type === "radio" ? [...document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${el.name}"]`)] : null;
+      if (radios && el.name && radios.some((o) => o.checked) ? !el.checked : radios && el.name && radios[0] !== el) return false;
+      return el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && !el.closest("fieldset:disabled, [inert], [hidden]") && st.visibility !== "hidden" && st.display !== "none" && r.width > 0 && r.height > 0;
+    });
+    // idempotent: controls that became enabled since (a selection enables Remove) are marked on the next call
+    let next = document.querySelectorAll("[data-kbd]").length;
+    els.filter((el) => !el.hasAttribute("data-kbd")).forEach((el) => el.setAttribute("data-kbd", String(next++)));
+    return next;
+  });
+const focusedMark = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("data-kbd") ?? null);
+
+/** Walk Tab (or Shift+Tab) from the page start until the walk repeats or leaves the controls; return the markers reached, in order. */
+async function walk(page: Page, key: "Tab" | "Shift+Tab", limit: number): Promise<string[]> {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const reached: string[] = [];
+  for (let i = 0; i < limit; i++) {
+    await page.keyboard.press(key);
+    await markTabbable(page);
+    const mark = await focusedMark(page);
+    if (mark === null) break; // focus left the controls: not trapped
+    if (reached.includes(mark)) break; // came round: not trapped
+    reached.push(mark);
+  }
+  return reached;
+}
+
+/** The controls (by identity) that `key` never lands on in a walk from the page start; Tab-reachable ones are all of them, or the screen traps focus. */
+async function unreachable(page: Page, key: "Tab" | "Shift+Tab"): Promise<{ missed: string[]; reached: number; total: number }> {
+  await page.evaluate(() => document.querySelectorAll("[data-kbd]").forEach((e) => e.removeAttribute("data-kbd")));
+  let total = await markTabbable(page);
+  const reached = await walk(page, key, total + 5);
+  total = await markTabbable(page); // a control a stop enabled (selecting a row enables Remove) counts too
+  const missed = await page.$$eval("[data-kbd]", (els, got) => els.filter((e) => !got.includes(e.getAttribute("data-kbd")!)).map((e) => `${e.tagName.toLowerCase()}${e.getAttribute("role") ? `[${e.getAttribute("role")}]` : ""} "${(e.getAttribute("aria-label") || e.textContent || "").trim().slice(0, 40)}"`), reached);
+  return { missed, reached: reached.length, total };
+}
+
+/** Tab and Shift+Tab reach every control of the screen as it is now, each named, and the walk ends. */
+async function assertReachable(page: Page, where: string): Promise<void> {
+  let total = 0;
+  for (const key of ["Tab", "Shift+Tab"] as const) {
+    const r = await unreachable(page, key);
+    total = r.total;
+    expect(r.missed, `${key} on ${where} did not reach (${r.reached} of ${r.total} reached)`).toEqual([]);
+  }
+  expect(total, `${where} has controls`).toBeGreaterThan(0);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  for (let i = 0; i < total; i++) {
+    await page.keyboard.press("Tab");
+    const f = await focusedName(page);
+    if (!f) break;
+    expect(f.name, `an unnamed ${f.tag}${f.role ? `[role=${f.role}]` : ""} took a Tab stop on ${where}`).not.toBe("");
+  }
+}
+
 test.describe("cpt-noter-flow-ui-accessibility-l10n-keyboard", () => {
   for (const label of SCREENS) {
-    test(`UI — ${label}: Tab walks every stop with an accessible name and comes back round, no trap`, async ({ page }) => {
+    test(`UI — ${label}: Tab and Shift+Tab reach every control, each with an accessible name, and the walk ends (no trap)`, async ({ page }) => {
       await openWindow(page, label);
       await expect(frame(page)).toHaveAttribute("data-state", /ready|capturing|pane|step/);
-      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-      const seen: string[] = [];
-      for (let i = 0; i < 120; i++) {
-        await page.keyboard.press("Tab");
-        const f = await focusedName(page);
-        if (!f) continue; // focus left the page content (browser chrome): the next Tab comes back
-        expect(f.name, `an unnamed ${f.tag}${f.role ? `[role=${f.role}]` : ""} took a Tab stop on ${label}`).not.toBe("");
-        if (seen.includes(f.key)) break; // round again: focus is not trapped
-        seen.push(f.key);
+      await assertReachable(page, label);
+      if (label === "first-run") {
+        // every step of the wizard, the opening one first, then Back to Welcome and Continue to the end
+        const back = page.getByRole("button", { name: "Back", exact: true });
+        const next = page.getByRole("button", { name: "Continue", exact: true });
+        for (let i = 0; i < 6 && !(await back.isDisabled()); i++) {
+          await back.click();
+          await assertReachable(page, `first-run back ${i + 1}`);
+        }
+        for (let i = 0; i < 6 && (await next.count()) && !(await next.isDisabled()); i++) {
+          await next.click();
+          await assertReachable(page, `first-run forward ${i + 1}`);
+        }
       }
-      expect(seen.length, `${label} has Tab stops`).toBeGreaterThan(1);
-      expect(seen.length, `${label}: Tab never came back to its first stop within 120 presses`).toBeLessThan(120);
+      if (label === "settings") {
+        const panes = page.locator('[data-region="ST-R1"] [role="list"] > [role="listitem"]');
+        for (let i = 0; i < (await panes.count()); i++) {
+          await panes.nth(i).click();
+          await assertReachable(page, `settings pane ${i + 1}`);
+        }
+      }
     });
   }
+});
+
+test("the reachability check fails on a two-control trap with an unreachable third action", async ({ page }) => {
+  await page.setContent(`<button id="a">A</button><button id="b">B</button><button id="c">C</button>
+    <script>
+      // Tab cycles only A and B, as a broken focus manager would
+      addEventListener("keydown", (e) => {
+        if (e.key !== "Tab") return;
+        e.preventDefault();
+        document.getElementById(document.activeElement.id === "a" ? "b" : "a").focus();
+      });
+    </script>`);
+  const r = await unreachable(page, "Tab");
+  expect(r.missed).toEqual(['button "C"']);
 });
 
 test.describe("cpt-noter-flow-ui-accessibility-l10n-pseudo", () => {
@@ -130,7 +215,7 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-pseudo", () => {
 });
 
 test.describe("cpt-noter-flow-ui-accessibility-l10n-lang", () => {
-  test("UI — the document is English and every Cyrillic content cell of the glossary carries its own lang", async ({ page }) => {
+  test("UI — Settings: the document is English and every Cyrillic content cell of the glossary carries its own lang", async ({ page }) => {
     await openWindow(page, "settings");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await page.getByRole("navigation", { name: t("settings.panes") }).getByRole("listitem").filter({ hasText: t("settings.pane.audio_and_transcription") }).click();
