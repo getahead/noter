@@ -8,7 +8,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Table, Th } from "../../ui/primitives/table";
 import { TextField } from "../../ui/primitives/text-field";
 import { Group } from "./form";
-import { byTerm, cell, EMPTY_FORM, newTermArgs, type TermForm } from "./glossary";
+import { cell, createGlossaryActions, EMPTY_FORM, listTerms, newTermArgs, type TermForm } from "./glossary";
 
 /** **Glossary**: the terms of `glossary_list`, **+** adds one, **−** removes the selected one. */
 export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
@@ -16,27 +16,13 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [form, setForm] = useState<TermForm | null>(null);
   const asked = useRef(false);
-  const take = (res: { status: string; data?: { terms: GlossaryTerm[] } }) => res.status === "ok" && setTerms(byTerm(res.data!.terms));
   useEffect(() => {
     if (asked.current) return;
     asked.current = true;
-    void bridge.act("glossary:list", "glossary_list", () => bridge.core.glossaryList({})).then(take);
+    void listTerms(bridge).then((list) => list && setTerms(list));
   }, [bridge]);
 
-  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-glossary
-  const add = async () => {
-    const args = form && newTermArgs(form);
-    if (!args) return;
-    const res = await bridge.act("glossary:upsert", "glossary_upsert", () => bridge.core.glossaryUpsert(args));
-    take(res);
-    if (res.status === "ok") setForm(null);
-  };
-  const remove = async () => {
-    if (!selected) return;
-    take(await bridge.act("glossary:remove", "glossary_remove", () => bridge.core.glossaryRemove({ id: selected })));
-    setSelected(null);
-  };
-  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-glossary
+  const { add, remove } = createGlossaryActions(bridge, { form, selected, setTerms, setForm, setSelected });
 
   const field = (key: keyof TermForm, label: string) => <TextField ariaLabel={label} placeholder={label} value={form![key]} onChange={(v) => setForm({ ...form!, [key]: v })} onEnter={() => void add()} />;
   return (

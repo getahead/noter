@@ -45,4 +45,15 @@ describe("HotkeyRecorder", () => {
     (field.props.onKeyDown as (e: unknown) => void)({ code: "KeyU", ctrlKey: true, altKey: true, metaKey: true, shiftKey: false, repeat: false, preventDefault, stopPropagation() {} });
     expect(preventDefault).not.toHaveBeenCalled();
   });
+
+  it("blur and the clear button run their handlers", async () => {
+    const cleared: string[] = [];
+    const tree = rendered(HotkeyRecorder, { id: "hk-a", label: "Catch me up", caps: "⌃⌥⌘C", onClear: async () => (cleared.push("x"), { ok: true as const }) });
+    (find(tree, (p, type) => type === "button" && typeof p.onBlur === "function").props.onBlur as () => void)();
+    (find(tree, (p) => p.label === "Clear shortcut" && typeof p.onAction === "function").props.onAction as () => void)();
+    await new Promise((r) => setTimeout(r));
+    expect(cleared).toEqual(["x"]);
+    const field = find(tree, (p, type) => type === "button" && typeof p.onKeyUp === "function");
+    (field.props.onKeyUp as (e: unknown) => void)({ code: "ControlLeft", ctrlKey: false, altKey: false, metaKey: false, shiftKey: false });
+  });
 });

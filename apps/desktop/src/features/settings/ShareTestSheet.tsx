@@ -11,7 +11,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { Table, Th } from "../../ui/primitives/table";
 import { capsOf } from "./accelerator";
-import { resultRows, shareTestReduce, surfaceKey, visibilityKey } from "./share-test";
+import { createShareActions, resultRows, shareTestReduce, surfaceKey, visibilityKey } from "./share-test";
 
 const HIDE_DEFAULT = "Ctrl+Alt+Super+0";
 
@@ -27,34 +27,13 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
   const display = useWindow(bridge, (s) => s.whole.environment?.displays.find((d) => !d.holds_call_app)?.name ?? s.whole.environment?.displays[0]?.name ?? "");
   const hide = useWindow(bridge, (s) => s.whole.hotkeys?.bindings.find((b) => b.action === "hide_for_presenting")?.shortcut ?? HIDE_DEFAULT);
 
-  const run = async (capture: boolean) => {
-    // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-api-share
-    const res = await bridge.act("share:run", "share_test_run", () => bridge.core.shareTestRun({ run_capture_test: capture }));
-    // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-api-share
-    if (res.status === "ok") {
-      setResult(res.data);
-      if (capture) dispatch({ type: "outcome", outcome: res.data.capture_test });
-    } else if (capture) dispatch({ type: "outcome", outcome: { type: "failed", code: res.error.code } });
-  };
+  const { run, start, answer } = createShareActions(bridge, { permission, dispatch, setResult });
   // the table answers on its own, also during a call
   const asked = useRef(false);
   useEffect(() => {
     if (!asked.current) void run(false);
     asked.current = true;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-run-capture
-  const start = () => {
-    dispatch({ type: "run", screenRecording: permission });
-    if (permission === "granted") void run(true);
-  };
-  const answer = async () => {
-    const res = await bridge.act("share:permission", "permission_request", () => bridge.core.permissionRequest({ kind: "screen_recording" }));
-    const granted = res.status === "ok";
-    dispatch({ type: "answered", granted });
-    if (granted) void run(true);
-  };
-  // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-run-capture
 
   // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-share-done
   // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-return-share

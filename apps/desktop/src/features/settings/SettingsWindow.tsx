@@ -18,7 +18,7 @@ import { PerformancePane } from "./PerformancePane";
 import { PrivacyPane } from "./PrivacyPane";
 import { laterNote, paneLabel, searchPanes } from "./search";
 import { UpdatesPane } from "./UpdatesPane";
-import { INITIAL_WINDOW, listStep, windowKind, windowReduce } from "./window";
+import { INITIAL_WINDOW, listKeyAction, windowKind, windowReduce } from "./window";
 
 const ICONS: Record<SettingsPane, IconName> = {
   general: "gear", audio_and_transcription: "mic", models_and_runtimes: "agent", privacy: "lock", call_screen_and_menu_bar: "display", hotkeys: "keyboard",
@@ -73,11 +73,11 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   const onListKey = (e: KeyboardEvent<HTMLElement>) => {
     const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=listitem]")];
     const at = items.indexOf(document.activeElement as HTMLElement);
-    // ↓ in the search field moves into the results
-    if (e.key === "ArrowDown" && (e.target as HTMLElement).tagName === "INPUT") return void (e.preventDefault(), items[0]?.focus());
-    const to = listStep(e.key, at, items.length);
-    if (to !== null) (e.preventDefault(), items[to]?.focus());
-    else if (e.key === "Enter" && at >= 0) (e.preventDefault(), items[at]!.click());
+    const act = listKeyAction(e.key, (e.target as HTMLElement).tagName, at, items.length);
+    if (!act) return;
+    e.preventDefault();
+    if ("focus" in act) items[act.focus]?.focus();
+    else items[act.click]!.click();
   };
 
   const pane = PANES[win.pane];

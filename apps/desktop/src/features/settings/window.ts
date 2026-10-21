@@ -63,3 +63,11 @@ export function listStep(key: string, at: number, length: number): number | null
   const step = key === "ArrowDown" ? 1 : key === "ArrowUp" ? -1 : 0;
   return step && at >= 0 ? Math.min(length - 1, Math.max(0, at + step)) : null;
 }
+
+/** What a key does in the pane list: focus an item (↓ from the search field enters the list), click the focused one with Return, or nothing. */
+export function listKeyAction(key: string, target: string, at: number, length: number): { focus: number } | { click: number } | null {
+  if (key === "ArrowDown" && target === "INPUT") return { focus: 0 };
+  const to = listStep(key, at, length);
+  if (to !== null) return { focus: to };
+  return key === "Enter" && at >= 0 ? { click: at } : null;
+}

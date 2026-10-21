@@ -7,7 +7,7 @@ import { KeyCap } from "../../ui/primitives/key-cap";
 import type { HotkeyAnswer } from "./actions";
 import type { ChordModifiers } from "./chord";
 import { IDLE_RECORDER, recorderReduce, type RecorderState } from "./recorder";
-import { holdMore, onRecordKey, releasedSet } from "./recorder-key";
+import { handleKeyDown, handleKeyUp } from "./recorder-key";
 
 export interface HotkeyRecorderProps {
   id: string;
@@ -46,30 +46,9 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
     // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-conflict
   };
 
-  // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
-    // Esc on the red hint of the user's own attempt takes the hint away (a hint the core reports for the row stays)
-    if (!recording && e.key === "Escape" && (state.type === "INVALID" || (state.type === "CONFLICT" && state.message !== conflict))) dispatch({ type: "dismiss" });
-    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
-    const out = onRecordKey(recording, e, variant === "modifier-set" ? "modifier-set" : "single");
-    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
-    if (!out) return;
-    e.preventDefault();
-    e.stopPropagation();
-    dispatch(out.event);
-    held.current = out.send?.type === "hold" ? holdMore(held.current, out.send.modifiers) : null;
-    // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
-    if (out.send?.type === "record") void settle(onRecord?.({ code: out.send.code, modifiers: out.send.modifiers }));
-    else if (out.send?.type === "clear") void settle(onClear?.());
-    // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
-  };
-  // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
-  const onKeyUp = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const done = recording ? releasedSet(held.current, e) : null;
-    if (!done) return;
-    held.current = null;
-    void settle(onRecord?.({ code: e.code, modifiers: done }));
-  };
+  const ctx = { state, variant, conflict, held, dispatch, settle: (a: Promise<HotkeyAnswer> | undefined) => void settle(a), onRecord, onClear };
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => handleKeyDown(ctx, e);
+  const onKeyUp = (e: KeyboardEvent<HTMLButtonElement>) => handleKeyUp(ctx, e);
 
   return (
     <div

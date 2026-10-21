@@ -1,5 +1,6 @@
+import type { HotkeyAnswer } from "./actions";
 import { checkChord, type ChordModifiers, type ChordResult } from "./chord";
-import type { RecorderEvent } from "./recorder";
+import type { RecorderEvent, RecorderState } from "./recorder";
 
 export interface RecorderKey {
   code: string;
@@ -39,3 +40,49 @@ export const holdMore = (held: ChordModifiers | null, m: ChordModifiers): ChordM
 /** A keyup ends a modifier set once no modifier is still down: the combination held so far is what to save. */
 export const releasedSet = (held: ChordModifiers | null, e: Pick<RecorderKey, "ctrlKey" | "altKey" | "metaKey" | "shiftKey">): ChordModifiers | null =>
   held && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey ? held : null;
+
+/** What a chord field's key handlers need from the component that owns its state. */
+export interface RecorderCtx {
+  state: RecorderState;
+  variant: "single" | "modifier-set" | "derived";
+  /** The line the core reports for the row. */
+  conflict?: string | null;
+  /** A modifier set collects its keys here until they are released. */
+  held: { current: ChordModifiers | null };
+  dispatch: (e: RecorderEvent) => void;
+  /** Wait for the core's answer and move the recorder on. */
+  settle: (answer: Promise<HotkeyAnswer> | undefined) => void;
+  onRecord?: (chord: { code: string; modifiers: ChordModifiers }) => Promise<HotkeyAnswer>;
+  onClear?: () => Promise<HotkeyAnswer>;
+}
+
+export type KeyEvent = RecorderKey & { key: string; preventDefault(): void; stopPropagation(): void };
+
+// @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
+export function handleKeyDown(ctx: RecorderCtx, e: KeyEvent): void {
+  const { state, conflict, dispatch, held } = ctx;
+  const recording = state.type === "RECORDING";
+  // Esc on the red hint of the user's own attempt takes the hint away (a hint the core reports for the row stays)
+  if (!recording && e.key === "Escape" && (state.type === "INVALID" || (state.type === "CONFLICT" && state.message !== conflict))) dispatch({ type: "dismiss" });
+  // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
+  const out = onRecordKey(recording, e, ctx.variant === "modifier-set" ? "modifier-set" : "single");
+  // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-check
+  if (!out) return;
+  e.preventDefault();
+  e.stopPropagation();
+  dispatch(out.event);
+  held.current = out.send?.type === "hold" ? holdMore(held.current, out.send.modifiers) : null;
+  // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
+  if (out.send?.type === "record") ctx.settle(ctx.onRecord?.({ code: out.send.code, modifiers: out.send.modifiers }));
+  else if (out.send?.type === "clear") ctx.settle(ctx.onClear?.());
+  // @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-accepted
+}
+// @cpt-end:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-user-chord
+
+/** A keyup ends a modifier set once no modifier is down: the combination held so far is sent. */
+export function handleKeyUp(ctx: RecorderCtx, e: Pick<RecorderKey, "code" | "ctrlKey" | "altKey" | "metaKey" | "shiftKey">): void {
+  const done = ctx.state.type === "RECORDING" ? releasedSet(ctx.held.current, e) : null;
+  if (!done) return;
+  ctx.held.current = null;
+  ctx.settle(ctx.onRecord?.({ code: e.code, modifiers: done }));
+}
