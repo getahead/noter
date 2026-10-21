@@ -202,14 +202,27 @@ pub struct Core {
 /// Other features' callbacks for a change, run after it committed.
 type Hooks<T> = Mutex<Vec<Box<dyn Fn(&T) + Send + Sync>>>;
 
-/// noter-core's own tables: settings and the glossary.
+/// noter-core's own tables: settings and the glossary, calls and their capture data.
 // @cpt-dbtable:cpt-noter-dbtable-settings:p1
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    owner: "noter-core",
-    version: 1,
-    name: "settings and glossary",
-    sql: include_str!("../migrations/0001_settings_glossary.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        owner: "noter-core",
+        version: 1,
+        name: "settings and glossary",
+        sql: include_str!("../migrations/0001_settings_glossary.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-calls:p1
+    // @cpt-dbtable:cpt-noter-dbtable-speakers:p1
+    // @cpt-dbtable:cpt-noter-dbtable-segments:p1
+    // @cpt-dbtable:cpt-noter-dbtable-marks:p1
+    // @cpt-dbtable:cpt-noter-dbtable-gaps:p1
+    Migration {
+        owner: "noter-core",
+        version: 2,
+        name: "calls and capture data",
+        sql: include_str!("../migrations/0002_calls_capture.sql"),
+    },
+];
 
 impl Core {
     /// Opens the core on `data_dir` (`noter.db`, `logs/`): the same call for the app, the
