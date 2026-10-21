@@ -24,3 +24,6 @@
 
 /* Narrow content: the page's own columns follow `data-grid` and `data-columns`; nothing scrolls sideways. */
 .np-content { overflow-x: hidden; }
+
+/* the sidebar footer line wraps in a long (German, Cyrillic) translation instead of truncating */
+.np-sidebar__footer .np-mode__word { white-space: normal; overflow: visible; text-overflow: clip; }

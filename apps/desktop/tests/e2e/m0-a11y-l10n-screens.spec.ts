@@ -83,7 +83,11 @@ async function walk(page: Page, key: "Tab" | "Shift+Tab", limit: number): Promis
     await page.keyboard.press(key);
     await markTabbable(page);
     const mark = await focusedMark(page);
-    if (mark === null) break; // focus left the controls: not trapped
+    if (mark === null) {
+      // focus left the page (not trapped), or sits on a programmatic target such as the page heading: keep walking
+      if (await page.evaluate(() => document.activeElement === document.body || document.activeElement === null)) break;
+      continue;
+    }
     if (reached.includes(mark)) break; // came round: not trapped
     reached.push(mark);
   }
@@ -238,8 +242,17 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-lang", () => {
         W.permission(w, "system_audio", "granted");
       },
     });
+    // the real core reads System Audio Recording only when the user comes back from System Settings (the window's focus)
+    const sys = page.locator('[data-component="cpt-noter-component-ui-permission-check-row"]').filter({ hasText: "System audio recording" });
+    await expect(sys).toContainText(/Granted|not allowed/);
+    const open = sys.getByRole("button", { name: "Open System Settings…" });
+    if (await open.count()) {
+      await open.click();
+      await page.evaluate(() => void dispatchEvent(new Event("focus")));
+    }
+    await expect(sys).toContainText("Granted", { timeout: 15_000 });
     await page.getByRole("button", { name: "Run Test", exact: true }).click();
-    await expect(page.locator(".fr-st__passed")).toBeVisible();
+    await expect(page.locator(".fr-st__passed")).toBeVisible({ timeout: 20_000 });
     const sentences = page.locator(".fr-st__live > span:not(.np-dim)");
     expect(await sentences.count(), "the self-test showed a transcript line").toBeGreaterThan(0);
     for (const sentence of await sentences.all()) await expect(sentence).toHaveAttribute("lang", /^(ru|und)$/);
