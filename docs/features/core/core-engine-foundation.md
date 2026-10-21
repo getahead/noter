@@ -46,7 +46,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-Two halves that only work together. In Swift, the `engine/` package builds `noter-engine`: a sandboxed executable with audio input and the App Group, no network, whose protocol types are generated from `contracts/engine.schema.json`. In Rust, crate `noter-engine-client` spawns it with `tokio::process`, checks the protocol version on `ready`, writes commands, reads events on a dedicated task, detects `seq` gaps, correlates `ack` and `error` with command ids and restarts a dead engine. In M0 the engine can do the handshake, `ping`, `shutdown`, `set_detection` and the first-run `self_test`, and runs in file mode for tests. Capture and live ASR are M1. The week-one spike of PRD › Roadmap runs at the start of this feature.
+Two halves that only work together. In Swift, the `engine/` package builds `noter-engine`: a sandboxed executable with audio input and the App Group, no network, whose protocol types are generated from `contracts/engine.schema.json`. In Rust, crate `noter-engine-client` spawns it with `tokio::process`, checks the protocol version on `ready`, writes commands, reads events on a dedicated task, detects `seq` gaps, correlates `ack` and `error` with command ids and restarts a dead engine. In M0 the engine can do the handshake, `ping`, `shutdown`, `set_detection` and the first-run `self_test`, and runs in file mode for tests. Capture and live ASR are M1. The Q4 sandbox-attribution half of the PRD › Roadmap week-one spike is recorded here; the owner moved the latency half to M1 week one through the real capture pipeline alongside Q7 (20 Oct 2026).
 
 ### 1.2 Purpose
 
@@ -144,22 +144,23 @@ The tap and the microphone on one clock, `self_test_line` per channel when the m
 
 ### Week-one spike
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-foundation-spike`
+Completed manual, throwaway process, not product code: it carries no ID, checkbox or marker (coordinator clarification, following the contract change-surface pattern in PR #98). The owner ran the Q4 spike on 20 Oct 2026; DESIGN-core Q4 records decision B (PR #110), with the results in [Spike Q4 evidence](../../../.plans/backend/spike-q4-evidence.md).
 
 **Actor**: Engine developer
 
 **Success Scenarios**:
-- A throwaway Swift CLI, spawned as a sandboxed helper, gets the System Audio Recording prompt attributed to Noter, receives non-zero buffers on both channels, runs one WhisperKit Turbo instance with per-utterance language ID on a real three-language call, and prints hypothesis and confirmed latency.
+- A throwaway Swift CLI proves Q4: the helper runs sandboxed with its own entitlements, the Microphone and System Audio Recording prompts name the responsible app, and both channels receive non-zero buffers.
 
 **Error Scenarios**:
-- The prompt is not attributed to Noter from a sandboxed child: the engine ships unsandboxed (Q4) and the CI network-monitor test becomes the guarantee; `storage_move` becomes available.
-- Latency misses the provisional budget (hypothesis ≤ 2 s, confirmed ≤ 4 s): the streaming policy is changed or Parakeet joins as a second backend.
+- A sandboxed parent spawning a child with its own sandbox traps before `main`; compare sandbox inheritance (A) with an unsandboxed host and independently sandboxed engine (B).
 
 **Steps**:
-1. [ ] - `p1` - Build the spike CLI and run it as a sandboxed child of a stand-in app - `inst-spike-build`
-2. [ ] - `p1` - Record whether the prompt is attributed to the app and whether buffers are non-zero on both channels - `inst-spike-prompt`
-3. [ ] - `p1` - Run WhisperKit Turbo over both channels on a real three-language call and record hypothesis and confirmed lag - `inst-spike-latency`
-4. [ ] - `p1` - **RETURN** the decisions (sandbox yes or no, streaming policy, backends) as an update of DESIGN-core Q4 by the owner and a note in this FEATURE - `inst-spike-return`
+1. Build the spike CLI and compare the sandboxed-parent, inherited-sandbox and unsandboxed-host variants
+2. Record prompt attribution to the host app, the child's sandbox status and non-zero buffers on both channels
+3. Record that the latency attempts produced no text or latency numbers; the owner moved measurement to the real capture pipeline in M1 week one, with no more M0 spike runs
+4. **RETURN** Q4 decision B (Noter.app unsandboxed, engine sandboxed with its own entitlements), recorded by the owner in DESIGN-core on 20 Oct 2026 (PR #110)
+
+**Evidence**: [Spike Q4 evidence](../../../.plans/backend/spike-q4-evidence.md), including the owner's 20 Oct results: variant B reports `sandboxed: true`, system audio first non-zero at 2.5 s and microphone at 3.6 s, with both prompts naming SpikeHost. These are buffer-arrival timings, not transcription latency. Q4 alone is complete; the unticked `cpt-noter-dod-core-engine-capture-latency` owns the latency answer in M1 alongside the Q7 engine-kill drill. The two latency attempts returned no decoded text, including the owner's 10-minute real-call run.
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -264,15 +265,9 @@ The system **MUST** sign the engine in the Swift build with its own entitlements
 
 ### Week-one decisions recorded
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-spike`
+Completed manual Q4 process, not a product-code DoD: no ID, checkbox or marker is required (the same process-evidence pattern as PR #98).
 
-The system **MUST** have the week-one spike run and its results recorded: sandbox attribution (Q4), the streaming policy and whether Parakeet joins, with the owner's decision reflected in DESIGN-core before `cpt-noter-feature-core-engine-capture` starts.
-
-**Implements**:
-- `cpt-noter-flow-core-engine-foundation-spike`
-
-**Touches**:
-- Entities: spike report
+The owner completed the Q4 spike on 20 Oct 2026: sandbox status, prompt attribution and non-zero buffers on both channels are recorded in [Spike Q4 evidence](../../../.plans/backend/spike-q4-evidence.md). DESIGN-core Q4 records decision B (PR #110): Noter.app unsandboxed, engine sandboxed with its own entitlements. The latency measurement and any resulting streaming-policy or backend decision belong to M1 week one (`cpt-noter-dod-core-engine-capture-latency`); this M0 process promises no latency answer.
 
 ## 6. Acceptance Criteria
 

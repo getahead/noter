@@ -92,7 +92,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 2. **Model download is a job in DESIGN-core, but the scheduler comes later.** DESIGN-core lists model download among the pipeline jobs of `noter-jobs`; `models_download` is M0, the scheduler arrives with post-call in M2 and the Jobs commands in M5. M0 runs the download as a setup task; M2 moves it onto the scheduler without changing the contract. **Confirmed by the owner (18 Oct).**
 3. **First run needs commands placed in M1.** DESIGN-core allows `levels_subscribe` from the first-run and Settings windows and first run opens System Settings panes and leaves to the main window, but `levels_subscribe`, `open_external` and `window_navigate` are M1. In M0 the first-run levels come from the self-test Channel; QA should not count those three commands in M0. **Confirmed by the owner (18 Oct).**
 4. **Calendar.** PRD › Roadmap lists "calendar" under v1.x, while DESIGN-core reads EventKit in v1 (new-meeting detection and Today) and `milestones.toml` places the Calendar permission in M0 and `today_get` in M2. This decomposition reads the PRD's v1.x calendar as the calendar integration as a knowledge source and keeps EventKit reads in v1 (M1 detection, M2 Today). **Confirmed by the owner (18 Oct).**
-5. **Two "week one" tests.** PRD › Roadmap makes week one of M0 a throwaway Swift spike (sandbox attribution Q4, streaming policy); DESIGN-core Q7 names "the M1 week-one test (engine kills during capture)". Both are kept: the Q4 spike in `cpt-noter-feature-core-engine-foundation` (M0), the Q7 drill in `cpt-noter-feature-core-engine-capture` (M1). **Confirmed by the owner (18 Oct).**
+5. **Two "week one" tests.** PRD › Roadmap makes week one of M0 a throwaway Swift spike for sandbox attribution Q4; the owner completed Q4 on 20 Oct and moved its unmeasured latency half and streaming-policy decision to the real pipeline in M1 week one; DESIGN-core Q7 names "the M1 week-one test (engine kills during capture)". Both are kept: the Q4 spike in `cpt-noter-feature-core-engine-foundation` (M0), the Q7 drill and real-call latency measurement in `cpt-noter-feature-core-engine-capture` (M1). **Confirmed by the owner (18 Oct); latency move decided 20 Oct.**
 6. **Footprint and dropout metrics.** DESIGN-core samples memory, CPU and thermal state every 10 s during capture into `metrics` and stores `dropout_ms` there, and `harness/perf.toml` has `call-memory-footprint` in M1; the Metrics component, the `metrics` table and the Performance commands are M5. In M1 footprint is measured by the harness scenario and gaps are stored in `gaps`; in-app sampling and roll-ups arrive with `cpt-noter-feature-core-metrics-performance`.
 7. **Audit visible one milestone late.** The egress gate writes `audit_log` from the first cloud run (M2), while `audit_list` and `audit_export` are M3, so for one milestone the audit exists but the Privacy pane cannot show it.
 8. **Summary notifications.** `cpt-noter-seq-notifications-allow-notifications` is M1, but the summary it is about arrives with post-call outputs in M2. M1 delivers the authorization path and NT-3; the "Summary ready" notification itself is M2.
@@ -373,7 +373,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p1` - **ID**: `cpt-noter-feature-core-engine-foundation`
 
-- **Milestone**: M0 · **Lane**: engine · **Status**: IN_PROGRESS: everything but the week-one spike (Q4), the offline guarantee that depends on it, and the owner's Mac self-test and codesign check. FEATURE spec: [features/core/core-engine-foundation.md](features/core/core-engine-foundation.md)
+- **Milestone**: M0 · **Lane**: engine · **Status**: IN_PROGRESS: Q4 decision B is recorded; the offline guarantee and the owner's Mac self-test and codesign check remain open. FEATURE spec: [features/core/core-engine-foundation.md](features/core/core-engine-foundation.md)
 
 - **Purpose**: Stand up the sandboxed Swift engine and its Rust supervisor: spawn, handshake, liveness, the self-test, detection on and off, file mode and restart, with the signing and entitlement checks that keep the engine offline.
 
@@ -384,7 +384,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
   - `ready`, `ping`, `shutdown`, `self_test` with its stream, line and result events, `set_detection`, file mode
   - Crate `noter-engine-client`: spawn with `tokio::process`, version check, `seq` gap detection, ack and error correlation, restart
   - App Group container layout and relative paths; signing and entitlements checks (engine without network)
-  - Week-one spike results (sandbox attribution Q4, streaming policy) recorded in the FEATURE
+  - Week-one spike Q4 results (sandbox, prompt attribution, both channels) recorded in the FEATURE; latency and the streaming-policy/backend decision are M1 week-one capture work
 
 - **Out of scope**:
   - Capture, ASR and diarization (`cpt-noter-feature-core-engine-capture`, M1)
