@@ -195,19 +195,29 @@ impl<L: EngineLauncher> EngineClient<L> {
 
     /// Starts capturing a call: `starting` until the engine's `session_started`.
     pub async fn start_session(&self, start: StartSession) -> Result<(), CommandError> {
-        // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
-        self.shared().session = Some(Session {
-            state: EngineSession::Starting,
-            start: start.clone(),
-            paused: false,
-            started_at: None,
-            last_event: None,
-            failures: VecDeque::new(),
-            gap_from: None,
-            no_segments_since: None,
-            active: Vec::new(),
-        });
-        // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
+        {
+            let mut s = self.shared();
+            if s.session
+                .as_ref()
+                .is_some_and(|x| x.running() || x.state == EngineSession::Stopping)
+            {
+                // One session at a time: never drop a running one's state.
+                return Err(CommandError::Unavailable);
+            }
+            // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
+            s.session = Some(Session {
+                state: EngineSession::Starting,
+                start: start.clone(),
+                paused: false,
+                started_at: None,
+                last_event: None,
+                failures: VecDeque::new(),
+                gap_from: None,
+                no_segments_since: None,
+                active: Vec::new(),
+            });
+            // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
+        }
         let Err(e) = self.command(EngineCommand::StartSession(start)).await else {
             return Ok(());
         };

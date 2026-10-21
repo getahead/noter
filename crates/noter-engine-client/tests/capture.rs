@@ -437,6 +437,7 @@ async fn pause_and_resume_only_follow_the_state_machine() {
     let c = client(&engine);
     c.start_session(start()).await.unwrap();
     assert!(c.pause_session().await.is_err(), "not capturing yet");
+    assert!(c.start_session(start()).await.is_err(), "a session runs");
     ms(TAPS_OPEN_MS + 1).await;
     assert!(c.resume_session().await.is_err(), "not paused");
     engine.kill_current();
