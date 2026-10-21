@@ -904,6 +904,7 @@ export const defaultHandlers: Handlers = {
     if (world.app.capture.call_id && ids.has(world.app.capture.call_id) && live(world.app.capture)) throw coreError("already_recording", "stop the call before deleting it");
     world.calls = world.calls.filter((c) => !ids.has(c.id));
     world.call_details = world.call_details.filter((d) => !ids.has(d.call.id));
+    world.transcripts = world.transcripts.filter((t) => !ids.has(t.call_id));
     ids.forEach((id) => emit("entity:changed", { type: "removed", kind: "call", id }));
     return { deleted: ids.size };
   },
