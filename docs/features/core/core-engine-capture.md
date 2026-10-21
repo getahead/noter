@@ -140,13 +140,13 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The engine cannot be restarted: `CaptureFailed { call_id, since }` for the session manager (phase `failed`, NT-3); nothing more is recorded, the call is not ended.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sees the process exit or miss `ping` while a session runs, instead of the idle restart of `cpt-noter-algo-core-engine-foundation-restart` (moved from its `inst-if-capture`, decision D-12) - `inst-see-crash`
-2. [ ] - `p1` - Supervisor respawns the engine and sends `start_session` with the same `call_id` and `resume_from_ms` = the ring's last written offset - `inst-respawn`
+1. [x] - `p1` - Supervisor sees the process exit or miss `ping` while a session runs, instead of the idle restart of `cpt-noter-algo-core-engine-foundation-restart` (moved from its `inst-if-capture`, decision D-12) - `inst-see-crash`
+2. [x] - `p1` - Supervisor respawns the engine and sends `start_session` with the same `call_id` and `resume_from_ms` = the ring's last written offset - `inst-respawn`
 3. [ ] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
-4. [ ] - `p1` - Supervisor reports a gap `engine_restart` from the last confirmed audio to the resumed offset - `inst-report-gap`
-5. [ ] - `p1` - **IF** the restart fails three times within 30 s - `inst-if-restart-fails`
-   1. [ ] - `p1` - **RETURN** `CaptureFailed { call_id, since }` to the session manager - `inst-return-failed`
-6. [ ] - `p1` - **RETURN** session running again - `inst-return-recovered`
+4. [x] - `p1` - Supervisor reports a gap `engine_restart` from the last confirmed audio to the resumed offset - `inst-report-gap`
+5. [x] - `p1` - **IF** the restart fails three times within 30 s - `inst-if-restart-fails`
+   1. [x] - `p1` - **RETURN** `CaptureFailed { call_id, since }` to the session manager - `inst-return-failed`
+6. [x] - `p1` - **RETURN** session running again - `inst-return-recovered`
 
 ### Replay a span
 
@@ -218,41 +218,41 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Translate engine facts into degraded states
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-degraded`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-degraded`
 
 **Input**: Engine events during a session.
 
 **Output**: Degraded states for the session manager to publish.
 
 **Steps**:
-1. [ ] - `p1` - `no_segments` for 10 s while levels show audio → `TranscriptionStalled`; a `stalled` gap if it lasts - `inst-stalled`
-2. [ ] - `p1` - `system_audio_silent` → `SystemAudioSilent { call_id, since, confidence }` - `inst-silent`
-3. [ ] - `p1` - Microphone `device_unavailable` or silent microphone while the system channel speaks → `MicrophoneOff { call_id }` - `inst-mic-off`
-4. [ ] - `p1` - `device_changed` → `DeviceChanged` and a `device_changed` gap from `gap_from_ms` to `gap_to_ms` - `inst-device`
-5. [ ] - `p1` - Engine restart → an `engine_restart` gap; failure → `CaptureFailed` - `inst-restart-states`
-6. [ ] - `p1` - **RETURN** the states; clearing a state is the same rule in reverse - `inst-return-degraded`
+1. [x] - `p1` - `no_segments` for 10 s while levels show audio → `TranscriptionStalled`; a `stalled` gap if it lasts - `inst-stalled`
+2. [x] - `p1` - `system_audio_silent` → `SystemAudioSilent { call_id, since, confidence }` - `inst-silent`
+3. [x] - `p1` - Microphone `device_unavailable` or silent microphone while the system channel speaks → `MicrophoneOff { call_id }` - `inst-mic-off`
+4. [x] - `p1` - `device_changed` → `DeviceChanged` and a `device_changed` gap from `gap_from_ms` to `gap_to_ms` - `inst-device`
+5. [x] - `p1` - Engine restart → an `engine_restart` gap; failure → `CaptureFailed` - `inst-restart-states`
+6. [x] - `p1` - **RETURN** the states; clearing a state is the same rule in reverse - `inst-return-degraded`
 
 ## 4. States (CDSL)
 
 ### Engine session
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-engine-capture-session`
+- [x] `p1` - **ID**: `cpt-noter-state-core-engine-capture-session`
 
 **States**: idle, starting, capturing, paused, restarting, stopping, stopped, failed
 
 **Initial State**: idle
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** idle **TO** starting **WHEN** `start_session` is sent - `inst-st-starting`
-2. [ ] - `p1` - **FROM** starting **TO** capturing **WHEN** `session_started` arrives - `inst-st-capturing`
-3. [ ] - `p1` - **FROM** capturing **TO** paused **WHEN** `pause` is acknowledged - `inst-st-paused`
-4. [ ] - `p1` - **FROM** paused **TO** capturing **WHEN** `resume` is acknowledged - `inst-st-resumed`
-5. [ ] - `p1` - **FROM** capturing **TO** restarting **WHEN** the engine process dies - `inst-st-restarting`
-6. [ ] - `p1` - **FROM** restarting **TO** capturing **WHEN** the capture-first restart resumed from the ring - `inst-st-recovered`
-7. [ ] - `p1` - **FROM** restarting **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
-8. [ ] - `p1` - **FROM** failed **TO** restarting **WHEN** the user presses **Try Again** - `inst-st-try-again`
-9. [ ] - `p1` - **FROM** capturing **TO** stopping **WHEN** `stop` is sent - `inst-st-stopping`
-10. [ ] - `p1` - **FROM** stopping **TO** stopped **WHEN** `session_stopped` arrives - `inst-st-stopped`
+1. [x] - `p1` - **FROM** idle **TO** starting **WHEN** `start_session` is sent - `inst-st-starting`
+2. [x] - `p1` - **FROM** starting **TO** capturing **WHEN** `session_started` arrives - `inst-st-capturing`
+3. [x] - `p1` - **FROM** capturing **TO** paused **WHEN** `pause` is acknowledged - `inst-st-paused`
+4. [x] - `p1` - **FROM** paused **TO** capturing **WHEN** `resume` is acknowledged - `inst-st-resumed`
+5. [x] - `p1` - **FROM** capturing **TO** restarting **WHEN** the engine process dies - `inst-st-restarting`
+6. [x] - `p1` - **FROM** restarting **TO** capturing **WHEN** the capture-first restart resumed from the ring - `inst-st-recovered`
+7. [x] - `p1` - **FROM** restarting **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
+8. [x] - `p1` - **FROM** failed **TO** restarting **WHEN** the user presses **Try Again** - `inst-st-try-again`
+9. [x] - `p1` - **FROM** capturing **TO** stopping **WHEN** `stop` is sent - `inst-st-stopping`
+10. [x] - `p1` - **FROM** stopping **TO** stopped **WHEN** `session_stopped` arrives - `inst-st-stopped`
 
 ## 5. Definitions of Done
 
