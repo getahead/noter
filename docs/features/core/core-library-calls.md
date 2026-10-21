@@ -50,6 +50,8 @@ design: docs/DESIGN-core.md
 
 A library service in `noter-core` serves the read models over the call rows, segments, speakers, marks and gaps that capture writes: the paged Library list, the call detail, the call types, edits of a call's title and type, and permanent deletion of calls with their files. It also brings in fixture parity for these read models: the fixtures are seeded as rows and the fake world is generated through the real read models. Tags, search, outputs and items arrive in M2 and M3.
 
+> **M1 decisions (Backend Teamlead, 21 Oct 2026).** The built-in list for `call_types_list` is a constant in noter-core for M1; skill folders under Application Support are read when present, and an unreadable one is logged and skipped (TL-6). `calls_delete` writes one non-undoable, content-free change row per deleted call, and the segments, speakers, marks and gaps under it are removed with `Store::delete` (TL-1). Until the UI ships the M1 screens, the `delete-call` story is proven by a story-named conformance test (TL-7).
+
 ### 1.2 Purpose
 
 After M1 the user can record calls and find them again. The list and the call record are where the UI first reads real data instead of fixtures, so fake and real must agree field by field.
