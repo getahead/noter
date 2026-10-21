@@ -401,11 +401,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.6 [First-run wizard](features/ui/first-run.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-first-run`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-first-run`
 
 - **Purpose**: Get the Mac ready before the first call: models downloading in the background, Microphone and System Audio Recording granted, the self-test passed, the call display and audio retention chosen, so call detection is on before the first real meeting and no start control ever waits for setup.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/first-run.md`](features/ui/first-run.md). **Status**: IN_PROGRESS.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/first-run.md`](features/ui/first-run.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`
 
@@ -426,7 +426,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-no-dialog-after-setup`
+  - `cpt-noter-constraint-no-dialog-after-setup` (plain reference: its status lives in DESIGN.md and closes with the last feature that references it, M1)
 
 - **Domain Model Entities**:
   - Setup status, model bundles, permissions, self-test state, display list, setting
@@ -467,11 +467,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.7 [Settings window](features/ui/settings.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-settings`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-settings`
 
 - **Purpose**: Give every setting one home in a separate Settings window with 11 panes and a search field, applied at once, with each failure's fix beside it, and make hotkeys and card keys safe to change before a call.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/settings.md`](features/ui/settings.md). **Status**: IN_PROGRESS.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/settings.md`](features/ui/settings.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-first-run`
 
@@ -496,7 +496,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-behaviour-metrics-off`
+  - `cpt-noter-constraint-behaviour-metrics-off` (plain reference: its status lives in DESIGN.md and closes with the last feature that references it, M5)
 
 - **Domain Model Entities**:
   - Setting, hotkey, glossary term, display, model bundle, permission

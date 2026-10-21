@@ -39,11 +39,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-first-run`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-first-run`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-first-run`
+- [x] `p1` - `cpt-noter-feature-ui-first-run`
 
 ### 1.1 Overview
 
