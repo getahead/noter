@@ -121,7 +121,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Start capture
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-start`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-start`
 
 **Actor**: Primary user (record prompt, start hotkey, menu bar, Today, call window)
 
@@ -137,19 +137,19 @@ Capture is the release-blocking function, and its rules must live in one machine
 - Never refused for setup state, audio permissions or the self-test (O1).
 
 **Steps**:
-1. [ ] - `p1` - API: `capture_start { source, sensitive, detection_id?, calendar_event_id? }` - `inst-start-call`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-capture-session-start-guard`; **RETURN** its error if any - `inst-start-guard`
-3. [ ] - `p1` - **IF** the phase is `stopped`, close that call's Continue window (it goes to `idle` for it) - `inst-close-continue`
-4. [ ] - `p1` - DB: INSERT `calls` (status `recording`, sensitive, title from the matched event or the app, `started_at`) through the change-log write path - `inst-insert-call`
-5. [ ] - `p1` - Phase `starting`; emit `capture:state` - `inst-phase-starting`
-6. [ ] - `p1` - Ask the supervisor to start the engine session (`cpt-noter-flow-core-engine-capture-session`) with audio storage from settings and the glossary - `inst-start-engine`
-7. [ ] - `p1` - On `session_started`, phase `recording`; ask the native layer to open the call window on the call display without focus - `inst-phase-recording`
-8. [ ] - `p1` - While the phase is `recording` or `paused`, subscribe to settings' glossary-changed hook and send `set_glossary` to the engine on each change, so a glossary edit reaches the live call (this meets the settings glossary DoD in M1); unsubscribe when the call stops - `inst-live-glossary`
-9. [ ] - `p1` - **RETURN** `CaptureState` with its `version` - `inst-return-started`
+1. [x] - `p1` - API: `capture_start { source, sensitive, detection_id?, calendar_event_id? }` - `inst-start-call`
+2. [x] - `p1` - Run `cpt-noter-algo-core-capture-session-start-guard`; **RETURN** its error if any - `inst-start-guard`
+3. [x] - `p1` - **IF** the phase is `stopped`, close that call's Continue window (it goes to `idle` for it) - `inst-close-continue`
+4. [x] - `p1` - DB: INSERT `calls` (status `recording`, sensitive, title from the matched event or the app, `started_at`) through the change-log write path - `inst-insert-call`
+5. [x] - `p1` - Phase `starting`; emit `capture:state` - `inst-phase-starting`
+6. [x] - `p1` - Ask the supervisor to start the engine session (`cpt-noter-flow-core-engine-capture-session`) with audio storage from settings and the glossary - `inst-start-engine`
+7. [x] - `p1` - On `session_started`, phase `recording`; ask the native layer to open the call window on the call display without focus - `inst-phase-recording`
+8. [x] - `p1` - While the phase is `recording` or `paused`, subscribe to settings' glossary-changed hook and send `set_glossary` to the engine on each change, so a glossary edit reaches the live call (this meets the settings glossary DoD in M1); unsubscribe when the call stops - `inst-live-glossary`
+9. [x] - `p1` - **RETURN** `CaptureState` with its `version` - `inst-return-started`
 
 ### Pause, resume and mark
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-pause-mark`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-pause-mark`
 
 **Actor**: Primary user (call window, main window, menu bar, hotkey)
 
@@ -161,12 +161,12 @@ Capture is the release-blocking function, and its rules must live in one machine
 - Pause while already paused (wanted state): the current state is returned, nothing changes.
 
 **Steps**:
-1. [ ] - `p1` - API: `capture_set_paused { call_id, paused }` or `capture_mark_moment { call_id, note }` - `inst-pause-call`
-2. [ ] - `p1` - **IF** the call is not the live one or is stopped **RETURN** `not_recording` - `inst-if-not-live`
-3. [ ] - `p1` - **IF** `paused` is the current state, **RETURN** `CaptureState` unchanged - `inst-if-same`
-4. [ ] - `p1` - For pause: tell the engine `pause`, open a `paused` gap, phase `paused`; for resume: tell the engine `resume`, close the gap, phase `recording` - `inst-apply-pause`
-5. [ ] - `p1` - For a mark: DB: INSERT `marks { call_id, at_ms, note }`; publish a `mark` message on the transcript stream - `inst-insert-mark`
-6. [ ] - `p1` - **RETURN** `CaptureState` (or `MarkView` for a mark); emit `capture:state` - `inst-return-pause`
+1. [x] - `p1` - API: `capture_set_paused { call_id, paused }` or `capture_mark_moment { call_id, note }` - `inst-pause-call`
+2. [x] - `p1` - **IF** the call is not the live one or is stopped **RETURN** `not_recording` - `inst-if-not-live`
+3. [x] - `p1` - **IF** `paused` is the current state, **RETURN** `CaptureState` unchanged - `inst-if-same`
+4. [x] - `p1` - For pause: tell the engine `pause`, open a `paused` gap, phase `paused`; for resume: tell the engine `resume`, close the gap, phase `recording` - `inst-apply-pause`
+5. [x] - `p1` - For a mark: DB: INSERT `marks { call_id, at_ms, note }`; publish a `mark` message on the transcript stream - `inst-insert-mark`
+6. [x] - `p1` - **RETURN** `CaptureState` (or `MarkView` for a mark); emit `capture:state` - `inst-return-pause`
 
 ### Stop at call end
 
@@ -206,13 +206,13 @@ Capture is the release-blocking function, and its rules must live in one machine
 - Discard without the nothing-heard notice: `notice_expired`.
 
 **Steps**:
-1. [ ] - `p1` - API: `capture_stop { call_id }` (or the countdown, or a native caller) - `inst-stop-call`
-2. [ ] - `p1` - Phase `stopping`; tell the engine `stop`; on `session_stopped` store the file paths and `ended_at` - `inst-engine-stop`
-3. [ ] - `p1` - DB: UPDATE `calls` status `processing` through the change-log write path; end the transcript and levels streams with `call_stopped` - `inst-update-call`
-4. [ ] - `p1` - Phase `stopped`, `continue_until` = now + 5 minutes; hand the call to the post-call queue - `inst-phase-stopped`
-5. [ ] - `p1` - API: `capture_continue { call_id }` before `continue_until`: cancel the queued post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
+1. [x] - `p1` - API: `capture_stop { call_id }` (or the countdown, or a native caller) - `inst-stop-call`
+2. [x] - `p1` - Phase `stopping`; tell the engine `stop`; on `session_stopped` store the file paths and `ended_at` - `inst-engine-stop`
+3. [x] - `p1` - DB: UPDATE `calls` status `processing` through the change-log write path; end the transcript and levels streams with `call_stopped` - `inst-update-call`
+4. [x] - `p1` - Phase `stopped`, `continue_until` = now + 5 minutes; hand the call to the post-call queue - `inst-phase-stopped`
+5. [x] - `p1` - API: `capture_continue { call_id }` before `continue_until`: cancel the queued post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
 6. [ ] - `p1` - API: `capture_discard { call_id }` while `NothingHeard` shows: stop the engine, delete the call's rows and files (logged, not undoable), end streams with `discarded`, phase `idle` - `inst-discard`
-7. [ ] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-stop`
+7. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-stop`
 
 ### Answer notices during a call
 
@@ -271,26 +271,26 @@ Capture is the release-blocking function, and its rules must live in one machine
 - Turning it off during capture: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `capture_set_sensitive { call_id, sensitive }` - `inst-sensitive-call`
-2. [ ] - `p1` - **IF** the call is live and `sensitive` is false **RETURN** `invalid_input` - `inst-if-off-live`
-3. [ ] - `p1` - DB: UPDATE `calls.sensitive` through the change-log write path - `inst-write-sensitive`
+1. [x] - `p1` - API: `capture_set_sensitive { call_id, sensitive }` - `inst-sensitive-call`
+2. [x] - `p1` - **IF** the call is live and `sensitive` is false **RETURN** `invalid_input` - `inst-if-off-live`
+3. [x] - `p1` - DB: UPDATE `calls.sensitive` through the change-log write path - `inst-write-sensitive`
 4. [ ] - `p1` - **RETURN** `CaptureState`; emit `capture:state` and `entity:changed` for the call - `inst-return-sensitive`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Start guard
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-capture-session-start-guard`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-capture-session-start-guard`
 
 **Input**: Current phase, free disk, live-model state.
 
 **Output**: Ok, or `already_recording`, `disk_full` or `model_missing`.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the phase is `starting`, `recording`, `paused`, `stopping` or `failed` **RETURN** `already_recording` - `inst-guard-recording`
-2. [ ] - `p1` - **IF** free disk is below 500 MB **RETURN** `disk_full` with `detail.needed_mb` - `inst-guard-disk`
-3. [ ] - `p1` - **IF** the live model is not downloaded **RETURN** `model_missing` - `inst-guard-model`
-4. [ ] - `p1` - **RETURN** ok; setup state, permissions and the self-test are never read here - `inst-guard-ok`
+1. [x] - `p1` - **IF** the phase is `starting`, `recording`, `paused`, `stopping` or `failed` **RETURN** `already_recording` - `inst-guard-recording`
+2. [x] - `p1` - **IF** free disk is below 500 MB **RETURN** `disk_full` with `detail.needed_mb` - `inst-guard-disk`
+3. [x] - `p1` - **IF** the live model is not downloaded **RETURN** `model_missing` - `inst-guard-model`
+4. [x] - `p1` - **RETURN** ok; setup state, permissions and the self-test are never read here - `inst-guard-ok`
 
 ### Detection decision
 
@@ -363,20 +363,20 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Initial State**: idle
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** idle **TO** starting **WHEN** `capture_start` passes the start guard - `inst-st-start`
-2. [ ] - `p1` - **FROM** stopped **TO** starting **WHEN** `capture_start` passes the guard (the stopped call's Continue window closes) - `inst-st-start-from-stopped`
-3. [ ] - `p1` - **FROM** starting **TO** recording **WHEN** the engine session started - `inst-st-recording`
-4. [ ] - `p1` - **FROM** recording **TO** paused **WHEN** `capture_set_paused(true)` - `inst-st-pause`
-5. [ ] - `p1` - **FROM** paused **TO** recording **WHEN** `capture_set_paused(false)` - `inst-st-resume`
-6. [ ] - `p1` - **FROM** recording **TO** stopping **WHEN** `capture_stop`, Stop Now or the countdown (also from paused) - `inst-st-stopping`
-7. [ ] - `p1` - **FROM** stopping **TO** stopped **WHEN** the engine session stopped - `inst-st-stopped`
+1. [x] - `p1` - **FROM** idle **TO** starting **WHEN** `capture_start` passes the start guard - `inst-st-start`
+2. [x] - `p1` - **FROM** stopped **TO** starting **WHEN** `capture_start` passes the guard (the stopped call's Continue window closes) - `inst-st-start-from-stopped`
+3. [x] - `p1` - **FROM** starting **TO** recording **WHEN** the engine session started - `inst-st-recording`
+4. [x] - `p1` - **FROM** recording **TO** paused **WHEN** `capture_set_paused(true)` - `inst-st-pause`
+5. [x] - `p1` - **FROM** paused **TO** recording **WHEN** `capture_set_paused(false)` - `inst-st-resume`
+6. [x] - `p1` - **FROM** recording **TO** stopping **WHEN** `capture_stop`, Stop Now or the countdown (also from paused) - `inst-st-stopping`
+7. [x] - `p1` - **FROM** stopping **TO** stopped **WHEN** the engine session stopped - `inst-st-stopped`
 8. [ ] - `p1` - **FROM** recording **TO** idle **WHEN** `capture_discard` after the nothing-heard notice (through stopping) - `inst-st-discard`
-9. [ ] - `p1` - **FROM** stopped **TO** recording **WHEN** `capture_continue` before `continue_until` - `inst-st-continue`
+9. [x] - `p1` - **FROM** stopped **TO** recording **WHEN** `capture_continue` before `continue_until` - `inst-st-continue`
 10. [ ] - `p1` - **FROM** stopped **TO** idle **WHEN** `continue_until` passes or another capture starts - `inst-st-idle`
 11. [ ] - `p1` - **FROM** idle **TO** recording **WHEN** `capture_resume_interrupted` while the interrupted banner shows - `inst-st-resume-interrupted`
 12. [ ] - `p1` - **FROM** recording **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
 13. [ ] - `p1` - **FROM** failed **TO** recording **WHEN** **Try Again** (`capture_resume_interrupted`) restarts the engine - `inst-st-try-again`
-14. [ ] - `p1` - **FROM** failed **TO** stopped **WHEN** `capture_stop` (the call ends at the last audio) - `inst-st-failed-stop`
+14. [x] - `p1` - **FROM** failed **TO** stopped **WHEN** `capture_stop` (the call ends at the last audio) - `inst-st-failed-stop`
 15. [ ] - `p1` - **FROM** recording **TO** recording **WHEN** a new meeting is answered or expires (Start as New Call splits into a new call; Keep in This Call keeps one) - `inst-st-split`
 
 ## 5. Definitions of Done
@@ -457,7 +457,7 @@ The system **MUST** keep the sensitive flag on the call (refusing to turn it off
 
 ### Same function from every surface
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-capture-session-native-callers`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-capture-session-native-callers`
 
 The system **MUST** expose start, pause, mark and stop to menu items and hotkeys as the same core functions, called as `Caller::Native { surface }`, taking effect within a second without a WebView round trip; a core test calls each as a native caller.
 

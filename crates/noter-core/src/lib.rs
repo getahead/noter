@@ -3,6 +3,7 @@
 //! Every later feature plugs its service in through [`CoreDeps`] and this crate.
 
 mod app;
+mod capture;
 mod first_run;
 mod glossary;
 mod hotkeys;
@@ -24,6 +25,7 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use app::WholeState;
+pub use capture::{CaptureEvent, Surfaces};
 pub use first_run::{
     detection, BoxFuture, BundleFile, BundleSpec, ChunkSink, EnvironmentReading, FetchError,
     ModelSource, NativeServices, Updater,
@@ -86,6 +88,8 @@ pub struct CoreDeps {
     /// Starts the engine (`ProcessLauncher` in the app, a scripted engine in the harness, S12).
     pub engine: Arc<dyn noter_engine_client::EngineLauncher>,
     pub engine_config: noter_engine_client::Config,
+    /// Record prompt and call window (AppKit in the app, recorded calls in the harness, TL-2).
+    pub surfaces: Arc<dyn Surfaces>,
 }
 
 impl CoreDeps {
@@ -102,7 +106,13 @@ impl CoreDeps {
             models_dir: None,
             engine: Arc::new(self_test::NoEngine),
             engine_config: noter_engine_client::Config::default(),
+            surfaces: Arc::new(capture::NoSurfaces),
         }
+    }
+
+    pub fn with_surfaces(mut self, surfaces: Arc<dyn Surfaces>) -> Self {
+        self.surfaces = surfaces;
+        self
     }
 
     pub fn with_engine(mut self, engine: Arc<dyn noter_engine_client::EngineLauncher>) -> Self {
@@ -197,6 +207,11 @@ pub struct Core {
     engine: self_test::Engine,
     /// The self-test's Channel messages.
     self_test_hub: std::sync::OnceLock<Arc<StreamHub<SelfTestMsg>>>,
+    /// The capture machine's bookkeeping; held by each capture command while it applies.
+    capture: tokio::sync::Mutex<capture::Session>,
+    capture_hooks: Hooks<CaptureEvent>,
+    /// The capture phase as last published, for commands that wait on the engine.
+    capture_phase: tokio::sync::watch::Sender<CapturePhase>,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -267,6 +282,9 @@ impl Core {
             runtime: std::sync::OnceLock::new(),
             engine,
             self_test_hub: std::sync::OnceLock::new(),
+            capture: tokio::sync::Mutex::new(capture::Session::default()),
+            capture_hooks: Mutex::new(vec![]),
+            capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -559,6 +577,62 @@ impl CoreApi for Core {
         args: GlossaryIdArgs,
     ) -> Result<GlossaryList, CoreError> {
         self.remove_term(ctx, args)
+    }
+
+    async fn capture_start(
+        &self,
+        ctx: &CommandCtx,
+        args: CaptureStartArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.start_call(ctx, args).await
+    }
+
+    async fn capture_stop(
+        &self,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.stop_call(ctx, args).await
+    }
+
+    async fn capture_set_paused(
+        &self,
+        ctx: &CommandCtx,
+        args: CapturePauseArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.pause_call(ctx, args).await
+    }
+
+    async fn capture_mark_moment(
+        &self,
+        _ctx: &CommandCtx,
+        args: MarkMomentArgs,
+    ) -> Result<MarkView, CoreError> {
+        self.mark_moment(args).await
+    }
+
+    async fn capture_continue(
+        &self,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.continue_call(ctx, args).await
+    }
+
+    async fn capture_discard(
+        &self,
+        _ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.discard_call(args).await
+    }
+
+    async fn capture_set_sensitive(
+        &self,
+        ctx: &CommandCtx,
+        args: SensitiveArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.set_call_sensitive(ctx, args).await
     }
 
     // @cpt-dod:cpt-noter-dod-core-ipc-host-snapshot:p1

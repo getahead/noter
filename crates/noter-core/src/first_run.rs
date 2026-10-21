@@ -321,6 +321,7 @@ impl Core {
         let launch = lock(&self.settings).general.launch_at_login;
         self.apply_login_item(launch);
         self.environment_changed(self.deps.native.environment());
+        self.start_capture();
     }
 
     fn apply_login_item(&self, on: bool) {

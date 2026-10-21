@@ -15,8 +15,8 @@ use std::sync::{Arc, Mutex};
 
 use noter_core::{
     BoxFuture as CoreFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, SystemClock,
-    Updater,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Surfaces,
+    SystemClock, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{EngineErrorCode, EngineEvent};
@@ -49,6 +49,7 @@ pub struct Harness {
     updater: Arc<ScriptedUpdater>,
     models: Arc<TinyModels>,
     engine: ScriptedEngine,
+    surfaces: Arc<ScriptedSurfaces>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -101,11 +102,13 @@ impl Harness {
             None => engine,
         };
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
+        let surfaces = Arc::new(ScriptedSurfaces::default());
         let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
             .with_native(native.clone())
             .with_models(models.clone())
             .with_engine(Arc::new(engine.clone()))
-            .with_updater(updater.clone());
+            .with_updater(updater.clone())
+            .with_surfaces(surfaces.clone());
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-inject
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
@@ -119,6 +122,7 @@ impl Harness {
             updater,
             models,
             engine,
+            surfaces,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -511,6 +515,8 @@ impl Controls for Harness {
                 "world_get" => self.world_get().await,
                 "world_set" => self.world_set(args).await,
                 "push" => self.push(args).await,
+                // `{}`: what the core asked the native layer to show, in order (TL-2).
+                "surfaces" => Ok(json!({ "calls": *lock(&self.surfaces.0) })),
                 // `{}`: the next model download delivers bytes that fail their checksum.
                 "corrupt_next_download" => {
                     self.models.corrupt_next.store(true, Ordering::SeqCst);
@@ -825,6 +831,22 @@ fn hex(bytes: &[u8]) -> String {
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
 /// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
 /// the harness's.
+/// The native layer's windows, as the calls the core made (TL-2).
+#[derive(Default)]
+struct ScriptedSurfaces(Mutex<Vec<&'static str>>);
+
+impl Surfaces for ScriptedSurfaces {
+    fn show_record_prompt(&self) {
+        lock(&self.0).push("show_record_prompt");
+    }
+    fn close_record_prompt(&self) {
+        lock(&self.0).push("close_record_prompt");
+    }
+    fn open_call_window_inactive(&self) {
+        lock(&self.0).push("open_call_window_inactive");
+    }
+}
+
 struct ScriptedUpdater(Mutex<Option<UpdateInfo>>);
 
 impl Updater for ScriptedUpdater {
