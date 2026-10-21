@@ -10,6 +10,7 @@ mod hotkeys;
 mod hub;
 mod log;
 mod models;
+mod notices;
 mod self_test;
 mod settings;
 #[cfg(feature = "harness")]
@@ -212,6 +213,8 @@ pub struct Core {
     capture_hooks: Hooks<CaptureEvent>,
     /// The capture phase as last published, for commands that wait on the engine.
     capture_phase: tokio::sync::watch::Sender<CapturePhase>,
+    /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the App Group container).
+    audio_dir: std::path::PathBuf,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -263,6 +266,7 @@ impl Core {
             .models_dir
             .clone()
             .unwrap_or_else(|| data_dir.join("models"));
+        let audio_dir = models_dir.parent().unwrap_or(data_dir).join("audio");
         let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
         let engine =
             noter_engine_client::EngineClient::new(deps.engine.clone(), deps.engine_config.clone());
@@ -285,6 +289,7 @@ impl Core {
             capture: tokio::sync::Mutex::new(capture::Session::default()),
             capture_hooks: Mutex::new(vec![]),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
+            audio_dir,
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -621,10 +626,74 @@ impl CoreApi for Core {
 
     async fn capture_discard(
         &self,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.discard_call(ctx, args).await
+    }
+
+    async fn capture_answer_call_end(
+        &self,
+        ctx: &CommandCtx,
+        args: CallEndAnswerArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.answer_call_end(ctx, args).await
+    }
+
+    async fn capture_hold_notice(
+        &self,
+        _ctx: &CommandCtx,
+        args: NoticeHoldArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.hold_notice(args).await
+    }
+
+    async fn capture_answer_new_meeting(
+        &self,
+        ctx: &CommandCtx,
+        args: NewMeetingAnswerArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.answer_new_meeting(ctx, args).await
+    }
+
+    async fn capture_keep_recording(
+        &self,
         _ctx: &CommandCtx,
         args: CallIdArgs,
     ) -> Result<CaptureState, CoreError> {
-        self.discard_call(args).await
+        self.keep_recording(args).await
+    }
+
+    async fn capture_keep_source(
+        &self,
+        _ctx: &CommandCtx,
+        args: KeepSourceArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.keep_source(args).await
+    }
+
+    async fn capture_exclude_source(
+        &self,
+        _ctx: &CommandCtx,
+        args: ExcludeSourceArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.exclude_source(args).await
+    }
+
+    async fn capture_dismiss_detection(
+        &self,
+        _ctx: &CommandCtx,
+        args: DismissDetectionArgs,
+    ) -> Result<Ack, CoreError> {
+        self.dismiss_detection(args)
+    }
+
+    async fn capture_ignore_app(
+        &self,
+        ctx: &CommandCtx,
+        args: IgnoreAppArgs,
+    ) -> Result<Ack, CoreError> {
+        self.ignore_app(ctx, args)
     }
 
     async fn capture_set_sensitive(

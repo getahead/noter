@@ -72,9 +72,42 @@ pub(crate) struct Session {
     away_ms: i64,
     /// When the last stop was asked for, and by whom (its change row names the surface).
     stop: Option<(i64, CommandCtx)>,
+    /// The meeting app of the live call (bundle id, name), when a detection started it.
+    pub(crate) app: Option<(String, String)>,
+    /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
+    pub(crate) released: u64,
+    /// When something was last heard (tokio time, for the timer) and at what wall time.
+    pub(crate) heard: Option<tokio::time::Instant>,
+    pub(crate) heard_since: i64,
+    /// Counts nothing-heard timers; only the latest one may raise the notice.
+    pub(crate) heard_chain: u64,
+    /// The app of the pending new-meeting notice.
+    pub(crate) new_meeting: Option<(String, String)>,
+    /// Second sources the user kept in this call.
+    pub(crate) kept_sources: Vec<String>,
+    /// The stop under way was the countdown's, not the user's.
+    pub(crate) auto_stop: bool,
+}
+
+/// Where a new call starts: when, under which title, and from which meeting app.
+pub(crate) struct Begin {
+    pub(crate) at: i64,
+    pub(crate) title: Option<String>,
+    pub(crate) app: Option<(String, String)>,
 }
 
 impl Session {
+    /// A fresh session from `origin`; the timer counters go on, so a timer of the last call
+    /// never acts for this one.
+    pub(crate) fn restart(&self, origin: i64) -> Session {
+        Session {
+            origin,
+            released: self.released,
+            heard_chain: self.heard_chain,
+            ..Session::default()
+        }
+    }
+
     fn offset(&self, at: i64) -> i64 {
         at - self.origin
     }
@@ -97,7 +130,22 @@ fn ms(v: i64) -> u32 {
     v.clamp(0, u32::MAX.into()) as u32
 }
 
-fn live(state: &CaptureState, call_id: &CallId) -> bool {
+/// The idle state: no call.
+pub(crate) fn to_idle(c: &mut CaptureState) {
+    c.phase = CapturePhase::Idle;
+    c.call_id = None;
+    c.title = None;
+    c.started_at = None;
+    c.recorded_ms = DurationMs(0);
+    c.sensitive = false;
+    c.pause = None;
+    c.notice = None;
+    c.continue_until = None;
+    c.audio_not_stored = false;
+    c.audio_writing = false;
+}
+
+pub(crate) fn live(state: &CaptureState, call_id: &CallId) -> bool {
     matches!(state.phase, CapturePhase::Recording | CapturePhase::Paused)
         && state.call_id.as_ref() == Some(call_id)
 }
@@ -121,7 +169,7 @@ fn mode_used(mode: PrivacyMode, sensitive: bool) -> &'static str {
     }
 }
 
-fn not_recording() -> CoreError {
+pub(crate) fn not_recording() -> CoreError {
     CoreError::new(ErrorCode::NotRecording, "no live call with this id")
 }
 
@@ -190,7 +238,7 @@ impl Core {
     }
 
     /// Changes the capture state and sends it whole with the next version.
-    fn set_capture(&self, change: impl FnOnce(&mut CaptureState)) -> CaptureState {
+    pub(crate) fn set_capture(&self, change: impl FnOnce(&mut CaptureState)) -> CaptureState {
         let mut app = self.app();
         change(&mut app.capture);
         let state = self.publish(event_names::CAPTURE_STATE, &mut app.capture);
@@ -206,7 +254,7 @@ impl Core {
     }
 
     // @cpt-algo:cpt-noter-algo-core-capture-session-start-guard:p1
-    fn start_guard(&self, phase: CapturePhase) -> Result<(), CoreError> {
+    pub(crate) fn start_guard(&self, phase: CapturePhase) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-algo-core-capture-session-start-guard:p1:inst-guard-recording
         if !matches!(phase, CapturePhase::Idle | CapturePhase::Stopped) {
             return Err(CoreError::new(
@@ -324,29 +372,59 @@ impl Core {
         args: CaptureStartArgs,
     ) -> Result<CaptureState, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-call
-        let mut session = self.capture.lock().await;
         let now = self.deps.clock.now().0;
+        // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-start-from-prompt
+        let detection = self.take_detection(&args, now)?;
+        // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-start-from-prompt
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-call
+        let begin = Begin {
+            at: now,
+            title: detection.as_ref().map(|d| {
+                d.matched_event
+                    .as_ref()
+                    .map_or_else(|| d.app_name.clone(), |e| e.title.clone())
+            }),
+            app: detection
+                .as_ref()
+                .map(|d| (d.bundle_id.clone(), d.app_name.clone())),
+        };
+        // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-run-start
+        let started = self.begin_call(ctx, args.sensitive, begin).await?;
+        // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-run-start
+        if detection.is_some() {
+            self.set_detection(None);
+            self.deps.surfaces.close_record_prompt();
+        }
+        Ok(started)
+    }
+
+    /// A new call from `begin`, through the start guard.
+    pub(crate) async fn begin_call(
+        &self,
+        ctx: &CommandCtx,
+        sensitive: bool,
+        begin: Begin,
+    ) -> Result<CaptureState, CoreError> {
+        let mut session = self.capture.lock().await;
+        let now = begin.at;
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-guard
         self.start_guard(self.capture_now().phase)?;
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-guard
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // A stopped call's Continue window closes: the new call replaces it.
         *session = Session {
-            origin: now,
-            ..Session::default()
+            app: begin.app.clone(),
+            ..session.restart(now)
         };
+        let title = begin.title.unwrap_or_else(|| UNTITLED.into());
+        let platform = begin.app.map(|(_, name)| name);
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-insert-call
         let call_id = CallId::new(format!("call_{}", ulid::Ulid::generate()));
         let start = self.session_for(&call_id, None)?;
         let store_audio = start.store_audio;
         let privacy = lock(&self.settings).privacy.mode;
-        let class = if args.sensitive {
-            "sensitive"
-        } else {
-            "normal"
-        };
+        let class = if sensitive { "sensitive" } else { "normal" };
         self.write_call(
             ctx,
             &call_id,
@@ -354,12 +432,13 @@ impl Core {
             false,
             vec![
                 ("started_at", json!(now)),
-                ("title", json!(UNTITLED)),
+                ("title", json!(title)),
+                ("platform", json!(platform)),
                 ("call_type", json!(UNCLASSIFIED)),
                 ("status", json!("recording")),
                 ("privacy_class", json!(class)),
                 ("audio_not_stored", json!(!store_audio)),
-                ("mode_used", json!(mode_used(privacy, args.sensitive))),
+                ("mode_used", json!(mode_used(privacy, sensitive))),
             ],
         )?;
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-insert-call
@@ -371,10 +450,10 @@ impl Core {
                 version: c.version,
                 phase: CapturePhase::Starting,
                 call_id: Some(call_id.clone()),
-                title: Some(UNTITLED.into()),
+                title: Some(title),
                 started_at: Some(TimestampMs(now)),
                 recorded_ms: DurationMs(0),
-                sensitive: args.sensitive,
+                sensitive,
                 pause: None,
                 notice: None,
                 continue_until: None,
@@ -407,24 +486,38 @@ impl Core {
     async fn engine_fact(&self, event: EngineEvent) {
         match event {
             EngineEvent::SessionStarted { call_id, .. } => {
+                let mut session = self.capture.lock().await;
                 // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-phase-recording
                 // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-recording
                 let state = self.capture_now();
                 if state.phase == CapturePhase::Starting && state.call_id == Some(call_id) {
                     self.set_capture(|c| c.phase = CapturePhase::Recording);
                     self.deps.surfaces.open_call_window_inactive();
+                    self.listen_for_speech(&mut session);
                 }
                 // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-recording
                 // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-phase-recording
             }
             EngineEvent::SessionStopped { call_id, .. } => {
-                let session = self.capture.lock().await;
-                if let Err(e) = self.finish_stop(&session, &call_id) {
+                let mut session = self.capture.lock().await;
+                if let Err(e) = self.finish_stop(&mut session, &call_id) {
                     self.log(crate::object(json!({
                         "level": "error", "module": "capture", "code": e.code
                     })));
                 }
             }
+            EngineEvent::CallDetected {
+                bundle_id,
+                app_name,
+                ..
+            } => self.call_detected(bundle_id, app_name).await,
+            EngineEvent::CallAudioReleased { bundle_id } => self.audio_released(bundle_id).await,
+            EngineEvent::AudioSourceAdded {
+                call_id,
+                bundle_id,
+                app_name,
+            } => self.source_added(call_id, bundle_id, app_name).await,
+            EngineEvent::Segment { segment } => self.heard(&segment.call_id).await,
             _ => {}
         }
     }
@@ -527,6 +620,16 @@ impl Core {
         ctx: &CommandCtx,
         args: CallIdArgs,
     ) -> Result<CaptureState, CoreError> {
+        self.stop_call_at(ctx, args, None).await
+    }
+
+    /// Stops the call; it ends at `ended` (the new meeting's start) or now.
+    pub(crate) async fn stop_call_at(
+        &self,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+        ended: Option<i64>,
+    ) -> Result<CaptureState, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-stop-call
         let mut session = self.capture.lock().await;
         let state = self.capture_now();
@@ -543,7 +646,7 @@ impl Core {
             self.insert_gap(&args.call_id, t0, t1, GapReason::Paused)?;
             session.away_ms += now - pause.since.0;
         }
-        session.stop = Some((now, ctx.clone()));
+        session.stop = Some((ended.unwrap_or(now), ctx.clone()));
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopping
         let recorded = session.recorded(now, None);
         self.set_capture(|c| {
@@ -568,7 +671,7 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-engine-stop
         // Without the engine's answer in time the call still ends, at the stop.
-        self.finish_stop(&session, &args.call_id)?;
+        self.finish_stop(&mut session, &args.call_id)?;
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-return-stop
         Ok(self.capture_now())
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-return-stop
@@ -576,7 +679,7 @@ impl Core {
 
     /// The stop's second half, once: the call row, phase `stopped`, the Continue window and
     /// the post-call hand-off. Nothing happens unless `call_id` is stopping.
-    fn finish_stop(&self, session: &Session, call_id: &CallId) -> Result<(), CoreError> {
+    fn finish_stop(&self, session: &mut Session, call_id: &CallId) -> Result<(), CoreError> {
         let state = self.capture_now();
         if state.phase != CapturePhase::Stopping || state.call_id.as_ref() != Some(call_id) {
             return Ok(());
@@ -597,14 +700,21 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-update-call
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-phase-stopped
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopped
-        let until = self.deps.clock.now().0 + CONTINUE_MS;
+        let until = TimestampMs(self.deps.clock.now().0 + CONTINUE_MS);
         let recorded = session.recorded(ended, None);
+        let notice =
+            std::mem::take(&mut session.auto_stop).then(|| CaptureNotice::StoppedAutomatically {
+                call_id: call_id.clone(),
+            });
         self.set_capture(|c| {
             c.phase = CapturePhase::Stopped;
             c.pause = None;
             c.recorded_ms = recorded;
-            c.continue_until = Some(TimestampMs(until));
+            c.continue_until = Some(until);
+            c.notice = notice;
         });
+        self.drop_sources_of(call_id);
+        self.close_continue_at(call_id.clone(), until, CONTINUE_MS);
         // The post-call hand-off is a no-op until the PostCall job (M2).
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopped
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-phase-stopped
@@ -642,8 +752,10 @@ impl Core {
         self.set_capture(|c| {
             c.phase = CapturePhase::Recording;
             c.continue_until = None;
+            c.notice = None;
             c.recorded_ms = recorded;
         });
+        self.listen_for_speech(&mut session);
         if self
             .engine
             .command(EngineCommand::StartSession(start))
@@ -657,19 +769,103 @@ impl Core {
         Ok(self.capture_now())
     }
 
-    pub(crate) async fn discard_call(&self, args: CallIdArgs) -> Result<CaptureState, CoreError> {
-        let _session = self.capture.lock().await;
+    pub(crate) async fn discard_call(
+        &self,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CaptureState, CoreError> {
+        let mut session = self.capture.lock().await;
         let state = self.capture_now();
         let heard_nothing = matches!(state.notice, Some(CaptureNotice::NothingHeard { .. }));
-        // shortcut: NothingHeard is raised by the notice timers (next slice); until then every
-        // discard answers `notice_expired`, and the discard itself lands with that slice.
-        if live(&state, &args.call_id) && heard_nothing {
-            return Err(internal("discard lands with the notice timers"));
+        if !(live(&state, &args.call_id) && heard_nothing) {
+            return Err(CoreError::new(
+                ErrorCode::NoticeExpired,
+                "the nothing-heard notice is not shown",
+            ));
         }
-        Err(CoreError::new(
-            ErrorCode::NoticeExpired,
-            "the nothing-heard notice is not shown",
-        ))
+        // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-discard
+        // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
+        let call_id = args.call_id;
+        self.set_capture(|c| c.phase = CapturePhase::Stopping);
+        let stop = EngineCommand::Stop {
+            call_id: call_id.clone(),
+        };
+        let _ = self.engine.command(stop).await;
+        let meta = self.change_meta(ctx, "Discarded recording".into(), "capture_discard");
+        let id = call_id.as_str().to_string();
+        self.store().delete("call", "calls", vec![id], meta)?;
+        if let Err(e) = std::fs::remove_dir_all(self.audio_dir.join(call_id.as_str())) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                self.log(crate::object(json!({
+                    "level": "warn", "module": "capture", "message": "discarded audio stays"
+                })));
+            }
+        }
+        self.capture_event(CaptureEvent::Stopped {
+            call_id: call_id.clone(),
+            reason: StreamEndReason::Discarded,
+        });
+        self.drop_sources_of(&call_id);
+        *session = session.restart(0);
+        let idle = self.set_capture(to_idle);
+        // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
+        // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-discard
+        Ok(idle)
+    }
+
+    /// The capture state as `harness.world_set` asks: the call row it names exists and the
+    /// machine continues from there (harness only).
+    pub(crate) async fn seed_capture(&self, wanted: CaptureState) -> Result<(), CoreError> {
+        let mut session = self.capture.lock().await;
+        let now = self.deps.clock.now().0;
+        *session = session.restart(now - i64::from(wanted.recorded_ms.0));
+        if let Some(call_id) = wanted
+            .call_id
+            .as_ref()
+            .filter(|_| wanted.phase != CapturePhase::Idle)
+        {
+            let id = call_id.as_str().to_string();
+            let found: i64 = self.store().read(move |c| {
+                c.query_row("SELECT count(*) FROM calls WHERE id = ?1", [id], |r| {
+                    r.get(0)
+                })
+            })?;
+            if found == 0 {
+                let status = match wanted.phase {
+                    CapturePhase::Paused => "paused",
+                    CapturePhase::Stopping | CapturePhase::Stopped => "processing",
+                    _ => "recording",
+                };
+                let privacy = lock(&self.settings).privacy.mode;
+                let class = if wanted.sensitive {
+                    "sensitive"
+                } else {
+                    "normal"
+                };
+                let main = CommandCtx {
+                    caller: Caller::Window {
+                        label: WindowLabel::Main,
+                    },
+                };
+                let values = vec![
+                    ("started_at", json!(wanted.started_at.map_or(now, |t| t.0))),
+                    ("title", json!(wanted.title.as_deref().unwrap_or(UNTITLED))),
+                    ("call_type", json!(UNCLASSIFIED)),
+                    ("status", json!(status)),
+                    ("privacy_class", json!(class)),
+                    ("audio_not_stored", json!(wanted.audio_not_stored)),
+                    ("mode_used", json!(mode_used(privacy, wanted.sensitive))),
+                ];
+                self.write_call(&main, call_id, "Seeded call", false, values)?;
+            }
+        }
+        self.set_capture(|c| {
+            *c = CaptureState {
+                version: c.version,
+                ..wanted
+            }
+        });
+        Ok(())
     }
 
     // @cpt-flow:cpt-noter-flow-core-capture-session-sensitive:p2

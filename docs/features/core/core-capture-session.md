@@ -93,7 +93,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Record a detected call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-record-detected`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-record-detected`
 
 **Actor**: Primary user (record prompt), after the engine reported a meeting app
 
@@ -108,16 +108,16 @@ Capture is the release-blocking function, and its rules must live in one machine
 - The user picked **Don't Ask for <app>…**: the detection goes away and the app is ignored from then on.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor delivers `call_detected { bundle_id, app_name, pid }` - `inst-detected-fact`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-capture-session-detection` - `inst-run-detection`
-3. [ ] - `p1` - **IF** the rule says prompt - `inst-if-prompt`
-   1. [ ] - `p1` - Ask the native layer to show the record prompt (non-activating) and emit `capture:detected { detection, version }` with `prompt_until` = now + 15 s - `inst-show-prompt`
-4. [ ] - `p1` - API: `capture_start { source: record_prompt, detection_id, sensitive }` from the record prompt - `inst-start-from-prompt`
-5. [ ] - `p1` - **IF** the detection's `prompt_until` passed **RETURN** `detection_expired` - `inst-if-expired`
-6. [ ] - `p1` - Run `cpt-noter-flow-core-capture-session-start` - `inst-run-start`
-7. [ ] - `p1` - **IF** instead `capture_dismiss_detection` arrives (not now, close or timeout), close the prompt only: set the detection's `prompt_until` to now, never prompt again for this call, keep the detection until `call_audio_released` for its app, and emit `capture:detected` with the kept detection; a start from the menu bar or the start hotkey still succeeds - `inst-dismiss`
-8. [ ] - `p1` - **IF** `capture_ignore_app` arrives, clear the detection, add the app to the ignored apps and emit `capture:detected` with no detection - `inst-ignore`
-9. [ ] - `p1` - **IF** `call_audio_released` arrives for a detection that was never recorded, clear it and emit `capture:detected` with no detection - `inst-detection-ends`
+1. [x] - `p1` - Supervisor delivers `call_detected { bundle_id, app_name, pid }` - `inst-detected-fact`
+2. [x] - `p1` - Run `cpt-noter-algo-core-capture-session-detection` - `inst-run-detection`
+3. [x] - `p1` - **IF** the rule says prompt - `inst-if-prompt`
+   1. [x] - `p1` - Ask the native layer to show the record prompt (non-activating) and emit `capture:detected { detection, version }` with `prompt_until` = now + 15 s - `inst-show-prompt`
+4. [x] - `p1` - API: `capture_start { source: record_prompt, detection_id, sensitive }` from the record prompt - `inst-start-from-prompt`
+5. [x] - `p1` - **IF** the detection's `prompt_until` passed **RETURN** `detection_expired` - `inst-if-expired`
+6. [x] - `p1` - Run `cpt-noter-flow-core-capture-session-start` - `inst-run-start`
+7. [x] - `p1` - **IF** instead `capture_dismiss_detection` arrives (not now, close or timeout), close the prompt only: set the detection's `prompt_until` to now, never prompt again for this call, keep the detection until `call_audio_released` for its app, and emit `capture:detected` with the kept detection; a start from the menu bar or the start hotkey still succeeds - `inst-dismiss`
+8. [x] - `p1` - **IF** `capture_ignore_app` arrives, clear the detection, add the app to the ignored apps and emit `capture:detected` with no detection - `inst-ignore`
+9. [x] - `p1` - **IF** `call_audio_released` arrives for a detection that was never recorded, clear it and emit `capture:detected` with no detection - `inst-detection-ends`
 
 ### Start capture
 
@@ -170,7 +170,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Stop at call end
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-call-end`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-call-end`
 
 **Actor**: Primary user (call window or record prompt), after the meeting app released the audio
 
@@ -183,16 +183,16 @@ Capture is the release-blocking function, and its rules must live in one machine
 - The notice is gone when the answer arrives: `notice_expired`.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor delivers `call_audio_released` for the call's app - `inst-released-fact`
-2. [ ] - `p1` - Start the notice timer (`cpt-noter-algo-core-capture-session-notice-timers`): after 20 s set `CallEnded { stops_at: now + 10 s }` (or `CallSeemsEnded` with 10 minutes while hidden) - `inst-start-notice`
-3. [ ] - `p1` - API: `capture_hold_notice { held }` sets `stops_at` to null while held and to now + 10 s on release - `inst-hold`
-4. [ ] - `p1` - API: `capture_answer_call_end { choice }`: `keep_recording` clears the notice; `stop_now` runs `cpt-noter-flow-core-capture-session-stop` - `inst-answer`
-5. [ ] - `p1` - **IF** `stops_at` passes, run `cpt-noter-flow-core-capture-session-stop` - `inst-auto-stop`
-6. [ ] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-call-end`
+1. [x] - `p1` - Supervisor delivers `call_audio_released` for the call's app - `inst-released-fact`
+2. [x] - `p1` - Start the notice timer (`cpt-noter-algo-core-capture-session-notice-timers`): after 20 s set `CallEnded { stops_at: now + 10 s }` (or `CallSeemsEnded` with 10 minutes while hidden) - `inst-start-notice`
+3. [x] - `p1` - API: `capture_hold_notice { held }` sets `stops_at` to null while held and to now + 10 s on release - `inst-hold`
+4. [x] - `p1` - API: `capture_answer_call_end { choice }`: `keep_recording` clears the notice; `stop_now` runs `cpt-noter-flow-core-capture-session-stop` - `inst-answer`
+5. [x] - `p1` - **IF** `stops_at` passes, run `cpt-noter-flow-core-capture-session-stop` - `inst-auto-stop`
+6. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-call-end`
 
 ### Stop, continue and discard
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-stop`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-stop`
 
 **Actor**: Primary user (Stop, the countdown, the menu bar, a hotkey)
 
@@ -211,12 +211,12 @@ Capture is the release-blocking function, and its rules must live in one machine
 3. [x] - `p1` - DB: UPDATE `calls` status `processing` through the change-log write path; end the transcript and levels streams with `call_stopped` - `inst-update-call`
 4. [x] - `p1` - Phase `stopped`, `continue_until` = now + 5 minutes; hand the call to the post-call queue - `inst-phase-stopped`
 5. [x] - `p1` - API: `capture_continue { call_id }` before `continue_until`: cancel the queued post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
-6. [ ] - `p1` - API: `capture_discard { call_id }` while `NothingHeard` shows: stop the engine, delete the call's rows and files (logged, not undoable), end streams with `discarded`, phase `idle` - `inst-discard`
+6. [x] - `p1` - API: `capture_discard { call_id }` while `NothingHeard` shows: stop the engine, delete the call's rows and files (logged, not undoable), end streams with `discarded`, phase `idle` - `inst-discard`
 7. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-stop`
 
 ### Answer notices during a call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-notices`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-notices`
 
 **Actor**: Primary user (call window or record prompt)
 
@@ -229,11 +229,11 @@ Capture is the release-blocking function, and its rules must live in one machine
 - An answer for a notice that has gone: `notice_expired`.
 
 **Steps**:
-1. [ ] - `p1` - Notices are raised by `cpt-noter-algo-core-capture-session-notice-timers` and carried in `CaptureState.notice` - `inst-raise-notice`
-2. [ ] - `p1` - API: `capture_answer_new_meeting { choice }`: for `start_as_new_call` stop the current call at `detected_at` and start a new call from that offset; for `keep_in_this_call` clear the notice - `inst-new-meeting`
-3. [ ] - `p1` - API: `capture_keep_recording` resets the 5-minute nothing-heard timer - `inst-keep-recording`
-4. [ ] - `p1` - API: `capture_keep_source { bundle_id }` remembers the app for this call; `capture_exclude_source { bundle_id }` sends `exclude_process` to the engine - `inst-second-source`
-5. [ ] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-notices`
+1. [x] - `p1` - Notices are raised by `cpt-noter-algo-core-capture-session-notice-timers` and carried in `CaptureState.notice` - `inst-raise-notice`
+2. [x] - `p1` - API: `capture_answer_new_meeting { choice }`: for `start_as_new_call` stop the current call at `detected_at` and start a new call from that offset; for `keep_in_this_call` clear the notice - `inst-new-meeting`
+3. [x] - `p1` - API: `capture_keep_recording` resets the 5-minute nothing-heard timer - `inst-keep-recording`
+4. [x] - `p1` - API: `capture_keep_source { bundle_id }` remembers the app for this call; `capture_exclude_source { bundle_id }` sends `exclude_process` to the engine - `inst-second-source`
+5. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-notices`
 
 ### Resume after a quit, a crash or an engine failure
 
@@ -294,34 +294,34 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Detection decision
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-capture-session-detection`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-capture-session-detection`
 
 **Input**: A detection fact, settings, the self-test state, the ignored apps, the calendar, the phase.
 
 **Output**: Prompt (with `blocked` when a start would be refused), or ignore.
 
 **Steps**:
-1. [ ] - `p1` - **IF** detection is off (`offer_to_record` off or self-test not passed) or the app is ignored or a capture runs, **RETURN** ignore - `inst-detect-ignore`
-2. [ ] - `p1` - Match the detection to a calendar event that is running or starts within 10 minutes, if calendar access is granted - `inst-detect-match`
-3. [ ] - `p1` - Set `blocked` to `disk_full` or `model_missing` when the start guard would refuse - `inst-detect-blocked`
-4. [ ] - `p1` - **RETURN** prompt with `prompt_until` = now + 15 s - `inst-detect-prompt`
+1. [x] - `p1` - **IF** detection is off (`offer_to_record` off or self-test not passed) or the app is ignored or a capture runs, **RETURN** ignore - `inst-detect-ignore`
+2. [x] - `p1` - Match the detection to a calendar event that is running or starts within 10 minutes, if calendar access is granted - `inst-detect-match`
+3. [x] - `p1` - Set `blocked` to `disk_full` or `model_missing` when the start guard would refuse - `inst-detect-blocked`
+4. [x] - `p1` - **RETURN** prompt with `prompt_until` = now + 15 s - `inst-detect-prompt`
 
 ### Notice timers
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-capture-session-notice-timers`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-capture-session-notice-timers`
 
 **Input**: Engine facts (`call_audio_released`, `silence`, `audio_source_added`), calendar facts, presenting state, an injected clock.
 
 **Output**: `CaptureState.notice` changes and automatic actions at their deadlines.
 
 **Steps**:
-1. [ ] - `p1` - Audio released for 20 s → `CallEnded { stops_at: now + 10 s }`; while hidden for presenting → `CallSeemsEnded { stops_at: now + 10 min }` - `inst-timer-call-end`
-2. [ ] - `p1` - While the notice is held, clear `stops_at`; on release set it to now plus 10 s - `inst-timer-hold`
-3. [ ] - `p1` - Silence for 5 minutes → `NothingHeard { since }`; **Keep Recording** restarts the 5 minutes - `inst-timer-nothing-heard`
-4. [ ] - `p1` - Next calendar event starting, or the meeting app reporting a new meeting → `NewMeeting { detected_at, expires_at: +60 s, default_choice: start_as_new_call }`; at `expires_at` apply the default - `inst-timer-new-meeting`
-5. [ ] - `p1` - A second source → the `SecondAudioSource` degraded state until kept or excluded - `inst-timer-second-source`
-6. [ ] - `p1` - `continue_until` passes or another capture starts → the stopped call leaves Continue, phase `idle` - `inst-timer-continue`
-7. [ ] - `p1` - **RETURN** the new state; each change emits `capture:state` - `inst-timer-return`
+1. [x] - `p1` - Audio released for 20 s → `CallEnded { stops_at: now + 10 s }`; while hidden for presenting → `CallSeemsEnded { stops_at: now + 10 min }` - `inst-timer-call-end`
+2. [x] - `p1` - While the notice is held, clear `stops_at`; on release set it to now plus 10 s - `inst-timer-hold`
+3. [x] - `p1` - Silence for 5 minutes → `NothingHeard { since }`; **Keep Recording** restarts the 5 minutes - `inst-timer-nothing-heard`
+4. [x] - `p1` - Next calendar event starting, or the meeting app reporting a new meeting → `NewMeeting { detected_at, expires_at: +60 s, default_choice: start_as_new_call }`; at `expires_at` apply the default - `inst-timer-new-meeting`
+5. [x] - `p1` - A second source → the `SecondAudioSource` degraded state until kept or excluded - `inst-timer-second-source`
+6. [x] - `p1` - `continue_until` passes or another capture starts → the stopped call leaves Continue, phase `idle` - `inst-timer-continue`
+7. [x] - `p1` - **RETURN** the new state; each change emits `capture:state` - `inst-timer-return`
 
 ### Notification rule
 
@@ -370,14 +370,14 @@ Capture is the release-blocking function, and its rules must live in one machine
 5. [x] - `p1` - **FROM** paused **TO** recording **WHEN** `capture_set_paused(false)` - `inst-st-resume`
 6. [x] - `p1` - **FROM** recording **TO** stopping **WHEN** `capture_stop`, Stop Now or the countdown (also from paused) - `inst-st-stopping`
 7. [x] - `p1` - **FROM** stopping **TO** stopped **WHEN** the engine session stopped - `inst-st-stopped`
-8. [ ] - `p1` - **FROM** recording **TO** idle **WHEN** `capture_discard` after the nothing-heard notice (through stopping) - `inst-st-discard`
+8. [x] - `p1` - **FROM** recording **TO** idle **WHEN** `capture_discard` after the nothing-heard notice (through stopping) - `inst-st-discard`
 9. [x] - `p1` - **FROM** stopped **TO** recording **WHEN** `capture_continue` before `continue_until` - `inst-st-continue`
-10. [ ] - `p1` - **FROM** stopped **TO** idle **WHEN** `continue_until` passes or another capture starts - `inst-st-idle`
+10. [x] - `p1` - **FROM** stopped **TO** idle **WHEN** `continue_until` passes or another capture starts - `inst-st-idle`
 11. [ ] - `p1` - **FROM** idle **TO** recording **WHEN** `capture_resume_interrupted` while the interrupted banner shows - `inst-st-resume-interrupted`
 12. [ ] - `p1` - **FROM** recording **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
 13. [ ] - `p1` - **FROM** failed **TO** recording **WHEN** **Try Again** (`capture_resume_interrupted`) restarts the engine - `inst-st-try-again`
 14. [x] - `p1` - **FROM** failed **TO** stopped **WHEN** `capture_stop` (the call ends at the last audio) - `inst-st-failed-stop`
-15. [ ] - `p1` - **FROM** recording **TO** recording **WHEN** a new meeting is answered or expires (Start as New Call splits into a new call; Keep in This Call keeps one) - `inst-st-split`
+15. [x] - `p1` - **FROM** recording **TO** recording **WHEN** a new meeting is answered or expires (Start as New Call splits into a new call; Keep in This Call keeps one) - `inst-st-split`
 
 ## 5. Definitions of Done
 
@@ -401,7 +401,7 @@ The system **MUST** implement every transition of DESIGN-core 3.1 Capture transi
 
 ### Detection and the record prompt
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-capture-session-detection`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-capture-session-detection`
 
 The system **MUST** prompt only when detection is on, the app is not ignored and no capture runs; show the prompt for 15 s with its calendar match and `blocked` reason; and handle **Not Now**, close, timeout and **Don't Ask for <app>…**.
 
@@ -415,7 +415,7 @@ The system **MUST** prompt only when detection is on, the app is not ignored and
 
 ### Notices and their timers
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-capture-session-notices`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-capture-session-notices`
 
 The system **MUST** raise and resolve the call-ended (with hold), call-seems-ended, new-meeting (with the 60 s default split at `detected_at`), nothing-heard and second-source notices with the timers of DESIGN-core 3.2, answering stale answers with `notice_expired`.
 
