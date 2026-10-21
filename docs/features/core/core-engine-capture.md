@@ -100,13 +100,13 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Steps**:
 1. [ ] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
 2. [ ] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
-3. [ ] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
-4. [ ] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
+3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
+4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
 5. [ ] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
-6. [ ] - `p1` - **IF** the supervisor sends `pause` - `inst-if-pause`
-   1. [ ] - `p1` - Engine stops both streams (no audio kept while paused) until `resume` - `inst-pause-streams`
-7. [ ] - `p1` - **IF** the supervisor sends `stop` - `inst-if-stop`
-   1. [ ] - `p1` - Engine flushes the decoder and writers, writes `timeline.json`, emits `session_stopped { call_id, timeline_path, mic_path, sys_path }` - `inst-stop`
+6. [x] - `p1` - **IF** the supervisor sends `pause` - `inst-if-pause`
+   1. [x] - `p1` - Engine stops both streams (no audio kept while paused) until `resume` - `inst-pause-streams`
+7. [x] - `p1` - **IF** the supervisor sends `stop` - `inst-if-stop`
+   1. [x] - `p1` - Engine flushes the decoder and writers, writes `timeline.json`, emits `session_stopped { call_id, timeline_path, mic_path, sys_path }` - `inst-stop`
 8. [ ] - `p1` - **RETURN** - `inst-return-session`
 
 ### Detect a call
