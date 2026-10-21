@@ -44,6 +44,12 @@ public enum Mix {
 public protocol AudioSource: AnyObject, Sendable {
     func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws
     func stop()
+    /// The microphone and the output device by name, for `session_started`.
+    var devices: (mic: String, output: String) { get }
+}
+
+extension AudioSource {
+    public var devices: (mic: String, output: String) { ("", "") }
 }
 
 public enum Levels {
