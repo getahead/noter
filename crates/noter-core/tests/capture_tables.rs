@@ -192,7 +192,7 @@ fn the_tables_refuse_what_the_design_does_not_allow() {
         ("archive_status", json!("writing")),
         ("mode_used", json!("cloud_raw")),
     ] {
-        let refused = store.write(call("call_x", &[bad.clone()]), meta("start"));
+        let refused = store.write(call("call_x", std::slice::from_ref(&bad)), meta("start"));
         assert!(refused.is_err(), "{bad:?}");
     }
     store.write(call("call_1", &[]), meta("start")).unwrap();
