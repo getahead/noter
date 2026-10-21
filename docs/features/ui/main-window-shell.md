@@ -40,11 +40,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-main-window-shell`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-main-window-shell`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-main-window-shell`
+- [x] `p1` - `cpt-noter-feature-ui-main-window-shell`
 
 ### 1.1 Overview
 
@@ -323,11 +323,11 @@ The system **MUST** provide the mode indicator in its eight variants with glyph 
 
 ## 6. Acceptance Criteria
 
-- [ ] Every main-window state of DESIGN's States table that M0 and M1 can reach renders as in the prototype (App-level banner, Switched to local, No assistant, Capturing, Hidden for presenting, Update ready, Reopened after a quit, Window reloaded); Calendar access denied, Keyword-only search, Outputs being written and Proposals waiting render once their features land
-- [ ] The mode indicator shows the same glyph and word on every surface for the same mode, with the warning form for degraded modes
-- [ ] Back and Forward return to the same query, filters and scroll position
-- [ ] The live-call row shows the call window without taking focus from the call app
-- [ ] No sidebar label, group header or toolbar button truncates in the pseudo-localised build
+- [x] Every main-window state of DESIGN's States table that M0 and M1 can reach renders as in the prototype (App-level banner, Switched to local, No assistant, Capturing, Hidden for presenting, Update ready, Reopened after a quit, Window reloaded); Calendar access denied, Keyword-only search, Outputs being written and Proposals waiting render once their features land
+- [x] The mode indicator shows the same glyph and word on every surface for the same mode, with the warning form for degraded modes
+- [x] Back and Forward return to the same query, filters and scroll position
+- [x] The live-call row shows the call window without taking focus from the call app
+- [x] No sidebar label, group header or toolbar button truncates in the pseudo-localised build
 
 ## 7. Additional Context
 

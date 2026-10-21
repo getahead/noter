@@ -37,8 +37,11 @@ test.describe("cpt-noter-seq-core-window-open", () => {
   test("other path — reload: the window comes back ready from the core and keeps nothing in browser storage", async ({ page }) => {
     await openWindow(page, "main");
     await expect(frame(page)).toHaveAttribute("data-state", "ready");
+    const records = async () => (await frame(page).innerText()).replace(/\d\d:\d\d:\d\d/g, "--:--:--"); // the live call's timer runs
+    const before = await records();
     await page.reload();
     await expect(frame(page)).toHaveAttribute("data-state", "ready");
+    await expect.poll(records).toBe(before); // the same records after the reload: the core, not the page, kept them
     expect((await calls(page)).filter((c) => c.name === "app_snapshot")).toHaveLength(1); // a fresh store per load
     const storage = await page.evaluate(async () => ({
       local: localStorage.length,

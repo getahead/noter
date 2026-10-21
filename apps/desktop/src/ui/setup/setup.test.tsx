@@ -156,7 +156,7 @@ describe("self-test-panel (cpt-noter-component-ui-self-test-panel)", () => {
   });
 
   it("splits the transcript line into sentences and tags the Cyrillic one as Russian", () => {
-    expect(lineParts("Noter test. Привет. Hallo.")).toEqual([{ text: "Noter test." }, { text: "Привет.", lang: "ru" }, { text: "Hallo." }]);
+    expect(lineParts("Noter test. Привет. Hallo.")).toEqual([{ text: "Noter test.", lang: "und" }, { text: "Привет.", lang: "ru" }, { text: "Hallo.", lang: "und" }]); // the core sends no language: Cyrillic is Russian, the rest undetermined
     expect(lineParts("")).toEqual([]);
   });
 });

@@ -38,11 +38,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-primitives`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-primitives`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-primitives`
+- [x] `p1` - `cpt-noter-feature-ui-primitives`
 
 ### 1.1 Overview
 
