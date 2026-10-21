@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/getahead/noter/compare/v0.5.0...v0.6.0) (2026-10-21)
+
+
+### Features
+
+* **contract:** fake core corruptNextDownload for the checksum_failed story ([#112](https://github.com/getahead/noter/issues/112)) ([bab767c](https://github.com/getahead/noter/commit/bab767c9671b48e0506ff559895492f65af11ee8))
+* **ui:** first-run wizard ([#115](https://github.com/getahead/noter/issues/115)) ([c6bac50](https://github.com/getahead/noter/commit/c6bac508667c9d19e9115e18ac31cae6bd32e21c))
+* **ui:** main window shell and navigation ([#114](https://github.com/getahead/noter/issues/114)) ([19fdf76](https://github.com/getahead/noter/commit/19fdf763b8480e6e22a4bd62f74a13cea7412640))
+* **ui:** settings window ([#117](https://github.com/getahead/noter/issues/117)) ([6e3fce3](https://github.com/getahead/noter/commit/6e3fce345d15c8174d012436f3306deae97fdb58))
+
+
+### Bug fixes
+
+* **ui:** no literal colours in component CSS; tick the covered M0 UI spec items ([#113](https://github.com/getahead/noter/issues/113)) ([988a3f8](https://github.com/getahead/noter/commit/988a3f8143faf6bb45eaf4a9fd405f0b4afe4fcf))
+
 ## [0.5.0](https://github.com/getahead/noter/compare/v0.4.0...v0.5.0) (2026-10-19)
 
 
