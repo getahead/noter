@@ -87,18 +87,27 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-pseudo", () => {
     test(`UI — first-run window in ${mode} pseudo-localisation: no truncated label on any step`, async ({ page }) => {
       await openWindow(page, `first-run&pseudo=${mode}`);
       await expect(frame(page)).toHaveAttribute("data-state", /ready|step/);
-      // the wizard opens on the step the world's setup has reached; Back walks to Welcome
+      // the wizard opens on the step the core's setup has reached (the fake: the last, the real core: the first):
+      // Back walks to Welcome, Continue then walks every step to Finish
       const back = page.getByRole("button", { name: pseudo(mode, "first_run.back"), exact: true });
+      const next = page.getByRole("button", { name: pseudo(mode, "first_run.continue"), exact: true });
       await expect(back).toBeVisible();
       let visited = 0;
-      do {
+      const check = async () => {
         visited++;
         const truncated = await truncatedLabels(page);
-        expect(truncated, `step ${visited} truncated: ${truncated.join(", ")}`).toEqual([]);
-        if (await back.isDisabled()) break;
+        expect(truncated, `step view ${visited} truncated: ${truncated.join(", ")}`).toEqual([]);
+      };
+      await check();
+      for (let i = 0; i < 6 && !(await back.isDisabled()); i++) {
         await back.click();
-      } while (visited < 6);
-      expect(visited, "the pass walked past the first step").toBeGreaterThan(1);
+        await check();
+      }
+      for (let i = 0; i < 6 && (await next.count()) && !(await next.isDisabled()); i++) {
+        await next.click();
+        await check();
+      }
+      expect(visited, "the pass walked more than one step").toBeGreaterThan(1);
     });
 
     test(`UI — Settings window in ${mode} pseudo-localisation: no truncated label in any pane`, async ({ page }) => {
