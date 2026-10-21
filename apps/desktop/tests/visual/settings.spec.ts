@@ -63,9 +63,14 @@ test.describe("states of the prototype's Settings › State menu", () => {
         Object.assign(b, { state: "downloading", done_mb: Math.round(b.size_mb * 0.68) });
       },
     });
-    const progress = page.getByText(/Downloading [\d,]+ of [\d,]+ MB/);
-    await progress.scrollIntoViewIfNeeded();
-    await expect(progress).toBeVisible();
+    // the whole model row, bar included, is inside the viewport before the capture
+    const row = page.locator(".e-status", { hasText: /Downloading [\d,]+ of [\d,]+ MB/ }).first();
+    await row.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await expect(row).toBeVisible();
+    const box = (await row.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
     await shot(page, "model-downloading");
   });
 
