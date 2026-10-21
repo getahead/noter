@@ -12,7 +12,7 @@
 [milestone]
 # Advanced by the owner when a milestone gate passes. The E2E and perf
 # coverage gates count what milestones.toml / perf.toml list up to here.
-current = "pre-M0"
+current = "M0"
 order = ["pre-M0", "M0", "M1", "M2", "M3", "M4", "M5"]
 
 [gates.unit]
