@@ -62,6 +62,7 @@ describe("Sidebar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(p.onSelect).toHaveBeenCalledWith("library");
     (find(tree, (x) => x["data-variant"] === "live-row" && typeof x.onClick === "function").props.onClick as () => void)();
     expect(p.onShowCall).toHaveBeenCalledOnce();
+    expect(p.onSelect).toHaveBeenCalledOnce(); // the live row shows the call window and leaves the sidebar selection alone
     (find(tree, (x) => x.cls === "np-sidebar__toggle").props.onAction as () => void)();
     expect(p.onToggle).toHaveBeenCalledOnce();
     (find(tree, (x) => typeof x.onOpenPrivacy === "function").props.onOpenPrivacy as () => void)();

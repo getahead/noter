@@ -209,7 +209,7 @@ The record prompt, the call window and its notices never make Noter the active a
 
 #### Degrade visibly, never block
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-degrade-visibly`
+- [x] `p1` - **ID**: `cpt-noter-principle-degrade-visibly`
 
 Every failure has a visible state where the affected function lives, and that state names the next action. Capture, reading and search keep working while something is degraded. Without a network every screen still works: actions that need the cloud fall back to the local model and say so with **Switched to local**. No region is ever blank: an empty or loading region says what will appear there and how to get it.
 
@@ -217,7 +217,7 @@ Every failure has a visible state where the affected function lives, and that st
 
 #### Accessible in every language
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-accessible-multilingual`
+- [x] `p1` - **ID**: `cpt-noter-principle-accessible-multilingual`
 
 Every control works with the keyboard and VoiceOver, meets the WCAG 2.2 AA target size, and respects Reduce motion and Increase Contrast. The default appearance uses Apple's macOS system colours; when the user turns on Increase Contrast in macOS, every text and control colour switches to values checked against WCAG 2.2 AA (4.5:1 for text, 3:1 for control outlines and focus), so AA contrast is met in that mode (owner decision, PM-57). Layouts take German text about 30 % longer and Cyrillic without truncating labels. When this principle conflicts with a quieter or more native look, accessibility wins, except for the default colours, which follow Apple's system colours.
 
@@ -233,7 +233,7 @@ Every generated fact (a card, decision, action item, answer or closure) shows wh
 
 #### The core owns the state
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-core-owns-state`
+- [x] `p1` - **ID**: `cpt-noter-principle-core-owns-state`
 
 The UI shows only what the core has sent and changes data only through core commands. It stores nothing of its own beyond in-memory view state, such as scroll position or an expanded row. A window can therefore reload, or reopen after a crash, and show the same call, cards, pins and marks.
 
@@ -241,7 +241,7 @@ The UI shows only what the core has sent and changes data only through core comm
 
 #### Keyboard first
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-keyboard-first`
+- [x] `p1` - **ID**: `cpt-noter-principle-keyboard-first`
 
 Every action can be reached and done with the keyboard. Lists use arrow keys, and single-key actions are matched by physical key so that Russian and German layouts work. Every in-app shortcut also appears in a menu, and in-call actions use global hotkeys so that the call app keeps focus.
 
@@ -265,7 +265,7 @@ In-call surfaces show at most three cards, make no sound, and move only with a s
 
 #### Native macOS look and behaviour
 
-- [ ] `p2` - **ID**: `cpt-noter-principle-native-macos`
+- [x] `p2` - **ID**: `cpt-noter-principle-native-macos`
 
 Noter follows the macOS 27 design language and the HIG: the system font; an edge-to-edge sidebar in Liquid Glass with colour-tinted icons; a unified toolbar whose controls sit in glass capsule groups; capsule push buttons; settings in their own window; Liquid Glass materials for the sidebar, toolbar controls, menus, popovers, alerts and floating panels; concentric corner radii; Apple's system colours with the user's accent colour (system blue by default); and the system light or dark appearance. Buttons and menu items use title case; everything else uses sentence case. A control drawn in the WebView behaves like its AppKit counterpart. The WebView-drawn surfaces keep this look on every supported macOS version; native surfaces (the menu bar menu, alerts drawn by macOS, notifications, open and save panels) look like the macOS the user runs.
 
@@ -279,7 +279,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### macOS 14.4 or later on Apple Silicon
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-macos-apple-silicon`
+- [x] `p1` - **ID**: `cpt-noter-constraint-macos-apple-silicon`
 
 **Type**: Platform. Noter runs on macOS 14.4 or later, on Apple Silicon only, because the Core Audio process tap and its permission prompt arrive in 14.4. The UI relies on the WebKit of those macOS versions and needs no Intel or older-system fallback.
 
@@ -287,7 +287,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Tauri 2 with a React WebView
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-tauri-webview`
+- [x] `p1` - **ID**: `cpt-noter-constraint-tauri-webview`
 
 **Type**: Technology and licensing. The UI is React 19 with TypeScript inside Tauri 2 windows, rendered by WebKit. Native surfaces (the menu bar extra, notifications, alerts, open and save panels) come through Tauri plugins and can do only what those plugins expose. The panel plugin tauri-nspanel is pinned to a git revision.
 
@@ -343,7 +343,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Local-only UI
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-local-only-ui`
+- [x] `p1` - **ID**: `cpt-noter-constraint-local-only-ui`
 
 **Type**: Data residency. Audio, voice profiles and embeddings never leave the Mac. The WebView loads no remote content and makes no network requests; transcripts, documents and model output render as text only; each window gets only the core commands it needs (PM-08).
 
@@ -351,7 +351,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Three content languages, English interface
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-three-languages`
+- [x] `p1` - **ID**: `cpt-noter-constraint-three-languages`
 
 **Type**: Language. Transcripts, summaries, cards and search are English, Russian and German, often mixed in one call, and every content block carries its own language. The interface itself is English in v1 and built ready for translation: no string concatenation, plural rules for counts, and layouts that take German text about 30 % longer and Cyrillic (PM-02).
 
@@ -359,7 +359,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Accessibility baseline
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-accessibility-baseline`
+- [x] `p1` - **ID**: `cpt-noter-constraint-accessibility-baseline`
 
 **Type**: Quality. Every surface works with VoiceOver, the keyboard alone, Reduce motion, Increase Contrast and dark mode, and meets WCAG 2.2 AA target sizes and focus visibility. Colour contrast meets WCAG 2.2 AA when macOS Increase Contrast is on; the default appearance uses Apple's system colours, some of which are below 4.5:1 for secondary text (PM-57). New card titles are announced politely; the transcript is a log that is not announced.
 
@@ -367,7 +367,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Small team
 
-- [ ] `p2` - **ID**: `cpt-noter-constraint-small-team`
+- [x] `p2` - **ID**: `cpt-noter-constraint-small-team`
 
 **Type**: Resource. The PRD plans v1 for one part-time builder and names that as a high risk. The UI therefore uses one set of primitives and a fixed list of reusable components, prefers native controls, and applies one collapse order to every screen.
 
@@ -671,7 +671,7 @@ The screen map shows every surface and the trigger that moves the user between t
 
 #### Shell — Main window
 
-- [ ] `p1` - **ID**: `cpt-noter-component-shell-main-window`
+- [x] `p1` - **ID**: `cpt-noter-component-shell-main-window`
 
 ##### Why this component exists
 
@@ -1038,7 +1038,7 @@ Closing state after a manual and after an automatic stop:
 
 #### App layer — Core bridge
 
-- [ ] `p1` - **ID**: `cpt-noter-component-app-core-bridge`
+- [x] `p1` - **ID**: `cpt-noter-component-app-core-bridge`
 
 ##### Why this component exists
 
@@ -1110,7 +1110,7 @@ The UI reaches the Rust core only through Tauri 2 IPC: commands for actions, eve
 
 #### App layer — Window store
 
-- [ ] `p1` - **ID**: `cpt-noter-component-app-window-store`
+- [x] `p1` - **ID**: `cpt-noter-component-app-window-store`
 
 ##### Why this component exists
 
@@ -1169,7 +1169,7 @@ Each WebView window renders from an in-memory copy of the records the core sent,
 
 #### Screen — First-run wizard
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-first-run`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-first-run`
 
 ##### Why this component exists
 
@@ -1291,6 +1291,7 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 | Back from System Settings | FR-R2, the permission row | A small spinner and **Checking…** while Noter reads the permission again, then **Granted**; the self-test's **System audio recording is not allowed yet.** line goes away | PM-59 | `cpt-noter-seq-first-run-complete-setup` (Error — System audio not allowed) |
 | Self-test passed | FR-R2, self-test | **Self-test passed** above **System audio arrives**, **Your microphone arrives**, **Both streams line up** and **Noter's own sounds stay out of the recording**, announced politely | D66, D99 | `cpt-noter-seq-first-run-complete-setup` (Happy path) |
 | One stream silent | FR-R2, self-test | **We hear your microphone but not system audio. Play any sound in another app and try again.** | D66 | `cpt-noter-seq-first-run-complete-setup` (Error — Self-test hears only one stream) |
+| Self-test timed out | FR-R2, self-test | Nothing arrived within 10 s: **The test didn't finish. Check that sound is playing, then try again.** with **Run Test** enabled; the self-test never gates anything | D66; HoD decision D-14 | none of its own: `cpt-noter-seq-first-run-complete-setup` has no timed-out path |
 | Self-test skipped | FR-R1, then Today TD-R2 | Step 3 marked skipped with a dash, read as **Skipped**; after **Finish**, Today shows **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** · **Finish Setup…**; **Record** works as always | D64, PM-30, PM-60 | `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) |
 | Remaining steps | FR-R2, steps 4 to 6 | **Call display** with the display without the call app chosen and **Open the call screen automatically** on; **Audio storage** with **Keep audio for 30 days**; **Assistants** | D64, D65 | `cpt-noter-seq-first-run-complete-setup` (Other — Finish the remaining steps) |
 | One display | FR-R2, step 4 | A picture of the floating panel and a line about the floating layout | PRD › Live copilot › Surfaces | `cpt-noter-seq-first-run-complete-setup` (Other — Finish the remaining steps) |
@@ -3327,7 +3328,7 @@ Agent selected, **Settings** view:
 
 #### Screen — Settings window
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-settings`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-settings`
 
 ##### Why this component exists
 
@@ -3709,7 +3710,7 @@ Call performance:
 
 #### Component — Primitives inventory
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-primitives`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-primitives`
 
 ##### Why this component exists
 
@@ -4232,7 +4233,7 @@ The other variants are not focusable on their own; they are read with their pare
 
 #### Component — Mode indicator
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-mode-indicator`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-mode-indicator`
 
 ##### Why this component exists
 
@@ -8235,7 +8236,7 @@ The Bottlenecks list names the stage or component that is over budget most often
 
 #### Component — Wizard stepper
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-wizard-stepper`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-wizard-stepper`
 
 ##### Why this component exists
 
@@ -8313,7 +8314,7 @@ First run is six steps before the first call, and call detection stays off until
 
 #### Component — Permission check row
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-permission-check-row`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-permission-check-row`
 
 ##### Why this component exists
 
@@ -8396,7 +8397,7 @@ Noter asks for Microphone and System Audio Recording in first run, one at a time
 
 #### Component — Self-test panel
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-self-test-panel`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-self-test-panel`
 
 ##### Why this component exists
 
@@ -8494,7 +8495,7 @@ The self-test proves that the microphone and the system audio both arrive and li
 
 #### Component — Display picker
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-display-picker`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-display-picker`
 
 ##### Why this component exists
 
@@ -8578,7 +8579,7 @@ The call screen opens on a chosen display, remembered by the display's identity,
 
 #### Component — Hotkey recorder
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-hotkey-recorder`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-hotkey-recorder`
 
 ##### Why this component exists
 
@@ -8666,7 +8667,7 @@ Global hotkeys are configurable (PRD › Feature specification › 14. Settings 
 
 #### Component — Empty state
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-empty-state`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-empty-state`
 
 ##### Why this component exists
 
@@ -8753,7 +8754,7 @@ No region is ever blank: an empty or not-yet-allowed region says what will appea
 
 #### Component — Inline banner
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-inline-banner`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-inline-banner`
 
 ##### Why this component exists
 
@@ -8858,7 +8859,7 @@ Errors and degraded states appear where the affected function lives, name the ne
 
 #### Component — Inline status
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-inline-status`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-inline-status`
 
 ##### Why this component exists
 

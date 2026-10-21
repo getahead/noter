@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { INITIAL_HISTORY, historyMove, type History, type HistoryMove, type Route } from "./history";
+import { searchRoute } from "./sections";
 
 const call = (id: string): Route => ({ section: "library", key: `call:${id}` });
 const go = (h: History, ...moves: HistoryMove[]) => moves.reduce((s, m) => historyMove(s.history, m), { history: h, route: h.entries[h.index]! });
@@ -38,6 +39,15 @@ describe("historyMove", () => {
     r = go(r.history, { type: "forward" });
     expect(r.route).toEqual(call("a"));
     expect(go(r.history, { type: "forward" }).history).toBe(r.history);
+  });
+
+  it("Back and Forward return to the same search query, and Forward to the page that followed it", () => {
+    let r = go(INITIAL_HISTORY, { type: "push", route: searchRoute("zoom") }, { type: "push", route: call("a") });
+    r = go(r.history, { type: "back" });
+    expect(r.route).toEqual(searchRoute("zoom"));
+    expect(r.history.last.library).toEqual(searchRoute("zoom"));
+    r = go(r.history, { type: "forward" });
+    expect(r.route).toEqual(call("a"));
   });
 
   it("replace swaps the entry at the index", () => {

@@ -115,11 +115,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.1 [Core bridge and window stores](features/ui/core-bridge.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-core-bridge`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-core-bridge`
 
 - **Purpose**: Give every WebView window one typed path to the Rust core and one in-memory store, so screens render only what the core sent, typed errors become named states, and the UI can be built against the fake core first and switched to the real core per milestone.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/core-bridge.md`](features/ui/core-bridge.md). **Status**: IN_PROGRESS.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/core-bridge.md`](features/ui/core-bridge.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: None
 
@@ -139,13 +139,13 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-owns-state`
-  - [ ] `p1` - `cpt-noter-principle-degrade-visibly`
+  - [x] `p1` - `cpt-noter-principle-core-owns-state`
+  - [x] `p1` - `cpt-noter-principle-degrade-visibly`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-tauri-webview`
-  - [ ] `p1` - `cpt-noter-constraint-local-only-ui`
+  - [x] `p1` - `cpt-noter-constraint-tauri-webview`
+  - [x] `p1` - `cpt-noter-constraint-local-only-ui`
 
 - **Domain Model Entities**:
   - Every entity of DESIGN 3.1, as read-only view models generated from the core's types
@@ -154,8 +154,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-app-core-bridge`
-  - [ ] `p1` - `cpt-noter-component-app-window-store`
+  - [x] `p1` - `cpt-noter-component-app-core-bridge`
+  - [x] `p1` - `cpt-noter-component-app-window-store`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `app_snapshot`
@@ -179,7 +179,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.2 [Design tokens and theming](features/ui/tokens-theming.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-tokens-theming`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-tokens-theming`
 
 - **Purpose**: Set the macOS 27 foundations once: colour tokens with their default, dark and Increase Contrast values, typography, spacing, radii, Liquid Glass materials, Reduce transparency and Reduce motion, so every window looks native and meets WCAG 2.2 AA under Increase Contrast.
 
@@ -203,19 +203,19 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-native-macos`
+  - [x] `p1` - `cpt-noter-principle-native-macos`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-accessibility-baseline`
-  - [ ] `p1` - `cpt-noter-constraint-macos-apple-silicon`
+  - [x] `p1` - `cpt-noter-constraint-accessibility-baseline`
+  - [x] `p1` - `cpt-noter-constraint-macos-apple-silicon`
 
 - **Domain Model Entities**:
   - None (presentation foundations)
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-ui-primitives`
+  - [x] `p1` - `cpt-noter-component-ui-primitives`
 
   `cpt-noter-component-ui-primitives` is shared with `cpt-noter-feature-ui-primitives`: this feature builds its **Anatomy and variants** foundations (tokens, typography, materials, appearance, motion); that feature builds the 26 controls.
 
@@ -234,7 +234,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.3 [Primitives and feedback components](features/ui/primitives.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-primitives`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-primitives`
 
 - **Purpose**: Build the 26 primitives and the three feedback components once, as React components that behave like their AppKit counterparts and carry the prototype's data attributes, so every screen is assembled from one tested set.
 
@@ -255,22 +255,22 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-native-macos`
-  - [ ] `p1` - `cpt-noter-principle-degrade-visibly`
+  - [x] `p1` - `cpt-noter-principle-native-macos`
+  - [x] `p1` - `cpt-noter-principle-degrade-visibly`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-small-team`
+  - [x] `p1` - `cpt-noter-constraint-small-team`
 
 - **Domain Model Entities**:
   - None (controls hold no data)
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-ui-primitives`
-  - [ ] `p1` - `cpt-noter-component-ui-empty-state`
-  - [ ] `p1` - `cpt-noter-component-ui-inline-banner`
-  - [ ] `p1` - `cpt-noter-component-ui-inline-status`
+  - [x] `p1` - `cpt-noter-component-ui-primitives`
+  - [x] `p1` - `cpt-noter-component-ui-empty-state`
+  - [x] `p1` - `cpt-noter-component-ui-inline-banner`
+  - [x] `p1` - `cpt-noter-component-ui-inline-status`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - None (primitives call no command; banner actions call the command of the screen that shows them)
@@ -287,11 +287,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.4 [Accessibility, keyboard and localisation](features/ui/accessibility-l10n.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-accessibility-l10n`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-accessibility-l10n`
 
 - **Purpose**: Make keyboard-first operation, VoiceOver, the announcement policy and translation-ready text a shared service that every screen uses, and gate them with automated checks, so WCAG 2.2 AA and the three content languages hold on every surface.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/accessibility-l10n.md`](features/ui/accessibility-l10n.md). **Status**: NOT_STARTED.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/accessibility-l10n.md`](features/ui/accessibility-l10n.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-primitives`
 
@@ -311,20 +311,20 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-accessible-multilingual`
-  - [ ] `p1` - `cpt-noter-principle-keyboard-first`
+  - [x] `p1` - `cpt-noter-principle-accessible-multilingual`
+  - [x] `p1` - `cpt-noter-principle-keyboard-first`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-accessibility-baseline`
-  - [ ] `p1` - `cpt-noter-constraint-three-languages`
+  - [x] `p1` - `cpt-noter-constraint-accessibility-baseline`
+  - [x] `p1` - `cpt-noter-constraint-three-languages`
 
 - **Domain Model Entities**:
   - None
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-ui-primitives`
+  - [x] `p1` - `cpt-noter-component-ui-primitives`
 
   Shares `cpt-noter-component-ui-primitives` (its **Keyboard and VoiceOver** and **Localisation rules for controls** parts) with `cpt-noter-feature-ui-primitives`; it owns no component of its own because it is a cross-cutting service that every screen calls.
 
@@ -344,11 +344,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.5 [Main window shell and navigation](features/ui/main-window-shell.md) — M0 · HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-ui-main-window-shell`
+- [x] `p1` - **ID**: `cpt-noter-feature-ui-main-window-shell`
 
 - **Purpose**: Give every main-window page one frame: the Liquid Glass sidebar with the live-call row and badges, the unified toolbar with one Back and Forward history, the banner slot that shows the most severe app-level state, the inspector slot, the app menu and the collapse order.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/main-window-shell.md`](features/ui/main-window-shell.md). **Status**: NOT_STARTED.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/main-window-shell.md`](features/ui/main-window-shell.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`
 
@@ -369,7 +369,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-keyboard-first`
+  - [x] `p1` - `cpt-noter-principle-keyboard-first`
 
 - **Design Constraints Covered**:
 
@@ -380,8 +380,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-shell-main-window`
-  - [ ] `p1` - `cpt-noter-component-ui-mode-indicator`
+  - [x] `p1` - `cpt-noter-component-shell-main-window`
+  - [x] `p1` - `cpt-noter-component-ui-mode-indicator`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `app_snapshot` (through the bridge)
@@ -405,7 +405,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Get the Mac ready before the first call: models downloading in the background, Microphone and System Audio Recording granted, the self-test passed, the call display and audio retention chosen, so call detection is on before the first real meeting and no start control ever waits for setup.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/first-run.md`](features/ui/first-run.md). **Status**: NOT_STARTED.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/first-run.md`](features/ui/first-run.md). **Status**: IN_PROGRESS.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`
 
@@ -433,11 +433,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-screen-first-run`
-  - [ ] `p1` - `cpt-noter-component-ui-wizard-stepper`
-  - [ ] `p1` - `cpt-noter-component-ui-permission-check-row`
-  - [ ] `p1` - `cpt-noter-component-ui-self-test-panel`
-  - [ ] `p1` - `cpt-noter-component-ui-display-picker`
+  - [x] `p1` - `cpt-noter-component-screen-first-run`
+  - [x] `p1` - `cpt-noter-component-ui-wizard-stepper`
+  - [x] `p1` - `cpt-noter-component-ui-permission-check-row`
+  - [x] `p1` - `cpt-noter-component-ui-self-test-panel`
+  - [x] `p1` - `cpt-noter-component-ui-display-picker`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `setup_status`
@@ -471,7 +471,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Give every setting one home in a separate Settings window with 11 panes and a search field, applied at once, with each failure's fix beside it, and make hotkeys and card keys safe to change before a call.
 
-- **Milestone**: M0. **Spec**: [`docs/features/ui/settings.md`](features/ui/settings.md). **Status**: NOT_STARTED.
+- **Milestone**: M0. **Spec**: [`docs/features/ui/settings.md`](features/ui/settings.md). **Status**: IN_PROGRESS.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-first-run`
 
@@ -503,8 +503,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-screen-settings`
-  - [ ] `p1` - `cpt-noter-component-ui-hotkey-recorder`
+  - [x] `p1` - `cpt-noter-component-screen-settings`
+  - [x] `p1` - `cpt-noter-component-ui-hotkey-recorder`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `settings_get`

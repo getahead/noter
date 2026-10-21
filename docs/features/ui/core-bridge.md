@@ -39,11 +39,11 @@ milestone: M0
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-ui-core-bridge`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-ui-core-bridge`
 
 ## 1. Feature Context
 
-- [ ] `p1` - `cpt-noter-feature-ui-core-bridge`
+- [x] `p1` - `cpt-noter-feature-ui-core-bridge`
 
 ### 1.1 Overview
 
@@ -320,13 +320,13 @@ The system **MUST** map every `ErrorCode` of the contract to the calling screen'
 
 ## 6. Acceptance Criteria
 
-- [ ] A window reload against the fake core and against `noter-core-harness` shows the same records before and after, with no message lost or doubled (conformance `snapshot-stream`)
-- [ ] A `seq` gap forces a resubscription and the slice ends equal to the core's state
-- [ ] A late whole-state payload with a lower `version` never replaces a newer one
-- [ ] Every `ErrorCode` has a mapping test; no command is retried without a user action
-- [ ] No module outside `src/core` imports `@tauri-apps/*`; no screen imports the fake core (`just arch` passes)
-- [ ] No `localStorage`, `sessionStorage`, IndexedDB or cookie access exists in the UI bundle
-- [ ] Unit line coverage of the new code is at least 80 % (`just cov-unit`)
+- [x] A window reload against the fake core and against `noter-core-harness` shows the same records before and after, with no message lost or doubled (conformance `snapshot-stream`)
+- [x] A `seq` gap forces a resubscription and the slice ends equal to the core's state
+- [x] A late whole-state payload with a lower `version` never replaces a newer one
+- [x] Every `ErrorCode` has a mapping test; no command is retried without a user action
+- [x] No module outside `src/core` imports `@tauri-apps/*`; no screen imports the fake core (`just arch` passes)
+- [x] No `localStorage`, `sessionStorage`, IndexedDB or cookie access exists in the UI bundle
+- [x] Unit line coverage of the new code is at least 80 % (`just cov-unit`)
 
 ## 7. Additional Context
 
