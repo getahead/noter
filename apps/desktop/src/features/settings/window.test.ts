@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { INITIAL_WINDOW, windowKind, windowReduce, type WindowState } from "./window";
+import { INITIAL_WINDOW, listStep, windowKind, windowReduce, type WindowState } from "./window";
 
 const run = (s: WindowState, ...events: Parameters<typeof windowReduce>[1][]) => events.reduce(windowReduce, s);
 
@@ -40,5 +40,16 @@ describe("settings window state", () => {
     const hidden = windowReduce(before, { type: "hidden", hidden: true });
     expect(windowKind(hidden)).toBe("HIDDEN_FOR_PRESENTING");
     expect(windowReduce(hidden, { type: "hidden", hidden: false })).toEqual(before);
+  });
+});
+
+describe("listStep", () => {
+  it("moves one pane with ↑ and ↓, stopping at both ends, and ignores other keys or focus outside the list", () => {
+    expect(listStep("ArrowDown", 0, 11)).toBe(1);
+    expect(listStep("ArrowUp", 0, 11)).toBe(0);
+    expect(listStep("ArrowDown", 10, 11)).toBe(10);
+    expect(listStep("ArrowUp", 5, 11)).toBe(4);
+    expect(listStep("a", 5, 11)).toBeNull();
+    expect(listStep("ArrowDown", -1, 11)).toBeNull();
   });
 });

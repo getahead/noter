@@ -77,7 +77,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 
 ### Change a hotkey safely
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-settings-set-hotkeys`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-settings-set-hotkeys`
 
 **Actor**: Primary user
 
@@ -91,25 +91,25 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 - Empty — No setting matches the search: “zoom calls”, which matches no pane name or keyword (HoD decision D-2; plain “zoom” finds Privacy and Call Screen & Menu Bar), shows the search field's empty state **No settings match “zoom calls”** in place of the pane list; the E2E test types the same words
 
 **Steps**:
-1. [ ] - `p1` - User opens Settings and selects **Hotkeys** - `inst-open-hotkeys`
-2. [ ] - `p1` - API: `hotkeys_list` (the core test-registers the whole set when the pane opens and reports each row's result) - `inst-api-list`
-3. [ ] - `p1` - UI: one row per global hotkey in sentence case with its chord as key caps, the group **Card keys during calls** (**Use card keys during calls**, **Pin a card** with **+ 1, 2 or 3**, **Dismiss with keys** off, **Dismiss a card** derived, **Undo last card action**), **Restore Defaults** and the footnote; a conflict line under each row the core reports - `inst-render-hotkeys`
-4. [ ] - `p1` - User clicks a chord field or presses Return on it - `inst-start-record`
-5. [ ] - `p1` - UI: the field shows the focus ring and **Type a shortcut…** - `inst-recording`
-6. [ ] - `p1` - User presses a chord, Esc or ⌫ - `inst-user-chord`
-7. [ ] - `p1` - Algorithm: check it with `cpt-noter-algo-ui-settings-check-chord` - `inst-check`
-8. [ ] - `p1` - **IF** the chord is accepted locally - `inst-if-accepted`
-   1. [ ] - `p1` - API: `hotkey_set` (action, chord) - `inst-api-set`
-   2. [ ] - `p1` - **IF** the core reports `hotkey_conflict` or `hotkey_reserved` - `inst-if-conflict`
-      1. [ ] - `p1` - UI: keep the old chord and show the conflict line (**Used by VoiceOver**, **Used by macOS for Minimize**, **Card key** ⌃⌥⌘3 **is used by another app**), announced politely - `inst-conflict-line`
-   3. [ ] - `p1` - **ELSE** the row shows the new chord; `hotkeys:changed` updates the menu bar and the call window's labels - `inst-new-chord`
-9. [ ] - `p1` - **IF** the user clicks **Restore Defaults** - `inst-if-restore`
-   1. [ ] - `p1` - API: `hotkeys_reset`; the set is checked again - `inst-api-reset`
-10. [ ] - `p1` - **RETURN** the Hotkeys pane with every chord and conflict as the core reports them - `inst-return-hotkeys`
+1. [x] - `p1` - User opens Settings and selects **Hotkeys** - `inst-open-hotkeys`
+2. [x] - `p1` - API: `hotkeys_list` (the core test-registers the whole set when the pane opens and reports each row's result) - `inst-api-list`
+3. [x] - `p1` - UI: one row per global hotkey in sentence case with its chord as key caps, the group **Card keys during calls** (**Use card keys during calls**, **Pin a card** with **+ 1, 2 or 3**, **Dismiss with keys** off, **Dismiss a card** derived, **Undo last card action**), **Restore Defaults** and the footnote; a conflict line under each row the core reports - `inst-render-hotkeys`
+4. [x] - `p1` - User clicks a chord field or presses Return on it - `inst-start-record`
+5. [x] - `p1` - UI: the field shows the focus ring and **Type a shortcut…** - `inst-recording`
+6. [x] - `p1` - User presses a chord, Esc or ⌫ - `inst-user-chord`
+7. [x] - `p1` - Algorithm: check it with `cpt-noter-algo-ui-settings-check-chord` - `inst-check`
+8. [x] - `p1` - **IF** the chord is accepted locally - `inst-if-accepted`
+   1. [x] - `p1` - API: `hotkey_set` (action, chord) - `inst-api-set`
+   2. [x] - `p1` - **IF** the core reports `hotkey_conflict` or `hotkey_reserved` - `inst-if-conflict`
+      1. [x] - `p1` - UI: keep the old chord and show the conflict line (**Used by VoiceOver**, **Used by macOS for Minimize**, **Card key** ⌃⌥⌘3 **is used by another app**), announced politely - `inst-conflict-line`
+   3. [x] - `p1` - **ELSE** the row shows the new chord; `hotkeys:changed` updates the menu bar and the call window's labels - `inst-new-chord`
+9. [x] - `p1` - **IF** the user clicks **Restore Defaults** - `inst-if-restore`
+   1. [x] - `p1` - API: `hotkeys_reset`; the set is checked again - `inst-api-reset`
+10. [x] - `p1` - **RETURN** the Hotkeys pane with every chord and conflict as the core reports them - `inst-return-hotkeys`
 
 ### Change a setting
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-settings-change-setting`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-settings-change-setting`
 
 **Actor**: Primary user
 
@@ -124,25 +124,25 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 - **Storage location** in iCloud Drive or Dropbox: the warning line under the path
 
 **Steps**:
-1. [ ] - `p1` - User opens a pane by the pane list (↑ and ↓), the search field, ⌘, or a deep link from elsewhere (`nav:request` with pane and row) - `inst-open-pane`
-2. [ ] - `p1` - API: `settings_get` once per window; panes render from the settings slice - `inst-api-get`
-3. [ ] - `p1` - User changes a control - `inst-user-change`
-4. [ ] - `p1` - API: `settings_update` with the whole section as wanted state and its `rev` - `inst-api-update`
-5. [ ] - `p1` - **MATCH** the pane-specific control - `inst-match-control`
-   - [ ] - `p1` - **CASE** **Apps Noter doesn't ask about** › **Remove**: `settings_unignore_app` (bundle id) - `inst-case-unignore`
-   - [ ] - `p1` - **CASE** Glossary **+**, edit or **−**: `glossary_upsert` or `glossary_remove`; a new term leads to proposals in Activity (M5) - `inst-case-glossary`
-   - [ ] - `p1` - **CASE** **Run Audio Self-Test…**: open the self-test sheet with the self-test panel (sheet variant, `self_test_run`) - `inst-case-selftest`
-   - [ ] - `p1` - **CASE** Models › download or update: `models_download` - `inst-case-models`
-   - [ ] - `p1` - **CASE** **Call screen display**: the display picker, `setup_set_call_display` - `inst-case-display`
-   - [ ] - `p1` - **CASE** **Allow Calendar Access** (Privacy): `permission_request` (calendar) - `inst-case-calendar`
-   - [ ] - `p1` - **CASE** **Open System Settings…**: `open_external` (M1) - `inst-case-open`
-   - [ ] - `p1` - **CASE** **Restart Now**: `update_install` - `inst-case-update`
-6. [ ] - `p1` - Store: `settings:changed` replaces the slice; the control shows the stored value - `inst-store-settings`
-7. [ ] - `p1` - **RETURN** the pane with the new value - `inst-return-pane`
+1. [x] - `p1` - User opens a pane by the pane list (↑ and ↓), the search field, ⌘, or a deep link from elsewhere (`nav:request` with pane and row) - `inst-open-pane`
+2. [x] - `p1` - API: `settings_get` once per window; panes render from the settings slice - `inst-api-get`
+3. [x] - `p1` - User changes a control - `inst-user-change`
+4. [x] - `p1` - API: `settings_update` with the whole section as wanted state and its `rev` - `inst-api-update`
+5. [x] - `p1` - **MATCH** the pane-specific control - `inst-match-control`
+   - [x] - `p1` - **CASE** **Apps Noter doesn't ask about** › **Remove**: `settings_unignore_app` (bundle id) - `inst-case-unignore`
+   - [x] - `p1` - **CASE** Glossary **+**, edit or **−**: `glossary_upsert` or `glossary_remove`; a new term leads to proposals in Activity (M5) - `inst-case-glossary`
+   - [x] - `p1` - **CASE** **Run Audio Self-Test…**: open the self-test sheet with the self-test panel (sheet variant, `self_test_run`) - `inst-case-selftest`
+   - [x] - `p1` - **CASE** Models › download or update: `models_download` - `inst-case-models`
+   - [x] - `p1` - **CASE** **Call screen display**: the display picker, `setup_set_call_display` - `inst-case-display`
+   - [x] - `p1` - **CASE** **Allow Calendar Access** (Privacy): `permission_request` (calendar) - `inst-case-calendar`
+   - [x] - `p1` - **CASE** **Open System Settings…**: `open_external` (M1) - `inst-case-open`
+   - [x] - `p1` - **CASE** **Restart Now**: `update_install` - `inst-case-update`
+6. [x] - `p1` - Store: `settings:changed` replaces the slice; the control shows the stored value - `inst-store-settings`
+7. [x] - `p1` - **RETURN** the pane with the new value - `inst-return-pane`
 
 ### Test what a screen share would show
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-settings-share-test`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-settings-share-test`
 
 **Actor**: Primary user
 
@@ -155,97 +155,97 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 - Capture failed: **Couldn't capture the display.** · **Try Again**
 
 **Steps**:
-1. [ ] - `p1` - User clicks **Screen Share Test…** in Privacy - `inst-open-share-test`
-2. [ ] - `p1` - UI: the 640-pt sheet with the table and the limits line ending **Share a window, not a display, or press** ⌃⌥⌘0 **to hide Noter.** - `inst-share-table`
-3. [ ] - `p1` - **IF** a call is being recorded - `inst-if-call`
-   1. [ ] - `p1` - UI: **Run Capture Test** disabled with its reason - `inst-capture-disabled`
-4. [ ] - `p1` - User clicks **Run Capture Test**; the test-only permission row asks once (**Continue**) - `inst-run-capture`
-5. [ ] - `p2` - API: `share_test_run` (M2); while it runs, **Showing test windows on Display 2…** with a spinner - `inst-api-share`
-6. [ ] - `p2` - UI: the two images and one status row per surface (**Call window: hidden**, **Main window: visible: hide it before presenting**) - `inst-share-result`
-7. [ ] - `p1` - User clicks **Done** - `inst-share-done`
-8. [ ] - `p1` - **RETURN** the Privacy pane - `inst-return-share`
+1. [x] - `p1` - User clicks **Screen Share Test…** in Privacy - `inst-open-share-test`
+2. [x] - `p1` - UI: the 640-pt sheet with the table and the limits line ending **Share a window, not a display, or press** ⌃⌥⌘0 **to hide Noter.** - `inst-share-table`
+3. [x] - `p1` - **IF** a call is being recorded - `inst-if-call`
+   1. [x] - `p1` - UI: **Run Capture Test** disabled with its reason - `inst-capture-disabled`
+4. [x] - `p1` - User clicks **Run Capture Test**; the test-only permission row asks once (**Continue**) - `inst-run-capture`
+5. [x] - `p2` - API: `share_test_run` (M2); while it runs, **Showing test windows on Display 2…** with a spinner - `inst-api-share`
+6. [x] - `p2` - UI: the two images and one status row per surface (**Call window: hidden**, **Main window: visible: hide it before presenting**) - `inst-share-result`
+7. [x] - `p1` - User clicks **Done** - `inst-share-done`
+8. [x] - `p1` - **RETURN** the Privacy pane - `inst-return-share`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Check a recorded chord
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-settings-check-chord`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-settings-check-chord`
 
 **Input**: the key event while a chord field records, the row's variant (single chord, modifier set) and the VoiceOver state
 
 **Output**: accept the chord, keep the old one with a message, cancel or clear
 
 **Steps**:
-1. [ ] - `p1` - **IF** the key is Esc - `inst-if-esc`
-   1. [ ] - `p1` - **RETURN** cancel: the old chord stays, recording ends (the field never traps the keyboard) - `inst-return-cancel`
-2. [ ] - `p1` - **IF** the key is ⌫ - `inst-if-delete`
-   1. [ ] - `p1` - **RETURN** clear: the field reads **None** and menus show the item without a key - `inst-return-clear`
-3. [ ] - `p1` - **IF** no Command, Option or Control modifier is held - `inst-if-nomod`
-   1. [ ] - `p1` - **RETURN** keep the old chord with **Add Command, Option or Control** - `inst-return-nomod`
-4. [ ] - `p1` - **IF** VoiceOver runs and the chord starts with ⌃⌥ - `inst-if-vo`
-   1. [ ] - `p1` - **RETURN** keep the old chord with **Used by VoiceOver** (the pane's note explains the VO-Tab pass-through) - `inst-return-vo`
-5. [ ] - `p1` - Read the key by physical code so the Latin letter shows on any layout - `inst-physical`
-6. [ ] - `p1` - **RETURN** accept; the core may still refuse it at registration - `inst-return-accept`
+1. [x] - `p1` - **IF** the key is Esc - `inst-if-esc`
+   1. [x] - `p1` - **RETURN** cancel: the old chord stays, recording ends (the field never traps the keyboard) - `inst-return-cancel`
+2. [x] - `p1` - **IF** the key is ⌫ - `inst-if-delete`
+   1. [x] - `p1` - **RETURN** clear: the field reads **None** and menus show the item without a key - `inst-return-clear`
+3. [x] - `p1` - **IF** no Command, Option or Control modifier is held - `inst-if-nomod`
+   1. [x] - `p1` - **RETURN** keep the old chord with **Add Command, Option or Control** - `inst-return-nomod`
+4. [x] - `p1` - **IF** VoiceOver runs and the chord starts with ⌃⌥ - `inst-if-vo`
+   1. [x] - `p1` - **RETURN** keep the old chord with **Used by VoiceOver** (the pane's note explains the VO-Tab pass-through) - `inst-return-vo`
+5. [x] - `p1` - Read the key by physical code so the Latin letter shows on any layout - `inst-physical`
+6. [x] - `p1` - **RETURN** accept; the core may still refuse it at registration - `inst-return-accept`
 
 ### Filter panes by search
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-settings-search`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-settings-search`
 
 **Input**: the search text and the 11 panes with their names and keyword lists
 
 **Output**: the panes to list, or the empty state
 
 **Steps**:
-1. [ ] - `p1` - **IF** the text is empty: **RETURN** all 11 panes in their fixed order - `inst-if-empty`
-2. [ ] - `p1` - Keep the panes whose name or keywords contain the text, ignoring case (the prototype's `PANES` keywords) - `inst-match-keywords`
-3. [ ] - `p1` - **IF** none matches - `inst-if-none`
-   1. [ ] - `p1` - **RETURN** **No settings match “…”** in place of the pane list; × in the field clears it - `inst-return-none`
-4. [ ] - `p1` - **RETURN** the matching panes - `inst-return-matches`
+1. [x] - `p1` - **IF** the text is empty: **RETURN** all 11 panes in their fixed order - `inst-if-empty`
+2. [x] - `p1` - Keep the panes whose name or keywords contain the text, ignoring case (the prototype's `PANES` keywords) - `inst-match-keywords`
+3. [x] - `p1` - **IF** none matches - `inst-if-none`
+   1. [x] - `p1` - **RETURN** **No settings match “…”** in place of the pane list; × in the field clears it - `inst-return-none`
+4. [x] - `p1` - **RETURN** the matching panes - `inst-return-matches`
 
 ## 4. States (CDSL)
 
 ### Hotkey recorder
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-settings-hotkey-recorder`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-settings-hotkey-recorder`
 
 **States**: IDLE, RECORDING, CONFLICT, INVALID, CLEARED, DISABLED
 
 **Initial State**: IDLE
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** IDLE **TO** RECORDING **WHEN** the user clicks the field or presses Return or Space on it - `inst-idle-recording`
-2. [ ] - `p1` - **FROM** RECORDING **TO** IDLE **WHEN** an accepted chord registers, or Esc cancels - `inst-recording-idle`
-3. [ ] - `p1` - **FROM** RECORDING **TO** INVALID **WHEN** the chord has no modifier - `inst-recording-invalid`
-4. [ ] - `p1` - **FROM** RECORDING **TO** CONFLICT **WHEN** VoiceOver, macOS or another app holds the chord - `inst-recording-conflict`
-5. [ ] - `p1` - **FROM** IDLE **TO** CONFLICT **WHEN** the pane's test registration reports the row's chord refused - `inst-idle-conflict`
-6. [ ] - `p1` - **FROM** CONFLICT **TO** RECORDING **WHEN** the user records again - `inst-conflict-recording`
-7. [ ] - `p1` - **FROM** INVALID **TO** RECORDING **WHEN** the user records again - `inst-invalid-recording`
-8. [ ] - `p1` - **FROM** RECORDING **TO** CLEARED **WHEN** the user presses ⌫ or **Clear shortcut** - `inst-recording-cleared`
-9. [ ] - `p1` - **FROM** IDLE **TO** DISABLED **WHEN** **Use card keys during calls** turns off (card rows) or **Dismiss with keys** is off (**Dismiss a card**) - `inst-idle-disabled`
-10. [ ] - `p1` - **FROM** DISABLED **TO** IDLE **WHEN** the switch turns on - `inst-disabled-idle`
+1. [x] - `p1` - **FROM** IDLE **TO** RECORDING **WHEN** the user clicks the field or presses Return or Space on it - `inst-idle-recording`
+2. [x] - `p1` - **FROM** RECORDING **TO** IDLE **WHEN** an accepted chord registers, or Esc cancels - `inst-recording-idle`
+3. [x] - `p1` - **FROM** RECORDING **TO** INVALID **WHEN** the chord has no modifier - `inst-recording-invalid`
+4. [x] - `p1` - **FROM** RECORDING **TO** CONFLICT **WHEN** VoiceOver, macOS or another app holds the chord - `inst-recording-conflict`
+5. [x] - `p1` - **FROM** IDLE **TO** CONFLICT **WHEN** the pane's test registration reports the row's chord refused - `inst-idle-conflict`
+6. [x] - `p1` - **FROM** CONFLICT **TO** RECORDING **WHEN** the user records again - `inst-conflict-recording`
+7. [x] - `p1` - **FROM** INVALID **TO** RECORDING **WHEN** the user records again - `inst-invalid-recording`
+8. [x] - `p1` - **FROM** RECORDING **TO** CLEARED **WHEN** the user presses ⌫ or **Clear shortcut** - `inst-recording-cleared`
+9. [x] - `p1` - **FROM** IDLE **TO** DISABLED **WHEN** **Use card keys during calls** turns off (card rows) or **Dismiss with keys** is off (**Dismiss a card**) - `inst-idle-disabled`
+10. [x] - `p1` - **FROM** DISABLED **TO** IDLE **WHEN** the switch turns on - `inst-disabled-idle`
 
 ### Settings window
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-settings-window`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-settings-window`
 
 **States**: PANE, SEARCH_RESULTS, NO_MATCH, PANE_ERROR, HIDDEN_FOR_PRESENTING
 
 **Initial State**: PANE
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** PANE **TO** SEARCH_RESULTS **WHEN** the user types in the search field and panes match - `inst-pane-search`
-2. [ ] - `p1` - **FROM** SEARCH_RESULTS **TO** NO_MATCH **WHEN** no pane matches - `inst-search-nomatch`
-3. [ ] - `p1` - **FROM** NO_MATCH **TO** PANE **WHEN** the user clears the field - `inst-nomatch-pane`
-4. [ ] - `p1` - **FROM** PANE **TO** PANE_ERROR **WHEN** a pane-level error arrives (ST-R3), such as **Keychain is locked** (M3) - `inst-pane-error`
-5. [ ] - `p1` - **FROM** PANE_ERROR **TO** PANE **WHEN** the core reports the fix - `inst-error-pane`
-6. [ ] - `p1` - **FROM** PANE **TO** HIDDEN_FOR_PRESENTING **WHEN** Noter hides for presenting; it comes back as it was - `inst-pane-hidden`
-7. [ ] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** PANE **WHEN** Noter is shown again - `inst-hidden-pane`
+1. [x] - `p1` - **FROM** PANE **TO** SEARCH_RESULTS **WHEN** the user types in the search field and panes match - `inst-pane-search`
+2. [x] - `p1` - **FROM** SEARCH_RESULTS **TO** NO_MATCH **WHEN** no pane matches - `inst-search-nomatch`
+3. [x] - `p1` - **FROM** NO_MATCH **TO** PANE **WHEN** the user clears the field - `inst-nomatch-pane`
+4. [x] - `p1` - **FROM** PANE **TO** PANE_ERROR **WHEN** a pane-level error arrives (ST-R3), such as **Keychain is locked** (M3) - `inst-pane-error`
+5. [x] - `p1` - **FROM** PANE_ERROR **TO** PANE **WHEN** the core reports the fix - `inst-error-pane`
+6. [x] - `p1` - **FROM** PANE **TO** HIDDEN_FOR_PRESENTING **WHEN** Noter hides for presenting; it comes back as it was - `inst-pane-hidden`
+7. [x] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** PANE **WHEN** Noter is shown again - `inst-hidden-pane`
 
 ## 5. Definitions of Done
 
 ### Settings window, pane list and search
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-settings-window`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-settings-window`
 
 The system **MUST** render the Settings window (820×620, minimum 700×480) with ST-R1 (search and the 11 panes in DESIGN's order), ST-R2 (grouped inset form up to 560 pt, labels above controls below 600 pt) and ST-R3, open at a pane and row from deep links, remember each pane's scroll position, and filter panes by name and keywords as the prototype does.
 
@@ -262,7 +262,7 @@ The system **MUST** render the Settings window (820×620, minimum 700×480) with
 
 ### Hotkeys pane and recorder
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-settings-hotkeys`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-settings-hotkeys`
 
 The system **MUST** provide the hotkey recorder in its single-chord, modifier-set and derived variants, show the core's test-registration result when the pane opens, keep the old chord on any refusal with the conflict or invalid line, and offer **Restore Defaults**.
 
@@ -280,7 +280,7 @@ The system **MUST** provide the hotkey recorder in its single-chord, modifier-se
 
 ### Privacy settings rows and the Screen Share Test
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-settings-privacy`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-settings-privacy`
 
 The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indicator in force), **Audio retention** with its next-nightly-run line, the **Calendar** permission row, the behaviour-metrics switch with its footnote (off by default, rows absent until on), **Voice profiles** with **Manage on Person Pages**, and the **Screen Share Test…** sheet; **What left this Mac** is a frame filled by `cpt-noter-feature-ui-privacy-sources` (M3).
 
@@ -295,11 +295,11 @@ The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indi
 
 ## 6. Acceptance Criteria
 
-- [ ] Every Settings state of the prototype's `ST` State menu for the panes this feature builds renders identically (General, Audio & Transcription, Privacy rows, Call Screen & Menu Bar, Hotkeys, Updates, search)
-- [ ] A change applies without a Save button and survives a window reload (it comes back from `settings_get`)
-- [ ] No hotkey can be set without a modifier; Esc always ends recording
-- [ ] Searching for a word in a pane's keywords lists that pane; a word in none shows **No settings match “…”**
-- [ ] The Models & Runtimes, Repositories, Knowledge Sources and Maintenance panes show their frames and state their later milestone instead of a blank area
+- [x] Every Settings state of the prototype's `ST` State menu for the panes this feature builds renders identically (General, Audio & Transcription, Privacy rows, Call Screen & Menu Bar, Hotkeys, Updates, search)
+- [x] A change applies without a Save button and survives a window reload (it comes back from `settings_get`)
+- [x] No hotkey can be set without a modifier; Esc always ends recording
+- [x] Searching for a word in a pane's keywords lists that pane; a word in none shows **No settings match “…”**
+- [x] The Models & Runtimes, Repositories, Knowledge Sources and Maintenance panes show their frames and state their later milestone instead of a blank area
 
 ## 7. Additional Context
 

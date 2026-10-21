@@ -69,3 +69,12 @@ describe("recorderReduce", () => {
     expect(recorderReduce(rec, { type: "disable" })).toBe(rec);
   });
 });
+
+describe("dismiss", () => {
+  it("clears the hint of an invalid or refused attempt and leaves other states alone", () => {
+    expect(recorderReduce({ type: "INVALID", message: "x" }, { type: "dismiss" })).toEqual({ type: "IDLE" });
+    expect(recorderReduce({ type: "CONFLICT", message: "x" }, { type: "dismiss" })).toEqual({ type: "IDLE" });
+    expect(recorderReduce({ type: "CLEARED" }, { type: "dismiss" })).toEqual({ type: "CLEARED" });
+    expect(recorderReduce({ type: "RECORDING", from: "IDLE" }, { type: "dismiss" })).toEqual({ type: "RECORDING", from: "IDLE" });
+  });
+});

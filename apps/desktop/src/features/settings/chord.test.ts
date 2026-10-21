@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { checkChord, conflictLine, type ChordInput } from "./chord";
+import type { CoreError } from "../../core/bindings";
+import { checkChord, conflictLine, refusalLine, type ChordInput } from "./chord";
 
 const none = { control: false, option: false, command: false, shift: false };
 const ev = (over: Partial<ChordInput> = {}): ChordInput => ({
@@ -63,6 +64,10 @@ describe("checkChord", () => {
   it("never clears a modifier set: card keys need at least one modifier", () => {
     expect(checkChord(ev({ variant: "modifier-set", code: "Backspace", modifiers: none }))).toMatchObject({ type: "keep", reason: "no_modifier" });
   });
+  it("waits on a Shift-first start and on Fn or CapsLock instead of refusing the chord", () => {
+    expect(checkChord(ev({ code: "ShiftLeft", modifiers: { ...none, shift: true } }))).toEqual({ type: "wait" });
+    for (const code of ["Fn", "CapsLock"]) expect(checkChord(ev({ code, modifiers: { ...none, command: true } }))).toEqual({ type: "wait" });
+  });
 });
 
 describe("conflictLine", () => {
@@ -78,4 +83,20 @@ describe("conflictLine", () => {
   it("explains a system reservation", () => {
     expect(conflictLine({ type: "reserved_by_system" })).toBe("Used by macOS");
   });
+});
+
+describe("refusalLine", () => {
+  const err = (code: string, owner?: string | null) => ({ code, detail: owner === undefined ? null : { type: "hotkey_owner", owner } }) as unknown as CoreError;
+
+  it("names the owner the core reports", () => {
+    expect(refusalLine(err("hotkey_reserved", "VoiceOver"))).toBe("Used by VoiceOver");
+    expect(refusalLine(err("hotkey_conflict", "Raycast"))).toBe("Used by Raycast");
+  });
+
+  it("falls back to macOS for a reservation and another app for a conflict", () => {
+    expect(refusalLine(err("hotkey_reserved"))).toBe("Used by macOS");
+    expect(refusalLine(err("hotkey_conflict", null))).toBe("Used by another app");
+  });
+
+  it("is null for an error that is not a refusal", () => expect(refusalLine(err("offline"))).toBeNull());
 });

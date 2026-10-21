@@ -1,4 +1,5 @@
-import type { HotkeyStatus } from "../../core/bindings";
+import type { CoreError, HotkeyStatus } from "../../core/bindings";
+import { t } from "../../i18n/format";
 
 export interface ChordModifiers {
   control: boolean;
@@ -29,22 +30,52 @@ export type ChordResult =
   /** A single chord got only a modifier keydown: keep recording until a non-modifier key arrives. */
   | { type: "wait" };
 
-const MODIFIER_CODES = new Set(["Control", "Alt", "Meta", "Shift"].flatMap((m) => [`${m}Left`, `${m}Right`]));
+// Fn and CapsLock are never a chord's key: like a modifier keydown, they keep a single chord recording.
+const MODIFIER_CODES = new Set([...["Control", "Alt", "Meta", "Shift"].flatMap((m) => [`${m}Left`, `${m}Right`]), "Fn", "CapsLock"]);
 
 // @cpt-algo:cpt-noter-algo-ui-settings-check-chord:p1
 export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInput): ChordResult {
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-esc
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-cancel
   if (code === "Escape") return { type: "cancel" };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-cancel
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-esc
   const hasModifier = m.control || m.option || m.command;
-  // a modifier set is never empty: the core refuses it (`no_modifier`)
-  if (code === "Backspace" && variant === "single") return { type: "clear" };
-  if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: "Add Command, Option or Control" };
+  // a chord may start with any modifier, Shift included: only the completing key is judged
   if (variant === "single" && MODIFIER_CODES.has(code)) return { type: "wait" };
-  if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: "Used by VoiceOver" };
-  return { type: "accept", code, modifiers: m };
+  // a modifier set is never empty: the core refuses it (`no_modifier`)
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-delete
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-clear
+  if (code === "Backspace" && variant === "single") return { type: "clear" };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-clear
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-delete
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-nomod
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-nomod
+  if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: t("settings.hotkeys.no_modifier") };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-nomod
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-nomod
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-vo
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-vo
+  if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: t("settings.hotkeys.used_by", { owner: "VoiceOver" }) };
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-vo
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-vo
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-physical
+  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-accept
+  return { type: "accept", code, modifiers: m }; // `code` is the physical KeyboardEvent.code, not the layout's character
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-accept
+  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-physical
 }
 
 /** The line under a row the core reports a refusal for; null when the row has none. */
 export function conflictLine(status: HotkeyStatus): string | null {
-  if (status.type === "conflict") return `Used by ${status.owner ?? "another app"}`;
-  return status.type === "reserved_by_system" ? "Used by macOS" : null;
+  if (status.type === "conflict") return t("settings.hotkeys.used_by", { owner: status.owner ?? "another app" });
+  return status.type === "reserved_by_system" ? t("settings.hotkeys.used_by_macos") : null;
+}
+
+/** The line a `hotkey_set` refusal (`hotkey_conflict`, `hotkey_reserved`) shows under the row; null for any other error. */
+export function refusalLine(error: CoreError): string | null {
+  if (error.code !== "hotkey_conflict" && error.code !== "hotkey_reserved") return null;
+  const owner = error.detail?.type === "hotkey_owner" ? error.detail.owner : null;
+  if (owner) return t("settings.hotkeys.used_by", { owner });
+  return error.code === "hotkey_reserved" ? t("settings.hotkeys.used_by_macos") : t("settings.hotkeys.used_by", { owner: "another app" });
 }

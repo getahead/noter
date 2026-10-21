@@ -69,4 +69,10 @@ describe("section draft", () => {
     const d = editDraft(editDraft(newDraft("copilot"), { muted_call_types: ["a", "b"] } as never), { muted_call_types: ["c"] } as never);
     expect(d.edits).toEqual({ muted_call_types: ["c"] });
   });
+
+  it("ignores an explicit undefined leaf instead of overwriting the stored value", () => {
+    const d = editDraft(newDraft("copilot"), { card_keys: { enabled: undefined, modifiers: { command: false } } });
+    expect(d.edits).toEqual({ card_keys: { modifiers: { command: false } } });
+    expect(draftValue(base, d).card_keys.enabled).toBe(base.copilot.card_keys.enabled);
+  });
 });

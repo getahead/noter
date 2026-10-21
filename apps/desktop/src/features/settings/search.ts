@@ -1,4 +1,6 @@
 import type { SettingsPane } from "../../core/bindings";
+import type { MsgKey } from "../../i18n/en";
+import { t } from "../../i18n/format";
 
 export interface PaneEntry {
   id: SettingsPane;
@@ -31,7 +33,23 @@ export type SearchResult =
 // @cpt-algo:cpt-noter-algo-ui-settings-search:p1
 export function searchPanes(text: string): SearchResult {
   const q = text.trim().toLowerCase();
+  // @cpt-begin:cpt-noter-algo-ui-settings-search:p1:inst-if-empty
   if (!q) return { kind: "all", panes: PANES };
+  // @cpt-end:cpt-noter-algo-ui-settings-search:p1:inst-if-empty
+  // @cpt-begin:cpt-noter-algo-ui-settings-search:p1:inst-match-keywords
   const panes = PANES.filter((p) => `${p.label} ${p.keywords}`.toLowerCase().includes(q));
+  // @cpt-end:cpt-noter-algo-ui-settings-search:p1:inst-match-keywords
+  // @cpt-begin:cpt-noter-algo-ui-settings-search:p1:inst-if-none
+  // @cpt-begin:cpt-noter-algo-ui-settings-search:p1:inst-return-none
+  // @cpt-begin:cpt-noter-algo-ui-settings-search:p1:inst-return-matches
   return panes.length ? { kind: "matches", panes } : { kind: "none", panes: [], text: text.trim() };
+  // @cpt-end:cpt-noter-algo-ui-settings-search:p1:inst-return-matches
+  // @cpt-end:cpt-noter-algo-ui-settings-search:p1:inst-return-none
+  // @cpt-end:cpt-noter-algo-ui-settings-search:p1:inst-if-none
 }
+
+/** A pane's name, as the pane list and the pane title show it. */
+export const paneLabel = (id: SettingsPane): string => t(`settings.pane.${id}` satisfies MsgKey);
+
+/** What a pane that a later feature fills says instead of a blank area. */
+export const laterNote = (id: "models_and_runtimes" | "repositories" | "knowledge_sources" | "maintenance"): string => t(`settings.later.${id}` satisfies MsgKey);
