@@ -309,7 +309,6 @@ impl Store {
     /// change row per deleted record: never undoable and without record content (PRD › Deletion).
     /// Returns each deleted id with its change id; an id that was not stored is skipped.
     // @cpt-algo:cpt-noter-algo-core-storage-delete:p1
-    // @cpt-dod:cpt-noter-dod-core-storage-capture-writes:p1
     pub fn delete(
         &self,
         entity_type: &'static str,
