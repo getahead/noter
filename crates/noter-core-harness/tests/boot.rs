@@ -797,10 +797,15 @@ async fn engine_fact_reaches_a_running_engine_and_kill_is_accepted() {
 #[tokio::test]
 async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was_shown() {
     let mut r = start().await;
+    // The fixture world records its live call; the test starts from idle.
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
     assert_eq!(shown, json!({ "calls": [] }));
-    // The scripted engine acks the session but never reports it started: the start answers
-    // `starting`, and the call window waits for the engine.
+    // The scripted engine answers the session: the start records and the call window opens.
     let started = r
         .ok(
             "main",
@@ -808,13 +813,39 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
             json!({ "source": "today", "sensitive": false }),
         )
         .await;
-    assert_eq!(started["phase"], "starting");
+    assert_eq!(started["phase"], "recording");
     let call_id = started["call_id"].clone();
     let stopped = r
         .ok("main", "capture_stop", json!({ "call_id": call_id }))
         .await;
     assert_eq!(stopped["phase"], "stopped");
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert_eq!(shown, json!({ "calls": [] }));
+    assert_eq!(shown, json!({ "calls": ["open_call_window_inactive"] }));
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_fixture_live_call_is_seeded_into_the_real_core() {
+    let mut r = start().await;
+    let capture = r.ok("main", "app_snapshot", json!({})).await["capture"].clone();
+    assert_eq!(capture["phase"], "recording");
+    assert_eq!(capture["call_id"], "call_live");
+    // The seeded call answers capture commands like a recorded one.
+    let paused = r
+        .ok(
+            "call-screen",
+            "capture_set_paused",
+            json!({ "call_id": "call_live", "paused": true }),
+        )
+        .await;
+    assert_eq!(paused["phase"], "paused");
+    let sensitive = r
+        .ok(
+            "call-screen",
+            "capture_set_sensitive",
+            json!({ "call_id": "call_live", "sensitive": true }),
+        )
+        .await;
+    assert_eq!(sensitive["sensitive"], true);
     r.finish().await;
 }

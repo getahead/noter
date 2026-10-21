@@ -944,3 +944,807 @@ async fn every_transition_of_part_one_lands_in_its_phase() {
         assert!(phases.contains(&wanted), "{wanted:?} in {phases:?}");
     }
 }
+
+// === Part 2: detection, notices and timers ===========================================
+
+const ZOOM: &str = "us.zoom.xos";
+const TEAMS: &str = "com.microsoft.teams2";
+
+impl Rig {
+    /// Moves the wall clock and tokio time together, a second at a time so the engine keeps
+    /// answering its liveness pings, and lets due timers run.
+    async fn pass(&self, ms: i64) {
+        let mut left = ms;
+        while left > 0 {
+            let step = left.min(1_000);
+            self.advance(step);
+            tokio::time::advance(Duration::from_millis(step as u64)).await;
+            for _ in 0..10 {
+                tokio::task::yield_now().await;
+            }
+            left -= step;
+        }
+    }
+
+    async fn offer_to_record(&self, on: bool) {
+        let settings = self
+            .core
+            .settings_get(&main_window(), NoArgs {})
+            .await
+            .unwrap();
+        let mut general = settings.general.clone();
+        general.offer_to_record = on;
+        self.core
+            .settings_update(
+                &main_window(),
+                SettingsUpdateArgs {
+                    rev: settings.rev,
+                    section: SettingsSection::General(general),
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    /// Detection runs: the self-test passed (Offer to Record is on by default).
+    async fn detection_on(&self) {
+        noter_core::testing::seed_self_test(
+            &self.core,
+            SelfTestState::Passed {
+                at: TimestampMs(T0),
+            },
+        );
+        // The engine must be up to hear facts.
+        let _ = self.core.app_snapshot(&main_window(), NoArgs {}).await;
+        self.sent(|c| matches!(c, EngineCommand::SetDetection { enabled: true, .. }))
+            .await;
+    }
+
+    fn fact(&self, event: EngineEvent) {
+        assert!(self.engine.inject(event));
+    }
+
+    fn call_detected(&self, bundle_id: &str, app_name: &str) {
+        self.fact(EngineEvent::CallDetected {
+            bundle_id: bundle_id.into(),
+            app_name: app_name.into(),
+            pid: 4242,
+        });
+    }
+
+    async fn detection(&self) -> Option<CallDetection> {
+        self.core
+            .app_snapshot(&main_window(), NoArgs {})
+            .await
+            .unwrap()
+            .detection
+            .detection
+    }
+
+    async fn detection_becomes(
+        &self,
+        wanted: impl Fn(&Option<CallDetection>) -> bool,
+    ) -> Option<CallDetection> {
+        for _ in 0..200 {
+            let d = self.detection().await;
+            if wanted(&d) {
+                return d;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        panic!("detection never matched: {:?}", self.detection().await);
+    }
+
+    async fn notice_becomes(
+        &self,
+        wanted: impl Fn(&Option<CaptureNotice>) -> bool,
+    ) -> CaptureState {
+        for _ in 0..200 {
+            let s = self.state().await;
+            if wanted(&s.notice) {
+                return s;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        panic!("notice never matched: {:?}", self.state().await);
+    }
+
+    async fn degraded(&self) -> Vec<DegradedState> {
+        self.core
+            .app_snapshot(&main_window(), NoArgs {})
+            .await
+            .unwrap()
+            .degraded
+            .states
+    }
+
+    /// A recording call started from the record prompt of a detected `app`.
+    async fn recording_detected(&self, bundle_id: &str, app_name: &str) -> CallId {
+        self.call_detected(bundle_id, app_name);
+        let detection = self.detection_becomes(|d| d.is_some()).await.unwrap();
+        let starts = self.sessions().len();
+        let started = self
+            .core
+            .capture_start(
+                &main_window(),
+                CaptureStartArgs {
+                    source: StartSource::RecordPrompt,
+                    detection_id: Some(detection.id),
+                    ..start_args()
+                },
+            )
+            .await
+            .unwrap();
+        let call_id = started.call_id.unwrap();
+        self.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+            .await;
+        self.session_started(&call_id);
+        self.phase_becomes(CapturePhase::Recording).await;
+        call_id
+    }
+
+    /// Answers the engine's next `stop` with `session_stopped`.
+    async fn answer_stop(&self, call_id: &CallId, stops_before: usize) {
+        self.sent_n(stops_before + 1, |c| {
+            matches!(c, EngineCommand::Stop { .. })
+        })
+        .await;
+        self.session_stopped(call_id);
+    }
+
+    fn stops(&self) -> usize {
+        self.engine
+            .commands()
+            .iter()
+            .filter(|c| matches!(c, EngineCommand::Stop { .. }))
+            .count()
+    }
+}
+
+// --- Detection -----------------------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn the_engine_hears_the_known_meeting_apps_minus_the_ignored_ones() {
+    let r = rig();
+    r.detection_on().await;
+    let EngineCommand::SetDetection {
+        known_bundle_ids, ..
+    } = r
+        .sent(|c| matches!(c, EngineCommand::SetDetection { enabled: true, .. }))
+        .await
+    else {
+        unreachable!()
+    };
+    for app in [ZOOM, TEAMS, "com.apple.FaceTime", "com.google.Chrome"] {
+        assert!(
+            known_bundle_ids.iter().any(|b| b == app),
+            "{app} in {known_bundle_ids:?}"
+        );
+    }
+    r.core
+        .capture_ignore_app(
+            &menu_bar(),
+            IgnoreAppArgs {
+                bundle_id: ZOOM.into(),
+                app_name: "Zoom".into(),
+            },
+        )
+        .await
+        .unwrap();
+    let EngineCommand::SetDetection {
+        known_bundle_ids, ..
+    } = r
+        .sent_n(2, |c| {
+            matches!(c, EngineCommand::SetDetection { enabled: true, .. })
+        })
+        .await
+    else {
+        unreachable!()
+    };
+    assert!(!known_bundle_ids.iter().any(|b| b == ZOOM));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_detected_call_shows_the_prompt_for_fifteen_seconds_only_when_detection_is_on() {
+    let r = rig();
+    r.detection_on().await;
+    r.offer_to_record(false).await;
+    r.call_detected(ZOOM, "Zoom");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(r.detection().await, None, "Offer to Record is off");
+
+    r.offer_to_record(true).await;
+    r.call_detected(ZOOM, "Zoom");
+    let d = r.detection_becomes(|d| d.is_some()).await.unwrap();
+    assert!(d.id.as_str().starts_with("det_"));
+    assert_eq!((d.app_name.as_str(), d.bundle_id.as_str()), ("Zoom", ZOOM));
+    assert_eq!(d.detected_at, TimestampMs(r.now()));
+    assert_eq!(d.prompt_until, TimestampMs(r.now() + 15_000));
+    assert_eq!(d.blocked, None);
+    assert_eq!(d.matched_event, None, "no calendar until native surfaces");
+    assert!(r.shown.0.lock().unwrap().contains(&"show_record_prompt"));
+    assert!(r
+        .events
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|(name, _)| *name == event_names::CAPTURE_DETECTED));
+
+    // The meeting app lets go of the audio before anyone recorded: the detection goes.
+    r.fact(EngineEvent::CallAudioReleased {
+        bundle_id: ZOOM.into(),
+    });
+    r.detection_becomes(|d| d.is_none()).await;
+
+    // Not while a capture runs.
+    r.recording().await;
+    r.call_detected(TEAMS, "Microsoft Teams");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(r.detection().await, None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_prompt_names_why_record_would_be_refused() {
+    let r = rig_with(Setup {
+        disk_free_mb: 300,
+        ..Setup::default()
+    });
+    r.detection_on().await;
+    r.call_detected(ZOOM, "Zoom");
+    let d = r.detection_becomes(|d| d.is_some()).await.unwrap();
+    assert_eq!(d.blocked, Some(StartBlocked::DiskFull));
+}
+
+#[tokio::test(start_paused = true)]
+async fn record_on_the_prompt_starts_the_call_named_after_the_app() {
+    let r = rig();
+    r.detection_on().await;
+    let call_id = r.recording_detected(ZOOM, "Zoom").await;
+    let state = r.state().await;
+    assert_eq!(state.title.as_deref(), Some("Zoom"));
+    let id = call_id.clone();
+    let (title, platform): (String, String) = r
+        .core
+        .store()
+        .read(move |c| {
+            c.query_row(
+                "SELECT title, platform FROM calls WHERE id = ?1",
+                [id.as_str()],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+        })
+        .unwrap();
+    assert_eq!((title.as_str(), platform.as_str()), ("Zoom", "Zoom"));
+    assert_eq!(r.detection().await, None, "the detection was used");
+    assert!(r.shown.0.lock().unwrap().contains(&"close_record_prompt"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_missed_prompt_keeps_the_detection_for_the_menu_bar_and_the_hotkey() {
+    let r = rig();
+    r.detection_on().await;
+    r.call_detected(ZOOM, "Zoom");
+    let d = r.detection_becomes(|d| d.is_some()).await.unwrap();
+    r.pass(16_000).await;
+    let from_prompt = CaptureStartArgs {
+        source: StartSource::RecordPrompt,
+        detection_id: Some(d.id.clone()),
+        ..start_args()
+    };
+    assert_eq!(
+        code(r.core.capture_start(&main_window(), from_prompt).await),
+        ErrorCode::DetectionExpired
+    );
+    // The prompt says it timed out: it closes, the detection stays, no second prompt.
+    r.core
+        .capture_dismiss_detection(
+            &main_window(),
+            DismissDetectionArgs {
+                detection_id: d.id.clone(),
+                reason: DismissReason::TimedOut,
+            },
+        )
+        .await
+        .unwrap();
+    let kept = r.detection().await.unwrap();
+    assert_eq!(kept.id, d.id);
+    assert_eq!(kept.prompt_until, TimestampMs(r.now()));
+    r.call_detected(ZOOM, "Zoom");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let prompts = r
+        .shown
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|s| **s == "show_record_prompt")
+        .count();
+    assert_eq!(prompts, 1, "never prompted twice for this call");
+
+    // The start hotkey still starts it, named after the app.
+    let started = r
+        .core
+        .capture_start(
+            &CommandCtx {
+                caller: Caller::Native {
+                    surface: NativeSurface::Hotkey,
+                },
+            },
+            CaptureStartArgs {
+                source: StartSource::Hotkey,
+                detection_id: Some(d.id),
+                ..start_args()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(started.title.as_deref(), Some("Zoom"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn dont_ask_for_an_app_ignores_it_from_then_on() {
+    let r = rig();
+    r.detection_on().await;
+    r.call_detected(ZOOM, "Zoom");
+    r.detection_becomes(|d| d.is_some()).await;
+    r.core
+        .capture_ignore_app(
+            &main_window(),
+            IgnoreAppArgs {
+                bundle_id: ZOOM.into(),
+                app_name: "Zoom".into(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.detection().await, None);
+    let settings = r
+        .core
+        .settings_get(&main_window(), NoArgs {})
+        .await
+        .unwrap();
+    assert!(settings
+        .general
+        .ignored_apps
+        .iter()
+        .any(|a| a.bundle_id == ZOOM));
+    r.call_detected(ZOOM, "Zoom");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(r.detection().await, None);
+    // An unknown detection is gone already.
+    assert_eq!(
+        code(
+            r.core
+                .capture_dismiss_detection(
+                    &main_window(),
+                    DismissDetectionArgs {
+                        detection_id: DetectionId::new("det_gone"),
+                        reason: DismissReason::NotNow,
+                    },
+                )
+                .await
+        ),
+        ErrorCode::DetectionExpired
+    );
+}
+
+// --- Call end ------------------------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn the_call_ended_notice_counts_down_holds_and_stops_by_itself() {
+    let r = rig();
+    r.detection_on().await;
+    let call_id = r.recording_detected(ZOOM, "Zoom").await;
+    let answer = |choice| CallEndAnswerArgs {
+        call_id: call_id.clone(),
+        choice,
+    };
+    assert_eq!(
+        code(
+            r.core
+                .capture_answer_call_end(&main_window(), answer(CallEndChoice::KeepRecording))
+                .await
+        ),
+        ErrorCode::NoticeExpired
+    );
+    r.fact(EngineEvent::CallAudioReleased {
+        bundle_id: ZOOM.into(),
+    });
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.pass(19_000).await;
+    assert_eq!(r.state().await.notice, None, "20 s first");
+    r.pass(1_000).await;
+    let s = r.notice_becomes(|n| n.is_some()).await;
+    assert_eq!(
+        s.notice,
+        Some(CaptureNotice::CallEnded {
+            stops_at: Some(TimestampMs(r.now() + 10_000))
+        })
+    );
+    // Keep Recording clears it.
+    r.core
+        .capture_answer_call_end(&main_window(), answer(CallEndChoice::KeepRecording))
+        .await
+        .unwrap();
+    assert_eq!(r.state().await.notice, None);
+
+    // Released again: held while the pointer is on it, then 10 s again from the release.
+    r.fact(EngineEvent::CallAudioReleased {
+        bundle_id: ZOOM.into(),
+    });
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.pass(20_000).await;
+    r.notice_becomes(|n| n.is_some()).await;
+    let hold = |held| NoticeHoldArgs {
+        call_id: call_id.clone(),
+        held,
+    };
+    let held = r
+        .core
+        .capture_hold_notice(&main_window(), hold(true))
+        .await
+        .unwrap();
+    assert_eq!(
+        held.notice,
+        Some(CaptureNotice::CallEnded { stops_at: None })
+    );
+    r.pass(30_000).await;
+    assert_eq!(
+        r.state().await.phase,
+        CapturePhase::Recording,
+        "held, no stop"
+    );
+    let released = r
+        .core
+        .capture_hold_notice(&main_window(), hold(false))
+        .await
+        .unwrap();
+    assert_eq!(
+        released.notice,
+        Some(CaptureNotice::CallEnded {
+            stops_at: Some(TimestampMs(r.now() + 10_000))
+        })
+    );
+    let stops = r.stops();
+    r.pass(10_000).await;
+    r.answer_stop(&call_id, stops).await;
+    let stopped = r.phase_becomes(CapturePhase::Stopped).await;
+    assert_eq!(
+        stopped.notice,
+        Some(CaptureNotice::StoppedAutomatically {
+            call_id: call_id.clone()
+        })
+    );
+    // Continue is still offered after an automatic stop.
+    assert!(stopped.continue_until.is_some());
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_now_on_the_notice_stops_at_once() {
+    let r = rig();
+    r.detection_on().await;
+    let call_id = r.recording_detected(ZOOM, "Zoom").await;
+    r.fact(EngineEvent::CallAudioReleased {
+        bundle_id: ZOOM.into(),
+    });
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.pass(20_000).await;
+    r.notice_becomes(|n| n.is_some()).await;
+    let stops = r.stops();
+    let answer = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_answer_call_end(
+                &main_window(),
+                CallEndAnswerArgs {
+                    call_id,
+                    choice: CallEndChoice::StopNow,
+                },
+            )
+            .await
+        })
+    };
+    r.answer_stop(&call_id, stops).await;
+    assert_eq!(answer.await.unwrap().unwrap().phase, CapturePhase::Stopped);
+}
+
+#[tokio::test(start_paused = true)]
+async fn while_hidden_for_presenting_the_call_seems_ended_for_ten_minutes() {
+    let r = rig();
+    r.detection_on().await;
+    r.recording_detected(ZOOM, "Zoom").await;
+    noter_core::testing::seed_presenting(&r.core, true);
+    r.fact(EngineEvent::CallAudioReleased {
+        bundle_id: ZOOM.into(),
+    });
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.pass(20_000).await;
+    let s = r.notice_becomes(|n| n.is_some()).await;
+    assert_eq!(
+        s.notice,
+        Some(CaptureNotice::CallSeemsEnded {
+            stops_at: TimestampMs(r.now() + 600_000)
+        })
+    );
+}
+
+// --- Nothing heard, discard ----------------------------------------------------------
+
+fn segment(call_id: &CallId) -> EngineEvent {
+    EngineEvent::Segment {
+        segment: noter_protocol::engine::EngineSegment {
+            id: "e1".into(),
+            call_id: call_id.clone(),
+            channel: AudioChannel::Sys,
+            t0_ms: OffsetMs(0),
+            t1_ms: OffsetMs(900),
+            state: noter_protocol::engine::EngineSegmentState::Confirmed,
+            lang: Lang::En,
+            lang_p: 0.9,
+            speaker_label: "spk_1".into(),
+            text: "Hello".into(),
+            words_path: None,
+            avg_logprob: -0.2,
+            no_speech_p: 0.01,
+            corrections: vec![],
+            crosstalk_labels: vec![],
+        },
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let started = r.now();
+    r.pass(299_000).await;
+    assert_eq!(r.state().await.notice, None);
+    r.pass(1_000).await;
+    let s = r.notice_becomes(|n| n.is_some()).await;
+    assert_eq!(
+        s.notice,
+        Some(CaptureNotice::NothingHeard {
+            since: TimestampMs(started)
+        })
+    );
+    // Keep Recording: the 5 minutes start again.
+    r.core
+        .capture_keep_recording(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.state().await.notice, None);
+    r.pass(300_000).await;
+    r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+
+    // Discard: nothing is kept.
+    let stops = r.stops();
+    let discard = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_discard(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.answer_stop(&call_id, stops).await;
+    let idle = discard.await.unwrap().unwrap();
+    assert_eq!(idle.phase, CapturePhase::Idle);
+    assert_eq!(idle.call_id, None);
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM changes WHERE entity_type = 'call' AND undoable = 0 AND field IS NULL AND delta IS NULL AND reason = 'capture_discard'"),
+        1
+    );
+    assert!(r.captured.lock().unwrap().contains(&CaptureEvent::Stopped {
+        call_id,
+        reason: StreamEndReason::Discarded,
+    }));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_heard_segment_means_no_nothing_heard_notice() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(60_000).await;
+    r.fact(segment(&call_id));
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.pass(250_000).await;
+    assert_eq!(r.state().await.notice, None);
+    r.pass(50_000).await;
+    r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    assert_eq!(
+        code(
+            r.core
+                .capture_keep_recording(
+                    &main_window(),
+                    CallIdArgs {
+                        call_id: CallId::new("call_x")
+                    }
+                )
+                .await
+        ),
+        ErrorCode::NoticeExpired
+    );
+}
+
+// --- New meeting ---------------------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn a_new_meeting_splits_the_call_unless_kept() {
+    let r = rig();
+    r.detection_on().await;
+    let first = r.recording_detected(ZOOM, "Zoom").await;
+    r.pass(30_000).await;
+    r.call_detected(TEAMS, "Microsoft Teams");
+    let s = r.notice_becomes(|n| n.is_some()).await;
+    let detected_at = r.now();
+    assert_eq!(
+        s.notice,
+        Some(CaptureNotice::NewMeeting {
+            event: None,
+            app_name: Some("Microsoft Teams".into()),
+            detected_at: TimestampMs(detected_at),
+            expires_at: TimestampMs(detected_at + 60_000),
+            default_choice: NewMeetingChoice::StartAsNewCall,
+        })
+    );
+    // Keep in This Call.
+    let answer = |call_id: &CallId, choice| NewMeetingAnswerArgs {
+        call_id: call_id.clone(),
+        choice,
+    };
+    r.core
+        .capture_answer_new_meeting(
+            &main_window(),
+            answer(&first, NewMeetingChoice::KeepInThisCall),
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.state().await.notice, None);
+    assert_eq!(
+        code(
+            r.core
+                .capture_answer_new_meeting(
+                    &main_window(),
+                    answer(&first, NewMeetingChoice::KeepInThisCall)
+                )
+                .await
+        ),
+        ErrorCode::NoticeExpired
+    );
+
+    // Unanswered for 60 s: Start as New Call, split at detected_at.
+    r.call_detected(TEAMS, "Microsoft Teams");
+    r.notice_becomes(|n| n.is_some()).await;
+    let detected_at = r.now();
+    let stops = r.stops();
+    let starts = r.sessions().len();
+    r.pass(60_000).await;
+    r.answer_stop(&first, stops).await;
+    let EngineCommand::StartSession(next) = r
+        .sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+        .await
+    else {
+        unreachable!()
+    };
+    assert_ne!(next.call_id, first);
+    r.session_started(&next.call_id);
+    let s = r.phase_becomes(CapturePhase::Recording).await;
+    assert_eq!(s.call_id, Some(next.call_id.clone()));
+    assert_eq!(s.title.as_deref(), Some("Microsoft Teams"));
+    assert_eq!(s.started_at, Some(TimestampMs(detected_at)));
+    let id = first.clone();
+    let ended: i64 = r
+        .core
+        .store()
+        .read(move |c| {
+            c.query_row(
+                "SELECT ended_at FROM calls WHERE id = ?1",
+                [id.as_str()],
+                |r| r.get(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        ended, detected_at,
+        "the first call ends where the new meeting began"
+    );
+}
+
+// --- Second audio source -------------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn a_second_audio_source_is_kept_or_excluded() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let added = |bundle: &str, name: &str| EngineEvent::AudioSourceAdded {
+        call_id: call_id.clone(),
+        bundle_id: bundle.into(),
+        app_name: name.into(),
+    };
+    let second = |states: &[DegradedState]| {
+        states
+            .iter()
+            .filter_map(|s| match s {
+                DegradedState::SecondAudioSource { bundle_id, .. } => Some(bundle_id.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    r.fact(added("com.spotify.client", "Spotify"));
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    assert_eq!(second(&r.degraded().await), ["com.spotify.client"]);
+    r.core
+        .capture_keep_source(
+            &main_window(),
+            KeepSourceArgs {
+                call_id: call_id.clone(),
+                bundle_id: "com.spotify.client".into(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(second(&r.degraded().await).is_empty());
+    // Kept: not raised again for this app in this call.
+    r.fact(added("com.spotify.client", "Spotify"));
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    assert!(second(&r.degraded().await).is_empty());
+
+    r.fact(added("com.apple.Music", "Music"));
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.core
+        .capture_exclude_source(
+            &main_window(),
+            ExcludeSourceArgs {
+                call_id: call_id.clone(),
+                bundle_id: "com.apple.Music".into(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(second(&r.degraded().await).is_empty());
+    let EngineCommand::ExcludeProcess { bundle_id, .. } = r
+        .sent(|c| matches!(c, EngineCommand::ExcludeProcess { .. }))
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!(bundle_id, "com.apple.Music");
+    assert_eq!(
+        code(
+            r.core
+                .capture_keep_source(
+                    &main_window(),
+                    KeepSourceArgs {
+                        call_id,
+                        bundle_id: "com.none".into(),
+                    },
+                )
+                .await
+        ),
+        ErrorCode::NoticeExpired
+    );
+}
+
+// --- Continue window -----------------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn the_continue_window_closes_after_five_minutes() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.stop(&main_window(), &call_id).await;
+    r.pass(299_000).await;
+    assert_eq!(r.state().await.phase, CapturePhase::Stopped);
+    r.pass(1_000).await;
+    let idle = r.phase_becomes(CapturePhase::Idle).await;
+    assert_eq!(idle.continue_until, None);
+}
