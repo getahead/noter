@@ -925,14 +925,6 @@ pub fn world() -> FakeWorld {
                 person: chip("per_dmitri"),
             },
             AudioChannel::Sys,
-            2,
-        ),
-        past_speaker(
-            "spk_b_oleg",
-            SpeakerLabel::Person {
-                person: chip("per_oleg"),
-            },
-            AudioChannel::Sys,
             1,
         ),
     ];
@@ -971,23 +963,9 @@ pub fn world() -> FakeWorld {
             ),
             past_seg(
                 2,
-                2,
-                25,
-                "The buckets come back, but the index rebuild takes about four minutes.",
-                Lang::En,
-            ),
-            past_seg(
-                3,
                 0,
                 40,
                 "Can we keep serving reads while it rebuilds?",
-                Lang::En,
-            ),
-            past_seg(
-                4,
-                1,
-                52,
-                "Yes, reads stay up; writes wait for the index.",
                 Lang::En,
             ),
         ],
