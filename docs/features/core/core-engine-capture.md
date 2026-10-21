@@ -36,6 +36,7 @@ design: docs/DESIGN-core.md
   - [Live transcription on budget](#live-transcription-on-budget)
   - [Detection facts](#detection-facts)
   - [Capture-first restart](#capture-first-restart)
+  - [M1 week-one real-call latency](#m1-week-one-real-call-latency)
   - [Silence, stall and device facts](#silence-stall-and-device-facts)
   - [Replay and footprint](#replay-and-footprint)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
@@ -296,7 +297,7 @@ The system **MUST** report `call_detected`, `call_audio_released` and `audio_sou
 
 - [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
 
-The system **MUST** restart a crashed engine with taps before models, resume from the ring's write position with one `engine_restart` gap of at most 2 s per restart, and raise `CaptureFailed` when it cannot; an engine-kill drill during a replayed call proves the gap bound (the Q7 test).
+The system **MUST** restart a crashed engine with taps before models, resume from the ring's write position with one `engine_restart` gap of at most 2 s per restart, and raise `CaptureFailed` when it cannot; an engine-kill drill during a replayed call proves the gap bound (the Q7 test, M1 week one alongside the real-call latency measurement).
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-recover`
@@ -304,6 +305,20 @@ The system **MUST** restart a crashed engine with taps before models, resume fro
 
 **Touches**:
 - Entities: `GapView` (`engine_restart`), `DegradedState::CaptureFailed`
+
+### M1 week-one real-call latency
+
+- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-latency`
+
+The system **MUST**, in M1 week one alongside the Q7 engine-kill drill, measure hypothesis lag ≤ 2 s p95 and confirmed lag ≤ 4 s p95 on a real English/Russian/German call with one WhisperKit Turbo instance, measured through the real streaming capture pipeline on both channels with per-utterance language ID. Record the measured percentiles and streaming-policy/backend decision; if the budgets are not met, the streaming policy changes or Parakeet joins as a second backend (PRD › Roadmap).
+
+The owner moved this measurement from the M0 throwaway spike on 20 Oct 2026 after two runs returned no decoded text or latency numbers, including a 10-minute real-call run. M0 gets no more spike runs. The completed Q4 evidence is in [Spike Q4 evidence](../../../.plans/backend/spike-q4-evidence.md); the real-call measurement remains open and supplements the golden-set file-mode budget check.
+
+**Implements**:
+- `cpt-noter-algo-core-engine-capture-live-asr`
+
+**Touches**:
+- Entities: `EngineSegment`, real-call latency report
 
 ### Silence, stall and device facts
 
