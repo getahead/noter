@@ -419,3 +419,61 @@ async fn a_device_change_is_a_state_and_a_gap_and_stopping_clears_every_state() 
     ms(101).await;
     assert_eq!(drain(&mut facts), vec![cleared(changed)]);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_session_whose_engine_cannot_launch_is_refused_and_leaves_no_session() {
+    let engine = ScriptedEngine::new().with_default(Behaviour {
+        launch_fails: true,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    assert!(c.start_session(start()).await.is_err());
+    assert_eq!(c.session(), EngineSession::Idle);
+}
+
+#[tokio::test(start_paused = true)]
+async fn pause_and_resume_only_follow_the_state_machine() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    c.start_session(start()).await.unwrap();
+    assert!(c.pause_session().await.is_err(), "not capturing yet");
+    ms(TAPS_OPEN_MS + 1).await;
+    assert!(c.resume_session().await.is_err(), "not paused");
+    engine.kill_current();
+    ms(1).await;
+    assert_eq!(c.session(), EngineSession::Restarting);
+    assert!(c.pause_session().await.is_err(), "restarting");
+    assert!(!engine.commands().iter().any(|c| matches!(
+        c,
+        EngineCommand::Pause { .. } | EngineCommand::Resume { .. }
+    )));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_stopped_session_hears_no_more_facts() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    let mut facts = c.capture_facts();
+    capturing(&c).await;
+    c.stop_session().await.unwrap();
+    ms(101).await;
+    engine.inject(levels(-120.0, -30.0));
+    ms(1).await;
+    assert_eq!(drain(&mut facts), vec![]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_engine_dying_while_stopping_ends_the_session_and_clears_its_states() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    let mut facts = c.capture_facts();
+    capturing(&c).await;
+    engine.inject(levels(-120.0, -30.0));
+    ms(1).await;
+    drain(&mut facts);
+    c.stop_session().await.unwrap();
+    engine.kill_current();
+    ms(1).await;
+    assert_eq!(c.session(), EngineSession::Stopped);
+    assert_eq!(drain(&mut facts), vec![cleared(Degraded::MicrophoneOff)]);
+}
