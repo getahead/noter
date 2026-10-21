@@ -132,12 +132,19 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-keyboard", () => {
         // every step of the wizard, the opening one first, then Back to Welcome and Continue to the end
         const back = page.getByRole("button", { name: "Back", exact: true });
         const next = page.getByRole("button", { name: "Continue", exact: true });
+        const screen = page.locator('[data-component="cpt-noter-component-screen-first-run"]');
+        // Continue saves through the core before the wizard moves: walk the next step, not the one being left
+        const moveWith = async (button: typeof next) => {
+          const from = await screen.getAttribute("data-variant");
+          await button.click();
+          await expect(screen).not.toHaveAttribute("data-variant", from!);
+        };
         for (let i = 0; i < 6 && !(await back.isDisabled()); i++) {
-          await back.click();
+          await moveWith(back);
           await assertReachable(page, `first-run back ${i + 1}`);
         }
         for (let i = 0; i < 6 && (await next.count()) && !(await next.isDisabled()); i++) {
-          await next.click();
+          await moveWith(next);
           await assertReachable(page, `first-run forward ${i + 1}`);
         }
       }
