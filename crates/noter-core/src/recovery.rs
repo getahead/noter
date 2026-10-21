@@ -8,11 +8,7 @@ use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
 
-use crate::capture::NEEDED_MB;
 use crate::Core;
-
-/// Under this much free disk, `DiskLow` warns; it never refuses anything.
-const LOW_MB: u32 = 2_048;
 
 fn main_ctx() -> CommandCtx {
     CommandCtx {
@@ -218,31 +214,5 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-resume:p1:inst-return-resume
         Ok(self.capture_now())
         // @cpt-end:cpt-noter-flow-core-capture-session-resume:p1:inst-return-resume
-    }
-
-    /// A new disk reading: `DiskLow` under 2 GB, `DiskFull` under 500 MB, when a call stops
-    /// writing audio while the transcript goes on.
-    pub(crate) fn disk_changed(&self, free_mb: u32) {
-        // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-disk
-        self.edit_degraded(|states| {
-            states.retain(|s| {
-                !matches!(
-                    s,
-                    DegradedState::DiskLow { .. } | DegradedState::DiskFull { .. }
-                )
-            });
-            if free_mb < NEEDED_MB {
-                states.push(DegradedState::DiskFull { free_mb });
-            } else if free_mb < LOW_MB {
-                states.push(DegradedState::DiskLow { free_mb });
-            }
-        });
-        let state = self.capture_now();
-        let writing = !state.audio_not_stored && free_mb >= NEEDED_MB;
-        let running = !matches!(state.phase, CapturePhase::Idle | CapturePhase::Stopped);
-        if running && state.audio_writing != writing {
-            self.set_capture(|c| c.audio_writing = writing);
-        }
-        // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-disk
     }
 }

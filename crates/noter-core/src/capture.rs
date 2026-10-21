@@ -50,7 +50,9 @@ pub enum CaptureEvent {
 }
 
 /// Under this much free disk a start is refused (`disk_full`).
-pub(crate) const NEEDED_MB: u32 = 500;
+const NEEDED_MB: u32 = 500;
+/// Under this much free disk, `DiskLow` warns; it never refuses anything.
+const LOW_MB: u32 = 2_048;
 /// Continue Recording is offered this long after any stop.
 const CONTINUE_MS: i64 = 5 * 60_000;
 /// The menu bar's "Paused for 5 minutes" reminder.
@@ -318,6 +320,7 @@ impl Core {
         self.store().write(mutation, meta).map(drop)
     }
 
+    // @cpt-algo:cpt-noter-algo-core-capture-session-degraded:p1
     pub(crate) fn insert_gap(
         &self,
         call_id: &CallId,
@@ -329,7 +332,6 @@ impl Core {
         if t1 <= t0 {
             return Ok(());
         }
-        // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
         self.store().insert_batch(vec![Insert {
             table: "gaps",
             values: vec![
@@ -339,7 +341,6 @@ impl Core {
                 ("reason", serde_json::to_value(reason).map_err(internal)?),
             ],
         }])?;
-        // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
         self.capture_event(CaptureEvent::Gap(GapView {
             call_id: call_id.clone(),
             t0_ms: OffsetMs(ms(t0)),
@@ -932,5 +933,31 @@ impl Core {
             return Ok(state);
         }
         Ok(self.set_capture(|c| c.sensitive = args.sensitive))
+    }
+
+    /// A new disk reading: `DiskLow` under 2 GB, `DiskFull` under 500 MB, when a call stops
+    /// writing audio while the transcript goes on.
+    pub(crate) fn disk_changed(&self, free_mb: u32) {
+        // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-disk
+        self.edit_degraded(|states| {
+            states.retain(|s| {
+                !matches!(
+                    s,
+                    DegradedState::DiskLow { .. } | DegradedState::DiskFull { .. }
+                )
+            });
+            if free_mb < NEEDED_MB {
+                states.push(DegradedState::DiskFull { free_mb });
+            } else if free_mb < LOW_MB {
+                states.push(DegradedState::DiskLow { free_mb });
+            }
+        });
+        let state = self.capture_now();
+        let writing = !state.audio_not_stored && free_mb >= NEEDED_MB;
+        let running = !matches!(state.phase, CapturePhase::Idle | CapturePhase::Stopped);
+        if running && state.audio_writing != writing {
+            self.set_capture(|c| c.audio_writing = writing);
+        }
+        // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-disk
     }
 }
