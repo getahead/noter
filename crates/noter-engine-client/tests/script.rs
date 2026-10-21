@@ -25,7 +25,7 @@ fn set_languages() -> EngineCommand {
 #[test]
 fn parse_skips_blank_and_comment_lines() {
     let text = format!(
-        "// a call\n\n{{\"on\": \"set_languages\", \"after_ms\": 500, \"event\": {LEVELS}}}\n  // killed\n{{\"on\": \"ping\", \"after_ms\": 0, \"kill\": true}}\n"
+        "// a call\n\n{{\"on\": \"set_languages\", \"after_ms\": 500, \"event\": {LEVELS}}}\n  // killed\n{{\"on\": \"stop\", \"after_ms\": 0, \"kill\": true}}\n"
     );
     assert_eq!(Script::parse(&text).unwrap().len(), 2);
     assert!(Script::parse("").unwrap().is_empty());
@@ -42,6 +42,8 @@ fn parse_errors_name_the_first_bad_line() {
         r#"{"on": "stop_session", "after_ms": 0, "kill": true}"#.to_string(),
         r#"{"on": "set_languages", "after_ms": 0, "event": {"type": "levels"}}"#.to_string(),
         r#"{"on": "set_languages", "after_ms": 0, "kill": true, "extra": 1}"#.to_string(),
+        r#"{"on": "ping", "after_ms": 0, "kill": true}"#.to_string(),
+        r#"{"on": "shutdown", "after_ms": 0, "kill": true}"#.to_string(),
     ] {
         let err = Script::parse(&format!("// header\n{ok}\n{bad}\n{ok}\n")).unwrap_err();
         assert_eq!(err.line, 3, "{bad}: {err}");
@@ -84,4 +86,20 @@ async fn a_kill_step_ends_the_engine_at_its_time() {
     assert!(engine.inject(levels()), "alive before its time");
     tokio::time::sleep(Duration::from_millis(2)).await;
     assert!(!engine.inject(levels()), "dead after it");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_step_too_far_away_never_runs_and_never_ends_the_engine() {
+    let script = Script::parse(&format!(
+        r#"{{"on": "set_languages", "after_ms": {}, "kill": true}}"#,
+        u64::MAX
+    ))
+    .unwrap();
+    let engine = ScriptedEngine::new().with_script(script);
+    let c = EngineClient::new(engine.clone(), Config::default());
+    c.ensure_ready().await.unwrap();
+    c.command(set_languages()).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(3600)).await;
+    assert!(engine.inject(levels()), "still alive");
+    assert_eq!(engine.launches(), 1, "never crashed and restarted");
 }

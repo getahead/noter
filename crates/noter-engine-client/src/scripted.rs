@@ -92,6 +92,10 @@ impl Script {
                     return Err(fail(format!("`on`: {e}")));
                 }
             }
+            if matches!(raw.on.as_str(), "ping" | "shutdown") {
+                // `ping` gets `pong`, not `ack`; after `shutdown` the engine is gone.
+                return Err(fail(format!("`on`: a step after `{}` never runs", raw.on)));
+            }
             let action = match (raw.event, raw.kill) {
                 (Some(event), None) => Action::Event(Box::new(event)),
                 (None, Some(true)) => Action::Kill,
