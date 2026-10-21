@@ -88,6 +88,7 @@ public enum Models {
         return names.filter { !$0.hasPrefix(".") && !$0.hasSuffix(".partial") }.sorted()
     }
 
+    // @cpt-dod:cpt-noter-dod-core-engine-foundation-offline:p1
     public static func container(environment: [String: String]) -> URL? {
         environment["NOTER_APP_GROUP_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
