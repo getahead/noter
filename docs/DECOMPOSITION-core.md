@@ -371,9 +371,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.6 [Engine sidecar and supervisor foundation](features/core/core-engine-foundation.md) - HIGH
 
-- [ ] `p1` - **ID**: `cpt-noter-feature-core-engine-foundation`
+- [x] `p1` - **ID**: `cpt-noter-feature-core-engine-foundation`
 
-- **Milestone**: M0 · **Lane**: engine · **Status**: IN_PROGRESS: Q4 decision B is recorded; the offline guarantee and the owner's Mac self-test and codesign check remain open. FEATURE spec: [features/core/core-engine-foundation.md](features/core/core-engine-foundation.md)
+- **Milestone**: M0 · **Lane**: engine · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-engine-foundation.md](features/core/core-engine-foundation.md)
 
 - **Purpose**: Stand up the sandboxed Swift engine and its Rust supervisor: spawn, handshake, liveness, the self-test, detection on and off, file mode and restart, with the signing and entitlement checks that keep the engine offline.
 
@@ -396,12 +396,12 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p1` - `cpt-noter-principle-core-fakes`
+  - `cpt-noter-principle-core-fakes`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p1` - `cpt-noter-constraint-core-macos`
-  - [ ] `p1` - `cpt-noter-constraint-core-engine-offline`
+  - `cpt-noter-constraint-core-macos`
+  - `cpt-noter-constraint-core-engine-offline`
 
 - **Domain Model Entities**:
   - EngineCommandLine
@@ -409,8 +409,8 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p1` - `cpt-noter-component-engine`
-  - [ ] `p1` - `cpt-noter-component-core-engine-supervisor`
+  - `cpt-noter-component-engine`
+  - `cpt-noter-component-core-engine-supervisor`
 
 - **API**:
   - Interface `cpt-noter-interface-engine-stdio`
@@ -421,7 +421,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Data**:
 
-  - [ ] `p1` - `cpt-noter-topology-core-processes`
+  - `cpt-noter-topology-core-processes`
 
 ### 2.7 [First run, permissions and environment](features/core/core-first-run.md) - HIGH
 

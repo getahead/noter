@@ -38,9 +38,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p1` - **ID**: `cpt-noter-featstatus-core-engine-foundation`
+- [x] `p1` - **ID**: `cpt-noter-featstatus-core-engine-foundation`
 
-- [ ] `p1` - `cpt-noter-feature-core-engine-foundation`
+- [x] `p1` - `cpt-noter-feature-core-engine-foundation`
 
 ## 1. Feature Context
 
@@ -249,14 +249,14 @@ The system **MUST** provide `noter-engine-client` without a Tauri dependency: sp
 
 ### Offline by construction
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-offline`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-offline`
 
 The system **MUST** sign the engine in the Swift build with its own entitlements (App Sandbox, audio input, App Group `<TEAMID>.ai.noter`, no network) and Info.plist, ship it through `bundle.macOS.files` so the Tauri bundler does not re-sign it, and keep every path the supervisor sends relative to the App Group container; the architecture check finds no network entitlement in any engine entitlements file.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-foundation-start`
 
-**Decision E1 (Teamlead, 18 Oct 2026)**: this definition is conditional on Q4. If the week-one spike keeps the engine sandboxed, App Sandbox with no network entitlement is the guarantee; if Q4 decides the engine ships unsandboxed, the guarantee is no network entitlement plus the CI network-monitor test.
+**Decision E1 (Teamlead, 18 Oct 2026; resolved by the owner, 20 Oct 2026)**: Q4 decided B (DESIGN-core, PR #110): Noter.app is unsandboxed and the engine keeps its own App Sandbox with no network entitlement, which is the offline guarantee. Source evidence: `engine/Resources/noter-engine.entitlements`, `bundle.macOS.files` (PR #107), `just arch`, and the built-binary check `scripts/ci/check-engine-signature.sh` (PR #111, merged and green on main).
 
 **Constraints**: `cpt-noter-constraint-core-engine-offline`
 
@@ -273,7 +273,7 @@ The owner completed the Q4 spike on 20 Oct 2026: sandbox status, prompt attribut
 
 - [x] The supervisor starts the engine, gets `ready`, and refuses an engine reporting another protocol major with `engine_unavailable`.
 - [x] Killing the engine while idle leads to a restart; three failed starts within a minute stop the retries.
-- [ ] The self-test passes on a Mac with both channels producing sound and fails with the right reason when one channel is silent or only zeros arrive.
+- [x] The self-test passes on a Mac with both channels producing sound and fails with the right reason when one channel is silent or only zeros arrive — **owner-reported 21 Oct 2026**: the four cases in [the self-test runbook](../../../.plans/backend/engine-self-test-runbook.md) succeeded (pass, system silent, mic silent, no model folder); no raw result lines were supplied.
 - [x] File mode replays a WAV pair and speaks the same protocol.
-- [ ] `just arch` finds no network entitlement for the engine; the codesign check of the built engine shows its own entitlements.
-- [ ] `just gate` passes (engine tests on the macOS runner).
+- [x] `just arch` finds no network entitlement for the engine; the codesign check of the built engine shows its own entitlements (`scripts/ci/check-engine-signature.sh`, PR #111, merged and green on main).
+- [x] `just gate` passes locally; engine tests and the built-engine signature check pass in the macOS job of [main CI run 39551728865](https://github.com/getahead/noter/actions/runs/39551728865) at `d0a1ee0` (#120). The overall main run has a separate first-run keyboard E2E failure; the macOS job is green.

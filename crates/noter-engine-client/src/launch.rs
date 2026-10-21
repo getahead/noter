@@ -109,6 +109,7 @@ impl ProcessLauncher {
             .stderr(Stdio::piped())
             .kill_on_drop(true);
         if let Some(dir) = &self.app_group {
+            // @cpt-dod:cpt-noter-dod-core-engine-foundation-offline:p1
             cmd.env("NOTER_APP_GROUP_DIR", dir);
         }
         let mut child = cmd.spawn()?;
