@@ -8,9 +8,11 @@
 //! liveness with `ping` and restarts a dead engine with back-off
 //! (`docs/features/core/core-engine-foundation.md`). No Tauri dependency.
 
+mod capture;
 mod launch;
 pub mod scripted;
 
+pub use capture::{CaptureFact, Degraded, EngineSession};
 pub use launch::{EngineIo, EngineLauncher, LaunchFuture, ProcessLauncher};
 
 use std::collections::{HashMap, VecDeque};
@@ -143,6 +145,7 @@ struct Shared {
     failures: VecDeque<Instant>,
     stats: Stats,
     detection: (bool, Vec<String>),
+    session: Option<capture::Session>,
 }
 
 /// The running engine: its stdin and its reader task.
@@ -166,6 +169,7 @@ struct Inner<L> {
     conn: tokio::sync::Mutex<Option<Conn>>,
     shared: Mutex<Shared>,
     events: broadcast::Sender<EngineEventLine>,
+    facts: broadcast::Sender<CaptureFact>,
     next_id: AtomicU64,
 }
 
@@ -211,8 +215,10 @@ impl<L: EngineLauncher> EngineClient<L> {
                     failures: VecDeque::new(),
                     stats: Stats::default(),
                     detection: (false, Vec::new()),
+                    session: None,
                 }),
                 events: broadcast::channel(1024).0,
+                facts: broadcast::channel(256).0,
                 next_id: AtomicU64::new(1),
             }),
         }
@@ -519,6 +525,7 @@ impl<L: EngineLauncher> EngineClient<L> {
         // @cpt-end:cpt-noter-algo-core-engine-foundation-read-events:p1:inst-correlate
         // @cpt-begin:cpt-noter-algo-core-engine-foundation-read-events:p1:inst-route
         drop(s);
+        self.on_capture_event(&line.event);
         // No subscriber is not an error: the event is simply not wanted now.
         let _ = self.inner.events.send(line);
         // @cpt-end:cpt-noter-algo-core-engine-foundation-read-events:p1:inst-route
@@ -544,10 +551,22 @@ impl<L: EngineLauncher> EngineClient<L> {
                 s.state = EngineState::Restarting;
             }
             // @cpt-end:cpt-noter-state-core-engine-foundation-process:p1:inst-st-restart
-            restart
+            // A session running: the capture-first restart instead of the idle rule (D-12, TL-8).
+            let capture = if restart {
+                self.crash_during_capture(&mut s)
+            } else {
+                None
+            };
+            (restart, capture)
         };
-        if restart {
-            tokio::spawn(self.clone().restart());
+        match restart {
+            (_, Some(true)) => {
+                tokio::spawn(self.clone().restart_capture());
+            }
+            (true, None) => {
+                tokio::spawn(self.clone().restart());
+            }
+            _ => {}
         }
     }
 

@@ -51,6 +51,8 @@ design: docs/DESIGN-core.md
 
 The transcript service in `noter-core` receives segments from the supervisor. Hypotheses go straight to the stream hub, never to the database. Confirmed segments get an id and a normalised shadow text for FTS, are written in batches of at most 250 ms, and are published only after their batch commits. Live speaker labels become `speakers` rows of pass `live`. The service answers `transcript_subscribe` (snapshot, then stream), `levels_subscribe`, `transcript_span` previews, and replay through the engine with the headphones-only rule during capture. At call end it writes `transcript.jsonl`. Renames, term fixes and naming are M2.
 
+> **M1 decisions (Backend Teamlead, 21 Oct 2026).** The commit-then-publish crash test uses the hook `TranscriptService::fail_after_commit_once()` (`cfg(test)` or feature `testing`), not sleeps (TL-11). The session manager and the transcript service both subscribe to `EngineClient::events()`: the session owns the engine commands and the `EngineSession` state, the transcript owns `segment`, `speaker_turn` and `levels`; the session writes gap and mark rows and calls `publish_gap` and `publish_mark` on the transcript. Segments and live speakers are inserted with `insert_batch` and no change row (TL-1). Timers use tokio time (TL-4).
+
 ### 1.2 Purpose
 
 The transcript is primary data: written exactly once, never lost on a reload, and never doubled. Replay must never send the call's own audio back into the meeting.

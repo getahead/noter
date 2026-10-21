@@ -53,6 +53,8 @@ design: docs/DESIGN-core.md
 
 In `apps/desktop/src-tauri` and the `noter-native` crate (objc2), the core builds everything that must work while no WebView has focus. The call window and the record prompt become non-activating, content-protected NSPanels (tauri-nspanel, pinned to a commit), placed by display identity and switched between the dedicated and floating layouts when displays change. Hide for presenting removes every surface. The tray shows the recording state and a menu whose items call the core as `Caller::Native`. Notifications go through `UNUserNotificationCenter` with a thread per call and a `NavTarget`, and a click becomes `nav:request`. EventKit is read for detection matching. Window commands, announcements and external opens complete the set.
 
+> **M1 decisions (Backend Teamlead, 21 Oct 2026).** `CallWindowState`, `PresentingState`, the record prompt request and all ten commands of this feature live in noter-core behind the `Surfaces` trait on `CoreDeps`; `src-tauri` implements it over noter-native and the harness has a scripted implementation that records calls and answers the display list, so the window-free parts of the stories are proven through the harness (TL-2). The tray shows the privacy mode from `Settings.privacy.mode` and updates on `settings:changed`; `PrivacyStatus` is M2 (TL-10). The XCUITest stories (display unplugged, allow notifications, and the AppKit half of the others) wait for the UI lane; until then the core halves are proven by story-named conformance tests (TL-7).
+
 ### 1.2 Purpose
 
 During a call Noter must never steal focus from the call app, never appear in a screen share, and keep every quick action within a second of the click, without a dialog.

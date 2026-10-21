@@ -57,6 +57,8 @@ design: docs/DESIGN-core.md
 
 The session manager in `noter-core` owns `CaptureState` and `CallDetection` and every capture transition of DESIGN-core 3.1. It turns engine facts and calendar facts into notices with timers, creates the call row, drives the engine session through the supervisor, writes marks and gaps, publishes `capture:state`, `capture:detected` and the capture rows of `degraded:changed`, and decides when notifications go out (the native layer delivers them). Every surface (record prompt, call window, main window, menu bar, hotkeys) calls the same functions; native callers come in as `Caller::Native`.
 
+> **M1 decisions (Backend Teamlead, 21 Oct 2026).** The native-surface calls the session needs (show or close the record prompt, notify, announce) go through a `Surfaces` trait on `CoreDeps`; the first slice defines it minimally and the harness supplies a scripted implementation that records the calls (TL-2). Timers (start-guard waits, notice timers, the 5-minute silence timer) use tokio time, and tests drive them with `tokio::time::pause()` and `advance`; `Clock` stays the source of timestamps (TL-4). The known meeting apps are the constant `capture::KNOWN_MEETING_APPS` (Teams, Zoom, Webex, Slack, FaceTime, Safari, Chrome, Firefox, Arc, Edge) minus `Settings.ignored_apps` (TL-5). Capture rows (segments, live speakers, gaps, marks) are written with `insert_batch` and no change row; deleting a call writes one non-undoable, content-free row (TL-1).
+
 ### 1.2 Purpose
 
 Capture is the release-blocking function, and its rules must live in one machine that never stops or refuses a recording because something else failed or setup is unfinished (owner decision O1).

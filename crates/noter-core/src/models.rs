@@ -151,7 +151,15 @@ fn private_dir(dir: &Path) -> std::io::Result<()> {
 fn sha256_hex(path: &Path) -> std::io::Result<String> {
     let mut hasher = Sha256::new();
     let mut file = std::fs::File::open(path)?;
-    std::io::copy(&mut file, &mut hasher)?;
+    // sha2 0.11 hashers are not `io::Write`: feed them with `update`, which works on 0.10 too.
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = std::io::Read::read(&mut file, &mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
     Ok(hasher
         .finalize()
         .iter()
@@ -523,5 +531,31 @@ impl ModelSource for PinnedModels {
                 noter_llm::FetchError::Io(e) => FetchError::Io(e),
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod sha256_tests {
+    use super::sha256_hex;
+
+    #[test]
+    fn hashes_a_file_in_chunks_like_the_reference_digest() {
+        let dir = std::env::temp_dir().join(format!("noter-sha-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let small = dir.join("abc");
+        std::fs::write(&small, b"abc").unwrap();
+        assert_eq!(
+            sha256_hex(&small).unwrap(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        // Larger than one read buffer, so the loop runs more than once.
+        let big = dir.join("big");
+        std::fs::write(&big, vec![b'a'; 200_000]).unwrap();
+        assert_eq!(
+            sha256_hex(&big).unwrap(),
+            "2287d207f24a941ff3b56c04c8a25ad56b63e3023207b3bb5b4ac0c9869d74be"
+        );
+        assert!(sha256_hex(&dir.join("missing")).is_err());
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

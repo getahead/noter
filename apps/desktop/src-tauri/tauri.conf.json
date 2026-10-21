@@ -1,10 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Noter",
-  "version": "0.2.0",
+  "version": "../package.json",
   "identifier": "com.getahead.noter",
   "build": {
-    "frontendDist": "placeholder"
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "pnpm exec vite build && TEAM_ID=${APPLE_TEAM_ID:-TEAMID} SIGN_IDENTITY=${APPLE_SIGNING_IDENTITY:--} ../../engine/scripts/sign.sh"
   },
   "app": {
     "windows": [
@@ -20,7 +22,7 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "macOS": {
       "entitlements": "Noter.entitlements",
       "files": {
