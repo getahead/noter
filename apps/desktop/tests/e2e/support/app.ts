@@ -26,6 +26,8 @@ export interface CorePlan {
   world?: (world: World) => void;
   /** The window's first bundle download ends in `checksum_failed` once (harness.corrupt_next_download), set before the page loads. */
   corruptNextDownload?: boolean;
+  /** The window's first bundle download stops serving at this percent until `steer.releaseDownload()` (real core only: harness.hold_next_download; the fake's downloads finish at once). */
+  holdDownloadAt?: number;
 }
 
 /** What the outside world does to the core behind an open window, as the scenario controls do. */
@@ -33,6 +35,8 @@ export interface Steer {
   change(mutate: (world: World) => void): Promise<void>;
   failNext(cmd: CommandName, code: ErrorCode, detail?: ErrorDetail | null): Promise<void>;
   push(cmd: ChannelCommand, body: ChannelBody): Promise<void>;
+  /** A download held by `holdDownloadAt` serves the rest (a no-op on the fake). */
+  releaseDownload(): Promise<void>;
 }
 
 export interface Call {
@@ -136,9 +140,11 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     },
     failNext: async (cmd, code, detail = null) => void (await control("harness.fail_next", { window: win, cmd, code, detail })),
     push: async (cmd, body) => void (await control("harness.push", { cmd, body })),
+    releaseDownload: async () => void (await control("harness.release_download", {})),
   };
   if (plan.world) await steer.change(plan.world);
   if (plan.corruptNextDownload) await control("harness.corrupt_next_download", {});
+  if (plan.holdDownloadAt !== undefined) await control("harness.hold_next_download", { at_percent: plan.holdDownloadAt });
   for (const f of plan.fail ?? []) await steer.failNext(f.cmd, f.code);
   // A delivery may race a reload or the page closing; the new document ignores it anyway.
   const deliver = (doc: string, id: number, x: unknown) =>
@@ -182,6 +188,7 @@ function fakeSteer(page: Page): Steer {
     failNext: (cmd, code, detail = null) =>
       page.evaluate(([c, k, d]) => void (globalThis as unknown as PageFake).__noterFake.failNext(c, k, d), [cmd, code, detail] as const),
     push: (cmd, body) => page.evaluate(([c, b]) => void (globalThis as unknown as PageFake).__noterFake.push(c, b), [cmd, body] as const),
+    releaseDownload: async () => {},
   };
 }
 

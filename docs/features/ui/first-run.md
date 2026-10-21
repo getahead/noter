@@ -82,7 +82,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 
 ### Set up Noter before the first call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-first-run-complete-setup`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-first-run-complete-setup`
 
 **Actor**: Primary user
 
@@ -97,36 +97,36 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 - Empty — Self-test skipped: step 3 marked with a dash; after **Finish**, the app banner **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** · **Finish Setup…**; **Record** works as always
 
 **Steps**:
-1. [ ] - `p1` - User opens Noter for the first time, or **Run Setup Again…**, **Finish Setup…** - `inst-open`
-2. [ ] - `p1` - API: `setup_status` (steps, models, permissions, self-test, call display, detection) - `inst-api-status`
-3. [ ] - `p1` - UI: open at the step where setup stopped (resumed variant of the stepper), or **Welcome** - `inst-open-step`
-4. [ ] - `p1` - User reads **Welcome to Noter** and clicks **Continue**; API: `setup_set_step` (models) - `inst-welcome`
-5. [ ] - `p1` - Flow: the Models step runs `cpt-noter-flow-ui-first-run-download-models`; **Continue** is enabled at once - `inst-models-step`
-6. [ ] - `p1` - UI: the Permissions step shows the **Microphone** and **System audio recording** rows and the self-test, with **Run Test** dimmed until system audio is allowed - `inst-permissions-step`
-7. [ ] - `p1` - User clicks **Allow…** beside **Microphone** - `inst-allow-mic`
-8. [ ] - `p1` - API: `permission_request` (microphone); macOS shows its prompt - `inst-api-mic`
-9. [ ] - `p1` - **IF** the user allows - `inst-if-mic-allowed`
-   1. [ ] - `p2` - API: `levels_subscribe` (M1); the row shows the device, a moving meter and **Hearing you** - `inst-mic-meter`
-10. [ ] - `p1` - **ELSE** - `inst-else-mic-denied`
-    1. [ ] - `p1` - UI: the row reads **Microphone · not allowed** with **Open System Settings…** - `inst-mic-denied`
-11. [ ] - `p1` - User clicks **Open System Settings…** beside **System audio recording** (or beside a denied microphone) - `inst-open-settings`
-12. [ ] - `p2` - API: `open_external` (the System Settings privacy pane, M1) - `inst-api-open-settings`
-13. [ ] - `p1` - UI: when Noter becomes active again, the row shows a spinner and **Checking…** while the core re-reads the permission (`setup:changed`), then **Granted**; the self-test line **System audio recording is not allowed yet.** goes away - `inst-checking`
-14. [ ] - `p1` - User clicks **Run Test**; Flow: `cpt-noter-flow-ui-first-run-self-test` - `inst-run-test`
-15. [ ] - `p1` - **IF** the user clicks **Skip for Now** on steps 3 or 4 - `inst-if-skip`
-    1. [ ] - `p1` - API: `setup_set_step` (skip); the stepper marks the step skipped with a dash - `inst-api-skip`
-16. [ ] - `p1` - UI: **Call display** with `cpt-noter-component-ui-display-picker`; the user keeps or changes the choice; API: `setup_set_call_display` (display identity, open automatically) - `inst-call-display`
-17. [ ] - `p1` - UI: **Audio storage** radio group (**Keep audio for 30 days**, **7 days**, **90 days**, **Forever**, **Never store audio**); API: `setup_set_audio_storage` - `inst-audio-storage`
-18. [ ] - `p1` - UI: **Assistants** shows the step 6 frame: the cards of `cpt-noter-feature-ui-accounts` (key fields M2, sign-in M3), the **Local runtime** line and the **Privacy mode** radio group; a change calls `settings_update` (privacy) - `inst-assistants`
-19. [ ] - `p1` - **IF** no key is stored, no account is signed in and no local runtime is found - `inst-if-no-assistant`
-    1. [ ] - `p1` - UI: the warning **Without an assistant Noter still records and transcribes; summaries wait until one is connected.**; **Finish** stays enabled - `inst-no-assistant`
-20. [ ] - `p1` - User clicks **Finish** - `inst-finish`
-21. [ ] - `p2` - API: `setup_set_step` (done), then `window_navigate` (Today, M1); the first-run window closes - `inst-api-finish`
-22. [ ] - `p1` - **RETURN** the main window with call detection on, or with the self-test banner in MW-R5 when step 3 was skipped - `inst-return-finish`
+1. [x] - `p1` - User opens Noter for the first time, or **Run Setup Again…**, **Finish Setup…** - `inst-open`
+2. [x] - `p1` - API: `setup_status` (steps, models, permissions, self-test, call display, detection) - `inst-api-status`
+3. [x] - `p1` - UI: open at the step where setup stopped (resumed variant of the stepper), or **Welcome** - `inst-open-step`
+4. [x] - `p1` - User reads **Welcome to Noter** and clicks **Continue**; API: `setup_set_step` (models) - `inst-welcome`
+5. [x] - `p1` - Flow: the Models step runs `cpt-noter-flow-ui-first-run-download-models`; **Continue** is enabled at once - `inst-models-step`
+6. [x] - `p1` - UI: the Permissions step shows the **Microphone** and **System audio recording** rows and the self-test, with **Run Test** dimmed until system audio is allowed - `inst-permissions-step`
+7. [x] - `p1` - User clicks **Allow…** beside **Microphone** - `inst-allow-mic`
+8. [x] - `p1` - API: `permission_request` (microphone); macOS shows its prompt - `inst-api-mic`
+9. [x] - `p1` - **IF** the user allows - `inst-if-mic-allowed`
+   1. [x] - `p2` - API: `levels_subscribe` (M1); the row shows the device, a moving meter and **Hearing you** - `inst-mic-meter`
+10. [x] - `p1` - **ELSE** - `inst-else-mic-denied`
+    1. [x] - `p1` - UI: the row reads **Microphone · not allowed** with **Open System Settings…** - `inst-mic-denied`
+11. [x] - `p1` - User clicks **Open System Settings…** beside **System audio recording** (or beside a denied microphone) - `inst-open-settings`
+12. [x] - `p2` - API: `open_external` (the System Settings privacy pane, M1) - `inst-api-open-settings`
+13. [x] - `p1` - UI: when Noter becomes active again, the row shows a spinner and **Checking…** while the core re-reads the permission (`setup:changed`), then **Granted**; the self-test line **System audio recording is not allowed yet.** goes away - `inst-checking`
+14. [x] - `p1` - User clicks **Run Test**; Flow: `cpt-noter-flow-ui-first-run-self-test` - `inst-run-test`
+15. [x] - `p1` - **IF** the user clicks **Skip for Now** on steps 3 or 4 - `inst-if-skip`
+    1. [x] - `p1` - API: `setup_set_step` (skip); the stepper marks the step skipped with a dash - `inst-api-skip`
+16. [x] - `p1` - UI: **Call display** with `cpt-noter-component-ui-display-picker`; the user keeps or changes the choice; API: `setup_set_call_display` (display identity, open automatically) - `inst-call-display`
+17. [x] - `p1` - UI: **Audio storage** radio group (**Keep audio for 30 days**, **7 days**, **90 days**, **Forever**, **Never store audio**); API: `setup_set_audio_storage` - `inst-audio-storage`
+18. [x] - `p1` - UI: **Assistants** shows the step 6 frame: the cards of `cpt-noter-feature-ui-accounts` (key fields M2, sign-in M3), the **Local runtime** line and the **Privacy mode** radio group; a change calls `settings_update` (privacy) - `inst-assistants`
+19. [x] - `p1` - **IF** no key is stored, no account is signed in and no local runtime is found - `inst-if-no-assistant`
+    1. [x] - `p1` - UI: the warning **Without an assistant Noter still records and transcribes; summaries wait until one is connected.**; **Finish** stays enabled - `inst-no-assistant`
+20. [x] - `p1` - User clicks **Finish** - `inst-finish`
+21. [x] - `p2` - API: `setup_set_step` (done), then `window_navigate` (Today, M1); the first-run window closes - `inst-api-finish`
+22. [x] - `p1` - **RETURN** the main window with call detection on, or with the self-test banner in MW-R5 when step 3 was skipped - `inst-return-finish`
 
 ### Download the models while finishing setup
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-first-run-download-models`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-first-run-download-models`
 
 **Actor**: Primary user
 
@@ -140,20 +140,20 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 - Error — Speech model not downloaded yet: the self-test shows **Waiting for the speech model · 62 %** and runs by itself once the model is in
 
 **Steps**:
-1. [ ] - `p1` - UI: the Models step lists **Speech model · WhisperKit Large v3 Turbo** 1.5 GB, **Speaker model** 0.1 GB, **Search model** 0.4 GB - `inst-list-bundles`
-2. [ ] - `p1` - API: `models_download` (start) unless the core already downloads them - `inst-api-download`
-3. [ ] - `p1` - UI: each row follows `jobs:progress` with its percentage or **Ready**; the footer reads **About 2 GB** with **Pause** or **Resume** (`models_download` pause or resume) - `inst-progress`
-4. [ ] - `p1` - **MATCH** the download state the core reports - `inst-match-download`
-   - [ ] - `p1` - **CASE** offline: the line **Waiting for a connection — downloads resume automatically**; nothing to do - `inst-case-offline`
-   - [ ] - `p1` - **CASE** disk short (`disk_full`): the error banner in FR-R2 **Needs 2.1 GB, 1.4 GB free** · **Try Again** (`models_download` again) - `inst-case-disk`
-   - [ ] - `p1` - **CASE** a bundle failed its check (`checksum_failed`): **Check failed** · **Try Again** on that row, its bar stopped; the stepper marks **Models** with the error glyph - `inst-case-checksum`
-5. [ ] - `p1` - User clicks **Continue** at any time; the stepper shows the background ring on **Models** with **Downloading in the background · 64 %** - `inst-continue-bg`
-6. [ ] - `p1` - UI: when every bundle is in, announce **Models downloaded** politely once - `inst-announce-done`
-7. [ ] - `p1` - **RETURN** the models downloading or ready, with setup going on - `inst-return-models`
+1. [x] - `p1` - UI: the Models step lists **Speech model · WhisperKit Large v3 Turbo** 1.5 GB, **Speaker model** 0.1 GB, **Search model** 0.4 GB - `inst-list-bundles`
+2. [x] - `p1` - API: `models_download` (start) unless the core already downloads them - `inst-api-download`
+3. [x] - `p1` - UI: each row follows `jobs:progress` with its percentage or **Ready**; the footer reads **About 2 GB** with **Pause** or **Resume** (`models_download` pause or resume) - `inst-progress`
+4. [x] - `p1` - **MATCH** the download state the core reports - `inst-match-download`
+   - [x] - `p1` - **CASE** offline: the line **Waiting for a connection — downloads resume automatically**; nothing to do - `inst-case-offline`
+   - [x] - `p1` - **CASE** disk short (`disk_full`): the error banner in FR-R2 **Needs 2.1 GB, 1.4 GB free** · **Try Again** (`models_download` again) - `inst-case-disk`
+   - [x] - `p1` - **CASE** a bundle failed its check (`checksum_failed`): **Check failed** · **Try Again** on that row, its bar stopped; the stepper marks **Models** with the error glyph - `inst-case-checksum`
+5. [x] - `p1` - User clicks **Continue** at any time; the stepper shows the background ring on **Models** with **Downloading in the background · 64 %** - `inst-continue-bg`
+6. [x] - `p1` - UI: when every bundle is in, announce **Models downloaded** politely once - `inst-announce-done`
+7. [x] - `p1` - **RETURN** the models downloading or ready, with setup going on - `inst-return-models`
 
 ### Run the audio self-test
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-first-run-self-test`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-first-run-self-test`
 
 **Actor**: Primary user
 
@@ -166,14 +166,14 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 - Exclusion off or failed: the fourth line is information only; the test still passes for call detection
 
 **Steps**:
-1. [ ] - `p1` - User clicks **Play Test Clip** or **Run Test**, or plays any sound in another app - `inst-user-test`
-2. [ ] - `p1` - **IF** the speech model is not in - `inst-if-model`
-   1. [ ] - `p1` - UI: **Waiting for the speech model · 62 %**; the test runs by itself when it arrives - `inst-wait-model`
-3. [ ] - `p1` - API: `self_test_run` with the snapshot-then-stream rule; the Channel sends `levels`, `line`, `stream_arrived`, `passed` or `failed`, then `ended` - `inst-api-selftest`
-4. [ ] - `p1` - Algorithm: render each message with `cpt-noter-algo-ui-first-run-self-test-result` - `inst-render-selftest`
-5. [ ] - `p1` - **IF** the test passed - `inst-if-passed`
-   1. [ ] - `p1` - UI: **Self-test passed** beside the heading, the result lines and **Details** (lag, alignment, clip heard after); each line announced politely once, then "Self-test passed"; the stepper marks **Permissions** done - `inst-passed`
-6. [ ] - `p1` - **RETURN** the self-test result; the core switches call detection on after a pass - `inst-return-selftest`
+1. [x] - `p1` - User clicks **Play Test Clip** or **Run Test**, or plays any sound in another app - `inst-user-test`
+2. [x] - `p1` - **IF** the speech model is not in - `inst-if-model`
+   1. [x] - `p1` - UI: **Waiting for the speech model · 62 %** from the setup status, **Play Test Clip** and **Run Test** dimmed; the core refuses `self_test_run` with `model_missing` until the speech bundle is ready (D-21), so the UI calls it again by itself when the bundle turns ready - `inst-wait-model`
+3. [x] - `p1` - API: `self_test_run` with the snapshot-then-stream rule; the Channel sends `levels`, `line`, `stream_arrived`, `passed` or `failed`, then `ended` - `inst-api-selftest`
+4. [x] - `p1` - Algorithm: render each message with `cpt-noter-algo-ui-first-run-self-test-result` - `inst-render-selftest`
+5. [x] - `p1` - **IF** the test passed - `inst-if-passed`
+   1. [x] - `p1` - UI: **Self-test passed** beside the heading, the result lines and **Details** (lag, alignment, clip heard after); each line announced politely once, then "Self-test passed"; the stepper marks **Permissions** done - `inst-passed`
+6. [x] - `p1` - **RETURN** the self-test result; the core switches call detection on after a pass - `inst-return-selftest`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -286,7 +286,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 
 ### First-run window and steps
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-first-run-window`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-window`
 
 The system **MUST** render the first-run window FR-R1 to FR-R3 and its six steps as the prototype's `surface('firstrun')` does, resume at the stored step, save each choice through its command, keep **Continue** enabled during downloads, and open the main window on **Finish**.
 
@@ -303,7 +303,7 @@ The system **MUST** render the first-run window FR-R1 to FR-R3 and its six steps
 
 ### Models step
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-first-run-models`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-models`
 
 The system **MUST** show the three model bundles with progress, **Pause** and **Resume**, the no-connection line, the disk banner with **Try Again**, the per-row **Check failed** with **Try Again**, and the background ring in the stepper.
 
@@ -319,7 +319,7 @@ The system **MUST** show the three model bundles with progress, **Pause** and **
 
 ### Permission rows, self-test panel and display picker
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-ui-first-run-components`
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-components`
 
 The system **MUST** provide the permission check row (setup, status and test-only variants), the self-test panel (step and sheet variants) and the display picker (several displays, one display, remembered display absent) as reusable components with the prototype's markup, so Settings and the self-test sheet use the same ones.
 
@@ -338,11 +338,11 @@ The system **MUST** provide the permission check row (setup, status and test-onl
 
 ## 6. Acceptance Criteria
 
-- [ ] Every state of the first-run States table that belongs to steps 1 to 5 renders as the matching `FR_STATES` entry of the prototype (Welcome, Models downloading, No connection, Not enough disk space, Checksum failed, Speech model not ready, Permission not asked, Microphone denied, System audio permission missing, Back from System Settings, Self-test passed, One stream silent, Self-test skipped, Call display, One display, Audio storage); the step 6 states belong to `cpt-noter-feature-ui-accounts`
-- [ ] No permission prompt appears except after **Allow…** or **Open System Settings…**
-- [ ] **Continue** is never disabled by a running download
-- [ ] Closing the window mid-setup and reopening it resumes at the same step
-- [ ] The self-test's transcript line is never announced; each result line is announced once
+- [x] Every state of the first-run States table that belongs to steps 1 to 5 renders as the matching `FR_STATES` entry of the prototype (Welcome, Models downloading, No connection, Not enough disk space, Checksum failed, Speech model not ready, Permission not asked, Microphone denied, System audio permission missing, Back from System Settings, Self-test passed, One stream silent, Self-test skipped, Call display, One display, Audio storage); the step 6 states belong to `cpt-noter-feature-ui-accounts`
+- [x] No permission prompt appears except after **Allow…** or **Open System Settings…**
+- [x] **Continue** is never disabled by a running download
+- [x] Closing the window mid-setup and reopening it resumes at the same step
+- [x] The self-test's transcript line is never announced; each result line is announced once
 
 ## 7. Additional Context
 
