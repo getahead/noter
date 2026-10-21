@@ -61,8 +61,10 @@ const markTabbable = (page: Page) =>
       const r = el.getBoundingClientRect();
       const st = getComputedStyle(el);
       // a radio group is one Tab stop (the checked radio, or the first); arrows move inside it
-      const radios = el instanceof HTMLInputElement && el.type === "radio" ? [...document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${el.name}"]`)] : null;
-      if (radios && el.name && radios.some((o) => o.checked) ? !el.checked : radios && el.name && radios[0] !== el) return false;
+      if (el instanceof HTMLInputElement && el.type === "radio" && el.name) {
+        const group = [...document.querySelectorAll<HTMLInputElement>(`input[type="radio"][name="${el.name}"]`)];
+        if (group.some((o) => o.checked) ? !el.checked : group[0] !== el) return false;
+      }
       return el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && !el.closest("fieldset:disabled, [inert], [hidden]") && st.visibility !== "hidden" && st.display !== "none" && r.width > 0 && r.height > 0;
     });
     // idempotent: controls that became enabled since (a selection enables Remove) are marked on the next call
