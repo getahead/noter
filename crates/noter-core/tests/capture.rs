@@ -1853,7 +1853,7 @@ async fn a_call_cut_by_a_quit_is_offered_resume_with_an_interrupted_gap() {
                 id: call_id.clone(),
                 title: "Untitled call".into(),
                 started_at: TimestampMs(T0),
-                call_type: CallTypeId::new("unclassified"),
+                call_type: CallTypeId("unclassified".into()),
             }
         }]
     );

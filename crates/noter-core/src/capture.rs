@@ -50,7 +50,7 @@ pub enum CaptureEvent {
 }
 
 /// Under this much free disk a start is refused (`disk_full`).
-const NEEDED_MB: u32 = 500;
+pub(crate) const NEEDED_MB: u32 = 500;
 /// Continue Recording is offered this long after any stop.
 const CONTINUE_MS: i64 = 5 * 60_000;
 /// The menu bar's "Paused for 5 minutes" reminder.
@@ -69,7 +69,9 @@ pub(crate) struct Session {
     /// Wall time of offset 0: the call's start.
     origin: i64,
     /// Time spent paused, or stopped before Continue; closed spans only.
-    away_ms: i64,
+    pub(crate) away_ms: i64,
+    /// When the engine failed and the call stopped recording (Try Again counts the gap from it).
+    pub(crate) failed_at: Option<i64>,
     /// When the last stop was asked for, and by whom (its change row names the surface).
     stop: Option<(i64, CommandCtx)>,
     /// The meeting app of the live call (bundle id, name), when a detection started it.
@@ -108,12 +110,12 @@ impl Session {
         }
     }
 
-    fn offset(&self, at: i64) -> i64 {
+    pub(crate) fn offset(&self, at: i64) -> i64 {
         at - self.origin
     }
 
     /// Audio time recorded at `at`: the call so far, minus pauses (an open one too) and stops.
-    fn recorded(&self, at: i64, pause: Option<&PauseInfo>) -> DurationMs {
+    pub(crate) fn recorded(&self, at: i64, pause: Option<&PauseInfo>) -> DurationMs {
         let open = pause.map_or(0, |p| at - p.since.0);
         DurationMs(ms(at - self.origin - self.away_ms - open))
     }
@@ -204,6 +206,11 @@ impl Core {
                 }
             }
         });
+        if let Err(e) = self.find_interrupted() {
+            self.log(crate::object(json!({
+                "level": "error", "module": "capture", "code": e.code
+            })));
+        }
         let weak = Arc::downgrade(self);
         self.on_glossary_changed(move |list| {
             let Some(core) = weak.upgrade() else { return };
@@ -290,7 +297,7 @@ impl Core {
     }
 
     /// Columns of the `calls` row, through the change log. Capture moves are not undoable.
-    fn write_call(
+    pub(crate) fn write_call(
         &self,
         ctx: &CommandCtx,
         call_id: &CallId,
@@ -311,7 +318,7 @@ impl Core {
         self.store().write(mutation, meta).map(drop)
     }
 
-    fn insert_gap(
+    pub(crate) fn insert_gap(
         &self,
         call_id: &CallId,
         t0: i64,
@@ -343,7 +350,7 @@ impl Core {
     }
 
     /// The engine session for `call_id`; `resume_from_ms` continues its offsets.
-    fn session_for(
+    pub(crate) fn session_for(
         &self,
         call_id: &CallId,
         resume_from_ms: Option<i64>,
@@ -410,6 +417,8 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-guard
         self.start_guard(self.capture_now().phase)?;
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-guard
+        // Another capture ends the call a quit cut, and its Resume Recording offer.
+        self.drop_interrupted()?;
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // A stopped call's Continue window closes: the new call replaces it.
         *session = Session {
@@ -471,11 +480,12 @@ impl Core {
             .engine
             .command(EngineCommand::StartSession(start))
             .await;
-        drop(session);
         if started.is_err() {
             // Never refused (O1): the call stays; Stop ends it, Try Again restarts the engine.
+            session.failed_at = Some(now);
             return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
         }
+        drop(session);
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-engine
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-return-started
         Ok(self.phase_leaves(CapturePhase::Starting).await)
@@ -773,6 +783,7 @@ impl Core {
             .await
             .is_err()
         {
+            session.failed_at = Some(now);
             return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
         }
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-continue

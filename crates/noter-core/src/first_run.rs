@@ -432,6 +432,8 @@ impl Core {
             app.environment = next;
             self.publish(event_names::ENV_CHANGED, &mut app.environment);
         }
+        drop(app);
+        self.disk_changed(reading.disk_free_mb);
     }
 
     /// Recomputes the setup status and the degraded set; sends `setup:changed` when it changed.

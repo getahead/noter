@@ -11,6 +11,7 @@ mod hub;
 mod log;
 mod models;
 mod notices;
+mod recovery;
 mod self_test;
 mod settings;
 #[cfg(feature = "harness")]
@@ -632,6 +633,14 @@ impl CoreApi for Core {
         self.discard_call(ctx, args).await
     }
 
+    async fn capture_resume_interrupted(
+        &self,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.resume_interrupted(ctx, args).await
+    }
+
     async fn capture_answer_call_end(
         &self,
         ctx: &CommandCtx,
@@ -753,6 +762,10 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         args: BannerDismissArgs,
     ) -> Result<BannerSet, CoreError> {
+        if args.banner == BannerKind::RecordingInterruptedByQuit {
+            // The call the banner offered to resume ends at its last audio.
+            self.drop_interrupted()?;
+        }
         // @cpt-begin:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-dismiss
         let mut app = self.app();
         let before = app.banners.banners.len();
