@@ -13,7 +13,7 @@ use noter_protocol::engine::{
     ENGINE_PROTOCOL_VERSION,
 };
 use noter_protocol::{AudioChannel, PermissionState, TimestampMs};
-use serde::Deserialize;
+use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, DuplexStream};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
@@ -61,15 +61,6 @@ impl fmt::Display for ScriptError {
 
 impl std::error::Error for ScriptError {}
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawStep {
-    on: String,
-    after_ms: u64,
-    event: Option<EngineEvent>,
-    kill: Option<bool>,
-}
-
 impl Script {
     /// Parses JSON Lines steps; blank lines and `//` lines are skipped; `Err` names the first bad line.
     pub fn parse(text: &str) -> Result<Script, ScriptError> {
@@ -83,27 +74,46 @@ impl Script {
                 line: i + 1,
                 message,
             };
-            let raw: RawStep = serde_json::from_str(line).map_err(|e| fail(e.to_string()))?;
+            // A plain JSON object, not a derived type: no serde dependency of our own.
+            let step: serde_json::Map<String, Value> =
+                serde_json::from_str(line).map_err(|e| fail(e.to_string()))?;
+            if let Some(k) = step
+                .keys()
+                .find(|k| !["on", "after_ms", "event", "kill"].contains(&k.as_str()))
+            {
+                return Err(fail(format!("unknown field `{k}`")));
+            }
+            let on = step
+                .get("on")
+                .and_then(Value::as_str)
+                .ok_or_else(|| fail("`on` must name a command".into()))?;
+            let after_ms = step
+                .get("after_ms")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| fail("`after_ms` must be a whole number".into()))?;
             // A known tag with missing fields fails differently from an unknown one: catches typos.
             if let Err(e) =
-                serde_json::from_value::<EngineCommand>(serde_json::json!({ "type": raw.on }))
+                serde_json::from_value::<EngineCommand>(serde_json::json!({ "type": on }))
             {
                 if e.to_string().starts_with("unknown variant") {
                     return Err(fail(format!("`on`: {e}")));
                 }
             }
-            if matches!(raw.on.as_str(), "ping" | "shutdown") {
+            if matches!(on, "ping" | "shutdown") {
                 // `ping` gets `pong`, not `ack`; after `shutdown` the engine is gone.
-                return Err(fail(format!("`on`: a step after `{}` never runs", raw.on)));
+                return Err(fail(format!("`on`: a step after `{on}` never runs")));
             }
-            let action = match (raw.event, raw.kill) {
-                (Some(event), None) => Action::Event(Box::new(event)),
-                (None, Some(true)) => Action::Kill,
+            let action = match (step.get("event"), step.get("kill")) {
+                (Some(event), None) => Action::Event(Box::new(
+                    serde_json::from_value(event.clone())
+                        .map_err(|e| fail(format!("`event`: {e}")))?,
+                )),
+                (None, Some(Value::Bool(true))) => Action::Kill,
                 _ => return Err(fail("a step has either `event` or `\"kill\": true`".into())),
             };
             steps.push(Step {
-                on: raw.on,
-                after_ms: raw.after_ms,
+                on: on.to_string(),
+                after_ms,
                 action,
             });
         }

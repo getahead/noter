@@ -761,7 +761,6 @@ name = "noter-engine-client"
 version = "0.1.0"
 dependencies = [
  "noter-protocol",
- "serde",
  "serde_json",
  "tokio",
 ]
