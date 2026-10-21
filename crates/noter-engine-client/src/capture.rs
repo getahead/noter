@@ -139,6 +139,19 @@ impl Session {
             .position(|d| discriminant(d) == discriminant(like))
     }
 
+    /// The session ended: every active state clears.
+    fn stopped(&mut self, out: &mut Vec<CaptureFact>) {
+        // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopped
+        self.state = EngineSession::Stopped;
+        // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopped
+        for state in std::mem::take(&mut self.active) {
+            out.push(CaptureFact::Cleared {
+                call_id: self.start.call_id.clone(),
+                state,
+            });
+        }
+    }
+
     /// Counts a crash or failed start; `true` when the capture must give up.
     fn failed(&mut self, now: Instant) -> bool {
         self.failures.push_back(now);
@@ -195,23 +208,24 @@ impl<L: EngineLauncher> EngineClient<L> {
             active: Vec::new(),
         });
         // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
-        let result = self.command(EngineCommand::StartSession(start)).await;
+        let Err(e) = self.command(EngineCommand::StartSession(start)).await else {
+            return Ok(());
+        };
         let mut s = self.shared();
-        match result {
+        match s.session.as_ref().map(|x| (x.state, x.failures.is_empty())) {
             // The engine died after taking the command: the capture-first restart has it.
-            Err(CommandError::Unavailable) if s.session.as_ref().is_some_and(|x| x.running()) => {
-                Ok(())
-            }
-            Err(e) => {
+            Some((EngineSession::Restarting | EngineSession::Capturing, false)) => Ok(()),
+            // Failed after a crash: kept for Try Again.
+            Some((EngineSession::Failed, false)) => Err(e),
+            _ => {
                 s.session = None;
                 Err(e)
             }
-            ok => ok,
         }
     }
 
     pub async fn pause_session(&self) -> Result<(), CommandError> {
-        let call_id = self.call_id()?;
+        let call_id = self.call_id(&[EngineSession::Capturing])?;
         self.command(EngineCommand::Pause { call_id }).await?;
         if let Some(x) = self.shared().session.as_mut() {
             // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-paused
@@ -223,7 +237,7 @@ impl<L: EngineLauncher> EngineClient<L> {
     }
 
     pub async fn resume_session(&self) -> Result<(), CommandError> {
-        let call_id = self.call_id()?;
+        let call_id = self.call_id(&[EngineSession::Paused])?;
         self.command(EngineCommand::Resume { call_id }).await?;
         if let Some(x) = self.shared().session.as_mut() {
             // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-resumed
@@ -236,7 +250,11 @@ impl<L: EngineLauncher> EngineClient<L> {
 
     /// Stops the session: `stopping` until the engine's `session_stopped`.
     pub async fn stop_session(&self) -> Result<(), CommandError> {
-        let call_id = self.call_id()?;
+        let call_id = self.call_id(&[
+            EngineSession::Starting,
+            EngineSession::Capturing,
+            EngineSession::Paused,
+        ])?;
         if let Some(x) = self.shared().session.as_mut() {
             // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopping
             x.state = EngineSession::Stopping;
@@ -269,10 +287,12 @@ impl<L: EngineLauncher> EngineClient<L> {
         }
     }
 
-    fn call_id(&self) -> Result<CallId, CommandError> {
+    /// The session's call, when the session is in one of the states `from`.
+    fn call_id(&self, from: &[EngineSession]) -> Result<CallId, CommandError> {
         self.shared()
             .session
             .as_ref()
+            .filter(|x| from.contains(&x.state))
             .map(|x| x.start.call_id.clone())
             .ok_or(CommandError::Unavailable)
     }
@@ -291,7 +311,8 @@ impl<L: EngineLauncher> EngineClient<L> {
         let x = s.session.as_mut()?;
         if x.state == EngineSession::Stopping {
             // It was ending anyway; the `stop` command reports the failure.
-            x.state = EngineSession::Stopped;
+            x.stopped(&mut facts);
+            self.send_facts(facts);
             return None;
         }
         if !x.running() {
@@ -351,6 +372,7 @@ impl<L: EngineLauncher> EngineClient<L> {
             start.resume_from_ms = x.gap_from.map(OffsetMs);
             (start, x.paused)
         };
+        let call_id = start.call_id.clone();
         // A failure here is another crash: the reader's close starts the next restart.
         if self
             .command(EngineCommand::StartSession(start))
@@ -358,7 +380,8 @@ impl<L: EngineLauncher> EngineClient<L> {
             .is_ok()
             && paused
         {
-            let _ = self.pause_session().await;
+            // `session_started` then lands in `paused`.
+            let _ = self.command(EngineCommand::Pause { call_id }).await;
         }
         // @cpt-end:cpt-noter-flow-core-engine-capture-recover:p1:inst-respawn
     }
@@ -369,7 +392,11 @@ impl<L: EngineLauncher> EngineClient<L> {
         let mut out = Vec::new();
         {
             let mut s = self.shared();
-            let Some(x) = s.session.as_mut() else {
+            let Some(x) = s
+                .session
+                .as_mut()
+                .filter(|x| x.running() || x.state == EngineSession::Stopping)
+            else {
                 return;
             };
             let now = Instant::now();
@@ -398,17 +425,7 @@ impl<L: EngineLauncher> EngineClient<L> {
                     }
                     // @cpt-end:cpt-noter-flow-core-engine-capture-recover:p1:inst-report-gap
                 }
-                EngineEvent::SessionStopped { .. } => {
-                    // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopped
-                    x.state = EngineSession::Stopped;
-                    // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopped
-                    for state in std::mem::take(&mut x.active) {
-                        out.push(CaptureFact::Cleared {
-                            call_id: x.start.call_id.clone(),
-                            state,
-                        });
-                    }
-                }
+                EngineEvent::SessionStopped { .. } => x.stopped(&mut out),
                 // @cpt-begin:cpt-noter-algo-core-engine-capture-degraded:p1:inst-stalled
                 EngineEvent::NoSegments { since_ms, .. } => {
                     x.no_segments_since.get_or_insert(since_ms.0);
