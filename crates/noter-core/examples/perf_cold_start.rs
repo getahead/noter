@@ -1,7 +1,9 @@
 //! Perf scenario `core_cold_start` (harness/perf.toml).
 //!
-//! Starts the core on a fresh data folder, as on a new Mac: create `noter.db`, run every
-//! migration, answer `app_snapshot` for the main window, shut down. Repeated ROUNDS times
+//! Starts the core the way every daily launch does: open an already-migrated `noter.db`,
+//! answer `app_snapshot` for the main window, shut down. The data folder is created and
+//! migrated once per process first (the first install), so schema growth between milestones
+//! does not count as a start-up regression (owner decision D-28 A). Repeated ROUNDS times
 //! so the start outweighs process start-up. Measured by the perf gate in instruction counts
 //! (cachegrind) on Linux and in wall time on the Mac runner, so it runs on one thread with a
 //! fixed clock: nothing in it may depend on scheduling or the time of day.
@@ -30,7 +32,8 @@ impl EventEmitter for NoEvents {
     fn emit(&self, _event: &'static str, _payload: Value) {}
 }
 
-/// Runs `rounds` cold starts; returns the bytes of every serialized snapshot as a checksum.
+/// Migrates one data folder, then runs `rounds` cold starts on it; returns the bytes of every
+/// serialized snapshot as a checksum.
 fn cold_start(rounds: usize) -> usize {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
@@ -40,9 +43,15 @@ fn cold_start(rounds: usize) -> usize {
             label: WindowLabel::Main,
         },
     };
+    let dir = tempfile::tempdir().expect("temp data folder");
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents));
+    runtime.block_on(
+        Core::open(dir.path(), deps)
+            .expect("first install migrates")
+            .shutdown(),
+    );
     let mut bytes = 0;
     for _ in 0..rounds {
-        let dir = tempfile::tempdir().expect("temp data folder");
         let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents));
         let core = Core::open(dir.path(), deps).expect("core opens");
         let snapshot = runtime
