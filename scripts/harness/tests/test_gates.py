@@ -200,6 +200,15 @@ class PerfGateTests(unittest.TestCase):
         head = {"mode": "ir", "results": {"s": {"status": "unavailable", "why": "build error"}}}
         self.assertEqual(len(perf_gate.compare({"results": {}}, head, 5.0)[0]), 1)
 
+    def test_growth_allowance_raises_the_limit_for_that_scenario_only(self):
+        base = {"mode": "ir", "results": {"s": {"status": "ok", "value": 100.0}, "t": {"status": "ok", "value": 100.0}}}
+        head = {"mode": "ir", "results": {"s": {"status": "ok", "value": 112.0}, "t": {"status": "ok", "value": 112.0}}}
+        errors, report = perf_gate.compare(base, head, 10.0, allowances={"s": 12.0})
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("t is 12.00% slower", errors[0])
+        self.assertIn("≤ +22%", report)
+        self.assertEqual(perf_gate.allowances({"scenarios": {"s": {"growth_allowance_pct": 12.0}, "t": {}}}), {"s": 12.0})
+
     def test_scenario_coverage_counts_due_entries(self):
         perf = {
             "registry": [
@@ -299,6 +308,16 @@ class ConfigGuardTests(unittest.TestCase):
         looser["coverage"]["exclude"].append({"path": "crates/noter-core/**", "why": "x"})
         found = config_guard.loosened(base, self._files(looser))
         self.assertEqual(len(found), 4, found)
+
+    def test_perf_growth_allowance_is_loosening(self):
+        base = self._files(CFG, perf={"scenarios": {"s": {"modes": ["ir"]}, "t": {"growth_allowance_pct": 5.0}}})
+        same = self._files(CFG, perf={"scenarios": {"s": {"modes": ["ir"]}, "t": {"growth_allowance_pct": 5.0}}})
+        self.assertEqual(config_guard.loosened(base, same), [])
+        looser = self._files(CFG, perf={"scenarios": {"s": {"growth_allowance_pct": 12.0}, "t": {"growth_allowance_pct": 6.0}}})
+        found = config_guard.loosened(base, looser)
+        self.assertEqual(len(found), 2, found)
+        tighter = self._files(CFG, perf={"scenarios": {"s": {"modes": ["ir"]}, "t": {}}})
+        self.assertEqual(config_guard.loosened(base, tighter), [])
 
     def test_moving_work_later_is_loosening(self):
         cfg = json.loads(json.dumps(CFG))
