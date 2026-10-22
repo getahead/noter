@@ -152,7 +152,14 @@ def measure(checkout: Path, perf: dict, mode: str, runs: int, warmups: int, only
 # ---------------------------------------------------------------- comparing
 
 
-def compare(base: dict, head: dict, max_regression: float, report_only: bool = False) -> tuple[list[str], str]:
+def allowances(perf: dict) -> dict[str, float]:
+    """Per-scenario `growth_allowance_pct`: an owner-approved, labelled widening of the limit for one
+    scenario whose work grew by design (fixtures, schema); it is removed once that growth is on main."""
+    return {n: float(sc["growth_allowance_pct"]) for n, sc in perf.get("scenarios", {}).items() if "growth_allowance_pct" in sc}
+
+
+def compare(base: dict, head: dict, max_regression: float, report_only: bool = False,
+            allowances: dict[str, float] | None = None) -> tuple[list[str], str]:
     mode = head.get("mode", "ir")
     rows = [
         f"### Performance ({mode}{', report only' if report_only else ''})",
@@ -175,14 +182,15 @@ def compare(base: dict, head: dict, max_regression: float, report_only: bool = F
             rows.append(f"| {name} | new | {h['value']:.6g} | – | new scenario |")
             continue
         change = 100.0 * (h["value"] - b["value"]) / b["value"] if b["value"] else 0.0
-        regressed = change > max_regression
+        limit = max_regression + (allowances or {}).get(name, 0.0)
+        regressed = change > limit
         if regressed and mode == "wall":
             noise = 2 * max(b.get("mad", 0.0), h.get("mad", 0.0))
             regressed = (h["value"] - b["value"]) > noise
         verdict = "❌" if regressed and not report_only else ("⚠️" if regressed else "✅")
-        rows.append(f"| {name} | {b['value']:.6g} | {h['value']:.6g} | {change:+.2f}% | ≤ +{max_regression:.0f}% {verdict} |")
+        rows.append(f"| {name} | {b['value']:.6g} | {h['value']:.6g} | {change:+.2f}% | ≤ +{limit:.0f}% {verdict} |")
         if regressed and not report_only:
-            errors.append(f"{name} is {change:.2f}% slower than base (limit {max_regression:.0f}%)")
+            errors.append(f"{name} is {change:.2f}% slower than base (limit {limit:.0f}%)")
     return errors, "\n".join(rows) + "\n"
 
 
@@ -246,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "compare":
             base = json.loads(args.base.read_text())
             head = json.loads(args.head.read_text())
-            errors, report = compare(base, head, float(gates["max_regression_pct"]), args.report_only)
+            errors, report = compare(base, head, float(gates["max_regression_pct"]), args.report_only, allowances(perf))
         else:
             base_dir = make_base_worktree(args.base)
             env_target = os.environ.pop("CARGO_TARGET_DIR", None)
@@ -261,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
                 remove_base_worktree(base_dir)
             dump_json(args.out_dir / f"base-{args.mode}.json", base)
             dump_json(args.out_dir / f"head-{args.mode}.json", head)
-            errors, report = compare(base, head, float(gates["max_regression_pct"]), args.report_only)
+            errors, report = compare(base, head, float(gates["max_regression_pct"]), args.report_only, allowances(perf))
     except (HarnessError, subprocess.CalledProcessError) as e:
         fail(str(e) + (f"\n{e.stderr}" if isinstance(e, subprocess.CalledProcessError) and e.stderr else ""))
     write_summary(report)
