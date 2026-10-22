@@ -1,8 +1,10 @@
 //! A scripted engine over an in-memory pipe, for the supervisor's tests and for
 //! `noter-core-harness` (decision D3: in M0 it answers `ready`, `ack`, `pong` and the
-//! self-test; replaying recordings comes with the engine's file mode in M1).
+//! self-test; replaying recordings comes with the engine's file mode in M1). A [`Script`]
+//! adds timed steps bound to commands (`.plans/engine-script-format.md`, TL-3).
 
 use std::collections::VecDeque;
+use std::fmt;
 use std::io;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -11,6 +13,7 @@ use noter_protocol::engine::{
     ENGINE_PROTOCOL_VERSION,
 };
 use noter_protocol::{AudioChannel, PermissionState, TimestampMs};
+use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, DuplexStream};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
@@ -19,6 +22,112 @@ use crate::launch::{EngineIo, EngineLauncher, LaunchFuture};
 
 /// The engine sends levels at most this often.
 const LEVELS_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// What a script step does when it is due.
+#[derive(Debug, Clone, PartialEq)]
+enum Action {
+    /// Send this event on the engine's stdout (the engine adds `seq` and `at`).
+    Event(Box<EngineEvent>),
+    /// End the engine as [`ScriptedEngine::kill_current`] does.
+    Kill,
+}
+
+/// One step: `action` runs `after_ms` (tokio time) after each `ack` of the command `on` names.
+#[derive(Debug, Clone, PartialEq)]
+struct Step {
+    on: String,
+    after_ms: u64,
+    action: Action,
+}
+
+/// An engine script: JSON Lines steps bound to commands, in file order.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Script {
+    steps: Vec<Step>,
+}
+
+/// The first line of a script that does not parse (1-based).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptError {
+    pub line: usize,
+    pub message: String,
+}
+
+impl fmt::Display for ScriptError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "line {}: {}", self.line, self.message)
+    }
+}
+
+impl std::error::Error for ScriptError {}
+
+impl Script {
+    /// Parses JSON Lines steps; blank lines and `//` lines are skipped; `Err` names the first bad line.
+    pub fn parse(text: &str) -> Result<Script, ScriptError> {
+        let mut steps = Vec::new();
+        for (i, line) in text.lines().enumerate() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
+            let fail = |message: String| ScriptError {
+                line: i + 1,
+                message,
+            };
+            // A plain JSON object, not a derived type: no serde dependency of our own.
+            let step: serde_json::Map<String, Value> =
+                serde_json::from_str(line).map_err(|e| fail(e.to_string()))?;
+            if let Some(k) = step
+                .keys()
+                .find(|k| !["on", "after_ms", "event", "kill"].contains(&k.as_str()))
+            {
+                return Err(fail(format!("unknown field `{k}`")));
+            }
+            let on = step
+                .get("on")
+                .and_then(Value::as_str)
+                .ok_or_else(|| fail("`on` must name a command".into()))?;
+            let after_ms = step
+                .get("after_ms")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| fail("`after_ms` must be a whole number".into()))?;
+            // A known tag with missing fields fails differently from an unknown one: catches typos.
+            if let Err(e) =
+                serde_json::from_value::<EngineCommand>(serde_json::json!({ "type": on }))
+            {
+                if e.to_string().starts_with("unknown variant") {
+                    return Err(fail(format!("`on`: {e}")));
+                }
+            }
+            if matches!(on, "ping" | "shutdown") {
+                // `ping` gets `pong`, not `ack`; after `shutdown` the engine is gone.
+                return Err(fail(format!("`on`: a step after `{on}` never runs")));
+            }
+            let action = match (step.get("event"), step.get("kill")) {
+                (Some(event), None) => Action::Event(Box::new(
+                    serde_json::from_value(event.clone())
+                        .map_err(|e| fail(format!("`event`: {e}")))?,
+                )),
+                (None, Some(Value::Bool(true))) => Action::Kill,
+                _ => return Err(fail("a step has either `event` or `\"kill\": true`".into())),
+            };
+            steps.push(Step {
+                on: on.to_string(),
+                after_ms,
+                action,
+            });
+        }
+        Ok(Script { steps })
+    }
+
+    pub fn len(&self) -> usize {
+        self.steps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+}
 
 /// How one launched engine behaves.
 #[derive(Debug, Clone)]
@@ -68,6 +177,7 @@ struct State {
     kill: Option<oneshot::Sender<()>>,
     inject: Option<mpsc::UnboundedSender<EngineEvent>>,
     system_audio: PermissionState,
+    script: Arc<Script>,
 }
 
 impl Default for State {
@@ -80,6 +190,7 @@ impl Default for State {
             kill: None,
             inject: None,
             system_audio: PermissionState::Granted,
+            script: Arc::default(),
         }
     }
 }
@@ -105,6 +216,12 @@ impl ScriptedEngine {
     /// Launches after the queue is used up behave like this.
     pub fn with_default(self, behaviour: Behaviour) -> Self {
         self.lock().default = behaviour;
+        self
+    }
+
+    /// Engines of this launcher play `script` on top of their behaviour.
+    pub fn with_script(self, script: Script) -> Self {
+        self.lock().script = Arc::new(script);
         self
     }
 
@@ -152,7 +269,7 @@ impl EngineLauncher for ScriptedEngine {
 
 impl ScriptedEngine {
     async fn start(&self) -> io::Result<EngineIo> {
-        let (behaviour, kill, inject) = {
+        let (behaviour, kill, inject, script) = {
             let mut s = self.lock();
             s.launches += 1;
             let b = s.queue.pop_front().unwrap_or_else(|| s.default.clone());
@@ -166,11 +283,11 @@ impl ScriptedEngine {
             s.kill = Some(tx);
             let (inject_tx, inject_rx) = mpsc::unbounded_channel();
             s.inject = Some(inject_tx);
-            (b, rx, inject_rx)
+            (b, rx, inject_rx, s.script.clone())
         };
         let (core, engine) = tokio::io::duplex(1 << 16);
         let (stdout, stdin) = tokio::io::split(core);
-        tokio::spawn(run(self.clone(), behaviour, engine, kill, inject));
+        tokio::spawn(run(self.clone(), behaviour, script, engine, kill, inject));
         Ok(EngineIo {
             stdin: Box::new(stdin),
             stdout: Box::new(stdout),
@@ -200,10 +317,25 @@ impl<W: AsyncWrite + Unpin> Out<W> {
     }
 }
 
+/// Queues the script's steps bound to `cmd`, due `after_ms` from now; same instant keeps file order.
+fn schedule(due: &mut Vec<(Instant, Action)>, script: &Script, cmd: &EngineCommand) {
+    let tag = serde_json::to_value(cmd).ok();
+    let tag = tag.as_ref().and_then(|v| v["type"].as_str());
+    let now = Instant::now();
+    for step in script.steps.iter().filter(|s| Some(s.on.as_str()) == tag) {
+        due.push((
+            now + std::time::Duration::from_millis(step.after_ms),
+            step.action.clone(),
+        ));
+    }
+    due.sort_by_key(|(at, _)| *at);
+}
+
 // @cpt-algo:cpt-noter-algo-core-harness-scripted-engine:p1
 async fn run(
     engine: ScriptedEngine,
     b: Behaviour,
+    script: Arc<Script>,
     io: DuplexStream,
     mut kill: oneshot::Receiver<()>,
     mut inject: mpsc::UnboundedReceiver<EngineEvent>,
@@ -230,15 +362,27 @@ async fn run(
     let mut lines = BufReader::new(r).lines();
     // Paced self-test events, each due at its instant, in order.
     let mut due: VecDeque<(Instant, EngineEvent)> = VecDeque::new();
+    // Script steps, each due at its instant, in order.
+    let mut steps: Vec<(Instant, Action)> = Vec::new();
     // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-for-commands
     loop {
         let next_due = due.front().map(|(at, _)| *at);
+        let next_step = steps.first().map(|(at, _)| *at);
         let next = tokio::select! {
             biased;
             _ = &mut kill => return,
             _ = async { tokio::time::sleep_until(next_due.unwrap_or_else(Instant::now)).await }, if next_due.is_some() => {
                 if let Some((_, event)) = due.pop_front() {
                     out.emit(event).await;
+                }
+                continue;
+            }
+            _ = async { tokio::time::sleep_until(next_step.unwrap_or_else(Instant::now)).await }, if next_step.is_some() => {
+                match steps.remove(0).1 {
+                    Action::Event(event) => out.emit(*event).await,
+                    // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-return-engine
+                    Action::Kill => return,
+                    // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-return-engine
                 }
                 continue;
             }
@@ -282,6 +426,7 @@ async fn run(
             }
             EngineCommand::SelfTest { .. } => {
                 out.emit(ack).await;
+                schedule(&mut steps, &script, &cmd);
                 // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
                 let failure = b.self_test_failure.or(match engine.lock().system_audio {
                     PermissionState::Granted => None,
@@ -339,7 +484,12 @@ async fn run(
                 }
                 // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
             }
-            _ => out.emit(ack).await,
+            _ => {
+                out.emit(ack).await;
+                // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
+                schedule(&mut steps, &script, &cmd);
+                // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
+            }
         }
         // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ack-command
     }
