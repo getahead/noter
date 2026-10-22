@@ -120,6 +120,11 @@ def loosened(base: dict[str, dict], head: dict[str, dict]) -> list[str]:
             found.append(f"{item} removed from milestones.toml")
         elif nm in idx and ms in idx and idx[nm] > idx[ms]:
             found.append(f"{item} moved later {ms} → {nm}")
+    old_s, new_s = base.get("harness/perf.toml", {}).get("scenarios", {}), head.get("harness/perf.toml", {}).get("scenarios", {})
+    for name, sc in new_s.items():
+        new_a, old_a = sc.get("growth_allowance_pct"), old_s.get(name, {}).get("growth_allowance_pct")
+        if new_a is not None and (old_a is None or new_a > old_a):
+            found.append(f"perf scenario {name} growth allowance {old_a} → {new_a}%")
     old_r = {r["id"]: r for r in base.get("harness/perf.toml", {}).get("registry", [])}
     new_r = {r["id"]: r for r in head.get("harness/perf.toml", {}).get("registry", [])}
     for rid, r in old_r.items():
