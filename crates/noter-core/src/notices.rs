@@ -16,20 +16,29 @@ use crate::app::WholeState;
 use crate::capture::{live, not_recording, Begin};
 use crate::{first_run, lock, Core};
 
-/// Meeting apps the engine watches (TL-5), minus the ones the user ignores.
-pub(crate) const KNOWN_MEETING_APPS: &[&str] = &[
+/// Meeting apps that count when they play audio while the microphone is in use (D-24).
+pub(crate) const MEETING_APPS: &[&str] = &[
+    "us.zoom.xos",
     "com.microsoft.teams2",
     "com.microsoft.teams",
-    "us.zoom.xos",
     "com.cisco.webexmeetingsapp",
     "Cisco-Systems.Spark",
     "com.tinyspeck.slackmacgap",
+    "com.hnc.Discord",
     "com.apple.FaceTime",
+];
+
+/// Browsers that count only when they play audio and hold the microphone themselves (D-24).
+pub(crate) const BROWSERS: &[&str] = &[
     "com.apple.Safari",
     "com.google.Chrome",
+    "org.chromium.Chromium",
+    "com.microsoft.edgemac",
     "org.mozilla.firefox",
     "company.thebrowser.Browser",
-    "com.microsoft.edgemac",
+    "com.brave.Browser",
+    "com.operasoftware.Opera",
+    "com.vivaldi.Vivaldi",
 ];
 
 const PROMPT_MS: i64 = 15_000;
@@ -41,9 +50,13 @@ const SEEMS_ENDED_MS: i64 = 10 * 60_000;
 const NOTHING_HEARD_MS: i64 = 5 * 60_000;
 const NEW_MEETING_MS: i64 = 60_000;
 
+/// Both lists minus the ignored apps.
+/// shortcut: one wire list, so the engine applies the browser rule (plays audio and holds the
+/// mic itself) to meeting apps too; split `SetDetection` when the Swift detection slice lands.
 pub(crate) fn known_apps(ignored: &[IgnoredApp]) -> Vec<String> {
-    KNOWN_MEETING_APPS
+    MEETING_APPS
         .iter()
+        .chain(BROWSERS)
         .filter(|b| !ignored.iter().any(|a| a.bundle_id == **b))
         .map(|b| b.to_string())
         .collect()
