@@ -307,7 +307,7 @@ The system **MUST** insert capture data (confirmed segments, live speakers, gaps
 
 - [x] `p2` - **ID**: `cpt-noter-dod-core-storage-cold-start`
 
-The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (open the database, run migrations, answer `app_snapshot`) built and measured in CI, with `cpt-noter-feature-core-ipc-host` providing the snapshot half.
+The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (open the database, run migrations, answer `app_snapshot`) built and measured in CI, its measured rounds opening an already migrated database as every launch after the first does (D-28), with `cpt-noter-feature-core-ipc-host` providing the snapshot half.
 
 **Implements**:
 - `cpt-noter-flow-core-storage-open`
