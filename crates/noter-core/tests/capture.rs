@@ -1104,7 +1104,7 @@ impl Rig {
 // --- Detection -----------------------------------------------------------------------
 
 #[tokio::test(start_paused = true)]
-async fn the_engine_hears_the_known_meeting_apps_minus_the_ignored_ones() {
+async fn the_engine_hears_the_meeting_apps_and_browsers_minus_the_ignored_ones() {
     let r = rig();
     r.detection_on().await;
     let EngineCommand::SetDetection {
@@ -1115,7 +1115,18 @@ async fn the_engine_hears_the_known_meeting_apps_minus_the_ignored_ones() {
     else {
         unreachable!()
     };
-    for app in [ZOOM, TEAMS, "com.apple.FaceTime", "com.google.Chrome"] {
+    // D-24: both lists by bundle id, Teams under its old and new ids.
+    for app in [
+        ZOOM,
+        TEAMS,
+        "com.microsoft.teams",
+        "com.hnc.Discord",
+        "com.apple.FaceTime",
+        "com.google.Chrome",
+        "org.chromium.Chromium",
+        "com.brave.Browser",
+        "com.vivaldi.Vivaldi",
+    ] {
         assert!(
             known_bundle_ids.iter().any(|b| b == app),
             "{app} in {known_bundle_ids:?}"
@@ -1131,17 +1142,30 @@ async fn the_engine_hears_the_known_meeting_apps_minus_the_ignored_ones() {
         )
         .await
         .unwrap();
+    r.core
+        .capture_ignore_app(
+            &menu_bar(),
+            IgnoreAppArgs {
+                bundle_id: "com.brave.Browser".into(),
+                app_name: "Brave Browser".into(),
+            },
+        )
+        .await
+        .unwrap();
     let EngineCommand::SetDetection {
         known_bundle_ids, ..
     } = r
-        .sent_n(2, |c| {
+        .sent_n(3, |c| {
             matches!(c, EngineCommand::SetDetection { enabled: true, .. })
         })
         .await
     else {
         unreachable!()
     };
-    assert!(!known_bundle_ids.iter().any(|b| b == ZOOM));
+    assert!(!known_bundle_ids
+        .iter()
+        .any(|b| b == ZOOM || b == "com.brave.Browser"));
+    assert!(known_bundle_ids.iter().any(|b| b == "com.apple.Safari"));
 }
 
 #[tokio::test(start_paused = true)]
