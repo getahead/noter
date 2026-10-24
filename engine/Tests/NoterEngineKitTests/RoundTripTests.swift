@@ -100,7 +100,7 @@ extension EngineEvent: Decodable {
     private enum Keys: String, CodingKey {
         case type, protocol_version, engine_version, models, sandboxed, cmd_id, code, message, call_id, mic_db, sys_db
         case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path, mic_device, output_device
-        case device_name, gap_from_ms, gap_to_ms, bundle_id, app_name, pid, since_ms, confidence, at_ms, playing
+        case device_name, gap_from_ms, gap_to_ms, bundle_id, app_name, pid, since_ms, confidence, at_ms, playing, segment, text
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -154,6 +154,13 @@ extension EngineEvent: Decodable {
             self = .playbackPosition(
                 callId: try c.decode(String.self, forKey: .call_id), atMs: try c.decode(Int.self, forKey: .at_ms),
                 playing: try c.decode(Bool.self, forKey: .playing))
+        case "segment": self = .segment(try c.decode(Segment.self, forKey: .segment))
+        case "no_segments":
+            self = .noSegments(callId: try c.decode(String.self, forKey: .call_id), sinceMs: try c.decode(Int.self, forKey: .since_ms))
+        case "silence":
+            self = .silence(callId: try c.decode(String.self, forKey: .call_id), sinceMs: try c.decode(Int.self, forKey: .since_ms))
+        case "self_test_line":
+            self = .selfTestLine(channel: try c.decode(Channel.self, forKey: .channel), text: try c.decode(String.self, forKey: .text))
         default: throw NotWritten()
         }
     }
@@ -207,8 +214,8 @@ final class RoundTripTests: XCTestCase {
             written.sorted(),
             [
                 "ack", "audio_source_added", "call_audio_released", "call_detected", "device_changed", "error", "levels",
-                "playback_position", "pong", "ready", "self_test_result", "self_test_stream", "session_started",
-                "session_stopped", "system_audio_silent",
+                "no_segments", "playback_position", "pong", "ready", "segment", "self_test_line", "self_test_result",
+                "self_test_stream", "session_started", "session_stopped", "silence", "system_audio_silent",
             ])
     }
 

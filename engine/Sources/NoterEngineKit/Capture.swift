@@ -222,12 +222,15 @@ final class CaptureSession: @unchecked Sendable {
     private var resampled: [Channel: Resampled] = [:]
     private var zeros = ZeroRun()
     private var meetingAppPlaying = false
+    /// The live transcript of this call, fed the 16 kHz audio in call time.
+    let asr: LiveASR
 
     init(
         start: StartSession, container: URL, writer: EventWriter, now: @escaping () -> Int64,
-        encoder: (URL) throws -> AudioEncoder
+        encoder: (URL) throws -> AudioEncoder, asrQueue: DispatchQueue? = nil
     ) throws {
         callId = start.callId
+        asr = LiveASR(callId: start.callId, languages: start.languages, glossary: start.glossary, writer: writer, queue: asrQueue)
         relative = start.sessionDir
         dir = container.appendingPathComponent(start.sessionDir, isDirectory: true)
         self.writer = writer
@@ -272,6 +275,7 @@ final class CaptureSession: @unchecked Sendable {
     // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-write-ring
     func feed(_ chunk: AudioChunk) {
         var events: [EngineEvent] = []
+        var heard: (samples: [Float], atMs: Int)?
         lock.withLock {
             guard live, pausedAt == nil else { return }
             let to = Double(CaptureRing.rate)
@@ -287,6 +291,7 @@ final class CaptureSession: @unchecked Sendable {
             }
             // @cpt-end:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-return-zero
             ring.write(chunk.channel, samples)
+            heard = (samples, spanStart + (spanSamples[chunk.channel] ?? 0) * 1000 / CaptureRing.rate)
             spanSamples[chunk.channel, default: 0] += samples.count
             db[chunk.channel] = Levels.db(chunk.samples)
             if let encoder = encoders[chunk.channel] {
@@ -306,6 +311,9 @@ final class CaptureSession: @unchecked Sendable {
             }
         }
         events.forEach(writer.emit)
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-run-asr
+        if let heard { asr.feed(chunk.channel, heard.samples, atMs: heard.atMs) }
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-run-asr
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-write-ring
 
@@ -317,6 +325,7 @@ final class CaptureSession: @unchecked Sendable {
             pausedAt = (callMs, now())
             try? save()
         }
+        asr.cut()
     }
 
     func resume() {
@@ -345,6 +354,7 @@ final class CaptureSession: @unchecked Sendable {
             return .deviceChanged(callId: callId, deviceName: change.name, gapFromMs: from, gapToMs: to)
         }
         event.map(writer.emit)
+        if event != nil { asr.cut() }
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
 

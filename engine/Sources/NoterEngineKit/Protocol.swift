@@ -73,6 +73,55 @@ public struct StartSession: Equatable, Sendable {
     public var resumeFromMs: UInt32?
 }
 
+/// A live transcript segment (`EngineSegment`): hypotheses, then one confirmed with the same id.
+public struct Segment: Codable, Equatable, Sendable {
+    public struct Correction: Codable, Equatable, Sendable {
+        public var from: String
+        public var to: String
+    }
+
+    public var id: String
+    public var callId: String
+    public var channel: Channel
+    public var t0Ms: Int
+    public var t1Ms: Int
+    public var state: String
+    public var lang: String
+    public var langP: Float
+    public var speakerLabel: String
+    public var text: String
+    public var wordsPath: String?
+    public var avgLogprob: Float
+    public var noSpeechP: Float
+    public var corrections: [Correction]
+    public var crosstalkLabels: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id, channel, state, lang, text, corrections
+        case callId = "call_id", t0Ms = "t0_ms", t1Ms = "t1_ms", langP = "lang_p", speakerLabel = "speaker_label"
+        case wordsPath = "words_path", avgLogprob = "avg_logprob", noSpeechP = "no_speech_p", crosstalkLabels = "crosstalk_labels"
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(callId, forKey: .callId)
+        try c.encode(channel, forKey: .channel)
+        try c.encode(t0Ms, forKey: .t0Ms)
+        try c.encode(t1Ms, forKey: .t1Ms)
+        try c.encode(state, forKey: .state)
+        try c.encode(lang, forKey: .lang)
+        try c.encode(langP, forKey: .langP)
+        try c.encode(speakerLabel, forKey: .speakerLabel)
+        try c.encode(text, forKey: .text)
+        try c.encode(wordsPath, forKey: .wordsPath)  // null, as serde writes it
+        try c.encode(avgLogprob, forKey: .avgLogprob)
+        try c.encode(noSpeechP, forKey: .noSpeechP)
+        try c.encode(corrections, forKey: .corrections)
+        try c.encode(crosstalkLabels, forKey: .crosstalkLabels)
+    }
+}
+
 // @cpt-dod:cpt-noter-dod-core-engine-foundation-package:p1
 public enum EngineCommand: Equatable, Sendable {
     case ping
@@ -178,6 +227,10 @@ public enum EngineEvent: Equatable, Sendable {
     case audioSourceAdded(callId: String, bundleId: String, appName: String)
     case systemAudioSilent(callId: String, sinceMs: Int, confidence: Float)
     case playbackPosition(callId: String, atMs: Int, playing: Bool)
+    case segment(Segment)
+    case noSegments(callId: String, sinceMs: Int)
+    case silence(callId: String, sinceMs: Int)
+    case selfTestLine(channel: Channel, text: String)
 }
 
 extension EngineEvent: Encodable {
@@ -257,6 +310,21 @@ extension EngineEvent: Encodable {
             try put("call_id", callId)
             try put("at_ms", atMs)
             try put("playing", playing)
+        case let .segment(segment):
+            try put("type", "segment")
+            try put("segment", segment)
+        case let .noSegments(callId, sinceMs):
+            try put("type", "no_segments")
+            try put("call_id", callId)
+            try put("since_ms", sinceMs)
+        case let .silence(callId, sinceMs):
+            try put("type", "silence")
+            try put("call_id", callId)
+            try put("since_ms", sinceMs)
+        case let .selfTestLine(channel, text):
+            try put("type", "self_test_line")
+            try put("channel", channel)
+            try put("text", text)
         }
     }
 }

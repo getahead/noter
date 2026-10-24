@@ -39,6 +39,16 @@ BUNDLES = [
         "folder": "openai_whisper-large-v3-v20240930_turbo",
         "required_for_capture": True,
     },
+    # Its tokenizer, into the same folder: WhisperKit would fetch it from the Hub at load, and the
+    # sandboxed engine has no network.
+    {
+        "bundle": "whisper-turbo",
+        "repo": "openai/whisper-large-v3",
+        "commit": "06f233fe06e710322aca913c1bc4249a0d71fce1",
+        "folder": "",
+        "only": ["tokenizer.json", "tokenizer_config.json"],
+        "required_for_capture": True,
+    },
 ]
 
 
@@ -60,16 +70,19 @@ def sha256_of(url: str) -> str:
 
 
 def files_of(spec: dict) -> list[dict]:
-    tree = get_json(f"{API}/{spec['repo']}/tree/{spec['commit']}/{spec['folder']}?recursive=true")
+    """A source's files: everything under `folder` (the repo root when empty), or only those named."""
+    folder = spec["folder"]
+    tree = get_json(f"{API}/{spec['repo']}/tree/{spec['commit']}{'/' + folder if folder else ''}?recursive=true")
     out = []
     for entry in sorted(tree, key=lambda e: e["path"]):
-        if entry["type"] != "file":
+        path = entry["path"][len(folder) + 1:] if folder else entry["path"]
+        if entry["type"] != "file" or path not in spec.get("only", [path]):
             continue
         url = resolve_url(spec["repo"], spec["commit"], entry["path"])
         lfs = entry.get("lfs") or {}
         out.append({
             "bundle": spec["bundle"],
-            "path": entry["path"][len(spec["folder"]) + 1:],
+            "path": path,
             "url": url,
             "size_bytes": entry["size"],
             "sha256": lfs.get("oid") or sha256_of(url),

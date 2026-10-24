@@ -191,6 +191,22 @@
    "size_bytes": 2767,
    "sha256": "7fbb053a023be11fbeccd8421811610308143daa93d9617c52aab4a0fa1491c6",
    "required_for_capture": true
+  },
+  {
+   "bundle": "whisper-turbo",
+   "path": "tokenizer.json",
+   "url": "https://huggingface.co/openai/whisper-large-v3/resolve/06f233fe06e710322aca913c1bc4249a0d71fce1/tokenizer.json",
+   "size_bytes": 2480617,
+   "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+   "required_for_capture": true
+  },
+  {
+   "bundle": "whisper-turbo",
+   "path": "tokenizer_config.json",
+   "url": "https://huggingface.co/openai/whisper-large-v3/resolve/06f233fe06e710322aca913c1bc4249a0d71fce1/tokenizer_config.json",
+   "size_bytes": 282843,
+   "sha256": "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+   "required_for_capture": true
   }
  ]
 }
