@@ -132,7 +132,6 @@ public final class EngineLoop: @unchecked Sendable {
         return true
     }
 
-    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
     private func startSession(_ id: UInt64, _ start: StartSession) {
         guard session == nil else {
             writer.emit(.error(cmdId: id, code: .badCommand, message: "a session runs already"))
