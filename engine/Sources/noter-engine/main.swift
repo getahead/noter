@@ -28,7 +28,7 @@ case let .invalid(why):
 case let .file(mic, sys, realtime):
     let engine = EngineLoop(
         writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container
-    ) {
+    ) { _ in
         guard let m = try? WAV.read(mic), let s = try? WAV.read(sys) else { return nil }
         return FileAudioSource(mic: m, sys: s, realtime: realtime)
     }
@@ -40,8 +40,8 @@ case let .file(mic, sys, realtime):
 case .live:
     let engine = EngineLoop(
         writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container
-    ) {
-        LiveAudioSource()
+    ) { start in
+        LiveAudioSource(micUid: start?.micDeviceUid, excluding: start?.excludeBundleIds ?? [])
     }
     engine.start()
     serve(engine, exitAtEndOfInput: true)

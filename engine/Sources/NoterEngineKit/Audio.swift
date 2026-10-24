@@ -57,16 +57,58 @@ struct Resampled {
     }
 }
 
+/// The source swapped the microphone by itself (unplugged, a new default input): audio stopped
+/// at `lostAtMs` and flows again from `backAtMs` (epoch milliseconds) on `name`.
+public struct DeviceChange: Sendable, Equatable {
+    public let name: String
+    public let lostAtMs: Int64
+    public let backAtMs: Int64
+
+    public init(name: String, lostAtMs: Int64, backAtMs: Int64) {
+        self.name = name
+        self.lostAtMs = lostAtMs
+        self.backAtMs = backAtMs
+    }
+}
+
 /// A source of audio chunks on both channels; `start` delivers chunks on any thread.
 public protocol AudioSource: AnyObject, Sendable {
     func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws
     func stop()
     /// The microphone and the output device by name, for `session_started`.
     var devices: (mic: String, output: String) { get }
+    /// Leaves a running app out of the system channel from now on (`exclude_process`).
+    func exclude(bundleId: String) throws
+    /// `handler` hears of every microphone swap, before audio from the new device arrives.
+    func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void)
 }
 
 extension AudioSource {
     public var devices: (mic: String, output: String) { ("", "") }
+    public func exclude(bundleId: String) throws {}
+    public func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void) {}
+}
+
+/// The capture's aggregate device runs the microphone and the system tap on one clock.
+public enum OneClock {
+    /// One IO cycle's input buffers, the microphone's first, then the tap's, as mono channels.
+    /// Each buffer is interleaved with its own channel count; several buffers of a side are mixed.
+    public static func split(_ buffers: [(channels: Int, samples: [Float])], micBuffers: Int) -> (mic: [Float], sys: [Float]) {
+        func mixed(_ side: ArraySlice<(channels: Int, samples: [Float])>) -> [Float] {
+            let monos = side.map { Mix.mono($0.samples, channels: max(1, $0.channels)) }
+            guard let n = monos.map(\.count).min() else { return [] }
+            return (0..<n).map { i in monos.reduce(0) { $0 + $1[i] } / Float(monos.count) }
+        }
+        let cut = min(micBuffers, buffers.count)
+        return (mixed(buffers[..<cut]), mixed(buffers[cut...]))
+    }
+}
+
+public enum Exclusion {
+    /// An excluded app's process, or one of its helpers (`<bundle id>.…`), is left out of the tap.
+    public static func matches(_ bundleId: String, _ excluded: Set<String>) -> Bool {
+        !bundleId.isEmpty && excluded.contains { bundleId == $0 || bundleId.hasPrefix($0 + ".") }
+    }
 }
 
 public enum Levels {
