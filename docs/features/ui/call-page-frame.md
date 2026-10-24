@@ -87,13 +87,13 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 - The read fails: the section error with **Try Again**
 
 **Steps**:
-1. [ ] - `p1` - User or core opens the route `call_page` (call id, tab, optional span) - `inst-open-route`
-2. [ ] - `p1` - API: `call_get` (call id) - `inst-api-get`
-3. [ ] - `p1` - **IF** the result is `not_found` - `inst-if-gone`
-   1. [ ] - `p1` - **RETURN** the empty state with Back to Calls - `inst-return-gone`
-4. [ ] - `p1` - UI: PC-R1 with Back, the title (tail-truncated, full title in a help tag), the subtitle, the view control listing only the views delivered so far (**Transcript** in M1; **Summary**, **Agent Reviews** and **History** join in M2 and M4), ⋯ More and the inspector toggle (⌥⌘I) - `inst-toolbar`
-5. [ ] - `p1` - API: `window_report_view` (call id), so the core sends no notification for the call this window shows; `null` when the page closes - `inst-api-report`
-6. [ ] - `p1` - UI: PC-R4 Call info at 280 pt in Wide (overlay in Medium and Narrow): **Participants** (person chips), **Call** (**Type**, **App**, **When**, **Length**, **Languages**), **Privacy** (the mode indicator and a **Sensitive** switch), **Audio** (**Kept until 15 Nov**, or **Audio deleted on 15 Nov · transcript kept**), **Processing** - `inst-call-info`
+1. [x] - `p1` - User or core opens the route `call_page` (call id, tab, optional span) - `inst-open-route`
+2. [x] - `p1` - API: `call_get` (call id) - `inst-api-get`
+3. [x] - `p1` - **IF** the result is `not_found` - `inst-if-gone`
+   1. [x] - `p1` - **RETURN** the empty state with Back to Calls - `inst-return-gone`
+4. [x] - `p1` - UI: PC-R1 with Back, the title (tail-truncated, full title in a help tag), the subtitle, the view control listing only the views delivered so far (**Transcript** in M1; **Summary**, **Agent Reviews** and **History** join in M2 and M4), ⋯ More and the inspector toggle (⌥⌘I) - `inst-toolbar`
+5. [x] - `p1` - API: `window_report_view` (call id), so the core sends no notification for the call this window shows; `null` when the page closes - `inst-api-report`
+6. [x] - `p1` - UI: PC-R4 Call info at 280 pt in Wide (overlay in Medium and Narrow): **Participants** (person chips), **Call** (**Type**, **App**, **When**, **Length**, **Languages**), **Privacy** (the mode indicator and a **Sensitive** switch), **Audio** (**Kept until 15 Nov**, or **Audio deleted on 15 Nov · transcript kept**), **Processing** - `inst-call-info`
 7. [ ] - `p1` - Flow: the stored transcript with `cpt-noter-flow-ui-live-transcript-stored` in PC-R5, with the playback bar PC-R6 from the first play - `inst-transcript`
 8. [ ] - `p1` - **IF** the core opened the page after a stop (`nav:request` without activation) - `inst-if-background`
    1. [ ] - `p1` - UI: render without taking focus or activating the window - `inst-background`
@@ -118,9 +118,9 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 **Steps**:
 1. [ ] - `p1` - User opens ⋯ More - `inst-user-more`
 2. [ ] - `p1` - **MATCH** the item - `inst-match-more`
-   - [ ] - `p1` - **CASE** **Rename…**: an inline field in the title; Return saves with `call_update` (title, `rev`) - `inst-case-rename`
-   - [ ] - `p1` - **CASE** **Call Type ▸**: the types from `call_types_list`; `call_update` (type) - `inst-case-type`
-   - [ ] - `p1` - **CASE** **Mark as Sensitive** or the Call info **Sensitive** switch: `capture_set_sensitive` (call id, true) - `inst-case-sensitive`
+   - [x] - `p1` - **CASE** **Rename…**: an inline field in the title; Return saves with `call_update` (title, `rev`) - `inst-case-rename`
+   - [x] - `p1` - **CASE** **Call Type ▸**: the types from `call_types_list`; `call_update` (type) - `inst-case-type`
+   - [x] - `p1` - **CASE** **Mark as Sensitive** or the Call info **Sensitive** switch: `capture_set_sensitive` (call id, true) - `inst-case-sensitive`
    - [ ] - `p1` - **CASE** **Show in Finder**: `open_external` (the call's folder) - `inst-case-finder`
    - [ ] - `p1` - **CASE** **Delete Call…**: Flow `cpt-noter-flow-ui-dialogs-host-delete-call` with this call - `inst-case-delete`
 3. [ ] - `p1` - **RETURN** the page with the change, or Library › **Calls** after a delete - `inst-return-more`
@@ -132,19 +132,19 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 **Actor**: Primary user
 
 **Success Scenarios**:
-- After the first recorded call, PC-R2 shows **Get a notification when a call's summary is ready.** with **Notify Me When Summaries Are Ready** and ×; the button brings up the macOS prompt; after **Allow** the banner goes away
+- After the first recorded call, PC-R2 shows **Get a notification when a summary is ready.** with **Notify Me When Summaries Are Ready** and ×; the button brings up the macOS prompt; after **Allow** the banner goes away
 
 **Error Scenarios**:
 - **Don't Allow**: the banner goes away; ready and failed states stay visible in Noter; Settings › General shows **Notifications are off for Noter**
 - × closes the banner and leaves notifications off without asking
 
 **Steps**:
-1. [ ] - `p1` - Core: the app snapshot reports that the Notifications permission was never asked and a call was recorded - `inst-core-not-asked`
-2. [ ] - `p1` - UI: the info banner in PC-R2 (one banner at a time, by the slot order) - `inst-banner`
-3. [ ] - `p1` - User clicks **Notify Me When Summaries Are Ready** - `inst-user-notify`
-4. [ ] - `p1` - API: `permission_request` (notifications); macOS shows its prompt - `inst-api-permission`
+1. [x] - `p1` - Core: the app snapshot reports that the Notifications permission was never asked and a call was recorded - `inst-core-not-asked`
+2. [x] - `p1` - UI: the info banner in PC-R2 (one banner at a time, by the slot order) - `inst-banner`
+3. [x] - `p1` - User clicks **Notify Me When Summaries Are Ready** - `inst-user-notify`
+4. [x] - `p1` - API: `permission_request` (notifications); macOS shows its prompt - `inst-api-permission`
 5. [ ] - `p1` - **IF** the user closes the banner with × - `inst-if-close`
-   1. [ ] - `p1` - UI: hide the banner as local view state for this window's lifetime; send no command and show no prompt (`banner_dismiss` has no notification-consent `BannerKind`; persisting the dismissal is a contract gap for the owner) - `inst-local-dismiss`
+   1. [x] - `p1` - UI: hide the banner as local view state for this window's lifetime; send no command and show no prompt (`banner_dismiss` has no notification-consent `BannerKind`; persisting the dismissal is a contract gap for the owner) - `inst-local-dismiss`
 6. [ ] - `p1` - **RETURN** the banner gone, notifications allowed or not - `inst-return-banner`
 
 ## 3. Processes / Business Logic (CDSL)
@@ -158,10 +158,10 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 **Output**: the view control's segments and the view to show
 
 **Steps**:
-1. [ ] - `p1` - List the views in DESIGN's order (**Summary**, **Transcript**, **Agent Reviews**, **History**) that a delivered feature has registered - `inst-list-views`
-2. [ ] - `p1` - **IF** the requested tab is not registered: show **Transcript** - `inst-fallback`
+1. [x] - `p1` - List the views in DESIGN's order (**Summary**, **Transcript**, **Agent Reviews**, **History**) that a delivered feature has registered - `inst-list-views`
+2. [x] - `p1` - **IF** the requested tab is not registered: show **Transcript** - `inst-fallback`
 3. [ ] - `p1` - At Narrow width render the segments as a pop-up button - `inst-narrow`
-4. [ ] - `p1` - **RETURN** the segments and the view - `inst-return-views`
+4. [x] - `p1` - **RETURN** the segments and the view - `inst-return-views`
 
 ## 4. States (CDSL)
 
@@ -174,10 +174,10 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** READY **WHEN** `call_get` returns the call (skeleton rows after 300 ms until then) - `inst-loading-ready`
-2. [ ] - `p1` - **FROM** LOADING **TO** NOT_FOUND **WHEN** the call no longer exists - `inst-loading-notfound`
-3. [ ] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-loading-error`
-4. [ ] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
+1. [x] - `p1` - **FROM** LOADING **TO** READY **WHEN** `call_get` returns the call (skeleton rows after 300 ms until then) - `inst-loading-ready`
+2. [x] - `p1` - **FROM** LOADING **TO** NOT_FOUND **WHEN** the call no longer exists - `inst-loading-notfound`
+3. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-loading-error`
+4. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
 5. [ ] - `p1` - **FROM** READY **TO** DELETED **WHEN** the user deletes the call; the route moves to Library › **Calls** - `inst-ready-deleted`
 6. [ ] - `p1` - **FROM** READY **TO** READY **WHEN** `entity:changed` reports a new title, type, sensitivity or audio state; the page re-renders - `inst-ready-ready`
 

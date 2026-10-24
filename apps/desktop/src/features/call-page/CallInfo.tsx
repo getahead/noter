@@ -10,7 +10,6 @@ import { setSensitive } from "./actions";
 import { useExtras, useTypes } from "./cache";
 import { callInfo } from "./logic";
 
-// @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p1
 // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-call-info
 export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string }) {
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
@@ -24,7 +23,7 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
   const info = callInfo(call, { audio_not_stored: extras?.audio_not_stored ?? false }, Date.now(), prefs, typeLabel);
   const mode = modeIndicator({ mode: privacy?.mode ?? "cloud_redacted", degraded: degraded?.states ?? [], sensitiveCall: info.sensitive });
   return (
-    <div className="pc-info" data-variant="call-info" data-region="PC-R4">
+    <div className="pc-info" data-variant="call-info">
       <header className="pc-info__head">
         <span className="t-headline">{t("callpage.info")}</span>
       </header>

@@ -38,8 +38,6 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
   ];
 }
 
-// @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p1
-// @cpt-dod:cpt-noter-dod-ui-call-page-frame-actions:p1
 export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspector }: PageToolbarProps) {
   const at = parseCallKey(route.key)!;
   const call = useWindow(bridge, (s) => s.entities.call[at.callId]);
@@ -50,6 +48,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const { segments, view } = callViews(REGISTERED_VIEWS, at.tab);
   const title = call ? call.title : "";
   const sub = call && prefs ? subtitleOf(call, Date.now(), prefs) : undefined;
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-toolbar
   return (
     <MainToolbar
       {...base}
@@ -87,6 +86,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
       }
     />
   );
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-toolbar
 }
 
 /** Rename in place: Return saves with `call_update` (title and `rev`), Esc or leaving the field cancels. */

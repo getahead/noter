@@ -1,7 +1,7 @@
 // The call page's body (PC-R5 and the page states): reads the call and the call types once, tells the core which
 // call this window shows, and draws the stored transcript the live-transcript feature registers (a placeholder
 // until it lands). The toolbar, banner and Call info read the same call from the window store.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -14,30 +14,29 @@ import { pageState } from "./logic";
 import { slots } from "./slots";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
-// @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p1
 export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: string }) {
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
   const read = useWindow(bridge, (s) => s.commands[readKey(callId)]);
-  const slow = useWindow(bridge, (s) => s.slow);
   const extras = useExtras(callId);
   const asked = useRef<string | null>(null);
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
+  // once per call and instance: a development remount must not ask the core twice
   useEffect(() => {
     if (asked.current === callId) return;
     asked.current = callId;
     void loadCall(bridge, callId).then((r) => r.status === "ok" && holdExtras(callId, r.data));
     void loadTypes(bridge).then((r) => r.status === "ok" && holdTypes(r.data.call_types));
-    // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
-    // the core sends no notification for the call this window shows; null once the page closes
+  }, [bridge, callId]);
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
+  // the core sends no notification for the call this window shows; null once the page closes
+  useEffect(() => {
     void reportView(bridge, callId);
-    return () => {
-      asked.current = null;
-      void reportView(bridge, null);
-    };
+    return () => void reportView(bridge, null);
   }, [bridge, callId]);
 
   const state = pageState(read, call !== undefined);
+  const skeleton = useAfter(300, state === "LOADING");
   const tryAgain = () => void loadCall(bridge, callId).then((r) => r.status === "ok" && holdExtras(callId, r.data));
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-gone
@@ -46,25 +45,36 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-gone
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-gone
   if (state === "ERROR") return <InlineBanner banner={{ id: "call-error", severity: "error", text: t("callpage.error"), actions: [{ label: t("action.try_again"), onAction: tryAgain }] }} />;
-  if (state === "LOADING") return slow || read?.state === "WAITING" ? <Skeleton /> : null;
+  // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
+  if (state === "LOADING") return skeleton ? <Skeleton /> : null;
+  // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
 
   const audioKept = !!call && !call.audio_deleted && !(extras?.audio_not_stored ?? false);
   const Transcript = slots.transcript;
   return (
     <div className="pc pc--transcript" data-state="ready">
-      {/* @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-transcript */}
       <section className="pc-tr" data-region="PC-R5" aria-label={t("callpage.transcript")}>
         <div className="pc-tr__head">
           <span className="t-headline">{t("callpage.transcript")}</span>
         </div>
         {Transcript ? <Transcript bridge={bridge} callId={callId} audioKept={audioKept} span={span} /> : <p className="np-dim">{t("callpage.transcript_pending")}</p>}
       </section>
-      {/* @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-transcript */}
     </div>
   );
 }
 
-/** Skeleton rows after 300 ms of loading (the bridge's `slow`). */
+/** True once `active` has held for `ms` (skeleton rows after 300 ms, never a flash for a quick read). */
+export function useAfter(ms: number, active: boolean): boolean {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!active) return void setLate(false);
+    const id = setTimeout(() => setLate(true), ms);
+    return () => clearTimeout(id);
+  }, [ms, active]);
+  return active && late;
+}
+
+/** Skeleton rows while the call is read. */
 function Skeleton() {
   return (
     <div className="pc-skel" role="status" aria-label={t("callpage.loading")}>
