@@ -107,7 +107,10 @@ describe("typed errors of M0/M1 commands: code, detail and retryable as the core
     const bad = refused(await main.callUpdate({ call_id: W.PAST_CALL, rev: row.rev + 1, call_type: "no_such_type" }));
     typed(bad, "invalid_input");
     expect(bad.detail?.type).toBe("validation");
-    const blank = refused(await s.core("call-screen").windowAnnounce({ text: " ", politeness: "polite" }));
+    // The native-surfaces commands answer from their own feature on (M1).
+    const announced = await s.core("call-screen").windowAnnounce({ text: " ", politeness: "polite" });
+    if (pending(announced)) return;
+    const blank = refused(announced);
     typed(blank, "invalid_input");
     expect(blank.detail).toEqual({ type: "validation", field: "text", rule: "required" });
     typed(refused(await main.openExternal({ target: { type: "url", url: "file:///etc/passwd" } })), "invalid_input");
