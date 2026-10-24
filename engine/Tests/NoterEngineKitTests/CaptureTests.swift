@@ -102,7 +102,7 @@ final class CaptureTests: XCTestCase {
     ) -> EngineLoop {
         let e = EngineLoop(
             writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false,
-            container: root, now: clock.now, encoder: encoder ?? { try ADTSEncoder(url: $0) }, source: { source })
+            container: root, now: clock.now, encoder: encoder ?? { try ADTSEncoder(url: $0) }, source: { _ in source })
         e.start()
         return e
     }

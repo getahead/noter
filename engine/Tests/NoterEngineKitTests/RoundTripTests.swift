@@ -93,6 +93,7 @@ extension EngineEvent: Decodable {
     private enum Keys: String, CodingKey {
         case type, protocol_version, engine_version, models, sandboxed, cmd_id, code, message, call_id, mic_db, sys_db
         case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path, mic_device, output_device
+        case device_name, gap_from_ms, gap_to_ms
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -125,6 +126,10 @@ extension EngineEvent: Decodable {
             self = .sessionStopped(
                 callId: try c.decode(String.self, forKey: .call_id), timelinePath: try c.decode(String.self, forKey: .timeline_path),
                 micPath: try c.decode(String?.self, forKey: .mic_path), sysPath: try c.decode(String?.self, forKey: .sys_path))
+        case "device_changed":
+            self = .deviceChanged(
+                callId: try c.decode(String.self, forKey: .call_id), deviceName: try c.decode(String.self, forKey: .device_name),
+                gapFromMs: try c.decode(Int.self, forKey: .gap_from_ms), gapToMs: try c.decode(Int.self, forKey: .gap_to_ms))
         default: throw NotWritten()
         }
     }
@@ -177,8 +182,8 @@ final class RoundTripTests: XCTestCase {
         XCTAssertEqual(
             written.sorted(),
             [
-                "ack", "error", "levels", "pong", "ready", "self_test_result", "self_test_stream", "session_started",
-                "session_stopped",
+                "ack", "device_changed", "error", "levels", "pong", "ready", "self_test_result", "self_test_stream",
+                "session_started", "session_stopped",
             ])
     }
 

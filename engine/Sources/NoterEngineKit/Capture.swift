@@ -317,6 +317,23 @@ final class CaptureSession: @unchecked Sendable {
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-pause-streams
 
+    // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
+    /// The source swapped the microphone: the call went on while no audio came, so it resumes
+    /// in call time after a `device_changed` gap. Not while paused: nothing is captured then.
+    func deviceChanged(_ change: DeviceChange) {
+        let event: EngineEvent? = lock.withLock {
+            guard live, pausedAt == nil else { return nil }
+            let from = callMs
+            let to = from + max(0, Int(change.backAtMs - change.lostAtMs))
+            if to > from { timeline.gaps.append(.init(t0Ms: from, t1Ms: to, reason: "device_changed")) }
+            (spanStart, spanSamples, nextLevels) = (to, [.mic: 0, .sys: 0], to + 100)
+            try? save()
+            return .deviceChanged(callId: callId, deviceName: change.name, gapFromMs: from, gapToMs: to)
+        }
+        event.map(writer.emit)
+    }
+    // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
+
     // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
     /// Flushes the files, writes `timeline.json`; the `session_stopped` to send.
     func stop() -> EngineEvent {

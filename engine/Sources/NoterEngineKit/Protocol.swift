@@ -162,6 +162,7 @@ public enum EngineEvent: Equatable, Sendable {
     case selfTestResult(passed: Bool, failure: EngineErrorCode?, ownSoundsLeak: Bool)
     case sessionStarted(callId: String, micDevice: String, outputDevice: String)
     case sessionStopped(callId: String, timelinePath: String, micPath: String?, sysPath: String?)
+    case deviceChanged(callId: String, deviceName: String, gapFromMs: Int, gapToMs: Int)
 }
 
 extension EngineEvent: Encodable {
@@ -212,6 +213,12 @@ extension EngineEvent: Encodable {
             try put("timeline_path", timelinePath)
             try put("mic_path", micPath)
             try put("sys_path", sysPath)
+        case let .deviceChanged(callId, deviceName, gapFromMs, gapToMs):
+            try put("type", "device_changed")
+            try put("call_id", callId)
+            try put("device_name", deviceName)
+            try put("gap_from_ms", gapFromMs)
+            try put("gap_to_ms", gapToMs)
         }
     }
 }

@@ -7,7 +7,8 @@ public final class EngineLoop: @unchecked Sendable {
     private let engineVersion: String
     private let models: [String]
     private let sandboxed: Bool
-    private let source: () -> AudioSource?
+    private let source: (StartSession?) -> AudioSource?
+    private let play: @Sendable ([Float]) -> Void
     private let container: URL?
     private let now: () -> Int64
     private let encoder: (URL) throws -> AudioEncoder
@@ -16,14 +17,16 @@ public final class EngineLoop: @unchecked Sendable {
     /// The call being captured and its audio; commands arrive on one thread.
     private var session: (capture: CaptureSession, audio: AudioSource)?
 
-    /// `models` are the installed model folders; `source` opens the audio for a self-test or a
-    /// session (the live taps, or WAV files in file mode and tests); `container` is the App Group
-    /// container sessions write into; `now` gives epoch milliseconds.
+    /// `models` are the installed model folders; `source` opens the audio for a session or, given
+    /// nil, a self-test (the live taps, or WAV files in file mode and tests); `container` is the
+    /// App Group container sessions write into; `now` gives epoch milliseconds; `play` plays the
+    /// self-test's clip.
     public init(
         writer: EventWriter, engineVersion: String, models: [String], sandboxed: Bool,
         container: URL? = nil, now: @escaping () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
         encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
-        source: @escaping () -> AudioSource?
+        play: @escaping @Sendable ([Float]) -> Void = { Clip.play($0) },
+        source: @escaping (StartSession?) -> AudioSource?
     ) {
         self.writer = writer
         self.engineVersion = engineVersion
@@ -33,6 +36,7 @@ public final class EngineLoop: @unchecked Sendable {
         self.now = now
         self.encoder = encoder
         self.source = source
+        self.play = play
     }
 
     /// Announces the engine; the core checks the protocol major.
@@ -58,9 +62,9 @@ public final class EngineLoop: @unchecked Sendable {
         case .setDetection:
             // shortcut: acknowledged only; the call-detection listeners arrive with capture (M1).
             writer.emit(.ack(cmdId: command.id))
-        case let .selfTest(_, timeoutMs):
+        case let .selfTest(playClip, timeoutMs):
             writer.emit(.ack(cmdId: command.id))
-            selfTests.async { self.selfTest(timeout: TimeInterval(timeoutMs) / 1000) }
+            selfTests.async { self.selfTest(timeout: TimeInterval(timeoutMs) / 1000, playClip: playClip) }
         case let .startSession(start):
             startSession(command.id, start)
         case let .pause(callId), let .resume(callId), let .stop(callId), let .excludeProcess(callId, _):
@@ -86,10 +90,13 @@ public final class EngineLoop: @unchecked Sendable {
         }
         do {
             guard let container else { throw LiveAudioSource.Failure(description: "no App Group container") }
-            guard let audio = source() else { throw LiveAudioSource.Failure(description: "no audio source") }
+            // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
+            guard let audio = source(start) else { throw LiveAudioSource.Failure(description: "no audio source") }
             let capture = try CaptureSession(
                 start: start, container: container, writer: writer, now: now, encoder: encoder)
+            audio.observeDevices { capture.deviceChanged($0) }
             try audio.start { capture.feed($0) }
+            // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
             session = (capture, audio)
             writer.emit(.ack(cmdId: id))
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
@@ -124,20 +131,28 @@ public final class EngineLoop: @unchecked Sendable {
             writer.emit(session.capture.stop())
             self.session = nil
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
+        case let .excludeProcess(_, bundleId):
+            do {
+                try session.audio.exclude(bundleId: bundleId)
+                writer.emit(.ack(cmdId: command.id))
+            } catch {
+                writer.emit(.error(cmdId: command.id, code: .internal, message: "\(error)"))
+            }
         default:
-            // shortcut: `exclude_process` is acknowledged; rebuilding the live tap without the
-            // process comes with the one-clock aggregate device in the next capture change.
-            writer.emit(.ack(cmdId: command.id))
+            break
         }
     }
 
     // @cpt-flow:cpt-noter-flow-core-engine-foundation-self-test:p1
-    private func selfTest(timeout: TimeInterval) {
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-self-test:p1
+    private func selfTest(timeout: TimeInterval, playClip: Bool) {
+        let deadline = Date().addingTimeInterval(timeout)
         let state = SelfTestState()
         let done = DispatchSemaphore(value: 0)
         let writer = self.writer
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
-        let audio = source()
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
+        let audio = source(nil)
         do {
             try audio?.start { chunk in
                 guard let events = state.feed(chunk) else { return }
@@ -148,11 +163,22 @@ public final class EngineLoop: @unchecked Sendable {
         } catch {
             FileHandle.standardError.write(Data("noter-engine: self-test audio: \(error)\n".utf8))
         }
+        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
-        _ = done.wait(timeout: .now() + timeout)
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
+        if playClip, audio != nil {
+            state.clipStarted()
+            play(Clip.samples())
+            // The tap is listened to until the clip is over, however soon both channels arrive.
+            Thread.sleep(until: min(deadline, Date().addingTimeInterval(Clip.seconds + 0.3)))
+        }
+        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
+        _ = done.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow))
         audio?.stop()
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-return-self-test
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-return-self-test-capture
         writer.emit(state.finish(modelsPresent: !models.isEmpty))
+        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-return-self-test-capture
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-return-self-test
     }
 }
@@ -185,6 +211,8 @@ private final class SelfTestState: @unchecked Sendable {
         return .levels(callId: nil, micDb: mic, sysDb: sys)
     }
     // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-levels-lines
+
+    func clipStarted() { lock.withLock { monitor.clipStarted() } }
 
     var bothArrived: Bool {
         lock.lock()
