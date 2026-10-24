@@ -259,7 +259,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Make a call sensitive
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-capture-session-sensitive`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-capture-session-sensitive`
 
 **Actor**: Primary user (call window during capture; Call info afterwards)
 
@@ -274,7 +274,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 1. [x] - `p1` - API: `capture_set_sensitive { call_id, sensitive }` - `inst-sensitive-call`
 2. [x] - `p1` - **IF** the call is live and `sensitive` is false **RETURN** `invalid_input` - `inst-if-off-live`
 3. [x] - `p1` - DB: UPDATE `calls.sensitive` through the change-log write path - `inst-write-sensitive`
-4. [ ] - `p1` - **RETURN** `CaptureState`; emit `capture:state` and `entity:changed` for the call - `inst-return-sensitive`
+4. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` and `entity:changed` for the call - `inst-return-sensitive`
 
 ## 3. Processes / Business Logic (CDSL)
 

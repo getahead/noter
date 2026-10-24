@@ -986,10 +986,19 @@ impl Core {
         let values = vec![("privacy_class", json!(class))];
         self.write_call(ctx, &args.call_id, "Changed sensitivity", !running, values)?;
         // @cpt-end:cpt-noter-flow-core-capture-session-sensitive:p2:inst-write-sensitive
+        // @cpt-begin:cpt-noter-flow-core-capture-session-sensitive:p2:inst-return-sensitive
+        let call_id = args.call_id.clone();
+        match self.get_call(CallIdArgs { call_id }) {
+            Ok(detail) => self.emit_entity_changed(&EntityChanged::Call { call: detail.call }),
+            Err(e) => self.log(crate::object(json!({
+                "level": "error", "module": "capture", "code": e.code
+            }))),
+        }
         if !current || state.sensitive == args.sensitive {
             return Ok(state);
         }
         Ok(self.set_capture(|c| c.sensitive = args.sensitive))
+        // @cpt-end:cpt-noter-flow-core-capture-session-sensitive:p2:inst-return-sensitive
     }
 
     /// A new disk reading: `DiskLow` under 2 GB, `DiskFull` under 500 MB, when a call stops
