@@ -18,17 +18,19 @@ export const atEnd = (p: ScrollPos, row: number) => p.scrollHeight - p.scrollTop
 
 // @cpt-algo:cpt-noter-algo-ui-live-transcript-follow-output:p1
 /**
- * A scroll of the log: within one row of the end it follows; scrolled up from there (so more than one row from the end)
- * it detaches and counts new confirmed rows from now; a smooth scroll on its way down leaves it as it was.
+ * A scroll of the log: within one row of the end it follows; any step up away from the very end detaches at once (an
+ * animated wheel's first frame is still within one row, and a flush that kept the end would undo it) and counts new
+ * confirmed rows from now; a smooth scroll on its way down leaves it as it was.
  */
 export function onScroll(f: Follow, p: ScrollPos, prevTop: number, row: number, confirmed: number): Follow {
+  const up = p.scrollTop < prevTop && !atEnd(p, 1); // a log shortened by a correction clamps up to the very end: not the user
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-if-end
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-following
-  if (atEnd(p, row)) return f.following ? f : { following: true, base: confirmed };
+  if (!up && atEnd(p, row)) return f.following ? f : { following: true, base: confirmed };
   // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-following
   // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-if-end
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-detached
-  if (f.following && p.scrollTop < prevTop) return { following: false, base: confirmed };
+  if (f.following && up) return { following: false, base: confirmed };
   // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-detached
   return f;
 }
