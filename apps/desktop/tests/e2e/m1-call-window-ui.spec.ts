@@ -186,7 +186,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     await notice.hover();
     await expect.poll(async () => await sent(page, "capture_hold_notice")).toContainEqual({ ...live, held: true });
     await expect(notice).toContainText("Paused while you're here");
-    await page.mouse.move(0, 0);
+    await transcript(page).hover(); // off the notice (it spans the top of the window)
     await expect.poll(async () => await sent(page, "capture_hold_notice")).toContainEqual({ ...live, held: false });
 
     await notice.getByRole("button", { name: "Stop Now" }).click();
