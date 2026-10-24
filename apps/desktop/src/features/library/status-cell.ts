@@ -50,7 +50,6 @@ export function statusOf(c: CallRow): CellStatus | null {
   // @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-order
 }
 
-const AUDIO_KEPT_DAYS = 30;
 // "15 Nov": en-US supplies the short month ("Sep", where en-GB says "Sept"); the day goes first, as in the prototype
 const day = (ms: number, tz?: string) => {
   const p = new Intl.DateTimeFormat("en-US", {
@@ -61,18 +60,10 @@ const day = (ms: number, tz?: string) => {
   return `${p.find((x) => x.type === "day")!.value} ${p.find((x) => x.type === "month")!.value}`;
 };
 
-/** The help tag of the audio-deleted glyph; the day is 30 days before the core's `audio_kept_until`. */
-export function audioDeletedHelp(c: CallRow, tz?: string): string | null {
+/** The help tag of the audio-deleted glyph (D-36: no date, no retention). */
+export function audioDeletedHelp(c: CallRow): string | null {
   // @cpt-begin:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-audio-glyph
-  if (!c.audio_deleted) return null;
-  return t("library.row.audio_deleted", {
-    date: day(
-      c.audio_kept_until
-        ? c.audio_kept_until - AUDIO_KEPT_DAYS * 86_400_000
-        : c.started_at,
-      tz,
-    ),
-  });
+  return c.audio_deleted ? t("library.row.audio_deleted") : null;
   // @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-audio-glyph
 }
 

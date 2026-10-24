@@ -31,6 +31,23 @@ const sent = async (page: Page, name: string): Promise<unknown[]> =>
   (await calls(page))
     .filter((c) => c.kind === "invoke" && c.name === name)
     .map((c) => c.args);
+/** The core derives `unnamed_speakers` from speaker rows, so a call that says 2 needs two such rows. */
+function nameNoOne(w: World, id: string, n = 2): void {
+  const base = w.call_details.find((d) => d.call.id === W.PAST_CALL)!; // never one of the calls this seeds
+  const d = structuredClone(base);
+  d.call.id = id;
+  Object.assign(d, { marks: [], gaps: [] }); // those rows point at the base call's segments
+  d.speakers = Array.from({ length: n }, (_, i) => ({
+    ...structuredClone(base.speakers[0]),
+    id: `spk_${id}_${i + 1}`,
+    call_id: id,
+    channel: "sys" as const,
+    label: { type: "unnamed" as const, n: i + 1 },
+    named_by: null,
+  }));
+  w.call_details = w.call_details.filter((x) => x.call.id !== id).concat(d);
+  w.calls.find((c) => c.id === id)!.unnamed_speakers = n;
+}
 const first = (w: World) => w.calls.find((c) => c.id === W.PAST_CALL)!;
 
 async function openCalls(
@@ -112,7 +129,10 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
     await page.keyboard.press("Escape");
 
     await steer.change(
-      (w) => (w.app.setup.self_test = { type: "passed", at: Date.now() }),
+      (w) => {
+        w.app.setup.self_test = { type: "passed", at: Date.now() };
+        w.app.setup.detection_enabled = true; // the core derives it from the passed self-test
+      },
     );
     await expect(
       empty.getByRole("button", { name: "Run Audio Self-Test…" }),
@@ -149,15 +169,14 @@ test.describe("cpt-noter-algo-ui-library-calls-status-cell", () => {
     await openCalls(page, (w) => {
       W.morePastCalls(w, 3);
       const [a, b, c, d] = w.calls.filter((x) => x.id.startsWith(W.PAST_CALL));
+      for (const x of [b, c]) nameNoOne(w, x.id); // the base call keeps its own speakers (its segments name them)
       Object.assign(a, {
         outputs: "failed",
-        unnamed_speakers: 2,
         archive: "pending",
       }); // the first that applies wins
-      Object.assign(b, { outputs: "writing", unnamed_speakers: 2 });
+      Object.assign(b, { outputs: "writing" });
       Object.assign(c, {
         outputs: "ready",
-        unnamed_speakers: 2,
         archive: "pending",
         privacy: "sensitive",
       });
@@ -186,7 +205,7 @@ test.describe("cpt-noter-algo-ui-library-calls-status-cell", () => {
     );
     await expect(
       rowOf(page, "Backend sync #4").getByTitle(
-        /^Audio deleted on .+ \(kept 30 days\)$/,
+        "Audio deleted",
       ),
     ).toBeVisible();
   });

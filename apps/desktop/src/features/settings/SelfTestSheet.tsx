@@ -8,6 +8,9 @@ import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { SelfTestPanel } from "../../ui/setup/self-test-panel";
 import { createWizard, speechPercent } from "../first-run/wizard";
 
+// one array: a getSnapshot that returns a fresh [] each call loops forever
+const NO_BUNDLES: never[] = [];
+
 /** **Run Audio Self-Test…**: the first-run self-test panel in a sheet, run by the first-run controller. */
 export function SelfTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
   const announce = useAnnounce(bridge);
@@ -15,7 +18,7 @@ export function SelfTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: ()
   // Settings only runs the test: no model downloads and no microphone level stream
   useEffect(() => wizard.start({ downloads: false, levels: false }), [wizard]);
   const w = useSyncExternalStore(wizard.store.subscribe, wizard.store.getState, wizard.store.getState);
-  const models = useSyncExternalStore(bridge.store.subscribe, () => bridge.store.getState().whole.setup?.models.bundles ?? [], () => []);
+  const models = useSyncExternalStore(bridge.store.subscribe, () => bridge.store.getState().whole.setup?.models.bundles ?? NO_BUNDLES, () => NO_BUNDLES);
   return (
     <Sheet title={t("settings.selftest.title")} width={560} busy={w.panel.state === "RUNNING"} onCancel={onClose} onDefault={onClose}>
       <div className="np-sheet__head">

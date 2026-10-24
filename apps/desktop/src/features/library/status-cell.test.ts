@@ -48,16 +48,8 @@ describe("statusOf (cpt-noter-algo-ui-library-calls-status-cell)", () => {
 });
 
 describe("audioDeletedHelp", () => {
-  it("names the day the audio goes (kept 30 days)", () => {
-    expect(
-      audioDeletedHelp(
-        call({
-          audio_deleted: true,
-          audio_kept_until: Date.UTC(2026, 11, 15, 12),
-        }),
-        "UTC",
-      ),
-    ).toMatch(/^Audio deleted on 15 Nov \(kept 30 days\)$/);
-    expect(audioDeletedHelp(call({ audio_deleted: false }), "UTC")).toBeNull();
+  it("says only that the audio is deleted (D-36)", () => {
+    expect(audioDeletedHelp(call({ audio_deleted: true }))).toBe("Audio deleted");
+    expect(audioDeletedHelp(call({ audio_deleted: false }))).toBeNull();
   });
 });

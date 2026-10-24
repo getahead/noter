@@ -587,7 +587,7 @@ export const en = {
   "library.sort.desc": "descending",
   "library.row.open": "Open {title}",
   "library.row.local_only": "Local only",
-  "library.row.audio_deleted": "Audio deleted on {date} (kept 30 days)",
+  "library.row.audio_deleted": "Audio deleted",
   "library.status.failed": "Couldn't write the summary",
   "library.status.writing": "Writing summary…",
   "library.status.speakers": {

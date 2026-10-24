@@ -76,7 +76,7 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
     expect(h).toContain(">EN<");
     expect(h).toContain(">FR<");
     expect(h).toContain("+1");
-    expect(h).toContain("Audio deleted on");
+    expect(h).toContain("Audio deleted");
     expect(h).toContain('aria-label="Open Planning"');
   });
 
