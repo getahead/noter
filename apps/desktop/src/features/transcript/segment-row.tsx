@@ -129,7 +129,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
               attrs={shown.state === "disabled" ? { "aria-disabled": "true", "aria-description": help } : undefined}
               onAction={() => (shown.state === "enabled" ? onPlay?.(seg) : onReason?.(row.key, help))}
             />
-            {status && <InlineStatus text={status} variant="blind" onExpire={() => onStatusDone?.()} />}
+            {status && <InlineStatus text={status} variant="notice" onExpire={() => onStatusDone?.()} />}
           </span>
         )}
         <LanguageTag lang={seg.lang} confidence={seg.confidence} />

@@ -71,7 +71,9 @@ export function TranscriptView(p: TranscriptViewProps) {
 
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-jump
   const jump = () => {
+    // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-return-replay
     setFollow({ following: true, base: confirmed });
+    // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-return-replay
     el()?.scrollTo({ top: el()!.scrollHeight, behavior: smooth() });
   };
   // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-jump
@@ -133,6 +135,7 @@ export function TranscriptView(p: TranscriptViewProps) {
     // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-find
     else if (e.key === "Escape") setFind(null);
   };
+  // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-return-follow
   return (
     <div
       data-component="cpt-noter-component-ui-transcript-view"
@@ -197,6 +200,7 @@ export function TranscriptView(p: TranscriptViewProps) {
       {/* @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-detach */}
     </div>
   );
+  // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-return-follow
 }
 
 /** Focuses its input when it mounts (the find bar opened with ⌘F). */
