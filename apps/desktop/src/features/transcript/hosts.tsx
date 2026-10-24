@@ -74,7 +74,10 @@ export function showSpan(bridge: Pick<Bridge, "core">, span: TimeSpan, rows: rea
  * TranscriptBar.
  */
 export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptions = {}) {
+  // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-flush
+  // the bridge flushes the Channel into this slice every 100 ms: confirmed appended, hypothesis replaced, gaps, marks and updates by identity
   const stream = useWindow(bridge, (s) => s.streams.transcript_subscribe);
+  // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-flush
   const levels = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels ?? null);
   const capture = useWindow(bridge, (s) => s.whole.capture);
   const playback = useWindow(bridge, (s) => s.whole.playback);

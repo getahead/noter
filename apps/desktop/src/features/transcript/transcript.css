@@ -64,3 +64,5 @@
 /* A window that shows only the transcript (the call screen until 2.10, the dev route until 2.14): the regions fill it. */
 .tr-window { height: 100vh; display: flex; flex-direction: column; min-height: 0; }
 .tr-window > .pc-tr { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 16px 24px 0; }
+/* A disabled play control stays focusable (aria-disabled, not disabled), so it takes the primitive's disabled look here. */
+.cw-seg__acts .np-ibtn[aria-disabled="true"] { opacity: .35; cursor: default; background: transparent; }
