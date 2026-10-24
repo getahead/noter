@@ -159,6 +159,21 @@ final class LiveASRTests: XCTestCase {
         XCTAssertEqual(facts.map { $0["since_ms"] as? Int }, [1000, 14_000])
     }
 
+    func testTheOpenTailIsWhatTheCrashedEngineHadNotClosed() {
+        func audio(_ parts: [(Bool, Int)]) -> [Float] { parts.flatMap { $0.0 ? speech($0.1) : quiet($0.1) } }
+        func seconds(_ tail: [Float]) -> Double { Double(tail.count) / 16_000 }
+        XCTAssertEqual(seconds(LiveASR.openTail(audio([(false, 1000), (true, 2000)]), fromCallStart: false)), 2)
+        XCTAssertEqual(LiveASR.openTail(audio([(true, 2000), (false, 800)]), fromCallStart: false), [], "ends in a pause")
+        XCTAssertEqual(
+            seconds(LiveASR.openTail(audio([(false, 1000), (true, 25_000)]), fromCallStart: false)), 5,
+            "the crashed engine closed the first 20 s itself")
+        XCTAssertEqual(LiveASR.openTail(audio([(false, 1000), (true, 40_000)]), fromCallStart: false), [])
+        XCTAssertEqual(
+            LiveASR.openTail(audio([(true, 30_000)]), fromCallStart: false), [],
+            "speech fills the ring: where it was cut is unknown")
+        XCTAssertEqual(seconds(LiveASR.openTail(audio([(true, 25_000)]), fromCallStart: true)), 5)
+    }
+
     func testFinishConfirmsWhatIsStillBeingSaid() throws {
         let a = asr(FakeTranscriber("cut off by stop"))
         play(a, .mic, from: 0, 1500, speaking: true)
@@ -217,6 +232,52 @@ final class EngineASRTests: XCTestCase {
         XCTAssertEqual(segment["text"] as? String, "late words", "what was said before the model loaded is still confirmed")
         XCTAssertLessThan(
             try XCTUnwrap(lines.types.lastIndex(of: "segment")), try XCTUnwrap(lines.types.firstIndex(of: "session_stopped")))
+    }
+
+    /// The first engine hears `before` (quiet then speech) and dies without `stop`; the successor
+    /// restarts the call 1.5 s later and must transcribe what the first one never confirmed.
+    private func restart(before: [(speaking: Bool, ms: Int)]) throws -> (lines: Lines, asked: FakeTranscriber) {
+        let (root, clock) = (try root(), TestClock())
+        do {
+            let (lines, source) = (Lines(), DeviceSource())
+            let e = EngineLoop(
+                writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: root, now: clock.now,
+                source: { _ in source })
+            _ = e.handle(startLine)
+            for (speaking, ms) in before {
+                for _ in 0..<(ms / 100) { source.push(mic: speaking ? speech() : quiet(), sys: quiet()) }
+                clock.advance(Int64(ms))
+            }
+        }
+        clock.advance(1500)
+        let (lines, source, t) = (Lines(), DeviceSource(), FakeTranscriber("said as the engine died"))
+        let e = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false, container: root,
+            now: clock.now, transcriber: { t }, source: { _ in source })
+        _ = e.handle(startLine.replacingOccurrences(of: #""resume_from_ms":null"#, with: #""resume_from_ms":3000"#))
+        _ = try XCTUnwrap(lines.waitFor("session_started"))
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        _ = try XCTUnwrap(lines.waitFor("session_stopped"))
+        return (lines, t)
+    }
+
+    func testAfterARestartTheSuccessorDecodesWhatTheCrashedEngineHadNotConfirmed() throws {
+        let (lines, t) = try restart(before: [(false, 1000), (true, 2000)])
+        let segment = try XCTUnwrap(lines.events.compactMap { $0["segment"] as? [String: Any] }.first)
+        XCTAssertEqual(segment["state"] as? String, "confirmed")
+        XCTAssertEqual(segment["text"] as? String, "said as the engine died")
+        XCTAssertEqual(segment["t0_ms"] as? Int, 1000, "from the last pause before the crash")
+        XCTAssertEqual(segment["t1_ms"] as? Int, 3000, "to where the crashed engine stopped")
+        XCTAssertEqual(t.asked.first?.samples, 16 * 2000)
+        XCTAssertLessThan(
+            try XCTUnwrap(lines.types.firstIndex(of: "session_started")), try XCTUnwrap(lines.types.firstIndex(of: "segment")),
+            "taps first, then the model, then the ring")
+    }
+
+    func testAfterARestartAtAPauseThereIsNothingToDecodeAgain() throws {
+        let (lines, t) = try restart(before: [(true, 1000), (false, 2000)])
+        XCTAssertTrue(t.asked.isEmpty, "the crashed engine closed and confirmed that utterance itself")
+        XCTAssertNil(lines.events.first { $0["type"] as? String == "segment" })
     }
 
     func testAModelThatFailsToLoadIsReportedAndCaptureGoesOn() throws {
