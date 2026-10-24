@@ -604,7 +604,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p2` - **ID**: `cpt-noter-feature-core-live-transcript`
 
-- **Milestone**: M1 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-live-transcript.md](features/core/core-live-transcript.md)
+- **Milestone**: M1 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-live-transcript.md](features/core/core-live-transcript.md)
 
 - **Purpose**: Persist every confirmed segment exactly once, stream hypotheses and confirmed lines to every window with snapshot-then-stream, serve levels and span previews, and replay a line through the engine only where it cannot leak into the call.
 
