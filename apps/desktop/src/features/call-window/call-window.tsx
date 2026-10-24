@@ -6,10 +6,10 @@ import "./call-window.css";
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
-import { announcerFor, writeLive, type AnnounceEvent } from "../../app/a11y/announce";
+import { announcerFor, writeLive } from "../../app/a11y/announce";
 import type { ActOptions, Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { CallLayoutPreference, CaptureState, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, Result } from "../../core/bindings";
+import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, Result } from "../../core/bindings";
 import { callTime, quote, t } from "../../i18n/format";
 import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
@@ -21,20 +21,7 @@ import { capsOf } from "../settings/accelerator";
 import { elapsedSeconds } from "../shell/live-row";
 import { modeIndicator } from "../shell/mode-indicator";
 import { tickWhile } from "../shell/shell-effects";
-import {
-  captureView,
-  closingTitle,
-  degradedBanners,
-  failureAnnouncement,
-  indicatorStatus,
-  layoutRegions,
-  layoutState,
-  pausedMinutes,
-  stopped,
-  stoppedAnnouncement,
-  windowState,
-  type BannerHandlers,
-} from "./model";
+import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, stopped, windowState, type BannerHandlers, type Seen } from "./model";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
 import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
 import { TranscriptSlot } from "./transcript-slot";
@@ -53,6 +40,13 @@ const hhmm = (ms: number) =>
     minute: "2-digit",
     hourCycle: "h23",
   }).format(ms);
+
+/** Keep one Channel open while `on` holds: snapshot then stream; the cleanup ends it. */
+export function subscribeWhile<K extends "transcript_subscribe" | "levels_subscribe">(bridge: Bridge, on: boolean, cmd: K, args: CommandArgs[K]): (() => void) | undefined {
+  if (!on) return undefined;
+  void bridge.subscribe(cmd, args);
+  return () => void bridge.unsubscribe(cmd);
+}
 
 // @cpt-component:cpt-noter-component-shell-call-window:p1
 // @cpt-component:cpt-noter-component-screen-call-screen:p1
@@ -113,22 +107,13 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-crash-restore
   // A new WebView (first open, or after a crash) reads the snapshot (the bridge), then the window state, then the transcript.
   useEffect(() => void bridge.act("window_call_state", "window_call_state", () => bridge.core.windowCallState({}), { slice: "callWindow" }), [bridge]);
-  const ready = !!cw;
-  const recordingNow = live(cap);
-  useEffect(() => {
-    if (!ready || !callId || !recordingNow) return;
-    void bridge.subscribe("transcript_subscribe", { call_id: callId });
-    return () => void bridge.unsubscribe("transcript_subscribe");
-  }, [bridge, ready, callId, recordingNow]);
+  const transcriptFor = cw && callId && live(cap) ? callId : null;
+  useEffect(() => subscribeWhile(bridge, transcriptFor !== null, "transcript_subscribe", { call_id: transcriptFor! }), [bridge, transcriptFor]);
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-crash-restore
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-if-crash
   // The You and Others meters of the nothing-heard notice.
   const meters = noticeShown?.type === "nothing_heard";
-  useEffect(() => {
-    if (!meters) return;
-    void bridge.subscribe("levels_subscribe", { call_id: callId });
-    return () => void bridge.unsubscribe("levels_subscribe");
-  }, [bridge, meters, callId]);
+  useEffect(() => subscribeWhile(bridge, meters, "levels_subscribe", { call_id: callId }), [bridge, meters, callId]);
 
   const receivedAt = useMemo(() => Date.now(), [cap?.version]);
   const ticking = cap?.phase === "recording" || cap?.phase === "paused" || (noticeShown?.type === "call_ended" && noticeShown.stops_at !== null);
@@ -145,36 +130,13 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
       }),
     [bridge],
   );
-  useEffect(() => {
-    for (const d of degraded) {
-      const a = "call_id" in d && d.call_id === callId ? failureAnnouncement(d) : null;
-      if (a) void announce(a);
-    }
-  }, [announce, degraded, callId]);
-  const prev = useRef<{
-    phase: CaptureState["phase"] | null;
-    notice: string | null;
-  }>({ phase: null, notice: null });
+  useEffect(() => failureAnnouncements(degraded, callId).forEach((a) => void announce(a)), [announce, degraded, callId]);
+  const prev = useRef<Seen | null>(null);
   useEffect(() => {
     if (!cap) return;
-    const was = prev.current;
+    captureAnnouncements(prev.current, cap, noticeShown).forEach((a) => void announce(a));
     prev.current = { phase: cap.phase, notice: noticeShown?.type ?? null };
-    if (was.phase === null) return; // what the window opened on is not news
-    const say = (e: AnnounceEvent) => void announce(e);
-    const at = `${callId}:${cap.version}`;
-    if (noticeShown && noticeShown.type !== was.notice) {
-      if (noticeShown.type === "call_ended" || noticeShown.type === "call_seems_ended") say({ kind: "call_ended", text: t("cw.notice.call_ended"), key: at });
-      if (noticeShown.type === "new_meeting")
-        say({
-          kind: "new_meeting",
-          text: noticeShown.event ? t("cw.notice.new_meeting", { title: noticeShown.event.title }) : t("cw.notice.new_meeting_untitled"),
-          key: at,
-        });
-    }
-    if (was.phase === "recording" && cap.phase === "paused") say({ kind: "recording", text: t("cw.announce.paused"), key: at });
-    if (was.phase === "paused" && cap.phase === "recording") say({ kind: "recording", text: t("cw.announce.resumed"), key: at });
-    if (!stopped({ phase: was.phase }) && stopped(cap)) say(stoppedAnnouncement(cap));
-  }, [announce, cap, noticeShown, callId]);
+  }, [announce, cap, noticeShown]);
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-store-capture
   // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-announce-failure
 
