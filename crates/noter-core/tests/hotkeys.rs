@@ -544,10 +544,7 @@ async fn a_pressed_hotkey_asks_the_core_as_a_native_caller() {
 async fn a_hotkey_press_runs_its_command_through_the_core() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open_with(dir.path(), Arc::new(Shortcuts::default()));
-    // M0 has no call window yet: the command itself answers not_implemented, nothing is faked.
-    let err = core.hotkey_pressed("Ctrl+Alt+Super+N").await.unwrap_err();
-    assert_eq!(
-        (err.code, err.message.as_str()),
-        (ErrorCode::NotImplemented, "window_show_call")
-    );
+    // The key is the command: Open Call Screen shows the call window through the core.
+    let shown = core.hotkey_pressed("Ctrl+Alt+Super+N").await.unwrap();
+    assert_eq!(shown["visible"], true);
 }

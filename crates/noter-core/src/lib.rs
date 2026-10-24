@@ -16,6 +16,7 @@ mod playback;
 mod recovery;
 mod self_test;
 mod settings;
+mod surfaces;
 #[cfg(feature = "harness")]
 pub mod testing;
 mod transcript;
@@ -44,6 +45,7 @@ pub use noter_llm::allowed_download_url;
 use noter_protocol::ipc::Sink;
 pub use notify::{Notification, NotificationKind};
 pub use settings::default_settings;
+pub use surfaces::{Placement, TrayAction, TrayGlyph, TrayItem, TrayModel};
 
 /// `~/Library/Application Support/Noter`: where the app keeps `noter.db` and `logs/`.
 pub fn default_data_dir() -> Option<std::path::PathBuf> {
@@ -216,6 +218,8 @@ pub struct Core {
     /// The capture machine's bookkeeping; held by each capture command while it applies.
     capture: tokio::sync::Mutex<capture::Session>,
     capture_hooks: Hooks<CaptureEvent>,
+    /// The call window's state, the presenting memory and the tray the native layer shows.
+    windows: Mutex<surfaces::Windows>,
     /// The capture phase as last published, for commands that wait on the engine.
     capture_phase: tokio::sync::watch::Sender<CapturePhase>,
     /// The call the main window reports it shows (`window_report_view`).
@@ -301,6 +305,7 @@ impl Core {
             self_test_hub: std::sync::OnceLock::new(),
             capture: tokio::sync::Mutex::new(capture::Session::default()),
             capture_hooks: Mutex::new(vec![]),
+            windows: Mutex::new(surfaces::Windows::default()),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
             viewed: Mutex::new(None),
             held: Mutex::new(Vec::new()),
@@ -309,6 +314,8 @@ impl Core {
             transcript: transcript::Transcript::new(data_dir.to_path_buf()),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
+        core.init_call_window();
+        core.refresh_tray(None);
         Ok(core)
     }
 
@@ -581,6 +588,104 @@ impl CoreApi for Core {
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {
         self.install_update().await
+    }
+
+    async fn window_show_call(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-show-call
+        Ok(self.show_call(true))
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-show-call
+    }
+
+    async fn window_hide_call(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+        Ok(self.hide_call())
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+    }
+
+    async fn window_call_state(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<CallWindowState, CoreError> {
+        Ok(self.call_window_now())
+    }
+
+    async fn window_set_call_layout(
+        &self,
+        ctx: &CommandCtx,
+        args: CallLayoutArgs,
+    ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+        self.set_call_layout(ctx, args)
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+    }
+
+    async fn window_set_collapsed(
+        &self,
+        _ctx: &CommandCtx,
+        args: CollapseArgs,
+    ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+        Ok(self.set_call_collapsed(args.collapsed))
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+    }
+
+    async fn app_set_hidden_for_presenting(
+        &self,
+        _ctx: &CommandCtx,
+        args: HiddenArgs,
+    ) -> Result<PresentingState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-presenting-call
+        Ok(self.set_hidden_for_presenting(args.hidden))
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-presenting-call
+    }
+
+    async fn window_navigate(
+        &self,
+        _ctx: &CommandCtx,
+        args: NavigateArgs,
+    ) -> Result<Ack, CoreError> {
+        self.navigate(args.target);
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-return-nav
+        Ok(Ack {})
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-return-nav
+    }
+
+    async fn window_report_view(
+        &self,
+        _ctx: &CommandCtx,
+        args: ViewReportArgs,
+    ) -> Result<Ack, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-report-view
+        self.report_view(args.call_id);
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-report-view
+        Ok(Ack {})
+    }
+
+    async fn window_announce(
+        &self,
+        _ctx: &CommandCtx,
+        args: AnnounceArgs,
+    ) -> Result<Ack, CoreError> {
+        self.announce(args)?;
+        Ok(Ack {})
+    }
+
+    async fn open_external(
+        &self,
+        _ctx: &CommandCtx,
+        args: OpenExternalArgs,
+    ) -> Result<Ack, CoreError> {
+        self.open_external(args.target)?;
+        Ok(Ack {})
     }
 
     async fn settings_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Settings, CoreError> {

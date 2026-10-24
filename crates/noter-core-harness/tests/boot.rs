@@ -803,8 +803,18 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     world["app"]["capture"]["call_id"] = json!(null);
     r.ok("main", "harness.world_set", json!({ "world": world }))
         .await;
+    // Windows only: the tray model is redrawn on every capture change.
+    let windows = |shown: Value| -> Vec<String> {
+        shown["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|c| c.as_str().filter(|c| !c.starts_with("set_tray")))
+            .map(String::from)
+            .collect()
+    };
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert_eq!(shown, json!({ "calls": [] }));
+    assert!(windows(shown).is_empty());
     // The scripted engine answers the session: the start records and the call window opens.
     let started = r
         .ok(
@@ -820,7 +830,9 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
         .await;
     assert_eq!(stopped["phase"], "stopped");
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert_eq!(shown, json!({ "calls": ["open_call_window_inactive"] }));
+    let windows = windows(shown);
+    assert_eq!(windows.len(), 1, "{windows:?}");
+    assert!(windows[0] == "open_call_window_inactive", "{windows:?}");
     r.finish().await;
 }
 

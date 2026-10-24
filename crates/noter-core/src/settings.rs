@@ -415,6 +415,8 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-side-effects
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-emit-settings
         let stamped = self.publish(event_names::SETTINGS_CHANGED, settings);
+        self.refresh_tray(Some(stamped.privacy.mode));
+        self.follow_call_screen(&stamped.call_screen);
         // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-emit-settings
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-return-settings
         stamped

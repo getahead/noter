@@ -374,6 +374,8 @@ impl Core {
     pub fn environment_changed(&self, reading: EnvironmentReading) {
         self.refresh_environment(reading);
         self.refresh_setup();
+        let call_screen = lock(&self.settings).call_screen.clone();
+        self.follow_call_screen(&call_screen);
     }
 
     /// Re-reads the environment (permission rows included) from the Mac.
