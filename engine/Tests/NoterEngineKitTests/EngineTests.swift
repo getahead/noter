@@ -173,7 +173,7 @@ final class WAVTests: XCTestCase {
 
 final class EngineLoopTests: XCTestCase {
     func engine(_ lines: Lines, source: AudioSource? = nil, models: [String] = ["whisper-turbo"]) -> EngineLoop {
-        EngineLoop(writer: writer(lines), engineVersion: "test", models: models, sandboxed: false, source: { source })
+        EngineLoop(writer: writer(lines), engineVersion: "test", models: models, sandboxed: false, source: { _ in source })
     }
 
     func testAnswersTheM0Commands() {
@@ -264,7 +264,7 @@ final class FileModeTests: XCTestCase {
         let sys = try WAV.read(try wav("sys", seconds: 0.5, amplitude: 0))
         let e = EngineLoop(
             writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false,
-            source: { FileAudioSource(mic: mic, sys: sys, realtime: false) })
+            source: { _ in FileAudioSource(mic: mic, sys: sys, realtime: false) })
         _ = e.handle(#"{"id":1,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":300}}"#)
         let result = try XCTUnwrap(lines.waitFor("self_test_result"))
         XCTAssertEqual(result["failure"] as? String, "zero_buffers")
