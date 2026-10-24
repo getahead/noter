@@ -303,18 +303,24 @@ impl Core {
     }
 
     /// Tells a running engine the detection rule; a stopped engine gets it after its `ready`.
+    /// Detection needs a running engine, so a stopped one starts when detection turns on.
+    // @cpt-begin:cpt-noter-algo-core-capture-session-detection:p1:inst-detect-ignore
     pub(crate) async fn send_detection(&self, on: bool) {
-        self.engine.set_detection_rule(on, vec![]);
+        let known = crate::notices::known_apps(&lock(&self.settings).general.ignored_apps);
+        self.engine.set_detection_rule(on, known.clone());
         if self.engine.state() == noter_engine_client::EngineState::Ready {
             let _ = self
                 .engine
                 .command(EngineCommand::SetDetection {
                     enabled: on,
-                    known_bundle_ids: vec![],
+                    known_bundle_ids: known,
                 })
                 .await;
+        } else if on {
+            let _ = self.engine.ensure_ready().await;
         }
     }
+    // @cpt-end:cpt-noter-algo-core-capture-session-detection:p1:inst-detect-ignore
 
     /// Decision F1: the System Audio Recording prompt comes from the engine opening its tap
     /// in a short self-test (no clip). What arrives is the inference: system audio heard →

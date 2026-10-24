@@ -19,7 +19,7 @@ noter-protocol = { path = "../noter-protocol" }
 serde = "1"
 serde_json = "1"
 sha2 = "0.11"
-tokio = { version = "1", features = ["rt"] }
+tokio = { version = "1", features = ["rt", "sync", "time"] }
 ulid = "3"
 
 [dev-dependencies]
@@ -29,7 +29,7 @@ noter-llm = { path = "../noter-llm", features = ["local-tests"] }
 noter-core = { path = ".", features = ["harness"] }
 tempfile = "3"
 sha2 = "0.11"
-tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "test-util", "time"] }
 
 # Perf scenarios (harness/perf.toml); `test = true` runs their one-round tests in `cargo test`.
 [[example]]

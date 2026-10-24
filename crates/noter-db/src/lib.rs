@@ -2,7 +2,9 @@
 //! change-log write path. The only crate that touches SQLite (`just arch`).
 //!
 //! Callers read with plain SQL through `rusqlite` (re-exported) and write only through
-//! [`Store::write`] / [`Store::write_batch`], which commit each row with its `changes` row.
+//! [`Store::write`] / [`Store::write_batch`] / [`Store::write_with`], which commit each row with
+//! its `changes` row, [`Store::insert_batch`] for capture data (no change row) and
+//! [`Store::delete`] (one content-free change row per record).
 
 // @cpt-component:cpt-noter-component-core-storage:p1
 // @cpt-component:cpt-noter-component-core-changelog:p1

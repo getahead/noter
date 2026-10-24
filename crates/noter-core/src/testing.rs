@@ -1,6 +1,7 @@
 //! Hooks for `noter-core-harness` only (feature `harness`); the app never enables it.
 
-use noter_protocol::model::{ModelsStatus, SelfTestState};
+use noter_protocol::model::{CaptureState, ModelsStatus, SelfTestState};
+use noter_protocol::CoreError;
 
 use crate::Core;
 
@@ -20,4 +21,14 @@ pub fn system_audio_probing(core: &Core) -> bool {
 /// `models/`. A running download keeps its own states.
 pub fn seed_models(core: &Core, wanted: &ModelsStatus) {
     core.seed_models(wanted);
+}
+
+/// Seeds the capture state as `harness.world_set` asks; the call it names gets its `calls` row.
+pub async fn seed_capture(core: &Core, state: CaptureState) -> Result<(), CoreError> {
+    core.seed_capture(state).await
+}
+
+/// Hidden for presenting, as `harness.world_set` asks.
+pub fn seed_presenting(core: &Core, hidden: bool) {
+    core.seed_presenting(hidden);
 }

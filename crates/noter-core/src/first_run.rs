@@ -58,6 +58,12 @@ pub trait NativeServices: Send + Sync {
         let _ = on_change;
     }
     fn set_login_item(&self, on: bool) -> Result<(), CoreError>;
+    /// The calendar event running at `at` or starting within 10 minutes, when calendar access is
+    /// granted (EventKit; none until native surfaces read the calendar).
+    fn calendar_event_near(&self, at: TimestampMs) -> Option<CalendarEventRef> {
+        let _ = at;
+        None
+    }
 }
 
 /// One pinned model bundle of the compiled-in manifest: the files of one model folder at a
@@ -321,6 +327,7 @@ impl Core {
         let launch = lock(&self.settings).general.launch_at_login;
         self.apply_login_item(launch);
         self.environment_changed(self.deps.native.environment());
+        self.start_capture();
     }
 
     fn apply_login_item(&self, on: bool) {
@@ -489,9 +496,13 @@ impl Core {
         let mut fr = lock(&self.first_run);
         fr.stored.self_test = state;
         fr.stored.system_audio = None;
+        let (on, _) = detection(fr.offer_to_record, &fr.stored.self_test);
         drop(fr);
         self.refresh_environment(self.deps.native.environment());
         self.refresh_setup();
+        if let Some(core) = self.this() {
+            self.spawn(async move { core.send_detection(on).await });
+        }
     }
 
     // @cpt-dod:cpt-noter-dod-core-first-run-status:p1

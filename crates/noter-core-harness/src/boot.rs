@@ -15,16 +15,16 @@ use std::sync::{Arc, Mutex};
 
 use noter_core::{
     BoxFuture as CoreFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, SystemClock,
-    Updater,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Surfaces,
+    SystemClock, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
-use noter_protocol::engine::{EngineErrorCode, EngineEvent};
+use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::{
-    AudioChannel, CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs,
+    AudioChannel, CallId, CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -49,6 +49,7 @@ pub struct Harness {
     updater: Arc<ScriptedUpdater>,
     models: Arc<TinyModels>,
     engine: ScriptedEngine,
+    surfaces: Arc<ScriptedSurfaces>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -101,11 +102,16 @@ impl Harness {
             None => engine,
         };
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
-        let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
-            .with_native(native.clone())
-            .with_models(models.clone())
-            .with_engine(Arc::new(engine.clone()))
-            .with_updater(updater.clone());
+        let surfaces = Arc::new(ScriptedSurfaces::default());
+        let deps = CoreDeps::new(
+            clock,
+            Arc::new(EventLines(lines, seeding.clone(), engine.clone())),
+        )
+        .with_native(native.clone())
+        .with_models(models.clone())
+        .with_engine(Arc::new(engine.clone()))
+        .with_updater(updater.clone())
+        .with_surfaces(surfaces.clone());
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-inject
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
@@ -119,6 +125,7 @@ impl Harness {
             updater,
             models,
             engine,
+            surfaces,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -157,6 +164,9 @@ impl Harness {
         self.write_setup(&wanted["app"]["setup"]).await?;
         if !w.app.banners.banners.is_empty() {
             self.core.set_banners(w.app.banners.banners.clone());
+        }
+        if w.app.capture.phase != CapturePhase::Idle {
+            noter_core::testing::seed_capture(&self.core, w.app.capture.clone()).await?;
         }
         Ok(())
     }
@@ -407,6 +417,14 @@ impl Harness {
         if current["app"]["banners"]["banners"] != wanted["app"]["banners"]["banners"] {
             self.core.set_banners(parsed.app.banners.banners.clone());
         }
+        let unversioned = |v: &Value| {
+            let mut v = v.clone();
+            v["version"] = Value::Null;
+            v
+        };
+        if unversioned(&current["app"]["capture"]) != unversioned(&wanted["app"]["capture"]) {
+            noter_core::testing::seed_capture(&self.core, parsed.app.capture.clone()).await?;
+        }
         // Derived fields are the core's to compute; a world that disagrees with it is a preset
         // that drifted from the core's rules (what was applied stays applied).
         let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
@@ -498,7 +516,7 @@ fn parse<T: serde::de::DeserializeOwned>(args: Value, usage: &str) -> Result<T, 
 
 /// App snapshot slices the harness can set on the M0 core; `window` is the caller's own and the
 /// version-only slices follow their owners.
-const OWNED_APP: &[&str] = &["setup", "environment", "banners", "window"];
+const OWNED_APP: &[&str] = &["setup", "environment", "banners", "window", "capture"];
 
 impl Controls for Harness {
     fn control<'a>(
@@ -511,6 +529,8 @@ impl Controls for Harness {
                 "world_get" => self.world_get().await,
                 "world_set" => self.world_set(args).await,
                 "push" => self.push(args).await,
+                // `{}`: what the core asked the native layer to show, in order (TL-2).
+                "surfaces" => Ok(json!({ "calls": *lock(&self.surfaces.0) })),
                 // `{}`: the next model download delivers bytes that fail their checksum.
                 "corrupt_next_download" => {
                     self.models.corrupt_next.store(true, Ordering::SeqCst);
@@ -588,15 +608,62 @@ impl Clock for Fixed {
 }
 
 /// Core events as event lines.
-struct EventLines(Lines, Arc<AtomicBool>);
+struct EventLines(Lines, Arc<AtomicBool>, ScriptedEngine);
 
 impl EventEmitter for EventLines {
     fn emit(&self, event: &'static str, payload: Value) {
+        if event == noter_protocol::ipc::event_names::CAPTURE_STATE {
+            answer_session(&self.2, &payload);
+        }
         // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-write-events
         if !self.1.load(Ordering::SeqCst) {
             self.0.event(event, payload);
         }
         // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-write-events
+    }
+}
+
+/// The engine reports the session the core asked for: `session_started` once it has the
+/// `start_session`, `session_stopped` once it has the `stop`.
+// shortcut: stands in for the engine script's default answers (TL-3); drop it when the
+// harness boots with a script that answers sessions.
+fn answer_session(engine: &ScriptedEngine, state: &Value) {
+    let Some(call_id) = state["call_id"].as_str().map(CallId::new) else {
+        return;
+    };
+    let (asked, answer): (fn(&EngineCommand) -> bool, EngineEvent) = match state["phase"].as_str() {
+        Some("starting") => (
+            |c| matches!(c, EngineCommand::StartSession(_)),
+            EngineEvent::SessionStarted {
+                call_id,
+                mic_device: "Scripted Microphone".into(),
+                output_device: "Scripted Speakers".into(),
+            },
+        ),
+        Some("stopping") => (
+            |c| matches!(c, EngineCommand::Stop { .. }),
+            EngineEvent::SessionStopped {
+                timeline_path: format!("audio/{call_id}/timeline.json"),
+                call_id,
+                mic_path: None,
+                sys_path: None,
+            },
+        ),
+        _ => return,
+    };
+    let count = move |e: &ScriptedEngine| e.commands().iter().filter(|c| asked(c)).count();
+    let before = count(engine);
+    let engine = engine.clone();
+    if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+        runtime.spawn(async move {
+            for _ in 0..250 {
+                if count(&engine) > before {
+                    engine.inject(answer);
+                    return;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+        });
     }
 }
 
@@ -825,6 +892,22 @@ fn hex(bytes: &[u8]) -> String {
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
 /// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
 /// the harness's.
+/// The native layer's windows, as the calls the core made (TL-2).
+#[derive(Default)]
+struct ScriptedSurfaces(Mutex<Vec<&'static str>>);
+
+impl Surfaces for ScriptedSurfaces {
+    fn show_record_prompt(&self) {
+        lock(&self.0).push("show_record_prompt");
+    }
+    fn close_record_prompt(&self) {
+        lock(&self.0).push("close_record_prompt");
+    }
+    fn open_call_window_inactive(&self) {
+        lock(&self.0).push("open_call_window_inactive");
+    }
+}
+
 struct ScriptedUpdater(Mutex<Option<UpdateInfo>>);
 
 impl Updater for ScriptedUpdater {
