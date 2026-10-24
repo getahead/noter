@@ -158,6 +158,7 @@ impl Core {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-live-transcript-persist:p1
     // @cpt-algo:cpt-noter-algo-core-live-transcript-batch:p1
     // @cpt-state:cpt-noter-state-core-live-transcript-segment:p1
     fn on_segment(&self, seg: EngineSegment) {
@@ -201,7 +202,9 @@ impl Core {
             live.open.push(view);
             // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-add-confirmed
         }
+        // @cpt-begin:cpt-noter-algo-core-live-transcript-batch:p1:inst-return-batch
         self.arm(&call_id, live);
+        // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-return-batch
     }
 
     // @cpt-algo:cpt-noter-algo-core-live-transcript-speakers:p1
@@ -220,6 +223,7 @@ impl Core {
     }
 
     fn on_levels(&self, call_id: Option<CallId>, mic_db: f32, sys_db: f32, at: TimestampMs) {
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-forward
         let key = call_id.as_ref().map_or("", CallId::as_str);
         let origin = *lock(&self.transcript.state)
             .levels_origin
@@ -234,6 +238,7 @@ impl Core {
                 sys_db,
             },
         );
+        // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-forward
     }
 
     /// The state of a call that captures, loaded from its stored speakers the first time.
@@ -342,8 +347,10 @@ impl Core {
     fn publish_event(&self, call_id: &CallId, event: TranscriptEvent) {
         // Under the state lock like every publish, so a snapshot never falls between two.
         let _state = lock(&self.transcript.state);
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-deliver
         self.transcript_hub()
             .publish(call_id.as_str(), TranscriptMsg { seq: Seq(0), event });
+        // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-deliver
     }
 
     /// The call ended (`CallStopped`) or was thrown away (`Discarded`): the last batch commits,
@@ -352,7 +359,9 @@ impl Core {
     // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-end-stream
     pub(crate) fn call_ended(&self, call_id: &CallId, reason: StreamEndReason) {
         if reason != StreamEndReason::Discarded {
+            // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
             self.flush(call_id);
+            // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
             if let Err(e) = self.write_transcript_file(call_id) {
                 self.log_error("file", &e);
             }
@@ -363,6 +372,7 @@ impl Core {
     // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-end-stream
 
     /// `audio/<call_id>/transcript.jsonl`, 0600: a temporary file renamed into place.
+    // @cpt-dod:cpt-noter-dod-core-live-transcript-span-file:p2
     // @cpt-algo:cpt-noter-algo-core-live-transcript-file:p2
     fn write_transcript_file(&self, call_id: &CallId) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
@@ -381,7 +391,9 @@ impl Core {
             writeln!(file, "{}", to_json(segment)).map_err(internal)?;
         }
         file.sync_all().map_err(internal)?;
+        // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
         std::fs::rename(&tmp, dir.join("transcript.jsonl")).map_err(internal)
+        // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
     }
 
@@ -399,10 +411,13 @@ impl Core {
         args: TranscriptSubscribeArgs,
         channel: Sink<TranscriptMsg>,
     ) -> Result<TranscriptSnapshot, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-subscribe-call
+        let id = &args.call_id;
+        // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-subscribe-call
         // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-if-unknown
         let call = self
             .store
-            .read(|c| call_state(c, &args.call_id))?
+            .read(|c| call_state(c, id))?
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "no such call"))?;
         // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-if-unknown
         if !call.live {
@@ -499,6 +514,9 @@ impl Core {
         args: SubscribeLevelsArgs,
         channel: Sink<LevelsMsg>,
     ) -> Result<SubscriptionHandle, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-call
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-end
+        // The subscription ends with `stream_unsubscribe` or a webview reload: the core's hubs do it.
         // @cpt-begin:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-handle
         let key = args.call_id.as_ref().map_or("", CallId::as_str);
         let subscribed = self.subscribe(&self.levels_hub(), key, ctx, channel, || Ok(()))?;
@@ -506,11 +524,15 @@ impl Core {
             subscription_id: subscribed.subscription_id,
         })
         // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-handle
+        // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-end
+        // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-call
     }
 
     // @cpt-flow:cpt-noter-flow-core-live-transcript-span:p2
     pub(crate) fn span_preview(&self, args: SpanArgs) -> Result<SpanPreview, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-span:p2:inst-span-call
         let span = args.span;
+        // @cpt-end:cpt-noter-flow-core-live-transcript-span:p2:inst-span-call
         let call_id = span.call_id.clone();
         let found = self.store.read(|c| {
             let (Some(call), Some(state)) = (call_ref(c, &call_id)?, call_state(c, &call_id)?)
@@ -699,7 +721,10 @@ impl Live {
             speaker_id: SpeakerId::new(format!("spk_{}", ulid::Ulid::generate())),
             label: speaker_label(channel, label, n.map(i64::from), None),
         };
+        // @cpt-begin:cpt-noter-algo-core-live-transcript-speakers:p1:inst-you
         let named_by = matches!(speaker.label, SpeakerLabel::You).then_some("you");
+        // @cpt-end:cpt-noter-algo-core-live-transcript-speakers:p1:inst-you
+        // @cpt-begin:cpt-noter-algo-core-live-transcript-speakers:p1:inst-new-speaker
         self.rows.push(Insert {
             table: "speakers",
             values: vec![
@@ -712,9 +737,12 @@ impl Live {
                 ("named_by", json!(named_by)),
             ],
         });
+        // @cpt-end:cpt-noter-algo-core-live-transcript-speakers:p1:inst-new-speaker
         self.speakers
             .insert(key, speaker_view(call_id, &speaker, channel));
+        // @cpt-begin:cpt-noter-algo-core-live-transcript-speakers:p1:inst-return-speaker
         speaker
+        // @cpt-end:cpt-noter-algo-core-live-transcript-speakers:p1:inst-return-speaker
     }
 }
 
