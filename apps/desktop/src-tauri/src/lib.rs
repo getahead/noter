@@ -69,6 +69,11 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let _ = events.0.set(app.handle().clone());
+            // Once, before the event loop: noter-native runs the handler on the main thread.
+            let clicked = app.handle().clone();
+            noter_native::on_notification_click(Box::new(move |target| {
+                surfaces::notification_clicked(&clicked, target)
+            }));
             let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
             let updater = Arc::new(updater::TauriUpdater::new(app.handle().clone()));
             let group = noter_core::default_data_dir()

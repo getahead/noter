@@ -108,12 +108,12 @@ fn a_notification_carries_its_call_as_thread_and_where_a_click_goes() {
             confidence: 0.9,
         }),
     };
-    let posted = posted(&silent);
-    assert_eq!(posted.title, "System audio silent");
-    assert_eq!(posted.body, "Recording continues with your microphone.");
-    assert_eq!(posted.thread, call_id);
+    let sent = posted(&silent);
+    assert_eq!(sent.title, "System audio silent");
+    assert_eq!(sent.body, "Recording continues with your microphone.");
+    assert_eq!(sent.thread, call_id);
     assert_eq!(
-        posted.target,
+        sent.target,
         NavTarget::CallPage {
             call_id: call_id.clone(),
             tab: CallPageTab::Transcript,
@@ -139,17 +139,17 @@ fn a_notification_carries_its_call_as_thread_and_where_a_click_goes() {
         call_id: call_id.clone(),
         kind: NotificationKind::SummaryReady,
     };
-    let posted = posted(&ready);
-    assert_eq!(posted.title, "Summary ready");
+    let summary = posted(&ready);
+    assert_eq!(summary.title, "Summary ready");
     assert!(matches!(
-        posted.target,
+        summary.target,
         NavTarget::CallPage {
             tab: CallPageTab::Summary,
             ..
         }
     ));
     assert_ne!(
-        posted.id,
+        summary.id,
         posted(&ready).id,
         "every post is its own notification"
     );

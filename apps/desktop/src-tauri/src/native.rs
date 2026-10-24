@@ -6,7 +6,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use noter_core::{BoxFuture, EnvironmentReading, NativeServices};
-use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState};
+use noter_protocol::model::CalendarEventRef;
+use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs};
 
 /// The Mac; `storage` is the folder whose volume's free space counts.
 pub struct Mac {
@@ -28,7 +29,9 @@ fn reading(r: noter_native::Reading) -> EnvironmentReading {
         displays: r.displays,
         output_device: r.output_device,
         output_route: r.output_route,
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
         notifications: r.notifications,
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
         online: r.online,
         disk_free_mb: r.disk_free_mb,
     }
@@ -58,6 +61,17 @@ impl NativeServices for Mac {
             on_change(reading(r))
         });
         *self.watch.lock().unwrap_or_else(|e| e.into_inner()) = Some(watch);
+    }
+
+    /// The calendar event around `at` (EventKit through noter-native; never asks for access).
+    fn calendar_event_near(&self, at: TimestampMs) -> Option<CalendarEventRef> {
+        // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-fail
+        // EventKit reports no error: a read that throws is the failure, logged, and no event.
+        std::panic::catch_unwind(|| noter_native::calendar_event_near(at.0)).unwrap_or_else(|_| {
+            eprintln!("noter: the calendar read failed");
+            None
+        })
+        // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-fail
     }
 
     // @cpt-dod:cpt-noter-dod-core-first-run-login-update:p2

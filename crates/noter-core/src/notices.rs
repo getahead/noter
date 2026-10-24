@@ -502,8 +502,7 @@ impl Core {
 
     /// Start as New Call: the live call ends at the new meeting's `detected_at` and a new call
     /// starts there, named after the calendar event, else the meeting app.
-    // shortcut: the saved call is not offered Continue (one CaptureState holds one call); add a
-    // second Continue slot when the UI needs it.
+    // D-33: the saved call is closed for good; only the live call can be stopped and continued.
     async fn split_call(&self, ctx: &CommandCtx) -> Result<CaptureState, CoreError> {
         // The notice is checked and the old call stopped under one lock.
         let mut session = self.capture.lock().await;

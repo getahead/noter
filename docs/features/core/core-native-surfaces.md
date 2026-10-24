@@ -166,7 +166,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Allow and deliver notifications
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-notifications`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-notifications`
 
 **Actor**: Primary user (allows notifications from the call's page after a first call); the capture session (asks to send)
 
@@ -180,10 +180,10 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 **Steps**:
 1. [x] - `p1` - `permission_request { kind: notifications }` (`cpt-noter-flow-core-first-run-permission`) calls `requestAuthorization` through `noter-native` - `inst-request-auth`
-2. [ ] - `p1` - Read the notification settings into `EnvironmentState.notifications` (`not_determined`, `denied`, `authorized`) at launch and on change; emit `env:changed` - `inst-read-auth`
+2. [x] - `p1` - Read the notification settings into `EnvironmentState.notifications` (`not_determined`, `denied`, `authorized`) at launch and on change; emit `env:changed` - `inst-read-auth`
 3. [x] - `p1` - When the session's rule (`cpt-noter-algo-core-capture-session-notify`) says send, post through `UNUserNotificationCenter` with `threadIdentifier` = call id and `userInfo` = `NavTarget` - `inst-post`
-4. [ ] - `p1` - On a click, emit `nav:request` with the `NavTarget` and bring the main window forward - `inst-click`
-5. [ ] - `p1` - **RETURN** - `inst-return-notify`
+4. [x] - `p1` - On a click, emit `nav:request` with the `NavTarget` and bring the main window forward - `inst-click`
+5. [x] - `p1` - **RETURN** - `inst-return-notify`
 
 ### Navigate, announce, report and open
 
@@ -236,7 +236,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Calendar facts for detection
 
-- [ ] `p2` - **ID**: `cpt-noter-algo-core-native-surfaces-calendar`
+- [x] `p2` - **ID**: `cpt-noter-algo-core-native-surfaces-calendar`
 
 **Input**: Calendar authorization; a time window.
 
@@ -245,7 +245,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Steps**:
 1. [x] - `p1` - **IF** calendar access is not granted, **RETURN** none (never ask here; asking is `permission_request`) - `inst-no-access`
 2. [x] - `p1` - Read events from EventKit for the window - `inst-read-events`
-3. [ ] - `p1` - **IF** the read fails, add `CalendarAccessDenied` or log it, and **RETURN** none - `inst-read-fail`
+3. [x] - `p1` - **IF** the read fails, add `CalendarAccessDenied` or log it, and **RETURN** none - `inst-read-fail`
 4. [x] - `p1` - **RETURN** the events as `CalendarEventRef` - `inst-return-events`
 
 ### Native E2E command log
@@ -330,7 +330,7 @@ The system **MUST** show recording state, the call and the privacy mode in the t
 
 ### Notifications
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-notifications`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-notifications`
 
 The system **MUST** use `UNUserNotificationCenter` through `noter-native` (not `tauri-plugin-notification`): request authorization only from `permission_request`, report it in `EnvironmentState.notifications`, post with a thread per call and a `NavTarget`, and turn a click into `nav:request`.
 

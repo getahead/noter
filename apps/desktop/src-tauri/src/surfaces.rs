@@ -7,18 +7,25 @@
 //! in tauri-nspanel once deny.toml allows its git source (owner item NB10).
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
-use noter_core::{Core, Notification, Placement, Surfaces, TrayAction, TrayGlyph, TrayModel};
-use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, CoreApi, NativeSurface};
-use noter_protocol::model::{
-    AppSnapshot, CallLayout, DisplayInfo, ExternalTarget, Politeness, WindowLabel,
+use noter_core::{
+    Core, Notification, NotificationKind, Placement, Surfaces, TrayAction, TrayGlyph, TrayModel,
 };
-use noter_protocol::{NoArgs, PermissionKind, PrivacyMode};
+use noter_native::{Frame, PostedNotification};
+use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
+use noter_protocol::model::{
+    AppSnapshot, CallLayout, CallPageTab, DegradedState, DisplayInfo, ExternalTarget, NavTarget,
+    Politeness, WindowLabel,
+};
+use noter_protocol::{DisplayId, NoArgs, PermissionKind, PrivacyMode};
 use serde_json::{json, Value};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow};
+use tauri::{
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
+};
 
 /// Floating call panel and its collapsed strip, record prompt (points).
 const PANEL: (f64, f64) = (380.0, 600.0);
@@ -28,33 +35,24 @@ const PROMPT: (f64, f64) = (360.0, 132.0);
 const MARGIN: f64 = 16.0;
 const MENU_BAR: f64 = 32.0;
 
-/// A display's area in global logical points (top-left origin).
-#[derive(Debug, Clone, PartialEq)]
-pub struct Screen {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-    pub primary: bool,
+/// The frame of the call display: the chosen display by identity, else (none chosen, or
+/// unplugged) the main display; `frame` is noter-native's `display_frame`.
+// @cpt-begin:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-read-displays
+pub fn frame_of(
+    chosen: Option<&DisplayId>,
+    displays: &[DisplayInfo],
+    frame: impl Fn(&DisplayId) -> Option<Frame>,
+) -> Option<Frame> {
+    let main = || displays.iter().find(|d| d.is_main).or(displays.first());
+    chosen
+        .and_then(|id| displays.iter().find(|d| d.id == *id))
+        .or_else(main)
+        .and_then(|d| frame(&d.id))
 }
-
-/// The screen of `display` among the Mac's displays (the primary one without a display).
-// shortcut: noter-native's display names are plain labels, so the main display is the primary
-// monitor and the others are matched by size; use noter-native's display frame once it lands.
-pub fn screen_of<'a>(display: Option<&DisplayInfo>, screens: &'a [Screen]) -> Option<&'a Screen> {
-    let primary = || screens.iter().find(|s| s.primary).or(screens.first());
-    let Some(d) = display else { return primary() };
-    if d.is_main {
-        return primary();
-    }
-    screens
-        .iter()
-        .find(|s| !s.primary && s.width as u32 == d.width_pt && s.height as u32 == d.height_pt)
-        .or_else(primary)
-}
+// @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-read-displays
 
 /// Where the call window goes: the whole display (dedicated) or a panel in its top-right corner.
-pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Screen) -> (f64, f64, f64, f64) {
+pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Frame) -> (f64, f64, f64, f64) {
     match layout {
         CallLayout::Dedicated => (
             screen.x,
@@ -183,6 +181,79 @@ pub fn settings_url(permission: PermissionKind) -> &'static str {
     }
 }
 
+/// What a notification says and where its click goes (NT-3 opens the call's transcript).
+pub fn posted(n: &Notification) -> PostedNotification {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    let (title, body, tab) = match &n.kind {
+        NotificationKind::CaptureProblem(DegradedState::SystemAudioSilent { .. }) => (
+            "System audio silent",
+            "Recording continues with your microphone.",
+            CallPageTab::Transcript,
+        ),
+        NotificationKind::CaptureProblem(DegradedState::MicrophoneOff { .. }) => (
+            "Microphone off",
+            "Only the other side of the call is recorded.",
+            CallPageTab::Transcript,
+        ),
+        NotificationKind::CaptureProblem(_) => (
+            "Not recording · engine stopped",
+            "Try Again on the call screen.",
+            CallPageTab::Transcript,
+        ),
+        NotificationKind::SummaryReady => ("Summary ready", "", CallPageTab::Summary),
+    };
+    PostedNotification {
+        id: format!("ntf_{}_{}", n.call_id, NEXT.fetch_add(1, Ordering::Relaxed)),
+        title: title.into(),
+        body: body.into(),
+        thread: n.call_id.clone(),
+        target: NavTarget::CallPage {
+            call_id: n.call_id.clone(),
+            tab,
+            span: None,
+        },
+    }
+}
+
+/// A clicked notification: the main window comes forward and is asked to navigate.
+// @cpt-flow:cpt-noter-flow-core-native-surfaces-notifications:p1
+// @cpt-dod:cpt-noter-dod-core-native-surfaces-notifications:p1
+// @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
+pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
+    if let Some(main) = window(app, WindowLabel::Main) {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    let _ = app.emit(event_names::NAV_REQUEST, target);
+}
+// @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
+
+/// The window, created hidden on first use at `index.html?window=<label>`.
+fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewWindow<R>> {
+    if let Some(w) = app.get_webview_window(label.as_str()) {
+        return Some(w);
+    }
+    let url = WebviewUrl::App(format!("index.html?window={}", label.as_str()).into());
+    let builder = tauri::WebviewWindowBuilder::new(app, label.as_str(), url)
+        .title("Noter")
+        .visible(false);
+    let builder = if matches!(label, WindowLabel::CallScreen | WindowLabel::RecordPrompt) {
+        // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
+        // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
+        builder
+            .content_protected(true)
+            .always_on_top(true)
+            .visible_on_all_workspaces(true)
+            .focused(false)
+            .skip_taskbar(true)
+        // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
+        // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
+    } else {
+        builder
+    };
+    builder.build().ok()
+}
+
 /// The host's `Surfaces`: Tauri windows, the tray, `open`.
 pub struct TauriSurfaces<R: Runtime> {
     app: AppHandle<R>,
@@ -213,56 +284,14 @@ impl<R: Runtime> TauriSurfaces<R> {
         let _ = self.core.set(Arc::downgrade(core));
     }
 
-    /// The window, created hidden on first use at `index.html?window=<label>`.
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
-        if let Some(w) = self.app.get_webview_window(label.as_str()) {
-            return Some(w);
-        }
-        let url = WebviewUrl::App(format!("index.html?window={}", label.as_str()).into());
-        let builder = tauri::WebviewWindowBuilder::new(&self.app, label.as_str(), url)
-            .title("Noter")
-            .visible(false);
-        let builder = if matches!(label, WindowLabel::CallScreen | WindowLabel::RecordPrompt) {
-            // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
-            // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
-            builder
-                .content_protected(true)
-                .always_on_top(true)
-                .visible_on_all_workspaces(true)
-                .focused(false)
-                .skip_taskbar(true)
-            // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
-            // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
-        } else {
-            builder
-        };
-        builder.build().ok()
+        window(&self.app, label)
     }
 
-    fn screens(&self) -> Vec<Screen> {
-        let primary = self
-            .app
-            .primary_monitor()
-            .ok()
-            .flatten()
-            .map(|m| *m.position());
-        self.app
-            .available_monitors()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|m| {
-                let scale = m.scale_factor();
-                let pos = m.position().to_logical::<f64>(scale);
-                let size = m.size().to_logical::<f64>(scale);
-                Screen {
-                    x: pos.x,
-                    y: pos.y,
-                    width: size.width,
-                    height: size.height,
-                    primary: primary == Some(*m.position()),
-                }
-            })
-            .collect()
+    /// The call display's frame, or the main display's.
+    fn frame(&self, chosen: Option<&DisplayId>) -> Option<Frame> {
+        let displays = noter_native::environment(&self.storage).displays;
+        frame_of(chosen, &displays, noter_native::display_frame)
     }
 
     fn place(window: &WebviewWindow<R>, (x, y, w, h): (f64, f64, f64, f64)) {
@@ -274,14 +303,8 @@ impl<R: Runtime> TauriSurfaces<R> {
         let Some(window) = self.window(WindowLabel::CallScreen) else {
             return;
         };
-        let displays = noter_native::environment(&self.storage).displays;
-        let display = placement
-            .display_id
-            .as_ref()
-            .and_then(|id| displays.iter().find(|d| d.id == *id));
-        let screens = self.screens();
-        if let Some(screen) = screen_of(display, &screens) {
-            Self::place(&window, call_frame(placement.layout, collapsed, screen));
+        if let Some(frame) = self.frame(placement.display_id.as_ref()) {
+            Self::place(&window, call_frame(placement.layout, collapsed, &frame));
         }
     }
 
@@ -352,7 +375,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         let Some(prompt) = self.window(WindowLabel::RecordPrompt) else {
             return;
         };
-        if let Some(screen) = screen_of(None, &self.screens()) {
+        if let Some(screen) = self.frame(None) {
             let x = screen.x + screen.width - PROMPT.0 - MARGIN;
             Self::place(
                 &prompt,
@@ -450,8 +473,10 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
 
-    fn announce(&self, _text: &str, _politeness: Politeness) {
-        // shortcut: no NSAccessibility announcement until noter-native's announce lands (be-eng-2).
+    fn announce(&self, text: &str, politeness: Politeness) {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-announce
+        noter_native::announce(text, politeness);
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-announce
     }
 
     fn open_external(&self, target: &ExternalTarget) {
@@ -479,7 +504,14 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             .unwrap_or(false)
     }
 
-    fn post_notification(&self, _notification: &Notification) {
-        // shortcut: delivered once noter-native's UNUserNotificationCenter post lands (be-eng-2).
+    fn post_notification(&self, notification: &Notification) {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
+        if let Err(e) = noter_native::post_notification(&posted(notification)) {
+            eprintln!("noter: a notification was not posted: {e}");
+        }
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
+        // Delivery is fire-and-forget: a click comes back through `notification_clicked`.
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
     }
 }
