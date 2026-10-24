@@ -1,9 +1,7 @@
 //! Hooks for `noter-core-harness` only (feature `harness`); the app never enables it.
 
-use noter_protocol::model::{
-    CaptureState, GapView, MarkView, ModelsStatus, SelfTestState, StreamEndReason,
-};
-use noter_protocol::{CallId, CoreError};
+use noter_protocol::model::{CaptureState, ModelsStatus, SelfTestState};
+use noter_protocol::CoreError;
 
 use crate::Core;
 
@@ -40,17 +38,9 @@ pub async fn engine_ready(core: &Core) {
     let _ = core.engine.ensure_ready().await;
 }
 
-/// The capture session's calls into the transcript (the session lands in its own PR).
-pub fn end_call(core: &Core, call_id: &CallId, reason: StreamEndReason) {
-    core.call_ended(call_id, reason);
-}
-
-pub fn publish_gap(core: &Core, gap: GapView) {
-    core.publish_gap(gap);
-}
-
-pub fn publish_mark(core: &Core, mark: MarkView) {
-    core.publish_mark(mark);
+/// The session's event to its listeners, as capture sends it after a commit.
+pub fn capture_event(core: &Core, event: crate::capture::CaptureEvent) {
+    core.capture_event(event);
 }
 
 /// The next transcript commit "crashes" before it publishes (D-27: never in a release build).

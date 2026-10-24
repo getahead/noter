@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use noter_core::{testing, Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{testing, CaptureEvent, Clock, Core, CoreDeps, EventEmitter};
 use noter_db::{Insert, Mutation};
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_engine_client::EngineLauncher;
@@ -336,8 +336,8 @@ async fn the_session_calls_reach_subscribers_and_the_snapshot_holds_the_rows() {
         t1_ms: OffsetMs(2000),
         reason: GapReason::EngineRestart,
     };
-    testing::publish_mark(&r.core, mark.clone());
-    testing::publish_gap(&r.core, gap.clone());
+    testing::capture_event(&r.core, CaptureEvent::Mark(mark.clone()));
+    testing::capture_event(&r.core, CaptureEvent::Gap(gap.clone()));
     assert_eq!(
         events(&got),
         vec![TranscriptEvent::Mark { mark }, TranscriptEvent::Gap { gap }]
@@ -412,7 +412,13 @@ async fn stopping_commits_the_last_batch_writes_the_file_and_ends_streams() {
         .join("audio/call_live/transcript.jsonl.tmp")
         .exists());
     // A second stop (the session's own call) changes nothing.
-    testing::end_call(&r.core, &call_id(), StreamEndReason::CallStopped);
+    testing::capture_event(
+        &r.core,
+        CaptureEvent::Stopped {
+            call_id: call_id(),
+            reason: StreamEndReason::CallStopped,
+        },
+    );
     assert_eq!(events(&got).len(), 2);
 }
 
@@ -426,7 +432,13 @@ async fn a_discarded_call_drops_its_open_batch_and_writes_no_file() {
     r.engine
         .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "secret"));
     settle(10).await;
-    testing::end_call(&r.core, &call_id(), StreamEndReason::Discarded);
+    testing::capture_event(
+        &r.core,
+        CaptureEvent::Stopped {
+            call_id: call_id(),
+            reason: StreamEndReason::Discarded,
+        },
+    );
     settle(400).await;
     assert_eq!(
         events(&got),

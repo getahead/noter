@@ -278,7 +278,7 @@ impl Core {
         lock(&self.capture_hooks).push(Box::new(hook));
     }
 
-    fn capture_event(&self, event: CaptureEvent) {
+    pub(crate) fn capture_event(&self, event: CaptureEvent) {
         for hook in lock(&self.capture_hooks).iter() {
             hook(&event);
         }
