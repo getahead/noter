@@ -14,9 +14,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    BoxFuture as CoreFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Placement, Surfaces,
-    SystemClock, TrayModel, Updater,
+    BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock, Core,
+    CoreDeps, EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Placement,
+    Surfaces, SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -142,7 +142,7 @@ impl Harness {
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-seed
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
         if options.fixture {
-            harness.feed_engine(&w);
+            harness.feed_engine();
         }
         seeding.store(false, Ordering::SeqCst);
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
@@ -156,37 +156,9 @@ impl Harness {
     /// so a window subscribed to it sees a stream that moves. Nothing is delivered until the
     /// engine runs (subscribing to a stream starts it). Confirmed lines are not invented: they
     /// would add rows the fixture does not have.
-    fn feed_engine(&self, w: &FakeWorld) {
-        let fixture_call = w.app.capture.call_id.clone();
-        let hypotheses: Vec<EngineSegment> = w
-            .transcripts
-            .iter()
-            .filter(|t| Some(&t.call_id) == fixture_call.as_ref())
-            .flat_map(|t| t.hypotheses.iter())
-            .map(|h| EngineSegment {
-                id: h.id.as_str().to_string(),
-                call_id: h.call_id.clone(),
-                channel: h.channel,
-                t0_ms: h.t0_ms,
-                t1_ms: h.t1_ms,
-                state: EngineSegmentState::Hypothesis,
-                lang: h.lang.clone(),
-                lang_p: h.lang_p,
-                speaker_label: match &h.speaker.label {
-                    SpeakerLabel::Person { person } => person.display_name.clone(),
-                    SpeakerLabel::Unnamed { n } => format!("spk_{n}"),
-                    SpeakerLabel::GuestYourSide => "guest_your_side".into(),
-                    SpeakerLabel::You => "you".into(),
-                },
-                text: h.text.clone(),
-                words_path: None,
-                avg_logprob: 0.0,
-                no_speech_p: 0.0,
-                corrections: vec![],
-                crosstalk_labels: vec![],
-            })
-            .collect();
+    fn feed_engine(self: &Arc<Self>) {
         let (core, engine) = (self.core.clone(), self.engine.clone());
+        let harness = Arc::downgrade(self);
         tokio::spawn(async move {
             for tick in 0_u64.. {
                 let capturing = noter_core::testing::capturing(&core);
@@ -195,9 +167,21 @@ impl Harness {
                     mic_db: -32.0,
                     sys_db: -38.0,
                 });
-                if tick % 3 == 0 && capturing.is_some() && capturing == fixture_call {
-                    for h in &hypotheses {
-                        engine.inject(EngineEvent::Segment { segment: h.clone() });
+                let Some(harness) = harness.upgrade() else {
+                    return;
+                };
+                // The hypotheses of the call being captured, from the last accepted world: a
+                // `world_set` that empties them leaves the stream waiting for speech.
+                if let Some(call) = capturing.filter(|_| tick % 3 == 0) {
+                    let hypotheses: Vec<EngineSegment> = lock(&harness.world)
+                        .transcripts
+                        .iter()
+                        .filter(|t| t.call_id == call)
+                        .flat_map(|t| t.hypotheses.iter())
+                        .map(|h| engine_segment(h, EngineSegmentState::Hypothesis))
+                        .collect();
+                    for h in hypotheses {
+                        engine.inject(EngineEvent::Segment { segment: h });
                     }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -321,6 +305,15 @@ impl Harness {
             let transcript = transcripts.iter().find(|t| t["call_id"] == *id);
             let pass = transcript.map_or(json!("live"), |t| t["pass"].clone());
             let Some(d) = detail else { continue };
+            // Marks and gaps live on both slices; a transcript that carries them is the newer say.
+            let rows_of = |field: &str| -> Vec<Value> {
+                transcript
+                    .and_then(|t| t[field].as_array())
+                    .filter(|v| !v.is_empty())
+                    .or_else(|| d[field].as_array())
+                    .cloned()
+                    .unwrap_or_default()
+            };
             for sp in d["speakers"].as_array().unwrap_or(&empty) {
                 let label = &sp["label"];
                 let (text, n, person) = match label["type"].as_str() {
@@ -351,7 +344,7 @@ impl Harness {
                     ],
                 ));
             }
-            for m in d["marks"].as_array().unwrap_or(&empty) {
+            for m in &rows_of("marks") {
                 rows.push(ins(
                     "marks",
                     vec![
@@ -362,7 +355,7 @@ impl Harness {
                     ],
                 ));
             }
-            for g in d["gaps"].as_array().unwrap_or(&empty) {
+            for g in &rows_of("gaps") {
                 rows.push(ins(
                     "gaps",
                     vec![
@@ -476,20 +469,48 @@ impl Harness {
         Ok(())
     }
 
-    /// `harness.push { cmd: "self_test_run", body: { event } }`: the scripted engine says it. The
-    /// core rebuilds the failure channel from the streams that arrived, so a silent channel
-    /// is pushed as the other channel's stream followed by a failed result. Returns the seq
-    /// the Channel message gets, which the core assigns, so always `null`.
+    /// `harness.push { cmd, body: { event } }`: the scripted engine says it. For `self_test_run`
+    /// the core rebuilds the failure channel from the streams that arrived, so a silent channel
+    /// is pushed as the other channel's stream followed by a failed result. For
+    /// `transcript_subscribe` a hypothesis or confirmed line is the engine's segment (the core
+    /// assigns a confirmed line its own id), and a gap or mark is the session's event after its
+    /// commit. Returns the seq the Channel message gets, which the core assigns, so always `null`.
     async fn push(&self, args: Value) -> Result<Value, CoreError> {
         let bad =
             |what: &str| CoreError::new(ErrorCode::InvalidInput, format!("harness.push: {what}"));
+        let mut body = args["body"]["event"].clone();
+        if args["cmd"] == "transcript_subscribe" {
+            let event: TranscriptEvent =
+                serde_json::from_value(body).map_err(|e| bad(&e.to_string()))?;
+            let segment = match event {
+                TranscriptEvent::Hypothesis { segment } => {
+                    engine_segment(&segment, EngineSegmentState::Hypothesis)
+                }
+                TranscriptEvent::Confirmed { segment } => {
+                    engine_segment(&segment, EngineSegmentState::Confirmed)
+                }
+                TranscriptEvent::Gap { gap } => {
+                    noter_core::testing::capture_event(&self.core, CaptureEvent::Gap(gap));
+                    return Ok(Value::Null);
+                }
+                TranscriptEvent::Mark { mark } => {
+                    noter_core::testing::capture_event(&self.core, CaptureEvent::Mark(mark));
+                    return Ok(Value::Null);
+                }
+                _ => return Err(CoreError::new(
+                    ErrorCode::NotImplemented,
+                    "harness.push: transcript_subscribe plays hypothesis, confirmed, gap and mark",
+                )),
+            };
+            self.inject(vec![EngineEvent::Segment { segment }]).await?;
+            return Ok(Value::Null);
+        }
         if args["cmd"] != "self_test_run" {
             return Err(CoreError::new(
                 ErrorCode::NotImplemented,
-                "harness.push: only self_test_run has a scripted stream in the M0 core",
+                "harness.push: only self_test_run and transcript_subscribe have a scripted stream",
             ));
         }
-        let mut body = args["body"]["event"].clone();
         // The scenario says "no system audio" with null; the engine's levels are decibels.
         if body["type"] == "levels" && body["sys_db"].is_null() {
             body["sys_db"] = json!(-120.0);
@@ -539,19 +560,27 @@ impl Harness {
             // The core ends its stream itself when the self-test is over.
             SelfTestEvent::Ended { .. } => vec![],
         };
+        self.inject(events).await?;
+        Ok(Value::Null)
+    }
+
+    /// The engine starts on the first command that needs it; a push that races the subscribing
+    /// call waits for it.
+    async fn inject(&self, events: Vec<EngineEvent>) -> Result<(), CoreError> {
         for e in events {
-            // The engine starts on the first command that needs it; a push that races the
-            // `self_test_run` call waits for it.
             let mut tries = 0;
             while !self.engine.inject(e.clone()) {
                 tries += 1;
                 if tries > 100 {
-                    return Err(bad("no engine is running"));
+                    return Err(CoreError::new(
+                        ErrorCode::InvalidInput,
+                        "harness.push: no engine is running",
+                    ));
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             }
         }
-        Ok(Value::Null)
+        Ok(())
     }
 
     /// The world as the core holds it: the real read models for every slice a service owns,
@@ -610,7 +639,7 @@ impl Harness {
             if current.get(key) == Some(value)
                 || matches!(
                     key.as_str(),
-                    "now" | "settings" | "app" | "calls" | "call_details"
+                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts"
                 )
             {
                 continue;
@@ -636,7 +665,7 @@ impl Harness {
         // Compared with the last accepted world: the rows the core serves differ from the
         // fixture in the fields later features own (people, items).
         let accepted = to_json(&*lock(&self.world));
-        if ["calls", "call_details"]
+        if ["calls", "call_details", "transcripts"]
             .iter()
             .any(|k| accepted[k] != wanted[k])
         {
@@ -653,6 +682,14 @@ impl Harness {
             self.native.set(env, &parsed.app.setup.permissions);
             self.engine
                 .set_system_audio(system_audio(&parsed.app.setup.permissions));
+            // System audio cannot be queried: the environment row is what the tap was heard to be.
+            let heard = env
+                .permissions
+                .iter()
+                .find(|r| r.kind == PermissionKind::SystemAudio)
+                .map(|r| r.state)
+                .filter(|s| *s != PermissionState::NotAsked);
+            noter_core::testing::seed_system_audio(&self.core, heard);
             *lock(&self.updater.0) = env.update.clone();
             // The Mac says it changed: the core re-reads what was granted outside it.
             self.native.changed();
@@ -690,6 +727,25 @@ impl Harness {
         }
         if unversioned(&current["app"]["presenting"]) != unversioned(&wanted["app"]["presenting"]) {
             noter_core::testing::seed_presenting(&self.core, parsed.app.presenting.hidden);
+        }
+        if unversioned(&current["app"]["detection"]) != unversioned(&wanted["app"]["detection"]) {
+            noter_core::testing::seed_detection(&self.core, parsed.app.detection.detection.clone());
+        }
+        if unversioned(&current["app"]["degraded"]) != unversioned(&wanted["app"]["degraded"]) {
+            // The setup and hotkey states are the core's own to compute: the world sets the rest.
+            let own = |s: &DegradedState| {
+                matches!(
+                    s,
+                    DegradedState::SetupIncomplete | DegradedState::HotkeyNotRegistered { .. }
+                )
+            };
+            let now: Vec<DegradedState> =
+                serde_json::from_value(current["app"]["degraded"]["states"].clone())
+                    .map_err(crate::internal)?;
+            let mut states: Vec<DegradedState> = parsed.app.degraded.states.clone();
+            states.retain(|s| !own(s));
+            states.extend(now.into_iter().filter(own));
+            self.core.set_degraded(states);
         }
         // Derived fields are the core's to compute; a world that disagrees with it is a preset
         // that drifted from the core's rules (what was applied stays applied).
@@ -789,7 +845,35 @@ const OWNED_APP: &[&str] = &[
     "window",
     "capture",
     "presenting",
+    "degraded",
+    "detection",
 ];
+
+/// A transcript line as the scripted engine reports it.
+fn engine_segment(h: &SegmentView, state: EngineSegmentState) -> EngineSegment {
+    EngineSegment {
+        id: h.id.as_str().to_string(),
+        call_id: h.call_id.clone(),
+        channel: h.channel,
+        t0_ms: h.t0_ms,
+        t1_ms: h.t1_ms,
+        state,
+        lang: h.lang.clone(),
+        lang_p: h.lang_p,
+        speaker_label: match &h.speaker.label {
+            SpeakerLabel::Person { person } => person.display_name.clone(),
+            SpeakerLabel::Unnamed { n } => format!("spk_{n}"),
+            SpeakerLabel::GuestYourSide => "guest_your_side".into(),
+            SpeakerLabel::You => "you".into(),
+        },
+        text: h.text.clone(),
+        words_path: None,
+        avg_logprob: 0.0,
+        no_speech_p: 0.0,
+        corrections: vec![],
+        crosstalk_labels: vec![],
+    }
+}
 
 impl Controls for Harness {
     fn control<'a>(

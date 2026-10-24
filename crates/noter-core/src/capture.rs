@@ -468,7 +468,8 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-run-start
         let started = self.begin_call(ctx, args.sensitive, begin).await?;
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-run-start
-        if detection.is_some() {
+        // One prompt per call (D-38): a start from anywhere uses up the pending detection.
+        if self.detection_now().is_some() {
             self.set_detection(None);
             self.deps.surfaces.close_record_prompt();
         }
@@ -949,12 +950,26 @@ impl Core {
                 self.write_call(&main, call_id, "Seeded call", false, values)?;
             }
         }
+        let phase = wanted.phase;
+        // shortcut: a seeded failure is dated one second before now so Try Again records a gap
+        // under a fixed clock; pass the degraded state's `since` when the harness clock moves.
+        session.failed_at = (phase == CapturePhase::Failed).then_some(now - 1_000);
         self.set_capture(|c| {
             *c = CaptureState {
                 version: c.version,
                 ..wanted
             }
         });
+        // A seeded live call has its window up, as the engine's session start shows it.
+        match phase {
+            CapturePhase::Recording | CapturePhase::Paused => {
+                self.show_call(false);
+            }
+            CapturePhase::Idle => {
+                self.hide_call();
+            }
+            _ => {}
+        }
         Ok(())
     }
 

@@ -92,6 +92,25 @@ impl Runner {
             .to_string()
     }
 
+    /// Sends one subscribing request (`channel: true`) and returns its answer; the stream's
+    /// messages and event lines before it are skipped.
+    async fn channel(&mut self, window: &str, cmd: &str, args: Value) -> Value {
+        let id = self.next;
+        self.next += 1;
+        let req = json!({ "id": id, "window": window, "cmd": cmd, "args": args, "channel": true });
+        self.input
+            .write_all(format!("{req}\n").as_bytes())
+            .await
+            .unwrap();
+        loop {
+            let line = self.line().await;
+            if line["id"] == id {
+                assert!(line.get("ok").is_some(), "{cmd}: {line}");
+                return line["ok"].clone();
+            }
+        }
+    }
+
     async fn finish(mut self) {
         self.input.shutdown().await.unwrap();
         drop(self.input);
@@ -862,8 +881,14 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
             .map(String::from)
             .collect()
     };
+    // Boot seeded the fixture's live call with its window up; the idle world took it down.
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert!(windows(shown).is_empty());
+    let before = windows(shown);
+    assert_eq!(
+        before,
+        ["open_call_window_inactive", "hide_call_window"],
+        "{before:?}"
+    );
     // The scripted engine answers the session: the start records and the call window opens.
     let started = r
         .ok(
@@ -880,8 +905,198 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     assert_eq!(stopped["phase"], "stopped");
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
     let windows = windows(shown);
-    assert_eq!(windows.len(), 1, "{windows:?}");
-    assert!(windows[0] == "open_call_window_inactive", "{windows:?}");
+    assert_eq!(windows.len(), before.len() + 1, "{windows:?}");
+    assert!(windows[2] == "open_call_window_inactive", "{windows:?}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_capture_seeded_through_world_set_shows_the_call_window() {
+    let mut r = start().await;
+    // The fixture's live call was seeded at boot: its window is up, as after `capture_start`.
+    let state = r.ok("call-screen", "window_call_state", json!({})).await;
+    assert_eq!(state["visible"], true, "{state}");
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    let (set, events) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "window:call"),
+        "{events:?}"
+    );
+    let state = r.ok("call-screen", "window_call_state", json!({})).await;
+    assert_eq!(state["visible"], false, "{state}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_sets_the_degraded_set() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // The core's own states (setup incomplete, refused hotkeys) stay as it computes them.
+    let own: Vec<Value> = world["app"]["degraded"]["states"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| {
+            matches!(
+                s["type"].as_str(),
+                Some("setup_incomplete" | "hotkey_not_registered")
+            )
+        })
+        .cloned()
+        .collect();
+    assert!(!own.is_empty(), "the fixture's setup is incomplete");
+    world["app"]["degraded"]["states"] = json!([{ "type": "disk_low", "free_mb": 1024 }]);
+    let (set, events) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "degraded:changed"),
+        "{events:?}"
+    );
+    let states = r.ok("main", "app_snapshot", json!({})).await["degraded"]["states"].clone();
+    let mut expected = vec![json!({ "type": "disk_low", "free_mb": 1024 })];
+    expected.extend(own);
+    assert_eq!(states, json!(expected));
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_accepts_transcripts_and_seeds_their_rows() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // The past call's stored transcript, replaced by one archive line of its own.
+    let transcripts = world["transcripts"].as_array_mut().unwrap();
+    let mut line = transcripts[0]["segments"][0].clone();
+    line["id"] = json!("seg_stored_0");
+    line["call_id"] = json!("call_backend");
+    line["text"] = json!("Stored line 0");
+    line["pass"] = json!("archive");
+    transcripts.retain(|t| t["call_id"] != "call_backend");
+    let gap = json!({ "call_id": "call_backend", "t0_ms": 5_000, "t1_ms": 7_000, "reason": "device_changed" });
+    transcripts.push(json!({
+        "subscription_id": null, "call_id": "call_backend", "live": false, "pass": "archive",
+        "archive": "done", "segments": [line], "hypotheses": [], "marks": [], "gaps": [gap],
+        "speakers": [], "last_seq": 1, "audio_available": true
+    }));
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let snapshot = r
+        .channel(
+            "main",
+            "transcript_subscribe",
+            json!({ "call_id": "call_backend" }),
+        )
+        .await;
+    assert_eq!(snapshot["live"], false, "{snapshot}");
+    assert_eq!(
+        snapshot["segments"][0]["text"], "Stored line 0",
+        "{snapshot}"
+    );
+    assert_eq!(snapshot["segments"][0]["pass"], "archive", "{snapshot}");
+    assert_eq!(
+        snapshot["gaps"][0]["reason"], "device_changed",
+        "{snapshot}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_seeds_what_the_system_audio_tap_was_heard_to_be() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for path in ["setup", "environment"] {
+        for row in world["app"][path]["permissions"].as_array_mut().unwrap() {
+            if row["kind"] == "system_audio" {
+                row["state"] = json!("denied");
+            }
+        }
+    }
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let rows = r.ok("main", "app_snapshot", json!({})).await["environment"]["permissions"].clone();
+    let row = rows
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["kind"] == "system_audio")
+        .unwrap();
+    assert_eq!(row["state"], "denied", "{rows}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn try_again_on_a_seeded_failure_clears_capture_failed() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["capture"]["phase"] = json!("failed");
+    world["app"]["degraded"]["states"] =
+        json!([{ "type": "capture_failed", "call_id": "call_live", "since": now }]);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let resumed = r
+        .ok(
+            "call-screen",
+            "capture_resume_interrupted",
+            json!({ "call_id": "call_live" }),
+        )
+        .await;
+    assert_eq!(resumed["phase"], "recording", "{resumed}");
+    let states = r.ok("main", "app_snapshot", json!({})).await["degraded"]["states"].clone();
+    assert!(
+        !states
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["type"] == "capture_failed"),
+        "{states}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_pushed_transcript_line_reaches_the_open_channel() {
+    let mut r = start().await;
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let mut line = world["transcripts"][0]["segments"][0].clone();
+    line["call_id"] = json!("call_live");
+    line["text"] = json!("Hello, can you hear me?");
+    let snapshot = r
+        .channel(
+            "call-screen",
+            "transcript_subscribe",
+            json!({ "call_id": "call_live" }),
+        )
+        .await;
+    assert_eq!(snapshot["live"], true, "{snapshot}");
+    let push = r
+        .call(
+            "main",
+            "harness.push",
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "confirmed", "segment": line } } }),
+        )
+        .await;
+    assert!(push.0.get("ok").is_some(), "{push:?}");
+    let mut seen = vec![];
+    loop {
+        let line = r.line().await;
+        let event = &line["message"]["event"];
+        seen.push(event["type"].as_str().unwrap_or("").to_string());
+        if event["type"] == "confirmed" {
+            assert_eq!(
+                event["segment"]["text"], "Hello, can you hear me?",
+                "{line}"
+            );
+            break;
+        }
+    }
+    assert!(seen.contains(&"confirmed".to_string()), "{seen:?}");
     r.finish().await;
 }
 
@@ -1094,5 +1309,179 @@ async fn q7_an_engine_that_dies_on_every_restart_fails_the_call_with_capture_fai
         degraded(&failed).contains(&"capture_failed".to_string()),
         "{failed}"
     );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn pushed_hypotheses_gaps_and_marks_reach_the_open_channel() {
+    let mut r = start().await;
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let live = &world["transcripts"][0];
+    assert_eq!(live["call_id"], "call_live");
+    r.channel(
+        "call-screen",
+        "transcript_subscribe",
+        json!({ "call_id": "call_live" }),
+    )
+    .await;
+    // One hypothesis per speaker label the engine can report, then the session's own events.
+    let mut pushes = vec![];
+    for (n, label) in [
+        json!({ "type": "you" }),
+        json!({ "type": "guest_your_side" }),
+        json!({ "type": "person", "person": { "id": "per_1", "display_name": "Ann", "short_name": "Ann", "initials": "A", "is_you": false } }),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut segment = live["segments"][0].clone();
+        segment["id"] = json!(format!("hyp_{n}"));
+        segment["state"] = json!("hypothesis");
+        segment["speaker"]["label"] = label;
+        pushes.push(json!({ "type": "hypothesis", "segment": segment }));
+    }
+    pushes.push(json!({ "type": "gap", "gap": live["gaps"][0] }));
+    pushes.push(json!({ "type": "mark", "mark": live["marks"][0] }));
+    // Written without reading the answers: the stream's messages must not be skipped.
+    for event in &pushes {
+        let id = r.next;
+        r.next += 1;
+        let req = json!({ "id": id, "window": "main", "cmd": "harness.push", "args": { "cmd": "transcript_subscribe", "body": { "event": event } } });
+        r.input
+            .write_all(format!("{req}\n").as_bytes())
+            .await
+            .unwrap();
+    }
+    let mut seen: Vec<String> = vec![];
+    let all = |seen: &[String]| {
+        ["hypothesis", "gap", "mark"]
+            .iter()
+            .all(|t| seen.iter().any(|s| s == t))
+    };
+    while !all(&seen) {
+        let line = r.line().await;
+        assert!(line.get("error").is_none(), "{line}");
+        if let Some(t) = line["message"]["event"]["type"].as_str() {
+            seen.push(t.to_string());
+        }
+    }
+    for t in ["hypothesis", "gap", "mark"] {
+        assert!(seen.iter().any(|s| s == t), "{t} in {seen:?}");
+    }
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn push_refuses_streams_and_events_nothing_scripted_plays() {
+    let mut r = start().await;
+    let code = r
+        .code(
+            "main",
+            "harness.push",
+            json!({ "cmd": "levels_subscribe", "body": { "event": {} } }),
+        )
+        .await;
+    assert_eq!(code, "not_implemented");
+    let code = r
+        .code(
+            "main",
+            "harness.push",
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "ended", "reason": "call_stopped" } } }),
+        )
+        .await;
+    assert_eq!(code, "not_implemented");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_push_with_no_engine_running_is_refused() {
+    let mut r = start().await;
+    // Nothing subscribed to a stream yet, so no engine runs to take the line.
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let segment = world["transcripts"][0]["segments"][0].clone();
+    let code = r
+        .code(
+            "main",
+            "harness.push",
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "confirmed", "segment": segment } } }),
+        )
+        .await;
+    assert_eq!(code, "invalid_input");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_seeds_a_detection_and_the_record_prompt_follows_it() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["detection"]["detection"] = json!({
+        "id": "det_com.microsoft.teams2", "app_name": "Microsoft Teams",
+        "bundle_id": "com.microsoft.teams2", "matched_event": null,
+        "detected_at": now, "prompt_until": now + 30_000, "blocked": null
+    });
+    let (set, events) = r
+        .call(
+            "main",
+            "harness.world_set",
+            json!({ "world": world.clone() }),
+        )
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "capture:detected"),
+        "{events:?}"
+    );
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(
+        snap["detection"]["detection"]["id"],
+        "det_com.microsoft.teams2"
+    );
+    // The seeded detection is the one a start from the prompt names.
+    let started = r
+        .ok(
+            "record-prompt",
+            "capture_start",
+            json!({ "source": "record_prompt", "sensitive": false, "detection_id": "det_com.microsoft.teams2" }),
+        )
+        .await;
+    assert_eq!(started["phase"], "recording", "{started}");
+    let shown = r.ok("main", "harness.surfaces", json!({})).await;
+    let calls: Vec<&str> = shown["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(calls.contains(&"show_record_prompt"), "{calls:?}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_start_from_the_menu_uses_up_a_seeded_detection() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["detection"]["detection"] = json!({
+        "id": "det_com.microsoft.teams2", "app_name": "Microsoft Teams",
+        "bundle_id": "com.microsoft.teams2", "matched_event": null,
+        "detected_at": now, "prompt_until": now + 30_000, "blocked": null
+    });
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({ "source": "menu_bar", "sensitive": false }),
+        )
+        .await;
+    assert_eq!(started["phase"], "recording", "{started}");
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(snap["detection"]["detection"], Value::Null, "{snap}");
     r.finish().await;
 }

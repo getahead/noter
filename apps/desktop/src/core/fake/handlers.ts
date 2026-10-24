@@ -226,6 +226,10 @@ export const defaultHandlers: Handlers = {
     const free = world.app.environment.disk_free_mb;
     if (free < 500) throw coreError("disk_full", "under 500 MB", { type: "disk_space", free_mb: free, needed_mb: 500 });
     if (world.app.setup.models.bundles.some((b) => b.required_for_capture && b.state !== "ready")) throw coreError("model_missing");
+    if (a.source === "record_prompt" && a.detection_id) {
+      const d = world.app.detection.detection;
+      if (d?.id !== a.detection_id || now() >= d.prompt_until) throw coreError("detection_expired");
+    }
     if (fake.playback.playing) {
       Object.assign(fake.playback, { playing: false, stopped_reason: "capture_started" });
       publish("playback:state");
@@ -351,8 +355,10 @@ export const defaultHandlers: Handlers = {
     return world.app.capture;
   },
   capture_dismiss_detection: (a, { world, publish }) => {
-    if (world.app.detection.detection?.id !== a.detection_id) throw coreError("detection_expired");
-    world.app.detection.detection = null;
+    const detection = world.app.detection.detection;
+    if (detection?.id !== a.detection_id) throw coreError("detection_expired");
+    // The prompt closes; the detection stays for the menu bar while the app holds audio (D-38).
+    detection.prompt_until = now();
     publish("capture:detected");
     return ack;
   },

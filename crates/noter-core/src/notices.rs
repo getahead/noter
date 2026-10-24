@@ -115,6 +115,16 @@ impl Core {
         self.publish(event_names::CAPTURE_DETECTED, &mut app.detection);
     }
 
+    pub(crate) fn seed_detection(&self, detection: Option<CallDetection>) {
+        let shown = detection.is_some();
+        self.set_detection(detection);
+        if shown && !self.app().presenting.hidden {
+            self.deps.surfaces.show_record_prompt();
+        } else {
+            self.deps.surfaces.close_record_prompt();
+        }
+    }
+
     fn set_notice(&self, notice: Option<CaptureNotice>) -> CaptureState {
         // @cpt-begin:cpt-noter-flow-core-capture-session-notices:p1:inst-raise-notice
         // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-return
@@ -236,7 +246,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-expired
         match detection {
             None if from_prompt => Err(detection_expired()),
-            Some(d) if from_prompt && now > d.prompt_until.0 => Err(detection_expired()),
+            Some(d) if from_prompt && now >= d.prompt_until.0 => Err(detection_expired()),
             other => Ok(other),
         }
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-expired

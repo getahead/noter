@@ -123,12 +123,17 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     const prompt = scenario.core("record-prompt");
     const detected = await scenario.events("capture:detected");
 
+    const seededUntil = detection.prompt_until; // the in-process fake shares the object: keep the number
     if (!ahead(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "not_now" }))) return; // M1 command
-    await until(() => detected.latest()?.detection === null, "the prompt closes");
-    expect(refused(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "not_now" })).code).toBe("detection_expired");
+    // The prompt closes (prompt_until is now); the detection stays for the menu bar (D-38).
+    await until(() => (detected.latest()?.detection?.prompt_until ?? seededUntil) !== seededUntil, "the prompt closes");
+    ok(await prompt.captureDismissDetection({ detection_id: detection.id, reason: "not_now" })); // closing it again is nothing
+    expect(refused(await prompt.captureStart({ source: "record_prompt", sensitive: false, detection_id: detection.id })).code).toBe("detection_expired"); // Record after the prompt closed
 
     const started = ahead(await scenario.core("call-screen").captureStart({ source: "hotkey", sensitive: false })); // ⌃⌥⌘R
-    if (started) expect(started).toMatchObject({ phase: "recording", recorded_ms: 0 }); // capture_start (M1)
+    if (!started) return; // capture_start (M1)
+    expect(started).toMatchObject({ phase: "recording", recorded_ms: 0 });
+    await until(() => detected.latest()?.detection === null, "the start uses up the detection");
   });
 
   test("empty path — Prompt closed unanswered: Call Detected · Start Recording from the menu, no second prompt", async ({ scenario }) => {
@@ -142,7 +147,8 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     expect(ok(await prompt.appSnapshot({})).detection.detection).toBeNull(); // no second prompt for this call
-    expect(detected.all.every((d: DetectionChanged) => d.detection === null)).toBe(true);
+    await until(() => detected.latest()?.detection === null, "the start uses up the detection");
+    expect(detected.all.every((d: DetectionChanged) => d.detection === null || d.detection.id === detection.id)).toBe(true); // only the one detection, closed then used
   });
 
   test("error path — Setup incomplete: no prompt, Start Recording works, Finish Setup… after the call", async ({ scenario }) => {

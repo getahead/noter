@@ -1,6 +1,8 @@
 //! Hooks for `noter-core-harness` only (feature `harness`); the app never enables it.
 
-use noter_protocol::model::{CapturePhase, CaptureState, ModelsStatus, SelfTestState};
+use noter_protocol::model::{
+    CallDetection, CapturePhase, CaptureState, ModelsStatus, SelfTestState,
+};
 use noter_protocol::CoreError;
 
 use crate::Core;
@@ -29,6 +31,16 @@ pub async fn seed_capture(core: &Core, state: CaptureState) -> Result<(), CoreEr
 }
 
 /// Hidden for presenting, as `harness.world_set` asks.
+/// The detection as `harness.world_set` seeds it: the prompt shows for one, closes for none.
+pub fn seed_detection(core: &Core, detection: Option<CallDetection>) {
+    core.seed_detection(detection);
+}
+
+/// The system-audio state the world's environment row reports, `None` for not asked.
+pub fn seed_system_audio(core: &Core, heard: Option<noter_protocol::PermissionState>) {
+    core.seed_system_audio(heard);
+}
+
 pub fn seed_presenting(core: &Core, hidden: bool) {
     core.seed_presenting(hidden);
 }
