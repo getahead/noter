@@ -142,7 +142,7 @@ impl Harness {
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-seed
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
         if options.fixture {
-            harness.feed_live_call(&w);
+            harness.feed_engine(&w);
         }
         seeding.store(false, Ordering::SeqCst);
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
@@ -151,27 +151,21 @@ impl Harness {
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
     }
 
-    /// A fixture world that is recording has a live engine behind it: levels every 100 ms and the
-    /// fixture's current hypotheses every 250 ms, so a window subscribed to the call sees a stream
-    /// that moves. Confirmed lines are not invented (they would add rows the fixture does not have).
-    fn feed_live_call(&self, w: &FakeWorld) {
-        let capture = &w.app.capture;
-        let Some(call_id) = capture.call_id.clone().filter(|_| {
-            matches!(
-                capture.phase,
-                CapturePhase::Recording | CapturePhase::Paused
-            )
-        }) else {
-            return;
-        };
+    /// The engine's meters: levels every 100 ms, for the call being captured or (none) the mic
+    /// check, and while the fixture's own live call records, its current hypotheses every 300 ms,
+    /// so a window subscribed to it sees a stream that moves. Nothing is delivered until the
+    /// engine runs (subscribing to a stream starts it). Confirmed lines are not invented: they
+    /// would add rows the fixture does not have.
+    fn feed_engine(&self, w: &FakeWorld) {
+        let fixture_call = w.app.capture.call_id.clone();
         let hypotheses: Vec<EngineSegment> = w
             .transcripts
             .iter()
-            .filter(|t| t.call_id == call_id)
+            .filter(|t| Some(&t.call_id) == fixture_call.as_ref())
             .flat_map(|t| t.hypotheses.iter())
             .map(|h| EngineSegment {
                 id: h.id.as_str().to_string(),
-                call_id: call_id.clone(),
+                call_id: h.call_id.clone(),
                 channel: h.channel,
                 t0_ms: h.t0_ms,
                 t1_ms: h.t1_ms,
@@ -194,18 +188,14 @@ impl Harness {
             .collect();
         let (core, engine) = (self.core.clone(), self.engine.clone());
         tokio::spawn(async move {
-            noter_core::testing::engine_ready(&core).await;
             for tick in 0_u64.. {
-                // The call ended (a scenario started another, or went idle): the feed ends too.
-                if noter_core::testing::capturing(&core).as_ref() != Some(&call_id) {
-                    break;
-                }
+                let capturing = noter_core::testing::capturing(&core);
                 engine.inject(EngineEvent::Levels {
-                    call_id: Some(call_id.clone()),
+                    call_id: capturing.clone(),
                     mic_db: -32.0,
                     sys_db: -38.0,
                 });
-                if tick % 3 == 0 {
+                if tick % 3 == 0 && capturing.is_some() && capturing == fixture_call {
                     for h in &hypotheses {
                         engine.inject(EngineEvent::Segment { segment: h.clone() });
                     }

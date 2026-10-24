@@ -551,7 +551,12 @@ impl CoreApi for Core {
         args: TranscriptSubscribeArgs,
         channel: Sink<TranscriptMsg>,
     ) -> Result<TranscriptSnapshot, CoreError> {
-        self.subscribe_transcript(ctx, args, channel)
+        let snapshot = self.subscribe_transcript(ctx, args, channel)?;
+        // A live call's lines come from the engine: it runs once someone watches them.
+        if snapshot.live {
+            let _ = self.engine.ensure_ready().await;
+        }
+        Ok(snapshot)
     }
 
     async fn levels_subscribe(
@@ -560,7 +565,10 @@ impl CoreApi for Core {
         args: SubscribeLevelsArgs,
         channel: Sink<LevelsMsg>,
     ) -> Result<SubscriptionHandle, CoreError> {
-        self.subscribe_levels(ctx, args, channel)
+        let handle = self.subscribe_levels(ctx, args, channel)?;
+        // The meters are the engine's: it runs once someone watches them.
+        let _ = self.engine.ensure_ready().await;
+        Ok(handle)
     }
 
     async fn transcript_span(

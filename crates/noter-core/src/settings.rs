@@ -338,7 +338,14 @@ impl Core {
             // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-if-conflict
             other => other?,
         };
-        Ok(self.settings_written(&mut settings, section, rev))
+        let audio = matches!(section, SettingsSection::Audio(_));
+        let stamped = self.settings_written(&mut settings, section, rev);
+        drop(settings);
+        // The output route follows the headphones list (`audio_play` reads it from the environment).
+        if audio {
+            self.refresh_environment_now();
+        }
+        Ok(stamped)
     }
 
     pub(crate) fn unignore_app(
