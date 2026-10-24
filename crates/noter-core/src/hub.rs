@@ -190,6 +190,10 @@ impl<M: StreamMsg> StreamHub<M> {
         let now = self.coalesce_ms.map(|_| self.clock.now().0);
         // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-publish
         let mut streams = self.lock();
+        // Levels nobody watches take no `seq`: a subscription to them starts the count.
+        if self.coalesce_ms.is_some() && streams.get(key).map_or(true, |s| s.subs.is_empty()) {
+            return Seq(streams.get(key).map_or(0, |s| s.seq));
+        }
         let stream = streams.entry(key.to_owned()).or_insert_with(Stream::new);
         // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-coalesce
         if let (Some(gap), Some(now), Some(last)) = (self.coalesce_ms, now, stream.last_sent_ms) {

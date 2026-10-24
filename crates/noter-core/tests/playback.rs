@@ -246,6 +246,44 @@ async fn during_capture_the_route_decides() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn treating_the_output_as_headphones_in_settings_unlocks_replay_at_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path(), OutputRoute::Unknown);
+    r.mac.reading.lock().unwrap().output_device = Some(OutputDeviceInfo {
+        uid: "usb-1".into(),
+        name: "Scarlett".into(),
+        marked_headphones: false,
+    });
+    r.mac.route(OutputRoute::Unknown);
+    call(&r.core, "call_old", "ready", 0);
+    call(&r.core, "call_live", "recording", 0);
+    assert_eq!(refused(&r, "call_old").await, ErrorCode::OutputRouteUnknown);
+    let mut audio = noter_core::default_settings().audio;
+    audio.output.headphones_devices = vec!["usb-1".into()];
+    r.core
+        .settings_update(
+            &CommandCtx {
+                caller: Caller::Window {
+                    label: WindowLabel::Settings,
+                },
+            },
+            SettingsUpdateArgs {
+                rev: Rev(1),
+                section: SettingsSection::Audio(audio),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        r.core
+            .audio_play(&window(), play("call_old"))
+            .await
+            .unwrap()
+            .playing
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_engine_reports_the_position_and_the_end() {
     let dir = tempfile::tempdir().unwrap();
     let r = open(dir.path(), OutputRoute::Headphones);

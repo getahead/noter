@@ -19,7 +19,9 @@ use noter_core::{
     SystemClock, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
-use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
+use noter_protocol::engine::{
+    EngineCommand, EngineErrorCode, EngineEvent, EngineSegment, EngineSegmentState,
+};
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
@@ -139,11 +141,68 @@ impl Harness {
         }
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-seed
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
+        if options.fixture {
+            harness.feed_engine(&w);
+        }
         seeding.store(false, Ordering::SeqCst);
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
         eprintln!("noter-core-harness: core open in {}", harness.dir.display());
         Ok(harness)
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
+    }
+
+    /// The engine's meters: levels every 100 ms, for the call being captured or (none) the mic
+    /// check, and while the fixture's own live call records, its current hypotheses every 300 ms,
+    /// so a window subscribed to it sees a stream that moves. Nothing is delivered until the
+    /// engine runs (subscribing to a stream starts it). Confirmed lines are not invented: they
+    /// would add rows the fixture does not have.
+    fn feed_engine(&self, w: &FakeWorld) {
+        let fixture_call = w.app.capture.call_id.clone();
+        let hypotheses: Vec<EngineSegment> = w
+            .transcripts
+            .iter()
+            .filter(|t| Some(&t.call_id) == fixture_call.as_ref())
+            .flat_map(|t| t.hypotheses.iter())
+            .map(|h| EngineSegment {
+                id: h.id.as_str().to_string(),
+                call_id: h.call_id.clone(),
+                channel: h.channel,
+                t0_ms: h.t0_ms,
+                t1_ms: h.t1_ms,
+                state: EngineSegmentState::Hypothesis,
+                lang: h.lang.clone(),
+                lang_p: h.lang_p,
+                speaker_label: match &h.speaker.label {
+                    SpeakerLabel::Person { person } => person.display_name.clone(),
+                    SpeakerLabel::Unnamed { n } => format!("spk_{n}"),
+                    SpeakerLabel::GuestYourSide => "guest_your_side".into(),
+                    SpeakerLabel::You => "you".into(),
+                },
+                text: h.text.clone(),
+                words_path: None,
+                avg_logprob: 0.0,
+                no_speech_p: 0.0,
+                corrections: vec![],
+                crosstalk_labels: vec![],
+            })
+            .collect();
+        let (core, engine) = (self.core.clone(), self.engine.clone());
+        tokio::spawn(async move {
+            for tick in 0_u64.. {
+                let capturing = noter_core::testing::capturing(&core);
+                engine.inject(EngineEvent::Levels {
+                    call_id: capturing.clone(),
+                    mic_db: -32.0,
+                    sys_db: -38.0,
+                });
+                if tick % 3 == 0 && capturing.is_some() && capturing == fixture_call {
+                    for h in &hypotheses {
+                        engine.inject(EngineEvent::Segment { segment: h.clone() });
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        });
     }
 
     /// The core, for `serve_with`.

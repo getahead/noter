@@ -329,6 +329,7 @@ impl Core {
         self.environment_changed(self.deps.native.environment());
         self.start_capture();
         self.start_playback();
+        self.start_transcript();
     }
 
     fn apply_login_item(&self, on: bool) {
