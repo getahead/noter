@@ -59,6 +59,14 @@ describe("follow output (cpt-noter-algo-ui-live-transcript-follow-output)", () =
     expect(onScroll(detached, pos(1490), 1000, 32, 13)).toEqual({ following: true, base: 13 });
     expect(onScroll(following, pos(1300), 1200, 32, 13)).toBe(following); // a smooth scroll on its way down
   });
+  it("detaches on the first step of a scroll up, even within one row of the end, so the next flush keeps it", () => {
+    const following = { following: true, base: 0 };
+    const detached = onScroll(following, pos(1490), 1500, 32, 10); // an animated wheel's first frame
+    expect(detached).toEqual({ following: false, base: 10 });
+    expect(onScroll(detached, pos(1470), 1490, 32, 10)).toBe(detached); // still on its way up
+    const shrunk = { scrollTop: 1400, clientHeight: 500, scrollHeight: 1900 }; // a correction shortened the log: clamped to the end
+    expect(onScroll(following, shrunk, 1500, 32, 10)).toBe(following);
+  });
   it("names the view's state", () => {
     const s = { error: false, loaded: true, waiting: false, follow: { following: true, base: 0 }, find: false };
     expect(viewState({ ...s, error: true })).toBe("ERROR");
