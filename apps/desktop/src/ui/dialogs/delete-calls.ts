@@ -19,7 +19,11 @@ export async function deleteCalls(
   const alert = deleteAlert(calls);
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-build-alert
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-cancel
-  if (!(await askAlert(alert, ask))) return { outcome: "cancelled" };
+  if (!(await askAlert(alert, ask))) {
+    // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-cancel
+    return { outcome: "cancelled" };
+    // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-cancel
+  }
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-cancel
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-api-delete
   const res = await bridge.act(

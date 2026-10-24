@@ -94,10 +94,10 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 2. [x] - `p1` - Algorithm: build the alert with `cpt-noter-algo-ui-dialogs-host-delete-alert` - `inst-build-alert`
 3. [x] - `p1` - UI: request the native alert from the core's dialog plugin, attached to the main window as a sheet where the plugin allows; **Cancel** is the default (Return and Esc) - `inst-request-alert`
 4. [x] - `p1` - **IF** the user chooses **Cancel** or presses Return or Esc - `inst-if-cancel`
-   1. [ ] - `p1` - **RETURN** nothing deleted; focus returns to the control that asked - `inst-return-cancel`
+   1. [x] - `p1` - **RETURN** nothing deleted; focus returns to the control that asked - `inst-return-cancel`
 5. [x] - `p1` - API: `calls_delete` (the call ids) - `inst-api-delete`
 6. [x] - `p1` - **IF** the result is an error - `inst-if-delete-error`
-   1. [ ] - `p1` - **RETURN** the calling page's section error, with **Try Again** when retryable - `inst-return-delete-error`
+   1. [x] - `p1` - **RETURN** the calling page's section error, with **Try Again** when retryable - `inst-return-delete-error`
 7. [ ] - `p1` - UI: from a call's page, navigate to Library › **Calls**; in Calls, the rows leave the list as `entity:changed` reports them gone - `inst-after-delete`
 8. [ ] - `p1` - **RETURN** the calls deleted for good - `inst-return-deleted`
 
@@ -168,7 +168,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Build a delete alert
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-dialogs-host-delete-alert`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-dialogs-host-delete-alert`
 
 **Input**: the selected call ids and the first call's title
 
