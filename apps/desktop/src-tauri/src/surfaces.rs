@@ -286,8 +286,9 @@ impl<R: Runtime> TauriSurfaces<R> {
     }
 
     /// A menu bar click, run as the menu bar surface.
-    // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
+    // @cpt-flow:cpt-noter-flow-core-native-surfaces-menu-bar:p1
     fn menu_clicked(&self, action: TrayAction) {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
         if action == TrayAction::OpenNoter {
             self.show_window(WindowLabel::Main);
             return;
@@ -307,11 +308,14 @@ impl<R: Runtime> TauriSurfaces<R> {
             let Some((name, args)) = tray_command(action, &snap) else {
                 return;
             };
-            // A refusal (the call ended meanwhile) is an answer, not a failure.
+            // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
+            // shows the item disabled at the next update.
             let _ = dispatch_json(core.as_ref(), &ctx, name, args, None).await;
         });
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
     }
-    // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
+    // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
 
     fn menu(&self, tray: &TrayModel) -> tauri::Result<Menu<R>> {
         let app = &self.app;
@@ -394,7 +398,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
 
-    // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-all
+    // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
     fn hide_all(&self) {
         let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
         for (label, window) in self.app.webview_windows() {
@@ -406,7 +410,6 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             }
         }
     }
-    // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-all
 
     fn restore_all(&self) {
         let hidden = std::mem::take(&mut *self.hidden.lock().unwrap_or_else(|e| e.into_inner()));
@@ -416,6 +419,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             }
         }
     }
+    // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
 
     fn set_tray(&self, model: &TrayModel) {
         let Ok(menu) = self.menu(model) else {
