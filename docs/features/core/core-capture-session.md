@@ -49,7 +49,7 @@ design: docs/DESIGN-core.md
 
 - [ ] `p2` - **ID**: `cpt-noter-featstatus-core-capture-session`
 
-- [ ] `p2` - `cpt-noter-feature-core-capture-session`
+- [x] `p2` - `cpt-noter-feature-core-capture-session`
 
 ## 1. Feature Context
 
@@ -470,11 +470,11 @@ The system **MUST** expose start, pause, mark and stop to menu items and hotkeys
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core with the scripted engine, story `cpt-noter-seq-record-prompt-start-recording`: a detection shows the prompt, `capture_start` from the record prompt starts recording, `capture:state` reaches every window.
-- [ ] Story `cpt-noter-seq-record-prompt-record-after-missed-prompt`: after the prompt timed out or was dismissed (`capture_dismiss_detection` with reason timeout), the snapshot and `capture:detected` still carry the detection, no second prompt appears, and the start hotkey or **Call Detected · Start Recording** in the menu starts the call.
-- [ ] Story `cpt-noter-seq-call-screen-recover-capture`: silent system audio, a microphone turned off and an engine restart each show their degraded state while the recording continues; a failed engine offers **Try Again**.
-- [ ] Story `cpt-noter-seq-call-screen-stop-at-call-end`: audio released → notice with countdown; hold pauses it; Keep Recording, Stop Now and Start as New Call behave as specified; Continue Recording works for 5 minutes.
-- [ ] Story `cpt-noter-seq-menu-bar-control-recording` (core half): mark, pause and stop called as `Caller::Native { surface: menu_bar }` take effect at once.
-- [ ] `capture_start` is never refused with nothing set up except for a missing live model; `disk_full` carries `detail.needed_mb`.
-- [ ] Every one of the 16 capture commands succeeds at least once in E2E runs against the real core.
-- [ ] `just gate` passes.
+- [x] E2E against the real core with the scripted engine, story `cpt-noter-seq-record-prompt-start-recording`: a detection shows the prompt, `capture_start` from the record prompt starts recording, `capture:state` reaches every window.
+- [x] Story `cpt-noter-seq-record-prompt-record-after-missed-prompt`: after the prompt timed out or was dismissed (`capture_dismiss_detection` with reason timeout), the snapshot and `capture:detected` still carry the detection, no second prompt appears, and the start hotkey or **Call Detected · Start Recording** in the menu starts the call.
+- [x] Story `cpt-noter-seq-call-screen-recover-capture`: silent system audio, a microphone turned off and an engine restart each show their degraded state while the recording continues; a failed engine offers **Try Again**.
+- [x] Story `cpt-noter-seq-call-screen-stop-at-call-end`: audio released → notice with countdown; hold pauses it; Keep Recording, Stop Now and Start as New Call behave as specified; Continue Recording works for 5 minutes.
+- [x] Story `cpt-noter-seq-menu-bar-control-recording` (core half): mark, pause and stop called as `Caller::Native { surface: menu_bar }` take effect at once.
+- [x] `capture_start` is never refused with nothing set up except for a missing live model; `disk_full` carries `detail.needed_mb`.
+- [x] Every one of the 16 capture commands succeeds at least once in E2E runs against the real core.
+- [x] `just gate` passes.
