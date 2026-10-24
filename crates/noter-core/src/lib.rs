@@ -18,6 +18,7 @@ mod self_test;
 mod settings;
 #[cfg(feature = "harness")]
 pub mod testing;
+mod transcript;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -225,6 +226,8 @@ pub struct Core {
     audio_dir: std::path::PathBuf,
     /// Replay state, `playback:state`.
     playback: playback::Playback,
+    /// The live transcript: batching, streams, speakers.
+    transcript: transcript::Transcript,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -303,6 +306,7 @@ impl Core {
             held: Mutex::new(Vec::new()),
             audio_dir,
             playback: playback::Playback::new(),
+            transcript: transcript::Transcript::new(data_dir.to_path_buf()),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -539,6 +543,30 @@ impl CoreApi for Core {
         _args: NoArgs,
     ) -> Result<PlaybackState, CoreError> {
         self.stop_audio().await
+    async fn transcript_subscribe(
+        &self,
+        ctx: &CommandCtx,
+        args: TranscriptSubscribeArgs,
+        channel: Sink<TranscriptMsg>,
+    ) -> Result<TranscriptSnapshot, CoreError> {
+        self.subscribe_transcript(ctx, args, channel)
+    }
+
+    async fn levels_subscribe(
+        &self,
+        ctx: &CommandCtx,
+        args: SubscribeLevelsArgs,
+        channel: Sink<LevelsMsg>,
+    ) -> Result<SubscriptionHandle, CoreError> {
+        self.subscribe_levels(ctx, args, channel)
+    }
+
+    async fn transcript_span(
+        &self,
+        _ctx: &CommandCtx,
+        args: SpanArgs,
+    ) -> Result<SpanPreview, CoreError> {
+        self.span_preview(args)
     }
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {

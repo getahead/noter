@@ -86,7 +86,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Follow the transcript
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-live-transcript-subscribe`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-live-transcript-subscribe`
 
 **Actor**: UI window (call window or main)
 
@@ -109,7 +109,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Watch levels
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-live-transcript-levels`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-live-transcript-levels`
 
 **Actor**: UI window (call window, main, Settings, First run)
 
@@ -127,7 +127,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Preview a span
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-live-transcript-span`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-live-transcript-span`
 
 **Actor**: UI window (evidence popover, span preview)
 
@@ -173,7 +173,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Batch, persist and publish segments
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-batch`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-batch`
 
 **Input**: `segment` events from the supervisor (hypothesis or confirmed), `speaker_turn` events.
 
@@ -190,7 +190,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Live speakers
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-speakers`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-speakers`
 
 **Input**: Live speaker labels per channel from the engine.
 
@@ -218,7 +218,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Write the transcript file
 
-- [ ] `p2` - **ID**: `cpt-noter-algo-core-live-transcript-file`
+- [x] `p2` - **ID**: `cpt-noter-algo-core-live-transcript-file`
 
 **Input**: A call that stopped.
 
@@ -246,7 +246,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Segment
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-live-transcript-segment`
+- [x] `p1` - **ID**: `cpt-noter-state-core-live-transcript-segment`
 
 **States**: hypothesis, confirmed
 
@@ -260,7 +260,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Exactly once, published after commit
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-persist`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-persist`
 
 The system **MUST** persist every confirmed segment exactly once in batches of at most 250 ms with its normalised shadow text, never persist hypotheses, publish `confirmed` only after its batch committed, and map live speaker labels to `speakers` rows of pass `live`.
 
@@ -275,7 +275,7 @@ The system **MUST** persist every confirmed segment exactly once in batches of a
 
 ### Snapshot, then stream
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-stream`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-stream`
 
 The system **MUST** answer `transcript_subscribe` with a snapshot and `last_seq` read under the hub lock, stream every message in order after it, end streams with their reason, and fan out to three windows at 10 messages a second within the `stream-hub-fanout` scenario's budget.
 
@@ -289,7 +289,7 @@ The system **MUST** answer `transcript_subscribe` with a snapshot and `last_seq`
 
 ### Span previews and the transcript file
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-live-transcript-span-file`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-live-transcript-span-file`
 
 The system **MUST** answer `transcript_span` from the call's current pass and write `transcript.jsonl` atomically at call end.
 
