@@ -237,7 +237,7 @@ After M1 the user can record calls and find them again. The list and the call re
 1. [x] - `p1` - **FROM** recording **TO** paused **WHEN** capture pauses - `inst-st-paused`
 2. [x] - `p1` - **FROM** paused **TO** recording **WHEN** capture resumes - `inst-st-recording`
 3. [x] - `p1` - **FROM** recording **TO** processing **WHEN** the call stops (also from paused) - `inst-st-processing`
-4. [ ] - `p1` - **FROM** processing **TO** ready **WHEN** the transcript file is written; from M2, when the post-call outputs are written - `inst-st-ready`
+4. [x] - `p1` - **FROM** processing **TO** ready **WHEN** the transcript file is written; from M2, when the post-call outputs are written - `inst-st-ready`
 5. [x] - `p1` - **FROM** processing **TO** recording **WHEN** Continue Recording appends to the call - `inst-st-continued`
 6. [ ] - `p1` - **FROM** processing **TO** failed **WHEN** the post-call work fails (M2) - `inst-st-failed`
 
