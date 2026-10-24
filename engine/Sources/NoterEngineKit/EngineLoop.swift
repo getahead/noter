@@ -18,6 +18,7 @@ public final class EngineLoop: @unchecked Sendable {
     /// The speech model, loaded on first use; nil without one installed.
     private let model: ModelCache?
     private let asrQueue = DispatchQueue(label: "ai.noter.engine.asr")
+    private let stops = DispatchQueue(label: "ai.noter.engine.stop")
     private let processes: @Sendable () -> [ProcessAudio]
     /// The call being captured and its audio; commands arrive on one thread.
     private var session: (capture: CaptureSession, audio: AudioSource)?
@@ -186,13 +187,18 @@ public final class EngineLoop: @unchecked Sendable {
         case .stop:
             session.audio.stop()
             writer.emit(.ack(cmdId: command.id))
-            session.capture.asr.finish()
             facts.withLock {
                 detector.stopSession()
                 capturing = nil
             }
-            writer.emit(session.capture.stop())
             self.session = nil
+            // The last words (after a model still loading) and the files can take seconds to
+            // finish: off the command thread, so `ping` is still answered meanwhile.
+            let (capture, writer) = (session.capture, self.writer)
+            stops.async {
+                capture.asr.finish()
+                writer.emit(capture.stop())
+            }
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
         case let .excludeProcess(_, bundleId):
             do {
