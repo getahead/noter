@@ -50,8 +50,7 @@ describe("call page commands", () => {
   it("a conflicting rename leaves the core's current values in the store", async () => {
     const id = await ready();
     const rev = fake.world.calls[0]!.rev;
-    fake.world.calls[0]!.title = "Renamed elsewhere";
-    fake.world.calls[0]!.rev += 1;
+    for (const c of [fake.world.calls[0]!, ...fake.world.call_details.filter((d) => d.call.id === id).map((d) => d.call)]) Object.assign(c, { title: "Renamed elsewhere", rev: rev + 1 });
     const res = await rename(bridge, id, rev, "Mine");
     expect(res.status).toBe("error");
     await loadCall(bridge, id);
