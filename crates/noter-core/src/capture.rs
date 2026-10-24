@@ -627,8 +627,10 @@ impl Core {
         let call_id = args.call_id;
         if args.paused {
             let _ = self.engine.pause_session().await;
+            // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-paused
             let status = vec![("status", json!("paused"))];
             self.write_call(ctx, &call_id, "Paused recording", false, status)?;
+            // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-paused
             let pause = PauseInfo {
                 since: TimestampMs(now),
                 remind_at: Some(TimestampMs(now + PAUSE_REMIND_MS)),
@@ -647,8 +649,10 @@ impl Core {
         let (t0, t1) = (session.offset(since), session.offset(now));
         self.insert_gap(&call_id, t0, t1, GapReason::Paused)?;
         session.away_ms += now - since;
+        // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-recording
         let status = vec![("status", json!("recording"))];
         self.write_call(ctx, &call_id, "Resumed recording", false, status)?;
+        // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-recording
         let recorded = session.recorded(now, None);
         // @cpt-end:cpt-noter-flow-core-capture-session-pause-mark:p1:inst-apply-pause
         // @cpt-begin:cpt-noter-flow-core-capture-session-pause-mark:p1:inst-return-pause
@@ -773,8 +777,11 @@ impl Core {
             (self.deps.clock.now().0, CommandCtx { caller: main })
         });
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-update-call
+        // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-processing
+        // "processing" stays until the post-call job (M2): there is no "ready" write in M1.
         let values = vec![("status", json!("processing")), ("ended_at", json!(ended))];
         self.write_call(&ctx, call_id, "Stopped recording", false, values)?;
+        // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-processing
         self.capture_event(CaptureEvent::Stopped {
             call_id: call_id.clone(),
             reason: StreamEndReason::CallStopped,
@@ -829,8 +836,10 @@ impl Core {
         let (t0, t1) = (session.offset(stopped_at), session.offset(now));
         self.insert_gap(&call_id, t0, t1, GapReason::Continued)?;
         session.away_ms += now - stopped_at;
+        // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-continued
         let values = vec![("status", json!("recording")), ("ended_at", Value::Null)];
         self.write_call(ctx, &call_id, "Continued recording", false, values)?;
+        // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-continued
         let start = self.session_for(&call_id, Some(t1))?;
         let recorded = session.recorded(now, None);
         self.set_capture(|c| {
