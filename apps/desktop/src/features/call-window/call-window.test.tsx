@@ -211,9 +211,9 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(args("capture_discard")).toEqual([live]);
   });
 
-  it("keeps the notice out of a hidden window", async () => {
+  it("keeps the notice drawn in a hidden window, for when it shows again", async () => {
     await open({ notice: { type: "call_ended", stops_at: Date.now() + 10_000 } }, { visible: false });
-    expect(html()).not.toContain('data-region="CS-R0"');
+    expect(html()).toContain('data-region="CS-R0"');
   });
 
   it("shows the closing state after a stop: Continue Recording, Open in Noter, Close", async () => {

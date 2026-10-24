@@ -48,6 +48,8 @@ async function more(page: Page, item: string) {
 const toFloating = (page: Page) => more(page, "Use Floating Panel");
 const gapAt = (steer: Steer, t0_ms: number, t1_ms: number, reason: string) =>
   steer.push("transcript_subscribe", { event: { type: "gap", gap: { call_id: W.LIVE_CALL, t0_ms, t1_ms, reason: reason as never } } });
+/** No scripted lines after the snapshot, so a before/after comparison of the transcript is stable. */
+const still = (w: Parameters<typeof W.idle>[0]) => void (FAKE && ((w as unknown as { live_script: unknown[] }).live_script = []));
 const startLive = (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = () => {}) => openWindow(page, "call-screen", { world });
 
 test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
@@ -268,14 +270,14 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
 
 test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("UI — happy path: Hide Noter for Presenting sends the wanted state, the window keeps its state for the return", async ({ page }) => {
-    const steer = await startLive(page);
+    const steer = await startLive(page, still);
     const before = await transcript(page).innerText();
 
     await header(page).getByRole("button", { name: "Hide Noter for Presenting" }).click();
     expect(await sent(page, "app_set_hidden_for_presenting")).toContainEqual({ hidden: true });
     await steer.change((w) => (w.app.presenting.hidden = true)); // the core hides every surface and sends app:presenting
     await steer.change((w) => (w.app.presenting.hidden = false)); // ⌃⌥⌘0 or Show Noter
-    await expect(transcript(page)).toHaveText(before);
+    await expect(transcript(page)).toHaveText(before, { useInnerText: true });
     await expect(word(page, "Recording")).toBeVisible();
   });
 
@@ -385,7 +387,7 @@ test.describe("cpt-noter-seq-floating-panel-collapse-strip", () => {
 
 test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
   test("UI — happy path: Hide (Hide to the menu bar) — recording goes on, the panel comes back as it was", async ({ page }) => {
-    await startLive(page);
+    await startLive(page, still);
     await toFloating(page);
     const before = await transcript(page).innerText();
 
@@ -396,7 +398,9 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
     await coreWindow(page, { visible: false });
     await coreWindow(page, { visible: true }); // ⌃⌥⌘N or Open Call Screen: the core shows it, not key
     await expect(floating(page)).toBeVisible();
-    await expect(transcript(page)).toHaveText(before);
+    // the real core keeps transcribing, so its tail moves on; the fake's stays as it was
+    if (FAKE) await expect(transcript(page)).toHaveText(before, { useInnerText: true });
+    else await expect(transcript(page)).not.toBeEmpty();
     await expect(word(page, "Recording")).toBeVisible();
   });
 

@@ -169,8 +169,10 @@ describe("announcements (DESIGN › Keyboard and VoiceOver, announcement table)"
     expect(failureAnnouncements(states, "call_live").map((a) => a.text)).toEqual(["Microphone off."]);
   });
 
-  it("says nothing for the state the window opened on", () => {
+  it("says nothing for the capture state the window opened on, but speaks a notice it opened with", () => {
     expect(captureAnnouncements(null, cap({ phase: "paused" }), null)).toEqual([]);
+    const ended = { type: "call_ended" as const, stops_at: 1 };
+    expect(captureAnnouncements(null, cap({ notice: ended }), ended).map((a) => a.kind)).toEqual(["call_ended"]);
   });
 
   it("announces a new notice assertively, Paused and Resumed, and the stop with its minutes", () => {
