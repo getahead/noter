@@ -87,7 +87,7 @@ describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
 
   it("shows skeleton rows only once the read is slow, and the error banner with Try Again", () => {
     const loading = state({ status: "LOADING", rows: [] });
-    expect(html({ state: loading })).not.toContain("lb-skel");
+    expect(html({ state: loading })).not.toContain("lb-skel__row");
     expect(html({ state: loading, slow: true })).toContain('aria-busy="true"');
     expect(html({ state: state({ status: "ERROR", rows: [] }) })).toContain(
       "Try Again",

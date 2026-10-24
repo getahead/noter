@@ -172,3 +172,13 @@
   position: fixed;
   z-index: 40;
 }
+.lb-title {
+  display: inline;
+  margin: 0 6px 0 0;
+  font: inherit;
+  font-weight: 600;
+  outline: none;
+}
+.lb-loading {
+  min-height: 8px;
+}

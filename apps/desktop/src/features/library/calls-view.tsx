@@ -53,7 +53,9 @@ export function CallsView(p: CallsViewProps) {
   return (
     <>
       <div data-region="LC-R1" className="lb-head">
-        <strong>{t("library.calls.title")}</strong>{" "}
+        <h2 className="lb-title" tabIndex={-1}>
+          {t("library.calls.title")}
+        </h2>{" "}
         {state.status === "LISTED" &&
           subtitle(
             state.rows,
@@ -121,24 +123,31 @@ function Body(p: CallsViewProps) {
     );
   // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
   if (state.status === "LOADING")
-    return p.slow ? (
+    // the area keeps its place (and says it is busy) from the first moment; the skeleton rows follow after 300 ms
+    return (
       <div
-        className="lb-skel"
-        data-component="cpt-noter-component-ui-primitives"
-        data-primitive="table"
+        className="lb-loading"
         data-state="loading"
         aria-busy="true"
         aria-label={t("library.calls.loading")}
       >
-        {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="lb-skel__row">
-            <span />
-            <span />
-            <span />
+        {p.slow && (
+          <div
+            className="lb-skel"
+            data-component="cpt-noter-component-ui-primitives"
+            data-primitive="table"
+          >
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="lb-skel__row">
+                <span />
+                <span />
+                <span />
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-    ) : null;
+    );
   const head = (col: Column, width: string) => (
     <Th
       label={t(COLUMNS[col])}
