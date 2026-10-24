@@ -543,6 +543,8 @@ impl CoreApi for Core {
         _args: NoArgs,
     ) -> Result<PlaybackState, CoreError> {
         self.stop_audio().await
+    }
+
     async fn transcript_subscribe(
         &self,
         ctx: &CommandCtx,
