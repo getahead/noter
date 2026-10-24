@@ -12,6 +12,7 @@ mod log;
 mod models;
 mod notices;
 mod notify;
+mod playback;
 mod recovery;
 mod self_test;
 mod settings;
@@ -222,6 +223,8 @@ pub struct Core {
     held: Mutex<Vec<Notification>>,
     /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the App Group container).
     audio_dir: std::path::PathBuf,
+    /// Replay state, `playback:state`.
+    playback: playback::Playback,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -299,6 +302,7 @@ impl Core {
             viewed: Mutex::new(None),
             held: Mutex::new(Vec::new()),
             audio_dir,
+            playback: playback::Playback::new(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         Ok(core)
@@ -519,6 +523,22 @@ impl CoreApi for Core {
         args: ModelsDownloadArgs,
     ) -> Result<SetupStatus, CoreError> {
         self.download_models(args)
+    }
+
+    async fn audio_play(
+        &self,
+        _ctx: &CommandCtx,
+        args: PlayAudioArgs,
+    ) -> Result<PlaybackState, CoreError> {
+        self.play_audio(args).await
+    }
+
+    async fn audio_stop(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<PlaybackState, CoreError> {
+        self.stop_audio().await
     }
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {

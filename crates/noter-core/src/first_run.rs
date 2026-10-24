@@ -328,6 +328,7 @@ impl Core {
         self.apply_login_item(launch);
         self.environment_changed(self.deps.native.environment());
         self.start_capture();
+        self.start_playback();
     }
 
     fn apply_login_item(&self, on: bool) {
@@ -431,6 +432,7 @@ impl Core {
         if next != app.environment {
             app.environment = next;
             self.publish(event_names::ENV_CHANGED, &mut app.environment);
+            self.playback_route_changed(app.environment.output_route);
         }
         drop(app);
         self.disk_changed(reading.disk_free_mb);

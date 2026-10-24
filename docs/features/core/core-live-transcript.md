@@ -145,7 +145,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Replay a line
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-live-transcript-replay`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-live-transcript-replay`
 
 **Actor**: Primary user (call window or Call page)
 
@@ -161,13 +161,13 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 - The output switches to speakers while playing: playback stops with `output_switched_to_speakers`; a capture starting stops it with `capture_started`.
 
 **Steps**:
-1. [ ] - `p1` - API: `audio_play { call_id, from_ms, to_ms?, channel? }` - `inst-play-call`
-2. [ ] - `p1` - **IF** the call has no stored audio **RETURN** `audio_deleted` - `inst-if-no-audio`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-live-transcript-replay-route`; **RETURN** its error if any - `inst-route-check`
-4. [ ] - `p1` - Ask the supervisor to `play` (`cpt-noter-flow-core-engine-capture-replay`) - `inst-engine-play`
-5. [ ] - `p1` - Publish `playback:state` from `playback_position` events with a new version - `inst-playback-events`
-6. [ ] - `p1` - **RETURN** `PlaybackState { playing: true, call_id, position_ms, to_ms, route }` - `inst-play-return`
-7. [ ] - `p1` - API: `audio_stop {}` sends `stop_playback` and **RETURN** `PlaybackState` with `stopped_reason: user` - `inst-stop-replay`
+1. [x] - `p1` - API: `audio_play { call_id, from_ms, to_ms?, channel? }` - `inst-play-call`
+2. [x] - `p1` - **IF** the call has no stored audio **RETURN** `audio_deleted` - `inst-if-no-audio`
+3. [x] - `p1` - Run `cpt-noter-algo-core-live-transcript-replay-route`; **RETURN** its error if any - `inst-route-check`
+4. [x] - `p1` - Ask the supervisor to `play` (`cpt-noter-flow-core-engine-capture-replay`) - `inst-engine-play`
+5. [x] - `p1` - Publish `playback:state` from `playback_position` events with a new version - `inst-playback-events`
+6. [x] - `p1` - **RETURN** `PlaybackState { playing: true, call_id, position_ms, to_ms, route }` - `inst-play-return`
+7. [x] - `p1` - API: `audio_stop {}` sends `stop_playback` and **RETURN** `PlaybackState` with `stopped_reason: user` - `inst-stop-replay`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -203,18 +203,18 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Replay route rule
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-replay-route`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-replay-route`
 
 **Input**: Whether a capture runs, the current `OutputRoute` and output device, `AudioOutputSettings.headphones_devices`, whether own sounds are excluded.
 
 **Output**: Allowed, or the refusing error code.
 
 **Steps**:
-1. [ ] - `p1` - **IF** no capture runs **RETURN** allowed - `inst-no-capture`
-2. [ ] - `p1` - **IF** the route is speakers **RETURN** `replay_needs_headphones` - `inst-speakers`
-3. [ ] - `p1` - **IF** the route is unknown and the device is not in `headphones_devices` **RETURN** `output_route_unknown` - `inst-unknown`
-4. [ ] - `p1` - **IF** own sounds are not excluded from the tap **RETURN** `own_sounds_not_excluded` - `inst-own-sounds`
-5. [ ] - `p1` - **RETURN** allowed - `inst-route-allowed`
+1. [x] - `p1` - **IF** no capture runs **RETURN** allowed - `inst-no-capture`
+2. [x] - `p1` - **IF** the route is speakers **RETURN** `replay_needs_headphones` - `inst-speakers`
+3. [x] - `p1` - **IF** the route is unknown and the device is not in `headphones_devices` **RETURN** `output_route_unknown` - `inst-unknown`
+4. [x] - `p1` - **IF** own sounds are not excluded from the tap **RETURN** `own_sounds_not_excluded` - `inst-own-sounds`
+5. [x] - `p1` - **RETURN** allowed - `inst-route-allowed`
 
 ### Write the transcript file
 
@@ -233,16 +233,16 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Playback
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-live-transcript-playback`
+- [x] `p1` - **ID**: `cpt-noter-state-core-live-transcript-playback`
 
 **States**: idle, playing, stopped
 
 **Initial State**: idle
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** idle **TO** playing **WHEN** `audio_play` passed the route rule and the engine started playing - `inst-st-play`
-2. [ ] - `p1` - **FROM** playing **TO** stopped **WHEN** the span ended (`ended`), the user stopped (`user`), the output switched to speakers during capture (`output_switched_to_speakers`) or a capture started (`capture_started`) - `inst-st-stop`
-3. [ ] - `p1` - **FROM** stopped **TO** playing **WHEN** `audio_play` again - `inst-st-replay`
+1. [x] - `p1` - **FROM** idle **TO** playing **WHEN** `audio_play` passed the route rule and the engine started playing - `inst-st-play`
+2. [x] - `p1` - **FROM** playing **TO** stopped **WHEN** the span ended (`ended`), the user stopped (`user`), the output switched to speakers during capture (`output_switched_to_speakers`) or a capture started (`capture_started`) - `inst-st-stop`
+3. [x] - `p1` - **FROM** stopped **TO** playing **WHEN** `audio_play` again - `inst-st-replay`
 
 ### Segment
 
@@ -303,7 +303,7 @@ The system **MUST** answer `transcript_span` from the call's current pass and wr
 
 ### Replay without leaking into the call
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-replay`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-replay`
 
 The system **MUST** play replay through the engine only, refuse replay during capture on speakers, on an unidentified output not marked as headphones and when own sounds are not excluded, stop playback with its reason, and publish `playback:state` whole with a version.
 
