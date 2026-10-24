@@ -645,6 +645,7 @@ impl Core {
     }
 
     /// Hidden for presenting, as `harness.world_set` asks (native surfaces own it in the app).
+    #[cfg(feature = "harness")]
     pub(crate) fn seed_presenting(&self, hidden: bool) {
         self.set_hidden_for_presenting(hidden);
     }

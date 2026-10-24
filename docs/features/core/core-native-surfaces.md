@@ -148,7 +148,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Use the menu bar
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-menu-bar`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-menu-bar`
 
 **Actor**: Primary user (status item)
 
@@ -161,8 +161,8 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Steps**:
 1. [x] - `p1` - Build the tray menu and title from `CaptureState`, the call title and `PrivacyStatus`; update them on `capture:state` and `privacy:changed` - `inst-build-menu`
 2. [x] - `p1` - Set the tray glyph: idle, recording, paused, or copilot muted - `inst-glyph`
-3. [ ] - `p1` - On a menu click, call the matching core command in process as a native caller from the menu bar surface - `inst-menu-click`
-4. [ ] - `p1` - **RETURN** - `inst-return-menu`
+3. [x] - `p1` - On a menu click, call the matching core command in process as a native caller from the menu bar surface - `inst-menu-click`
+4. [x] - `p1` - **RETURN** - `inst-return-menu`
 
 ### Allow and deliver notifications
 
@@ -230,8 +230,8 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 **Steps**:
 1. [ ] - `p1` - Convert the windows to NSPanel with the non-activating style through tauri-nspanel (pinned commit) - `inst-convert`
-2. [ ] - `p1` - Set the sharing type so screen capture excludes them - `inst-content-protect`
-3. [ ] - `p1` - Keep them above normal windows on every Space while a call runs - `inst-level`
+2. [x] - `p1` - Set the sharing type so screen capture excludes them - `inst-content-protect`
+3. [x] - `p1` - Keep them above normal windows on every Space while a call runs - `inst-level`
 4. [ ] - `p1` - **RETURN** - `inst-return-panels`
 
 ### Calendar facts for detection

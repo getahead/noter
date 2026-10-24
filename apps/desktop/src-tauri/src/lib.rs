@@ -5,6 +5,7 @@
 // @cpt-component:cpt-noter-component-core-ipc-host:p1
 
 mod native;
+pub mod surfaces;
 pub mod updater;
 
 use std::sync::{Arc, OnceLock};
@@ -70,7 +71,11 @@ pub fn run() {
             let _ = events.0.set(app.handle().clone());
             let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
             let updater = Arc::new(updater::TauriUpdater::new(app.handle().clone()));
-            app.manage(boot(events.clone(), shortcuts, updater.clone()));
+            let group = noter_core::default_data_dir()
+                .map(|dir| noter_native::app_group_container().unwrap_or(dir))
+                .unwrap_or_default();
+            let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group);
+            app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
             // Without a feed (M0) the check ends at once and nothing is ever ready.
             tauri::async_runtime::spawn(async move {
                 let _ = updater.check().await;
@@ -88,10 +93,11 @@ pub fn run() {
     });
 }
 
-fn boot(
+fn boot<R: Runtime>(
     events: Arc<dyn EventEmitter>,
     shortcuts: Arc<dyn ShortcutRegistrar>,
     updater: Arc<dyn noter_core::Updater>,
+    surfaces: Arc<surfaces::TauriSurfaces<R>>,
 ) -> Booted {
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
@@ -114,10 +120,12 @@ fn boot(
         .with_native(Arc::new(Mac::new(&group)))
         .with_models_dir(group.join("models"))
         .with_models(Arc::new(PinnedModels::new()))
-        .with_updater(updater);
+        .with_updater(updater)
+        .with_surfaces(surfaces.clone());
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
+            surfaces.attach(&core);
             // On the async runtime, which first run keeps for macOS's notices (other threads).
             tauri::async_runtime::block_on(async { core.start_first_run() });
             Booted(Ok(core))
