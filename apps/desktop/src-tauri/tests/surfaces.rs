@@ -4,17 +4,25 @@
 
 use std::sync::Arc;
 
-use noter_core::{Core, CoreDeps, EventEmitter, Surfaces, SystemClock, TrayAction, TrayGlyph};
-use noter_desktop::surfaces::{
-    action_of, call_frame, screen_of, settings_url, tray_command, tray_label, tray_title, Screen,
-    TauriSurfaces,
+use std::sync::Mutex;
+
+use noter_core::{
+    Core, CoreDeps, EventEmitter, Notification, NotificationKind, Surfaces, SystemClock,
+    TrayAction, TrayGlyph,
 };
-use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, NativeSurface};
-use noter_protocol::model::{CallLayout, DisplayInfo, WindowLabel};
-use noter_protocol::{CallId, DisplayId, NoArgs, PermissionKind};
+use noter_desktop::surfaces::{
+    action_of, call_frame, frame_of, notification_clicked, posted, settings_url, tray_command,
+    tray_label, tray_title, TauriSurfaces,
+};
+use noter_native::Frame;
+use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
+use noter_protocol::model::{
+    CallLayout, CallPageTab, DegradedState, DisplayInfo, NavTarget, WindowLabel,
+};
+use noter_protocol::{CallId, DisplayId, NoArgs, PermissionKind, TimestampMs};
 use serde_json::{json, Value};
 use tauri::test::{mock_builder, mock_context, noop_assets};
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
 struct NoEvents;
 
@@ -22,69 +30,152 @@ impl EventEmitter for NoEvents {
     fn emit(&self, _: &'static str, _: Value) {}
 }
 
-fn screens() -> Vec<Screen> {
-    vec![
-        Screen {
-            x: 0.0,
-            y: 0.0,
-            width: 1512.0,
-            height: 982.0,
-            primary: true,
-        },
-        Screen {
-            x: 1512.0,
-            y: -200.0,
-            width: 2560.0,
-            height: 1440.0,
-            primary: false,
-        },
-    ]
+const BUILT_IN: Frame = Frame {
+    x: 0.0,
+    y: 0.0,
+    width: 1512.0,
+    height: 982.0,
+};
+const STUDIO: Frame = Frame {
+    x: 1512.0,
+    y: -200.0,
+    width: 2560.0,
+    height: 1440.0,
+};
+
+fn display(id: &str, is_main: bool) -> DisplayInfo {
+    DisplayInfo {
+        id: DisplayId::new(id.to_string()),
+        name: "Display".into(),
+        is_main,
+        holds_call_app: false,
+        width_pt: 0,
+        height_pt: 0,
+    }
 }
 
-fn display(main: bool, width_pt: u32, height_pt: u32) -> DisplayInfo {
-    DisplayInfo {
-        id: DisplayId::new("dsp_x".to_string()),
-        name: "Display 2".into(),
-        is_main: main,
-        holds_call_app: false,
-        width_pt,
-        height_pt,
+/// The Mac's frames by display id, as noter-native's `display_frame` answers.
+fn frames(id: &DisplayId) -> Option<Frame> {
+    match id.as_str() {
+        "dsp_builtin" => Some(BUILT_IN),
+        "dsp_studio" => Some(STUDIO),
+        _ => None,
     }
 }
 
 #[test]
-fn the_call_display_is_found_by_main_or_size_and_falls_back_to_the_primary() {
-    let s = screens();
-    assert_eq!(screen_of(None, &s), Some(&s[0]));
-    assert_eq!(screen_of(Some(&display(true, 1512, 982)), &s), Some(&s[0]));
+fn the_call_display_is_found_by_identity_and_falls_back_to_the_main_display() {
+    let displays = [display("dsp_builtin", true), display("dsp_studio", false)];
+    let id = |s: &str| DisplayId::new(s.to_string());
     assert_eq!(
-        screen_of(Some(&display(false, 2560, 1440)), &s),
-        Some(&s[1])
+        frame_of(Some(&id("dsp_studio")), &displays, frames),
+        Some(STUDIO)
     );
+    assert_eq!(frame_of(None, &displays, frames), Some(BUILT_IN));
     assert_eq!(
-        screen_of(Some(&display(false, 1920, 1080)), &s),
-        Some(&s[0]),
+        frame_of(Some(&id("dsp_unplugged")), &displays, frames),
+        Some(BUILT_IN),
         "unplugged"
     );
-    assert_eq!(screen_of(None, &[]), None);
+    assert_eq!(frame_of(None, &[], frames), None);
 }
 
 #[test]
 fn the_call_window_fills_a_dedicated_display_or_floats_in_its_top_right_corner() {
-    let studio = &screens()[1];
     assert_eq!(
-        call_frame(CallLayout::Dedicated, false, studio),
+        call_frame(CallLayout::Dedicated, false, &STUDIO),
         (1512.0, -168.0, 2560.0, 1408.0)
     );
-    let (x, y, w, h) = call_frame(CallLayout::Floating, false, studio);
+    let (x, y, w, h) = call_frame(CallLayout::Floating, false, &STUDIO);
     assert_eq!((w, h), (380.0, 600.0));
     assert_eq!(x + w, 1512.0 + 2560.0 - 16.0);
     assert_eq!(y, -200.0 + 32.0 + 16.0);
     assert_eq!(
-        call_frame(CallLayout::Floating, true, studio).3,
+        call_frame(CallLayout::Floating, true, &STUDIO).3,
         56.0,
         "the strip"
     );
+}
+
+#[test]
+fn a_notification_carries_its_call_as_thread_and_where_a_click_goes() {
+    let call_id = CallId::new("call_1".to_string());
+    let silent = Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::CaptureProblem(DegradedState::SystemAudioSilent {
+            call_id: call_id.clone(),
+            since: TimestampMs(0),
+            confidence: 0.9,
+        }),
+    };
+    let posted = posted(&silent);
+    assert_eq!(posted.title, "System audio silent");
+    assert_eq!(posted.body, "Recording continues with your microphone.");
+    assert_eq!(posted.thread, call_id);
+    assert_eq!(
+        posted.target,
+        NavTarget::CallPage {
+            call_id: call_id.clone(),
+            tab: CallPageTab::Transcript,
+            span: None
+        }
+    );
+    let failed = Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::CaptureProblem(DegradedState::CaptureFailed {
+            call_id: call_id.clone(),
+            since: TimestampMs(0),
+        }),
+    };
+    assert_eq!(posted(&failed).title, "Not recording · engine stopped");
+    let mic = Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::CaptureProblem(DegradedState::MicrophoneOff {
+            call_id: call_id.clone(),
+        }),
+    };
+    assert_eq!(posted(&mic).title, "Microphone off");
+    let ready = Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::SummaryReady,
+    };
+    let posted = posted(&ready);
+    assert_eq!(posted.title, "Summary ready");
+    assert!(matches!(
+        posted.target,
+        NavTarget::CallPage {
+            tab: CallPageTab::Summary,
+            ..
+        }
+    ));
+    assert_ne!(
+        posted.id,
+        posted(&ready).id,
+        "every post is its own notification"
+    );
+}
+
+#[test]
+fn a_notification_click_asks_the_main_window_to_navigate() {
+    let app = mock_builder().build(mock_context(noop_assets())).unwrap();
+    let heard = Arc::new(Mutex::new(Vec::new()));
+    let h = heard.clone();
+    app.listen_any(event_names::NAV_REQUEST, move |e| {
+        h.lock().unwrap().push(e.payload().to_string());
+    });
+    let target = NavTarget::CallPage {
+        call_id: CallId::new("call_1".to_string()),
+        tab: CallPageTab::Transcript,
+        span: None,
+    };
+    notification_clicked(app.handle(), target.clone());
+    let heard = heard.lock().unwrap().clone();
+    assert_eq!(heard.len(), 1);
+    assert_eq!(
+        serde_json::from_str::<NavTarget>(&heard[0]).unwrap(),
+        target
+    );
+    assert!(app.get_webview_window(WindowLabel::Main.as_str()).is_some());
 }
 
 #[test]

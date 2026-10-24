@@ -30,3 +30,13 @@ fn a_login_item_macos_refuses_is_an_error_the_core_logs() {
         assert!(!e.message.is_empty());
     }
 }
+
+#[test]
+fn the_calendar_is_read_only_with_access_and_never_asked_here() {
+    // A test binary has no calendar access: no event, and no prompt.
+    let mac = Mac::new(&std::env::temp_dir());
+    assert_eq!(
+        mac.calendar_event_near(noter_protocol::TimestampMs(1_790_000_000_000)),
+        None
+    );
+}
