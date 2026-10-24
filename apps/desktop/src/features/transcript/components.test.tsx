@@ -7,7 +7,7 @@ import type { CallDetail, WindowLabel } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
-import { audioLine, CallScreenTranscript, StoredTranscript, TranscriptPanel, useTranscript } from "./hosts";
+import { audioLine, CallScreenTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
 import { PlaybackBar } from "./playback-bar";
@@ -19,8 +19,7 @@ const LIVE = "call_live";
 const PAST = "call_backend";
 const rowOf = (s = seg("a", 1_198_000, { lang: "ru", text: "drawer redesign до пятницы" })) => ({ kind: "segment" as const, key: s.id, at: s.t0_ms, seg: s });
 const act = (p: Record<string, unknown>) => (p.onAction as () => void)();
-type Hook = ReturnType<typeof useTranscript>;
-const hookOf = (b: Bridge, callId: string, variant: "live" | "stored") => rendered(() => useTranscript(b, callId, variant) as never, {}) as unknown as Hook;
+const hookOf = (b: Bridge, callId: string, o: Parameters<typeof useTranscript>[2] = {}) => rendered(() => useTranscript(b, callId, o) as never, {}) as unknown as TranscriptHandle;
 
 describe("speaker label and language tag", () => {
   it("draw the prototype's markup with the variant and the VoiceOver name", () => {
@@ -200,11 +199,13 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
   it("draws the live call in CS-R2 from the Channel, and the call screen mounts it", async () => {
     const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
     await b.subscribe("transcript_subscribe", { call_id: LIVE });
-    const html = renderToString(<TranscriptPanel bridge={b} callId={LIVE} variant="live" />);
+    const html = renderToString(<CallScreenTranscript bridge={b} />);
     expect(html).toContain('data-region="CS-R2"');
     expect(html).toContain("drawer redesign");
     expect(renderToString(<App bridge={b} />)).toContain('data-region="CS-R2"');
-    expect(renderToString(<CallScreenTranscript bridge={b} />)).toContain("tr-window");
+    const tr = hookOf(b, LIVE);
+    expect(renderToString(<TranscriptLog tr={tr} variant="tail" tailLines={2} />).match(/cw-seg--tail/g)).toHaveLength(2);
+    expect(renderToString(<TranscriptBar tr={tr} variant="live" />)).toBe("");
   });
 
   it("plays a line, pauses, resumes, seeks and closes through audio_play and audio_stop", async () => {
@@ -212,13 +213,16 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     await b.subscribe("transcript_subscribe", { call_id: LIVE });
     const play = vi.spyOn(b.core, "audioPlay");
     const stop = vi.spyOn(b.core, "audioStop");
-    const first = hookOf(b, LIVE, "live");
+    const first = hookOf(b, LIVE);
     const anna = first.data!.segments.find((s) => s.text.includes("drawer redesign"))!;
     expect(first.control({ kind: "segment", key: anna.id, at: 0, seg: anna })).toEqual({ state: "enabled", help: "transcript.play" });
     expect(first.control({ kind: "gap", key: "g", at: 0, gap: { call_id: LIVE, t0_ms: 0, t1_ms: 1, reason: "paused" } })).toBeUndefined();
     await first.play(anna);
     expect(play).toHaveBeenCalledWith(expect.objectContaining({ call_id: LIVE, from_ms: anna.t0_ms }));
     expect(b.store.getState().whole.playback?.playing).toBe(true);
+    const playing = hookOf(b, LIVE);
+    expect(renderToString(<TranscriptBar tr={{ ...playing, replay: { key: anna.id, call_id: LIVE, from_ms: anna.t0_ms, to_ms: anna.t1_ms, speaker: "Anna K.", since: 0, paused: false }, bar: "PLAYING" }} variant="live" />)).toContain('data-region="CS-R2b"');
+    expect(renderToString(<TranscriptBar tr={{ ...playing, replay: { key: anna.id, call_id: LIVE, from_ms: 0, to_ms: 1, speaker: "", since: 0, paused: false }, bar: "PLAYING" }} variant="tail" />)).not.toContain("data-region");
     first.toggle();
     first.seek(anna.t0_ms + 1000);
     first.close();
@@ -232,7 +236,7 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
       w.app.environment.output_route = "speakers";
     });
     await b.subscribe("transcript_subscribe", { call_id: LIVE });
-    const tr = hookOf(b, LIVE, "live");
+    const tr = hookOf(b, LIVE);
     await tr.play(tr.data!.segments[0]!);
     expect(b.store.getState().commands.audio_play?.state).toBe("ERROR");
   });
@@ -241,21 +245,23 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     const { bridge: b } = await open("main");
     await b.subscribe("transcript_subscribe", { call_id: PAST });
     const detail = (await b.core.callGet({ call_id: PAST })) as { status: "ok"; data: CallDetail };
-    const html = renderToString(<TranscriptPanel bridge={b} callId={PAST} variant="stored" detail={detail.data} />);
-    expect(html).toContain('data-region="PC-R5"');
-    expect(html).toMatch(/audio kept until/);
-    expect(renderToString(<StoredTranscript bridge={b} callId={PAST} />)).toContain("tr-window");
-    expect(hookOf(b, PAST, "stored").waiting).toBe(false);
+    const tr = hookOf(b, PAST, { detail: detail.data });
+    expect(renderToString(<TranscriptLog tr={tr} variant="stored" />)).toMatch(/audio kept until/);
+    expect(renderToString(<TranscriptLog tr={hookOf(b, PAST, { detail: { ...detail.data, audio_not_stored: true } })} variant="stored" />)).toContain('title="Audio not stored for this call"');
+    expect(renderToString(<TranscriptLog tr={hookOf(b, PAST, { detail: { ...detail.data, call: { ...detail.data.call, audio_deleted: true } } })} variant="stored" />)).toContain('title="Audio deleted"');
+    expect(hookOf(b, PAST, { audioKept: false }).control({ kind: "segment", key: "x", at: 0, seg: tr.data!.segments[0]! })).toEqual({ state: "hidden" });
+    expect(renderToString(<StoredTranscriptRoute bridge={b} callId={PAST} />)).toContain('data-region="PC-R5"');
+    expect(tr.waiting).toBe(false);
   });
 
   it("writes the audio line for kept, deleted and never-stored audio", () => {
     const prefs = { time_format: "h24" as const, first_weekday: 1, time_zone: "UTC" };
     const call = { audio_deleted: false, audio_kept_until: Date.UTC(2026, 10, 15), started_at: Date.UTC(2026, 9, 16), duration_ms: 52 * 60_000 };
     const d = (c: object, notStored = false) => ({ call: { ...call, ...c }, audio_not_stored: notStored }) as unknown as CallDetail;
-    // the date in the macOS locale: "15 Nov" or "Nov 15"
+    // the date in the macOS locale: "15 Nov" or "Nov 15"; D-36: no deletion date in M1
     expect(audioLine(d({}), prefs)).toMatch(/^52 min · audio kept until (15 Nov|Nov 15)$/);
-    expect(audioLine(d({ audio_deleted: true }), prefs)).toMatch(/^Audio deleted on (15 Nov|Nov 15) · transcript kept$/);
-    expect(audioLine(d({ audio_deleted: true, audio_kept_until: null }), prefs)).toMatch(/^Audio deleted on (16 Oct|Oct 16) · transcript kept$/);
+    expect(audioLine(d({}), undefined)).toBeNull();
+    expect(audioLine(d({ audio_deleted: true }), prefs)).toBe("Audio deleted · transcript kept");
     expect(audioLine(d({}, true), prefs)).toBe("Audio not stored for this call");
     expect(audioLine(d({ audio_kept_until: null }), prefs)).toBeNull();
     expect(audioLine(null, prefs)).toBeNull();
@@ -265,7 +271,7 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     const { fake, bridge: b } = await open("main");
     fake.failNext("transcript_subscribe", "internal");
     await b.subscribe("transcript_subscribe", { call_id: PAST });
-    const html = renderToString(<TranscriptPanel bridge={b} callId={PAST} variant="stored" />);
+    const html = renderToString(<TranscriptLog tr={hookOf(b, PAST)} variant="stored" />);
     expect(html).toContain("Couldn’t load the transcript.");
     expect(html).toContain("Try Again");
   });

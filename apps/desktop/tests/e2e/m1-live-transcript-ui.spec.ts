@@ -397,7 +397,7 @@ test.describe("cpt-noter-flow-ui-live-transcript-stored", () => {
   });
 
   for (const [name, patch, header] of [
-    ["Audio deleted", { audio_deleted: true }, /^Audio deleted on .+ · transcript kept/],
+    ["Audio deleted", { audio_deleted: true }, /^Audio deleted · transcript kept/], // D-36: no deletion date in M1
     ["Audio not stored", { audio_not_stored: true }, /Audio not stored for this call/],
   ] as const) {
     test(`UI — empty path: ${name} — no play controls, the header says why, the rows stay readable`, async ({ page }) => {

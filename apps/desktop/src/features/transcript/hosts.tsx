@@ -1,7 +1,7 @@
 // The transcript as its hosts mount it: the call screen (CS-R2, CS-R2b), the floating panel (FP-R5) and the call page
 // (PC-R5, PC-R6). `useTranscript` holds the Channel, the replay and the play-control rule; `TranscriptPanel` draws the
 // view and the playback bar in the host's regions. Hosts pass the call id and the variant; nothing else.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CallDetail, SegmentView, TimeSpan, UiPrefs } from "../../core/bindings";
 import type { Bridge } from "../../app/bridge/bridge";
@@ -21,6 +21,8 @@ export interface TranscriptOptions {
   span?: TimeSpan | null;
   /** The call's details (call page): audio retention and "Never store audio". */
   detail?: CallDetail | null;
+  /** The host knows the audio is gone (deleted or never stored): no play controls. */
+  audioKept?: boolean;
 }
 
 /**
@@ -65,7 +67,13 @@ export function showSpan(bridge: Pick<Bridge, "core">, span: TimeSpan, rows: rea
 
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-replay-line:p1
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-stored:p1
-export function useTranscript(bridge: Bridge, callId: string, variant: Variant, o: TranscriptOptions = {}) {
+/**
+ * The transcript of a call while mounted: the Channel (snapshot, then stream), the meters while waiting for speech,
+ * the evidence highlight, the play-control rule and the replay. Call it once per call where the transcript lives (a
+ * window that switches between the live log and the tail keeps one subscription), and draw with TranscriptLog and
+ * TranscriptBar.
+ */
+export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptions = {}) {
   const stream = useWindow(bridge, (s) => s.streams.transcript_subscribe);
   const levels = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels ?? null);
   const capture = useWindow(bridge, (s) => s.whole.capture);
@@ -85,9 +93,9 @@ export function useTranscript(bridge: Bridge, callId: string, variant: Variant, 
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-api-subscribe
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-mount
 
-  const rows = useMemo(() => (data ? buildRows(data, variant) : []), [data, variant]);
+  const rows = useMemo(() => (data ? buildRows(data, "stored") : []), [data]);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-if-waiting
-  const waiting = variant !== "stored" && !!data?.live && data.segments.length === 0 && data.hypotheses.length === 0;
+  const waiting = !!data?.live && data.segments.length === 0 && data.hypotheses.length === 0;
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-if-waiting
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-waiting
   useChannel(bridge, "levels_subscribe", waiting ? callId : null);
@@ -100,7 +108,7 @@ export function useTranscript(bridge: Bridge, callId: string, variant: Variant, 
   useEffect(() => (highlight.length ? after(HIGHLIGHT_MS, () => setHighlight([])) : undefined), [highlight]);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
 
-  const audio = !!data?.audio_available && !o.detail?.call.audio_deleted && !o.detail?.audio_not_stored && !(capture?.call_id === callId && capture.audio_not_stored);
+  const audio = o.audioKept !== false && !!data?.audio_available && !o.detail?.call.audio_deleted && !o.detail?.audio_not_stored && !(capture?.call_id === callId && capture.audio_not_stored);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-user-hover
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-play-control
   const control = (row: Row) =>
@@ -138,6 +146,9 @@ export function useTranscript(bridge: Bridge, callId: string, variant: Variant, 
   const position = fresh ? playback.position_ms : (replay?.from_ms ?? 0);
 
   return {
+    bridge,
+    callId,
+    detail: o.detail ?? null,
     data,
     rows,
     waiting,
@@ -169,96 +180,125 @@ export function useTranscript(bridge: Bridge, callId: string, variant: Variant, 
   };
 }
 
-const day = (ms: number, prefs: UiPrefs) => new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", timeZone: prefs.time_zone || undefined }).format(ms);
+export type TranscriptHandle = ReturnType<typeof useTranscript>;
 
+// D-36: M1 shows no deletion date ("audio_deleted_at" comes in M2)
 /** The stored variant's header line about the audio: kept until, deleted, or never stored. */
 export function audioLine(detail: CallDetail | null | undefined, prefs: UiPrefs | undefined): string | null {
-  if (!detail || !prefs) return null;
+  if (!detail) return null;
   const { call } = detail;
   if (detail.audio_not_stored) return t("transcript.audio.not_stored");
-  // shortcut: CallRow carries no deletion date; the retention date (else the call's date) stands in until the contract adds one
-  if (call.audio_deleted) return t("transcript.audio.deleted", { date: day(call.audio_kept_until ?? call.started_at, prefs) });
-  if (call.audio_kept_until == null) return null;
-  return t("transcript.audio.kept", { length: duration(call.duration_ms / 1000), date: day(call.audio_kept_until, prefs) });
+  if (call.audio_deleted) return t("transcript.audio.deleted");
+  if (call.audio_kept_until == null || !prefs) return null;
+  const date = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", timeZone: prefs.time_zone || undefined }).format(call.audio_kept_until);
+  return t("transcript.audio.kept", { length: duration(call.duration_ms / 1000), date });
 }
 
-const REGIONS: Record<Variant, { view: string; bar: string; cls: string; barCls: string; variant: BarVariant }> = {
-  live: { view: "CS-R2", bar: "CS-R2b", cls: "cs-r2", barCls: "cs-r2b", variant: "live-headphones" },
-  tail: { view: "FP-R5", bar: "FP-R5", cls: "fp-r5", barCls: "fp-r5", variant: "live-headphones" },
-  stored: { view: "PC-R5", bar: "PC-R6", cls: "pc-tr", barCls: "pc-play", variant: "stored" },
-};
-
-export interface TranscriptPanelProps extends TranscriptOptions {
-  bridge: Bridge;
-  callId: string;
+export interface TranscriptLogProps {
+  tr: TranscriptHandle;
   variant: Variant;
-  /** Content above the view in its region (the call page's speaker naming panel). */
-  before?: ReactNode;
+  /** Tail lines: 3, or 8 when the copilot is off (FP-R5). */
+  tailLines?: number;
+  /** The stored variant's audio line; by default from the call's details. */
+  header?: string | null;
 }
 
-/** The view in the host's region and the playback bar under it; in the floating panel the bar takes the tail's place. */
-export function TranscriptPanel({ bridge, callId, variant, before, ...o }: TranscriptPanelProps) {
-  const tr = useTranscript(bridge, callId, variant, o);
-  const prefs = useWindow(bridge, (s) => s.app?.prefs);
-  const r = REGIONS[variant];
-  const header = variant === "stored" ? audioLine(o.detail, prefs) : null;
-  // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-bar
-  const bar = tr.replay && tr.bar !== "CLOSED" && (
-    <div data-region={r.bar} className={r.barCls}>
-      <PlaybackBar variant={r.variant} state={tr.bar} replay={tr.replay} position_ms={tr.position} onToggle={tr.toggle} onSeek={tr.seek} onClose={tr.close} />
-    </div>
-  );
-  // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-bar
-  if (variant === "tail" && bar) return bar;
+/** The transcript view of `useTranscript`'s call, in the host's region (CS-R2, FP-R5 or PC-R5). */
+export function TranscriptLog({ tr, variant, tailLines, header }: TranscriptLogProps) {
+  const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
+  const rows = useMemo(() => (variant === "tail" && tr.data ? buildRows(tr.data, "tail", tailLines) : tr.rows), [variant, tr.data, tr.rows, tailLines]);
+  const line = header !== undefined ? header : variant === "stored" ? audioLine(tr.detail, prefs) : null;
+  const gone = !!tr.detail && (tr.detail.call.audio_deleted || tr.detail.audio_not_stored);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-return-stored
   const error = tr.error && <InlineBanner banner={{ id: "transcript-error", severity: "error", text: t("transcript.error"), actions: [{ label: t("action.try_again"), onAction: tr.retry }] }} />;
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-return-stored
   return (
-    <>
-      <section data-region={r.view} className={r.cls} aria-label={t("transcript.label")}>
-        {before}
-        <TranscriptView
-          key={callId}
-          variant={variant}
-          rows={tr.rows}
-          speakers={tr.data?.speakers ?? []}
-          loaded={!!tr.data}
-          loading={tr.loading}
-          waiting={tr.waiting}
-          levels={tr.levels}
-          error={error || undefined}
-          header={header}
-          control={tr.control}
-          playingKey={tr.playingKey}
-          highlight={tr.highlight}
-          refused={tr.refused}
-          onRefusedDone={tr.clearRefused}
-          timeHelp={header && (o.detail?.call.audio_deleted || o.detail?.audio_not_stored) ? header : undefined}
-          onPlay={(seg) => void tr.play(seg)}
-        />
-      </section>
+    <TranscriptView
+      key={tr.callId}
+      variant={variant}
+      rows={rows}
+      speakers={tr.data?.speakers ?? []}
+      loaded={!!tr.data}
+      loading={tr.loading}
+      waiting={variant !== "stored" && tr.waiting}
+      levels={tr.levels}
+      error={error || undefined}
+      header={line}
+      control={tr.control}
+      playingKey={tr.playingKey}
+      highlight={tr.highlight}
+      refused={tr.refused}
+      onRefusedDone={tr.clearRefused}
+      timeHelp={gone ? (tr.detail!.audio_not_stored ? t("transcript.audio.not_stored") : t("transcript.audio.deleted_help")) : undefined}
+      onPlay={(seg) => void tr.play(seg)}
+    />
+  );
+}
+
+const BAR: Record<Variant, { region?: string; cls?: string; variant: BarVariant }> = {
+  live: { region: "CS-R2b", cls: "cs-r2b", variant: "live-headphones" },
+  tail: { variant: "live-headphones" }, // in FP-R5, in the tail's place
+  stored: { region: "PC-R6", cls: "pc-play", variant: "stored" },
+};
+
+// @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-bar
+/** The playback bar while a line replays: CS-R2b under the live log, PC-R6 on the call page; in the floating panel the
+ *  host draws it in FP-R5 instead of the tail. Nothing while closed. */
+export function TranscriptBar({ tr, variant }: { tr: TranscriptHandle; variant: Variant }) {
+  if (!tr.replay || tr.bar === "CLOSED") return null;
+  const b = BAR[variant];
+  const bar = <PlaybackBar variant={b.variant} state={tr.bar} replay={tr.replay} position_ms={tr.position} onToggle={tr.toggle} onSeek={tr.seek} onClose={tr.close} />;
+  return b.region ? (
+    <div data-region={b.region} className={b.cls}>
       {bar}
+    </div>
+  ) : (
+    bar
+  );
+}
+// @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-bar
+
+/** The call screen until the call window (2.10) lands around it: the capture's call, live, in CS-R2 and CS-R2b. */
+export function CallScreenTranscript({ bridge }: { bridge: Bridge }) {
+  const callId = useWindow(bridge, (s) => s.whole.capture?.call_id ?? null);
+  return callId ? <LiveHost bridge={bridge} callId={callId} /> : null;
+}
+
+function LiveHost({ bridge, callId }: { bridge: Bridge; callId: string }) {
+  const tr = useTranscript(bridge, callId);
+  return (
+    <div className="tr-window">
+      <section data-region="CS-R2" className="cs-r2" aria-label={t("transcript.label")}>
+        <TranscriptLog tr={tr} variant="live" />
+      </section>
+      <TranscriptBar tr={tr} variant="live" />
+    </div>
+  );
+}
+
+/**
+ * A call's stored transcript for the call page's PC-R5 (the page draws the region and its heading): the audio line,
+ * the view with its play controls, and the playback bar in PC-R6. It reads the call's details for the audio line.
+ */
+export function StoredTranscript({ bridge, callId, audioKept, span }: { bridge: Bridge; callId: string; audioKept?: boolean; span?: TimeSpan | null }) {
+  const [detail, setDetail] = useState<CallDetail | null>(null);
+  useEffect(() => void bridge.core.callGet({ call_id: callId }).then((r) => r.status === "ok" && setDetail(r.data)), [bridge, callId]);
+  const tr = useTranscript(bridge, callId, { detail, audioKept, span });
+  return (
+    <>
+      <TranscriptLog tr={tr} variant="stored" />
+      <TranscriptBar tr={tr} variant="stored" />
     </>
   );
 }
 
-/** The call screen until the call window (2.10) lands around it: the capture's call, live. */
-export function CallScreenTranscript({ bridge }: { bridge: Bridge }) {
-  const callId = useWindow(bridge, (s) => s.whole.capture?.call_id ?? null);
-  return callId ? (
-    <div className="tr-window">
-      <TranscriptPanel bridge={bridge} callId={callId} variant="live" />
-    </div>
-  ) : null;
-}
-
-/** A call's stored transcript with the call's details for the audio line (the call page mounts the same panel). */
-export function StoredTranscript({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: TimeSpan | null }) {
-  const [detail, setDetail] = useState<CallDetail | null>(null);
-  useEffect(() => void bridge.core.callGet({ call_id: callId }).then((r) => r.status === "ok" && setDetail(r.data)), [bridge, callId]);
+/** Dev server only (App's `#transcript=<call id>`): the stored transcript in a PC-R5 of its own, until the call page lands. */
+export function StoredTranscriptRoute({ bridge, callId }: { bridge: Bridge; callId: string }) {
   return (
     <div className="tr-window">
-      <TranscriptPanel bridge={bridge} callId={callId} variant="stored" detail={detail} span={span} />
+      <section data-region="PC-R5" className="pc-tr" aria-label={t("transcript.label")}>
+        <StoredTranscript bridge={bridge} callId={callId} />
+      </section>
     </div>
   );
 }
