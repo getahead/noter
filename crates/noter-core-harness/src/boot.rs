@@ -162,6 +162,7 @@ impl Harness {
                 .await?;
         }
         self.write_setup(&wanted["app"]["setup"]).await?;
+        self.seed_calls(&wanted)?;
         if !w.app.banners.banners.is_empty() {
             self.core.set_banners(w.app.banners.banners.clone());
         }
@@ -169,6 +170,140 @@ impl Harness {
             noter_core::testing::seed_capture(&self.core, w.app.capture.clone()).await?;
         }
         Ok(())
+    }
+
+    /// Writes the world's calls, speakers, segments, marks and gaps as rows, the way capture
+    fn seed_calls(&self, wanted: &Value) -> Result<(), CoreError> {
+        let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
+            table,
+            values,
+        };
+        let empty = vec![];
+        let transcripts = wanted["transcripts"].as_array().unwrap_or(&empty);
+        let mut rows = vec![];
+        for call in wanted["calls"].as_array().unwrap_or(&empty) {
+            let id = &call["id"];
+            let detail = wanted["call_details"]
+                .as_array()
+                .unwrap_or(&empty)
+                .iter()
+                .find(|d| d["call"]["id"] == *id);
+            let started = call["started_at"].as_i64().unwrap_or(0);
+            let live = matches!(call["status"].as_str(), Some("recording" | "paused"));
+            rows.push(ins(
+                "calls",
+                vec![
+                    ("id", id.clone()),
+                    ("rev", call["rev"].clone()),
+                    ("started_at", json!(started)),
+                    (
+                        "ended_at",
+                        if live {
+                            Value::Null
+                        } else {
+                            json!(started + call["duration_ms"].as_i64().unwrap_or(0))
+                        },
+                    ),
+                    ("title", call["title"].clone()),
+                    ("call_type", call["call_type"].clone()),
+                    ("platform", call["platform"].clone()),
+                    ("privacy_class", call["privacy"].clone()),
+                    ("status", call["status"].clone()),
+                    ("outputs_status", call["outputs"].clone()),
+                    ("archive_status", call["archive"].clone()),
+                    ("audio_retention_until", call["audio_kept_until"].clone()),
+                    ("audio_deleted", call["audio_deleted"].clone()),
+                    (
+                        "audio_not_stored",
+                        detail.map_or(json!(false), |d| d["audio_not_stored"].clone()),
+                    ),
+                    (
+                        "mode_used",
+                        detail.map_or(json!("cloud_redacted"), |d| d["mode_used"].clone()),
+                    ),
+                ],
+            ));
+            let transcript = transcripts.iter().find(|t| t["call_id"] == *id);
+            let pass = transcript.map_or(json!("live"), |t| t["pass"].clone());
+            let Some(d) = detail else { continue };
+            for sp in d["speakers"].as_array().unwrap_or(&empty) {
+                let label = &sp["label"];
+                let (text, n, person) = match label["type"].as_str() {
+                    Some("you") => (json!("you"), Value::Null, Value::Null),
+                    Some("guest_your_side") => (json!("guest_your_side"), Value::Null, Value::Null),
+                    Some("person") => (
+                        label["person"]["display_name"].clone(),
+                        Value::Null,
+                        label["person"]["id"].clone(),
+                    ),
+                    _ => (
+                        json!(format!("spk_{}", label["n"])),
+                        label["n"].clone(),
+                        Value::Null,
+                    ),
+                };
+                rows.push(ins(
+                    "speakers",
+                    vec![
+                        ("id", sp["id"].clone()),
+                        ("call_id", id.clone()),
+                        ("label", text),
+                        ("n", n),
+                        ("channel", sp["channel"].clone()),
+                        ("person_id", person),
+                        ("named_by", sp["named_by"].clone()),
+                        ("pass", pass.clone()),
+                    ],
+                ));
+            }
+            for m in d["marks"].as_array().unwrap_or(&empty) {
+                rows.push(ins(
+                    "marks",
+                    vec![
+                        ("id", m["id"].clone()),
+                        ("call_id", id.clone()),
+                        ("at_ms", m["at_ms"].clone()),
+                        ("note", m["note"].clone()),
+                    ],
+                ));
+            }
+            for g in d["gaps"].as_array().unwrap_or(&empty) {
+                rows.push(ins(
+                    "gaps",
+                    vec![
+                        ("call_id", id.clone()),
+                        ("t0_ms", g["t0_ms"].clone()),
+                        ("t1_ms", g["t1_ms"].clone()),
+                        ("reason", g["reason"].clone()),
+                    ],
+                ));
+            }
+            for seg in transcript
+                .into_iter()
+                .flat_map(|t| t["segments"].as_array().unwrap_or(&empty))
+            {
+                rows.push(ins(
+                    "segments",
+                    vec![
+                        ("id", seg["id"].clone()),
+                        ("call_id", id.clone()),
+                        ("speaker_id", seg["speaker"]["speaker_id"].clone()),
+                        ("channel", seg["channel"].clone()),
+                        ("t0_ms", seg["t0_ms"].clone()),
+                        ("t1_ms", seg["t1_ms"].clone()),
+                        ("text", seg["text"].clone()),
+                        (
+                            "text_norm",
+                            json!(seg["text"].as_str().unwrap_or_default().to_lowercase()),
+                        ),
+                        ("lang", seg["lang"].clone()),
+                        ("lang_p", seg["lang_p"].clone()),
+                        ("pass", seg["pass"].clone()),
+                    ],
+                ));
+            }
+        }
+        self.core.store().insert_batch(rows)
     }
 
     async fn call(&self, window: WindowLabel, cmd: &str, args: Value) -> Result<Value, CoreError> {

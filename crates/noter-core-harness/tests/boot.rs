@@ -849,3 +849,54 @@ async fn the_fixture_live_call_is_seeded_into_the_real_core() {
     assert_eq!(sensitive["sensitive"], true);
     r.finish().await;
 }
+
+#[tokio::test]
+async fn the_fixture_calls_are_seeded_as_capture_rows() {
+    let (_input, _core_in) = tokio::io::duplex(1024);
+    let (core_out, _output) = tokio::io::duplex(1 << 20);
+    let harness = Harness::start(
+        Options {
+            fixture: true,
+            fixed_clock: true,
+            ..Options::default()
+        },
+        Output::new(core_out).lines(),
+    )
+    .await
+    .unwrap();
+    let world = serde_json::to_value(noter_protocol::fixtures::world()).unwrap();
+    let count = |table: &str| -> i64 {
+        harness
+            .core()
+            .store()
+            .read(|c| c.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0)))
+            .unwrap()
+    };
+    let len = |v: &Value| v.as_array().map_or(0, Vec::len) as i64;
+    let details = world["call_details"].as_array().unwrap();
+    let sum = |key: &str| details.iter().map(|d| len(&d[key])).sum::<i64>();
+    assert_eq!(count("calls"), len(&world["calls"]));
+    assert_eq!(count("speakers"), sum("speakers"));
+    assert_eq!(count("marks"), sum("marks"));
+    assert_eq!(count("gaps"), sum("gaps"));
+    let segments: i64 = world["transcripts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| len(&t["segments"]))
+        .sum();
+    assert!(segments > 0);
+    assert_eq!(count("segments"), segments);
+    let changes: i64 = harness
+        .core()
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT COUNT(*) FROM changes WHERE entity_type = 'call'",
+                [],
+                |r| r.get(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(changes, 0, "capture rows carry no change rows (D-22)");
+}
