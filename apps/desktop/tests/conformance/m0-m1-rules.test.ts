@@ -251,8 +251,11 @@ describe("capture notices: hold, keep and resume", () => {
     if (!next) return;
     expect(next.call_id).not.toBe(W.LIVE_CALL);
     expect(ok(await s.core("main").callGet({ call_id: next.call_id! })).call).toMatchObject({ id: next.call_id, title: "1:1 with Anna K." });
-    const fresh = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: next.call_id! }, () => {}));
+    const heard: TranscriptMsg[] = [];
+    const fresh = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: next.call_id! }, (m) => heard.push(m)));
     if (fresh) expect(fresh).toMatchObject({ call_id: next.call_id, live: true, segments: [], hypotheses: [] });
+    await sleep(400); // the new call waits for speech: the previous call's lines are not replayed into it
+    expect(heard.filter((m) => m.event.type === "hypothesis" || m.event.type === "confirmed")).toEqual([]);
   });
 
   it("capture_set_sensitive on a stored call changes its row everywhere and sends entity:changed (D-37)", async () => {
