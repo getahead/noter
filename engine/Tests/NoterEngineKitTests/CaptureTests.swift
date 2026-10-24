@@ -38,6 +38,16 @@ final class FakeSource: AudioSource, @unchecked Sendable {
             deliver?(AudioChunk(channel: .sys, samples: samples))
         }
     }
+
+    /// `chunks` IO cycles of 512 frames at 48 kHz on both channels, as a live device delivers them.
+    func pushDevice(chunks: Int) {
+        let deliver = lock.withLock { onChunk }
+        let samples = (0..<512).map { i in 0.3 * sin(Float(i) * 2 * .pi * 440 / 48_000) }
+        for _ in 0..<chunks {
+            deliver?(AudioChunk(channel: .mic, samples: samples, sampleRate: 48_000))
+            deliver?(AudioChunk(channel: .sys, samples: samples, sampleRate: 48_000))
+        }
+    }
 }
 
 /// A clock the test moves (epoch milliseconds).
@@ -207,6 +217,20 @@ final class CaptureTests: XCTestCase {
         let other = try CaptureRing(url: url, callId: "call_2")
         XCTAssertEqual(other.written(.mic), 0, "another call starts an empty ring")
         XCTAssertNil(other.last)
+    }
+
+    func testDeviceSizedChunksKeepCallTimeExact() throws {
+        // A live device delivers 512 frames at 48 kHz: 170.67 samples at 16 kHz per chunk, which
+        // must not round up chunk by chunk (that runs call time ~7 s fast per hour).
+        let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
+        let e = engine(lines, source, root, clock)
+        _ = e.handle(startLine(id: 1, store: false))
+        _ = try XCTUnwrap(lines.waitFor("session_started"))
+        source.pushDevice(chunks: 1875)  // 20 s at 48 kHz
+        let ring = try CaptureRing(url: root.appendingPathComponent(CaptureRing.fileName), callId: "call_1")
+        XCTAssertEqual(ring.written(.mic), 320_000)
+        XCTAssertEqual(ring.written(.sys), 320_000)
+        XCTAssertEqual(ring.last?.callMs, 20_000)
     }
 
     func testAFullDiskStopsTheAudioFilesOnceAndCaptureGoesOn() throws {
