@@ -110,7 +110,7 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(args("capture_exclude_source")).toEqual([{ ...live, bundle_id: slack.bundle_id }]);
     expect(args("capture_keep_source")).toEqual([{ ...live, bundle_id: slack.bundle_id }]);
     expect(args("open_external")).toEqual([{ target: { type: "system_settings", permission: "system_audio" } }]);
-    expect(args("window_navigate")).toEqual([{ target: { type: "settings", pane: "maintenance" } }]);
+    expect(args("window_navigate")).toEqual([{ target: { type: "delete_old_audio" } }]);
   });
 
   it("replaces Pause and Stop with Try Again after the engine stopped, which resumes the same call", async () => {
@@ -171,6 +171,7 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(args("window_set_call_layout")).toEqual([{ preference: "auto" }, { preference: "auto" }]);
     expect(args("window_set_collapsed")).toEqual([{ collapsed: true }, { collapsed: true }]);
     expect(args("window_hide_call")).toEqual([{}]);
+    expect(args("window_share_warning_seen")).toEqual([{}]);
   });
 
   it("answers the call-ended notice, holds it, and shows the countdown", async () => {
