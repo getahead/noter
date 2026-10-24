@@ -18,6 +18,7 @@ const fixture = worldJson as unknown as FakeWorld;
 
 type Row = FakeWorld["calls"][number];
 type Detail = FakeWorld["call_details"][number];
+type Transcript = FakeWorld["transcripts"][number];
 
 // What M1 owns of a row. Participants, open items and reviews arrive with the people and items
 // features (M2, M3); a call still recording lasts until the real clock's now, so only its lower
@@ -37,6 +38,24 @@ function ownedDetail(d: Detail) {
       const { suggestion: _s, sample: _m, label, ...rest } = sp;
       return { ...rest, label: label.type === "person" ? { type: label.type, person: label.person.id } : label };
     }),
+  };
+}
+
+// A snapshot: the subscription and `live` follow the capture state, `last_seq` counts the stream's
+// messages, hypotheses are the engine's current guesses, a segment's confidence comes from the
+// engine's log-probability (the fixture rows do not carry it), and name suggestions and a named
+// speaker's chip come with the people feature (M2): compare who the speaker is, not the chip.
+// Everything else is the stored transcript: segments, speakers (with their replay sample), marks
+// and gaps.
+type Label = Transcript["speakers"][number]["label"];
+const who = (label: Label) => (label.type === "person" ? { type: label.type, person: label.person.id } : label);
+
+function ownedTranscript(t: Transcript) {
+  const { subscription_id: _s, live: _l, last_seq: _q, hypotheses: _h, segments, speakers, ...rest } = t;
+  return {
+    ...rest,
+    segments: segments.map(({ confidence: _c, speaker, ...seg }) => ({ ...seg, speaker: { ...speaker, label: who(speaker.label) } })),
+    speakers: speakers.map(({ suggestion: _g, label, ...sp }) => ({ ...sp, label: who(label) })),
   };
 }
 
@@ -75,8 +94,8 @@ describe.each(fixture.calls.map((c) => [c.id, c] as const))("fixture parity of %
     const snap = ahead(await s.core("main").transcriptSubscribe({ call_id: id }, () => {}));
     if (!snap) return;
     // The subscription and `live` follow the capture state, not the stored transcript.
-    const { subscription_id: _sub, live: _live, ...stored } = transcript;
-    const { subscription_id: _s, live: _l, ...served } = snap;
+    const stored = ownedTranscript(transcript);
+    const served = ownedTranscript(snap);
     // @cpt-begin:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-return
     expect(served).toEqual(stored);
     // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-return
