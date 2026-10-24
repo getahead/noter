@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import "./styles/tokens";
 
 import { App } from "./app/App";
+import { DialogsProvider } from "./ui/dialogs/host";
 import { createBridge } from "./app/bridge/bridge";
 import { COMMANDS, type WindowLabel } from "./core/bindings";
 import { FakeCore } from "./core/fake/fake-core";
@@ -17,12 +18,19 @@ const LABELS = COMMANDS.app_snapshot.windows as readonly WindowLabel[];
 
 // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-read-label
 // The host opens each window at index.html?window=<label>; a plain browser defaults to the main window.
-const asked = new URLSearchParams(location.search).get("window") as WindowLabel | null;
+const asked = new URLSearchParams(location.search).get(
+  "window",
+) as WindowLabel | null;
 const label: WindowLabel = asked && LABELS.includes(asked) ? asked : "main";
 // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-read-label
 
 // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-build-bridge
-const bridge = createBridge(label, import.meta.env.VITE_FAKE_CORE ? new FakeCore({ window: label }) : tauriTransport);
+const bridge = createBridge(
+  label,
+  import.meta.env.VITE_FAKE_CORE
+    ? new FakeCore({ window: label })
+    : tauriTransport,
+);
 // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-build-bridge
 
 // @cpt-begin:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-user-closes
@@ -31,14 +39,17 @@ addEventListener("pagehide", () => void bridge.close());
 
 // ?pseudo=cyrillic|german turns on pseudo-localisation (the screenshot suite's string pass).
 const pseudo = new URLSearchParams(location.search).get("pseudo");
-if (pseudo === "cyrillic" || pseudo === "german") setPseudo(pseudo satisfies Pseudo);
+if (pseudo === "cyrillic" || pseudo === "german")
+  setPseudo(pseudo satisfies Pseudo);
 installTabNavigation(document);
 installUnobscure(document);
 
 // @cpt-tech:cpt-noter-tech-ui-stack:p1
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App bridge={bridge} />
+    <DialogsProvider>
+      <App bridge={bridge} />
+    </DialogsProvider>
   </StrictMode>,
 );
 void bridge.open();

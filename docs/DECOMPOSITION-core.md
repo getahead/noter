@@ -483,7 +483,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p2` - **ID**: `cpt-noter-feature-core-engine-capture`
 
-- **Milestone**: M1 · **Lane**: engine · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-engine-capture.md](features/core/core-engine-capture.md)
+- **Milestone**: M1 · **Lane**: engine · **Status**: IN_PROGRESS: only the owner-measured real-call latency (`cpt-noter-dod-core-engine-capture-latency`, Q4) holds the box; the golden-set lag (`-asr`) and footprint (`-replay`) DoDs are perf scenarios and do not hold the box per D-30. FEATURE spec: [features/core/core-engine-capture.md](features/core/core-engine-capture.md)
 
 - **Purpose**: Record both channels on one clock into a crash-safe ring, transcribe them live, report the facts the session manager needs, play replay audio, and come back after a crash with at most a 2 s gap.
 
@@ -658,9 +658,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.11 [Native surfaces: panels, menu bar, notifications and windows](features/core/core-native-surfaces.md) - HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-core-native-surfaces`
+- [x] `p2` - **ID**: `cpt-noter-feature-core-native-surfaces`
 
-- **Milestone**: M1 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IN_PROGRESS: blocked on NB10 (owner) for `inst-convert`/`inst-return-panels`/`-panels`; the XCUITest ACs are the UI lane's (`just native`), per D-23 and D-26. FEATURE spec: [features/core/core-native-surfaces.md](features/core/core-native-surfaces.md)
+- **Milestone**: M1 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IMPLEMENTED (NSPanel conversion #189 after NB10); the XCUITest ACs are the UI lane's (`just native`), per D-23 and D-26. FEATURE spec: [features/core/core-native-surfaces.md](features/core/core-native-surfaces.md)
 
 - **Purpose**: Show the call where the user needs it without stealing focus: non-activating panels, the call window's two layouts across displays, hide for presenting, the menu bar and tray, notifications through `UNUserNotificationCenter`, announcements, navigation and external opens, with menu and hotkey actions calling the core as native callers.
 
@@ -683,11 +683,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p2` - `cpt-noter-principle-core-degrade`
+  `cpt-noter-principle-core-degrade`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p2` - `cpt-noter-constraint-core-macos`
+  `cpt-noter-constraint-core-macos`
 
 - **Domain Model Entities**:
   - CallWindowState
@@ -696,7 +696,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-core-native`
+  - `cpt-noter-component-core-native`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `window_report_view`, `open_external`

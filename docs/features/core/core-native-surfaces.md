@@ -43,9 +43,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-core-native-surfaces`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-core-native-surfaces`
 
-- [ ] `p2` - `cpt-noter-feature-core-native-surfaces`
+- [x] `p2` - `cpt-noter-feature-core-native-surfaces`
 
 ## 1. Feature Context
 
