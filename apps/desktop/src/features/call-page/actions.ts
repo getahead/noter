@@ -42,9 +42,7 @@ export function setSensitive(bridge: Bridge, callId: string, sensitive: boolean)
 }
 
 export function revealFolder(bridge: Bridge, callId: string) {
-  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-finder
   return bridge.act(`call:finder:${callId}`, "open_external", () => bridge.core.openExternal({ target: { type: "reveal_in_finder", path: callFolder(callId) } }));
-  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-finder
 }
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1

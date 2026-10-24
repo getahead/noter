@@ -50,6 +50,10 @@ describe("pageState (cpt-noter-state-ui-call-page-frame-page)", () => {
     expect(pageState(cmd("DONE"), true)).toBe("READY");
     expect(pageState(cmd("WAITING"), true)).toBe("READY");
   });
+  it("shows a failed read even when a list already put the row in the store", () => {
+    expect(pageState(cmd("ERROR", "not_found"), true)).toBe("NOT_FOUND");
+    expect(pageState(cmd("ERROR", "internal"), true)).toBe("ERROR");
+  });
   it("is NOT_FOUND for not_found and ERROR for any other failure", () => {
     expect(pageState(cmd("ERROR", "not_found"), false)).toBe("NOT_FOUND");
     expect(pageState(cmd("ERROR", "internal"), false)).toBe("ERROR");

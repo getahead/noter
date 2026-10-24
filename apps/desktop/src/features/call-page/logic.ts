@@ -42,14 +42,15 @@ export type PageState = "LOADING" | "READY" | "NOT_FOUND" | "ERROR";
 // @cpt-state:cpt-noter-state-ui-call-page-frame-page:p1
 /** The page's state from the `call_get` command and whether the call is held; DELETED is the route leaving. */
 export function pageState(read: CommandState | undefined, haveCall: boolean): PageState {
-  // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
-  if (haveCall) return "READY";
-  // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
   // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-notfound
   // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-error
+  // a failed read shows its error even when a list already put the row in the store
   if (read?.state === "ERROR") return read.error?.code === "not_found" ? "NOT_FOUND" : "ERROR";
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-error
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-notfound
+  // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
+  if (haveCall) return "READY";
+  // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
   // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-error-loading
   return "LOADING";
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-error-loading

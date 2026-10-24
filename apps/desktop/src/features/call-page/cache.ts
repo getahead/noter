@@ -10,6 +10,9 @@ export interface Extras {
   mode_used: CallDetail["mode_used"];
 }
 
+/** Banners the user closed with × (view state for this window's lifetime). */
+export const dismissed = new Set<string>();
+
 interface Held {
   extras: Map<string, Extras>;
   types: CallTypeInfo[];
@@ -23,7 +26,7 @@ const emit = () => {
 };
 const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
 
-export const holdExtras = (callId: string, d: CallDetail) => {
+export const holdExtras = (callId: string, d: Pick<CallDetail, "first_recorded_call" | "audio_not_stored" | "mode_used">) => {
   held.extras.set(callId, { first_recorded_call: d.first_recorded_call, audio_not_stored: d.audio_not_stored, mode_used: d.mode_used });
   emit();
 };
@@ -32,8 +35,12 @@ export const holdTypes = (types: CallTypeInfo[]) => {
   emit();
 };
 export const resetCache = () => {
+  dismissed.clear();
   held = { extras: new Map(), types: [] };
   emit();
 };
-export const useExtras = (callId: string): Extras | undefined => useSyncExternalStore(subscribe, () => held.extras.get(callId));
-export const useTypes = (): CallTypeInfo[] => useSyncExternalStore(subscribe, () => held.types);
+export const useExtras = (callId: string): Extras | undefined => {
+  const get = () => held.extras.get(callId);
+  return useSyncExternalStore(subscribe, get, get);
+};
+export const useTypes = (): CallTypeInfo[] => useSyncExternalStore(subscribe, () => held.types, () => held.types);

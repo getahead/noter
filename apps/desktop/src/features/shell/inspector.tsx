@@ -13,8 +13,9 @@ import { leaveTimer, openFocus } from "./shell-effects";
 type Def = NonNullable<PageDef["inspector"]>;
 
 export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: Def | undefined; route: Route; bridge: Bridge; overlay: boolean; onClose: () => void }) {
-  const held = useRef(def);
-  if (def) held.current = def;
+  // the page that opened it, drawn until it has slid out: the route it leaves for is not its own
+  const held = useRef(def && { def, route });
+  if (def) held.current = { def, route };
   const leaving = !def && held.current !== undefined;
   const [, redraw] = useState(0);
   const ref = useRef<HTMLElement>(null);
@@ -27,7 +28,7 @@ export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: D
     [leaving],
   );
   useEffect(() => openFocus(def !== undefined, ref.current ?? undefined, () => document.activeElement as HTMLElement | null), [def !== undefined]);
-  const shown = held.current;
+  const shown = held.current?.def;
   if (!shown) return null;
   return (
     <aside
@@ -44,7 +45,7 @@ export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: D
       <div className="np-inspector__close">
         <IconButton icon="x" label={t("shell.close_inspector")} size="inline" onAction={onClose} />
       </div>
-      {shown.render(route, bridge)}
+      {shown.render(held.current!.route, bridge)}
     </aside>
   );
 }

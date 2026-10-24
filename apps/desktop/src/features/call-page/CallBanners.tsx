@@ -8,15 +8,13 @@ import { t } from "../../i18n/format";
 import { BannerSlot, type Banner } from "../../ui/feedback/inline-banner";
 import type { Route } from "../shell/history";
 import { requestNotifications } from "./actions";
-import { useExtras } from "./cache";
+import { dismissed as closed, useExtras } from "./cache";
 import { parseCallKey } from "./logic";
 
 // The × is view state for this window's lifetime: `banner_dismiss` has no notification-consent `BannerKind`, so
 // nothing is sent and nothing persists (contract gap for the owner, call-page-frame.md).
-const closed = new Set<string>();
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1
-// @cpt-dod:cpt-noter-dod-ui-call-page-frame-actions:p1
 export function CallBanners({ route, bridge, appBanners }: { route: Route; bridge: Bridge; appBanners: number }) {
   const callId = parseCallKey(route.key)!.callId;
   const extras = useExtras(callId);
