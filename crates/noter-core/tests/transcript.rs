@@ -291,7 +291,7 @@ async fn live_speakers_become_rows_once_per_label() {
     );
     assert_eq!(snapshot.speakers[2].segment_count, 2);
     assert_eq!(snapshot.speakers[0].named_by, Some(NamedBy::You));
-    // The sample is the speaker's first line (`You` has none), as the library serves it.
+    // The sample is the speaker's first line (`You` has none) in the live pass.
     let sample = |i: usize| {
         snapshot.speakers[i]
             .sample
@@ -356,18 +356,13 @@ async fn the_session_calls_reach_subscribers_and_the_snapshot_holds_the_rows() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_stopped_call_gives_the_whole_transcript_and_ends_the_stream_at_once() {
+async fn a_stopped_call_gives_the_whole_transcript_and_no_stream() {
     let dir = tempfile::tempdir().unwrap();
     let r = open(dir.path());
     new_call(&r.core, "ready");
     let (snapshot, got) = subscribe(&r).await;
     assert!(!snapshot.live && snapshot.subscription_id.is_none());
-    assert_eq!(
-        events(&got),
-        vec![TranscriptEvent::Ended {
-            reason: StreamEndReason::CallStopped
-        }]
-    );
+    assert_eq!(events(&got), vec![], "nothing will stream for a past call");
     let (sink, _) = collecting();
     let unknown = r
         .core
@@ -584,4 +579,76 @@ async fn a_span_returns_the_overlapping_lines_with_their_call() {
             .code,
         ErrorCode::NotFound
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_past_call_shows_the_archive_pass_once_it_exists() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    new_call(&r.core, "ready");
+    let row = |table: &'static str, id: &str, pass: &str, text: &str| {
+        let mut values = vec![
+            ("id", json!(id)),
+            ("call_id", json!("call_live")),
+            ("pass", json!(pass)),
+        ];
+        if table == "speakers" {
+            values.extend([
+                ("label", json!(format!("{id}_l"))),
+                ("channel", json!("sys")),
+            ]);
+        } else {
+            values.extend([
+                ("channel", json!("sys")),
+                ("t0_ms", json!(0)),
+                ("t1_ms", json!(1000)),
+                ("text", json!(text)),
+                ("text_norm", json!(text)),
+            ]);
+        }
+        Insert { table, values }
+    };
+    r.core
+        .store()
+        .insert_batch(vec![
+            row("segments", "seg_live", "live", "live line"),
+            row("speakers", "spk_live", "live", ""),
+            row("segments", "seg_arch", "archive", "archive line"),
+            row("speakers", "spk_arch", "archive", ""),
+        ])
+        .unwrap();
+    let (snapshot, _) = subscribe(&r).await;
+    assert_eq!(snapshot.pass, TranscriptPass::Archive);
+    let ids: Vec<_> = snapshot.segments.iter().map(|g| g.id.as_str()).collect();
+    assert_eq!(ids, ["seg_arch"]);
+    assert_eq!(snapshot.speakers.len(), 1);
+    assert_eq!(snapshot.speakers[0].id.as_str(), "spk_arch");
+}
+
+#[tokio::test(start_paused = true)]
+async fn levels_nobody_watches_do_not_use_up_seq_numbers() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    engine_up(&r).await;
+    r.clock.0.store(1_000, Ordering::SeqCst);
+    r.engine.inject(EngineEvent::Levels {
+        call_id: None,
+        mic_db: -20.0,
+        sys_db: -50.0,
+    });
+    settle(1).await;
+    let (sink, got) = collecting::<LevelsMsg>();
+    r.core
+        .levels_subscribe(&call_window(), SubscribeLevelsArgs { call_id: None }, sink)
+        .await
+        .unwrap();
+    r.clock.0.store(1_200, Ordering::SeqCst);
+    r.engine.inject(EngineEvent::Levels {
+        call_id: None,
+        mic_db: -21.0,
+        sys_db: -50.0,
+    });
+    settle(1).await;
+    let seqs: Vec<u64> = got.lock().unwrap().iter().map(|m| m.seq.0).collect();
+    assert_eq!(seqs, vec![1]);
 }

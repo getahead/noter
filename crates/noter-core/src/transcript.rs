@@ -438,12 +438,7 @@ impl Core {
             // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-return-snapshot
             let snapshot = self.snapshot(&args.call_id, &call, vec![], &HashSet::new())?;
             // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-return-snapshot
-            channel.send(TranscriptMsg {
-                seq: Seq(1),
-                event: TranscriptEvent::Ended {
-                    reason: StreamEndReason::CallStopped,
-                },
-            });
+            // Nothing will stream: no subscription and no message (`subscription_id` is null).
             return Ok(snapshot);
         }
         // The state lock comes first: a commit that has not published yet is left out of the
@@ -499,12 +494,13 @@ impl Core {
                 speakers.push(speaker_view(call_id, &h.speaker, h.channel));
             }
         }
+        let pass = segments.first().map_or(TranscriptPass::Live, |g| g.pass);
         for s in &mut speakers {
             s.segment_count = segments
                 .iter()
                 .filter(|g| g.speaker.speaker_id == s.id)
                 .count() as u32;
-            s.sample = (s.label != SpeakerLabel::You)
+            s.sample = (s.label != SpeakerLabel::You && pass == TranscriptPass::Live)
                 .then(|| {
                     segments
                         .iter()
@@ -523,7 +519,7 @@ impl Core {
             subscription_id: None,
             call_id: call_id.clone(),
             live: call.live,
-            pass: TranscriptPass::Live,
+            pass,
             archive: call.archive,
             segments,
             hypotheses,
@@ -627,7 +623,7 @@ fn call_ref(c: &Connection, id: &CallId) -> noter_db::rusqlite::Result<Option<Ca
     .optional()
 }
 
-/// The call's live-pass segments in time order; `span` keeps those that overlap it.
+/// The call's current-pass segments (archive once it exists, else live) in time order; `span` keeps those that overlap it.
 fn segments_of(
     c: &Connection,
     call_id: &CallId,
@@ -635,9 +631,11 @@ fn segments_of(
 ) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
     let mut stmt = c.prepare(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, s.lang_p, s.avg_logprob,
-                p.id, p.label, p.n, p.named_by
+                p.id, p.label, p.n, p.named_by, s.pass, p.person_id
          FROM segments s LEFT JOIN speakers p ON p.id = s.speaker_id
-         WHERE s.call_id = ?1 AND s.pass = 'live'
+         WHERE s.call_id = ?1 AND s.pass = (CASE WHEN EXISTS
+               (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')
+               THEN 'archive' ELSE 'live' END)
          ORDER BY s.t0_ms, s.rowid",
     )?;
     let rows = stmt.query_map([call_id.as_str()], |r| {
@@ -655,6 +653,7 @@ fn segments_of(
                     label.as_deref().unwrap_or(""),
                     r.get(10)?,
                     named_by.as_deref(),
+                    r.get::<_, Option<String>>(13)?,
                 ),
             },
             crosstalk_with: vec![],
@@ -665,7 +664,11 @@ fn segments_of(
             lang_p: r.get::<_, Option<f64>>(6)?.unwrap_or(0.0) as f32,
             confidence: confidence(r.get::<_, Option<f64>>(7)?.unwrap_or(0.0) as f32),
             state: SegmentState::Confirmed,
-            pass: TranscriptPass::Live,
+            pass: if r.get::<_, String>(12)? == "archive" {
+                TranscriptPass::Archive
+            } else {
+                TranscriptPass::Live
+            },
             corrections: vec![],
         })
     })?;
@@ -682,8 +685,11 @@ fn speakers_of(
     call_id: &CallId,
 ) -> noter_db::rusqlite::Result<Vec<(String, SpeakerView)>> {
     let mut stmt = c.prepare(
-        "SELECT id, label, n, channel, named_by FROM speakers
-         WHERE call_id = ?1 AND pass = 'live' ORDER BY rowid",
+        "SELECT id, label, n, channel, named_by, person_id FROM speakers
+         WHERE call_id = ?1 AND pass = (CASE WHEN EXISTS
+               (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive')
+               THEN 'archive' ELSE 'live' END)
+         ORDER BY rowid",
     )?;
     let rows = stmt.query_map([call_id.as_str()], |r| {
         let channel: AudioChannel = word(&r.get::<_, String>(3)?).unwrap_or(AudioChannel::Sys);
@@ -691,9 +697,17 @@ fn speakers_of(
         let named_by: Option<String> = r.get(4)?;
         let speaker = SpeakerRef {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
-            label: speaker_label(channel, &label, r.get(2)?, named_by.as_deref()),
+            label: speaker_label(
+                channel,
+                &label,
+                r.get(2)?,
+                named_by.as_deref(),
+                r.get::<_, Option<String>>(5)?,
+            ),
         };
-        Ok((label, speaker_view(call_id, &speaker, channel)))
+        let mut view = speaker_view(call_id, &speaker, channel);
+        view.named_by = named_by.as_deref().and_then(word);
+        Ok((label, view))
     })?;
     rows.collect()
 }
@@ -747,7 +761,7 @@ impl Live {
         });
         let speaker = SpeakerRef {
             speaker_id: SpeakerId::new(format!("spk_{}", ulid::Ulid::generate())),
-            label: speaker_label(channel, label, n.map(i64::from), None),
+            label: speaker_label(channel, label, n.map(i64::from), None, None),
         };
         // @cpt-begin:cpt-noter-algo-core-live-transcript-speakers:p1:inst-you
         let named_by = matches!(speaker.label, SpeakerLabel::You).then_some("you");
@@ -794,7 +808,13 @@ fn speaker_label(
     label: &str,
     n: Option<i64>,
     named_by: Option<&str>,
+    person_id: Option<String>,
 ) -> SpeakerLabel {
+    if let Some(id) = person_id {
+        return SpeakerLabel::Person {
+            person: chip(id, label),
+        };
+    }
     match channel {
         AudioChannel::Mic if label == "you" || named_by == Some("you") => SpeakerLabel::You,
         AudioChannel::Mic => SpeakerLabel::GuestYourSide,
@@ -883,4 +903,25 @@ fn lang(word: &str) -> Lang {
 /// An enum column in the protocol's snake_case words.
 fn word<T: serde::de::DeserializeOwned>(s: &str) -> Option<T> {
     serde_json::from_value(Value::String(s.into())).ok()
+}
+
+/// A named speaker's chip. shortcut: no `people` table before library-people (M2), so the chip is
+/// made from the stored name, as the library does; that feature reads the person's own record.
+fn chip(person_id: String, name: &str) -> PersonChip {
+    let words: Vec<&str> = name.split_whitespace().collect();
+    PersonChip {
+        id: PersonId::new(person_id),
+        short_name: match words.as_slice() {
+            [first, .., last] => format!("{first} {}.", last.chars().next().unwrap_or_default()),
+            _ => name.to_string(),
+        },
+        initials: words
+            .iter()
+            .filter_map(|w| w.chars().next())
+            .take(2)
+            .collect::<String>()
+            .to_uppercase(),
+        display_name: name.to_string(),
+        is_you: false,
+    }
 }
