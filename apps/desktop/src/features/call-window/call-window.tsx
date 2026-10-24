@@ -24,7 +24,7 @@ import { tickWhile } from "../shell/shell-effects";
 import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, stopped, windowState, type BannerHandlers, type Seen } from "./model";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
 import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
-import { TranscriptSlot } from "./transcript-slot";
+import { TranscriptBar, TranscriptLog, useTranscript } from "../transcript/hosts";
 
 const NO_STATES: readonly DegradedState[] = [];
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -43,7 +43,7 @@ const hhmm = (ms: number) =>
   }).format(ms);
 
 /** Keep one Channel open while `on` holds: snapshot then stream; the cleanup ends it. */
-export function subscribeWhile<K extends "transcript_subscribe" | "levels_subscribe">(bridge: Bridge, on: boolean, cmd: K, args: CommandArgs[K]): (() => void) | undefined {
+export function subscribeWhile<K extends "levels_subscribe">(bridge: Bridge, on: boolean, cmd: K, args: CommandArgs[K]): (() => void) | undefined {
   if (!on) return undefined;
   void bridge.subscribe(cmd, args);
   return () => void bridge.unsubscribe(cmd);
@@ -95,7 +95,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const displays = useWindow(bridge, (s) => s.whole.environment?.displays.length ?? 1);
   const hotkeys = useWindow(bridge, (s) => s.whole.hotkeys?.bindings);
   const commands = useWindow(bridge, (s) => s.commands);
-  const transcript = useWindow(bridge, (s) => s.streams.transcript_subscribe?.data);
   const levels = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels);
 
   // the second sources the user kept, for one call
@@ -120,11 +119,12 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // A new WebView (first open, or after a crash) reads the snapshot (the bridge), then the window state, then the transcript.
   useEffect(() => void bridge.act("window_call_state", "window_call_state", () => bridge.core.windowCallState({}), { slice: "callWindow" }), [bridge]);
   const transcriptFor = cw && callId && live(cap) ? callId : null;
-  useEffect(() => subscribeWhile(bridge, transcriptFor !== null, "transcript_subscribe", { call_id: transcriptFor! }), [bridge, transcriptFor]);
+  // one transcript Channel for the window: the live log and the tail share it, so a layout switch keeps it
+  const tr = useTranscript(bridge, transcriptFor ?? "");
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-crash-restore
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-if-crash
-  // The You and Others meters of the nothing-heard notice.
-  const meters = noticeShown?.type === "nothing_heard";
+  // The You and Others meters of the nothing-heard notice (the transcript holds them already while it waits for speech).
+  const meters = noticeShown?.type === "nothing_heard" && !tr.waiting;
   useEffect(() => subscribeWhile(bridge, meters, "levels_subscribe", { call_id: callId }), [bridge, meters, callId]);
 
   const receivedAt = useMemo(() => Date.now(), [cap?.version]);
@@ -308,12 +308,13 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const floating = layout !== "DEDICATED";
   const shareWarning = layout === "FLOATING" && cw.show_share_warning && !warningSeen;
   const bannerList = degradedBanners(degraded, callId, floating, banners, kept.call === callId ? kept.ids : NO_IDS);
+  const replaying = !!tr.replay && tr.bar !== "CLOSED";
   const regions = new Set(
     layoutRegions({
       layout,
       notice: !!noticeShown,
       banners: bannerList.length > 0 || shareWarning,
-      replaying: false,
+      replaying,
     }),
   );
   const status = indicatorStatus(cap, degraded);
@@ -324,7 +325,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     sensitiveCall: cap.sensitive,
   });
   const title = cap.title ?? "";
-  const speakers = transcript?.call_id === callId ? transcript.speakers : [];
+  const speakers = tr.data?.speakers ?? [];
   const twoDisplays = displays > 1;
 
   // @cpt-begin:cpt-noter-flow-ui-call-window-controls:p1:inst-return-control
@@ -475,8 +476,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                   </div>
                 )}
                 <div className="cs-r2" data-region="CS-R2" aria-label={t("cw.transcript")}>
-                  <TranscriptSlot bridge={bridge} callId={callId} />
+                  <TranscriptLog tr={tr} variant="live" />
                 </div>
+                <TranscriptBar tr={tr} variant="live" />
               </div>
             </div>
           </>
@@ -543,7 +545,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
               </div>
             )}
             <div className="fp-r5 fp-r5--full" data-region="FP-R5" aria-label={t("cw.transcript")}>
-              <TranscriptSlot bridge={bridge} callId={callId} tailLines={8} />
+              {replaying ? <TranscriptBar tr={tr} variant="tail" /> : <TranscriptLog tr={tr} variant="tail" tailLines={8} />}
             </div>
           </>
         )}

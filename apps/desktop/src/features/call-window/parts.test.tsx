@@ -200,9 +200,9 @@ describe("subscribeWhile", () => {
   it("opens the Channel while on and ends it on cleanup", () => {
     const bridge = { subscribe: vi.fn(async () => {}), unsubscribe: vi.fn(async () => {}) } as unknown as Bridge;
     expect(subscribeWhile(bridge, false, "levels_subscribe", { call_id: "c" })).toBeUndefined();
-    const end = subscribeWhile(bridge, true, "transcript_subscribe", { call_id: "c" })!;
-    expect(bridge.subscribe).toHaveBeenCalledWith("transcript_subscribe", { call_id: "c" });
+    const end = subscribeWhile(bridge, true, "levels_subscribe", { call_id: "c" })!;
+    expect(bridge.subscribe).toHaveBeenCalledWith("levels_subscribe", { call_id: "c" });
     end();
-    expect(bridge.unsubscribe).toHaveBeenCalledWith("transcript_subscribe");
+    expect(bridge.unsubscribe).toHaveBeenCalledWith("levels_subscribe");
   });
 });
