@@ -1,7 +1,8 @@
 // The live ASR loop (`cpt-noter-algo-core-engine-capture-live-asr`): per channel, an energy VAD
 // cuts the 16 kHz capture into utterances; while one is spoken a hypothesis is decoded about
-// once a second, and when it ends (a pause, or 20 s) it is decoded again, filtered, corrected
-// with the glossary and confirmed with a live speaker label. Alongside: `no_segments` when speech
+// once a second, and when it ends (a pause, or 10 s) it is decoded again, filtered, corrected
+// with the glossary and confirmed with a live speaker label; one decode queue serves both
+// channels, confirmations before hypotheses. Alongside: `no_segments` when speech
 // flows but nothing comes out for 10 s, and `silence` when neither channel speaks for 10 s.
 
 import Foundation
@@ -36,7 +37,8 @@ final class LiveASR: @unchecked Sendable {
     /// diarization (FluidAudio) if noisy rooms cut utterances wrong.
     static let speechDb: Float = -50
     static let pauseMs = 700
-    static let maxUtteranceMs = 20_000
+    /// A hypothesis decodes the whole utterance so far: past 10 s its p95 went over 2 s (Q4 replay).
+    static let maxUtteranceMs = 10_000
     static let hypothesisEveryMs = 1_000
     static let stallMs = 10_000
     static let silenceMs = 10_000
@@ -67,8 +69,12 @@ final class LiveASR: @unchecked Sendable {
     private var transcriber: Transcriber?
     private var open: [Channel: Utterance] = [:]
     private var generation: [Channel: Int] = [:]
+    /// The decodes waiting for the queue; a confirmation goes before any hypothesis (Q4).
+    private var pending: [Job] = []
     /// The language the first hypothesis of an utterance found, for its next hypotheses.
     private var utteranceLang: [String: String] = [:]
+    /// The language each channel's speaker confirmed last: it leads their next language ID.
+    private var lastLang: [Channel: String] = [:]
     private var next = 0
     private var lastSpeechEndMs = 0
     private var silenceReported = false
@@ -121,7 +127,7 @@ final class LiveASR: @unchecked Sendable {
         lock.withLock {
             // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-vad
             guard Levels.db(samples) > Self.speechDb else {
-                if var u = open[channel] {
+                if var u = open.removeValue(forKey: channel) {
                     u.audio += samples
                     open[channel] = u
                     if endMs - u.speechEndMs >= Self.pauseMs { jobs.append(close(channel)) }
@@ -144,7 +150,8 @@ final class LiveASR: @unchecked Sendable {
                 facts.append(.noSegments(callId: callId, sinceMs: since))
             }
             // @cpt-end:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-no-segments
-            var u = open[channel] ?? {
+            // Out of the dictionary, so appending a chunk does not copy the whole utterance.
+            var u = open.removeValue(forKey: channel) ?? {
                 next += 1
                 return Utterance(id: "eseg_\(run)_\(next)", startMs: atMs, speechEndMs: atMs, lastHypothesisMs: atMs)
             }()
@@ -169,8 +176,8 @@ final class LiveASR: @unchecked Sendable {
     }
 
     /// The utterance still open when capture stopped (so never confirmed), from the end of
-    /// `samples` (16 kHz): it began after the last pause, at the last 20 s mark since then (a
-    /// longer utterance was closed every 20 s). Empty when they end in a pause, or when speech
+    /// `samples` (16 kHz): it began after the last pause, at the last 10 s mark since then (a
+    /// longer utterance was closed every 10 s). Empty when they end in a pause, or when speech
     /// fills them and they do not reach back to the call's start (where it was cut is unknown).
     static func openTail(_ samples: [Float], fromCallStart: Bool) -> [Float] {
         let (w, n) = (rate / 10, samples.count / (rate / 10))
@@ -221,7 +228,21 @@ final class LiveASR: @unchecked Sendable {
         if let queue { queue.async(execute: work) } else { work() }
     }
 
-    private func schedule(_ job: Job) { perform { self.decode(job) } }
+    private func schedule(_ job: Job) {
+        lock.withLock { pending.append(job) }
+        perform { self.decodeNext() }
+    }
+
+    /// The first confirmation waiting, else the oldest hypothesis: with both channels speaking,
+    /// the final text of one would otherwise queue behind the other's provisional decodes.
+    private func decodeNext() {
+        let job = lock.withLock { () -> Job? in
+            guard !pending.isEmpty else { return nil }
+            let i = pending.firstIndex { if case .confirm = $0 { true } else { false } } ?? 0
+            return pending.remove(at: i)
+        }
+        if let job { decode(job) }
+    }
 
     private func decode(_ job: Job) {
         let (channel, u, confirmed): (Channel, Utterance, Bool)
@@ -234,12 +255,16 @@ final class LiveASR: @unchecked Sendable {
         }
         // Language ID once per utterance for its hypotheses; the confirmation decides on all of it.
         let (transcriber, languages, glossary) = lock.withLock {
-            (self.transcriber, confirmed ? self.languages : utteranceLang[u.id].map { [$0] } ?? self.languages, self.glossary)
+            let session = lastLang[channel].map { last in [last] + self.languages.filter { $0 != last } } ?? self.languages
+            return (self.transcriber, confirmed ? session : utteranceLang[u.id].map { [$0] } ?? session, self.glossary)
         }
         let samples = confirmed ? Array(u.audio.prefix(u.speechSamples)) : u.audio
         let d = transcriber.flatMap { try? $0.decode(samples, languages: languages) }
         lock.withLock {
-            if confirmed { utteranceLang[u.id] = nil } else if let d, utteranceLang[u.id] == nil { utteranceLang[u.id] = d.lang }
+            if confirmed {
+                utteranceLang[u.id] = nil
+                if let d, Self.keep(d) { lastLang[channel] = d.lang }
+            } else if let d, utteranceLang[u.id] == nil { utteranceLang[u.id] = d.lang }
         }
         guard let d, Self.keep(d) else { return }
         // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-confirm
@@ -263,6 +288,15 @@ final class LiveASR: @unchecked Sendable {
         "subtitles by the amaraorg community", "untertitel im auftrag des zdf für funk 2017",
         "untertitel der amaraorg community", "untertitelung des zdf 2020",
     ]
+
+    /// The utterance's language among the session's (none: any) from language ID's log
+    /// probabilities. WhisperKit gives only its top language; one outside the session is not
+    /// taken: the first session language is (the channel's last one, which leads the list).
+    static func language(_ probabilities: [String: Float], among languages: [String]) -> (lang: String, p: Float) {
+        let allowed = languages.isEmpty ? probabilities : probabilities.filter { languages.contains($0.key) }
+        if let top = allowed.max(by: { $0.value < $1.value }) { return (top.key, top.value) }
+        return (languages.first ?? "en", 0)
+    }
 
     /// The hallucination and unsure-decode filters.
     static func keep(_ d: Decoded) -> Bool {

@@ -320,6 +320,8 @@ The system **MUST**, in M1 week one alongside the Q7 engine-kill drill, measure 
 
 The owner moved this measurement from the M0 throwaway spike on 20 Oct 2026 after two runs returned no decoded text or latency numbers, including a 10-minute real-call run. M0 gets no more spike runs. The completed Q4 evidence is in [Spike Q4 evidence](../../../.plans/backend/spike-q4-evidence.md); the real-call measurement remains open and supplements the golden-set file-mode budget check.
 
+> **Two real calls (24 Oct 2026): FAIL, cause found, re-run pending.** The owner's calls reported p95 40-52 s (hypothesis) and 50-56 s (confirmed), but `latency.py` timed segments from `session_started`, charging the capture start delay and the model load to transcription. From the capture clock the surviving call still fails (hypothesis p95 7.5 s, confirmed p50 11 s / p95 17 s): one FIFO decode queue for both channels, every hypothesis re-decoding a 20 s utterance, and confirmations queued behind hypotheses. Replayed on the stored audio with the model loaded (file mode never loaded it), the policy change (10 s utterances, confirmations first on the queue, chunks handed off the IO thread, session-only language ID) meets both budgets: hypothesis p95 1.7 s, confirmed p95 3.1 s, both channels in crosstalk. Parakeet is not indicated on this evidence; the DoD ticks when the owner's re-run passes. Numbers, cause and the re-run block: [Q4 latency evidence](../../../.plans/backend/q4-latency-evidence.md).
+
 **Implements**:
 - `cpt-noter-algo-core-engine-capture-live-asr`
 
