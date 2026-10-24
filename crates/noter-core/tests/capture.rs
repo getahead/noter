@@ -2232,3 +2232,53 @@ async fn an_engine_that_cannot_be_restarted_fails_the_call_and_try_again_resumes
         "one gap, the engine's"
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_call_paused_when_the_engine_failed_comes_back_paused() {
+    let r = rig_with(Setup {
+        then: vec![
+            Behaviour::default(),
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+        ],
+        ..Setup::default()
+    });
+    let call_id = r.recording().await;
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    r.advance(1_000);
+    r.engine.kill_current();
+    r.phase_becomes(CapturePhase::Failed).await;
+    r.advance(4_000);
+    let starts = r.sessions().len();
+    let again = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+        .await;
+    r.session_started(&call_id);
+    let back = again.await.unwrap().unwrap();
+    assert_eq!(back.phase, CapturePhase::Paused);
+    assert!(back.pause.is_some());
+    // Recorded time stops at the pause, not at the failure.
+    assert_eq!(back.recorded_ms, DurationMs(0));
+}
