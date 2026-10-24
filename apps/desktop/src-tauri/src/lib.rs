@@ -74,6 +74,7 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
 pub fn run() {
     let events = Arc::new(TauriEvents::default());
     let app = builder(tauri::Builder::default())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_nspanel::init())

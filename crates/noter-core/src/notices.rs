@@ -115,6 +115,8 @@ impl Core {
         self.publish(event_names::CAPTURE_DETECTED, &mut app.detection);
     }
 
+    /// The detection as `harness.world_set` seeds it (feature `harness`).
+    #[cfg(feature = "harness")]
     pub(crate) fn seed_detection(&self, detection: Option<CallDetection>) {
         let shown = detection.is_some();
         self.set_detection(detection);

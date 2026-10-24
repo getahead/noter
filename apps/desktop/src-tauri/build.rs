@@ -21,7 +21,14 @@ fn main() {
     let caps = out.join("capabilities");
     std::fs::create_dir_all(&caps).expect("capabilities dir");
     for w in WINDOWS {
+        // The M1 alerts (dialogs host) are native ask/message dialogs of the main window and the
+        // call screen.
+        let dialogs = matches!(w, WindowLabel::Main | WindowLabel::CallScreen)
+            .then(|| ["dialog:allow-ask", "dialog:allow-message"].map(String::from))
+            .into_iter()
+            .flatten();
         let permissions: Vec<String> = std::iter::once("core:default".to_string())
+            .chain(dialogs)
             .chain(
                 COMMANDS
                     .iter()
