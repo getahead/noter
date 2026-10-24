@@ -123,8 +123,8 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Steps**:
 1. [ ] - `p1` - Supervisor sends `set_detection { enabled, known_bundle_ids }` whenever the detection rule changes - `inst-set-detection`
-2. [ ] - `p1` - **IF** enabled, engine listens for audio-process and microphone-use changes of known bundles - `inst-listen`
-3. [ ] - `p1` - Engine emits `call_detected`, `call_audio_released` or `audio_source_added` as facts; it never decides to record - `inst-emit-facts`
+2. [x] - `p1` - **IF** enabled, engine listens for audio-process and microphone-use changes of known bundles - `inst-listen`
+3. [x] - `p1` - Engine emits `call_detected`, `call_audio_released` or `audio_source_added` as facts; it never decides to record - `inst-emit-facts`
 4. [ ] - `p1` - **RETURN** - `inst-return-detect`
 
 ### Recover from an engine crash during capture
@@ -161,9 +161,9 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The audio was not stored or was deleted: `error` for the command; the core maps it to `audio_deleted`.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sends `play` - `inst-play`
-2. [ ] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
-3. [ ] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
+1. [x] - `p1` - Supervisor sends `play` - `inst-play`
+2. [x] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
+3. [x] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
 4. [ ] - `p1` - **RETURN** - `inst-return-replay`
 
 ### Complete the self-test on the capture pipeline
@@ -205,16 +205,16 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### System audio silence detection
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-zero-detect`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-zero-detect`
 
 **Input**: System-channel buffers.
 
 **Output**: `system_audio_silent { call_id, since_ms, confidence }` when the permission is likely off.
 
 **Steps**:
-1. [ ] - `p1` - Count consecutive buffers made of exact digital zeros (a real quiet room is never exact zero) - `inst-count-zeros`
-2. [ ] - `p1` - **IF** zeros persist past the threshold while the meeting app is detected, emit the fact with a confidence that grows with the duration - `inst-emit-silent`
-3. [ ] - `p1` - **RETURN** - `inst-return-zero`
+1. [x] - `p1` - Count consecutive buffers made of exact digital zeros (a real quiet room is never exact zero) - `inst-count-zeros`
+2. [x] - `p1` - **IF** zeros persist past the threshold while the meeting app is detected, emit the fact with a confidence that grows with the duration - `inst-emit-silent`
+3. [x] - `p1` - **RETURN** - `inst-return-zero`
 
 ### Translate engine facts into degraded states
 
@@ -285,7 +285,7 @@ The system **MUST** emit hypotheses about once a second and confirmed segments w
 
 ### Detection facts
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-detection`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-detection`
 
 The system **MUST** report `call_detected`, `call_audio_released` and `audio_source_added` only while detection is enabled (or, for a second source, while a session runs) and never act on them itself.
 
