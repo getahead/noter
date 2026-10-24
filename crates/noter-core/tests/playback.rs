@@ -65,7 +65,10 @@ impl Mac {
     }
 }
 
-impl NativeServices for Arc<Mac> {
+/// The core owns its `NativeServices`; the test keeps a handle on the same Mac.
+struct SharedMac(Arc<Mac>);
+
+impl NativeServices for SharedMac {
     fn permission(&self, _: PermissionKind) -> PermissionState {
         PermissionState::Granted
     }
@@ -73,10 +76,10 @@ impl NativeServices for Arc<Mac> {
         Box::pin(async { PermissionState::Granted })
     }
     fn environment(&self) -> EnvironmentReading {
-        self.reading.lock().unwrap().clone()
+        self.0.reading.lock().unwrap().clone()
     }
     fn on_change(&self, on_change: Listener) {
-        *self.changed.lock().unwrap() = Some(on_change);
+        *self.0.changed.lock().unwrap() = Some(on_change);
     }
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
@@ -97,7 +100,7 @@ fn open(dir: &Path, route: OutputRoute) -> Run {
     let events = Arc::new(Events::default());
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
     let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_native(Arc::new(mac.clone()))
+        .with_native(Arc::new(SharedMac(mac.clone())))
         .with_engine(launcher);
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();

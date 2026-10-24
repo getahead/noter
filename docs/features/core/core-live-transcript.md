@@ -145,7 +145,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Replay a line
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-live-transcript-replay`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-live-transcript-replay`
 
 **Actor**: Primary user (call window or Call page)
 
@@ -203,7 +203,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Replay route rule
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-replay-route`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-live-transcript-replay-route`
 
 **Input**: Whether a capture runs, the current `OutputRoute` and output device, `AudioOutputSettings.headphones_devices`, whether own sounds are excluded.
 
@@ -233,7 +233,7 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 ### Playback
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-live-transcript-playback`
+- [x] `p1` - **ID**: `cpt-noter-state-core-live-transcript-playback`
 
 **States**: idle, playing, stopped
 
@@ -303,7 +303,7 @@ The system **MUST** answer `transcript_span` from the call's current pass and wr
 
 ### Replay without leaking into the call
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-replay`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-live-transcript-replay`
 
 The system **MUST** play replay through the engine only, refuse replay during capture on speakers, on an unidentified output not marked as headphones and when own sounds are not excluded, stop playback with its reason, and publish `playback:state` whole with a version.
 
