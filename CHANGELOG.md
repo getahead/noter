@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.7.0](https://github.com/getahead/noter/compare/v0.6.0...v0.7.0) (2026-10-24)
+
+
+### Features
+
+* **contract:** fixture parity for the M1 read models ([#127](https://github.com/getahead/noter/issues/127)) ([c9fb986](https://github.com/getahead/noter/commit/c9fb9867e3c51ca9963256480405189a0b4a4ad1))
+* **core:** call status ready after the transcript file is written ([#178](https://github.com/getahead/noter/issues/178)) ([96f3f48](https://github.com/getahead/noter/commit/96f3f481ce783b2d752d004a973bdeb007f26f1a))
+* **core:** capture recovery, degraded states and the notification rule ([#151](https://github.com/getahead/noter/issues/151)) ([6cc7533](https://github.com/getahead/noter/commit/6cc7533059a78af3a78a03cf74620c47e7505430))
+* **core:** capture session machine, call detection, notices and timers ([#141](https://github.com/getahead/noter/issues/141)) ([04c74e2](https://github.com/getahead/noter/commit/04c74e2db660d119859954f857314f2bc1fd6ad5))
+* **core:** harness --engine-script, engine_fact and engine_kill controls ([#138](https://github.com/getahead/noter/issues/138)) ([b8a0c7a](https://github.com/getahead/noter/commit/b8a0c7a52a3c8653b8e9139dc373c43a0ebfafba))
+* **core:** harness controls for the output route and free disk ([#125](https://github.com/getahead/noter/issues/125)) ([5aeacee](https://github.com/getahead/noter/commit/5aeacee1f7ef6d07622d96f5aa1567f6806d0c1f))
+* **core:** harness seeds the M1 call tables from the fixture world ([#154](https://github.com/getahead/noter/issues/154)) ([b49fb0b](https://github.com/getahead/noter/commit/b49fb0bc6ca0e21e27a4c7ac9ebfb655dbbbd121))
+* **core:** harness.data_dir control ([#174](https://github.com/getahead/noter/issues/174)) ([3dd9284](https://github.com/getahead/noter/commit/3dd92846fa93f39b2076421b481db9dfa8c1377d))
+* **core:** host notifications, announcements, calendar and display frames through noter-native ([#175](https://github.com/getahead/noter/issues/175)) ([b333fbb](https://github.com/getahead/noter/commit/b333fbbc765dffb3fb131b3d1582789027636824))
+* **core:** library call list and call records ([#148](https://github.com/getahead/noter/issues/148)) ([65ec5d7](https://github.com/getahead/noter/commit/65ec5d79ae066bb7171ac5069189de9657325f8d))
+* **core:** library call status markers and ticks ([#176](https://github.com/getahead/noter/issues/176)) ([cea08f4](https://github.com/getahead/noter/commit/cea08f4940398d479b4340d0f1b2134f6a5501d3))
+* **core:** live transcript persistence and streams ([#164](https://github.com/getahead/noter/issues/164)) ([180ef78](https://github.com/getahead/noter/commit/180ef78dc111f81786044191da85026da2085689))
+* **core:** native surfaces in the tauri host ([#170](https://github.com/getahead/noter/issues/170)) ([f212b2f](https://github.com/getahead/noter/commit/f212b2f31a9443ec6bcf6f51d10a47d8e0dbd272))
+* **core:** native surfaces: call window, presenting, tray model and window commands ([#155](https://github.com/getahead/noter/issues/155)) ([3598c16](https://github.com/getahead/noter/commit/3598c16326fdba6780709834f8fc8551c3e81a7e))
+* **core:** noter-db M1 tables, insert_batch and delete ([#131](https://github.com/getahead/noter/issues/131)) ([daf3fb5](https://github.com/getahead/noter/commit/daf3fb587a2c02c3d36bb44fb9fc3527d844abde))
+* **core:** replay route and playback ([#146](https://github.com/getahead/noter/issues/146)) ([226b0da](https://github.com/getahead/noter/commit/226b0da7a700c0a64bc88de9c1bd2de08bb33ba7))
+* **core:** saved call-window frames and the native e2e command log ([#177](https://github.com/getahead/noter/issues/177)) ([c5d37d9](https://github.com/getahead/noter/commit/c5d37d91d21693268b14958bb76503428d082cce))
+* **engine:** capture sessions in the Swift engine ([#139](https://github.com/getahead/noter/issues/139)) ([0e8031d](https://github.com/getahead/noter/commit/0e8031d31f56e84a5bedb513f07d5383e6da700d))
+* **engine:** capture-first restart and degraded translation ([#132](https://github.com/getahead/noter/issues/132)) ([bcee6fe](https://github.com/getahead/noter/commit/bcee6fee0aee3f4e2bb58865713a48b16d07193a))
+* **engine:** capture-first restart re-decodes the ring; supervisor start_session ([#160](https://github.com/getahead/noter/issues/160)) ([af66565](https://github.com/getahead/noter/commit/af665653a28c60071818aa4d32dea20e36fd2612))
+* **engine:** detection facts, system audio silence and replay ([#150](https://github.com/getahead/noter/issues/150)) ([c8d5266](https://github.com/getahead/noter/commit/c8d52661081996d9c3b58f3bc136b1500eb5da3f))
+* **engine:** live ASR on WhisperKit ([#153](https://github.com/getahead/noter/issues/153)) ([fb3c128](https://github.com/getahead/noter/commit/fb3c1285257f748309493c087833c0dda070e680))
+* **engine:** one-clock capture, exclusions, device changes and the self-test clip ([#145](https://github.com/getahead/noter/issues/145)) ([234a999](https://github.com/getahead/noter/commit/234a999c8f82e54a21059a76fbbdc5c6240a4676))
+* **engine:** scripted engine scripts and kill switch ([#126](https://github.com/getahead/noter/issues/126)) ([da5d4d6](https://github.com/getahead/noter/commit/da5d4d6274cc38e7d63f7ab20d5704e27ad95c09))
+* **native:** notifications, announcements, display frames and calendar events ([#165](https://github.com/getahead/noter/issues/165)) ([01b9818](https://github.com/getahead/noter/commit/01b9818dd8d116e99decbfc35f7688381c78d9e4))
+
+
+### Bug fixes
+
+* **core:** no record prompt while hidden for presenting ([#169](https://github.com/getahead/noter/issues/169)) ([e827f17](https://github.com/getahead/noter/commit/e827f1725d84df1f33eeb84880757d48930fb8de))
+* **core:** the transcript crash hook leaves no trace in a release build ([#168](https://github.com/getahead/noter/issues/168)) ([db597ea](https://github.com/getahead/noter/commit/db597ea15af5a20d8ccd4bd87b23f366b1885e30))
+* **deps:** bump rustls-webpki and webpki-root-certs past the emSign distrust ([#137](https://github.com/getahead/noter/issues/137)) ([6a8c374](https://github.com/getahead/noter/commit/6a8c374eaaa9c88b0ad46a097baf496812edb117))
+* **deps:** bump sha2 from 0.10.9 to 0.11.1 ([#93](https://github.com/getahead/noter/issues/93)) ([bfe2566](https://github.com/getahead/noter/commit/bfe2566236c0cdafcaccd09c659e5d80caea727e))
+* **engine:** marker and runbook fixes from QA ([#157](https://github.com/getahead/noter/issues/157)) ([9a1da33](https://github.com/getahead/noter/commit/9a1da33eb0a96fa701ad1e08cd533627dfb66f65))
+
 ## [0.6.0](https://github.com/getahead/noter/compare/v0.5.0...v0.6.0) (2026-10-21)
 
 
