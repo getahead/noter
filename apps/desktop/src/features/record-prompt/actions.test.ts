@@ -9,7 +9,7 @@ let bridge: Bridge;
 let fake: FakeCore;
 afterEach(() => bridge.close());
 
-const det: CallDetection = { id: "det_teams", app_name: "Microsoft Teams", bundle_id: "com.microsoft.teams2", matched_event: null, detected_at: 0, prompt_until: 30_000, blocked: null };
+const det: CallDetection = { id: "det_teams", app_name: "Microsoft Teams", bundle_id: "com.microsoft.teams2", matched_event: null, detected_at: Date.now(), prompt_until: Date.now() + 30_000, blocked: null };
 async function ready() {
   fake = new FakeCore({ window: "record-prompt" });
   fake.world.app.capture.phase = "idle";

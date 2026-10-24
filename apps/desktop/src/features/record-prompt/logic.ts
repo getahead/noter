@@ -59,7 +59,7 @@ export function chooseView(i: PromptInput): { variant: Variant; state: PanelStat
 export const sourceLine = (d: CallDetection): string => d.matched_event?.title ?? t("prompt.source", { app: d.app_name });
 
 /** The speech model's download progress in whole percent, `null` when it is not downloading. */
-export const modelPercent = (b: ModelBundle | undefined): number | null => (b && b.state === "downloading" ? Math.floor((b.done_mb / Math.max(1, b.size_mb)) * 100) : null);
+export const modelPercent = (b: ModelBundle | undefined): number | null => (b && b.state === "downloading" ? Math.min(100, Math.max(0, Math.floor((b.done_mb / Math.max(1, b.size_mb)) * 100))) : null);
 
 /** Whole seconds until the core stops the call; `null` while the core holds the notice. */
 export const countdownSeconds = (stopsAt: number | null, now: number): number | null => (stopsAt === null ? null : Math.max(0, Math.ceil((stopsAt - now) / 1000)));
