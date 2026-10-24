@@ -254,6 +254,10 @@ describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     const next = ok(await s.core("call-screen").captureAnswerNewMeeting({ call_id: callId, choice: "start_as_new_call" }));
     expect(next.call_id).not.toBe(callId);
     expect(next.title).toBe("1:1 with Anna K.");
+    // D-37: the new call has its row and an empty live transcript straight away
+    expect(ok(await s.core("main").callGet({ call_id: next.call_id! })).call.id).toBe(next.call_id);
+    const fresh = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: next.call_id! }, () => {}));
+    if (fresh) expect(fresh).toMatchObject({ call_id: next.call_id, live: true, segments: [] });
     await ready(callId);
   });
 });
