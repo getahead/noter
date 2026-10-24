@@ -222,17 +222,17 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Non-activating, content-protected panels
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-native-surfaces-panels`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-native-surfaces-panels`
 
 **Input**: The call window and record prompt at creation.
 
 **Output**: NSPanels that take clicks without becoming key and do not appear in screen sharing.
 
 **Steps**:
-1. [ ] - `p1` - Convert the windows to NSPanel with the non-activating style through tauri-nspanel (pinned commit) - `inst-convert`
+1. [x] - `p1` - Convert the windows to NSPanel with the non-activating style through tauri-nspanel (pinned commit) - `inst-convert`
 2. [x] - `p1` - Set the sharing type so screen capture excludes them - `inst-content-protect`
 3. [x] - `p1` - Keep them above normal windows on every Space while a call runs - `inst-level`
-4. [ ] - `p1` - **RETURN** - `inst-return-panels`
+4. [x] - `p1` - **RETURN** - `inst-return-panels`
 
 ### Calendar facts for detection
 
@@ -285,7 +285,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Panels and placement
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-panels`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-panels`
 
 The system **MUST** make the call window and the record prompt non-activating, content-protected panels, place the call window by display identity, switch layouts on display changes, and answer the window commands with a versioned `CallWindowState`.
 

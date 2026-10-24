@@ -2,9 +2,8 @@
 //! host carries out what the core decides through `noter_core::Surfaces`, and turns menu bar
 //! clicks into core commands as `Caller::Native { surface: menu_bar }`.
 //!
-//! shortcut: the record prompt and the call window are plain Tauri windows (always on top,
-//! content-protected, on every Space, not focused when shown), not non-activating NSPanels; swap
-//! in tauri-nspanel once deny.toml allows its git source (owner item NB10).
+//! The record prompt and the call window are non-activating NSPanels (tauri-nspanel, pinned in
+//! Cargo.toml): they take clicks without bringing Noter forward over the call app.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -27,6 +26,18 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
 };
+use tauri_nspanel::{tauri_panel, ManagerExt, StyleMask, WebviewPanelManager, WebviewWindowExt};
+
+tauri_panel! {
+    panel!(CallPanel {
+        config: {
+            can_become_key_window: true,
+            becomes_key_only_if_needed: true,
+            is_floating_panel: true,
+            hides_on_deactivate: false
+        }
+    })
+}
 
 /// Floating call panel and its collapsed strip, record prompt (points).
 const PANEL: (f64, f64) = (380.0, 600.0);
@@ -295,6 +306,58 @@ pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
 }
 // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
 
+/// The windows that are non-activating panels; the others are ordinary windows.
+// @cpt-algo:cpt-noter-algo-core-native-surfaces-panels:p1
+// @cpt-dod:cpt-noter-dod-core-native-surfaces-panels:p1
+pub fn is_panel(label: WindowLabel) -> bool {
+    matches!(label, WindowLabel::CallScreen | WindowLabel::RecordPrompt)
+}
+
+/// Whether panels exist: only the app registers the nspanel plugin; the tests' mock runtime has
+/// no AppKit window to convert, so its panels stay plain windows.
+fn panels_on<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<WebviewPanelManager<R>>().is_some()
+}
+
+/// The window becomes an NSPanel that takes clicks without activating Noter (on the main
+/// thread: AppKit, and tauri-nspanel does not dispatch there itself).
+fn make_panel<R: Runtime>(window: &WebviewWindow<R>) {
+    if !panels_on(window.app_handle()) {
+        return;
+    }
+    let panel = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-convert
+        if let Ok(panel) = panel.to_panel::<CallPanel<R>>() {
+            let _ = panel.add_style_mask(StyleMask::empty().nonactivating_panel().into());
+        }
+        // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-convert
+    });
+}
+
+/// Shows a window; a panel comes forward without becoming key unless `key` (it still never
+/// activates Noter), a plain window takes focus when `key`.
+fn show<R: Runtime>(window: &WebviewWindow<R>, key: bool) {
+    let app = window.app_handle().clone();
+    let label = window.label().to_string();
+    if !(crate::window_label(&label).is_some_and(is_panel) && panels_on(&app)) {
+        let _ = window.show();
+        if key {
+            let _ = window.set_focus();
+        }
+        return;
+    }
+    let plain = window.clone();
+    let _ = window.run_on_main_thread(move || match app.get_webview_panel(&label) {
+        Ok(panel) if key => panel.show_and_make_key(),
+        Ok(panel) => panel.show(),
+        // The conversion failed: the window still shows.
+        Err(_) => {
+            let _ = plain.show();
+        }
+    });
+}
+
 /// The window, created hidden on first use at `index.html?window=<label>`.
 fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewWindow<R>> {
     if let Some(w) = app.get_webview_window(label.as_str()) {
@@ -318,7 +381,13 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
     } else {
         builder
     };
-    builder.build().ok()
+    let window = builder.build().ok()?;
+    if is_panel(label) {
+        make_panel(&window);
+    }
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-return-panels
+    Some(window)
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-return-panels
 }
 
 /// The host's `Surfaces`: Tauri windows, the tray, `open`.
@@ -499,7 +568,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
                 (x, screen.y + MENU_BAR + MARGIN, PROMPT.0, PROMPT.1),
             );
         }
-        let _ = prompt.show();
+        show(&prompt, false);
     }
 
     fn close_record_prompt(&self) {
@@ -514,14 +583,13 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     fn show_call_window(&self, placement: &Placement) {
         self.place_call(placement, false);
         if let Some(window) = self.window(WindowLabel::CallScreen) {
-            let _ = window.show();
+            show(&window, false);
         }
     }
 
     fn make_call_window_key(&self) {
         if let Some(window) = self.window(WindowLabel::CallScreen) {
-            let _ = window.show();
-            let _ = window.set_focus();
+            show(&window, true);
         }
     }
 
@@ -558,7 +626,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         let hidden = std::mem::take(&mut *self.hidden.lock().unwrap_or_else(|e| e.into_inner()));
         for label in hidden {
             if let Some(window) = self.app.get_webview_window(label.as_str()) {
-                let _ = window.show();
+                show(&window, false);
             }
         }
     }
@@ -613,8 +681,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
 
     fn show_window(&self, window: WindowLabel) {
         if let Some(w) = self.window(window) {
-            let _ = w.show();
-            let _ = w.set_focus();
+            show(&w, true);
         }
     }
 

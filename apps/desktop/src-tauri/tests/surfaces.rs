@@ -11,8 +11,8 @@ use noter_core::{
     TrayAction, TrayGlyph,
 };
 use noter_desktop::surfaces::{
-    action_of, call_frame, clamp_frame, frame_of, notification_clicked, posted, settings_url,
-    tray_command, tray_label, tray_title, SavedFrames, TauriSurfaces,
+    action_of, call_frame, clamp_frame, frame_of, is_panel, notification_clicked, posted,
+    settings_url, tray_command, tray_label, tray_title, SavedFrames, TauriSurfaces,
 };
 use noter_native::Frame;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
@@ -274,8 +274,22 @@ fn the_menu_bar_title_and_the_settings_panes() {
 }
 
 #[test]
+fn the_call_window_and_the_record_prompt_are_panels_the_other_windows_stay_windows() {
+    assert!(is_panel(WindowLabel::CallScreen));
+    assert!(is_panel(WindowLabel::RecordPrompt));
+    for label in [
+        WindowLabel::Main,
+        WindowLabel::Settings,
+        WindowLabel::FirstRun,
+    ] {
+        assert!(!is_panel(label), "{label:?}");
+    }
+}
+
+#[test]
 fn the_host_creates_the_core_windows_on_first_use() {
-    // The mock runtime has no monitors: placement is proven by the frame tests above.
+    // The mock runtime has no monitors: placement is proven by the frame tests above. Without the
+    // nspanel plugin (no AppKit window here) the panels stay plain windows.
     let app = mock_builder().build(mock_context(noop_assets())).unwrap();
     let surfaces = TauriSurfaces::new(app.handle().clone(), std::env::temp_dir());
     assert!(!surfaces.call_surface_visible());
@@ -288,6 +302,10 @@ fn the_host_creates_the_core_windows_on_first_use() {
         );
     }
     surfaces.close_record_prompt(); // never shown: nothing to close
+    surfaces.show_record_prompt();
+    assert!(app
+        .get_webview_window(WindowLabel::RecordPrompt.as_str())
+        .is_some());
     surfaces.hide_call_window();
     surfaces.hide_all();
     surfaces.restore_all();

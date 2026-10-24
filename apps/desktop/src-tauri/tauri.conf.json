@@ -9,6 +9,7 @@
     "beforeBuildCommand": "pnpm exec vite build && TEAM_ID=${APPLE_TEAM_ID:-TEAMID} SIGN_IDENTITY=${APPLE_SIGNING_IDENTITY:--} ../../engine/scripts/sign.sh"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
