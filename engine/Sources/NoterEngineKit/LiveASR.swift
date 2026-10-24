@@ -67,6 +67,8 @@ final class LiveASR: @unchecked Sendable {
     private var transcriber: Transcriber?
     private var open: [Channel: Utterance] = [:]
     private var generation: [Channel: Int] = [:]
+    /// The language the first hypothesis of an utterance found, for its next hypotheses.
+    private var utteranceLang: [String: String] = [:]
     private var next = 0
     private var lastSpeechEndMs = 0
     private var silenceReported = false
@@ -200,9 +202,16 @@ final class LiveASR: @unchecked Sendable {
             (channel, u, confirmed) = (c, utterance, false)
         case let .confirm(c, utterance): (channel, u, confirmed) = (c, utterance, true)
         }
-        let (transcriber, languages, glossary) = lock.withLock { (self.transcriber, self.languages, self.glossary) }
+        // Language ID once per utterance for its hypotheses; the confirmation decides on all of it.
+        let (transcriber, languages, glossary) = lock.withLock {
+            (self.transcriber, confirmed ? self.languages : utteranceLang[u.id].map { [$0] } ?? self.languages, self.glossary)
+        }
         let samples = confirmed ? Array(u.audio.prefix(u.speechSamples)) : u.audio
-        guard let transcriber, let d = try? transcriber.decode(samples, languages: languages), Self.keep(d) else { return }
+        let d = transcriber.flatMap { try? $0.decode(samples, languages: languages) }
+        lock.withLock {
+            if confirmed { utteranceLang[u.id] = nil } else if let d, utteranceLang[u.id] == nil { utteranceLang[u.id] = d.lang }
+        }
+        guard let d, Self.keep(d) else { return }
         // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-confirm
         let (text, corrections) = confirmed ? glossary.apply(d.text) : (d.text, [])
         let segment = Segment(

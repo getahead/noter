@@ -21,8 +21,9 @@ public final class WhisperTranscriber: Transcriber, @unchecked Sendable {
     // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-lang-id
     public func decode(_ samples: [Float], languages: [String]) throws -> Decoded {
         try Self.blocking { [whisper] in
-            // Language ID per utterance, among the session's languages.
-            let (_, probabilities) = try await whisper.detectLangauge(audioArray: samples)
+            // Language ID among the session's languages; one language given is taken as is.
+            let probabilities: [String: Float] =
+                languages.count == 1 ? [languages[0]: 1] : try await whisper.detectLangauge(audioArray: samples).langProbs
             let allowed = languages.isEmpty ? probabilities : probabilities.filter { languages.contains($0.key) }
             let (lang, langP) = (allowed.max { $0.value < $1.value } ?? probabilities.max { $0.value < $1.value })
                 .map { ($0.key, $0.value) } ?? ("en", 0)
