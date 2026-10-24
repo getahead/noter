@@ -86,6 +86,9 @@ public enum EngineCommand: Equatable, Sendable {
     case excludeProcess(callId: String, bundleId: String)
     case setGlossary(entries: JSONValue)
     case setLanguages(languages: JSONValue)
+    /// Replay a span of the stored audio; no `channel` plays both.
+    case play(callId: String, fromMs: Int, toMs: Int?, channel: Channel?)
+    case stopPlayback
     /// A command of the protocol this engine does not answer yet.
     case other(type: String)
 }
@@ -147,6 +150,13 @@ extension EngineCommand: Decodable {
                 bundleId: try c.decode(String.self, forKey: AnyKey("bundle_id")))
         case "set_glossary": self = .setGlossary(entries: try c.decode(JSONValue.self, forKey: AnyKey("entries")))
         case "set_languages": self = .setLanguages(languages: try c.decode(JSONValue.self, forKey: AnyKey("languages")))
+        case "play":
+            self = .play(
+                callId: try c.decode(String.self, forKey: AnyKey("call_id")),
+                fromMs: try c.decode(Int.self, forKey: AnyKey("from_ms")),
+                toMs: try c.decode(Int?.self, forKey: AnyKey("to_ms")),
+                channel: try c.decode(Channel?.self, forKey: AnyKey("channel")))
+        case "stop_playback": self = .stopPlayback
         default: self = .other(type: type)
         }
     }
@@ -163,6 +173,11 @@ public enum EngineEvent: Equatable, Sendable {
     case sessionStarted(callId: String, micDevice: String, outputDevice: String)
     case sessionStopped(callId: String, timelinePath: String, micPath: String?, sysPath: String?)
     case deviceChanged(callId: String, deviceName: String, gapFromMs: Int, gapToMs: Int)
+    case callDetected(bundleId: String, appName: String, pid: Int32)
+    case callAudioReleased(bundleId: String)
+    case audioSourceAdded(callId: String, bundleId: String, appName: String)
+    case systemAudioSilent(callId: String, sinceMs: Int, confidence: Float)
+    case playbackPosition(callId: String, atMs: Int, playing: Bool)
 }
 
 extension EngineEvent: Encodable {
@@ -219,6 +234,29 @@ extension EngineEvent: Encodable {
             try put("device_name", deviceName)
             try put("gap_from_ms", gapFromMs)
             try put("gap_to_ms", gapToMs)
+        case let .callDetected(bundleId, appName, pid):
+            try put("type", "call_detected")
+            try put("bundle_id", bundleId)
+            try put("app_name", appName)
+            try put("pid", pid)
+        case let .callAudioReleased(bundleId):
+            try put("type", "call_audio_released")
+            try put("bundle_id", bundleId)
+        case let .audioSourceAdded(callId, bundleId, appName):
+            try put("type", "audio_source_added")
+            try put("call_id", callId)
+            try put("bundle_id", bundleId)
+            try put("app_name", appName)
+        case let .systemAudioSilent(callId, sinceMs, confidence):
+            try put("type", "system_audio_silent")
+            try put("call_id", callId)
+            try put("since_ms", sinceMs)
+            try put("confidence", confidence)
+        case let .playbackPosition(callId, atMs, playing):
+            try put("type", "playback_position")
+            try put("call_id", callId)
+            try put("at_ms", atMs)
+            try put("playing", playing)
         }
     }
 }

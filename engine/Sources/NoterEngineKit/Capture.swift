@@ -220,6 +220,8 @@ final class CaptureSession: @unchecked Sendable {
     private var nextLevels: Int
     private var db: [Channel: Float] = [.mic: -160, .sys: -160]
     private var resampled: [Channel: Resampled] = [:]
+    private var zeros = ZeroRun()
+    private var meetingAppPlaying = false
 
     init(
         start: StartSession, container: URL, writer: EventWriter, now: @escaping () -> Int64,
@@ -261,6 +263,9 @@ final class CaptureSession: @unchecked Sendable {
         try JSONEncoder().encode(timeline).write(to: dir.appendingPathComponent("timeline.json"), options: .atomic)
     }
 
+    /// Whether a meeting app plays now: exact zeros on the system channel then mean no permission.
+    func meetingApp(_ playing: Bool) { lock.withLock { meetingAppPlaying = playing } }
+
     /// Audio flows to the ring and files from now on (after `session_started`).
     func go() { lock.withLock { live = true } }
 
@@ -272,6 +277,15 @@ final class CaptureSession: @unchecked Sendable {
             let to = Double(CaptureRing.rate)
             let count = resampled[chunk.channel, default: Resampled()].count(chunk.samples.count, from: chunk.sampleRate, to: to)
             let samples = Mix.resample(chunk.samples, from: chunk.sampleRate, to: to, count: count)
+            // @cpt-begin:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-return-zero
+            if chunk.channel == .sys,
+                let fact = zeros.feed(
+                    zeros: !chunk.samples.isEmpty && chunk.samples.allSatisfy { $0 == 0 },
+                    atMs: spanStart + (spanSamples[.sys] ?? 0) * 1000 / CaptureRing.rate, meetingApp: meetingAppPlaying)
+            {
+                events.append(.systemAudioSilent(callId: callId, sinceMs: fact.sinceMs, confidence: fact.confidence))
+            }
+            // @cpt-end:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-return-zero
             ring.write(chunk.channel, samples)
             spanSamples[chunk.channel, default: 0] += samples.count
             db[chunk.channel] = Levels.db(chunk.samples)

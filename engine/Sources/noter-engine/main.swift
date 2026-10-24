@@ -39,10 +39,12 @@ case let .file(mic, sys, realtime):
         })
 case .live:
     let engine = EngineLoop(
-        writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container
+        writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
+        processes: { ProcessWatcher.snapshot() }
     ) { start in
         LiveAudioSource(micUid: start?.micDeviceUid, excluding: start?.excludeBundleIds ?? [])
     }
     engine.start()
+    engine.watchProcesses()
     serve(engine, exitAtEndOfInput: true)
 }
