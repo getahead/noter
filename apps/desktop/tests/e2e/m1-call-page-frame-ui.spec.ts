@@ -275,6 +275,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
           mode_used: w.app.privacy.effective,
           audio_not_stored: false,
           first_recorded_call: true,
+          folder: "/tmp/noter/live",
         });
       },
     });
