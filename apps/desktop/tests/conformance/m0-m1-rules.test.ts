@@ -235,6 +235,33 @@ describe("capture notices: hold, keep and resume", () => {
     expect(ok(await screen.captureSetSensitive({ call_id: W.LIVE_CALL, sensitive: true })).sensitive).toBe(true);
     typed(refused(await screen.captureSetSensitive({ call_id: W.LIVE_CALL, sensitive: false })), "invalid_input");
   });
+
+  it("Start as New Call gives the new call its row and an empty live transcript (D-37)", async () => {
+    await s.change((w) =>
+      W.notice(w, {
+        type: "new_meeting",
+        event: { id: "evt_anna", title: "1:1 with Anna K.", starts_at: Date.now(), ends_at: Date.now() + 30 * W.MIN },
+        app_name: "Microsoft Teams",
+        detected_at: Date.now() - 12_000,
+        expires_at: Date.now() + 60_000,
+        default_choice: "start_as_new_call",
+      }),
+    );
+    const next = ahead(await s.core("call-screen").captureAnswerNewMeeting({ call_id: W.LIVE_CALL, choice: "start_as_new_call" }));
+    if (!next) return;
+    expect(next.call_id).not.toBe(W.LIVE_CALL);
+    expect(ok(await s.core("main").callGet({ call_id: next.call_id! })).call).toMatchObject({ id: next.call_id, title: "1:1 with Anna K." });
+    const fresh = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: next.call_id! }, () => {}));
+    if (fresh) expect(fresh).toMatchObject({ call_id: next.call_id, live: true, segments: [], hypotheses: [] });
+  });
+
+  it("capture_set_sensitive on a stored call changes its row everywhere and sends entity:changed (D-37)", async () => {
+    const changed = await s.events("entity:changed");
+    const main = s.core("main");
+    ok(await main.captureSetSensitive({ call_id: W.PAST_CALL, sensitive: true }));
+    expect(ok(await main.callGet({ call_id: W.PAST_CALL })).call.privacy).toBe("sensitive");
+    await until(() => changed.all.some((e) => e.type === "call" && e.call.id === W.PAST_CALL && e.call.privacy === "sensitive"), "entity:changed { call }");
+  });
 });
 
 describe("snapshot, then stream (R23/R24)", () => {
