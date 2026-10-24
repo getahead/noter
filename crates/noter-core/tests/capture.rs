@@ -132,6 +132,8 @@ struct Setup {
     first_launch_fails: bool,
     /// Behaviours of the next launches (after a failing first one), then the default one.
     then: Vec<Behaviour>,
+    /// The self-test passed before this launch (setup done: detection is on from the start).
+    self_test_passed: bool,
 }
 
 impl Default for Setup {
@@ -142,6 +144,7 @@ impl Default for Setup {
             engine: Behaviour::default(),
             first_launch_fails: false,
             then: Vec::new(),
+            self_test_passed: false,
         }
     }
 }
@@ -179,6 +182,14 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
         .with_models(Arc::new(Whisper))
         .with_surfaces(shown.clone());
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
+    if setup.self_test_passed {
+        noter_core::testing::seed_self_test(
+            &core,
+            SelfTestState::Passed {
+                at: TimestampMs(T0),
+            },
+        );
+    }
     core.start_first_run();
     let captured = Arc::new(Mutex::new(Vec::new()));
     let c = captured.clone();
@@ -2281,4 +2292,21 @@ async fn a_call_paused_when_the_engine_failed_comes_back_paused() {
     assert!(back.pause.is_some());
     // Recorded time stops at the pause, not at the failure.
     assert_eq!(back.recorded_ms, DurationMs(0));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_core_that_starts_with_detection_on_tells_the_engine() {
+    let r = rig_with(Setup {
+        self_test_passed: true,
+        ..Setup::default()
+    });
+    let EngineCommand::SetDetection {
+        known_bundle_ids, ..
+    } = r
+        .sent(|c| matches!(c, EngineCommand::SetDetection { enabled: true, .. }))
+        .await
+    else {
+        unreachable!()
+    };
+    assert!(known_bundle_ids.iter().any(|b| b == TEAMS));
 }
