@@ -318,6 +318,8 @@ The system **MUST**, in M1 week one alongside the Q7 engine-kill drill, measure 
 
 The owner moved this measurement from the M0 throwaway spike on 20 Oct 2026 after two runs returned no decoded text or latency numbers, including a 10-minute real-call run. M0 gets no more spike runs. The completed Q4 evidence is in [Spike Q4 evidence](../../../.plans/backend/spike-q4-evidence.md); the real-call measurement remains open and supplements the golden-set file-mode budget check.
 
+> **First real call (24 Oct 2026): FAIL, then diagnosed.** The owner's 39-minute call reported p95 51.6 s / 55.5 s, but that timed segments from `session_started`: the capture started 27.6 s late and lost 23.3 s of audio (IO-thread overruns on a busy Mac), and the cold model took 2.5 min to load on the busy Mac (2.5 s when quiet). Timed from the capture clock, transcription ran at p95 2.18 s (hypothesis) and 3.7 s (confirmed, after the load). The streaming policy changed: chunks leave the IO thread at once, utterances are cut at 10 s (hypothesis lag grows with the utterance), and language ID never takes a language outside the session's. A replay of the stored audio then measured p95 1.78 s / 3.30 s (PASS). Parakeet is not needed on this evidence; loading the model before the call, and the owner's live re-run, are open. Replay numbers, the proposal and the owner's re-run: [Q4 latency evidence](../../../.plans/backend/q4-latency-evidence.md).
+
 **Implements**:
 - `cpt-noter-algo-core-engine-capture-live-asr`
 

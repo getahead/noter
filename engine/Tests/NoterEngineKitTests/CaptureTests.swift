@@ -219,6 +219,21 @@ final class CaptureTests: XCTestCase {
         XCTAssertNil(other.last)
     }
 
+    func testTheIOThreadHandsChunksOnAndNeverWaitsForThem() {
+        let (queue, release, got) = (DispatchQueue(label: "test.capture"), DispatchSemaphore(value: 0), Lines())
+        let deliver = LiveAudioSource.handOff(on: queue) { chunk in
+            release.wait()
+            got.write(Data("{\"n\":\(chunk.samples.count)}\n".utf8))
+        }
+        deliver(AudioChunk(channel: .mic, samples: [0]))
+        deliver(AudioChunk(channel: .sys, samples: [0, 0]))
+        XCTAssertTrue(got.objects.isEmpty, "the IO proc returned while the consumer still works")
+        release.signal()
+        release.signal()
+        queue.sync {}
+        XCTAssertEqual(got.objects.map { $0["n"] as? Int }, [1, 2], "every chunk, in order")
+    }
+
     func testDeviceSizedChunksKeepCallTimeExact() throws {
         // A live device delivers 512 frames at 48 kHz: 170.67 samples at 16 kHz per chunk, which
         // must not round up chunk by chunk (that runs call time ~7 s fast per hour).

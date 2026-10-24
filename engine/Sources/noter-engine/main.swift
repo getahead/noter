@@ -29,8 +29,10 @@ case let .invalid(why):
     FileHandle.standardError.write(Data("noter-engine: \(why)\n".utf8))
     exit(2)
 case let .file(mic, sys, realtime):
+    // The speech model too: a replayed call is transcribed as a live one (golden set, Q4 replay).
     let engine = EngineLoop(
-        writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container
+        writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
+        transcriber: speechModel
     ) { _ in
         guard let m = try? WAV.read(mic), let s = try? WAV.read(sys) else { return nil }
         return FileAudioSource(mic: m, sys: s, realtime: realtime)

@@ -24,9 +24,7 @@ public final class WhisperTranscriber: Transcriber, @unchecked Sendable {
             // Language ID among the session's languages; one language given is taken as is.
             let probabilities: [String: Float] =
                 languages.count == 1 ? [languages[0]: 1] : try await whisper.detectLangauge(audioArray: samples).langProbs
-            let allowed = languages.isEmpty ? probabilities : probabilities.filter { languages.contains($0.key) }
-            let (lang, langP) = (allowed.max { $0.value < $1.value } ?? probabilities.max { $0.value < $1.value })
-                .map { ($0.key, $0.value) } ?? ("en", 0)
+            let (lang, langP) = LiveASR.language(probabilities, among: languages)
             let options = DecodingOptions(
                 language: lang, temperatureFallbackCount: 2, usePrefillPrompt: true, detectLanguage: false,
                 skipSpecialTokens: true, withoutTimestamps: true, suppressBlank: true)
