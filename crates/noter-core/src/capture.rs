@@ -240,6 +240,16 @@ impl Core {
                 }
             }
         });
+        // Setup done and the self-test passed before this launch: detection is on, so the
+        // engine starts to hear calls.
+        let on = {
+            let fr = lock(&self.first_run);
+            crate::first_run::detection(fr.offer_to_record, &fr.stored.self_test).0
+        };
+        if on {
+            let core = self.clone();
+            self.spawn(async move { core.send_detection(true).await });
+        }
         if let Err(e) = self.find_interrupted() {
             self.log(crate::object(json!({
                 "level": "error", "module": "capture", "code": e.code
