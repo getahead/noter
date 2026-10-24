@@ -59,6 +59,12 @@ async function callRow(callId: CallId) {
   return page ? (page.rows.find((c) => c.id === callId) ?? null) : undefined;
 }
 
+/** After a stop the call is processing until its transcript.jsonl is written, then ready (checked once calls_list is delivered). */
+async function ready(callId: CallId): Promise<void> {
+  if ((await callRow(callId)) === undefined) return;
+  await until(async () => (await callRow(callId))?.status === "ready", "the call to be ready: its transcript file written");
+}
+
 /** A call recording from the Today page; null on the fake once the engine is needed. */
 async function recording(): Promise<CallId | null> {
   const started = ok(await s.core("main").captureStart({ source: "today", sensitive: false }));
@@ -225,8 +231,7 @@ describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     const stopped = ok(await screen.captureAnswerCallEnd({ call_id: callId, choice: "stop_now" }));
     expect(stopped.phase).toBe("stopped");
     expect(stopped.continue_until! - Date.now()).toBeGreaterThan(4 * W.MIN); // Continue Recording for 5 minutes
-    const row = await callRow(callId);
-    if (row !== undefined) expect(row?.status).toBe("processing");
+    await ready(callId);
 
     expect(ok(await screen.captureContinue({ call_id: callId }))).toMatchObject({ phase: "recording", call_id: callId });
     const transcript = ahead(await screen.transcriptSubscribe({ call_id: callId }, () => {}));
@@ -249,8 +254,7 @@ describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     const next = ok(await s.core("call-screen").captureAnswerNewMeeting({ call_id: callId, choice: "start_as_new_call" }));
     expect(next.call_id).not.toBe(callId);
     expect(next.title).toBe("1:1 with Anna K.");
-    const saved = await callRow(callId);
-    if (saved !== undefined) expect(saved?.status).toBe("processing");
+    await ready(callId);
   });
 });
 
