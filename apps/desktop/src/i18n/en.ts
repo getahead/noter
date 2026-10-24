@@ -725,6 +725,7 @@ export const en = {
   "callpage.show_inspector_help": "Show Inspector (⌥⌘I)",
   "callpage.when_today": "Today {time}",
   "callpage.subtitle": "{when} · {length} · {people}",
+  "callpage.subtitle_alone": "{when} · {length}",
   "callpage.gone_title": "This call is no longer here",
   "callpage.gone_body": "It was deleted or moved. Go back to Calls to pick another.",
   "callpage.error": "Couldn’t open this call.",

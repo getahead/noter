@@ -3,7 +3,7 @@
 // `cpt-noter-seq-notifications-allow-notifications` (banner). m1-library-dialogs-notifications.spec.ts proves them at the contract;
 // these drive the page. Written before the page exists (tests first): they fail until call-page-frame lands, and its PR carries
 // them. Markup follows the prototype (`screen('call-page')`): toolbar PC-R1, banner slot PC-R2, Call info in the inspector slot
-// (MW-R4/PC-R4), the transcript in PC-R5; the calls are opened from Library › Calls (double-click), as the user does.
+// (MW-R4/PC-R4), the transcript in PC-R5; the call is opened as the core opens it (`window_navigate` → `nav:request`); the Calls list is 2.13's.
 // Native, not here: the delete NSAlert (Cancel default, Return keeps the call) is XCUITest
 // `test_cpt_noter_seq_dialogs_delete_call__alert_has_cancel_as_default`; the macOS notifications prompt is on the manual
 // checklist; the page loading without activating the window after a stop is XCUITest
@@ -40,10 +40,20 @@ const quiet =
     detail.first_recorded_call = first;
     more(w);
   };
-/** Library › Calls (⌘3), then the call's page: Return or a double-click opens it. */
+/**
+ * Library › Calls (⌘3), then the call's page the way the core opens it: a `window_navigate` to the call page (a
+ * `nav:request`, as Open in Noter, Open Last Summary and a notification do). The Calls list (2.13) is not part of
+ * this feature, so Back lands on Library › Calls whatever it shows. Works on the fake core and the real one.
+ */
 async function openCall(page: Page, title = TITLE) {
   await page.keyboard.press("Meta+Digit3");
-  await page.locator('[data-region="MW-R3"]').getByText(title, { exact: true }).first().dblclick();
+  const id = title === TITLE ? W.PAST_CALL : W.LIVE_CALL;
+  await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+  await page.evaluate(async (callId) => {
+    const args = { target: { type: "call_page", call_id: callId, tab: "transcript" } };
+    const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
+    await (g.__noterFake ? g.__noterFake.invoke("window_navigate", args) : g.__TAURI_INTERNALS__!.invoke("window_navigate", { args }));
+  }, id);
   await expect(toolbar(page)).toContainText(title);
 }
 const openMore = async (page: Page) => {

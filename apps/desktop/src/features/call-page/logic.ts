@@ -89,7 +89,9 @@ const people = (c: CallRow): string => c.participants.map((p) => p.short_name).j
 
 /** PC-R1's subtitle: **Today 10:00 · 48 min · Anna K., Pavel, Dmitri S., You**. */
 export const subtitleOf = (c: CallRow, now: number, prefs: UiPrefs): string =>
-  t("callpage.subtitle", { when: whenLabel(c.started_at, now, prefs), length: duration(c.duration_ms / 1000), people: people(c) });
+  c.participants.length
+    ? t("callpage.subtitle", { when: whenLabel(c.started_at, now, prefs), length: duration(c.duration_ms / 1000), people: people(c) })
+    : t("callpage.subtitle_alone", { when: whenLabel(c.started_at, now, prefs), length: duration(c.duration_ms / 1000) });
 
 export interface InfoModel {
   participants: CallRow["participants"];
