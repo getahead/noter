@@ -85,7 +85,10 @@ struct State {
     calls: HashMap<CallId, Live>,
     /// When the first levels of a stream arrived: `LevelsMsg.at_ms` counts from it.
     levels_origin: HashMap<String, i64>,
+    /// Test hook state (D-27): not compiled into a release build.
+    #[cfg(feature = "harness")]
     fail_after_commit: bool,
+    #[cfg(feature = "harness")]
     crashed: bool,
 }
 
@@ -177,6 +180,7 @@ impl Core {
     // @cpt-state:cpt-noter-state-core-live-transcript-segment:p1
     fn on_segment(&self, seg: EngineSegment) {
         let mut state = lock(&self.transcript.state);
+        #[cfg(feature = "harness")]
         if state.crashed {
             return;
         }
@@ -224,6 +228,7 @@ impl Core {
     // @cpt-algo:cpt-noter-algo-core-live-transcript-speakers:p1
     fn on_speaker_turn(&self, call_id: &CallId, channel: AudioChannel, label: &str) {
         let mut state = lock(&self.transcript.state);
+        #[cfg(feature = "harness")]
         if state.crashed {
             return;
         }
@@ -307,11 +312,14 @@ impl Core {
         let committed = self.store.insert_batch(rows.clone());
         // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-commit-batch
         let mut state = lock(&self.transcript.state);
-        let crash = std::mem::take(&mut state.fail_after_commit);
-        if crash && committed.is_ok() {
-            // The test hook: the core dies between the commit and the publish.
-            state.crashed = true;
-            return;
+        #[cfg(feature = "harness")]
+        {
+            let crash = std::mem::take(&mut state.fail_after_commit);
+            if crash && committed.is_ok() {
+                // The test hook: the core dies between the commit and the publish.
+                state.crashed = true;
+                return;
+            }
         }
         let Some(live) = state.calls.get_mut(call_id) else {
             return;
