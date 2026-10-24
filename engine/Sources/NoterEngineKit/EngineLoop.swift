@@ -25,7 +25,7 @@ public final class EngineLoop: @unchecked Sendable {
         writer: EventWriter, engineVersion: String, models: [String], sandboxed: Bool,
         container: URL? = nil, now: @escaping () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
         encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
-        play: @escaping @Sendable ([Float]) -> Void = Clip.play,
+        play: @escaping @Sendable ([Float]) -> Void = { Clip.play($0) },
         source: @escaping (StartSession?) -> AudioSource?
     ) {
         self.writer = writer

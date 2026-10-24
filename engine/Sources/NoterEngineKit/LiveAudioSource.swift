@@ -228,8 +228,10 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         var qualifier = uid as CFString
         var device = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<CFString>.size), &qualifier, &size, &device)
+        let status = withUnsafeMutablePointer(to: &qualifier) {
+            AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject), &address, UInt32(MemoryLayout<CFString>.size), $0, &size, &device)
+        }
         return status == noErr && device != kAudioObjectUnknown ? device : nil
     }
 
