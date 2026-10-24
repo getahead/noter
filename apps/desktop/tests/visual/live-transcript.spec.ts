@@ -42,6 +42,7 @@ test.describe("cpt-noter-dod-ui-live-transcript-view transcript view", () => {
     });
     await log(page).hover();
     await page.mouse.wheel(0, -20_000);
+    await expect(row(page, ANNA_LINE)).toBeInViewport(); // the scroll has settled: the view is detached
     for (const i of [1, 2, 3]) {
       const segment = { id: `seg_v${i}`, call_id: W.LIVE_CALL, channel: "sys" as const, speaker: { speaker_id: "spk_1", label: { type: "unnamed" as const, n: 1 } }, crosstalk_with: [], t0_ms: 1_500_000 + i * 8000, t1_ms: 1_506_000 + i * 8000, text: `New line ${i}`, lang: "en" as const, lang_p: 0.9, confidence: 0.9, state: "confirmed" as const, pass: "live" as const, corrections: [] };
       await steer.push("transcript_subscribe", { event: { type: "confirmed", segment } });
