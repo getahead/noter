@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CallWindowState, CaptureState, DegradedState } from "../../core/bindings";
-import { captureView, closingTitle, degradedBanners, failureAnnouncement, indicatorStatus, layoutRegions, layoutState, pausedMinutes, windowState, type BannerHandlers } from "./model";
+import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncement, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, windowState, type BannerHandlers } from "./model";
 
 const cap = (patch: Partial<CaptureState> = {}): CaptureState => ({
   version: 1,
@@ -160,5 +160,30 @@ describe("pausedMinutes", () => {
   it("counts whole minutes since the pause, at least one", () => {
     expect(pausedMinutes({ since: 0, remind_at: null }, 3 * 60_000 + 5_000)).toBe(3);
     expect(pausedMinutes({ since: 0, remind_at: null }, 1_000)).toBe(1);
+  });
+});
+
+describe("announcements (DESIGN › Keyboard and VoiceOver, announcement table)", () => {
+  it("announces the failures of this call only", () => {
+    const states: DegradedState[] = [{ type: "microphone_off", call_id: "call_live" }, { type: "microphone_off", call_id: "call_other" }, { type: "disk_low", free_mb: 1 }];
+    expect(failureAnnouncements(states, "call_live").map((a) => a.text)).toEqual(["Microphone off."]);
+  });
+
+  it("says nothing for the state the window opened on", () => {
+    expect(captureAnnouncements(null, cap({ phase: "paused" }), null)).toEqual([]);
+  });
+
+  it("announces a new notice assertively, Paused and Resumed, and the stop with its minutes", () => {
+    const ended = { type: "call_ended" as const, stops_at: 1 };
+    expect(captureAnnouncements({ phase: "recording", notice: null }, cap({ notice: ended }), ended)).toEqual([{ kind: "call_ended", text: "The call seems to have ended", key: "call_live:1" }]);
+    expect(captureAnnouncements({ phase: "recording", notice: "call_ended" }, cap({ notice: ended }), ended)).toEqual([]);
+    const meeting = { type: "new_meeting" as const, event: null, app_name: null, detected_at: 1, expires_at: 2, default_choice: "start_as_new_call" as const };
+    expect(captureAnnouncements({ phase: "recording", notice: null }, cap(), meeting)[0]).toMatchObject({ kind: "new_meeting", text: "A new meeting may have started" });
+    const titled = { ...meeting, event: { id: "e", title: "1:1 with Anna K." } as never };
+    expect(captureAnnouncements({ phase: "recording", notice: null }, cap(), titled)[0]!.text).toBe("A new meeting may have started: 1:1 with Anna K.");
+    expect(captureAnnouncements({ phase: "recording", notice: null }, cap({ phase: "paused" }), null).map((a) => a.text)).toEqual(["Paused"]);
+    expect(captureAnnouncements({ phase: "paused", notice: null }, cap(), null).map((a) => a.text)).toEqual(["Resumed"]);
+    expect(captureAnnouncements({ phase: "recording", notice: null }, cap({ phase: "stopped" }), null)).toEqual([{ kind: "recording", text: "Recording stopped, saved 48 minutes", key: "stopped:call_live:1" }]);
+    expect(captureAnnouncements({ phase: "stopped", notice: null }, cap({ phase: "stopped" }), null)).toEqual([]);
   });
 });

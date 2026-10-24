@@ -1,6 +1,6 @@
 // The call window's logic (docs/features/ui/call-window.md): what it shows for the core's capture,
 // degraded, window and presenting state. Pure functions; the components render what they return.
-import type { CallWindowState, CaptureState, DegradedState, PauseInfo, PermissionKind } from "../../core/bindings";
+import type { CallWindowState, CaptureNotice, CaptureState, DegradedState, PauseInfo, PermissionKind } from "../../core/bindings";
 import type { AnnounceEvent } from "../../app/a11y/announce";
 import type { Banner } from "../../ui/feedback/inline-banner";
 import { t } from "../../i18n/format";
@@ -232,6 +232,31 @@ export function failureAnnouncement(d: DegradedState): AnnounceEvent | null {
     default:
       return null;
   }
+}
+
+/** The failures of the current call to announce (the announcer speaks each occurrence once). */
+export const failureAnnouncements = (degraded: readonly DegradedState[], callId: string | null): AnnounceEvent[] =>
+  degraded.flatMap((d) => ("call_id" in d && d.call_id === callId ? (failureAnnouncement(d) ?? []) : []));
+
+/** What the window had shown when the capture state last changed. */
+export interface Seen {
+  phase: CaptureState["phase"];
+  notice: string | null;
+}
+
+/** The announcements of a capture state change: a notice that appeared, Paused, Resumed, and the stop. */
+export function captureAnnouncements(was: Seen | null, c: CaptureState, notice: CaptureNotice | null): AnnounceEvent[] {
+  if (!was) return []; // what the window opened on is not news
+  const out: AnnounceEvent[] = [];
+  const key = `${c.call_id}:${c.version}`;
+  if (notice && notice.type !== was.notice) {
+    if (notice.type === "call_ended" || notice.type === "call_seems_ended") out.push({ kind: "call_ended", text: t("cw.notice.call_ended"), key });
+    if (notice.type === "new_meeting") out.push({ kind: "new_meeting", text: notice.event ? t("cw.notice.new_meeting", { title: notice.event.title }) : t("cw.notice.new_meeting_untitled"), key });
+  }
+  if (was.phase === "recording" && c.phase === "paused") out.push({ kind: "recording", text: t("cw.announce.paused"), key });
+  if (was.phase === "paused" && c.phase === "recording") out.push({ kind: "recording", text: t("cw.announce.resumed"), key });
+  if (!stopped({ phase: was.phase }) && stopped(c)) out.push(stoppedAnnouncement(c));
+  return out;
 }
 
 const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
