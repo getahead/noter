@@ -27,3 +27,6 @@ export const tauriTransport: Transport = {
     return listen<unknown>(event, (e) => handler(e.payload));
   },
 };
+
+/** The dialog plugin's native alert (macOS draws it); resolves true when the OK button was chosen. */
+export const nativeAsk = (o: { title: string; message: string; kind: "info" | "warning"; okLabel: string; cancelLabel: string }): Promise<boolean> => invoke<boolean>("plugin:dialog|ask", o);

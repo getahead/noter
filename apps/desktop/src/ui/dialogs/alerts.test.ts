@@ -5,7 +5,8 @@ describe("deleteAlert (cpt-noter-algo-ui-dialogs-host-delete-alert)", () => {
   it("asks about one call by its own title, Cancel first", () => {
     expect(deleteAlert([{ id: "c1", title: "Backend sync" }])).toEqual({
       title: "Delete “Backend sync”?",
-      message: "This removes its audio, transcript, summary, items and cards. You can't undo this.",
+      message:
+        "This removes its audio, transcript, summary, items and cards. You can't undo this.",
       cancel: "Cancel",
       confirm: "Delete",
       destructive: true,
@@ -13,15 +14,23 @@ describe("deleteAlert (cpt-noter-algo-ui-dialogs-host-delete-alert)", () => {
   });
 
   it("keeps a title in another script inside the quotes", () => {
-    expect(deleteAlert([{ id: "c1", title: "Планирование" }]).title).toBe("Delete “Планирование”?");
+    expect(deleteAlert([{ id: "c1", title: "Планирование" }]).title).toBe(
+      "Delete “Планирование”?",
+    );
   });
 
   it("asks about several calls through the plural rules", () => {
-    const a = deleteAlert([1, 2, 3].map((n) => ({ id: `c${n}`, title: `T${n}` })));
+    const a = deleteAlert(
+      [1, 2, 3].map((n) => ({ id: `c${n}`, title: `T${n}` })),
+    );
     expect(a.title).toBe("Delete 3 calls?");
     expect(a.confirm).toBe("Delete 3 Calls");
-    expect(a.message).toBe("This removes their audio, transcripts, summaries, items and cards. You can't undo this.");
-    expect(deleteAlert([1, 2].map((n) => ({ id: `c${n}`, title: "x" }))).confirm).toBe("Delete 2 Calls");
+    expect(a.message).toBe(
+      "This removes their audio, transcripts, summaries, items and cards. You can't undo this.",
+    );
+    expect(
+      deleteAlert([1, 2].map((n) => ({ id: `c${n}`, title: "x" }))).confirm,
+    ).toBe("Delete 2 Calls");
   });
 });
 
@@ -43,12 +52,20 @@ describe("askAlert (cpt-noter-flow-ui-dialogs-host-delete-call)", () => {
   it("sends the dialog plugin's ask with the labels and a warning kind, and answers true on confirm", async () => {
     const ask = vi.fn().mockResolvedValue(true);
     expect(await askAlert(spec, ask)).toBe(true);
-    expect(ask).toHaveBeenCalledWith({ title: spec.title, message: spec.message, kind: "warning", okLabel: "Delete", cancelLabel: "Cancel" });
+    expect(ask).toHaveBeenCalledWith({
+      title: spec.title,
+      message: spec.message,
+      kind: "warning",
+      okLabel: "Delete",
+      cancelLabel: "Cancel",
+    });
   });
 
   it("answers false on cancel and when the dialog cannot be shown", async () => {
     expect(await askAlert(spec, vi.fn().mockResolvedValue(false))).toBe(false);
-    expect(await askAlert(spec, vi.fn().mockRejectedValue("denied"))).toBe(false);
+    expect(await askAlert(spec, vi.fn().mockRejectedValue("denied"))).toBe(
+      false,
+    );
   });
 
   it("is informational when the action is not destructive", async () => {

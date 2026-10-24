@@ -5,8 +5,12 @@ import { InlineConfirm } from "./inline-confirm";
 
 describe("InlineConfirm (cpt-noter-flow-ui-dialogs-host-inline-confirm)", () => {
   it("asks in place with Discard and Back, never a dialog or a default button", () => {
-    const html = renderToString(<InlineConfirm onConfirm={() => {}} onBack={() => {}} />);
-    expect(html).toContain("Discard this recording? This can&#x27;t be undone.");
+    const html = renderToString(
+      <InlineConfirm onConfirm={() => {}} onBack={() => {}} />,
+    );
+    expect(html).toContain(
+      "Discard this recording? This can&#x27;t be undone.",
+    );
     expect(html).toContain("Discard");
     expect(html).toContain("Back");
     expect(html).not.toContain("dialog");
