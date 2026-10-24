@@ -450,7 +450,8 @@ test.describe("cpt-noter-flow-ui-live-transcript-stored", () => {
   test("UI — other path: a read slower than 300 ms shows skeleton rows first", async ({ page }) => {
     await openWindow(page, "main", { world: stored(5), latency: 700 });
     await openCall(page, "Backend sync");
-    await expect(page.locator('[class*="skel"]').first()).toBeVisible();
+    // the skeleton shows from 300 ms until the read lands at 700 ms: poll finer than expect's default backoff
+    await expect.poll(() => page.locator('[class*="skel"]').first().isVisible(), { intervals: [50] }).toBe(true);
     await expect(rows(page)).toHaveCount(5);
   });
 });
