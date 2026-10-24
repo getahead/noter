@@ -92,8 +92,11 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     /// The engine, the app that started it and the excluded apps' processes (helpers included).
     /// Caller holds the lock.
     private func excludedProcesses() -> [AudioObjectID] {
-        [getpid(), getppid()].compactMap(Self.processObject)
-            + Self.processObjects().filter { Exclusion.matches(Self.string($0, kAudioProcessPropertyBundleID) ?? "", excluded) }
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-play-excluded
+        // The engine plays replays itself, so leaving its own process out keeps them out of the recording.
+        let own = [getpid(), getppid()].compactMap(Self.processObject)
+        // @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-play-excluded
+        return own + Self.processObjects().filter { Exclusion.matches(Self.string($0, kAudioProcessPropertyBundleID) ?? "", excluded) }
     }
 
     /// Caller holds the lock.

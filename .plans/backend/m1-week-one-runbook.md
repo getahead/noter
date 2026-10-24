@@ -4,7 +4,7 @@ For the owner. Closes, on real hardware, what CI cannot run (it has no TCC promp
 speakers): the Q7 engine-kill drill (`cpt-noter-dod-core-engine-capture-restart`), the live half
 of the capture pipeline (one clock, exclusions, device changes, the self-test clip:
 `cpt-noter-dod-core-engine-capture-pipeline`), and the Q4 real-call latency measurement
-(`cpt-noter-dod-core-engine-capture-latency`). Parts A and B take about 40 minutes and need
+(`cpt-noter-dod-core-engine-capture-latency`). Parts A and B take about an hour and need
 #139 and the one-clock capture PR on `main`; part C (one real call) needs the live ASR PR too.
 
 Send back the table at the end. The backend team records the results in
@@ -63,7 +63,7 @@ $DRILL $ENGINE 30 3 --mic /tmp/mic.wav --sys /tmp/sys.wav
 **Expected:** `kill 3: session is Failed, not capturing` and a final `FAIL` line. That is the
 designed outcome (3 restarts in 30 s → `CaptureFailed`, the app offers Try Again), not a defect.
 
-## B. Live capture checks (20 min)
+## B. Live capture checks (35 min)
 
 These talk to the engine over its JSON Lines protocol. Keep this helper in your shell; it starts a
 session, waits, sends any extra command lines you pass half way, waits again, then stops and
@@ -120,6 +120,48 @@ You hear a one-second 1.5 kHz tone. **Pass:** `"passed":true,"own_sounds_leak":f
 **B6. Stop time of a long call.** `session 1200 '[]'` (20 min, leave it running), then time from the
 `ack` of id 8 to `session_stopped` (the `at` fields are epoch ms). **Pass:** under 2 s (longer
 would make the supervisor's ping time out while the files are being finished).
+
+**B7. Call detection** (facts only; the app decides what to show). Run this, and while it runs
+start a FaceTime or Zoom test call (or a Google Meet in Chrome) with the microphone on, wait
+10 s, hang up:
+
+```sh
+( echo '{"id":1,"cmd":{"type":"set_detection","enabled":true,"known_bundle_ids":["us.zoom.xos","com.apple.FaceTime","com.google.Chrome","com.microsoft.teams2"]}}'
+  sleep 90; echo '{"id":2,"cmd":{"type":"shutdown"}}' ) | $ENGINE | grep -E 'call_detected|call_audio_released'
+```
+
+**Pass:** `call_detected` with the app's bundle id, name and pid about a second after the call
+audio starts, and `call_audio_released` about a second after hanging up. A Meet in **Safari** is
+not detected yet (Safari plays from WebKit processes without its bundle id): say whether you use
+Safari for calls. Then, a second sound source: `session 30 '[]'` and start Music half way: one
+`audio_source_added` line for `com.apple.Music`.
+
+**B8. Silent system audio** (the permission is off). In System Settings › Privacy & Security ›
+System Audio Recording, turn **Terminal off**; join a FaceTime/Zoom test call so its audio plays;
+then (the detection list goes in half way):
+
+```sh
+session 40 '[]' '{"id":5,"cmd":{"type":"set_detection","enabled":false,"known_bundle_ids":["us.zoom.xos","com.apple.FaceTime","com.google.Chrome"]}}'
+```
+
+**Pass:** `system_audio_silent` lines with `since_ms` near 0 and `confidence` 0.6, 0.8, then 0.95
+(at 30 s of zeros). Turn Terminal back **on** and run it again with the call playing: no
+`system_audio_silent` line.
+
+**B9. Replay.** After B1 (the call's audio is stored), keep a copy and play a span of it:
+
+```sh
+cp -R "$NOTER_APP_GROUP_DIR/audio/call_1" "$NOTER_APP_GROUP_DIR/audio/old"
+( echo '{"id":1,"cmd":{"type":"play","call_id":"old","from_ms":5000,"to_ms":15000,"channel":null}}'; sleep 12
+  echo '{"id":2,"cmd":{"type":"shutdown"}}' ) | $ENGINE | grep -E 'playback_position|error'
+```
+
+**Pass:** you hear seconds 5 to 15 of that recording; `playback_position` lines about every 250 ms
+rising from 5000 to 15000, the last one `"playing":false`. With `"call_id":"none"` instead: an
+`error` for the command. Then the replay must never enter a recording: with nothing else playing
+and staying silent, run
+`SHOW=levels session 30 '[]' '{"id":5,"cmd":{"type":"play","call_id":"old","from_ms":0,"to_ms":null,"channel":null}}'`.
+**Pass:** you hear the replay, and `sys_db` stays near -160 throughout.
 
 ## C. Q4 real-call latency, EN/RU/DE (one real call, 30-60 min)
 
@@ -179,6 +221,9 @@ lines), and a few confirmed segments per language as they are, for a look at the
 | B4 device change | `device_changed` line, gap ms | |
 | B5 own clip | `passed` / `own_sounds_leak` | |
 | B6 stop time | seconds | |
+| B7 detection | `call_detected` / `call_audio_released` lines, `audio_source_added`; Safari used? | |
+| B8 silent system audio | `system_audio_silent` lines (since, confidence); none with the permission on | |
+| B9 replay | positions 5000→15000, error for an unknown call, `sys_db` during a replay | |
 | C latency | p95 hypothesis / confirmed per language, model load time | |
 
 Paste the final lines of A1–A3 and the `device_changed` line as they are.

@@ -132,7 +132,6 @@ public final class EngineLoop: @unchecked Sendable {
         return true
     }
 
-    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
     private func startSession(_ id: UInt64, _ start: StartSession) {
         guard session == nil else {
             writer.emit(.error(cmdId: id, code: .badCommand, message: "a session runs already"))
@@ -232,7 +231,9 @@ public final class EngineLoop: @unchecked Sendable {
                 writer.emit(.playbackPosition(callId: callId, atMs: at, playing: playing))
             }
             replaying = true
+            // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-return-replay
             writer.emit(.ack(cmdId: id))
+            // @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-return-replay
         } catch {
             writer.emit(.error(cmdId: id, code: .internal, message: "\(error)"))
         }

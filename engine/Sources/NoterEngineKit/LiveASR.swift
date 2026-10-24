@@ -161,8 +161,10 @@ final class LiveASR: @unchecked Sendable {
             }
             // @cpt-end:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-hypothesis
         }
+        // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-return-asr
         facts.forEach(writer.emit)
         jobs.forEach(schedule)
+        // @cpt-end:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-return-asr
     }
 
     /// Ends the utterance of `channel` (caller holds the lock).
