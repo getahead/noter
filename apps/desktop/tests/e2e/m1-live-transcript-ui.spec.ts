@@ -94,8 +94,13 @@ function liveWith(extra: SegmentView[], hypothesis = true) {
     const t = w.transcripts.find((x) => x.call_id === W.LIVE_CALL)!;
     t.segments.push(...extra);
     t.last_seq += extra.length;
+    // every speaker a line names is a speaker of the call (the real core seeds them as rows from the call's details)
+    const detail = w.call_details.find((d) => d.call.id === W.LIVE_CALL);
+    for (const ref of extra.flatMap((x) => [x.speaker, ...x.crosstalk_with]))
+      for (const list of [t.speakers, detail?.speakers ?? []])
+        if (list.length && !list.some((sp) => sp.id === ref.speaker_id)) list.push({ ...list[0]!, id: ref.speaker_id, label: ref.label, channel: ref.label.type === "guest_your_side" ? "mic" : "sys" });
     if (!hypothesis) t.hypotheses = [];
-    w.live_script = [];
+    if (FAKE) w.live_script = []; // the real core's scripted engine keeps its own script (world_set refuses live_script)
   };
 }
 const many = (n: number) => Array.from({ length: n }, (_, i) => line(i));
@@ -111,6 +116,7 @@ function stored(n: number, matching = 0, patch: { audio_deleted?: boolean; audio
   return (w: World) => {
     W.idle(w);
     w.app.capture.phase = "idle";
+    for (const c of w.calls) if (c.status === "recording" || c.status === "paused") c.status = "ready"; // no call is being recorded
     const segments = Array.from({ length: n }, (_, i) =>
       line(
         i,
@@ -137,6 +143,7 @@ function stored(n: number, matching = 0, patch: { audio_deleted?: boolean; audio
       audio_available: !patch.audio_deleted,
     });
     const detail = w.call_details.find((d) => d.call.id === W.PAST_CALL)!;
+    Object.assign(detail, { marks: [], gaps: [] }); // the real core seeds the call's marks and gaps from its details
     for (const c of [detail.call, w.calls.find((x) => x.id === W.PAST_CALL)!]) {
       c.audio_deleted = !!patch.audio_deleted;
       if (patch.audio_deleted) c.audio_kept_until = null;
@@ -214,7 +221,8 @@ test.describe("cpt-noter-flow-ui-live-transcript-follow", () => {
     const steer = await openWindow(page, "call-screen", {
       world: (w) => {
         liveWith([], false)(w);
-        Object.assign(w.transcripts[0], { segments: [], marks: [], gaps: [] });
+        Object.assign(w.transcripts.find((x) => x.call_id === W.LIVE_CALL)!, { segments: [], marks: [], gaps: [] });
+        Object.assign(w.call_details.find((d) => d.call.id === W.LIVE_CALL) ?? {}, { marks: [], gaps: [] }); // the real core seeds them from the details too
       },
     });
     const view = page.locator('[data-component="cpt-noter-component-ui-transcript-view"]');
