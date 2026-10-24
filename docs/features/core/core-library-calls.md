@@ -42,7 +42,7 @@ design: docs/DESIGN-core.md
 
 - [ ] `p2` - **ID**: `cpt-noter-featstatus-core-library-calls`
 
-- [ ] `p2` - `cpt-noter-feature-core-library-calls`
+- [x] `p2` - `cpt-noter-feature-core-library-calls`
 
 ## 1. Feature Context
 
@@ -227,7 +227,7 @@ After M1 the user can record calls and find them again. The list and the call re
 
 ### Call status
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-library-calls-status`
+- [x] `p1` - **ID**: `cpt-noter-state-core-library-calls-status`
 
 **States**: recording, paused, processing, ready, failed
 
@@ -239,7 +239,7 @@ After M1 the user can record calls and find them again. The list and the call re
 3. [x] - `p1` - **FROM** recording **TO** processing **WHEN** the call stops (also from paused) - `inst-st-processing`
 4. [x] - `p1` - **FROM** processing **TO** ready **WHEN** the transcript file is written; from M2, when the post-call outputs are written - `inst-st-ready`
 5. [x] - `p1` - **FROM** processing **TO** recording **WHEN** Continue Recording appends to the call - `inst-st-continued`
-6. [ ] - `p1` - **FROM** processing **TO** failed **WHEN** the post-call work fails (M2) - `inst-st-failed`
+`failed` is entered by the post-call pipeline (`core-postcall`, M2); no M1 code writes it.
 
 ## 5. Definitions of Done
 
@@ -305,9 +305,9 @@ The system **MUST** run the fixture-parity test for `calls_list`, `call_get` and
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core, story `cpt-noter-seq-dialogs-delete-call`: after the alert the call disappears from the Library and from every open window, its files are gone, and a non-undoable change row without content is written (History shows it from M2).
-- [ ] A recorded call (scripted engine) appears in `calls_list` and opens with `call_get` with its marks and gaps.
-- [ ] `call_update` with a stale `rev` returns `conflict`; deleting the live call returns `already_recording`.
-- [ ] The fixture-parity test passes for the M1 read models.
-- [ ] Each of the five commands succeeds at least once in E2E runs against the real core.
-- [ ] `just gate` passes.
+- [x] E2E against the real core, story `cpt-noter-seq-dialogs-delete-call`: after the alert the call disappears from the Library and from every open window, its files are gone, and a non-undoable change row without content is written (History shows it from M2).
+- [x] A recorded call (scripted engine) appears in `calls_list` and opens with `call_get` with its marks and gaps.
+- [x] `call_update` with a stale `rev` returns `conflict`; deleting the live call returns `already_recording`.
+- [x] The fixture-parity test passes for the M1 read models.
+- [x] Each of the five commands succeeds at least once in E2E runs against the real core.
+- [x] `just gate` passes.
