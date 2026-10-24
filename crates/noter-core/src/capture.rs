@@ -416,6 +416,7 @@ impl Core {
 
     // @cpt-flow:cpt-noter-flow-core-capture-session-start:p1
     // @cpt-dod:cpt-noter-dod-core-capture-session-native-callers:p1
+    // @cpt-dod:cpt-noter-dod-core-capture-session-machine:p1
     pub(crate) async fn start_call(
         &self,
         ctx: &CommandCtx,

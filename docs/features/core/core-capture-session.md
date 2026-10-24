@@ -383,7 +383,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### The capture machine
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-capture-session-machine`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-capture-session-machine`
 
 The system **MUST** implement every transition of DESIGN-core 3.1 Capture transitions with table-driven tests on an injected clock, refuse a start only with `already_recording`, `disk_full` or `model_missing`, and never stop or refuse a capture because another component failed or setup is unfinished.
 
