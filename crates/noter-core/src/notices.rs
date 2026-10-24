@@ -495,24 +495,31 @@ impl Core {
     }
 
     /// Start as New Call: the live call ends at the new meeting's `detected_at` and a new call
-    /// starts there, named after the meeting app.
+    /// starts there, named after the calendar event, else the meeting app.
     // shortcut: the saved call is not offered Continue (one CaptureState holds one call); add a
     // second Continue slot when the UI needs it.
     async fn split_call(&self, ctx: &CommandCtx) -> Result<CaptureState, CoreError> {
-        let (call_id, detected_at, app) = {
+        let (call_id, detected_at, app, title) = {
             let mut session = self.capture.lock().await;
             let state = self.capture_now();
-            let (Some(call_id), Some(CaptureNotice::NewMeeting { detected_at, .. })) =
-                (state.call_id, state.notice)
+            let (
+                Some(call_id),
+                Some(CaptureNotice::NewMeeting {
+                    detected_at,
+                    event,
+                    app_name,
+                    ..
+                }),
+            ) = (state.call_id, state.notice)
             else {
                 return Err(notice_expired());
             };
-            (call_id, detected_at.0, session.new_meeting.take())
+            let title = event.map(|e| e.title).or(app_name);
+            (call_id, detected_at.0, session.new_meeting.take(), title)
         };
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-split
         self.stop_call_at(ctx, CallIdArgs { call_id }, Some(detected_at))
             .await?;
-        let title = app.as_ref().map(|(_, name)| name.clone());
         let begin = Begin {
             at: detected_at,
             title,
