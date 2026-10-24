@@ -246,7 +246,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-expired
         match detection {
             None if from_prompt => Err(detection_expired()),
-            Some(d) if from_prompt && now > d.prompt_until.0 => Err(detection_expired()),
+            Some(d) if from_prompt && now >= d.prompt_until.0 => Err(detection_expired()),
             other => Ok(other),
         }
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-expired

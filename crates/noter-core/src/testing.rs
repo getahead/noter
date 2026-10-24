@@ -36,6 +36,11 @@ pub fn seed_detection(core: &Core, detection: Option<CallDetection>) {
     core.seed_detection(detection);
 }
 
+/// The system-audio state the world's environment row reports, `None` for not asked.
+pub fn seed_system_audio(core: &Core, heard: Option<noter_protocol::PermissionState>) {
+    core.seed_system_audio(heard);
+}
+
 pub fn seed_presenting(core: &Core, hidden: bool) {
     core.seed_presenting(hidden);
 }

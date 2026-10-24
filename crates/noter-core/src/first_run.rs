@@ -512,6 +512,15 @@ impl Core {
         }
     }
 
+    /// What the Mac's system-audio tap was heard to be, as `harness.world_set` seeds it (the
+    /// world's environment row stands in for the short engine test's inference, F1).
+    #[cfg(feature = "harness")]
+    pub(crate) fn seed_system_audio(&self, heard: Option<PermissionState>) {
+        lock(&self.first_run).stored.system_audio = heard;
+        self.refresh_environment(self.deps.native.environment());
+        self.refresh_setup();
+    }
+
     // @cpt-dod:cpt-noter-dod-core-first-run-status:p1
     // @cpt-begin:cpt-noter-algo-core-first-run-status:p1:inst-return-status
     pub(crate) fn setup_now(&self) -> SetupStatus {

@@ -978,9 +978,10 @@ async fn world_set_accepts_transcripts_and_seeds_their_rows() {
     line["text"] = json!("Stored line 0");
     line["pass"] = json!("archive");
     transcripts.retain(|t| t["call_id"] != "call_backend");
+    let gap = json!({ "call_id": "call_backend", "t0_ms": 5_000, "t1_ms": 7_000, "reason": "device_changed" });
     transcripts.push(json!({
         "subscription_id": null, "call_id": "call_backend", "live": false, "pass": "archive",
-        "archive": "done", "segments": [line], "hypotheses": [], "marks": [], "gaps": [],
+        "archive": "done", "segments": [line], "hypotheses": [], "marks": [], "gaps": [gap],
         "speakers": [], "last_seq": 1, "audio_available": true
     }));
     r.ok("main", "harness.world_set", json!({ "world": world }))
@@ -998,6 +999,64 @@ async fn world_set_accepts_transcripts_and_seeds_their_rows() {
         "{snapshot}"
     );
     assert_eq!(snapshot["segments"][0]["pass"], "archive", "{snapshot}");
+    assert_eq!(
+        snapshot["gaps"][0]["reason"], "device_changed",
+        "{snapshot}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_seeds_what_the_system_audio_tap_was_heard_to_be() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    for path in ["setup", "environment"] {
+        for row in world["app"][path]["permissions"].as_array_mut().unwrap() {
+            if row["kind"] == "system_audio" {
+                row["state"] = json!("denied");
+            }
+        }
+    }
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let rows = r.ok("main", "app_snapshot", json!({})).await["environment"]["permissions"].clone();
+    let row = rows
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["kind"] == "system_audio")
+        .unwrap();
+    assert_eq!(row["state"], "denied", "{rows}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn try_again_on_a_seeded_failure_clears_capture_failed() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["capture"]["phase"] = json!("failed");
+    world["app"]["degraded"]["states"] =
+        json!([{ "type": "capture_failed", "call_id": "call_live", "since": now }]);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let resumed = r
+        .ok(
+            "call-screen",
+            "capture_resume_interrupted",
+            json!({ "call_id": "call_live" }),
+        )
+        .await;
+    assert_eq!(resumed["phase"], "recording", "{resumed}");
+    let states = r.ok("main", "app_snapshot", json!({})).await["degraded"]["states"].clone();
+    assert!(
+        !states
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["type"] == "capture_failed"),
+        "{states}"
+    );
     r.finish().await;
 }
 
@@ -1397,5 +1456,32 @@ async fn world_set_seeds_a_detection_and_the_record_prompt_follows_it() {
         .filter_map(Value::as_str)
         .collect();
     assert!(calls.contains(&"show_record_prompt"), "{calls:?}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_start_from_the_menu_uses_up_a_seeded_detection() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["detection"]["detection"] = json!({
+        "id": "det_com.microsoft.teams2", "app_name": "Microsoft Teams",
+        "bundle_id": "com.microsoft.teams2", "matched_event": null,
+        "detected_at": now, "prompt_until": now + 30_000, "blocked": null
+    });
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({ "source": "menu_bar", "sensitive": false }),
+        )
+        .await;
+    assert_eq!(started["phase"], "recording", "{started}");
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(snap["detection"]["detection"], Value::Null, "{snap}");
     r.finish().await;
 }

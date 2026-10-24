@@ -305,6 +305,15 @@ impl Harness {
             let transcript = transcripts.iter().find(|t| t["call_id"] == *id);
             let pass = transcript.map_or(json!("live"), |t| t["pass"].clone());
             let Some(d) = detail else { continue };
+            // Marks and gaps live on both slices; a transcript that carries them is the newer say.
+            let rows_of = |field: &str| -> Vec<Value> {
+                transcript
+                    .and_then(|t| t[field].as_array())
+                    .filter(|v| !v.is_empty())
+                    .or_else(|| d[field].as_array())
+                    .cloned()
+                    .unwrap_or_default()
+            };
             for sp in d["speakers"].as_array().unwrap_or(&empty) {
                 let label = &sp["label"];
                 let (text, n, person) = match label["type"].as_str() {
@@ -335,7 +344,7 @@ impl Harness {
                     ],
                 ));
             }
-            for m in d["marks"].as_array().unwrap_or(&empty) {
+            for m in &rows_of("marks") {
                 rows.push(ins(
                     "marks",
                     vec![
@@ -346,7 +355,7 @@ impl Harness {
                     ],
                 ));
             }
-            for g in d["gaps"].as_array().unwrap_or(&empty) {
+            for g in &rows_of("gaps") {
                 rows.push(ins(
                     "gaps",
                     vec![
@@ -673,6 +682,14 @@ impl Harness {
             self.native.set(env, &parsed.app.setup.permissions);
             self.engine
                 .set_system_audio(system_audio(&parsed.app.setup.permissions));
+            // System audio cannot be queried: the environment row is what the tap was heard to be.
+            let heard = env
+                .permissions
+                .iter()
+                .find(|r| r.kind == PermissionKind::SystemAudio)
+                .map(|r| r.state)
+                .filter(|s| *s != PermissionState::NotAsked);
+            noter_core::testing::seed_system_audio(&self.core, heard);
             *lock(&self.updater.0) = env.update.clone();
             // The Mac says it changed: the core re-reads what was granted outside it.
             self.native.changed();

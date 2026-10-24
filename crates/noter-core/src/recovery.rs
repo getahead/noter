@@ -201,6 +201,12 @@ impl Core {
             session.engine_base = None;
             self.engine.start_session(start).await?;
             self.insert_gap(&call_id, t0, t1, GapReason::EngineRestart)?;
+            // The engine runs again: the failure it reported is over for this call.
+            let gone = DegradedState::CaptureFailed {
+                call_id: call_id.clone(),
+                since: TimestampMs(0),
+            };
+            self.edit_degraded(|states| states.retain(|s| !same_kind(s, &gone)));
         }
         // A call paused before the failure comes back paused (the supervisor pauses its session
         // again); its open pause already counts the time away.
