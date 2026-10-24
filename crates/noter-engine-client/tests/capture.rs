@@ -9,7 +9,7 @@ use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_engine_client::{CaptureFact, Config, Degraded, EngineClient, EngineSession};
 use noter_protocol::engine::{
     AsrBackend, EngineCommand, EngineErrorCode, EngineEvent, EngineSegment, EngineSegmentState,
-    StartSession,
+    GlossaryEntry, SpeakerPrior, StartSession,
 };
 use noter_protocol::model::{GapReason, GapView};
 use noter_protocol::{AudioChannel, CallId, Lang, OffsetMs};
@@ -144,6 +144,34 @@ async fn the_session_moves_through_its_states_with_the_engine() {
             EngineCommand::Stop { call_id: call() },
         ]
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn start_session_sends_the_engine_everything_the_session_manager_gave() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    let full = StartSession {
+        store_audio: false,
+        mic_device_uid: Some("BuiltInMicrophoneDevice".into()),
+        exclude_bundle_ids: vec!["com.apple.Music".into()],
+        languages: vec![Lang::En, Lang::Ru, Lang::De],
+        glossary: vec![GlossaryEntry {
+            term: "Noter".into(),
+            variants_latin: vec!["Notter".into()],
+            variants_cyrillic: vec!["Ноутер".into()],
+            spoken_forms: vec!["no-ter".into()],
+        }],
+        speaker_priors: vec![SpeakerPrior {
+            label: "spk_1".into(),
+            en: 0.5,
+            ru: 0.25,
+            de: 0.25,
+        }],
+        ..start()
+    };
+    c.start_session(full.clone()).await.unwrap();
+    assert_eq!(starts(&engine), vec![full]);
+    assert_eq!(c.session(), EngineSession::Starting);
 }
 
 #[tokio::test(start_paused = true)]
