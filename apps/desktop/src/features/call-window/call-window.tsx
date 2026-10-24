@@ -109,8 +109,10 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const notice = cap && !stopped(cap) && cap.notice?.type !== "stopped_automatically" ? cap.notice : null;
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden
-  // Hidden by the user or for presenting: the record prompt or the menu bar shows the notice instead.
-  const noticeShown = notice && cw?.visible && !presenting ? notice : null;
+  // Hidden by the user or for presenting, the record prompt or the menu bar carries the notice: this window keeps it
+  // drawn for when it shows again, but does not speak it.
+  const noticeShown = notice;
+  const noticeSpoken = notice && cw?.visible && !presenting ? notice : null;
   // @cpt-end:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden
   // @cpt-end:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
 
@@ -146,9 +148,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const prev = useRef<Seen | null>(null);
   useEffect(() => {
     if (!cap) return;
-    captureAnnouncements(prev.current, cap, noticeShown).forEach((a) => void announce(a));
-    prev.current = { phase: cap.phase, notice: noticeShown?.type ?? null };
-  }, [announce, cap, noticeShown]);
+    captureAnnouncements(prev.current, cap, noticeSpoken).forEach((a) => void announce(a));
+    prev.current = { phase: cap.phase, notice: noticeSpoken?.type ?? null };
+  }, [announce, cap, noticeSpoken]);
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-store-capture
   // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-announce-failure
 

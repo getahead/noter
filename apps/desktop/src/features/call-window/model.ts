@@ -246,13 +246,14 @@ export interface Seen {
 
 /** The announcements of a capture state change: a notice that appeared, Paused, Resumed, and the stop. */
 export function captureAnnouncements(was: Seen | null, c: CaptureState, notice: CaptureNotice | null): AnnounceEvent[] {
-  if (!was) return []; // what the window opened on is not news
   const out: AnnounceEvent[] = [];
   const key = `${c.call_id}:${c.version}`;
-  if (notice && notice.type !== was.notice) {
+  // a notice is news even when the window opens with it; the capture state it opened on is not
+  if (notice && notice.type !== was?.notice) {
     if (notice.type === "call_ended" || notice.type === "call_seems_ended") out.push({ kind: "call_ended", text: t("cw.notice.call_ended"), key });
     if (notice.type === "new_meeting") out.push({ kind: "new_meeting", text: notice.event ? t("cw.notice.new_meeting", { title: notice.event.title }) : t("cw.notice.new_meeting_untitled"), key });
   }
+  if (!was) return out;
   if (was.phase === "recording" && c.phase === "paused") out.push({ kind: "recording", text: t("cw.announce.paused"), key });
   if (was.phase === "paused" && c.phase === "recording") out.push({ kind: "recording", text: t("cw.announce.resumed"), key });
   if (!stopped({ phase: was.phase }) && stopped(c)) out.push(stoppedAnnouncement(c));
