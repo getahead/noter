@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use noter_core::{
     BoxFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Surfaces,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Notification,
+    NotificationKind, Surfaces,
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
@@ -86,9 +87,14 @@ impl ModelSource for Whisper {
     }
 }
 
-/// What the core asked the native layer to show.
+/// What the core asked the native layer to show, the notifications it posted, and whether a
+/// call surface is visible.
 #[derive(Default)]
-struct Shown(Mutex<Vec<&'static str>>);
+struct Shown(
+    Mutex<Vec<&'static str>>,
+    Mutex<Vec<Notification>>,
+    std::sync::atomic::AtomicBool,
+);
 
 impl Surfaces for Shown {
     fn show_record_prompt(&self) {
@@ -99,6 +105,12 @@ impl Surfaces for Shown {
     }
     fn open_call_window_inactive(&self) {
         self.0.lock().unwrap().push("open_call_window_inactive");
+    }
+    fn call_surface_visible(&self) -> bool {
+        self.2.load(Ordering::SeqCst)
+    }
+    fn post_notification(&self, notification: &Notification) {
+        self.1.lock().unwrap().push(notification.clone());
     }
 }
 
@@ -118,6 +130,8 @@ struct Setup {
     engine: Behaviour,
     /// The first engine launch fails; later ones work.
     first_launch_fails: bool,
+    /// Behaviours of the next launches (after a failing first one), then the default one.
+    then: Vec<Behaviour>,
 }
 
 impl Default for Setup {
@@ -127,6 +141,7 @@ impl Default for Setup {
             model: true,
             engine: Behaviour::default(),
             first_launch_fails: false,
+            then: Vec::new(),
         }
     }
 }
@@ -148,6 +163,9 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
             launch_fails: true,
             ..Behaviour::default()
         });
+    }
+    for behaviour in setup.then {
+        engine = engine.then(behaviour);
     }
     let engine = engine.with_default(setup.engine);
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
@@ -2014,4 +2032,203 @@ async fn low_and_full_disks_are_degraded_states_and_a_full_one_stops_audio_only(
     r.core.environment_changed(disk(5_000));
     assert!(disk_states(r.degraded().await).is_empty());
     assert!(r.state().await.audio_writing);
+}
+
+// --- Engine gaps, degraded states, notifications ------------------------------------------
+
+impl Rig {
+    fn inject(&self, event: EngineEvent) {
+        assert!(self.engine.inject(event));
+    }
+
+    /// Polls until `check` holds on the degraded set.
+    async fn degraded_until(&self, check: impl Fn(&[DegradedState]) -> bool) -> Vec<DegradedState> {
+        for _ in 0..500 {
+            let states = self.degraded().await;
+            if check(&states) {
+                return states;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("degraded set never matched: {:?}", self.degraded().await);
+    }
+
+    fn posted(&self) -> Vec<Notification> {
+        self.shown.1.lock().unwrap().clone()
+    }
+}
+
+fn is_engine_state(s: &DegradedState) -> bool {
+    matches!(
+        s,
+        DegradedState::MicrophoneOff { .. }
+            | DegradedState::SystemAudioSilent { .. }
+            | DegradedState::TranscriptionStalled { .. }
+            | DegradedState::DeviceChanged { .. }
+            | DegradedState::CaptureFailed { .. }
+    )
+}
+
+#[tokio::test(start_paused = true)]
+async fn engine_gaps_and_degraded_states_reach_the_rows_the_set_and_nt3() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.inject(EngineEvent::DeviceChanged {
+        call_id: call_id.clone(),
+        device_name: "AirPods Pro".into(),
+        gap_from_ms: OffsetMs(1_000),
+        gap_to_ms: OffsetMs(1_500),
+    });
+    let states = r
+        .degraded_until(|s| {
+            s.iter()
+                .any(|d| matches!(d, DegradedState::DeviceChanged { .. }))
+        })
+        .await;
+    assert!(states.contains(&DegradedState::DeviceChanged {
+        call_id: call_id.clone(),
+        device_name: "AirPods Pro".into(),
+        gap_ms: DurationMs(500),
+    }));
+    assert_eq!(
+        r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'device_changed'"),
+        "1000-1500"
+    );
+    assert!(r
+        .captured
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|e| matches!(e, CaptureEvent::Gap(g) if g.reason == GapReason::DeviceChanged)));
+    assert!(r.posted().is_empty(), "a device change is not NT-3");
+
+    // NT-3 with no call surface visible and not hidden for presenting: sent at once, once.
+    r.inject(EngineEvent::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since_ms: OffsetMs(2_000),
+        confidence: 0.8,
+    });
+    let silent = DegradedState::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since: TimestampMs(T0 + 2_000),
+        confidence: 0.8,
+    };
+    r.degraded_until(|s| s.contains(&silent)).await;
+    assert_eq!(
+        r.posted(),
+        [Notification {
+            call_id: call_id.clone(),
+            kind: NotificationKind::CaptureProblem(silent.clone()),
+        }]
+    );
+    r.inject(EngineEvent::Levels {
+        call_id: Some(call_id.clone()),
+        mic_db: -30.0,
+        sys_db: -30.0,
+    });
+    r.degraded_until(|s| !s.contains(&silent)).await;
+
+    // A visible call surface shows NT-3 itself: no notification.
+    r.shown.2.store(true, Ordering::SeqCst);
+    r.inject(EngineEvent::Levels {
+        call_id: Some(call_id.clone()),
+        mic_db: -120.0,
+        sys_db: -30.0,
+    });
+    r.degraded_until(|s| {
+        s.iter()
+            .any(|d| matches!(d, DegradedState::MicrophoneOff { .. }))
+    })
+    .await;
+    assert_eq!(r.posted().len(), 1);
+
+    // The call ends: no engine state of it stays.
+    r.stop(&main_window(), &call_id).await;
+    assert!(!r.degraded().await.iter().any(is_engine_state));
+}
+
+#[tokio::test(start_paused = true)]
+async fn notifications_wait_for_the_call_to_end_and_skip_the_call_the_main_window_shows() {
+    let r = rig();
+    let first = r.recording().await;
+    let ready = |call_id: &CallId| Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::SummaryReady,
+    };
+    // Held while a capture runs, released one per call when it ends.
+    r.core.notify(ready(&first));
+    r.core.notify(ready(&first));
+    assert!(r.posted().is_empty());
+    r.stop(&main_window(), &first).await;
+    assert_eq!(r.posted(), [ready(&first)]);
+
+    // Nothing for the call the frontmost main window shows.
+    r.core.report_view(Some(first.clone()));
+    r.core.notify(ready(&first));
+    assert_eq!(r.posted().len(), 1);
+    r.core.report_view(None);
+    r.core.notify(ready(&first));
+    assert_eq!(r.posted().len(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_engine_that_cannot_be_restarted_fails_the_call_and_try_again_resumes_it() {
+    let r = rig_with(Setup {
+        // The call's engine, then two restarts that fail: three failures in 30 s.
+        then: vec![
+            Behaviour::default(),
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+        ],
+        ..Setup::default()
+    });
+    let call_id = r.recording().await;
+    r.engine.kill_current();
+    let failed = r.phase_becomes(CapturePhase::Failed).await;
+    assert_eq!(failed.call_id.as_ref(), Some(&call_id));
+    r.degraded_until(|s| {
+        s.iter()
+            .any(|d| matches!(d, DegradedState::CaptureFailed { .. }))
+    })
+    .await;
+    assert!(r.posted().iter().any(|n| matches!(
+        &n.kind,
+        NotificationKind::CaptureProblem(DegradedState::CaptureFailed { .. })
+    )));
+
+    let starts = r.sessions().len();
+    let again = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+        .await;
+    r.session_started(&call_id);
+    assert_eq!(again.await.unwrap().unwrap().phase, CapturePhase::Recording);
+    r.degraded_until(|s| {
+        !s.iter()
+            .any(|d| matches!(d, DegradedState::CaptureFailed { .. }))
+    })
+    .await;
+    for _ in 0..500 {
+        if r.query::<i64>("SELECT count(*) FROM gaps WHERE reason = 'engine_restart'") > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM gaps WHERE reason = 'engine_restart'"),
+        1,
+        "one gap, the engine's"
+    );
 }
