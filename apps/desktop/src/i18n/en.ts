@@ -5,7 +5,10 @@ export const en = {
   "action.try_again": "Try Again",
   "announce.recording_started": "Recording started",
   "announce.recording_stopped": "Recording stopped, saved {duration}",
-  "announce.cards_held": { one: "{count} new card waiting", other: "{count} new cards waiting" },
+  "announce.cards_held": {
+    one: "{count} new card waiting",
+    other: "{count} new cards waiting",
+  },
   "announce.search_done": { one: "{count} result", other: "{count} results" },
   "announce.copied": "Copied for {target}",
   "action.dismiss": "Dismiss",
@@ -29,7 +32,8 @@ export const en = {
   "group.library": "Library",
   "group.workspace": "Workspace",
   "section.empty_title": "{section} is not built yet",
-  "section.empty_body": "This page arrives in a later milestone. The sidebar, Back and Forward and the shortcuts already work.",
+  "section.empty_body":
+    "This page arrives in a later milestone. The sidebar, Back and Forward and the shortcuts already work.",
   "shell.window": "Noter",
   "shell.sidebar": "Sidebar",
   "shell.hide_sidebar": "Hide Sidebar",
@@ -67,12 +71,18 @@ export const en = {
   "mode.make_sensitive": "Make This Call Sensitive",
   "mode.mark_sensitive": "Mark as Sensitive",
   "mode.help": "Privacy mode: {mode}",
-  "mode.text.cloud": "Transcript excerpts go to your assistant in the cloud. Audio never leaves this Mac.",
-  "mode.text.cloud_redacted": "Cloud with redaction: names and PII are replaced before anything leaves this Mac.",
-  "mode.text.local_only": "Everything runs on this Mac with the local model. Nothing leaves it.",
-  "mode.text.sensitive_local": "This call is sensitive. From now on, nothing from this call leaves this Mac.",
-  "mode.text.switched_to_local": "The assistant did not answer, so Noter switched to the local model.",
-  "mode.text.no_assistant": "No API key and no local model. Recording and transcription still work; summaries and cards wait.",
+  "mode.text.cloud":
+    "Transcript excerpts go to your assistant in the cloud. Audio never leaves this Mac.",
+  "mode.text.cloud_redacted":
+    "Cloud with redaction: names and PII are replaced before anything leaves this Mac.",
+  "mode.text.local_only":
+    "Everything runs on this Mac with the local model. Nothing leaves it.",
+  "mode.text.sensitive_local":
+    "This call is sensitive. From now on, nothing from this call leaves this Mac.",
+  "mode.text.switched_to_local":
+    "The assistant did not answer, so Noter switched to the local model.",
+  "mode.text.no_assistant":
+    "No API key and no local model. Recording and transcription still work; summaries and cards wait.",
   "mode.open_privacy": "Open Privacy Settings",
   "banner.self_test": "Call detection is off until the audio self-test passes",
   "banner.run_self_test": "Run Audio Self-Test…",
@@ -86,7 +96,8 @@ export const en = {
   "banner.roll_up_failed": "The performance roll-up did not finish",
   "first_run.title": "Set up Noter",
   "first_run.steps": "Setup steps",
-  "first_run.note": "Everything here runs on this Mac. Nothing leaves it until you connect an assistant in step 6.",
+  "first_run.note":
+    "Everything here runs on this Mac. Nothing leaves it until you connect an assistant in step 6.",
   "first_run.env": "macOS 15 · Core Audio process tap",
   "first_run.step.welcome": "Welcome",
   "first_run.step.models": "Models",
@@ -101,13 +112,17 @@ export const en = {
   "first_run.continue": "Continue",
   "first_run.finish": "Finish",
   "first_run.welcome.title": "Welcome to Noter",
-  "first_run.welcome.body": "Noter records your online calls, transcribes them on this Mac and turns them into summaries, decisions and action items. Setup takes a few minutes; the models download while you carry on.",
-  "first_run.welcome.languages": "English, Russian and German, also mixed in one call",
+  "first_run.welcome.body":
+    "Noter records your online calls, transcribes them on this Mac and turns them into summaries, decisions and action items. Setup takes a few minutes; the models download while you carry on.",
+  "first_run.welcome.languages":
+    "English, Russian and German, also mixed in one call",
   "first_run.welcome.private": "Audio and transcripts stay on this Mac",
   "first_run.welcome.permissions": "Two permissions, both asked in step 3",
   "first_run.models.title": "Models",
-  "first_run.models.body": "Noter downloads its speech, speaker and search models once. You can continue while they download.",
-  "first_run.models.offline": "Waiting for a connection — downloads resume automatically",
+  "first_run.models.body":
+    "Noter downloads its speech, speaker and search models once. You can continue while they download.",
+  "first_run.models.offline":
+    "Waiting for a connection — downloads resume automatically",
   "first_run.models.disk": "Needs {needed}, {free} free",
   "first_run.models.about": "About {size}",
   "first_run.models.pause": "Pause",
@@ -121,34 +136,44 @@ export const en = {
   "first_run.models.size": "{size} GB",
   "first_run.models.percent": "{value} %",
   "first_run.permissions.title": "Microphone and system audio",
-  "first_run.permissions.body": "Noter captures your voice from the microphone and the other participants from whatever app plays them.",
+  "first_run.permissions.body":
+    "Noter captures your voice from the microphone and the other participants from whatever app plays them.",
   "first_run.display.title": "Call display",
-  "first_run.display.body": "Choose where the call screen opens. Noter remembers the display, not its position, so it finds it again after you reconnect.",
+  "first_run.display.body":
+    "Choose where the call screen opens. Noter remembers the display, not its position, so it finds it again after you reconnect.",
   "first_run.display.auto_open": "Open the call screen automatically",
-  "first_run.display.auto_open_hint": "When this is on, the call window opens as recording starts, and moves to a display that connects during the call.",
+  "first_run.display.auto_open_hint":
+    "When this is on, the call window opens as recording starts, and moves to a display that connects during the call.",
   "first_run.storage.title": "Audio storage",
-  "first_run.storage.body": "Transcripts, summaries and items are always kept. Choose how long the audio itself stays on this Mac.",
+  "first_run.storage.body":
+    "Transcripts, summaries and items are always kept. Choose how long the audio itself stays on this Mac.",
   "first_run.storage.label": "Audio retention",
   "first_run.storage.days30": "Keep audio for 30 days",
-  "first_run.storage.days30_note": "Lets you replay recent calls and correct transcripts",
+  "first_run.storage.days30_note":
+    "Lets you replay recent calls and correct transcripts",
   "first_run.storage.days7": "7 days",
   "first_run.storage.days90": "90 days",
   "first_run.storage.forever": "Forever",
   "first_run.storage.never": "Never store audio",
-  "first_run.storage.never_note": "Replay and the archive pass are not available",
-  "first_run.storage.hint": "You can change this later in Settings › Privacy › Audio retention.",
+  "first_run.storage.never_note":
+    "Replay and the archive pass are not available",
+  "first_run.storage.hint":
+    "You can change this later in Settings › Privacy › Audio retention.",
   "first_run.assistants.title": "Assistants",
-  "first_run.assistants.body": "Summaries, cards and answers come from an assistant. Add an API key, sign in with your own Claude or ChatGPT account, use a local model, or combine them. Keys go to the Keychain.",
+  "first_run.assistants.body":
+    "Summaries, cards and answers come from an assistant. Add an API key, sign in with your own Claude or ChatGPT account, use a local model, or combine them. Keys go to the Keychain.",
   "first_run.assistants.runtime": "Local runtime",
   "first_run.assistants.runtime_found": "Ollama detected",
   "first_run.assistants.runtime_none": "none found",
   "first_run.assistants.privacy": "Privacy mode",
   "first_run.assistants.privacy_redacted": "Cloud with redaction",
-  "first_run.assistants.privacy_redacted_note": "Names and PII are replaced before anything leaves this Mac",
+  "first_run.assistants.privacy_redacted_note":
+    "Names and PII are replaced before anything leaves this Mac",
   "first_run.assistants.privacy_cloud": "Cloud allowed",
   "first_run.assistants.privacy_local": "Local only",
   "first_run.assistants.privacy_local_note": "Everything stays on this Mac",
-  "first_run.assistants.none": "Without an assistant Noter still records and transcribes; summaries wait until one is connected.",
+  "first_run.assistants.none":
+    "Without an assistant Noter still records and transcribes; summaries wait until one is connected.",
   "permission.granted": "Granted",
   "permission.missing": "not allowed yet",
   "permission.not_asked": "Not allowed yet",
@@ -162,7 +187,8 @@ export const en = {
   "permission.mic_why": "Records your side of the call.",
   "permission.sys": "System audio recording",
   "permission.sys_why": "Records the other participants from the call app.",
-  "permission.sys_howto": "How to allow it: System Settings › Privacy & Security › Screen & System Audio Recording › System Audio Recording Only › turn on Noter.",
+  "permission.sys_howto":
+    "How to allow it: System Settings › Privacy & Security › Screen & System Audio Recording › System Audio Recording Only › turn on Noter.",
   "permission.hearing": "Hearing you",
   "permission.mic_level": "Microphone level",
   "self_test.title": "Self-test",
@@ -171,12 +197,14 @@ export const en = {
   "self_test.others": "Others",
   "self_test.mic_level": "Microphone level",
   "self_test.sys_level": "System audio level",
-  "self_test.line_empty": "The live transcript line appears here while the test runs.",
+  "self_test.line_empty":
+    "The live transcript line appears here while the test runs.",
   "self_test.waiting": "Waiting for the speech model · {value} %",
   "self_test.speech_model": "Speech model",
   "self_test.listening": "Listening for the clip…",
   "self_test.checking_own": "Checking that Noter's own sounds stay out…",
-  "self_test.clip_title": "Noter lets its own test clip into the capture for this test only.",
+  "self_test.clip_title":
+    "Noter lets its own test clip into the capture for this test only.",
   "self_test.play_clip": "Play Test Clip",
   "self_test.run": "Run Test",
   "self_test.hint": "Or play any sound in another app",
@@ -185,13 +213,18 @@ export const en = {
   "self_test.mic_arrives": "Your microphone arrives",
   "self_test.aligned": "Both streams line up",
   "self_test.own_excluded": "Noter's own sounds stay out of the recording",
-  "self_test.own_off": "Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.",
-  "self_test.own_leaked": "Noter's own sounds reached the recording. Replay while recording stays off until this passes.",
-  "self_test.silent_sys": "We hear your microphone but not system audio. Play any sound in another app and try again.",
-  "self_test.silent_mic": "We hear system audio but not your microphone. Speak and try again.",
+  "self_test.own_off":
+    "Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.",
+  "self_test.own_leaked":
+    "Noter's own sounds reached the recording. Replay while recording stays off until this passes.",
+  "self_test.silent_sys":
+    "We hear your microphone but not system audio. Play any sound in another app and try again.",
+  "self_test.silent_mic":
+    "We hear system audio but not your microphone. Speak and try again.",
   "self_test.sys_missing": "System audio recording is not allowed yet.",
   "self_test.refused": "The test could not start. Try again.",
-  "self_test.timed_out": "The test didn't finish. Check that sound is playing, then try again.",
+  "self_test.timed_out":
+    "The test didn't finish. Check that sound is playing, then try again.",
   "display.title": "Call screen display",
   "display.auto": "The display without the call app",
   "display.recommended": "Recommended",
@@ -199,18 +232,24 @@ export const en = {
   "display.call_app": "Call app is here",
   "display.absent": "{name} (not connected)",
   "display.unknown": "Unknown display",
-  "display.one_note": "With one display, the call opens as a floating panel beside the call app. Connect a second display and the call screen fills it.",
+  "display.one_note":
+    "With one display, the call opens as a floating panel beside the call app. Connect a second display and the call screen fills it.",
   "display.resolution": "{width} × {height}",
   "settings.title": "Settings",
   "settings.panes": "Settings panes",
   "settings.search": "Search",
   "settings.no_match": "No settings match “{text}”",
   "settings.pane_banner": "Pane banner",
-  "settings.later.models_and_runtimes": "Models & Runtimes arrives in a later version: API keys, your own accounts and the runtime per task.",
-  "settings.later.repositories": "Repositories arrives in a later version: map a Jira project to a folder so handoffs open in the right place.",
-  "settings.later.knowledge_sources": "Knowledge Sources arrives in a later version: folders and MCP servers Noter cites in search and Ask.",
-  "settings.later.maintenance": "Maintenance arrives in a later version: nightly jobs, backups and evidence sources.",
-  "settings.error.rejected": "Couldn’t save this setting. The stored value is shown.",
+  "settings.later.models_and_runtimes":
+    "Models & Runtimes arrives in a later version: API keys, your own accounts and the runtime per task.",
+  "settings.later.repositories":
+    "Repositories arrives in a later version: map a Jira project to a folder so handoffs open in the right place.",
+  "settings.later.knowledge_sources":
+    "Knowledge Sources arrives in a later version: folders and MCP servers Noter cites in search and Ask.",
+  "settings.later.maintenance":
+    "Maintenance arrives in a later version: nightly jobs, backups and evidence sources.",
+  "settings.error.rejected":
+    "Couldn’t save this setting. The stored value is shown.",
   "settings.error.loading": "Couldn’t load your settings",
   "settings.hotkeys.global": "Global hotkeys",
   "settings.hotkeys.card_keys": "Card keys during calls",
@@ -220,8 +259,10 @@ export const en = {
   "settings.hotkeys.dismiss_keys": "Dismiss with keys",
   "settings.hotkeys.dismiss": "Dismiss a card",
   "settings.hotkeys.undo": "Undo last card action",
-  "settings.hotkeys.footnote": "Pin and undo stay on when dismiss keys are off.",
-  "settings.hotkeys.vo_note": "Control and Option are VoiceOver’s keys; press VO-Tab to pass a shortcut through.",
+  "settings.hotkeys.footnote":
+    "Pin and undo stay on when dismiss keys are off.",
+  "settings.hotkeys.vo_note":
+    "Control and Option are VoiceOver’s keys; press VO-Tab to pass a shortcut through.",
   "settings.hotkeys.restore": "Restore Defaults",
   "settings.hotkeys.type_shortcut": "Type a shortcut…",
   "settings.hotkeys.none": "None",
@@ -244,26 +285,31 @@ export const en = {
   "settings.hotkey.undo_card_action": "Undo last card action",
   "settings.general.launch": "Launch at login",
   "settings.general.offer": "Offer to record when a call starts",
-  "settings.general.offer_note": "Noter always asks with the record prompt; it never records on its own.",
+  "settings.general.offer_note":
+    "Noter always asks with the record prompt; it never records on its own.",
   "settings.general.needs_self_test": "Needs a passed audio self-test",
   "settings.general.run_self_test": "Run Audio Self-Test…",
   "settings.general.notifications": "Notifications",
   "settings.general.notifications_off": "Notifications are off for Noter",
-  "settings.general.notifications_note": "The menu bar still offers Open Last Summary.",
+  "settings.general.notifications_note":
+    "The menu bar still offers Open Last Summary.",
   "settings.general.open_system_settings": "Open System Settings…",
   "settings.general.apps": "Apps Noter doesn’t ask about",
-  "settings.general.apps_note": "Calls in this app aren’t offered for recording.",
+  "settings.general.apps_note":
+    "Calls in this app aren’t offered for recording.",
   "settings.general.apps_empty": "Noter offers to record calls in every app.",
   "settings.general.remove": "Remove",
   "settings.general.outputs": "Outputs and storage",
   "settings.general.summary_language": "Summary language",
-  "settings.general.summary_language_note": "Applies to outputs written from now on.",
+  "settings.general.summary_language_note":
+    "Applies to outputs written from now on.",
   "settings.general.lang_en": "English",
   "settings.general.lang_ru": "Russian",
   "settings.general.lang_de": "German",
   "settings.general.lang_call": "Language of the call",
   "settings.general.storage": "Storage location",
-  "settings.general.storage_cloud": "This folder is in iCloud Drive or Dropbox, so your recordings sync off this Mac. Choose a local folder.",
+  "settings.general.storage_cloud":
+    "This folder is in iCloud Drive or Dropbox, so your recordings sync off this Mac. Choose a local folder.",
   "settings.general.today": "Today",
   "settings.general.horizon": "Horizon",
   "settings.general.horizon_today": "Today",
@@ -271,13 +317,16 @@ export const en = {
   "settings.general.ranking": "Ranking",
   "settings.general.ranking_owed": "Owed to today’s people, then due date",
   "settings.general.ranking_due": "Due date, then owed to you",
-  "settings.general.ranking_note": "Default: items owed to people on today’s calls first, then due date, then age.",
+  "settings.general.ranking_note":
+    "Default: items owed to people on today’s calls first, then due date, then age.",
   "settings.general.setup": "Setup",
   "settings.general.run_setup": "Run Setup Again…",
-  "settings.general.setup_note": "Opens the first-run wizard. Your library and settings stay.",
+  "settings.general.setup_note":
+    "Opens the first-run wizard. Your library and settings stay.",
   "settings.privacy.mode": "Privacy mode",
   "settings.privacy.mode_redacted": "Cloud with redaction",
-  "settings.privacy.mode_redacted_note": "Names and PII are replaced before anything leaves this Mac",
+  "settings.privacy.mode_redacted_note":
+    "Names and PII are replaced before anything leaves this Mac",
   "settings.privacy.mode_cloud": "Cloud allowed",
   "settings.privacy.mode_cloud_note": "Text goes as is",
   "settings.privacy.mode_local": "Local only",
@@ -289,14 +338,19 @@ export const en = {
   "settings.privacy.retention_90": "90 days",
   "settings.privacy.retention_forever": "Forever",
   "settings.privacy.retention_never": "Never store audio",
-  "settings.privacy.retention_due": { one: "The next nightly run deletes the audio of {count} call.", other: "The next nightly run deletes the audio of {count} calls." },
+  "settings.privacy.retention_due": {
+    one: "The next nightly run deletes the audio of {count} call.",
+    other: "The next nightly run deletes the audio of {count} calls.",
+  },
   "settings.privacy.retention_none": "No audio is due for deletion.",
   "settings.privacy.metrics": "Show talk-time share and “who was silent”",
-  "settings.privacy.metrics_note": "Off by default. These rows don’t exist anywhere until you turn this on. They count only calls from the moment you turn it on.",
+  "settings.privacy.metrics_note":
+    "Off by default. These rows don’t exist anywhere until you turn this on. They count only calls from the moment you turn it on.",
   "settings.privacy.voice_profiles": "Voice profiles",
   "settings.privacy.manage_people": "Manage on Person Pages",
   "settings.privacy.left_mac": "What left this Mac",
-  "settings.privacy.left_mac_later": "The log of what left this Mac arrives in a later version.",
+  "settings.privacy.left_mac_later":
+    "The log of what left this Mac arrives in a later version.",
   "settings.privacy.share_test": "Screen Share Test…",
   "settings.call.screen": "Call screen",
   "settings.call.display": "Call screen display",
@@ -304,13 +358,15 @@ export const en = {
   "settings.call.layout_auto": "Automatic",
   "settings.call.layout_floating": "Always floating",
   "settings.call.auto_open": "Open the call screen automatically",
-  "settings.call.auto_open_note": "Opens the call window when recording starts, and moves it to a display that connects during the call.",
+  "settings.call.auto_open_note":
+    "Opens the call window when recording starts, and moves it to a display that connects during the call.",
   "settings.call.menu_bar": "Menu bar",
   "settings.call.menu_title": "Menu bar title",
   "settings.call.menu_title_none": "None",
   "settings.call.menu_title_elapsed": "Elapsed Time",
   "settings.call.menu_title_card": "Newest Card",
-  "settings.call.menu_title_note": "Up to 24 characters, next to the Noter icon.",
+  "settings.call.menu_title_note":
+    "Up to 24 characters, next to the Noter icon.",
   "settings.call.quick_actions": "Quick actions",
   "settings.perf.stages": "Stages sampled",
   "settings.perf.keep": "Keep metrics for",
@@ -345,10 +401,12 @@ export const en = {
   "settings.pane.updates": "Updates",
   "settings.audio.input_output": "Input and output",
   "settings.audio.headphones": "Treat {device} as headphones",
-  "settings.audio.headphones_note": "Replay while recording works only on headphones. Speakers never replay while you record.",
+  "settings.audio.headphones_note":
+    "Replay while recording works only on headphones. Speakers never replay while you record.",
   "settings.audio.output": "Output device",
   "settings.audio.exclude": "Exclude Noter’s own sounds",
-  "settings.audio.exclude_note": "Replay while recording needs a headphone route and this setting.",
+  "settings.audio.exclude_note":
+    "Replay while recording needs a headphone route and this setting.",
   "settings.audio.transcription": "Transcription",
   "settings.audio.live": "Live transcription",
   "settings.audio.live_note": "Applies from the next call.",
@@ -372,7 +430,8 @@ export const en = {
   "settings.share.surface_main_window": "Main window",
   "settings.share.surface_settings_window": "Settings window",
   "settings.share.surface_menu_bar_title": "Menu bar title",
-  "settings.share.limits": "Hidden from Teams, Meet and window-filtered Zoom shares only. A whole-display share may show every window. Share a window, not a display, or press {chord} to hide Noter.",
+  "settings.share.limits":
+    "Hidden from Teams, Meet and window-filtered Zoom shares only. A whole-display share may show every window. Share a window, not a display, or press {chord} to hide Noter.",
   "settings.share.run": "Run Capture Test",
   "settings.share.run_again": "Run Again",
   "settings.share.during_call": "Run the test when no call is being recorded.",
@@ -385,7 +444,8 @@ export const en = {
   "settings.share.failed": "Couldn’t capture the display.",
   "settings.share.try_again": "Try Again",
   "settings.share.result_hidden": "{surface}: hidden",
-  "settings.share.result_visible": "{surface}: visible: hide it before presenting",
+  "settings.share.result_visible":
+    "{surface}: visible: hide it before presenting",
   "settings.share.result_maybe": "{surface}: may be visible",
   "settings.share.done": "Done",
   "settings.glossary.title": "Glossary",
@@ -415,13 +475,16 @@ export const en = {
   "settings.models.empty": "No models are listed yet.",
   "settings.privacy.calendar": "Calendar",
   "settings.privacy.allow_calendar": "Allow Calendar Access",
-  "settings.privacy.calendar_note": "The macOS prompt follows. Noter never asks during a recording.",
+  "settings.privacy.calendar_note":
+    "The macOS prompt follows. Noter never asks during a recording.",
   "settings.privacy.voice_profiles_manage": "Manage on Person Pages",
   "settings.audio.permissions": "Permissions",
   "settings.audio.self_test": "Audio self-test",
-  "settings.audio.self_test_note": "With Exclude Noter’s own sounds on, the test also checks that Noter’s own sounds stay out.",
+  "settings.audio.self_test_note":
+    "With Exclude Noter’s own sounds on, the test also checks that Noter’s own sounds stay out.",
   "settings.selftest.title": "Run Audio Self-Test",
-  "settings.selftest.sub": "Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.",
+  "settings.selftest.sub":
+    "Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.",
   "settings.call.display_label": "Call screen display",
   "settings.error.loading_retry": "Couldn’t read your settings.",
   "settings.error.row": "Couldn’t save this change. The stored value is shown.",
@@ -429,20 +492,31 @@ export const en = {
   "settings.error.hotkeys_read": "Couldn’t read your hotkeys.",
   "dialogs.cancel": "Cancel",
   "dialogs.delete_call.title": "Delete “{title}”?",
-  "dialogs.delete_call.message": "This removes its audio, transcript, summary, items and cards. You can't undo this.",
+  "dialogs.delete_call.message":
+    "This removes its audio, transcript, summary, items and cards. You can't undo this.",
   "dialogs.delete_call.confirm": "Delete",
-  "dialogs.delete_calls.title": { one: "Delete {count} call?", other: "Delete {count} calls?" },
-  "dialogs.delete_calls.message": "This removes their audio, transcripts, summaries, items and cards. You can't undo this.",
-  "dialogs.delete_calls.confirm": { one: "Delete {count} Call", other: "Delete {count} Calls" },
-  "dialogs.delete_calls.recording": "This call is still recording. Stop the recording first.",
+  "dialogs.delete_calls.title": {
+    one: "Delete {count} call?",
+    other: "Delete {count} calls?",
+  },
+  "dialogs.delete_calls.message":
+    "This removes their audio, transcripts, summaries, items and cards. You can't undo this.",
+  "dialogs.delete_calls.confirm": {
+    one: "Delete {count} Call",
+    other: "Delete {count} Calls",
+  },
+  "dialogs.delete_calls.recording":
+    "This call is still recording. Stop the recording first.",
   "dialogs.quit.title": "Noter is recording “{title}”",
-  "dialogs.quit.message": "Quitting stops the recording. The transcript so far is kept.",
+  "dialogs.quit.message":
+    "Quitting stops the recording. The transcript so far is kept.",
   "dialogs.quit.confirm": "Stop and Quit",
   "dialogs.discard.ask": "Discard this recording? This can't be undone.",
   "dialogs.discard.confirm": "Discard",
   "dialogs.discard.back": "Back",
   "dialogs.old_audio.title": "Delete Old Audio",
-  "dialogs.old_audio.message": "Delete audio older than {days} days? Transcripts and summaries stay.",
+  "dialogs.old_audio.message":
+    "Delete audio older than {days} days? Transcripts and summaries stay.",
   "dialogs.old_audio.note": "Recording goes on while this runs.",
   "dialogs.old_audio.confirm": "Delete Audio",
   "transcript.label": "Transcript",
@@ -490,6 +564,41 @@ export const en = {
   "playback.close": "Close Playback",
   "playback.live_headphones": "Replaying while recording · headphones",
   "playback.stopped_by_route": "Replay stopped: output switched to speakers",
+  "library.calls.title": "Calls",
+  "library.calls.count": { one: "{count} call", other: "{count} calls" },
+  "library.calls.hours": { one: "{count} hour", other: "{count} hours" },
+  "library.calls.since": "since {date}",
+  "library.calls.selected": "{count} selected",
+  "library.calls.empty_title": "No calls yet",
+  "library.calls.empty_body":
+    "Calls you record appear here with their summary, decisions and action items.",
+  "library.calls.self_test": "Run Audio Self-Test…",
+  "library.calls.error": "Couldn’t read your calls",
+  "library.calls.loading": "Loading calls",
+  "library.calls.untitled": "Untitled call",
+  "library.col.when": "When",
+  "library.col.call": "Call",
+  "library.col.type": "Type",
+  "library.col.length": "Length",
+  "library.col.open": "Open",
+  "library.col.status": "Status",
+  "library.sorted": "{column} sorted {direction}",
+  "library.sort.asc": "ascending",
+  "library.sort.desc": "descending",
+  "library.row.open": "Open {title}",
+  "library.row.local_only": "Local only",
+  "library.row.audio_deleted": "Audio deleted on {date} (kept 30 days)",
+  "library.status.failed": "Couldn't write the summary",
+  "library.status.writing": "Writing summary…",
+  "library.status.speakers": {
+    one: "{count} speaker not named",
+    other: "{count} speakers not named",
+  },
+  "library.status.archive": "Archive pending",
+  "library.menu.open": "Open",
+  "library.menu.delete": "Delete…",
+  "library.you": "You",
+  "library.calls.delete_failed": "Couldn’t delete the calls",
 } as const;
 
 export type MsgKey = keyof typeof en;

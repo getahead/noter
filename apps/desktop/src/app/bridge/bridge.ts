@@ -54,20 +54,34 @@ export interface ActOptions {
   entity?: keyof Entities;
 }
 
-type StreamMsg = { seq: number; event?: { type: string; reason?: StreamEndReason } };
-type Subscribe<K extends ChannelCommand> = (args: CommandArgs[K], onMessage: (m: ChannelMessages[K]) => void) => Promise<Result<CommandResults[K]>>;
+type StreamMsg = {
+  seq: number;
+  event?: { type: string; reason?: StreamEndReason };
+};
+type Subscribe<K extends ChannelCommand> = (
+  args: CommandArgs[K],
+  onMessage: (m: ChannelMessages[K]) => void,
+) => Promise<Result<CommandResults[K]>>;
 
 const major = (version: string) => version.split(".")[0];
 
-function initialData<K extends ChannelCommand>(cmd: K, r: CommandResults[K]): StreamData[K] {
+function initialData<K extends ChannelCommand>(
+  cmd: K,
+  r: CommandResults[K],
+): StreamData[K] {
   if (cmd === "transcript_subscribe") return r as StreamData[K];
-  if (cmd === "levels_subscribe") return { ...r, levels: null } as StreamData[K];
-  if (cmd === "cards_subscribe") return { ...r, feedback: null } as StreamData[K];
+  if (cmd === "levels_subscribe")
+    return { ...r, levels: null } as StreamData[K];
+  if (cmd === "cards_subscribe")
+    return { ...r, feedback: null } as StreamData[K];
   return { ...r, messages: [] } as unknown as StreamData[K];
 }
 
 /** Report `slow` once `p` has taken longer than 300 ms, and clear it when it settles. */
-async function slowAfter<T>(p: Promise<T>, mark: (slow: boolean) => void): Promise<T> {
+async function slowAfter<T>(
+  p: Promise<T>,
+  mark: (slow: boolean) => void,
+): Promise<T> {
   // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-slow
   const timer = setTimeout(() => mark(true), SLOW_MS);
   // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-slow
@@ -105,11 +119,20 @@ export function createBridge(label: WindowLabel, transport: Transport) {
   let resyncing = 0;
   let closed = false;
 
-  const log = (level: "warn" | "error", code: ErrorCode | null, message: string, screen: string = label) =>
-    void core.logUi({ level, screen, code, message });
+  const log = (
+    level: "warn" | "error",
+    code: ErrorCode | null,
+    message: string,
+    screen: string = label,
+  ) => void core.logUi({ level, screen, code, message });
 
   // @cpt-algo:cpt-noter-algo-ui-core-bridge-map-error:p1
-  function mapError(error: CoreError, cmd: CommandName, named: NamedStates = {}, screen?: string): ErrorState {
+  function mapError(
+    error: CoreError,
+    cmd: CommandName,
+    named: NamedStates = {},
+    screen?: string,
+  ): ErrorState {
     const { code, retryable } = error;
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-map-error:p1:inst-if-named
     const state = named[code];
@@ -137,10 +160,26 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-loading-failed
   }
 
-  const setStream = <K extends ChannelCommand>(cmd: K, patch: Partial<Stream<K>>) =>
-    set((s) => ({ streams: { ...s.streams, [cmd]: { data: null, slow: false, ended: null, error: null, ...s.streams[cmd], ...patch } } }));
+  const setStream = <K extends ChannelCommand>(
+    cmd: K,
+    patch: Partial<Stream<K>>,
+  ) =>
+    set((s) => ({
+      streams: {
+        ...s.streams,
+        [cmd]: {
+          data: null,
+          slow: false,
+          ended: null,
+          error: null,
+          ...s.streams[cmd],
+          ...patch,
+        },
+      },
+    }));
 
-  const setCommand = (key: string, c: CommandState) => set((s) => ({ commands: { ...s.commands, [key]: c } }));
+  const setCommand = (key: string, c: CommandState) =>
+    set((s) => ({ commands: { ...s.commands, [key]: c } }));
 
   // @cpt-flow:cpt-noter-flow-ui-core-bridge-open-window:p1
   async function open(): Promise<void> {
@@ -154,7 +193,8 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     listening ??= Promise.all(
       (Object.keys(EVENTS) as EventName[]).map((event) =>
         core.on(event, (payload) => {
-          if (!closed) set((s) => applyEvent(s, { event, payload } as AnyEvent));
+          if (!closed)
+            set((s) => applyEvent(s, { event, payload } as AnyEvent));
         }),
       ),
     );
@@ -164,12 +204,17 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     const res = await slowAfter(core.appSnapshot({}), (slow) => set({ slow }));
     // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-api-snapshot
     if (closed) return;
-    if (res.status === "error") return failWindow(mapError(res.error, "app_snapshot"));
+    if (res.status === "error")
+      return failWindow(mapError(res.error, "app_snapshot"));
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-version
     const theirs = res.data.contract_version;
     if (major(theirs) !== major(CONTRACT_VERSION)) {
       // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-version-stop
-      log("error", null, `app_snapshot: contract ${theirs}, bindings ${CONTRACT_VERSION}`);
+      log(
+        "error",
+        null,
+        `app_snapshot: contract ${theirs}, bindings ${CONTRACT_VERSION}`,
+      );
       return failWindow({ code: null, state: "section", tryAgain: false });
       // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-version-stop
     }
@@ -189,13 +234,20 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     buffers.clear();
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-commit
     set((s) => {
-      const streams = { ...s.streams } as Record<ChannelCommand, Stream<ChannelCommand> | undefined>;
+      const streams = { ...s.streams } as Record<
+        ChannelCommand,
+        Stream<ChannelCommand> | undefined
+      >;
       for (const [cmd, msgs] of batch) {
         const st = streams[cmd];
         if (!st?.data) continue;
         const last = msgs.at(-1)?.event;
         const ended = last?.type === "ended" ? (last.reason ?? null) : st.ended;
-        streams[cmd] = { ...st, data: reduceStream(cmd, st.data, msgs as never), ended };
+        streams[cmd] = {
+          ...st,
+          data: reduceStream(cmd, st.data, msgs as never),
+          ended,
+        };
       }
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-return-flush
       return { streams: streams as WindowState["streams"] };
@@ -213,21 +265,30 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
   }
 
-  function resync<K extends ChannelCommand>(cmd: K, args: CommandArgs[K], named?: NamedStates): void {
+  function resync<K extends ChannelCommand>(
+    cmd: K,
+    args: CommandArgs[K],
+    named?: NamedStates,
+  ): void {
     resyncing++;
     // @cpt-begin:cpt-noter-state-ui-core-bridge-window-store:p1:inst-ready-resync
     if (store.getState().status === "READY") set({ status: "RESYNCING" });
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-ready-resync
     void subscribe(cmd, args, named).finally(() => {
       // @cpt-begin:cpt-noter-state-ui-core-bridge-window-store:p1:inst-resync-ready
-      if (--resyncing === 0 && store.getState().status === "RESYNCING") set({ status: "READY" });
+      if (--resyncing === 0 && store.getState().status === "RESYNCING")
+        set({ status: "READY" });
       // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-resync-ready
     });
   }
 
   /** Snapshot, then stream: fill the Channel's slice from the result, then keep it current. */
   // @cpt-algo:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1
-  async function subscribe<K extends ChannelCommand>(cmd: K, args: CommandArgs[K], named?: NamedStates): Promise<void> {
+  async function subscribe<K extends ChannelCommand>(
+    cmd: K,
+    args: CommandArgs[K],
+    named?: NamedStates,
+  ): Promise<void> {
     if (closed) return;
     const previous = subs.get(cmd)?.id;
     const mine = ++token;
@@ -260,8 +321,13 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-for-each-msg
     };
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-call-subscribing
-    const subscribing = (subscribers[cmd] as Subscribe<K>)(args, receive as (m: ChannelMessages[K]) => void);
-    const res = await slowAfter(subscribing, (slow) => setStream(cmd, { slow }));
+    const subscribing = (subscribers[cmd] as Subscribe<K>)(
+      args,
+      receive as (m: ChannelMessages[K]) => void,
+    );
+    const res = await slowAfter(subscribing, (slow) =>
+      setStream(cmd, { slow }),
+    );
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-call-subscribing
     if (!current()) {
       // Superseded or closed while waiting: end the Channel this call opened.
@@ -280,7 +346,11 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-store-snapshot
     subs.set(cmd, { token: mine, id: res.data.subscription_id });
     lastSeq = (res.data as { last_seq?: number }).last_seq ?? 0;
-    setStream(cmd, { data: initialData(cmd, res.data), ended: null, error: null });
+    setStream(cmd, {
+      data: initialData(cmd, res.data),
+      ended: null,
+      error: null,
+    });
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-store-snapshot
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-return-live
     early.splice(0).forEach(receive);
@@ -301,7 +371,12 @@ export function createBridge(label: WindowLabel, transport: Transport) {
    * with the mapped named state. Send the wanted state and the record's `rev`; never a toggle.
    */
   // @cpt-flow:cpt-noter-flow-ui-core-bridge-act:p1
-  async function act<T>(key: string, cmd: CommandName, run: () => Promise<Result<T>>, opts: ActOptions = {}): Promise<Result<T>> {
+  async function act<T>(
+    key: string,
+    cmd: CommandName,
+    run: () => Promise<Result<T>>,
+    opts: ActOptions = {},
+  ): Promise<Result<T>> {
     retries.set(key, () => act(key, cmd, run, opts));
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-loading
     // @cpt-begin:cpt-noter-state-ui-core-bridge-command:p1:inst-idle-waiting
@@ -358,7 +433,9 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     buffers.clear();
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-for-each-sub
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-api-unsubscribe
-    await Promise.all(ids.map((id) => core.streamUnsubscribe({ subscription_id: id }))); // a refusal is ignored
+    await Promise.all(
+      ids.map((id) => core.streamUnsubscribe({ subscription_id: id })),
+    ); // a refusal is ignored
     // @cpt-end:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-api-unsubscribe
     // @cpt-end:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-for-each-sub
     (await listening)?.forEach((off) => off());

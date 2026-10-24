@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createFocusReturn, FOCUSABLE, installTabNavigation, installUnobscure, nextFocusable, unobscuredScrollTop } from "./focus";
+import {
+  createFocusReturn,
+  FOCUSABLE,
+  installTabNavigation,
+  installUnobscure,
+  nextFocusable,
+  unobscuredScrollTop,
+} from "./focus";
 
 describe("createFocusReturn", () => {
   it("goes IN_PAGE → IN_OVERLAY → RETURNED → IN_PAGE and refocuses the opener", () => {
@@ -46,20 +53,39 @@ describe("nextFocusable", () => {
   });
   it("selects controls but not disabled, tabindex=-1, hidden or inert ones", () => {
     expect(FOCUSABLE).toContain("button:not(:disabled)"); // also a button inside a disabled fieldset
-    expect(FOCUSABLE).toContain('[tabindex]:not(:disabled):not([tabindex="-1"])');
-    expect(FOCUSABLE).toContain('[contenteditable]:not([contenteditable="false"])');
+    expect(FOCUSABLE).toContain(
+      '[tabindex]:not(:disabled):not([tabindex="-1"])',
+    );
+    expect(FOCUSABLE).toContain(
+      '[contenteditable]:not([contenteditable="false"])',
+    );
   });
 });
 
 type Listener = (e: never) => void;
 const focus = { active: undefined as unknown };
 const shownBox = { closest: () => null, getClientRects: () => [{}] };
-function fakeDoc(items: { sheet?: unknown[]; hiddenModalAfter?: boolean; page: unknown[]; active?: unknown }) {
+function fakeDoc(items: {
+  sheet?: unknown[];
+  hiddenModalAfter?: boolean;
+  page: unknown[];
+  active?: unknown;
+}) {
   const l: Record<string, Listener> = {};
   focus.active = items.active;
   const modals = [
-    ...(items.sheet ? [{ ...shownBox, querySelectorAll: () => items.sheet }] : []),
-    ...(items.hiddenModalAfter ? [{ closest: () => ({}), getClientRects: () => [], querySelectorAll: () => [] }] : []),
+    ...(items.sheet
+      ? [{ ...shownBox, querySelectorAll: () => items.sheet }]
+      : []),
+    ...(items.hiddenModalAfter
+      ? [
+          {
+            closest: () => ({}),
+            getClientRects: () => [],
+            querySelectorAll: () => [],
+          },
+        ]
+      : []),
   ];
   const doc = {
     get activeElement() {
@@ -67,17 +93,35 @@ function fakeDoc(items: { sheet?: unknown[]; hiddenModalAfter?: boolean; page: u
     },
     addEventListener: (t: string, f: Listener) => void (l[t] = f),
     removeEventListener: (t: string) => void delete l[t],
-    querySelectorAll: (s: string) => (s.startsWith("[aria-modal") ? modals : items.page),
-    defaultView: { getComputedStyle: (el: { overflow?: string }) => ({ overflowY: el.overflow ?? "visible" }) },
+    querySelectorAll: (s: string) =>
+      s.startsWith("[aria-modal") ? modals : items.page,
+    defaultView: {
+      getComputedStyle: (el: { overflow?: string }) => ({
+        overflowY: el.overflow ?? "visible",
+      }),
+    },
   };
   return { doc: doc as unknown as Document, l };
 }
 /** A candidate control; `takes: false` refuses focus as WebKit does for some it cannot focus. */
 const el = (name: string, takes = true) => {
-  const e = { name, ...shownBox, focus: vi.fn(() => void (takes && (focus.active = e))) };
+  const e = {
+    name,
+    ...shownBox,
+    focus: vi.fn(() => void (takes && (focus.active = e))),
+  };
   return e;
 };
-const tab = (o = {}) => ({ key: "Tab", ctrlKey: false, altKey: false, metaKey: false, shiftKey: false, defaultPrevented: false, preventDefault: vi.fn(), ...o });
+const tab = (o = {}) => ({
+  key: "Tab",
+  ctrlKey: false,
+  altKey: false,
+  metaKey: false,
+  shiftKey: false,
+  defaultPrevented: false,
+  preventDefault: vi.fn(),
+  ...o,
+});
 
 describe("installTabNavigation", () => {
   it("moves focus to the next control and wraps with ⇧Tab", () => {
@@ -99,7 +143,11 @@ describe("installTabNavigation", () => {
     const [p, s] = [el("p"), el("s")];
     const hid = { ...el("h"), closest: () => ({}) };
     const unrendered = { ...el("u"), getClientRects: () => [] }; // display: none
-    const { doc, l } = fakeDoc({ page: [p], sheet: [hid, unrendered, s], active: p });
+    const { doc, l } = fakeDoc({
+      page: [p],
+      sheet: [hid, unrendered, s],
+      active: p,
+    });
     installTabNavigation(doc);
     l.keydown!(tab() as never);
     expect(s.focus).toHaveBeenCalled();
@@ -119,7 +167,12 @@ describe("installTabNavigation", () => {
 
   it("skips visibility: hidden controls", () => {
     const [a, b] = [el("a"), el("b")];
-    const invisible = { ...el("i"), ownerDocument: { defaultView: { getComputedStyle: () => ({ visibility: "hidden" }) } } };
+    const invisible = {
+      ...el("i"),
+      ownerDocument: {
+        defaultView: { getComputedStyle: () => ({ visibility: "hidden" }) },
+      },
+    };
     const { doc, l } = fakeDoc({ page: [a, invisible, b], active: a });
     installTabNavigation(doc);
     l.keydown!(tab() as never);
@@ -129,15 +182,28 @@ describe("installTabNavigation", () => {
 
   it("keeps the trap in the visible sheet although a closed dialog is retained after it", () => {
     const [p, s1, s2] = [el("p"), el("s1"), el("s2")];
-    const { doc, l } = fakeDoc({ page: [p, s1, s2], sheet: [s1, s2], hiddenModalAfter: true, active: s2 });
+    const { doc, l } = fakeDoc({
+      page: [p, s1, s2],
+      sheet: [s1, s2],
+      hiddenModalAfter: true,
+      active: s2,
+    });
     installTabNavigation(doc);
     l.keydown!(tab() as never);
     expect(focus.active).toBe(s1);
   });
 
   it("stops once per radio group: on its checked radio, else its first", () => {
-    const radio = (name: string, group: string, checked = false) => Object.assign(el(name), { type: "radio", name: group, checked });
-    const [a, r1, r2, s1, s2, b] = [el("a"), radio("r1", "g"), radio("r2", "g", true), radio("s1", "h"), radio("s2", "h"), el("b")];
+    const radio = (name: string, group: string, checked = false) =>
+      Object.assign(el(name), { type: "radio", name: group, checked });
+    const [a, r1, r2, s1, s2, b] = [
+      el("a"),
+      radio("r1", "g"),
+      radio("r2", "g", true),
+      radio("s1", "h"),
+      radio("s2", "h"),
+      el("b"),
+    ];
     const { doc, l } = fakeDoc({ page: [a, r1, r2, s1, s2, b], active: a });
     installTabNavigation(doc);
     l.keydown!(tab() as never);
@@ -169,9 +235,15 @@ describe("installTabNavigation", () => {
 describe("unobscuredScrollTop", () => {
   const box = { top: 100, bottom: 500 };
   it("scrolls up below a sticky header, down above a sticky footer, else stays", () => {
-    expect(unobscuredScrollTop(200, { top: 110, bottom: 130 }, box, 40, 0)).toBe(170);
-    expect(unobscuredScrollTop(200, { top: 480, bottom: 510 }, box, 0, 30)).toBe(240);
-    expect(unobscuredScrollTop(200, { top: 200, bottom: 230 }, box, 40, 30)).toBe(200);
+    expect(
+      unobscuredScrollTop(200, { top: 110, bottom: 130 }, box, 40, 0),
+    ).toBe(170);
+    expect(
+      unobscuredScrollTop(200, { top: 480, bottom: 510 }, box, 0, 30),
+    ).toBe(240);
+    expect(
+      unobscuredScrollTop(200, { top: 200, bottom: 230 }, box, 40, 30),
+    ).toBe(200);
   });
 });
 
@@ -179,18 +251,28 @@ describe("installUnobscure", () => {
   const rect = (r: object) => () => r;
   it("sets the scroll container's scrollTop on focusin", () => {
     const sticky = { getBoundingClientRect: rect({ top: 100, bottom: 140 }) };
-    const groupHeaderBelow = { getBoundingClientRect: rect({ top: 300, bottom: 330 }) }; // sticky, but not stuck now
+    const groupHeaderBelow = {
+      getBoundingClientRect: rect({ top: 300, bottom: 330 }),
+    }; // sticky, but not stuck now
     const container = {
-      overflow: "auto", scrollTop: 200, parentElement: null,
+      overflow: "auto",
+      scrollTop: 200,
+      parentElement: null,
       getBoundingClientRect: rect({ top: 100, bottom: 500 }),
-      querySelectorAll: (s: string) => (s.includes("top") ? [groupHeaderBelow, sticky] : []),
+      querySelectorAll: (s: string) =>
+        s.includes("top") ? [groupHeaderBelow, sticky] : [],
     };
-    const target = { parentElement: { overflow: "visible", parentElement: container }, getBoundingClientRect: rect({ top: 110, bottom: 130 }) };
+    const target = {
+      parentElement: { overflow: "visible", parentElement: container },
+      getBoundingClientRect: rect({ top: 110, bottom: 130 }),
+    };
     const { doc, l } = fakeDoc({ page: [] });
     const off = installUnobscure(doc);
     l.focusin!({ target } as never);
     expect(container.scrollTop).toBe(170);
-    l.focusin!({ target: { parentElement: null, getBoundingClientRect: rect({}) } } as never);
+    l.focusin!({
+      target: { parentElement: null, getBoundingClientRect: rect({}) },
+    } as never);
     l.focusin!({ target: {} } as never);
     l.focusin!({ target: null } as never);
     off();

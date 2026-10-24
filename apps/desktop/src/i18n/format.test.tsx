@@ -2,16 +2,29 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { en } from "./en";
-import { callTime, duration, formatDateTime, quote, setPseudo, t, tParts, usd } from "./format";
+import {
+  callTime,
+  duration,
+  formatDateTime,
+  quote,
+  setPseudo,
+  t,
+  tParts,
+  usd,
+} from "./format";
 import { Msg } from "./Msg";
 
 afterEach(() => setPseudo("off"));
 
 describe("t", () => {
   it("fills placeholders, formats numbers by locale and picks the plural", () => {
-    expect(t("announce.recording_stopped", { duration: "48 min" })).toBe("Recording stopped, saved 48 min");
+    expect(t("announce.recording_stopped", { duration: "48 min" })).toBe(
+      "Recording stopped, saved 48 min",
+    );
     expect(t("announce.cards_held", { count: 1 })).toBe("1 new card waiting");
-    expect(t("announce.cards_held", { count: 1200 })).toBe("1,200 new cards waiting");
+    expect(t("announce.cards_held", { count: 1200 })).toBe(
+      "1,200 new cards waiting",
+    );
     expect(t("announce.search_done", { count: 0 })).toBe("0 results");
   });
   it("leaves a missing placeholder visible and plain messages untouched", () => {
@@ -27,14 +40,19 @@ describe("t", () => {
 
 describe("tParts and quote", () => {
   it("gives quoted user text its own lang and keeps the rest plain", () => {
-    expect(tParts("announce.copied", { target: quote("Привет", "ru") })).toEqual([
-      { text: "Copied for " },
-      { text: "“Привет”", lang: "ru" },
-    ]);
+    expect(
+      tParts("announce.copied", { target: quote("Привет", "ru") }),
+    ).toEqual([{ text: "Copied for " }, { text: "“Привет”", lang: "ru" }]);
   });
   it("renders through <Msg>", () => {
-    expect(renderToStaticMarkup(<Msg id="announce.copied" args={{ target: quote("Hallo", "de") }} />)).toBe('Copied for <span lang="de">“Hallo”</span>');
-    expect(renderToStaticMarkup(<Msg id="window.error" />)).toBe("Something went wrong");
+    expect(
+      renderToStaticMarkup(
+        <Msg id="announce.copied" args={{ target: quote("Hallo", "de") }} />,
+      ),
+    ).toBe('Copied for <span lang="de">“Hallo”</span>');
+    expect(renderToStaticMarkup(<Msg id="window.error" />)).toBe(
+      "Something went wrong",
+    );
   });
 });
 
@@ -45,7 +63,9 @@ describe("pseudo-localisation", () => {
     expect(s).toContain("Apex");
     expect(s).not.toContain("Copied");
     expect(s.startsWith("Сорiеd")).toBe(true);
-    expect(t("announce.copied", { target: "" }).length).toBeGreaterThanOrEqual(Math.ceil("Copied for ".length * 1.4));
+    expect(t("announce.copied", { target: "" }).length).toBeGreaterThanOrEqual(
+      Math.ceil("Copied for ".length * 1.4),
+    );
   });
   it("uses umlauts for German and +40 % only for short labels", () => {
     setPseudo("german");
@@ -77,15 +97,40 @@ describe("value helpers", () => {
   });
   it("formatDateTime follows the 12/24 hour preference and the time zone", () => {
     const ms = Date.UTC(2026, 9, 18, 15, 30);
-    expect(formatDateTime(ms, { time_format: "h12", first_weekday: 1, time_zone: "UTC" })).toMatch(/3:30\sPM/);
-    expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "UTC" })).toContain("15:30");
+    expect(
+      formatDateTime(ms, {
+        time_format: "h12",
+        first_weekday: 1,
+        time_zone: "UTC",
+      }),
+    ).toMatch(/3:30\sPM/);
+    expect(
+      formatDateTime(ms, {
+        time_format: "h24",
+        first_weekday: 1,
+        time_zone: "UTC",
+      }),
+    ).toContain("15:30");
     // a zone the core sent that this WebView does not know falls back to the system zone instead of throwing
-    expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "Not/AZone" })).toMatch(/\d\d:30/);
-    expect(formatDateTime(ms, { time_format: "h24", first_weekday: 1, time_zone: "" })).toMatch(/\d\d:30/);
+    expect(
+      formatDateTime(ms, {
+        time_format: "h24",
+        first_weekday: 1,
+        time_zone: "Not/AZone",
+      }),
+    ).toMatch(/\d\d:30/);
+    expect(
+      formatDateTime(ms, {
+        time_format: "h24",
+        first_weekday: 1,
+        time_zone: "",
+      }),
+    ).toMatch(/\d\d:30/);
   });
   it("the catalogue has an entry for each v1 string", () => {
     // every screen adds its strings: the catalogue only grows, and no entry is empty
     expect(Object.keys(en).length).toBeGreaterThanOrEqual(14);
-    for (const m of Object.values(en)) expect(typeof m === "string" ? m : m.other).not.toBe("");
+    for (const m of Object.values(en))
+      expect(typeof m === "string" ? m : m.other).not.toBe("");
   });
 });

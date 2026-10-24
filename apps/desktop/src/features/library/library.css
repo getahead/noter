@@ -1,0 +1,174 @@
+/* Library › Calls: the prototype's .lb-* rules (40-d.css) for LC-R1 and LC-R3, ported as-is. */
+.lb-table td {
+  vertical-align: middle;
+}
+.lb-month th {
+  position: static;
+  background: var(--win-bg);
+  color: var(--label-2);
+  font: 600 11px/14px var(--font);
+  padding: 5px 10px;
+}
+.lb-crow {
+  height: 44px;
+}
+.lb-crow td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.lb-crow.is-sel {
+  background: var(--sel-accent);
+}
+.lb-crow__when {
+  white-space: nowrap;
+  color: var(--label-2);
+}
+.lb-crow__call {
+  min-width: 0;
+  max-width: 480px;
+}
+.lb-crow__l1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lb-crow__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-crow__l2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--label-2);
+  margin-top: 2px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.lb-crow__people {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-langs {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+.lb-tag {
+  font-weight: 400;
+  color: var(--label-2);
+  height: 16px;
+}
+.lb-more {
+  font-size: 11px;
+}
+.lb-crow__type,
+.lb-crow__len {
+  white-space: nowrap;
+  color: var(--label-2);
+}
+.lb-crow__status {
+  white-space: nowrap;
+}
+.lb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--label-2);
+  max-width: 180px;
+  overflow: hidden;
+}
+.lb-status span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-status--error {
+  color: var(--error);
+}
+.lb-audiodel {
+  display: inline-flex;
+  position: relative;
+  color: var(--label-3);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.lb-audiodel__x {
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  width: 15px;
+  height: 1.5px;
+  background: currentColor;
+  transform: rotate(-35deg);
+}
+.lb-hint {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  color: var(--label-3);
+}
+.lb-skel {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--sep);
+  border-radius: var(--r-row);
+  overflow: hidden;
+}
+.lb-skel__row {
+  display: grid;
+  grid-template-columns: 110px 1fr 120px;
+  gap: 16px;
+  padding: 14px 12px;
+  background: var(--card-bg);
+}
+.lb-skel__row span {
+  height: 10px;
+  border-radius: var(--r-tag);
+  background: var(--sel-unemph);
+}
+.lb-crow-c {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto auto 14px;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 10px;
+  color: var(--label);
+  text-decoration: none;
+  border-bottom: 1px solid var(--sep);
+}
+.lb-crow-c:last-child {
+  border-bottom: 0;
+}
+.lb-crow-c:hover {
+  background: var(--sel-unemph);
+}
+.lb-crow-c__when {
+  font-size: 12px;
+  color: var(--label-2);
+}
+.lb-crow-c__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-crow-c__type,
+.lb-crow-c__len {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.lb-head {
+  margin: 0 0 10px;
+  color: var(--label-2);
+  font-size: 12px;
+}
+.lb-ctx {
+  position: fixed;
+  z-index: 40;
+}

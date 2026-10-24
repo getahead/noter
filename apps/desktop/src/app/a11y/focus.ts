@@ -38,27 +38,50 @@ export function createFocusReturn(getActive: () => FocusTarget | null) {
 }
 
 // `:disabled` also covers controls inside a disabled fieldset.
-const NOT_OFF = ':not(:disabled):not([tabindex="-1"]):not([hidden]):not([inert])';
-export const FOCUSABLE = ["a[href]", "button", "input", "select", "textarea", "[tabindex]", "summary", '[contenteditable]:not([contenteditable="false"])']
+const NOT_OFF =
+  ':not(:disabled):not([tabindex="-1"]):not([hidden]):not([inert])';
+export const FOCUSABLE = [
+  "a[href]",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "[tabindex]",
+  "summary",
+  '[contenteditable]:not([contenteditable="false"])',
+]
   .map((s) => s + NOT_OFF)
   .join(",");
 
 /** The next element in Tab order, wrapping around; with no current one, the first (or last going back). */
-export function nextFocusable<T>(candidates: T[], current: unknown, back: boolean): T | undefined {
+export function nextFocusable<T>(
+  candidates: T[],
+  current: unknown,
+  back: boolean,
+): T | undefined {
   const i = candidates.indexOf(current as T);
   if (i < 0) return back ? candidates.at(-1) : candidates[0];
-  return candidates[(i + (back ? -1 : 1) + candidates.length) % candidates.length];
+  return candidates[
+    (i + (back ? -1 : 1) + candidates.length) % candidates.length
+  ];
 }
 
 /** Rendered and visible: not under [hidden] or [inert], not display: none, not visibility: hidden. */
 const shown = (el: Element) =>
-  !el.closest("[inert],[hidden]") && el.getClientRects().length > 0 && el.ownerDocument?.defaultView?.getComputedStyle(el).visibility !== "hidden";
+  !el.closest("[inert],[hidden]") &&
+  el.getClientRects().length > 0 &&
+  el.ownerDocument?.defaultView?.getComputedStyle(el).visibility !== "hidden";
 
-const isRadio = (el: HTMLElement): el is HTMLInputElement => (el as HTMLInputElement).type === "radio" && !!(el as HTMLInputElement).name;
+const isRadio = (el: HTMLElement): el is HTMLInputElement =>
+  (el as HTMLInputElement).type === "radio" && !!(el as HTMLInputElement).name;
 
 /** A radio group is one Tab stop, as natively: its checked radio, else its first. */
 function oneStopPerRadioGroup(list: HTMLElement[]): HTMLElement[] {
-  const checked = new Set(list.filter((el) => isRadio(el) && el.checked).map((el) => (el as HTMLInputElement).name));
+  const checked = new Set(
+    list
+      .filter((el) => isRadio(el) && el.checked)
+      .map((el) => (el as HTMLInputElement).name),
+  );
   const seen = new Set<string>();
   return list.filter((el) => {
     if (!isRadio(el)) return true;
@@ -68,14 +91,26 @@ function oneStopPerRadioGroup(list: HTMLElement[]): HTMLElement[] {
   });
 }
 
-const focusables = (scope: ParentNode) => oneStopPerRadioGroup([...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(shown));
+const focusables = (scope: ParentNode) =>
+  oneStopPerRadioGroup(
+    [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(shown),
+  );
 
 /** Tab and ⇧Tab move through every control; inside an open sheet focus stays in it. */
 export function installTabNavigation(root: Document): () => void {
   const on = (e: KeyboardEvent) => {
-    if (e.defaultPrevented || e.key !== "Tab" || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (
+      e.defaultPrevented ||
+      e.key !== "Tab" ||
+      e.ctrlKey ||
+      e.altKey ||
+      e.metaKey
+    )
+      return;
     // The trap is the topmost open sheet; a closed one kept in the DOM does not count.
-    const scope = [...root.querySelectorAll('[aria-modal="true"]')].filter(shown).at(-1) ?? root;
+    const scope =
+      [...root.querySelectorAll('[aria-modal="true"]')].filter(shown).at(-1) ??
+      root;
     const list = focusables(scope as ParentNode);
     let next = nextFocusable(list, root.activeElement, e.shiftKey);
     if (!next) return;
@@ -94,7 +129,13 @@ export function installTabNavigation(root: Document): () => void {
 type Box = { top: number; bottom: number };
 
 /** The scrollTop that puts the element between the sticky parts (or the same one when it already is). */
-export function unobscuredScrollTop(scrollTop: number, el: Box, container: Box, stickyTop: number, stickyBottom: number): number {
+export function unobscuredScrollTop(
+  scrollTop: number,
+  el: Box,
+  container: Box,
+  stickyTop: number,
+  stickyBottom: number,
+): number {
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-unobscure
   const top = container.top + stickyTop;
   const bottom = container.bottom - stickyBottom;
@@ -111,8 +152,12 @@ function stuckInset(c: Element, side: "top" | "bottom"): number {
   const near = (r: Box) => (side === "top" ? r.top : r.bottom);
   const far = (r: Box) => (side === "top" ? r.bottom : r.top);
   let edge = near(box);
-  const parts = [...c.querySelectorAll(`[data-sticky="${side}"]`)].map((s) => s.getBoundingClientRect()).sort((a, b) => sign * (near(a) - near(b)));
-  for (const r of parts) if (sign * (near(r) - edge) <= 1 && sign * (far(r) - edge) > 0) edge = far(r);
+  const parts = [...c.querySelectorAll(`[data-sticky="${side}"]`)]
+    .map((s) => s.getBoundingClientRect())
+    .sort((a, b) => sign * (near(a) - near(b)));
+  for (const r of parts)
+    if (sign * (near(r) - edge) <= 1 && sign * (far(r) - edge) > 0)
+      edge = far(r);
   return sign * (edge - near(box));
 }
 
@@ -121,8 +166,19 @@ export function installUnobscure(root: Document): () => void {
     const el = e.target as Element | null;
     if (!el?.getBoundingClientRect) return;
     let c = el.parentElement;
-    while (c && !/auto|scroll/.test(root.defaultView!.getComputedStyle(c).overflowY)) c = c.parentElement;
-    if (c) c.scrollTop = unobscuredScrollTop(c.scrollTop, el.getBoundingClientRect(), c.getBoundingClientRect(), stuckInset(c, "top"), stuckInset(c, "bottom"));
+    while (
+      c &&
+      !/auto|scroll/.test(root.defaultView!.getComputedStyle(c).overflowY)
+    )
+      c = c.parentElement;
+    if (c)
+      c.scrollTop = unobscuredScrollTop(
+        c.scrollTop,
+        el.getBoundingClientRect(),
+        c.getBoundingClientRect(),
+        stuckInset(c, "top"),
+        stuckInset(c, "bottom"),
+      );
   };
   root.addEventListener("focusin", on);
   return () => root.removeEventListener("focusin", on);
@@ -132,14 +188,20 @@ export function installUnobscure(root: Document): () => void {
 const overlays: object[] = [];
 
 /** While `open`: focus the overlay's first control; Esc or a press outside calls `onClose`; closing returns focus to the opener. */
-export function useFocusReturn(open: boolean, overlayRef: RefObject<HTMLElement | null>, onClose: () => void): void {
+export function useFocusReturn(
+  open: boolean,
+  overlayRef: RefObject<HTMLElement | null>,
+  onClose: () => void,
+): void {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
     if (!open) return;
     const me = {};
     overlays.push(me);
-    const fr = createFocusReturn(() => document.activeElement as HTMLElement | null);
+    const fr = createFocusReturn(
+      () => document.activeElement as HTMLElement | null,
+    );
     fr.open(overlayRef.current ? focusables(overlayRef.current)[0] : undefined);
     const top = () => overlays.at(-1) === me;
     const key = (e: KeyboardEvent) => {
@@ -147,7 +209,10 @@ export function useFocusReturn(open: boolean, overlayRef: RefObject<HTMLElement 
       e.stopPropagation(); // window shortcuts never see the Esc that closed the overlay
       close.current();
     };
-    const press = (e: PointerEvent) => top() && !overlayRef.current?.contains(e.target as Node) && close.current();
+    const press = (e: PointerEvent) =>
+      top() &&
+      !overlayRef.current?.contains(e.target as Node) &&
+      close.current();
     document.addEventListener("keydown", key);
     document.addEventListener("pointerdown", press);
     return () => {

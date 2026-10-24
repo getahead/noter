@@ -88,19 +88,19 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 - The list read fails: the page's inline banner with **Try Again**
 
 **Steps**:
-1. [ ] - `p1` - User selects **Calls** in the sidebar or presses ⌘3 - `inst-user-open`
-2. [ ] - `p1` - API: `calls_list` (no filter in M1, sort by **When** descending, first page) - `inst-api-list`
+1. [x] - `p1` - User selects **Calls** in the sidebar or presses ⌘3 - `inst-user-open`
+2. [x] - `p1` - API: `calls_list` (no filter in M1, sort by **When** descending, first page) - `inst-api-list`
 3. [ ] - `p1` - **IF** the result has no calls - `inst-if-empty`
-   1. [ ] - `p1` - UI: the first-use empty state; with the self-test not passed, its action **Run Audio Self-Test…** opens the self-test sheet - `inst-empty`
-4. [ ] - `p1` - UI: render the table with sticky month headers and call rows; the subtitle counts calls and hours with plural rules - `inst-render-table`
-5. [ ] - `p1` - User scrolls to the end of the loaded page - `inst-user-scroll`
-6. [ ] - `p1` - API: `calls_list` for the next page - `inst-api-next`
-7. [ ] - `p1` - User clicks a column header - `inst-user-sort`
-8. [ ] - `p1` - API: `calls_list` with the new sort; the sort state is announced ("sorted descending") - `inst-api-sort`
+   1. [x] - `p1` - UI: the first-use empty state; with the self-test not passed, its action **Run Audio Self-Test…** opens the self-test sheet - `inst-empty`
+4. [x] - `p1` - UI: render the table with sticky month headers and call rows; the subtitle counts calls and hours with plural rules - `inst-render-table`
+5. [x] - `p1` - User scrolls to the end of the loaded page - `inst-user-scroll`
+6. [x] - `p1` - API: `calls_list` for the next page - `inst-api-next`
+7. [x] - `p1` - User clicks a column header - `inst-user-sort`
+8. [x] - `p1` - API: `calls_list` with the new sort; the sort state is announced ("sorted descending") - `inst-api-sort`
 9. [ ] - `p1` - User presses Return, double-clicks or clicks › on a row - `inst-user-row`
-10. [ ] - `p1` - UI: push the Call page route for the call (`cpt-noter-feature-ui-call-page-frame`), which reads it with `call_get` - `inst-open-call`
+10. [x] - `p1` - UI: push the Call page route for the call (`cpt-noter-feature-ui-call-page-frame`), which reads it with `call_get` - `inst-open-call`
 11. [ ] - `p1` - Core: `entity:changed` and `outputs:progress` update a row's status cell (**Writing summary…**) and the sidebar's progress glyph; status changes are not announced - `inst-live-status`
-12. [ ] - `p1` - **RETURN** the Calls page - `inst-return-browse`
+12. [x] - `p1` - **RETURN** the Calls page - `inst-return-browse`
 
 ### Select and delete calls
 
@@ -116,10 +116,10 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 - A right-click on an unselected row selects only that row first
 
 **Steps**:
-1. [ ] - `p1` - User selects rows with click, ⌘-click, ⇧-click, ⇧↑ and ⇧↓, or ⌘A; the subtitle adds **· 3 selected** - `inst-user-select`
-2. [ ] - `p1` - User presses ⌘⌫, or opens the row context menu (**Open**, **Delete…**; **Add Tag…**, **Remove Tag** and **Export…** arrive with M2 and M3 features) and chooses **Delete…** - `inst-user-delete`
-3. [ ] - `p1` - Flow: `cpt-noter-flow-ui-dialogs-host-delete-call` with the selected ids - `inst-delete-flow`
-4. [ ] - `p1` - Store: rows leave as `entity:changed` reports them deleted; the selection clears - `inst-rows-leave`
+1. [x] - `p1` - User selects rows with click, ⌘-click, ⇧-click, ⇧↑ and ⇧↓, or ⌘A; the subtitle adds **· 3 selected** - `inst-user-select`
+2. [x] - `p1` - User presses ⌘⌫, or opens the row context menu (**Open**, **Delete…**; **Add Tag…**, **Remove Tag** and **Export…** arrive with M2 and M3 features) and chooses **Delete…** - `inst-user-delete`
+3. [x] - `p1` - Flow: `cpt-noter-flow-ui-dialogs-host-delete-call` with the selected ids - `inst-delete-flow`
+4. [x] - `p1` - Store: rows leave as `entity:changed` reports them deleted; the selection clears - `inst-rows-leave`
 5. [ ] - `p1` - **RETURN** the list without the deleted calls - `inst-return-delete`
 
 ### Rename or retype a call from its row
@@ -151,8 +151,8 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 **Output**: one status with icon and text, and the audio-deleted glyph
 
 **Steps**:
-1. [ ] - `p1` - Pick the first that applies, in this order: **Couldn't write the summary** (error icon), **Writing summary…** (small spinner), **2 speakers not named** (person icon, a link to the call's page with the naming panel from M2), **Archive pending** - `inst-order`
-2. [ ] - `p1` - **IF** the audio is deleted: add the glyph with the help tag **Audio deleted on 15 Nov (kept 30 days)** beside any of them - `inst-audio-glyph`
+1. [x] - `p1` - Pick the first that applies, in this order: **Couldn't write the summary** (error icon), **Writing summary…** (small spinner), **2 speakers not named** (person icon, a link to the call's page with the naming panel from M2), **Archive pending** - `inst-order`
+2. [x] - `p1` - **IF** the audio is deleted: add the glyph with the help tag **Audio deleted on 15 Nov (kept 30 days)** beside any of them - `inst-audio-glyph`
 3. [ ] - `p1` - **IF** the call is sensitive: the **Local only** tag after the title - `inst-local-only`
 4. [ ] - `p1` - At Medium width show the icon only with the text in its help tag and for VoiceOver - `inst-medium`
 5. [ ] - `p1` - **RETURN** the cell - `inst-return-cell`
@@ -168,13 +168,13 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** LISTED **WHEN** the first page arrives with calls - `inst-loading-listed`
-2. [ ] - `p1` - **FROM** LOADING **TO** EMPTY **WHEN** the first page has no call (No calls yet) - `inst-loading-empty`
-3. [ ] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-loading-error`
+1. [x] - `p1` - **FROM** LOADING **TO** LISTED **WHEN** the first page arrives with calls - `inst-loading-listed`
+2. [x] - `p1` - **FROM** LOADING **TO** EMPTY **WHEN** the first page has no call (No calls yet) - `inst-loading-empty`
+3. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-loading-error`
 4. [ ] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
 5. [ ] - `p1` - **FROM** LISTED **TO** SELECTED_SEVERAL **WHEN** more than one row is selected - `inst-listed-several`
 6. [ ] - `p1` - **FROM** SELECTED_SEVERAL **TO** LISTED **WHEN** the selection drops to one or none, or the calls are deleted - `inst-several-listed`
-7. [ ] - `p1` - **FROM** LISTED **TO** EMPTY **WHEN** the last call is deleted - `inst-listed-empty`
+7. [x] - `p1` - **FROM** LISTED **TO** EMPTY **WHEN** the last call is deleted - `inst-listed-empty`
 8. [ ] - `p1` - **FROM** EMPTY **TO** LISTED **WHEN** a recorded call arrives (`entity:changed`) - `inst-empty-listed`
 
 ## 5. Definitions of Done
