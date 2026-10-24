@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/getahead/noter/compare/v0.7.0...v0.8.0) (2026-10-24)
+
+
+### Features
+
+* **core:** the call window and the record prompt are non-activating panels ([#189](https://github.com/getahead/noter/issues/189)) ([23c1b32](https://github.com/getahead/noter/commit/23c1b32ff6af9e3c9fdb825189a4013979cf88e6))
+
 ## [0.7.0](https://github.com/getahead/noter/compare/v0.6.0...v0.7.0) (2026-10-24)
 
 
