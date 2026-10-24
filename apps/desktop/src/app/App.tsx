@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 import { CallWindow } from "../features/call-window/call-window";
 import { SettingsWindow } from "../features/settings/SettingsWindow";
 import { FirstRun } from "../features/first-run/first-run";
+import { RecordPrompt } from "../features/record-prompt/RecordPrompt";
 import { MainWindow } from "../features/shell/main-window";
 import { StoredTranscriptRoute } from "../features/transcript/hosts";
 import { t } from "../i18n/format";
@@ -27,6 +28,7 @@ export function App({ bridge }: { bridge: Bridge }) {
       )}
       {bridge.label === "main" && !error && (stored ? <StoredTranscriptRoute bridge={bridge} callId={stored} /> : <MainWindow bridge={bridge} />)}
       {bridge.label === "first-run" && !error && <FirstRun bridge={bridge} />}
+      {bridge.label === "record-prompt" && status === "READY" && <RecordPrompt bridge={bridge} />}
       {bridge.label === "settings" && status === "READY" && <SettingsWindow bridge={bridge} />}
       {bridge.label === "call-screen" && (status === "READY" || status === "RESYNCING") && <CallWindow bridge={bridge} />}
     </div>
