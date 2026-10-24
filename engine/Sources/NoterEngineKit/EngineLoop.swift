@@ -8,19 +8,30 @@ public final class EngineLoop: @unchecked Sendable {
     private let models: [String]
     private let sandboxed: Bool
     private let source: () -> AudioSource?
+    private let container: URL?
+    private let now: () -> Int64
+    private let encoder: (URL) throws -> AudioEncoder
     private let selfTests = DispatchQueue(label: "ai.noter.engine.self-test")
     private let decoder = JSONDecoder()
+    /// The call being captured and its audio; commands arrive on one thread.
+    private var session: (capture: CaptureSession, audio: AudioSource)?
 
-    /// `models` are the installed model folders; `source` opens the audio for a self-test
-    /// (the live taps, or WAV files in file mode and tests).
+    /// `models` are the installed model folders; `source` opens the audio for a self-test or a
+    /// session (the live taps, or WAV files in file mode and tests); `container` is the App Group
+    /// container sessions write into; `now` gives epoch milliseconds.
     public init(
         writer: EventWriter, engineVersion: String, models: [String], sandboxed: Bool,
+        container: URL? = nil, now: @escaping () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
+        encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
         source: @escaping () -> AudioSource?
     ) {
         self.writer = writer
         self.engineVersion = engineVersion
         self.models = models
         self.sandboxed = sandboxed
+        self.container = container
+        self.now = now
+        self.encoder = encoder
         self.source = source
     }
 
@@ -50,10 +61,74 @@ public final class EngineLoop: @unchecked Sendable {
         case let .selfTest(_, timeoutMs):
             writer.emit(.ack(cmdId: command.id))
             selfTests.async { self.selfTest(timeout: TimeInterval(timeoutMs) / 1000) }
+        case let .startSession(start):
+            startSession(command.id, start)
+        case let .pause(callId), let .resume(callId), let .stop(callId), let .excludeProcess(callId, _):
+            guard let session, session.capture.callId == callId else {
+                writer.emit(.error(cmdId: command.id, code: .noSession, message: "no session for \(callId)"))
+                break
+            }
+            sessionCommand(command, session)
+        case .setGlossary, .setLanguages:
+            // shortcut: kept for the live ASR loop, which arrives with it; acknowledged now.
+            writer.emit(.ack(cmdId: command.id))
         case let .other(type):
             writer.emit(.error(cmdId: command.id, code: .badCommand, message: "\(type) is not supported by this engine yet"))
         }
         return true
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
+    private func startSession(_ id: UInt64, _ start: StartSession) {
+        guard session == nil else {
+            writer.emit(.error(cmdId: id, code: .badCommand, message: "a session runs already"))
+            return
+        }
+        do {
+            guard let container else { throw LiveAudioSource.Failure(description: "no App Group container") }
+            guard let audio = source() else { throw LiveAudioSource.Failure(description: "no audio source") }
+            let capture = try CaptureSession(
+                start: start, container: container, writer: writer, now: now, encoder: encoder)
+            try audio.start { capture.feed($0) }
+            session = (capture, audio)
+            writer.emit(.ack(cmdId: id))
+            // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
+            writer.emit(.sessionStarted(callId: start.callId, micDevice: audio.devices.mic, outputDevice: audio.devices.output))
+            capture.go()
+            // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
+        } catch {
+            writer.emit(.error(cmdId: id, code: .deviceUnavailable, message: "\(error)"))
+        }
+    }
+
+    private func sessionCommand(_ command: EngineCommandLine, _ session: (capture: CaptureSession, audio: AudioSource)) {
+        switch command.cmd {
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-if-pause
+        case .pause:
+            session.audio.stop()
+            session.capture.pause()
+            writer.emit(.ack(cmdId: command.id))
+        case .resume:
+            session.capture.resume()
+            do {
+                try session.audio.start { session.capture.feed($0) }
+                writer.emit(.ack(cmdId: command.id))
+            } catch {
+                writer.emit(.error(cmdId: command.id, code: .deviceUnavailable, message: "\(error)"))
+            }
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-pause
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
+        case .stop:
+            session.audio.stop()
+            writer.emit(.ack(cmdId: command.id))
+            writer.emit(session.capture.stop())
+            self.session = nil
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
+        default:
+            // shortcut: `exclude_process` is acknowledged; rebuilding the live tap without the
+            // process comes with the one-clock aggregate device in the next capture change.
+            writer.emit(.ack(cmdId: command.id))
+        }
     }
 
     // @cpt-flow:cpt-noter-flow-core-engine-foundation-self-test:p1

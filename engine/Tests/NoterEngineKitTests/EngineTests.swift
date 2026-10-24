@@ -62,8 +62,11 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(try decode(#"{"id":4,"cmd":{"type":"shutdown"}}"#), EngineCommandLine(id: 4, cmd: .shutdown))
         XCTAssertEqual(
             try decode(#"{"id":5,"cmd":{"type":"stop","call_id":"call_1"}}"#),
-            EngineCommandLine(id: 5, cmd: .other(type: "stop")))
-        XCTAssertThrowsError(try decode(#"{"id":6}"#))
+            EngineCommandLine(id: 5, cmd: .stop(callId: "call_1")))
+        XCTAssertEqual(
+            try decode(#"{"id":6,"cmd":{"type":"offline_pass","call_id":"call_1"}}"#),
+            EngineCommandLine(id: 6, cmd: .other(type: "offline_pass")))
+        XCTAssertThrowsError(try decode(#"{"id":7}"#))
     }
 
     func testEventsEncodeAsTheCoreReadsThem() throws {
@@ -185,7 +188,7 @@ final class EngineLoopTests: XCTestCase {
         XCTAssertEqual(lines.types, ["ready", "pong", "ack", "error", "error", "ack"])
         XCTAssertEqual(lines.events[1].count, 1, "pong carries only its type")
         XCTAssertEqual(lines.events[3]["cmd_id"] as? Int, 3)
-        XCTAssertEqual(lines.events[3]["code"] as? String, "bad_command")
+        XCTAssertEqual(lines.events[3]["code"] as? String, "no_session", "stop without a session")
         XCTAssertTrue(lines.events[4]["cmd_id"] is NSNull)
         XCTAssertEqual(lines.events[5]["cmd_id"] as? Int, 4)
     }

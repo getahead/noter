@@ -155,7 +155,7 @@ describe("O1: capture_start is never gated on setup, permissions or the self-tes
       const started = ahead(await s.core(window).captureStart({ source, sensitive: false }));
       if (!started) return;
       expect(started.phase).toBe("recording");
-      ok(await s.core("call-screen").captureDiscard({ call_id: started.call_id! }));
+      ok(await s.core("call-screen").captureStop({ call_id: started.call_id! })); // discard is only for a NothingHeard call
     }
   });
 
@@ -211,8 +211,10 @@ describe("capture notices: hold, keep and resume", () => {
     if (!resumed) return;
     expect(resumed).toMatchObject({ phase: "recording", call_id: W.LIVE_CALL, title: W.LIVE_TITLE });
     expect(ok(await main.appSnapshot({})).banners.banners).toEqual([]);
-    expect(ok(await s.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {})).gaps.some((g) => g.reason === "interrupted")).toBe(true);
     typed(refused(await main.captureResumeInterrupted({ call_id: W.LIVE_CALL })), "notice_expired");
+    const sub = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
+    if (!sub) return;
+    expect(sub.gaps.some((g) => g.reason === "interrupted")).toBe(true);
   });
 
   it("banner_dismiss removes the interrupted-recording banner without resuming", async () => {

@@ -100,6 +100,26 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         try engine.start()
     }
 
+    public var devices: (mic: String, output: String) {
+        (AVCaptureDevice.default(for: .audio)?.localizedName ?? "", Self.defaultOutputName() ?? "")
+    }
+
+    /// The name of the default output device, which the tap hears through.
+    static func defaultOutputName() -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var device = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr
+        else { return nil }
+        address.mSelector = kAudioObjectPropertyName
+        var name: CFString = "" as CFString
+        size = UInt32(MemoryLayout<CFString>.size)
+        let status = withUnsafeMutablePointer(to: &name) { AudioObjectGetPropertyData(device, &address, 0, nil, &size, $0) }
+        return status == noErr ? name as String : nil
+    }
+
     /// The tap's stream format (sample rate and channels per frame).
     private func tapFormat(_ tap: AudioObjectID) throws -> AudioStreamBasicDescription {
         var address = AudioObjectPropertyAddress(
