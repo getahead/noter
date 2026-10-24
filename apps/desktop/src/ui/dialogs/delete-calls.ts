@@ -34,8 +34,9 @@ export async function deleteCalls(
   );
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-api-delete
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-delete-error
-  return res.status === "ok"
-    ? { outcome: "deleted" }
-    : { outcome: "failed", error: res.error };
+  if (res.status === "ok") return { outcome: "deleted" };
+  // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-delete-error
+  return { outcome: "failed", error: res.error };
+  // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-delete-error
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-delete-error
 }
