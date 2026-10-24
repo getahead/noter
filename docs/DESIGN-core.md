@@ -1306,7 +1306,7 @@ Every whole-state event payload has a `version`. `entity:changed`, `outputs:prog
 | `offline` | "No connection" (first run, sign-in sheet) | `models_download`, `account_signin_start`, `cli_install` |
 | `checksum_failed` | "Checksum failed" | `models_download` |
 | `model_missing` | "Speech model not downloaded" with the download step | `capture_start`, `self_test_run` |
-| `already_recording` | Today "Live call" (offer **Open Call Screen**) | `capture_start` |
+| `already_recording` | Today "Live call" (offer **Open Call Screen**) | `capture_start`, `calls_delete` |
 | `not_recording` | None; the window refreshes `capture:state` | capture commands, including resuming a stopped call |
 | `notice_expired` | None; the notice is gone | `capture_answer_*`, `capture_hold_notice`, `capture_keep_*`, `capture_resume_interrupted` after the banner is gone |
 | `continue_window_closed` | **Continue Recording** disappears | `capture_continue` |

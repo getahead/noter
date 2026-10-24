@@ -168,12 +168,12 @@ After M1 the user can record calls and find them again. The list and the call re
 - The calls, their transcript, speakers, marks, gaps, audio and per-call files are gone; the list and every window drop them; the change log keeps a non-undoable entry without content.
 
 **Error Scenarios**:
-- One of the calls is being recorded: `invalid_input`; nothing is deleted.
+- One of the calls is being recorded: `already_recording`; nothing is deleted.
 - A call is already gone: it is skipped and not counted.
 
 **Steps**:
 1. [ ] - `p1` - API: `calls_delete { call_ids }` from the main window only (the call window may not delete) - `inst-delete-call`
-2. [ ] - `p1` - **IF** any id is the live call **RETURN** `invalid_input` - `inst-delete-live`
+2. [ ] - `p1` - **IF** any id is the live call **RETURN** `already_recording` - `inst-delete-live`
 3. [ ] - `p1` - Run `cpt-noter-algo-core-library-calls-delete` - `inst-delete-run`
 4. [ ] - `p1` - Emit `entity:changed { removed }` for each deleted call - `inst-delete-emit`
 5. [ ] - `p1` - **RETURN** `DeleteResult { deleted }` - `inst-delete-return`
@@ -307,7 +307,7 @@ The system **MUST** run the fixture-parity test for `calls_list`, `call_get` and
 
 - [ ] E2E against the real core, story `cpt-noter-seq-dialogs-delete-call`: after the alert the call disappears from the Library and from every open window, its files are gone, and a non-undoable change row without content is written (History shows it from M2).
 - [ ] A recorded call (scripted engine) appears in `calls_list` and opens with `call_get` with its marks and gaps.
-- [ ] `call_update` with a stale `rev` returns `conflict`; deleting the live call returns `invalid_input`.
+- [ ] `call_update` with a stale `rev` returns `conflict`; deleting the live call returns `already_recording`.
 - [ ] The fixture-parity test passes for the M1 read models.
 - [ ] Each of the five commands succeeds at least once in E2E runs against the real core.
 - [ ] `just gate` passes.
