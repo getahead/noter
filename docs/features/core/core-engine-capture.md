@@ -297,7 +297,7 @@ The system **MUST** report `call_detected`, `call_audio_released` and `audio_sou
 
 ### Capture-first restart
 
-- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
+- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
 
 The system **MUST** restart a crashed engine with taps before models, resume from the ring's write position with one `engine_restart` gap of at most 2 s per restart, and raise `CaptureFailed` when it cannot; an engine-kill drill during a replayed call proves the gap bound (the Q7 test, M1 week one alongside the real-call latency measurement).
 
