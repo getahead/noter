@@ -27,6 +27,7 @@ import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingInd
 import { TranscriptSlot } from "./transcript-slot";
 
 const NO_STATES: readonly DegradedState[] = [];
+const NO_IDS: ReadonlySet<string> = new Set();
 const DEFAULT_KEYS: Partial<Record<HotkeyAction, string>> = {
   mark_moment: "⌃⌥⌘M",
   pause: "⌃⌥⌘P",
@@ -97,7 +98,8 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const transcript = useWindow(bridge, (s) => s.streams.transcript_subscribe?.data);
   const levels = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels);
 
-  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+  // the second sources the user kept, for one call
+  const [kept, setKept] = useState<{ call: string | null; ids: ReadonlySet<string> }>({ call: null, ids: new Set() });
   const [marked, setMarked] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [continueClosed, setContinueClosed] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-case-exclude
     // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-case-keep-source
     keep: (bundle_id) => {
-      setKept((k) => new Set(k).add(bundle_id)); // not shown again for that app in this call
+      setKept((k) => ({ call: callId, ids: new Set(k.call === callId ? k.ids : []).add(bundle_id) })); // not shown again for that app in this call
       void run("capture_keep_source", () => bridge.core.captureKeepSource({ ...id, bundle_id }), capture);
     },
     // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-case-keep-source
@@ -305,7 +307,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const layout = layoutState(cw, !!noticeShown);
   const floating = layout !== "DEDICATED";
   const shareWarning = layout === "FLOATING" && cw.show_share_warning && !warningSeen;
-  const bannerList = degradedBanners(degraded, callId, floating, banners, kept);
+  const bannerList = degradedBanners(degraded, callId, floating, banners, kept.call === callId ? kept.ids : NO_IDS);
   const regions = new Set(
     layoutRegions({
       layout,
