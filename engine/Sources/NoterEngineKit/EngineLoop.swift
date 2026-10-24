@@ -272,11 +272,17 @@ public final class EngineLoop: @unchecked Sendable {
         _ = done.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow))
         audio?.stop()
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-lines
-        if !models.isEmpty, let transcriber = try? model?.get() {
-            for channel in [Channel.mic, .sys] {
-                let heard = state.heard(channel)
-                guard !heard.isEmpty, let d = try? transcriber.decode(heard, languages: []), LiveASR.keep(d) else { continue }
-                writer.emit(.selfTestLine(channel: channel, text: d.text.trimmingCharacters(in: .whitespacesAndNewlines)))
+        // The core waits for the result only a little past the window, and a cold model can take
+        // longer to load: lines come from a model already loaded; otherwise it starts loading now.
+        if let model, !models.isEmpty {
+            if let transcriber = model.ready {
+                for channel in [Channel.mic, .sys] where Date() < deadline {
+                    let heard = state.heard(channel)
+                    guard !heard.isEmpty, let d = try? transcriber.decode(heard, languages: []), LiveASR.keep(d) else { continue }
+                    writer.emit(.selfTestLine(channel: channel, text: d.text.trimmingCharacters(in: .whitespacesAndNewlines)))
+                }
+            } else {
+                asrQueue.async { _ = try? model.get() }
             }
         }
         // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-lines
@@ -347,6 +353,13 @@ final class ModelCache: @unchecked Sendable {
     private var loaded: Transcriber?
 
     init(_ make: @escaping () throws -> Transcriber) { self.make = make }
+
+    /// The model if it is loaded already; never waits for a load.
+    var ready: Transcriber? {
+        guard lock.try() else { return nil }  // a load holds the lock: not ready
+        defer { lock.unlock() }
+        return loaded
+    }
 
     func get() throws -> Transcriber {
         try lock.withLock {
