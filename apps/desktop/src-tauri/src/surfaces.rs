@@ -6,8 +6,9 @@
 //! content-protected, on every Space, not focused when shown), not non-activating NSPanels; swap
 //! in tauri-nspanel once deny.toml allows its git source (owner item NB10).
 
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use noter_core::{
@@ -42,14 +43,80 @@ pub fn frame_of(
     chosen: Option<&DisplayId>,
     displays: &[DisplayInfo],
     frame: impl Fn(&DisplayId) -> Option<Frame>,
-) -> Option<Frame> {
+) -> Option<(DisplayId, Frame)> {
     let main = || displays.iter().find(|d| d.is_main).or(displays.first());
-    chosen
+    let display = chosen
         .and_then(|id| displays.iter().find(|d| d.id == *id))
-        .or_else(main)
-        .and_then(|d| frame(&d.id))
+        .or_else(main)?;
+    Some((display.id.clone(), frame(&display.id)?))
 }
 // @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-read-displays
+
+/// A frame kept inside the display's visible area, below the menu bar.
+pub fn clamp_frame((x, y, w, h): (f64, f64, f64, f64), visible: &Frame) -> (f64, f64, f64, f64) {
+    let top = visible.y + MENU_BAR;
+    let (w, h) = (w.min(visible.width), h.min(visible.height - MENU_BAR));
+    let x = x.clamp(visible.x, visible.x + visible.width - w);
+    let y = y.clamp(top, visible.y + visible.height - h);
+    (x, y, w, h)
+}
+
+/// The call window's frames the user left, per display and layout, in a small JSON file beside
+/// the data folder; a missing or damaged file is no saved frame.
+pub struct SavedFrames {
+    path: PathBuf,
+    frames: Mutex<BTreeMap<String, (f64, f64, f64, f64)>>,
+    dirty: AtomicBool,
+}
+
+fn frame_key(display: &DisplayId, layout: CallLayout) -> String {
+    format!("{}/{layout:?}", display.as_str())
+}
+
+impl SavedFrames {
+    pub fn load(path: &Path) -> Self {
+        let read: Option<BTreeMap<String, [f64; 4]>> = std::fs::read_to_string(path)
+            .ok()
+            .and_then(|text| serde_json::from_str(&text).ok());
+        let frames = read
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, [x, y, w, h])| (k, (x, y, w, h)))
+            .collect();
+        Self {
+            path: path.to_path_buf(),
+            frames: Mutex::new(frames),
+            dirty: AtomicBool::new(false),
+        }
+    }
+
+    pub fn get(&self, display: &DisplayId, layout: CallLayout) -> Option<(f64, f64, f64, f64)> {
+        let frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
+        frames.get(&frame_key(display, layout)).copied()
+    }
+
+    /// In memory only: a drag reports many frames; `save` writes the last one.
+    pub fn remember(&self, display: &DisplayId, layout: CallLayout, frame: (f64, f64, f64, f64)) {
+        let mut frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
+        if frames.insert(frame_key(display, layout), frame) != Some(frame) {
+            self.dirty.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Writes the frames when they changed since the last save.
+    pub fn save(&self) {
+        if !self.dirty.swap(false, Ordering::Relaxed) {
+            return;
+        }
+        let frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
+        let file: BTreeMap<&String, [f64; 4]> = frames
+            .iter()
+            .map(|(k, &(x, y, w, h))| (k, [x, y, w, h]))
+            .collect();
+        // Losing a saved frame only costs the default placement next time.
+        let _ = std::fs::write(&self.path, serde_json::to_string(&file).unwrap_or_default());
+    }
+}
 
 /// Where the call window goes: the whole display (dedicated) or a panel in its top-right corner.
 pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Frame) -> (f64, f64, f64, f64) {
@@ -262,17 +329,24 @@ pub struct TauriSurfaces<R: Runtime> {
     tray: Mutex<Option<TrayIcon<R>>>,
     /// The windows hidden for presenting, shown again on restore.
     hidden: Mutex<Vec<WindowLabel>>,
+    frames: SavedFrames,
+    /// The display and layout the call window was last placed on, uncollapsed: where a move or
+    /// resize by the user is saved.
+    placed: Mutex<Option<(DisplayId, CallLayout)>>,
     this: OnceLock<Weak<TauriSurfaces<R>>>,
 }
 
 impl<R: Runtime> TauriSurfaces<R> {
     pub fn new(app: AppHandle<R>, storage: PathBuf) -> Arc<Self> {
+        let frames = SavedFrames::load(&storage.join("call-window-frames.json"));
         let surfaces = Arc::new(Self {
             app,
             storage,
             core: OnceLock::new(),
             tray: Mutex::new(None),
             hidden: Mutex::new(Vec::new()),
+            frames,
+            placed: Mutex::new(None),
             this: OnceLock::new(),
         });
         let _ = surfaces.this.set(Arc::downgrade(&surfaces));
@@ -289,7 +363,7 @@ impl<R: Runtime> TauriSurfaces<R> {
     }
 
     /// The call display's frame, or the main display's.
-    fn frame(&self, chosen: Option<&DisplayId>) -> Option<Frame> {
+    fn frame(&self, chosen: Option<&DisplayId>) -> Option<(DisplayId, Frame)> {
         let displays = noter_native::environment(&self.storage).displays;
         frame_of(chosen, &displays, noter_native::display_frame)
     }
@@ -303,13 +377,51 @@ impl<R: Runtime> TauriSurfaces<R> {
         let Some(window) = self.window(WindowLabel::CallScreen) else {
             return;
         };
-        if let Some(frame) = self.frame(placement.display_id.as_ref()) {
-            Self::place(&window, call_frame(placement.layout, collapsed, &frame));
-        }
+        let Some((display, visible)) = self.frame(placement.display_id.as_ref()) else {
+            return;
+        };
+        let layout = placement.layout;
+        // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+        // The strip keeps its fixed size; an open call window comes back where the user left it.
+        let frame = match self.frames.get(&display, layout).filter(|_| !collapsed) {
+            Some(saved) => clamp_frame(saved, &visible),
+            None => call_frame(layout, collapsed, &visible),
+        };
+        *self.placed.lock().unwrap_or_else(|e| e.into_inner()) =
+            (!collapsed).then_some((display, layout));
+        // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+        Self::place(&window, frame);
     }
+
+    /// On quit: the frames the user left are written.
+    pub fn save_frames(&self) {
+        self.frames.save();
+    }
+
+    /// The user moved or resized the call window: its frame is saved for that display and layout.
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+    pub fn call_window_changed(&self, window: &tauri::Window<R>) {
+        let Some((display, layout)) = self
+            .placed
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+        else {
+            return;
+        };
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) else {
+            return;
+        };
+        let (pos, size) = (pos.to_logical::<f64>(scale), size.to_logical::<f64>(scale));
+        self.frames
+            .remember(&display, layout, (pos.x, pos.y, size.width, size.height));
+    }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
 
     /// A menu bar click, run as the menu bar surface.
     // @cpt-flow:cpt-noter-flow-core-native-surfaces-menu-bar:p1
+    // @cpt-dod:cpt-noter-dod-core-native-surfaces-menu-bar:p1
     fn menu_clicked(&self, action: TrayAction) {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
         if action == TrayAction::OpenNoter {
@@ -333,7 +445,12 @@ impl<R: Runtime> TauriSurfaces<R> {
             };
             // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
             // shows the item disabled at the next update.
-            let _ = dispatch_json(core.as_ref(), &ctx, name, args, None).await;
+            if dispatch_json(core.as_ref(), &ctx, name, args, None)
+                .await
+                .is_ok()
+            {
+                crate::e2e_log::record(name);
+            }
         });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
@@ -375,7 +492,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         let Some(prompt) = self.window(WindowLabel::RecordPrompt) else {
             return;
         };
-        if let Some(screen) = self.frame(None) {
+        if let Some((_, screen)) = self.frame(None) {
             let x = screen.x + screen.width - PROMPT.0 - MARGIN;
             Self::place(
                 &prompt,
@@ -413,6 +530,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     }
 
     fn hide_call_window(&self) {
+        self.frames.save();
         if let Some(window) = self
             .app
             .get_webview_window(WindowLabel::CallScreen.as_str())
@@ -421,8 +539,10 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-native-surfaces-presenting:p1
     // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
     fn hide_all(&self) {
+        self.frames.save();
         let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
         for (label, window) in self.app.webview_windows() {
             let Some(label) = crate::window_label(&label) else {
@@ -473,6 +593,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-native-surfaces-navigation:p2
     fn announce(&self, text: &str, politeness: Politeness) {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-announce
         noter_native::announce(text, politeness);

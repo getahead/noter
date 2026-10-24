@@ -11,8 +11,8 @@ use noter_core::{
     TrayAction, TrayGlyph,
 };
 use noter_desktop::surfaces::{
-    action_of, call_frame, frame_of, notification_clicked, posted, settings_url, tray_command,
-    tray_label, tray_title, TauriSurfaces,
+    action_of, call_frame, clamp_frame, frame_of, notification_clicked, posted, settings_url,
+    tray_command, tray_label, tray_title, SavedFrames, TauriSurfaces,
 };
 use noter_native::Frame;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
@@ -69,12 +69,15 @@ fn the_call_display_is_found_by_identity_and_falls_back_to_the_main_display() {
     let id = |s: &str| DisplayId::new(s.to_string());
     assert_eq!(
         frame_of(Some(&id("dsp_studio")), &displays, frames),
-        Some(STUDIO)
+        Some((id("dsp_studio"), STUDIO))
     );
-    assert_eq!(frame_of(None, &displays, frames), Some(BUILT_IN));
+    assert_eq!(
+        frame_of(None, &displays, frames),
+        Some((id("dsp_builtin"), BUILT_IN))
+    );
     assert_eq!(
         frame_of(Some(&id("dsp_unplugged")), &displays, frames),
-        Some(BUILT_IN),
+        Some((id("dsp_builtin"), BUILT_IN)),
         "unplugged"
     );
     assert_eq!(frame_of(None, &[], frames), None);
@@ -288,4 +291,54 @@ fn the_host_creates_the_core_windows_on_first_use() {
     surfaces.hide_call_window();
     surfaces.hide_all();
     surfaces.restore_all();
+}
+
+#[test]
+fn a_saved_frame_is_clamped_to_the_visible_display() {
+    // Inside: kept as it was.
+    assert_eq!(
+        clamp_frame((1600.0, 100.0, 400.0, 500.0), &STUDIO),
+        (1600.0, 100.0, 400.0, 500.0)
+    );
+    // Off the right edge and too tall: moved in and shortened below the menu bar.
+    assert_eq!(
+        clamp_frame((3900.0, -300.0, 400.0, 2000.0), &STUDIO),
+        (1512.0 + 2560.0 - 400.0, -200.0 + 32.0, 400.0, 1440.0 - 32.0)
+    );
+}
+
+#[test]
+fn the_call_window_frame_is_saved_per_display_and_layout_and_survives_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("call-window-frames.json");
+    let studio = DisplayId::new("dsp_studio".to_string());
+    let frames = SavedFrames::load(&path);
+    assert_eq!(frames.get(&studio, CallLayout::Floating), None);
+    frames.remember(&studio, CallLayout::Floating, (2000.0, 100.0, 420.0, 640.0));
+    frames.remember(
+        &studio,
+        CallLayout::Dedicated,
+        (1512.0, -168.0, 2000.0, 1200.0),
+    );
+    // A drag reports many frames: nothing is written until the window hides or Noter quits.
+    assert_eq!(
+        SavedFrames::load(&path).get(&studio, CallLayout::Floating),
+        None
+    );
+    frames.save();
+    let again = SavedFrames::load(&path);
+    assert_eq!(
+        again.get(&studio, CallLayout::Floating),
+        Some((2000.0, 100.0, 420.0, 640.0))
+    );
+    assert_eq!(
+        again.get(&studio, CallLayout::Dedicated),
+        Some((1512.0, -168.0, 2000.0, 1200.0))
+    );
+    // A damaged file is no saved frame, not a failure.
+    std::fs::write(&path, "not json").unwrap();
+    assert_eq!(
+        SavedFrames::load(&path).get(&studio, CallLayout::Floating),
+        None
+    );
 }
