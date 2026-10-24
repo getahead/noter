@@ -21,22 +21,3 @@ jobs:
     uses: ./.github/workflows/ci.yml
     secrets:
       CF_STUDIO_TOKEN: ${{ secrets.CF_STUDIO_TOKEN }}
-
-  mac-perf:
-    name: Wall-clock performance (Apple Silicon)
-    if: vars.NOTER_MAC_RUNNER == 'true'
-    runs-on: [self-hosted, macOS, ARM64, noter]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Compare with main as it was a day ago
-        run: NOTER_BASE_REF="$(git rev-list -1 --before='1 day ago' origin/main)" just perf-wall
-      # From M1: golden-set replay through the engine's file mode (latency, footprint), see docs/HARNESS.md.
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: perf-wall
-          path: target/perf
-          if-no-files-found: ignore

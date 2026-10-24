@@ -13,6 +13,5 @@
 - [ ] New behaviour has unit tests; changed lines are ≥ 80% covered
 - [ ] Delivered commands and stories have E2E tests (≥ 60% of the milestone)
 - [ ] Screenshot baselines unchanged — or refreshed with `update-screenshots` and every image reviewed (`visual-change-approved`)
-- [ ] No performance scenario more than 10% slower
 - [ ] Contract changed? Types first, `just contract-regen`, `CONTRACT_VERSION` bumped, one core and one UI review
 - [ ] No gate loosened — or the reason is below and the PR has `harness-change-approved`

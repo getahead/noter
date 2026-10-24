@@ -2,7 +2,7 @@
 # checks every pull request must pass (docs/ADR/0003, docs/HARNESS.md).
 #
 # Bars as set by the owner on 17 Oct 2026: realistic goals (unit 80%, E2E 60%,
-# screenshots 98%, performance <= 10% / 60%) plus a trace-coverage ratchet.
+# screenshots 98%; performance left the gate on 24 Oct 2026) plus a trace-coverage ratchet.
 #
 # Lowering a threshold, adding an exclusion, turning off or narrowing the trace
 # ratchet or moving the milestone back is a harness change: CI's config guard
@@ -10,8 +10,8 @@
 # working in a lane cannot edit this file at all (lane guard).
 
 [milestone]
-# Advanced by the owner when a milestone gate passes. The E2E and perf
-# coverage gates count what milestones.toml / perf.toml list up to here.
+# Advanced by the owner when a milestone gate passes. The E2E
+# coverage gate counts what milestones.toml lists up to here.
 current = "M0"
 order = ["pre-M0", "M0", "M1", "M2", "M3", "M4", "M5"]
 
@@ -31,6 +31,8 @@ min_pixel_match = 98.0        # per screenshot: at most 2% of pixels may differ 
 pixel_color_threshold = 0.02  # per-pixel colour distance (0..1) under which two pixels are equal
 
 [gates.perf]
+# Not enforced: the owner took performance out of `just gate` and CI on 24 Oct 2026
+# (tests and scripts stay; `just perf` runs them by hand).
 max_regression_pct = 10.0     # per scenario: head may be at most 10% worse than base (instruction counts)
 scenario_coverage_min = 60.0  # perf.toml registry entries due by the current milestone that have a scenario
 wall_runs = 10                # wall mode: measured runs per side; medians are compared
@@ -181,7 +183,6 @@ unit = ["rust", "ui", "protocol"]
 e2e = ["rust", "ui", "protocol", "stories"]
 e2e-coverage = ["rust", "ui", "protocol", "stories"]
 visual = ["ui", "protocol"]
-perf = ["rust", "ui", "protocol"]   # perf.toml has Rust and UI scenarios
 docs = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
 macos = ["rust", "tauri", "native", "engine"]
 
