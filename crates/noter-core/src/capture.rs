@@ -442,6 +442,7 @@ impl Core {
 
     // @cpt-flow:cpt-noter-flow-core-capture-session-start:p1
     // @cpt-dod:cpt-noter-dod-core-capture-session-native-callers:p1
+    // @cpt-dod:cpt-noter-dod-core-capture-session-machine:p1
     pub(crate) async fn start_call(
         &self,
         ctx: &CommandCtx,
@@ -985,10 +986,17 @@ impl Core {
         let values = vec![("privacy_class", json!(class))];
         self.write_call(ctx, &args.call_id, "Changed sensitivity", !running, values)?;
         // @cpt-end:cpt-noter-flow-core-capture-session-sensitive:p2:inst-write-sensitive
+        // @cpt-begin:cpt-noter-flow-core-capture-session-sensitive:p2:inst-return-sensitive
+        // The call exists (checked above) and the write committed.
+        let call_id = args.call_id.clone();
+        if let Ok(detail) = self.get_call(CallIdArgs { call_id }) {
+            self.emit_entity_changed(&EntityChanged::Call { call: detail.call });
+        }
         if !current || state.sensitive == args.sensitive {
             return Ok(state);
         }
         Ok(self.set_capture(|c| c.sensitive = args.sensitive))
+        // @cpt-end:cpt-noter-flow-core-capture-session-sensitive:p2:inst-return-sensitive
     }
 
     /// A new disk reading: `DiskLow` under 2 GB, `DiskFull` under 500 MB, when a call stops

@@ -845,6 +845,20 @@ async fn a_live_call_can_be_made_sensitive_but_not_turned_back() {
         r.query::<String>("SELECT privacy_class FROM calls"),
         "sensitive"
     );
+    // Windows that show the call replace it from entity:changed.
+    let changed: Vec<Value> = r
+        .events
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(name, _)| *name == event_names::ENTITY_CHANGED)
+        .map(|(_, v)| v.clone())
+        .collect();
+    let call = changed.last().expect("entity:changed for the call");
+    assert_eq!(call["type"], "call");
+    assert_eq!(call["call"]["id"], call_id.as_str());
+    assert_eq!(call["call"]["privacy"], "sensitive");
     assert_eq!(
         code(
             r.core
@@ -2331,4 +2345,477 @@ async fn a_core_that_starts_with_detection_on_tells_the_engine() {
         unreachable!()
     };
     assert!(known_bundle_ids.iter().any(|b| b == TEAMS));
+}
+
+// === The machine, table-driven (cpt-noter-dod-core-capture-session-machine) =============
+
+/// Where a transition starts; each row reaches it on a fresh core.
+#[derive(Debug, Clone, Copy)]
+enum From {
+    Idle,
+    Recording,
+    Paused,
+    Stopped,
+    NothingHeard,
+    NewMeeting,
+    Interrupted,
+    Failed,
+    /// Recording on an engine whose next two launches fail (three failures in 30 s).
+    Fragile,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Act {
+    Start,
+    Pause,
+    Resume,
+    Stop,
+    Discard,
+    Continue,
+    WindowPasses,
+    ResumeInterrupted,
+    EngineCrash,
+    EngineGivesUp,
+    TryAgain,
+    StartAsNewCall,
+    KeepInThisCall,
+}
+
+use CapturePhase as P;
+
+struct Row {
+    /// The spec §4 transition (or DESIGN-core 3.1 row) the line proves.
+    proves: &'static str,
+    from: From,
+    act: Act,
+    to: CapturePhase,
+    /// Phases `capture:state` passes through on the way.
+    via: &'static [CapturePhase],
+    gap: Option<&'static str>,
+    same_call: bool,
+}
+
+const MACHINE: &[Row] = &[
+    Row {
+        proves: "inst-st-start, inst-st-recording",
+        from: From::Idle,
+        act: Act::Start,
+        to: P::Recording,
+        via: &[P::Starting],
+        gap: None,
+        same_call: false,
+    },
+    Row {
+        proves: "inst-st-start-from-stopped",
+        from: From::Stopped,
+        act: Act::Start,
+        to: P::Recording,
+        via: &[P::Starting],
+        gap: None,
+        same_call: false,
+    },
+    Row {
+        proves: "inst-st-pause",
+        from: From::Recording,
+        act: Act::Pause,
+        to: P::Paused,
+        via: &[],
+        gap: None,
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-resume",
+        from: From::Paused,
+        act: Act::Resume,
+        to: P::Recording,
+        via: &[],
+        gap: Some("paused"),
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-stopping, inst-st-stopped",
+        from: From::Recording,
+        act: Act::Stop,
+        to: P::Stopped,
+        via: &[P::Stopping],
+        gap: None,
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-stopping (from paused)",
+        from: From::Paused,
+        act: Act::Stop,
+        to: P::Stopped,
+        via: &[P::Stopping],
+        gap: Some("paused"),
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-discard",
+        from: From::NothingHeard,
+        act: Act::Discard,
+        to: P::Idle,
+        via: &[P::Stopping],
+        gap: None,
+        same_call: false,
+    },
+    Row {
+        proves: "inst-st-continue",
+        from: From::Stopped,
+        act: Act::Continue,
+        to: P::Recording,
+        via: &[],
+        gap: Some("continued"),
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-idle",
+        from: From::Stopped,
+        act: Act::WindowPasses,
+        to: P::Idle,
+        via: &[],
+        gap: None,
+        same_call: false,
+    },
+    Row {
+        proves: "inst-st-resume-interrupted",
+        from: From::Interrupted,
+        act: Act::ResumeInterrupted,
+        to: P::Recording,
+        via: &[],
+        gap: Some("interrupted"),
+        same_call: true,
+    },
+    Row {
+        proves: "DESIGN-core 3.1 engine crash",
+        from: From::Recording,
+        act: Act::EngineCrash,
+        to: P::Recording,
+        via: &[],
+        gap: Some("engine_restart"),
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-failed",
+        from: From::Fragile,
+        act: Act::EngineGivesUp,
+        to: P::Failed,
+        via: &[],
+        gap: None,
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-try-again",
+        from: From::Failed,
+        act: Act::TryAgain,
+        to: P::Recording,
+        via: &[],
+        gap: Some("engine_restart"),
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-failed-stop",
+        from: From::Failed,
+        act: Act::Stop,
+        to: P::Stopped,
+        via: &[],
+        gap: None,
+        same_call: true,
+    },
+    Row {
+        proves: "inst-st-split (Start as New Call)",
+        from: From::NewMeeting,
+        act: Act::StartAsNewCall,
+        to: P::Recording,
+        via: &[P::Stopping, P::Stopped, P::Starting],
+        gap: None,
+        same_call: false,
+    },
+    Row {
+        proves: "inst-st-split (Keep in This Call)",
+        from: From::NewMeeting,
+        act: Act::KeepInThisCall,
+        to: P::Recording,
+        via: &[],
+        gap: None,
+        same_call: true,
+    },
+];
+
+/// Moves that are not transitions: refused with these codes, the phase unchanged.
+const REFUSED: &[(From, Act, ErrorCode)] = &[
+    (From::Idle, Act::Pause, ErrorCode::NotRecording),
+    (From::Idle, Act::Stop, ErrorCode::NotRecording),
+    (From::Idle, Act::Continue, ErrorCode::ContinueWindowClosed),
+    (From::Idle, Act::ResumeInterrupted, ErrorCode::NoticeExpired),
+    (From::Recording, Act::Start, ErrorCode::AlreadyRecording),
+    (From::Recording, Act::Discard, ErrorCode::NoticeExpired),
+    (
+        From::Recording,
+        Act::Continue,
+        ErrorCode::ContinueWindowClosed,
+    ),
+    (
+        From::Recording,
+        Act::ResumeInterrupted,
+        ErrorCode::NoticeExpired,
+    ),
+    (
+        From::Recording,
+        Act::KeepInThisCall,
+        ErrorCode::NoticeExpired,
+    ),
+    (From::Paused, Act::Start, ErrorCode::AlreadyRecording),
+    (From::Stopped, Act::Pause, ErrorCode::NotRecording),
+    (From::Stopped, Act::Discard, ErrorCode::NoticeExpired),
+    (From::Failed, Act::Start, ErrorCode::AlreadyRecording),
+    (From::Failed, Act::Pause, ErrorCode::NotRecording),
+];
+
+fn fragile() -> Setup {
+    let fails = || Behaviour {
+        launch_fails: true,
+        ..Behaviour::default()
+    };
+    Setup {
+        then: vec![Behaviour::default(), fails(), fails()],
+        ..Setup::default()
+    }
+}
+
+impl Rig {
+    async fn reach(from: From) -> (Rig, Option<CallId>) {
+        match from {
+            From::Idle => (rig(), None),
+            From::Recording | From::Paused | From::Stopped | From::NothingHeard => {
+                let r = rig();
+                let call_id = r.recording().await;
+                match from {
+                    From::Paused => {
+                        let args = CapturePauseArgs {
+                            call_id: call_id.clone(),
+                            paused: true,
+                        };
+                        r.core
+                            .capture_set_paused(&main_window(), args)
+                            .await
+                            .unwrap();
+                        r.advance(10_000);
+                    }
+                    From::Stopped => {
+                        r.stop(&main_window(), &call_id).await;
+                        r.advance(60_000);
+                    }
+                    From::NothingHeard => {
+                        r.pass(300_000).await;
+                        r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+                            .await;
+                    }
+                    _ => {}
+                }
+                (r, Some(call_id))
+            }
+            From::NewMeeting => {
+                let r = rig();
+                r.detection_on().await;
+                let call_id = r.recording_detected(ZOOM, "Zoom").await;
+                r.pass(30_000).await;
+                r.call_detected(TEAMS, "Microsoft Teams");
+                r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NewMeeting { .. })))
+                    .await;
+                (r, Some(call_id))
+            }
+            From::Interrupted => {
+                let (r, call_id) = Rig::interrupted().await;
+                (r, Some(call_id))
+            }
+            From::Fragile | From::Failed => {
+                let r = rig_with(fragile());
+                let call_id = r.recording().await;
+                if matches!(from, From::Failed) {
+                    r.engine.kill_current();
+                    r.phase_becomes(P::Failed).await;
+                    r.advance(5_000);
+                }
+                (r, Some(call_id))
+            }
+        }
+    }
+
+    /// Applies `act` the way a surface does, answering for the engine where a step needs it.
+    async fn act(&self, act: Act, call: &CallId) -> Result<CaptureState, CoreError> {
+        let ctx = main_window();
+        let id = || CallIdArgs {
+            call_id: call.clone(),
+        };
+        let paused = |paused| CapturePauseArgs {
+            call_id: call.clone(),
+            paused,
+        };
+        let meeting = |choice| NewMeetingAnswerArgs {
+            call_id: call.clone(),
+            choice,
+        };
+        let phase = self.state().await.phase;
+        match act {
+            Act::Start => {
+                let starts = self.sessions().len();
+                let started = self.core.capture_start(&ctx, start_args()).await?;
+                let new = started.call_id.unwrap();
+                self.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+                    .await;
+                self.session_started(&new);
+                Ok(self.phase_becomes(P::Recording).await)
+            }
+            Act::Pause => self.core.capture_set_paused(&ctx, paused(true)).await,
+            Act::Resume => self.core.capture_set_paused(&ctx, paused(false)).await,
+            Act::Stop if matches!(phase, P::Recording | P::Paused) => {
+                Ok(self.stop(&ctx, call).await)
+            }
+            Act::Stop => self.core.capture_stop(&ctx, id()).await,
+            Act::Discard
+                if matches!(
+                    self.state().await.notice,
+                    Some(CaptureNotice::NothingHeard { .. })
+                ) =>
+            {
+                let stops = self.stops();
+                let discard = {
+                    let core = self.core.clone();
+                    let args = id();
+                    tokio::spawn(async move { core.capture_discard(&main_window(), args).await })
+                };
+                self.answer_stop(call, stops).await;
+                discard.await.unwrap()
+            }
+            Act::Discard => self.core.capture_discard(&ctx, id()).await,
+            Act::Continue => self.core.capture_continue(&ctx, id()).await,
+            Act::WindowPasses => {
+                self.pass(300_001).await;
+                Ok(self.phase_becomes(P::Idle).await)
+            }
+            Act::ResumeInterrupted => self.core.capture_resume_interrupted(&ctx, id()).await,
+            Act::EngineCrash => {
+                let starts = self.sessions().len();
+                self.engine.kill_current();
+                self.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+                    .await;
+                self.session_started(call);
+                Ok(self.state().await)
+            }
+            Act::EngineGivesUp => {
+                self.engine.kill_current();
+                Ok(self.phase_becomes(P::Failed).await)
+            }
+            Act::TryAgain => {
+                let starts = self.sessions().len();
+                let again = {
+                    let core = self.core.clone();
+                    let args = id();
+                    tokio::spawn(async move {
+                        core.capture_resume_interrupted(&main_window(), args).await
+                    })
+                };
+                self.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+                    .await;
+                self.session_started(call);
+                again.await.unwrap()
+            }
+            Act::StartAsNewCall => {
+                let (stops, starts) = (self.stops(), self.sessions().len());
+                let split = {
+                    let core = self.core.clone();
+                    let args = meeting(NewMeetingChoice::StartAsNewCall);
+                    tokio::spawn(async move {
+                        core.capture_answer_new_meeting(&main_window(), args).await
+                    })
+                };
+                self.answer_stop(call, stops).await;
+                let EngineCommand::StartSession(next) = self
+                    .sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+                    .await
+                else {
+                    unreachable!()
+                };
+                self.session_started(&next.call_id);
+                split.await.unwrap()?;
+                Ok(self.phase_becomes(P::Recording).await)
+            }
+            Act::KeepInThisCall => {
+                let args = meeting(NewMeetingChoice::KeepInThisCall);
+                self.core.capture_answer_new_meeting(&ctx, args).await
+            }
+        }
+    }
+
+    async fn gap_written(&self, reason: &str) -> bool {
+        let sql = format!("SELECT count(*) FROM gaps WHERE reason = '{reason}'");
+        for _ in 0..200 {
+            if self.query::<i64>(&sql) > 0 {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        false
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_capture_transition_of_the_machine() {
+    for row in MACHINE {
+        let (r, call) = Rig::reach(row.from).await;
+        let none = CallId::new("call_none".to_string());
+        let call = call.unwrap_or(none);
+        let seen = r.capture_events().len();
+        let at = r.act(row.act, &call).await;
+        let state = at.unwrap_or_else(|e| panic!("{}: {e:?}", row.proves));
+        let state = if state.phase == row.to {
+            state
+        } else {
+            r.phase_becomes(row.to).await
+        };
+        let phases: Vec<_> = r.capture_events()[seen..].iter().map(|c| c.phase).collect();
+        for via in row.via {
+            assert!(
+                phases.contains(via),
+                "{}: {via:?} in {phases:?}",
+                row.proves
+            );
+        }
+        if row.to != P::Idle {
+            assert_eq!(
+                state.call_id.as_ref() == Some(&call),
+                row.same_call,
+                "{}",
+                row.proves
+            );
+        }
+        if let Some(reason) = row.gap {
+            assert!(
+                r.gap_written(reason).await,
+                "{}: a {reason} gap",
+                row.proves
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn moves_that_are_not_transitions_are_refused() {
+    for (from, act, want) in REFUSED {
+        let (r, call) = Rig::reach(*from).await;
+        let call = call.unwrap_or_else(|| CallId::new("call_none".to_string()));
+        let before = r.state().await.phase;
+        let got = r.act(*act, &call).await;
+        assert_eq!(
+            got.map(|s| s.phase).map_err(|e| e.code),
+            Err(*want),
+            "{from:?} {act:?}"
+        );
+        assert_eq!(
+            r.state().await.phase,
+            before,
+            "{from:?} {act:?} leaves the phase"
+        );
+    }
 }
