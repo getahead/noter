@@ -88,12 +88,15 @@ public struct Detector: Sendable {
             }
             session = s
         }
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-detect:p1:inst-return-detect
         return events
+        // @cpt-end:cpt-noter-flow-core-engine-capture-detect:p1:inst-return-detect
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-detect:p1:inst-emit-facts
 }
 
 // @cpt-algo:cpt-noter-algo-core-engine-capture-zero-detect:p1
+// @cpt-dod:cpt-noter-dod-core-engine-capture-facts:p1
 /// A run of exact digital zeros on the system channel. A real quiet room is never exact zero;
 /// zeros while a meeting app plays mean the System Audio Recording permission is likely off.
 public struct ZeroRun: Sendable {

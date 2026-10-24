@@ -338,7 +338,14 @@ impl Core {
             // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-if-conflict
             other => other?,
         };
-        Ok(self.settings_written(&mut settings, section, rev))
+        let audio = matches!(section, SettingsSection::Audio(_));
+        let stamped = self.settings_written(&mut settings, section, rev);
+        drop(settings);
+        // The output route follows the headphones list (`audio_play` reads it from the environment).
+        if audio {
+            self.refresh_environment_now();
+        }
+        Ok(stamped)
     }
 
     pub(crate) fn unignore_app(
@@ -408,6 +415,8 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-side-effects
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-emit-settings
         let stamped = self.publish(event_names::SETTINGS_CHANGED, settings);
+        self.refresh_tray(Some(stamped.privacy.mode));
+        self.follow_call_screen(&stamped.call_screen);
         // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-emit-settings
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-return-settings
         stamped

@@ -84,7 +84,7 @@ After M1 the user can record calls and find them again. The list and the call re
 
 ### Browse the Library
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-library-calls-list`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-library-calls-list`
 
 **Actor**: Primary user (main window, Library)
 
@@ -96,15 +96,15 @@ After M1 the user can record calls and find them again. The list and the call re
 - The core is still starting: `not_ready`.
 
 **Steps**:
-1. [ ] - `p1` - API: `calls_list { filter, sort, page }` from the main window - `inst-list-call`
-2. [ ] - `p1` - Validate the filter; a bad one **RETURN** `invalid_input` - `inst-list-validate`
-3. [ ] - `p1` - DB: SELECT from `calls` on a read-only connection with the filters in SQL, the sort, and the page cursor - `inst-list-select`
-4. [ ] - `p1` - Assemble each `CallRow` with `cpt-noter-algo-core-library-calls-row` - `inst-list-assemble`
-5. [ ] - `p1` - **RETURN** a page of `CallRow` with the next cursor - `inst-list-return`
+1. [x] - `p1` - API: `calls_list { filter, sort, page }` from the main window - `inst-list-call`
+2. [x] - `p1` - Validate the filter; a bad one **RETURN** `invalid_input` - `inst-list-validate`
+3. [x] - `p1` - DB: SELECT from `calls` on a read-only connection with the filters in SQL, the sort, and the page cursor - `inst-list-select`
+4. [x] - `p1` - Assemble each `CallRow` with `cpt-noter-algo-core-library-calls-row` - `inst-list-assemble`
+5. [x] - `p1` - **RETURN** a page of `CallRow` with the next cursor - `inst-list-return`
 
 ### Open a call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-library-calls-get`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-library-calls-get`
 
 **Actor**: Primary user (main window Call page; call window)
 
@@ -115,14 +115,14 @@ After M1 the user can record calls and find them again. The list and the call re
 - The call was deleted: `not_found` ("no longer exists").
 
 **Steps**:
-1. [ ] - `p1` - API: `call_get { call_id }` - `inst-get-call`
-2. [ ] - `p1` - DB: SELECT the call, its speakers, marks and gaps - `inst-get-select`
-3. [ ] - `p1` - **IF** the call does not exist **RETURN** `not_found` - `inst-get-missing`
-4. [ ] - `p1` - **RETURN** `CallDetail`; outputs show `pending` until M2's pipeline exists - `inst-get-return`
+1. [x] - `p1` - API: `call_get { call_id }` - `inst-get-call`
+2. [x] - `p1` - DB: SELECT the call, its speakers, marks and gaps - `inst-get-select`
+3. [x] - `p1` - **IF** the call does not exist **RETURN** `not_found` - `inst-get-missing`
+4. [x] - `p1` - **RETURN** `CallDetail`; outputs show `pending` until M2's pipeline exists - `inst-get-return`
 
 ### Edit a call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-library-calls-update`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-library-calls-update`
 
 **Actor**: Primary user (main window)
 
@@ -134,16 +134,16 @@ After M1 the user can record calls and find them again. The list and the call re
 - An unknown call type or an empty title: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `call_update { call_id, rev, title?, call_type? }` - `inst-update-call`
-2. [ ] - `p1` - Validate; **RETURN** `invalid_input` on failure - `inst-update-validate`
-3. [ ] - `p1` - DB: UPDATE `calls` through the change-log write path with the base `rev` - `inst-update-write`
-4. [ ] - `p1` - **IF** the write returned `conflict` **RETURN** it - `inst-update-conflict`
-5. [ ] - `p1` - Emit `entity:changed { call }` - `inst-update-emit`
-6. [ ] - `p1` - **RETURN** `CallMutation` with the new row and the change id - `inst-update-return`
+1. [x] - `p1` - API: `call_update { call_id, rev, title?, call_type? }` - `inst-update-call`
+2. [x] - `p1` - Validate; **RETURN** `invalid_input` on failure - `inst-update-validate`
+3. [x] - `p1` - DB: UPDATE `calls` through the change-log write path with the base `rev` - `inst-update-write`
+4. [x] - `p1` - **IF** the write returned `conflict` **RETURN** it - `inst-update-conflict`
+5. [x] - `p1` - Emit `entity:changed { call }` - `inst-update-emit`
+6. [x] - `p1` - **RETURN** `CallMutation` with the new row and the change id - `inst-update-return`
 
 ### List call types
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-library-calls-types`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-library-calls-types`
 
 **Actor**: UI window (main, call window, Settings)
 
@@ -154,13 +154,13 @@ After M1 the user can record calls and find them again. The list and the call re
 - A user skill folder is unreadable: it is left out and logged; the built-in list is always returned.
 
 **Steps**:
-1. [ ] - `p1` - API: `call_types_list {}` - `inst-types-call`
-2. [ ] - `p1` - Read the built-in types from the app bundle's `skills/` and user types from Application Support - `inst-types-read`
-3. [ ] - `p1` - **RETURN** `CallTypeList` - `inst-types-return`
+1. [x] - `p1` - API: `call_types_list {}` - `inst-types-call`
+2. [x] - `p1` - Read the built-in types from the app bundle's `skills/` and user types from Application Support - `inst-types-read`
+3. [x] - `p1` - **RETURN** `CallTypeList` - `inst-types-return`
 
 ### Delete calls for good
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-library-calls-delete`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-library-calls-delete`
 
 **Actor**: Primary user (main window, after the native alert that says what goes and that it cannot be undone)
 
@@ -172,53 +172,53 @@ After M1 the user can record calls and find them again. The list and the call re
 - A call is already gone: it is skipped and not counted.
 
 **Steps**:
-1. [ ] - `p1` - API: `calls_delete { call_ids }` from the main window only (the call window may not delete) - `inst-delete-call`
-2. [ ] - `p1` - **IF** any id is the live call **RETURN** `already_recording` - `inst-delete-live`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-library-calls-delete` - `inst-delete-run`
-4. [ ] - `p1` - Emit `entity:changed { removed }` for each deleted call - `inst-delete-emit`
-5. [ ] - `p1` - **RETURN** `DeleteResult { deleted }` - `inst-delete-return`
+1. [x] - `p1` - API: `calls_delete { call_ids }` from the main window only (the call window may not delete) - `inst-delete-call`
+2. [x] - `p1` - **IF** any id is the live call **RETURN** `already_recording` - `inst-delete-live`
+3. [x] - `p1` - Run `cpt-noter-algo-core-library-calls-delete` - `inst-delete-run`
+4. [x] - `p1` - Emit `entity:changed { removed }` for each deleted call - `inst-delete-emit`
+5. [x] - `p1` - **RETURN** `DeleteResult { deleted }` - `inst-delete-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Assemble a call row
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-library-calls-row`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-library-calls-row`
 
 **Input**: A `calls` row and its related rows.
 
 **Output**: A `CallRow` complete for the Library view.
 
 **Steps**:
-1. [ ] - `p1` - Copy the stored fields (title, type, start, duration, privacy, status, archive status, audio retention and deletion) - `inst-row-fields`
-2. [ ] - `p1` - Derive languages from the call's segments and count unnamed speakers - `inst-row-derive`
-3. [ ] - `p1` - Leave participants, tags, open items and reviews empty or zero until their features land (M2, M3) - `inst-row-later`
-4. [ ] - `p1` - **RETURN** the row - `inst-row-return`
+1. [x] - `p1` - Copy the stored fields (title, type, start, duration, privacy, status, archive status, audio retention and deletion) - `inst-row-fields`
+2. [x] - `p1` - Derive languages from the call's segments and count unnamed speakers - `inst-row-derive`
+3. [x] - `p1` - Leave participants, tags, open items and reviews empty or zero until their features land (M2, M3) - `inst-row-later`
+4. [x] - `p1` - **RETURN** the row - `inst-row-return`
 
 ### Delete calls and their files
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-library-calls-delete`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-library-calls-delete`
 
 **Input**: Call ids that are not live.
 
 **Output**: Rows and files removed; one change row per call, not undoable.
 
 **Steps**:
-1. [ ] - `p1` - **FOR EACH** call - `inst-del-for`
-   1. [ ] - `p1` - DB: in one writer transaction, DELETE the call (cascading to segments, speakers, marks, gaps and later tables) and INSERT a `changes` row with `undoable = 0` and a summary without content - `inst-del-tx`
-   2. [ ] - `p1` - Remove `audio/<call_id>/` from the App Group container after the commit - `inst-del-files`
-   3. [ ] - `p1` - **CATCH** a file removal failure: log it and retry at the next start; the rows stay deleted - `inst-del-catch`
-2. [ ] - `p1` - **RETURN** the count deleted - `inst-del-return`
+1. [x] - `p1` - **FOR EACH** call - `inst-del-for`
+   1. [x] - `p1` - DB: in one writer transaction, DELETE the call (cascading to segments, speakers, marks, gaps and later tables) and INSERT a `changes` row with `undoable = 0` and a summary without content - `inst-del-tx`
+   2. [x] - `p1` - Remove `audio/<call_id>/` from the App Group container after the commit - `inst-del-files`
+   3. [x] - `p1` - **CATCH** a file removal failure: log it and retry at the next start; the rows stay deleted - `inst-del-catch`
+2. [x] - `p1` - **RETURN** the count deleted - `inst-del-return`
 
 ### Fixture parity
 
-- [ ] `p2` - **ID**: `cpt-noter-algo-core-library-calls-fixture-parity`
+- [x] `p2` - **ID**: `cpt-noter-algo-core-library-calls-fixture-parity`
 
 **Input**: The typed fixture world, an injected clock.
 
 **Output**: The fake world regenerated through the real read models, and a comparison of the listed fields.
 
 **Steps**:
-1. [ ] - `p1` - Seed the fixture calls, segments, speakers, marks and gaps as database rows - `inst-parity-seed`
+1. [x] - `p1` - Seed the fixture calls, segments, speakers, marks and gaps as database rows - `inst-parity-seed`
 2. [x] - `p1` - Run `calls_list`, `call_get` and the transcript snapshot over them with the injected clock - `inst-parity-run`
 3. [x] - `p1` - Compare the fields the test lists with the fake world's values; a difference fails the test - `inst-parity-compare`
 4. [x] - `p1` - **RETURN** pass or the differing fields - `inst-parity-return`
@@ -245,7 +245,7 @@ After M1 the user can record calls and find them again. The list and the call re
 
 ### List and detail read models
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-library-calls-read`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-library-calls-read`
 
 The system **MUST** answer `calls_list` with filters in SQL, sort and cursor pages, and `call_get` with a `CallDetail` complete for its view, both from read-only connections, with the call status following the state machine above.
 
@@ -262,7 +262,7 @@ The system **MUST** answer `calls_list` with filters in SQL, sort and cursor pag
 
 ### Edits and call types
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-library-calls-edit`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-library-calls-edit`
 
 The system **MUST** apply `call_update` with the `rev` guard through the change log and broadcast `entity:changed`, and list call types from the built-in list and the user's skill folders.
 
@@ -277,7 +277,7 @@ The system **MUST** apply `call_update` with the `rev` guard through the change 
 
 ### Delete for good
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-library-calls-delete`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-library-calls-delete`
 
 The system **MUST** delete calls with every row and file recorded for them, refuse to delete the live call, log each deletion as a non-undoable change without content, and allow it only from the main window.
 

@@ -15,11 +15,13 @@ use std::sync::{Arc, Mutex};
 
 use noter_core::{
     BoxFuture as CoreFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Surfaces,
-    SystemClock, Updater,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Placement, Surfaces,
+    SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
-use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
+use noter_protocol::engine::{
+    EngineCommand, EngineErrorCode, EngineEvent, EngineSegment, EngineSegmentState,
+};
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
@@ -139,11 +141,68 @@ impl Harness {
         }
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-seed
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
+        if options.fixture {
+            harness.feed_engine(&w);
+        }
         seeding.store(false, Ordering::SeqCst);
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
         eprintln!("noter-core-harness: core open in {}", harness.dir.display());
         Ok(harness)
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-return-booted
+    }
+
+    /// The engine's meters: levels every 100 ms, for the call being captured or (none) the mic
+    /// check, and while the fixture's own live call records, its current hypotheses every 300 ms,
+    /// so a window subscribed to it sees a stream that moves. Nothing is delivered until the
+    /// engine runs (subscribing to a stream starts it). Confirmed lines are not invented: they
+    /// would add rows the fixture does not have.
+    fn feed_engine(&self, w: &FakeWorld) {
+        let fixture_call = w.app.capture.call_id.clone();
+        let hypotheses: Vec<EngineSegment> = w
+            .transcripts
+            .iter()
+            .filter(|t| Some(&t.call_id) == fixture_call.as_ref())
+            .flat_map(|t| t.hypotheses.iter())
+            .map(|h| EngineSegment {
+                id: h.id.as_str().to_string(),
+                call_id: h.call_id.clone(),
+                channel: h.channel,
+                t0_ms: h.t0_ms,
+                t1_ms: h.t1_ms,
+                state: EngineSegmentState::Hypothesis,
+                lang: h.lang.clone(),
+                lang_p: h.lang_p,
+                speaker_label: match &h.speaker.label {
+                    SpeakerLabel::Person { person } => person.display_name.clone(),
+                    SpeakerLabel::Unnamed { n } => format!("spk_{n}"),
+                    SpeakerLabel::GuestYourSide => "guest_your_side".into(),
+                    SpeakerLabel::You => "you".into(),
+                },
+                text: h.text.clone(),
+                words_path: None,
+                avg_logprob: 0.0,
+                no_speech_p: 0.0,
+                corrections: vec![],
+                crosstalk_labels: vec![],
+            })
+            .collect();
+        let (core, engine) = (self.core.clone(), self.engine.clone());
+        tokio::spawn(async move {
+            for tick in 0_u64.. {
+                let capturing = noter_core::testing::capturing(&core);
+                engine.inject(EngineEvent::Levels {
+                    call_id: capturing.clone(),
+                    mic_db: -32.0,
+                    sys_db: -38.0,
+                });
+                if tick % 3 == 0 && capturing.is_some() && capturing == fixture_call {
+                    for h in &hypotheses {
+                        engine.inject(EngineEvent::Segment { segment: h.clone() });
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        });
     }
 
     /// The core, for `serve_with`.
@@ -172,8 +231,33 @@ impl Harness {
         Ok(())
     }
 
+    /// Removes every call (and with it its segments, speakers, marks, gaps and tags).
+    fn clear_calls(&self) -> Result<(), CoreError> {
+        let ids: Vec<String> = self.core.store().read(|c| {
+            c.prepare("SELECT id FROM calls")?
+                .query_map([], |r| r.get(0))?
+                .collect()
+        })?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let meta = noter_db::ChangeMeta {
+            actor: Actor::You,
+            summary: "harness world_set".into(),
+            reason: "harness".into(),
+            evidence_ids: vec![],
+            batch_id: None,
+            undoable: false,
+            surface: None,
+        };
+        self.core.store().delete("call", "calls", ids, meta)?;
+        Ok(())
+    }
+
     /// Writes the world's calls, speakers, segments, marks and gaps as rows, the way capture
+    /// writes them (`cpt-noter-algo-core-library-calls-fixture-parity`, `inst-parity-seed`).
     fn seed_calls(&self, wanted: &Value) -> Result<(), CoreError> {
+        // @cpt-begin:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
             table,
             values,
@@ -223,6 +307,17 @@ impl Harness {
                     ),
                 ],
             ));
+            for tag in call["tags"].as_array().unwrap_or(&empty) {
+                let text = tag.as_str().unwrap_or_default();
+                rows.push(ins(
+                    "call_tags",
+                    vec![
+                        ("call_id", id.clone()),
+                        ("tag", json!(text)),
+                        ("tag_norm", json!(text.to_lowercase())),
+                    ],
+                ));
+            }
             let transcript = transcripts.iter().find(|t| t["call_id"] == *id);
             let pass = transcript.map_or(json!("live"), |t| t["pass"].clone());
             let Some(d) = detail else { continue };
@@ -303,6 +398,7 @@ impl Harness {
                 ));
             }
         }
+        // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         self.core.store().insert_batch(rows)
     }
 
@@ -474,6 +570,24 @@ impl Harness {
         w["app"]["setup"] = self
             .call(WindowLabel::FirstRun, "setup_status", json!({}))
             .await?;
+        // The library's read models: what `calls_list` and `call_get` serve over the seeded rows.
+        let page = self
+            .call(
+                WindowLabel::Main,
+                "calls_list",
+                json!({ "filter": {}, "sort": "newest", "page": { "limit": 500 } }),
+            )
+            .await?;
+        let mut details = vec![];
+        for call in page["rows"].as_array().into_iter().flatten() {
+            let args = json!({ "call_id": call["id"] });
+            details.push(self.call(WindowLabel::Main, "call_get", args).await?);
+        }
+        w["calls"] = page["rows"].clone();
+        w["call_details"] = Value::Array(details);
+        w["call_types"] = self
+            .call(WindowLabel::Main, "call_types_list", json!({}))
+            .await?;
         Ok(w)
     }
 
@@ -493,7 +607,11 @@ impl Harness {
         let current = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
         let mut refused = vec![];
         for (key, value) in wanted.as_object().into_iter().flatten() {
-            if current.get(key) == Some(value) || matches!(key.as_str(), "now" | "settings" | "app")
+            if current.get(key) == Some(value)
+                || matches!(
+                    key.as_str(),
+                    "now" | "settings" | "app" | "calls" | "call_details"
+                )
             {
                 continue;
             }
@@ -515,6 +633,16 @@ impl Harness {
         }
         self.write_settings(&wanted["settings"]).await?;
         self.write_setup(&wanted["app"]["setup"]).await?;
+        // Compared with the last accepted world: the rows the core serves differ from the
+        // fixture in the fields later features own (people, items).
+        let accepted = to_json(&*lock(&self.world));
+        if ["calls", "call_details"]
+            .iter()
+            .any(|k| accepted[k] != wanted[k])
+        {
+            self.clear_calls()?;
+            self.seed_calls(&wanted)?;
+        }
         if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
             noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());
         }
@@ -559,6 +687,9 @@ impl Harness {
         };
         if unversioned(&current["app"]["capture"]) != unversioned(&wanted["app"]["capture"]) {
             noter_core::testing::seed_capture(&self.core, parsed.app.capture.clone()).await?;
+        }
+        if unversioned(&current["app"]["presenting"]) != unversioned(&wanted["app"]["presenting"]) {
+            noter_core::testing::seed_presenting(&self.core, parsed.app.presenting.hidden);
         }
         // Derived fields are the core's to compute; a world that disagrees with it is a preset
         // that drifted from the core's rules (what was applied stays applied).
@@ -651,7 +782,14 @@ fn parse<T: serde::de::DeserializeOwned>(args: Value, usage: &str) -> Result<T, 
 
 /// App snapshot slices the harness can set on the M0 core; `window` is the caller's own and the
 /// version-only slices follow their owners.
-const OWNED_APP: &[&str] = &["setup", "environment", "banners", "window", "capture"];
+const OWNED_APP: &[&str] = &[
+    "setup",
+    "environment",
+    "banners",
+    "window",
+    "capture",
+    "presenting",
+];
 
 impl Controls for Harness {
     fn control<'a>(
@@ -1029,23 +1167,72 @@ fn hex(bytes: &[u8]) -> String {
 /// the harness's.
 /// The native layer's windows, as the calls the core made (TL-2).
 #[derive(Default)]
-struct ScriptedSurfaces(Mutex<Vec<&'static str>>);
+struct ScriptedSurfaces(Mutex<Vec<String>>, AtomicBool, AtomicBool);
+
+impl ScriptedSurfaces {
+    fn note(&self, call: impl Into<String>) {
+        lock(&self.0).push(call.into());
+    }
+}
 
 impl Surfaces for ScriptedSurfaces {
     fn show_record_prompt(&self) {
-        lock(&self.0).push("show_record_prompt");
+        self.note("show_record_prompt");
     }
     fn close_record_prompt(&self) {
-        lock(&self.0).push("close_record_prompt");
+        self.note("close_record_prompt");
     }
-    fn open_call_window_inactive(&self) {
-        lock(&self.0).push("open_call_window_inactive");
+    fn show_call_window(&self, _: &Placement) {
+        self.1.store(true, Ordering::SeqCst);
+        // The name the capture stories look for: the call window opens without taking focus.
+        self.note("open_call_window_inactive");
+    }
+    fn make_call_window_key(&self) {
+        self.note("make_call_window_key");
+    }
+    fn place_call_window(&self, placement: &Placement, collapsed: bool) {
+        self.note(format!(
+            "place_call_window {:?} collapsed={collapsed}",
+            placement.layout
+        ));
+    }
+    fn hide_call_window(&self) {
+        self.1.store(false, Ordering::SeqCst);
+        self.note("hide_call_window");
+    }
+    fn hide_all(&self) {
+        self.2
+            .store(self.1.swap(false, Ordering::SeqCst), Ordering::SeqCst);
+        self.note("hide_all");
+    }
+    fn restore_all(&self) {
+        self.1
+            .store(self.2.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.note("restore_all");
+    }
+    fn set_tray(&self, tray: &TrayModel) {
+        self.note(format!("set_tray {:?} {}", tray.glyph, tray.status));
+    }
+    fn announce(&self, text: &str, _politeness: Politeness) {
+        self.note(format!("announce {text}"));
+    }
+    fn open_external(&self, target: &ExternalTarget) {
+        let kind = match target {
+            ExternalTarget::Url { .. } => "url",
+            ExternalTarget::Document { .. } => "document",
+            ExternalTarget::SystemSettings { .. } => "system_settings",
+            ExternalTarget::RevealInFinder { .. } => "reveal_in_finder",
+        };
+        self.note(format!("open_external {kind}"));
+    }
+    fn show_window(&self, window: WindowLabel) {
+        self.note(format!("show_window {}", window.as_str()));
     }
     fn call_surface_visible(&self) -> bool {
-        false
+        self.1.load(Ordering::SeqCst)
     }
     fn post_notification(&self, _: &noter_core::Notification) {
-        lock(&self.0).push("post_notification");
+        self.note("post_notification");
     }
 }
 

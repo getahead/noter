@@ -2303,6 +2303,7 @@ dependencies = [
  "libc",
  "noter-protocol",
  "objc2",
+ "objc2-app-kit",
  "objc2-av-foundation",
  "objc2-core-audio",
  "objc2-core-foundation",
@@ -2312,6 +2313,7 @@ dependencies = [
  "objc2-security",
  "objc2-service-management",
  "objc2-user-notifications",
+ "serde_json",
  "system-configuration 0.8.0",
 ]
 

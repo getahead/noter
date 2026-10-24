@@ -22,7 +22,6 @@ public final class FilePlayer: Player, @unchecked Sendable {
 
     public init() {}
 
-    // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-play-excluded
     public func play(_ files: [URL], fromMs: Int, toMs: Int?, position: @escaping @Sendable (Int, Bool) -> Void) throws {
         stop()
         let engine = AVAudioEngine()
@@ -47,7 +46,6 @@ public final class FilePlayer: Player, @unchecked Sendable {
         }
         try engine.start()
         nodes.forEach { $0.play() }
-        // @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-play-excluded
         // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-position
         func head() -> Int {
             guard let now = lead.lastRenderTime, let t = lead.playerTime(forNodeTime: now) else { return fromMs }

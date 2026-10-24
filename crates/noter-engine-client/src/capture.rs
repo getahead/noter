@@ -218,9 +218,11 @@ impl<L: EngineLauncher> EngineClient<L> {
             });
             // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
         }
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
         let Err(e) = self.command(EngineCommand::StartSession(start)).await else {
             return Ok(());
         };
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
         let mut s = self.shared();
         match s.session.as_ref().map(|x| (x.state, x.failures.is_empty())) {
             // The engine died after taking the command: the capture-first restart has it.

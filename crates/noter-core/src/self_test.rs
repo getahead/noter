@@ -200,9 +200,12 @@ impl Core {
                     arrived.push(channel);
                     send(SelfTestEvent::StreamArrived { channel });
                 }
-                EngineEvent::Levels { mic_db, sys_db, .. } => {
-                    send(SelfTestEvent::Levels { mic_db, sys_db })
-                }
+                // A call's levels (call_id set) are the transcript's, not the self-test's.
+                EngineEvent::Levels {
+                    call_id: None,
+                    mic_db,
+                    sys_db,
+                } => send(SelfTestEvent::Levels { mic_db, sys_db }),
                 EngineEvent::SelfTestLine { channel, text } => {
                     send(SelfTestEvent::Line { channel, text })
                 }

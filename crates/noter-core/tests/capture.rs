@@ -103,9 +103,18 @@ impl Surfaces for Shown {
     fn close_record_prompt(&self) {
         self.0.lock().unwrap().push("close_record_prompt");
     }
-    fn open_call_window_inactive(&self) {
-        self.0.lock().unwrap().push("open_call_window_inactive");
+    fn show_call_window(&self, _: &noter_core::Placement) {
+        self.0.lock().unwrap().push("show_call_window");
     }
+    fn make_call_window_key(&self) {}
+    fn place_call_window(&self, _: &noter_core::Placement, _: bool) {}
+    fn hide_call_window(&self) {}
+    fn hide_all(&self) {}
+    fn restore_all(&self) {}
+    fn set_tray(&self, _: &noter_core::TrayModel) {}
+    fn announce(&self, _: &str, _: noter_protocol::model::Politeness) {}
+    fn open_external(&self, _: &noter_protocol::model::ExternalTarget) {}
+    fn show_window(&self, _: noter_protocol::model::WindowLabel) {}
     fn call_surface_visible(&self) -> bool {
         self.2.load(Ordering::SeqCst)
     }
@@ -455,7 +464,7 @@ async fn a_start_creates_the_call_and_records_once_the_engine_session_started() 
     let recording = r.phase_becomes(CapturePhase::Recording).await;
     assert_eq!(recording.call_id, Some(call_id.clone()));
     assert!(recording.audio_writing);
-    assert_eq!(*r.shown.0.lock().unwrap(), ["open_call_window_inactive"]);
+    assert_eq!(*r.shown.0.lock().unwrap(), ["show_call_window"]);
 
     let row: (String, String, i64) = r
         .core
@@ -1209,6 +1218,19 @@ async fn the_engine_hears_the_meeting_apps_and_browsers_minus_the_ignored_ones()
         .iter()
         .any(|b| b == ZOOM || b == "com.brave.Browser"));
     assert!(known_bundle_ids.iter().any(|b| b == "com.apple.Safari"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_call_detected_while_hidden_for_presenting_draws_no_prompt() {
+    let r = rig();
+    r.detection_on().await;
+    r.offer_to_record(true).await;
+    noter_core::testing::seed_presenting(&r.core, true);
+    r.call_detected(ZOOM, "Zoom");
+    // The menu still offers it (Call Detected · Start Recording); nothing is drawn.
+    let d = r.detection_becomes(|d| d.is_some()).await;
+    assert!(d.is_some());
+    assert!(!r.shown.0.lock().unwrap().contains(&"show_record_prompt"));
 }
 
 #[tokio::test(start_paused = true)]

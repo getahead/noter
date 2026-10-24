@@ -263,6 +263,7 @@ describe("cpt-noter-seq-menu-bar-control-recording", () => {
     const mark = ok(await s.core("call-screen").captureMarkMoment({ call_id: callId }));
     expect(mark.call_id).toBe(callId);
     expect(ok(await main.captureSetPaused({ call_id: callId, paused: true })).phase).toBe("paused");
+    await sleep(20); // a pause that lasts no time leaves no gap (and the real core's clock counts milliseconds)
     expect(ok(await main.captureSetPaused({ call_id: callId, paused: false })).phase).toBe("recording");
     expect(ok(await main.captureStop({ call_id: callId })).phase).toBe("stopped");
     await until(() => states.latest()?.phase === "stopped", "capture:state stopped");

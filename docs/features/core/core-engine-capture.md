@@ -53,7 +53,7 @@ design: docs/DESIGN-core.md
 
 The engine gains its main job: a global Core Audio process tap (excluding the engine's and the app's PIDs) and the microphone on one clock, written into a capture ring that is a memory-mapped file in the App Group container, and to AAC-LC files unless the call stores no audio. VAD, per-utterance language ID and Noter's streaming decode loop on WhisperKit produce hypotheses about once a second and confirmed segments with live speaker labels. Detection listeners report meeting apps. Replay plays a span natively. On the Rust side, the supervisor restarts a crashed engine in capture-first mode and translates engine facts into degraded states.
 
-> **M1 decisions (Backend Teamlead, 21 Oct 2026).** There are two restart rules in `noter-engine-client`: the idle restart (3 in 60 s, M0) and the capture-first restart (3 in 30 s, then `CaptureFailed`); the supervisor picks one by whether a session is running (TL-8). The Swift protocol types stay hand-written for M1, without code generation (TL-9). The scripted engine follows `.plans/engine-script-format.md` (JSON Lines with `on`, `after_ms` and `event` or `kill`), so the Q7 kill drill is proven on it before the owner runs it on the Mac (TL-3).
+> **M1 decisions (Backend Teamlead, 21 Oct 2026).** There are two restart rules in `noter-engine-client`: the idle restart (3 in 60 s, M0) and the capture-first restart (3 in 30 s, then `CaptureFailed`); the supervisor picks one by whether a session is running (TL-8). The Swift protocol types stay hand-written for M1, without code generation (TL-9). The scripted engine follows `.plans/engine-script-format.md` (JSON Lines with `on`, `after_ms` and `event` or `kill`), so the Q7 kill drill is proven on it before the owner runs it on the Mac (TL-3). M1 live labels are per side (You and `spk_1`, one `speakers` row of pass `live`); diarization stays with the offline pass (D-32).
 
 ### 1.2 Purpose
 
@@ -84,7 +84,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Capture a session
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-session`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-session`
 
 **Actor**: Engine supervisor (on behalf of the session manager)
 
@@ -98,7 +98,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The live model fails to load: `error { model_load_failed }`; the supervisor reports `engine_unavailable`.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
+1. [x] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
 2. [x] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
@@ -107,11 +107,11 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
    1. [x] - `p1` - Engine stops both streams (no audio kept while paused) until `resume` - `inst-pause-streams`
 7. [x] - `p1` - **IF** the supervisor sends `stop` - `inst-if-stop`
    1. [x] - `p1` - Engine flushes the decoder and writers, writes `timeline.json`, emits `session_stopped { call_id, timeline_path, mic_path, sys_path }` - `inst-stop`
-8. [ ] - `p1` - **RETURN** - `inst-return-session`
+8. [x] - `p1` - **RETURN** - `inst-return-session`
 
 ### Detect a call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-detect`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-detect`
 
 **Actor**: Meeting app
 
@@ -122,14 +122,14 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - Detection is off (`set_detection { enabled: false }`): no detection events; capture started by hand still works.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sends `set_detection { enabled, known_bundle_ids }` whenever the detection rule changes - `inst-set-detection`
+1. [x] - `p1` - Supervisor sends `set_detection { enabled, known_bundle_ids }` whenever the detection rule changes - `inst-set-detection`
 2. [x] - `p1` - **IF** enabled, engine listens for audio-process and microphone-use changes of known bundles - `inst-listen`
 3. [x] - `p1` - Engine emits `call_detected`, `call_audio_released` or `audio_source_added` as facts; it never decides to record - `inst-emit-facts`
-4. [ ] - `p1` - **RETURN** - `inst-return-detect`
+4. [x] - `p1` - **RETURN** - `inst-return-detect`
 
 ### Recover from an engine crash during capture
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-recover`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-recover`
 
 **Actor**: Engine supervisor
 
@@ -142,7 +142,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Steps**:
 1. [x] - `p1` - Supervisor sees the process exit or miss `ping` while a session runs, instead of the idle restart of `cpt-noter-algo-core-engine-foundation-restart` (moved from its `inst-if-capture`, decision D-12) - `inst-see-crash`
 2. [x] - `p1` - Supervisor respawns the engine and sends `start_session` with the same `call_id` and `resume_from_ms` = the ring's last written offset - `inst-respawn`
-3. [ ] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
+3. [x] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
 4. [x] - `p1` - Supervisor reports a gap `engine_restart` from the last confirmed audio to the resumed offset - `inst-report-gap`
 5. [x] - `p1` - **IF** the restart fails three times within 30 s - `inst-if-restart-fails`
    1. [x] - `p1` - **RETURN** `CaptureFailed { call_id, since }` to the session manager - `inst-return-failed`
@@ -150,7 +150,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Replay a span
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-engine-capture-replay`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-engine-capture-replay`
 
 **Actor**: Engine supervisor (on behalf of the transcript)
 
@@ -164,7 +164,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 1. [x] - `p1` - Supervisor sends `play` - `inst-play`
 2. [x] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
 3. [x] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
-4. [ ] - `p1` - **RETURN** - `inst-return-replay`
+4. [x] - `p1` - **RETURN** - `inst-return-replay`
 
 ### Complete the self-test on the capture pipeline
 
@@ -188,7 +188,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Live ASR loop
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-live-asr`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-live-asr`
 
 **Input**: Audio frames per channel from the ring, the glossary, languages and speaker priors of the session.
 
@@ -201,7 +201,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 4. [x] - `p1` - When an utterance is stable, apply the hallucination and term filters and the glossary, then emit it as confirmed with a live speaker label - `inst-confirm`
 5. [x] - `p1` - **IF** speech flows on a channel but no segment was produced for 10 s, emit `no_segments { since_ms }` - `inst-no-segments`
 6. [x] - `p1` - **IF** both channels carry no speech for the silence window, emit `silence { since_ms }` - `inst-silence`
-7. [ ] - `p1` - **RETURN** per frame batch - `inst-return-asr`
+7. [x] - `p1` - **RETURN** per frame batch - `inst-return-asr`
 
 ### System audio silence detection
 
@@ -258,7 +258,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Capture pipeline
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
 
 The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container, write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop.
 
@@ -324,7 +324,7 @@ The owner moved this measurement from the M0 throwaway spike on 20 Oct 2026 afte
 
 ### Silence, stall and device facts
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-facts`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-facts`
 
 The system **MUST** detect exact digital zeros on the system channel as `system_audio_silent` with a confidence, report stalls after 10 s without segments while audio flows, and report device changes with their gap bounds, so the session manager can show `SystemAudioSilent`, `TranscriptionStalled`, `MicrophoneOff` and `DeviceChanged`.
 

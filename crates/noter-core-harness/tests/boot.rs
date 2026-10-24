@@ -205,19 +205,51 @@ async fn world_set_writes_owned_slices_through_the_core() {
 async fn world_set_refuses_a_slice_no_service_owns_yet() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
-    world["calls"] = json!([]);
+    world["items"] = json!([]);
     let (set, events) = r
         .call("main", "harness.world_set", json!({ "world": world }))
         .await;
     assert_eq!(set["error"]["code"], "not_implemented");
     assert!(
-        set["error"]["message"].as_str().unwrap().contains("calls"),
+        set["error"]["message"].as_str().unwrap().contains("items"),
         "{set}"
     );
     assert!(
         events.is_empty(),
         "nothing is applied when a slice is refused"
     );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_fixture_calls_are_rows_the_library_serves_and_world_set_owns_them() {
+    let mut r = start().await;
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let ids: Vec<_> = world["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].clone())
+        .collect();
+    assert_eq!(ids, [json!("call_live"), json!("call_backend")]);
+    assert_eq!(
+        world["call_details"][0]["speakers"]
+            .as_array()
+            .unwrap()
+            .len(),
+        5
+    );
+    assert_eq!(
+        world["call_types"]["call_types"].as_array().unwrap().len(),
+        8
+    );
+    let mut empty = world.clone();
+    empty["calls"] = json!([]);
+    empty["call_details"] = json!([]);
+    r.ok("main", "harness.world_set", json!({ "world": empty }))
+        .await;
+    let after = r.ok("main", "harness.world_get", json!({})).await;
+    assert_eq!(after["calls"], json!([]));
     r.finish().await;
 }
 
@@ -803,8 +835,18 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     world["app"]["capture"]["call_id"] = json!(null);
     r.ok("main", "harness.world_set", json!({ "world": world }))
         .await;
+    // Windows only: the tray model is redrawn on every capture change.
+    let windows = |shown: Value| -> Vec<String> {
+        shown["calls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|c| c.as_str().filter(|c| !c.starts_with("set_tray")))
+            .map(String::from)
+            .collect()
+    };
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert_eq!(shown, json!({ "calls": [] }));
+    assert!(windows(shown).is_empty());
     // The scripted engine answers the session: the start records and the call window opens.
     let started = r
         .ok(
@@ -820,7 +862,9 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
         .await;
     assert_eq!(stopped["phase"], "stopped");
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert_eq!(shown, json!({ "calls": ["open_call_window_inactive"] }));
+    let windows = windows(shown);
+    assert_eq!(windows.len(), 1, "{windows:?}");
+    assert!(windows[0] == "open_call_window_inactive", "{windows:?}");
     r.finish().await;
 }
 

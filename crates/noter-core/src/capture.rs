@@ -17,7 +17,7 @@ use tokio::sync::broadcast::error::RecvError;
 
 use crate::app::WholeState;
 use crate::notify::Notification;
-use crate::{internal, lock, Core};
+use crate::{internal, lock, Core, Placement, TrayModel};
 
 /// Windows and panels the core asks the native layer for (TL-2). The app implements it over
 /// AppKit; the harness records the calls.
@@ -25,8 +25,23 @@ pub trait Surfaces: Send + Sync {
     /// The record prompt, shown without taking focus.
     fn show_record_prompt(&self);
     fn close_record_prompt(&self);
-    /// The call window on the call display, without taking focus.
-    fn open_call_window_inactive(&self);
+    /// The call window on the chosen placement, without taking focus.
+    fn show_call_window(&self, placement: &Placement);
+    /// A second request: the shown call window becomes key (PM-40).
+    fn make_call_window_key(&self);
+    /// The layout, display or strip state of the shown call window changed.
+    fn place_call_window(&self, placement: &Placement, collapsed: bool);
+    fn hide_call_window(&self);
+    /// Hide for presenting: every window and panel goes; the native layer remembers which.
+    fn hide_all(&self);
+    fn restore_all(&self);
+    fn set_tray(&self, tray: &TrayModel);
+    /// An NSAccessibility announcement for a panel that is not key (D55).
+    fn announce(&self, text: &str, politeness: Politeness);
+    /// Opens a target the core has already checked.
+    fn open_external(&self, target: &ExternalTarget);
+    /// Shows a window (the main window, Settings, First run) without moving its content.
+    fn show_window(&self, window: WindowLabel);
     /// The call window or the floating panel is on screen.
     fn call_surface_visible(&self) -> bool;
     /// Delivers a notification now (`UNUserNotificationCenter`); when is the core's rule.
@@ -39,7 +54,16 @@ pub(crate) struct NoSurfaces;
 impl Surfaces for NoSurfaces {
     fn show_record_prompt(&self) {}
     fn close_record_prompt(&self) {}
-    fn open_call_window_inactive(&self) {}
+    fn show_call_window(&self, _: &Placement) {}
+    fn make_call_window_key(&self) {}
+    fn place_call_window(&self, _: &Placement, _: bool) {}
+    fn hide_call_window(&self) {}
+    fn hide_all(&self) {}
+    fn restore_all(&self) {}
+    fn set_tray(&self, _: &TrayModel) {}
+    fn announce(&self, _: &str, _: Politeness) {}
+    fn open_external(&self, _: &ExternalTarget) {}
+    fn show_window(&self, _: WindowLabel) {}
     fn call_surface_visible(&self) -> bool {
         false
     }
@@ -278,7 +302,7 @@ impl Core {
         lock(&self.capture_hooks).push(Box::new(hook));
     }
 
-    fn capture_event(&self, event: CaptureEvent) {
+    pub(crate) fn capture_event(&self, event: CaptureEvent) {
         for hook in lock(&self.capture_hooks).iter() {
             hook(&event);
         }
@@ -294,6 +318,8 @@ impl Core {
         change(&mut app.capture);
         let state = self.publish(event_names::CAPTURE_STATE, &mut app.capture);
         self.capture_phase.send_replace(state.phase);
+        drop(app);
+        self.refresh_tray(None);
         state
     }
 
@@ -546,7 +572,7 @@ impl Core {
                 // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-recording
                 if state.phase == CapturePhase::Starting && state.call_id == Some(call_id) {
                     self.set_capture(|c| c.phase = CapturePhase::Recording);
-                    self.deps.surfaces.open_call_window_inactive();
+                    self.show_call(false);
                     self.listen_for_speech(&mut session);
                 }
                 // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-recording

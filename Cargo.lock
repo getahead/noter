@@ -781,6 +781,7 @@ dependencies = [
  "libc",
  "noter-protocol",
  "objc2",
+ "objc2-app-kit",
  "objc2-av-foundation",
  "objc2-core-audio",
  "objc2-core-foundation",
@@ -790,6 +791,7 @@ dependencies = [
  "objc2-security",
  "objc2-service-management",
  "objc2-user-notifications",
+ "serde_json",
  "system-configuration",
 ]
 
@@ -820,6 +822,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
+ "bitflags",
  "objc2",
  "objc2-foundation",
 ]

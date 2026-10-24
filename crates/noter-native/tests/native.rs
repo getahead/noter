@@ -217,3 +217,80 @@ fn turning_the_login_item_off_never_registers_anything() {
         Err(message) => assert!(!message.is_empty()),
     }
 }
+
+// ── native surfaces (core-native-surfaces): the pure halves ──────────────────
+
+use noter_protocol::model::{CalendarEventRef, CallPageTab, NavTarget, Politeness};
+use noter_protocol::{CalendarEventId, CallId, TimestampMs};
+
+fn event(id: &str, starts_at: i64, ends_at: i64) -> CalendarEventRef {
+    CalendarEventRef {
+        id: CalendarEventId(id.into()),
+        title: id.into(),
+        starts_at: TimestampMs(starts_at),
+        ends_at: TimestampMs(ends_at),
+    }
+}
+
+#[test]
+fn a_notification_carries_its_target_and_a_click_gives_it_back() {
+    let target = NavTarget::CallPage {
+        call_id: CallId::new("call_1"),
+        tab: CallPageTab::Transcript,
+        span: None,
+    };
+    let info = nav_user_info(&target);
+    assert_eq!(nav_from_user_info(&info), Some(target));
+    assert_eq!(
+        nav_from_user_info("not json"),
+        None,
+        "a click from elsewhere opens nothing"
+    );
+}
+
+#[test]
+fn an_assertive_announcement_has_the_high_priority() {
+    // NSAccessibilityPriorityLevel: medium 50, high 90.
+    assert_eq!(announcement_priority(Politeness::Polite), 50);
+    assert_eq!(announcement_priority(Politeness::Assertive), 90);
+}
+
+#[test]
+fn the_calendar_event_near_a_moment_is_the_running_one_or_the_next_within_10_minutes() {
+    let at = 1_000_000_000;
+    let min = 60_000;
+    let running = event("running", at - 30 * min, at + 30 * min);
+    let soon = event("soon", at + 5 * min, at + 35 * min);
+    let later = event("later", at + 11 * min, at + 40 * min);
+    let past = event("past", at - 60 * min, at - 1);
+    assert_eq!(
+        nearest_event(vec![later.clone(), soon.clone(), running.clone()], at),
+        Some(running.clone())
+    );
+    assert_eq!(
+        nearest_event(vec![later.clone(), soon.clone(), past.clone()], at),
+        Some(soon)
+    );
+    assert_eq!(nearest_event(vec![later, past], at), None);
+    // Two running: the one that started last is the call now.
+    let newer = event("newer", at - 5 * min, at + 25 * min);
+    assert_eq!(nearest_event(vec![running, newer.clone()], at), Some(newer));
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn off_macos_the_surfaces_do_nothing() {
+    let id = noter_protocol::DisplayId::new("display_1");
+    assert_eq!(display_frame(&id), None);
+    let n = PostedNotification {
+        id: "n1".into(),
+        title: "t".into(),
+        body: "b".into(),
+        thread: CallId::new("call_1"),
+        target: NavTarget::Today,
+    };
+    assert_eq!(post_notification(&n), Ok(()));
+    on_notification_click(Box::new(|_| {}));
+    announce("hello", Politeness::Polite);
+    assert_eq!(calendar_event_near(0), None);
+}

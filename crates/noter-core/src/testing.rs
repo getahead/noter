@@ -1,6 +1,6 @@
 //! Hooks for `noter-core-harness` only (feature `harness`); the app never enables it.
 
-use noter_protocol::model::{CaptureState, ModelsStatus, SelfTestState};
+use noter_protocol::model::{CapturePhase, CaptureState, ModelsStatus, SelfTestState};
 use noter_protocol::CoreError;
 
 use crate::Core;
@@ -31,4 +31,30 @@ pub async fn seed_capture(core: &Core, state: CaptureState) -> Result<(), CoreEr
 /// Hidden for presenting, as `harness.world_set` asks.
 pub fn seed_presenting(core: &Core, hidden: bool) {
     core.seed_presenting(hidden);
+}
+
+/// Starts the engine as the first command that needs it would.
+pub async fn engine_ready(core: &Core) {
+    let _ = core.engine.ensure_ready().await;
+}
+
+/// The session's event to its listeners, as capture sends it after a commit.
+pub fn capture_event(core: &Core, event: crate::capture::CaptureEvent) {
+    core.capture_event(event);
+}
+
+/// The next transcript commit "crashes" before it publishes (D-27: never in a release build).
+pub fn fail_transcript_after_commit_once(core: &Core) {
+    core.transcript.fail_after_commit_once();
+}
+
+/// The call the capture machine is recording or has paused, if any.
+pub fn capturing(core: &Core) -> Option<noter_protocol::CallId> {
+    let capture = core.capture_now();
+    matches!(
+        capture.phase,
+        CapturePhase::Recording | CapturePhase::Paused
+    )
+    .then_some(capture.call_id)
+    .flatten()
 }

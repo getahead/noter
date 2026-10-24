@@ -328,6 +328,8 @@ impl Core {
         self.apply_login_item(launch);
         self.environment_changed(self.deps.native.environment());
         self.start_capture();
+        self.start_playback();
+        self.start_transcript();
     }
 
     fn apply_login_item(&self, on: bool) {
@@ -372,6 +374,8 @@ impl Core {
     pub fn environment_changed(&self, reading: EnvironmentReading) {
         self.refresh_environment(reading);
         self.refresh_setup();
+        let call_screen = lock(&self.settings).call_screen.clone();
+        self.follow_call_screen(&call_screen);
     }
 
     /// Re-reads the environment (permission rows included) from the Mac.
@@ -431,6 +435,7 @@ impl Core {
         if next != app.environment {
             app.environment = next;
             self.publish(event_names::ENV_CHANGED, &mut app.environment);
+            self.playback_route_changed(app.environment.output_route);
         }
         drop(app);
         self.disk_changed(reading.disk_free_mb);
