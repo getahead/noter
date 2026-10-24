@@ -711,6 +711,9 @@ impl Harness {
         if unversioned(&current["app"]["presenting"]) != unversioned(&wanted["app"]["presenting"]) {
             noter_core::testing::seed_presenting(&self.core, parsed.app.presenting.hidden);
         }
+        if unversioned(&current["app"]["detection"]) != unversioned(&wanted["app"]["detection"]) {
+            noter_core::testing::seed_detection(&self.core, parsed.app.detection.detection.clone());
+        }
         if unversioned(&current["app"]["degraded"]) != unversioned(&wanted["app"]["degraded"]) {
             // The setup and hotkey states are the core's own to compute: the world sets the rest.
             let own = |s: &DegradedState| {
@@ -826,6 +829,7 @@ const OWNED_APP: &[&str] = &[
     "capture",
     "presenting",
     "degraded",
+    "detection",
 ];
 
 /// A transcript line as the scripted engine reports it.

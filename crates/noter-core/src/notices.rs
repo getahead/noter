@@ -115,6 +115,16 @@ impl Core {
         self.publish(event_names::CAPTURE_DETECTED, &mut app.detection);
     }
 
+    pub(crate) fn seed_detection(&self, detection: Option<CallDetection>) {
+        let shown = detection.is_some();
+        self.set_detection(detection);
+        if shown && !self.app().presenting.hidden {
+            self.deps.surfaces.show_record_prompt();
+        } else {
+            self.deps.surfaces.close_record_prompt();
+        }
+    }
+
     fn set_notice(&self, notice: Option<CaptureNotice>) -> CaptureState {
         // @cpt-begin:cpt-noter-flow-core-capture-session-notices:p1:inst-raise-notice
         // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-return

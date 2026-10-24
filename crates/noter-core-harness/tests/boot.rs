@@ -1252,3 +1252,150 @@ async fn q7_an_engine_that_dies_on_every_restart_fails_the_call_with_capture_fai
     );
     r.finish().await;
 }
+
+#[tokio::test]
+async fn pushed_hypotheses_gaps_and_marks_reach_the_open_channel() {
+    let mut r = start().await;
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let live = &world["transcripts"][0];
+    assert_eq!(live["call_id"], "call_live");
+    r.channel(
+        "call-screen",
+        "transcript_subscribe",
+        json!({ "call_id": "call_live" }),
+    )
+    .await;
+    // One hypothesis per speaker label the engine can report, then the session's own events.
+    let mut pushes = vec![];
+    for (n, label) in [
+        json!({ "type": "you" }),
+        json!({ "type": "guest_your_side" }),
+        json!({ "type": "person", "person": { "id": "per_1", "display_name": "Ann", "short_name": "Ann", "initials": "A", "is_you": false } }),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut segment = live["segments"][0].clone();
+        segment["id"] = json!(format!("hyp_{n}"));
+        segment["state"] = json!("hypothesis");
+        segment["speaker"]["label"] = label;
+        pushes.push(json!({ "type": "hypothesis", "segment": segment }));
+    }
+    pushes.push(json!({ "type": "gap", "gap": live["gaps"][0] }));
+    pushes.push(json!({ "type": "mark", "mark": live["marks"][0] }));
+    // Written without reading the answers: the stream's messages must not be skipped.
+    for event in &pushes {
+        let id = r.next;
+        r.next += 1;
+        let req = json!({ "id": id, "window": "main", "cmd": "harness.push", "args": { "cmd": "transcript_subscribe", "body": { "event": event } } });
+        r.input
+            .write_all(format!("{req}\n").as_bytes())
+            .await
+            .unwrap();
+    }
+    let mut seen: Vec<String> = vec![];
+    let all = |seen: &[String]| {
+        ["hypothesis", "gap", "mark"]
+            .iter()
+            .all(|t| seen.iter().any(|s| s == t))
+    };
+    while !all(&seen) {
+        let line = r.line().await;
+        assert!(line.get("error").is_none(), "{line}");
+        if let Some(t) = line["message"]["event"]["type"].as_str() {
+            seen.push(t.to_string());
+        }
+    }
+    for t in ["hypothesis", "gap", "mark"] {
+        assert!(seen.iter().any(|s| s == t), "{t} in {seen:?}");
+    }
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn push_refuses_streams_and_events_nothing_scripted_plays() {
+    let mut r = start().await;
+    let code = r
+        .code(
+            "main",
+            "harness.push",
+            json!({ "cmd": "levels_subscribe", "body": { "event": {} } }),
+        )
+        .await;
+    assert_eq!(code, "not_implemented");
+    let code = r
+        .code(
+            "main",
+            "harness.push",
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "ended", "reason": "call_stopped" } } }),
+        )
+        .await;
+    assert_eq!(code, "not_implemented");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_push_with_no_engine_running_is_refused() {
+    let mut r = start().await;
+    // Nothing subscribed to a stream yet, so no engine runs to take the line.
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let segment = world["transcripts"][0]["segments"][0].clone();
+    let code = r
+        .code(
+            "main",
+            "harness.push",
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "confirmed", "segment": segment } } }),
+        )
+        .await;
+    assert_eq!(code, "invalid_input");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_seeds_a_detection_and_the_record_prompt_follows_it() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["detection"]["detection"] = json!({
+        "id": "det_com.microsoft.teams2", "app_name": "Microsoft Teams",
+        "bundle_id": "com.microsoft.teams2", "matched_event": null,
+        "detected_at": now, "prompt_until": now + 30_000, "blocked": null
+    });
+    let (set, events) = r
+        .call(
+            "main",
+            "harness.world_set",
+            json!({ "world": world.clone() }),
+        )
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "capture:detected"),
+        "{events:?}"
+    );
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(
+        snap["detection"]["detection"]["id"],
+        "det_com.microsoft.teams2"
+    );
+    // The seeded detection is the one a start from the prompt names.
+    let started = r
+        .ok(
+            "record-prompt",
+            "capture_start",
+            json!({ "source": "record_prompt", "sensitive": false, "detection_id": "det_com.microsoft.teams2" }),
+        )
+        .await;
+    assert_eq!(started["phase"], "recording", "{started}");
+    let shown = r.ok("main", "harness.surfaces", json!({})).await;
+    let calls: Vec<&str> = shown["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(calls.contains(&"show_record_prompt"), "{calls:?}");
+    r.finish().await;
+}
