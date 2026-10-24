@@ -1221,6 +1221,19 @@ async fn the_engine_hears_the_meeting_apps_and_browsers_minus_the_ignored_ones()
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_call_detected_while_hidden_for_presenting_draws_no_prompt() {
+    let r = rig();
+    r.detection_on().await;
+    r.offer_to_record(true).await;
+    noter_core::testing::seed_presenting(&r.core, true);
+    r.call_detected(ZOOM, "Zoom");
+    // The menu still offers it (Call Detected · Start Recording); nothing is drawn.
+    let d = r.detection_becomes(|d| d.is_some()).await;
+    assert!(d.is_some());
+    assert!(!r.shown.0.lock().unwrap().contains(&"show_record_prompt"));
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_detected_call_shows_the_prompt_for_fifteen_seconds_only_when_detection_is_on() {
     let r = rig();
     r.detection_on().await;
