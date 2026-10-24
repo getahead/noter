@@ -41,7 +41,7 @@ milestone: M1
 
 ## 1. Feature Context
 
-- [x] `p2` - `cpt-noter-feature-ui-live-transcript`
+- [ ] `p2` - `cpt-noter-feature-ui-live-transcript`
 
 ### 1.1 Overview
 
