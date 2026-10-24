@@ -221,16 +221,29 @@ final class EngineASRTests: XCTestCase {
         XCTAssertTrue(lines.types.contains("levels"))
     }
 
-    func testTheSelfTestSaysWhatEachChannelHeardWhenTheModelIsThere() throws {
-        let (lines, source) = (Lines(), DeviceSource())
+    func testTheSelfTestSaysWhatEachChannelHeardOnceTheModelIsLoaded() throws {
+        let (source, loaded) = (DeviceSource(), DispatchSemaphore(value: 0))
+        var lines = Lines()
         let e = EngineLoop(
-            writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false,
-            play: { _ in }, transcriber: { FakeTranscriber("one two three") }, source: { _ in source })
-        _ = e.handle(#"{"id":1,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":3000}}"#)
-        Thread.sleep(forTimeInterval: 0.2)
-        for _ in 0..<20 { source.push(mic: speech(), sys: speech()) }
-        _ = try XCTUnwrap(lines.waitFor("self_test_result"))
-        let heard = lines.events.filter { $0["type"] as? String == "self_test_line" }
+            writer: EventWriter(clock: { 1_000 }, out: { lines.write($0) }), engineVersion: "test", models: ["whisper-turbo"],
+            sandboxed: false, play: { _ in },
+            transcriber: {
+                defer { loaded.signal() }
+                return FakeTranscriber("one two three")
+            }, source: { _ in source })
+        func selfTest() throws -> [[String: Any]] {
+            lines = Lines()
+            _ = e.handle(#"{"id":1,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":3000}}"#)
+            Thread.sleep(forTimeInterval: 0.2)
+            for _ in 0..<20 { source.push(mic: speech(), sys: speech()) }
+            _ = try XCTUnwrap(lines.waitFor("self_test_result"))
+            return lines.events.filter { $0["type"] as? String == "self_test_line" }
+        }
+        // A cold model can take longer to load than the core waits for the result: the first test
+        // only starts loading it.
+        XCTAssertEqual(try selfTest().count, 0)
+        XCTAssertEqual(loaded.wait(timeout: .now() + 5), .success)
+        let heard = try selfTest()
         XCTAssertEqual(Set(heard.compactMap { $0["channel"] as? String }), ["mic", "sys"])
         XCTAssertEqual(heard.first?["text"] as? String, "one two three")
         XCTAssertLessThan(
