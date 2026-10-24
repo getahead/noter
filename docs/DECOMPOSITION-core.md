@@ -602,7 +602,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.10 [Live transcript, levels and replay](features/core/core-live-transcript.md) - HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-core-live-transcript`
+- [x] `p2` - **ID**: `cpt-noter-feature-core-live-transcript`
 
 - **Milestone**: M1 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-live-transcript.md](features/core/core-live-transcript.md)
 
@@ -627,7 +627,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p2` - `cpt-noter-principle-core-snapshot-stream`
+  - `cpt-noter-principle-core-snapshot-stream`
 
 - **Design Constraints Covered**:
 
@@ -640,7 +640,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-core-transcript`
+  - `cpt-noter-component-core-transcript`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `transcript_subscribe`, `levels_subscribe`, `transcript_span`, `audio_play`, `audio_stop`

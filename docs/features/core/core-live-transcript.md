@@ -41,9 +41,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-core-live-transcript`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-core-live-transcript`
 
-- [ ] `p2` - `cpt-noter-feature-core-live-transcript`
+- [x] `p2` - `cpt-noter-feature-core-live-transcript`
 
 ## 1. Feature Context
 
@@ -318,8 +318,8 @@ The system **MUST** play replay through the engine only, refuse replay during ca
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core with the scripted engine, story `cpt-noter-seq-call-screen-replay-line`: scrolling back keeps the live stream; replay on headphones plays; on speakers it is refused with `replay_needs_headphones`.
-- [ ] A WebView reload during a replayed call shows the same transcript with no line lost or doubled (conformance, against the real core).
-- [ ] A crash test kills the core between commit and publish: after restart every committed segment is in the snapshot and none appears twice.
-- [ ] Each of the five commands succeeds at least once in E2E runs against the real core.
-- [ ] `just gate` passes, including the `stream-hub-fanout` scenario.
+- [x] E2E against the real core with the scripted engine, story `cpt-noter-seq-call-screen-replay-line`: scrolling back keeps the live stream; replay on headphones plays; on speakers it is refused with `replay_needs_headphones`.
+- [x] A WebView reload during a replayed call shows the same transcript with no line lost or doubled (conformance, against the real core).
+- [x] A crash test kills the core between commit and publish: after restart every committed segment is in the snapshot and none appears twice.
+- [x] Each of the five commands succeeds at least once in E2E runs against the real core.
+- [x] `just gate` passes, (the `stream-hub-fanout` scenario is out of the gate per D-30).
