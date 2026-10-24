@@ -102,7 +102,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 2. [x] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
-5. [ ] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
+5. [x] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
 6. [x] - `p1` - **IF** the supervisor sends `pause` - `inst-if-pause`
    1. [x] - `p1` - Engine stops both streams (no audio kept while paused) until `resume` - `inst-pause-streams`
 7. [x] - `p1` - **IF** the supervisor sends `stop` - `inst-if-stop`
@@ -168,7 +168,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Complete the self-test on the capture pipeline
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-self-test`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-self-test`
 
 **Actor**: Engine supervisor (on behalf of `self_test_run`)
 
@@ -180,7 +180,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Steps**:
 1. [x] - `p1` - Engine opens the tap and the microphone for the self-test on one clock, as for a session - `inst-self-test-one-clock`
-2. [ ] - `p1` - **IF** the live model is present, engine emits `self_test_line` per channel - `inst-self-test-lines`
+2. [x] - `p1` - **IF** the live model is present, engine emits `self_test_line` per channel - `inst-self-test-lines`
 3. [x] - `p1` - **IF** `play_clip`, engine plays its clip and checks the tap does not hear it; a leak fails with `OwnSoundsLeak` (moved from `cpt-noter-flow-core-engine-foundation-self-test`, decision D-12) - `inst-play-clip`
 4. [x] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
 
@@ -195,12 +195,12 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Output**: `segment` events (hypothesis, then confirmed) with channel, times, language, text and live speaker label; `speaker_turn`, `no_segments` and `silence` facts.
 
 **Steps**:
-1. [ ] - `p1` - Run VAD per channel; outside speech, emit nothing but levels - `inst-vad`
-2. [ ] - `p1` - Identify the language per utterance among the session languages - `inst-lang-id`
-3. [ ] - `p1` - Decode in streaming mode; emit a hypothesis about once a second per active channel - `inst-hypothesis`
-4. [ ] - `p1` - When an utterance is stable, apply the hallucination and term filters and the glossary, then emit it as confirmed with a live speaker label - `inst-confirm`
-5. [ ] - `p1` - **IF** speech flows on a channel but no segment was produced for 10 s, emit `no_segments { since_ms }` - `inst-no-segments`
-6. [ ] - `p1` - **IF** both channels carry no speech for the silence window, emit `silence { since_ms }` - `inst-silence`
+1. [x] - `p1` - Run VAD per channel; outside speech, emit nothing but levels - `inst-vad`
+2. [x] - `p1` - Identify the language per utterance among the session languages - `inst-lang-id`
+3. [x] - `p1` - Decode in streaming mode; emit a hypothesis about once a second per active channel - `inst-hypothesis`
+4. [x] - `p1` - When an utterance is stable, apply the hallucination and term filters and the glossary, then emit it as confirmed with a live speaker label - `inst-confirm`
+5. [x] - `p1` - **IF** speech flows on a channel but no segment was produced for 10 s, emit `no_segments { since_ms }` - `inst-no-segments`
+6. [x] - `p1` - **IF** both channels carry no speech for the silence window, emit `silence { since_ms }` - `inst-silence`
 7. [ ] - `p1` - **RETURN** per frame batch - `inst-return-asr`
 
 ### System audio silence detection

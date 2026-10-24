@@ -11,6 +11,9 @@ let sandboxed = environment["APP_SANDBOX_CONTAINER_ID"] != nil
 let writer = EventWriter.stdout()
 let container = Models.container(environment: environment)
 let models = Models.installed(container: container)
+/// The live speech model, when the core has installed it.
+let speechModel: (() throws -> Transcriber)? = container.map { $0.appendingPathComponent("models/whisper-turbo") }
+    .flatMap { folder in FileManager.default.fileExists(atPath: folder.path) ? { try WhisperTranscriber(folder: folder) } : nil }
 
 /// Answers commands from stdin until `shutdown`; end of input also ends live mode, while a
 /// file replay runs to its end.
@@ -40,7 +43,8 @@ case let .file(mic, sys, realtime):
 case .live:
     let engine = EngineLoop(
         writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
-        processes: { ProcessWatcher.snapshot() }
+        processes: { ProcessWatcher.snapshot() },
+        transcriber: speechModel
     ) { start in
         LiveAudioSource(micUid: start?.micDeviceUid, excluding: start?.excludeBundleIds ?? [])
     }

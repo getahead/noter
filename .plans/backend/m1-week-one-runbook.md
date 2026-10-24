@@ -5,7 +5,7 @@ speakers): the Q7 engine-kill drill (`cpt-noter-dod-core-engine-capture-restart`
 of the capture pipeline (one clock, exclusions, device changes, the self-test clip:
 `cpt-noter-dod-core-engine-capture-pipeline`), and the Q4 real-call latency measurement
 (`cpt-noter-dod-core-engine-capture-latency`). Parts A and B take about 40 minutes and need
-#139 and the one-clock capture PR on `main`. Part C needs live ASR (PR 4); its commands land with that PR.
+#139 and the one-clock capture PR on `main`; part C (one real call) needs the live ASR PR too.
 
 Send back the table at the end. The backend team records the results in
 `docs/features/core/core-engine-capture.md` and ticks what they prove.
@@ -67,13 +67,14 @@ designed outcome (3 restarts in 30 s → `CaptureFailed`, the app offers Try Aga
 
 These talk to the engine over its JSON Lines protocol. Keep this helper in your shell; it starts a
 session, waits, sends any extra command lines you pass half way, waits again, then stops and
-shuts down (set `SHOW=levels` to keep the `levels` lines, hidden by default):
+shuts down (set `SHOW=levels` to keep the `levels` lines, hidden by default, and `LANGS` for the
+session languages, English by default):
 
 ```sh
 export NOTER_APP_GROUP_DIR=$(mktemp -d)
 session() {  # session <seconds> <exclude_bundle_ids JSON> [command lines…]
   local secs=$1 excl=$2; shift 2
-  { echo '{"id":1,"cmd":{"type":"start_session","call_id":"call_1","session_dir":"audio/call_1","store_audio":true,"mic_device_uid":null,"exclude_bundle_ids":'"$excl"',"languages":["en"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}'
+  { echo '{"id":1,"cmd":{"type":"start_session","call_id":"call_1","session_dir":"audio/call_1","store_audio":true,"mic_device_uid":null,"exclude_bundle_ids":'"$excl"',"languages":'"${LANGS:-[\"en\"]}"',"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}'
     sleep $((secs / 2)); for line in "$@"; do echo "$line"; done; sleep $((secs / 2))
     echo '{"id":8,"cmd":{"type":"stop","call_id":"call_1"}}'; sleep 3
     echo '{"id":9,"cmd":{"type":"shutdown"}}'; } | $ENGINE | grep -v "${SHOW:-\"levels\"}"
@@ -120,21 +121,50 @@ You hear a one-second 1.5 kHz tone. **Pass:** `"passed":true,"own_sounds_leak":f
 `ack` of id 8 to `session_stopped` (the `at` fields are epoch ms). **Pass:** under 2 s (longer
 would make the supervisor's ping time out while the files are being finished).
 
-## C. Q4 real-call latency, EN/RU/DE (with PR 4)
+## C. Q4 real-call latency, EN/RU/DE (one real call, 30-60 min)
 
 What it measures (`cpt-noter-dod-core-engine-capture-latency`): one real call that mixes English,
 Russian and German, captured live through this pipeline on both channels with one WhisperKit
-Turbo instance and per-utterance language ID. For every segment: **hypothesis lag** = when its
-first hypothesis line arrived minus when its words ended (session start + `t1_ms`), and
-**confirmed lag** = the same for its confirmed line.
+Turbo instance and per-utterance language ID. For every segment line: **lag** = when the line
+arrived minus when its words ended (session start + `t1_ms`), for hypotheses and for confirmed
+segments.
 
 **Pass:** p95 hypothesis lag ≤ 2 s and p95 confirmed lag ≤ 4 s, with segments in all three
 languages. If not met, the backend team changes the streaming policy or adds Parakeet as a second
 backend (PRD › Roadmap); the numbers decide which.
 
-The exact commands (a `latency` report over the session's event lines, printing count and p50/p95
-per kind and per language) arrive with PR 4; this section is updated then and the Teamlead tells
-the owner.
+**C1. The model, once** (about 1.6 GB, from the pinned manifest, every file checked):
+
+```sh
+python3 - "$NOTER_APP_GROUP_DIR/models/whisper-turbo" <<'EOF'
+import hashlib, json, pathlib, sys, urllib.request
+out = pathlib.Path(sys.argv[1])
+for f in json.load(open("scripts/models/manifest.json"))["files"]:
+    if f["bundle"] != "whisper-turbo":
+        continue
+    dest = out / f["path"]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if not dest.exists():
+        urllib.request.urlretrieve(f["url"], dest)
+    assert hashlib.sha256(dest.read_bytes()).hexdigest() == f["sha256"], f["path"]
+print("model ready:", out)
+EOF
+```
+
+**C2. The call.** Start this as the call starts (set the seconds to the call's length plus a
+minute), then hold the call as usual, switching languages as you naturally would:
+
+```sh
+LANGS='["en","ru","de"]' session 3600 '[]' > /tmp/q4-call.jsonl
+python3 engine/scripts/latency.py /tmp/q4-call.jsonl
+```
+
+The first lines after `session_started` come once the model has loaded (taps first, then the
+model): a few seconds of the call's start are transcribed late, which is expected; say how long
+the load took (the first `segment` line's `at` minus `session_started`'s).
+
+**Send back:** the report's lines (count, p50 and p95 per state and language, the two PASS/FAIL
+lines), and a few confirmed segments per language as they are, for a look at the quality.
 
 ## What to send back
 
@@ -149,6 +179,6 @@ the owner.
 | B4 device change | `device_changed` line, gap ms | |
 | B5 own clip | `passed` / `own_sounds_leak` | |
 | B6 stop time | seconds | |
-| C latency (later) | p95 hypothesis / confirmed per language | |
+| C latency | p95 hypothesis / confirmed per language, model load time | |
 
 Paste the final lines of A1–A3 and the `device_changed` line as they are.
