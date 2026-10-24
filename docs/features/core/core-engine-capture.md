@@ -111,7 +111,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Detect a call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-detect`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-detect`
 
 **Actor**: Meeting app
 
@@ -122,10 +122,10 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - Detection is off (`set_detection { enabled: false }`): no detection events; capture started by hand still works.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sends `set_detection { enabled, known_bundle_ids }` whenever the detection rule changes - `inst-set-detection`
+1. [x] - `p1` - Supervisor sends `set_detection { enabled, known_bundle_ids }` whenever the detection rule changes - `inst-set-detection`
 2. [x] - `p1` - **IF** enabled, engine listens for audio-process and microphone-use changes of known bundles - `inst-listen`
 3. [x] - `p1` - Engine emits `call_detected`, `call_audio_released` or `audio_source_added` as facts; it never decides to record - `inst-emit-facts`
-4. [ ] - `p1` - **RETURN** - `inst-return-detect`
+4. [x] - `p1` - **RETURN** - `inst-return-detect`
 
 ### Recover from an engine crash during capture
 
@@ -150,7 +150,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Replay a span
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-engine-capture-replay`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-engine-capture-replay`
 
 **Actor**: Engine supervisor (on behalf of the transcript)
 
@@ -164,7 +164,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 1. [x] - `p1` - Supervisor sends `play` - `inst-play`
 2. [x] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
 3. [x] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
-4. [ ] - `p1` - **RETURN** - `inst-return-replay`
+4. [x] - `p1` - **RETURN** - `inst-return-replay`
 
 ### Complete the self-test on the capture pipeline
 
@@ -188,7 +188,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Live ASR loop
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-live-asr`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-capture-live-asr`
 
 **Input**: Audio frames per channel from the ring, the glossary, languages and speaker priors of the session.
 
@@ -201,7 +201,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 4. [x] - `p1` - When an utterance is stable, apply the hallucination and term filters and the glossary, then emit it as confirmed with a live speaker label - `inst-confirm`
 5. [x] - `p1` - **IF** speech flows on a channel but no segment was produced for 10 s, emit `no_segments { since_ms }` - `inst-no-segments`
 6. [x] - `p1` - **IF** both channels carry no speech for the silence window, emit `silence { since_ms }` - `inst-silence`
-7. [ ] - `p1` - **RETURN** per frame batch - `inst-return-asr`
+7. [x] - `p1` - **RETURN** per frame batch - `inst-return-asr`
 
 ### System audio silence detection
 
@@ -324,7 +324,7 @@ The owner moved this measurement from the M0 throwaway spike on 20 Oct 2026 afte
 
 ### Silence, stall and device facts
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-facts`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-facts`
 
 The system **MUST** detect exact digital zeros on the system channel as `system_audio_silent` with a confidence, report stalls after 10 s without segments while audio flows, and report device changes with their gap bounds, so the session manager can show `SystemAudioSilent`, `TranscriptionStalled`, `MicrophoneOff` and `DeviceChanged`.
 

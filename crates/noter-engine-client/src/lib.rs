@@ -325,12 +325,14 @@ impl<L: EngineLauncher> EngineClient<L> {
         // @cpt-end:cpt-noter-state-core-engine-foundation-process:p1:inst-st-restarted
         // @cpt-end:cpt-noter-state-core-engine-foundation-process:p1:inst-st-ready
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-set-detection
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-detect:p1:inst-set-detection
         // Its `ack` has no waiter; a dead pipe shows up as end of stdout.
         let cmd = EngineCommand::SetDetection {
             enabled,
             known_bundle_ids,
         };
         let _ = write_line(&mut *c.stdin, self.next_id(), cmd).await;
+        // @cpt-end:cpt-noter-flow-core-engine-capture-detect:p1:inst-set-detection
         // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-set-detection
         self.spawn_liveness(generation);
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-start:p1:inst-return-ready
