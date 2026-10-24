@@ -717,9 +717,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.12 [Library call list and call records](features/core/core-library-calls.md) - HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-core-library-calls`
+- [x] `p2` - **ID**: `cpt-noter-feature-core-library-calls`
 
-- **Milestone**: M1 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-library-calls.md](features/core/core-library-calls.md)
+- **Milestone**: M1 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-library-calls.md](features/core/core-library-calls.md)
 
 - **Purpose**: Serve the Library list and the call record: list with filters and sort, the call detail read model, edits with a revision, call types from the built-in list and skill folders, and deleting calls for good with everything recorded in them.
 
@@ -742,7 +742,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p2` - `cpt-noter-principle-core-intent-commands`
+  `cpt-noter-principle-core-intent-commands`
 
 - **Design Constraints Covered**:
 

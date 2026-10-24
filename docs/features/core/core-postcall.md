@@ -237,6 +237,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 5. [ ] - `p1` - **FROM** failed **TO** writing **WHEN** retry or local rewrite is admitted - `inst-st-retry`
 6. [ ] - `p1` - **FROM** ready **TO** writing **WHEN** archive or explicit regeneration starts; the existing version and edit remain available - `inst-st-regenerate`
 7. [ ] - `p1` - **FROM** empty **TO** writing **WHEN** a new generation starts - `inst-st-empty-retry`
+8. [ ] - `p1` - **FROM** processing **TO** failed (the call's status in `cpt-noter-state-core-library-calls-status`) **WHEN** the post-call work fails - `inst-st-call-failed`
 
 Continue Recording invalidates the running generation and returns unfinished sections to pending for the next stop; committed versions are retained. Aggregate status is writing while sections run, ready when all required sections are ready or empty, partially_failed for mixed success and failure, and failed when no usable required section succeeded.
 
