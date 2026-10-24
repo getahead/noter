@@ -4,7 +4,7 @@ import type { CommandState } from "../../app/store/window-store";
 import type { CallRow, UiPrefs } from "../../core/bindings";
 import { callInfo, callKey, callViews, pageState, parseCallKey, subtitleOf } from "./logic";
 
-const PREFS = { time_format: "h23", time_zone: "UTC", first_weekday: 1 } as UiPrefs;
+const PREFS: UiPrefs = { time_format: "h24", time_zone: "UTC", first_weekday: 1 };
 const NOW = Date.UTC(2026, 9, 24, 12, 0);
 const row = (o: Partial<CallRow> = {}): CallRow =>
   ({

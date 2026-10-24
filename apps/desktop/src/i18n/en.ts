@@ -704,6 +704,7 @@ export const en = {
   "prompt.announce_started": "Recording started",
   "prompt.announce_ended": "The call seems to have ended. Noter stops recording in 10 seconds. Press Control-Option-Command-N, then Return, to keep recording.",
   "prompt.announce_meeting": "A new meeting may have started: {title}",
+  "callpage.title": "Call",
   "callpage.view": "Call page view",
   "callpage.view.summary": "Summary",
   "callpage.view.transcript": "Transcript",

@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
+import type { Bridge } from "../../app/bridge/bridge";
+import type { Route } from "./history";
 import type { PageDef } from "./pages";
 import { leaveTimer, openFocus } from "./shell-effects";
 
 type Def = NonNullable<PageDef["inspector"]>;
 
-export function InspectorSlot({ def, overlay, onClose }: { def: Def | undefined; overlay: boolean; onClose: () => void }) {
+export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: Def | undefined; route: Route; bridge: Bridge; overlay: boolean; onClose: () => void }) {
   const held = useRef(def);
   if (def) held.current = def;
   const leaving = !def && held.current !== undefined;
@@ -42,7 +44,7 @@ export function InspectorSlot({ def, overlay, onClose }: { def: Def | undefined;
       <div className="np-inspector__close">
         <IconButton icon="x" label={t("shell.close_inspector")} size="inline" onAction={onClose} />
       </div>
-      {shown.render()}
+      {shown.render(route, bridge)}
     </aside>
   );
 }
