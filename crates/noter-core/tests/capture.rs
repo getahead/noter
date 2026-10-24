@@ -1761,6 +1761,15 @@ async fn a_new_meeting_splits_the_call_unless_kept() {
         ended, detected_at,
         "the first call ends where the new meeting began"
     );
+    // D-33: the saved call is closed for good; only the live call can be continued.
+    assert_eq!(
+        code(
+            r.core
+                .capture_continue(&main_window(), CallIdArgs { call_id: first })
+                .await
+        ),
+        ErrorCode::ContinueWindowClosed
+    );
 }
 
 // --- Second audio source -------------------------------------------------------------
