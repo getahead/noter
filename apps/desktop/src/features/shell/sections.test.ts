@@ -22,6 +22,7 @@ describe("sections", () => {
     expect(navRoute({ type: "item", item_id: "i1" })).toEqual({ section: "activity", key: "item:i1" });
     expect(["today", "ask", "agents", "performance"].map((type) => navRoute({ type } as never)?.section)).toEqual(["today", "ask", "agents", "performance"]);
     expect(navRoute({ type: "settings", pane: "privacy" })).toBeNull();
+    expect(navRoute({ type: "delete_old_audio" })).toBeNull();
     expect(navRoute({ type: "first_run" })).toBeNull();
   });
 

@@ -272,6 +272,16 @@ impl Core {
         self.publish_call(&mut w)
     }
 
+    /// **Got It** on the share warning (D-18): it is not shown again.
+    /// shortcut: remembered for this run only, like the first floating show; store it under the
+    /// call-screen settings when the warning must stay away across restarts.
+    pub(crate) fn share_warning_seen(&self) -> CallWindowState {
+        let mut w = lock(&self.windows);
+        w.warned = true;
+        w.call.show_share_warning = false;
+        self.publish_call(&mut w)
+    }
+
     pub(crate) fn call_window_now(&self) -> CallWindowState {
         self.sync_call_window();
         lock(&self.windows).call.clone()

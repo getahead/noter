@@ -267,6 +267,15 @@ async fn collapse_needs_the_floating_layout_and_the_layout_is_a_setting() {
         .unwrap();
     assert_eq!(floating.layout, CallLayout::Floating);
     assert!(floating.show_share_warning);
+    // Got It (D-18): the warning stays off, also after the window is shown again.
+    let seen = core
+        .window_share_warning_seen(&call, NoArgs {})
+        .await
+        .unwrap();
+    assert!(!seen.show_share_warning);
+    core.window_hide_call(&call, NoArgs {}).await.unwrap();
+    let again = core.window_show_call(&call, NoArgs {}).await.unwrap();
+    assert!(!again.show_share_warning);
     let stored = core.settings_get(&call, NoArgs {}).await.unwrap();
     assert_eq!(stored.call_screen.layout, CallLayoutPreference::Floating);
     rec.take();

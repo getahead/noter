@@ -529,6 +529,11 @@ export type CallDetail = {
 	audio_not_stored: boolean,
 	/**  First recorded call: offer **Notify Me When Summaries Are Ready** (D68). */
 	first_recorded_call: boolean,
+	/**
+	 *  The call's folder on disk (its audio and transcript files), absolute, for **Show in Finder**
+	 *  (`open_external { reveal_in_finder }`); it may be gone once the audio was deleted.
+	 */
+	folder: string,
 };
 
 /**  A detected call the record prompt offers to record (event `capture:detected`). */
@@ -2189,7 +2194,9 @@ export type NamedBy = "you" | "voice_profile" | "calendar";
  *  A place in the main window or the Settings window. The core sends it with
  *  `nav:request` (notification click, Open Last Summary, Open in Noter).
  */
-export type NavTarget = { type: "today" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step?: SetupStep | null };
+export type NavTarget = { type: "today" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step?: SetupStep | null } | 
+/**  The **Delete Old Audio…** sheet over the main window's current page (D-17). */
+{ type: "delete_old_audio" };
 
 export type NavigateArgs = {
 	target?: NavTarget | null,
@@ -3556,7 +3563,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.0";
+export const CONTRACT_VERSION = "2.1";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3729,6 +3736,7 @@ export const COMMANDS = {
   window_call_state: { group: "windows", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   window_set_call_layout: { group: "windows", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   window_set_collapsed: { group: "windows", stability: "frozen", windows: ["call-screen"], channel: false },
+  window_share_warning_seen: { group: "windows", stability: "frozen", windows: ["call-screen"], channel: false },
   app_set_hidden_for_presenting: { group: "windows", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   window_navigate: { group: "windows", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
   window_report_view: { group: "windows", stability: "frozen", windows: ["main"], channel: false },
@@ -3906,6 +3914,7 @@ export interface CommandArgs {
   window_call_state: NoArgs;
   window_set_call_layout: CallLayoutArgs;
   window_set_collapsed: CollapseArgs;
+  window_share_warning_seen: NoArgs;
   app_set_hidden_for_presenting: HiddenArgs;
   window_navigate: NavigateArgs;
   window_report_view: ViewReportArgs;
@@ -4081,6 +4090,7 @@ export interface CommandResults {
   window_call_state: CallWindowState;
   window_set_call_layout: CallWindowState;
   window_set_collapsed: CallWindowState;
+  window_share_warning_seen: CallWindowState;
   app_set_hidden_for_presenting: PresentingState;
   window_navigate: Ack;
   window_report_view: Ack;
@@ -4711,6 +4721,7 @@ export function createCore(transport: Transport) {
     windowCallState: (args: NoArgs) => call("window_call_state", args),
     windowSetCallLayout: (args: CallLayoutArgs) => call("window_set_call_layout", args),
     windowSetCollapsed: (args: CollapseArgs) => call("window_set_collapsed", args),
+    windowShareWarningSeen: (args: NoArgs) => call("window_share_warning_seen", args),
     /**
      * Hide for Presenting (wanted state).
      */

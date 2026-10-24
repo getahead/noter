@@ -1651,6 +1651,10 @@ pub fn world() -> FakeWorld {
                 mode_used: EffectiveMode::CloudRedacted,
                 audio_not_stored: false,
                 first_recorded_call: false,
+                folder: format!(
+                    "/Users/you/Library/Application Support/Noter/audio/{}",
+                    call.id.as_str()
+                ),
             })
             .collect(),
         transcripts: vec![transcript, past_transcript],

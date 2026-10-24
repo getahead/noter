@@ -172,6 +172,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   window_show_call: {},
   window_hide_call: {},
   window_call_state: {},
+  window_share_warning_seen: {},
   window_set_call_layout: {"preference": "auto"},
   window_set_collapsed: {"collapsed": false},
   app_set_hidden_for_presenting: {"hidden": false},

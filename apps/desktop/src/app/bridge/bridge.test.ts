@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ERROR_CODES, EVENTS, isDefaultRetryable, type CommandName, type Transport, type WindowLabel } from "../../core/bindings";
+import { CONTRACT_VERSION, ERROR_CODES, EVENTS, isDefaultRetryable, type CommandName, type Transport, type WindowLabel } from "../../core/bindings";
 import { FakeCore, type FakeCoreOptions } from "../../core/fake/fake-core";
 import { createBridge, type Bridge } from "./bridge";
 
@@ -79,7 +79,7 @@ describe("open a window (snapshot, then stream)", () => {
     await b.open();
     expect(state().status).toBe("FAILED");
     expect(state().error).toEqual({ code: null, state: "section", tryAgain: false });
-    expect(logs()).toEqual([{ level: "error", screen: "main", code: null, message: "app_snapshot: contract 3.0, bindings 2.0" }]);
+    expect(logs()).toEqual([{ level: "error", screen: "main", code: null, message: `app_snapshot: contract 3.0, bindings ${CONTRACT_VERSION}` }]);
   });
 
   it("shows a slow read after 300 ms", async () => {

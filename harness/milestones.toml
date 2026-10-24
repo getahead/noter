@@ -31,7 +31,7 @@ commands = [
   "capture_hold_notice", "capture_keep_recording", "capture_keep_source", "capture_resume_interrupted",
   "transcript_subscribe", "levels_subscribe", "transcript_span", "audio_play", "audio_stop",
   "window_show_call", "window_hide_call", "window_call_state", "window_set_call_layout",
-  "window_set_collapsed", "app_set_hidden_for_presenting", "window_navigate", "window_announce", "window_report_view", "open_external",
+  "window_set_collapsed", "window_share_warning_seen", "app_set_hidden_for_presenting", "window_navigate", "window_announce", "window_report_view", "open_external",
   "calls_list", "call_get", "call_update", "call_types_list", "calls_delete",
 ]
 stories = [
