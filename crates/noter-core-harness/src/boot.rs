@@ -668,9 +668,18 @@ impl Harness {
         // Compared with the last accepted world: the rows the core serves differ from the
         // fixture in the fields later features own (people, items).
         let accepted = to_json(&*lock(&self.world));
-        if ["calls", "call_details", "transcripts"]
+        // A call's folder is the core's own data dir, not the world's to say.
+        let sans_folder = |v: &Value| -> Value {
+            let mut v = v.clone();
+            for d in v.as_array_mut().into_iter().flatten() {
+                d["folder"] = Value::Null;
+            }
+            v
+        };
+        if ["calls", "transcripts"]
             .iter()
             .any(|k| accepted[k] != wanted[k])
+            || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"])
         {
             self.clear_calls()?;
             self.seed_calls(&wanted)?;
