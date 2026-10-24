@@ -8,6 +8,7 @@ mod first_run;
 mod glossary;
 mod hotkeys;
 mod hub;
+mod library;
 mod log;
 mod models;
 mod notices;
@@ -191,6 +192,8 @@ impl std::error::Error for BootError {}
 pub struct Core {
     deps: CoreDeps,
     store: Store,
+    /// `noter.db`, `logs/`, `audio/` and the user's `skills/` live here.
+    data_dir: std::path::PathBuf,
     log: log::Logger,
     /// The app snapshot's slices, kept whole; a window's snapshot is a copy.
     app: Mutex<AppSnapshot>,
@@ -257,6 +260,13 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "calls and capture data",
         sql: include_str!("../migrations/0002_calls_capture.sql"),
     },
+    // @cpt-dbtable:cpt-noter-dbtable-call-tags:p1
+    Migration {
+        owner: "noter-core",
+        version: 3,
+        name: "call tags",
+        sql: include_str!("../migrations/0003_call_tags.sql"),
+    },
 ];
 
 impl Core {
@@ -290,6 +300,7 @@ impl Core {
         let core = Core {
             deps,
             store,
+            data_dir: data_dir.to_path_buf(),
             log,
             app: Mutex::new(snapshot),
             hubs: Mutex::new(vec![]),
@@ -314,6 +325,7 @@ impl Core {
             transcript: transcript::Transcript::new(data_dir.to_path_buf()),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
+        core.retry_audio_removals();
         core.init_call_window();
         core.refresh_tray(None);
         Ok(core)
@@ -588,6 +600,42 @@ impl CoreApi for Core {
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {
         self.install_update().await
+    }
+
+    async fn calls_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: CallsListArgs,
+    ) -> Result<Page<CallRow>, CoreError> {
+        self.list_calls(args)
+    }
+
+    async fn call_get(&self, _ctx: &CommandCtx, args: CallIdArgs) -> Result<CallDetail, CoreError> {
+        self.get_call(args)
+    }
+
+    async fn call_update(
+        &self,
+        ctx: &CommandCtx,
+        args: CallUpdateArgs,
+    ) -> Result<CallMutation, CoreError> {
+        self.update_call(ctx, args)
+    }
+
+    async fn call_types_list(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<CallTypeList, CoreError> {
+        Ok(self.call_types_now())
+    }
+
+    async fn calls_delete(
+        &self,
+        ctx: &CommandCtx,
+        args: CallsDeleteArgs,
+    ) -> Result<DeleteResult, CoreError> {
+        self.delete_calls(ctx, args)
     }
 
     async fn window_show_call(
