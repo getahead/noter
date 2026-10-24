@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use noter_core::{
@@ -66,6 +66,7 @@ pub fn clamp_frame((x, y, w, h): (f64, f64, f64, f64), visible: &Frame) -> (f64,
 pub struct SavedFrames {
     path: PathBuf,
     frames: Mutex<BTreeMap<String, (f64, f64, f64, f64)>>,
+    dirty: AtomicBool,
 }
 
 fn frame_key(display: &DisplayId, layout: CallLayout) -> String {
@@ -85,6 +86,7 @@ impl SavedFrames {
         Self {
             path: path.to_path_buf(),
             frames: Mutex::new(frames),
+            dirty: AtomicBool::new(false),
         }
     }
 
@@ -93,11 +95,20 @@ impl SavedFrames {
         frames.get(&frame_key(display, layout)).copied()
     }
 
+    /// In memory only: a drag reports many frames; `save` writes the last one.
     pub fn remember(&self, display: &DisplayId, layout: CallLayout, frame: (f64, f64, f64, f64)) {
         let mut frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
-        if frames.insert(frame_key(display, layout), frame) == Some(frame) {
+        if frames.insert(frame_key(display, layout), frame) != Some(frame) {
+            self.dirty.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Writes the frames when they changed since the last save.
+    pub fn save(&self) {
+        if !self.dirty.swap(false, Ordering::Relaxed) {
             return;
         }
+        let frames = self.frames.lock().unwrap_or_else(|e| e.into_inner());
         let file: BTreeMap<&String, [f64; 4]> = frames
             .iter()
             .map(|(k, &(x, y, w, h))| (k, [x, y, w, h]))
@@ -382,6 +393,11 @@ impl<R: Runtime> TauriSurfaces<R> {
         Self::place(&window, frame);
     }
 
+    /// On quit: the frames the user left are written.
+    pub fn save_frames(&self) {
+        self.frames.save();
+    }
+
     /// The user moved or resized the call window: its frame is saved for that display and layout.
     // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
     pub fn call_window_changed(&self, window: &tauri::Window<R>) {
@@ -514,6 +530,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     }
 
     fn hide_call_window(&self) {
+        self.frames.save();
         if let Some(window) = self
             .app
             .get_webview_window(WindowLabel::CallScreen.as_str())
@@ -525,6 +542,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     // @cpt-dod:cpt-noter-dod-core-native-surfaces-presenting:p1
     // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
     fn hide_all(&self) {
+        self.frames.save();
         let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
         for (label, window) in self.app.webview_windows() {
             let Some(label) = crate::window_label(&label) else {

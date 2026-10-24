@@ -320,6 +320,12 @@ fn the_call_window_frame_is_saved_per_display_and_layout_and_survives_a_restart(
         CallLayout::Dedicated,
         (1512.0, -168.0, 2000.0, 1200.0),
     );
+    // A drag reports many frames: nothing is written until the window hides or Noter quits.
+    assert_eq!(
+        SavedFrames::load(&path).get(&studio, CallLayout::Floating),
+        None
+    );
+    frames.save();
     let again = SavedFrames::load(&path);
     assert_eq!(
         again.get(&studio, CallLayout::Floating),

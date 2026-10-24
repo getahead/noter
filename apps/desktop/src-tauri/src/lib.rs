@@ -102,6 +102,9 @@ pub fn run() {
     app.run(move |app, event| {
         if let RunEvent::Exit = event {
             e2e_log::write_on_quit();
+            if let Some(surfaces) = app.try_state::<Arc<surfaces::TauriSurfaces<tauri::Wry>>>() {
+                surfaces.save_frames();
+            }
             if let Some(Ok(core)) = app.try_state::<Booted>().map(|b| b.0.clone()) {
                 tauri::async_runtime::block_on(core.shutdown());
             }
