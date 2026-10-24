@@ -487,10 +487,18 @@ impl Harness {
                 serde_json::from_value(body).map_err(|e| bad(&e.to_string()))?;
             let segment = match event {
                 TranscriptEvent::Hypothesis { segment } => {
+                    self.remember_line(&segment, false);
                     engine_segment(&segment, EngineSegmentState::Hypothesis)
                 }
                 TranscriptEvent::Confirmed { segment } => {
+                    self.remember_line(&segment, true);
                     engine_segment(&segment, EngineSegmentState::Confirmed)
+                }
+                TranscriptEvent::Ended { reason } => {
+                    let call = noter_core::testing::capturing(&self.core)
+                        .ok_or_else(|| bad("no live call has a stream to end"))?;
+                    noter_core::testing::end_transcript_stream(&self.core, &call, reason);
+                    return Ok(Value::Null);
                 }
                 TranscriptEvent::Gap { gap } => {
                     noter_core::testing::capture_event(&self.core, CaptureEvent::Gap(gap));
@@ -502,7 +510,7 @@ impl Harness {
                 }
                 _ => return Err(CoreError::new(
                     ErrorCode::NotImplemented,
-                    "harness.push: transcript_subscribe plays hypothesis, confirmed, gap and mark",
+                    "harness.push: transcript_subscribe plays hypothesis, confirmed, gap, mark and ended",
                 )),
             };
             self.inject(vec![EngineEvent::Segment { segment }]).await?;
@@ -565,6 +573,23 @@ impl Harness {
         };
         self.inject(events).await?;
         Ok(Value::Null)
+    }
+
+    /// A pushed line is what the scripted engine now repeats for its channel: a hypothesis
+    /// replaces the repeating one, a confirmed line ends it (as the core removes the hypothesis
+    /// it confirms).
+    fn remember_line(&self, segment: &SegmentView, confirmed: bool) {
+        let mut w = lock(&self.world);
+        if let Some(t) = w
+            .transcripts
+            .iter_mut()
+            .find(|t| t.call_id == segment.call_id)
+        {
+            t.hypotheses.retain(|h| h.channel != segment.channel);
+            if !confirmed {
+                t.hypotheses.push(segment.clone());
+            }
+        }
     }
 
     /// The engine starts on the first command that needs it; a push that races the subscribing

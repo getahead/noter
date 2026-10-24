@@ -41,6 +41,15 @@ pub fn seed_system_audio(core: &Core, heard: Option<noter_protocol::PermissionSt
     core.seed_system_audio(heard);
 }
 
+/// Ends a call's live transcript stream with `reason`, as the hub does when a subscriber lags.
+pub fn end_transcript_stream(
+    core: &Core,
+    call_id: &noter_protocol::CallId,
+    reason: noter_protocol::model::StreamEndReason,
+) {
+    core.end_transcript_stream(call_id, reason);
+}
+
 pub fn seed_presenting(core: &Core, hidden: bool) {
     core.seed_presenting(hidden);
 }

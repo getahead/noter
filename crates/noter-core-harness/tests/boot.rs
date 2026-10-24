@@ -1372,6 +1372,64 @@ async fn pushed_hypotheses_gaps_and_marks_reach_the_open_channel() {
 }
 
 #[tokio::test]
+async fn a_pushed_hypothesis_replaces_the_repeating_one_and_ended_closes_the_stream() {
+    let mut r = start().await;
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let live = &world["transcripts"][0];
+    let mut hyp = live["hypotheses"][0].clone();
+    assert!(
+        !hyp.is_null(),
+        "the fixture's live call repeats a hypothesis"
+    );
+    hyp["text"] = json!("Then the buffer…");
+    r.channel(
+        "call-screen",
+        "transcript_subscribe",
+        json!({ "call_id": "call_live" }),
+    )
+    .await;
+    r.ok(
+        "main",
+        "harness.push",
+        json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "hypothesis", "segment": hyp } } }),
+    )
+    .await;
+    // Once the pushed line has gone out, every repeat on its channel is the pushed one.
+    let mut texts = vec![];
+    while texts.iter().filter(|t| *t == "Then the buffer…").count() < 3 {
+        let line = r.line().await;
+        let event = &line["message"]["event"];
+        if event["type"] == "hypothesis" && event["segment"]["channel"] == hyp["channel"] {
+            texts.push(event["segment"]["text"].as_str().unwrap_or("").to_string());
+        }
+    }
+    let first = texts.iter().position(|t| t == "Then the buffer…").unwrap();
+    assert!(
+        texts[first..].iter().all(|t| t == "Then the buffer…"),
+        "{texts:?}"
+    );
+    // Written without reading the answer: the end goes out before it.
+    let id = r.next;
+    r.next += 1;
+    let req = json!({ "id": id, "window": "main", "cmd": "harness.push", "args": { "cmd": "transcript_subscribe", "body": { "event": { "type": "ended", "reason": "lagged" } } } });
+    r.input
+        .write_all(format!("{req}\n").as_bytes())
+        .await
+        .unwrap();
+    loop {
+        let line = r.line().await;
+        if line["message"]["event"]["type"] == "ended" {
+            assert_eq!(line["message"]["event"]["reason"], "lagged", "{line}");
+            break;
+        }
+    }
+    // The call goes on: the stream ended, not the capture.
+    let capture = r.ok("main", "app_snapshot", json!({})).await["capture"].clone();
+    assert_eq!(capture["phase"], "recording");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn push_refuses_streams_and_events_nothing_scripted_plays() {
     let mut r = start().await;
     let code = r
@@ -1386,7 +1444,7 @@ async fn push_refuses_streams_and_events_nothing_scripted_plays() {
         .code(
             "main",
             "harness.push",
-            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "ended", "reason": "call_stopped" } } }),
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "segments_updated", "segments": [] } } }),
         )
         .await;
     assert_eq!(code, "not_implemented");
