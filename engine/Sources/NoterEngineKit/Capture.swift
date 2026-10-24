@@ -219,6 +219,7 @@ final class CaptureSession: @unchecked Sendable {
     private var pausedAt: (callMs: Int, epochMs: Int64)?
     private var nextLevels: Int
     private var db: [Channel: Float] = [.mic: -160, .sys: -160]
+    private var resampled: [Channel: Resampled] = [:]
 
     init(
         start: StartSession, container: URL, writer: EventWriter, now: @escaping () -> Int64,
@@ -268,7 +269,9 @@ final class CaptureSession: @unchecked Sendable {
         var events: [EngineEvent] = []
         lock.withLock {
             guard live, pausedAt == nil else { return }
-            let samples = Mix.resample(chunk.samples, from: chunk.sampleRate, to: Double(CaptureRing.rate))
+            let to = Double(CaptureRing.rate)
+            let count = resampled[chunk.channel, default: Resampled()].count(chunk.samples.count, from: chunk.sampleRate, to: to)
+            let samples = Mix.resample(chunk.samples, from: chunk.sampleRate, to: to, count: count)
             ring.write(chunk.channel, samples)
             spanSamples[chunk.channel, default: 0] += samples.count
             db[chunk.channel] = Levels.db(chunk.samples)
