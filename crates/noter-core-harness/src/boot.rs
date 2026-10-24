@@ -836,6 +836,8 @@ impl Controls for Harness {
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
                 "engine_kill" => self.engine_kill(),
+                // `{}` → `{ path }`: the data folder of this core, for stories that read its rows and files.
+                "data_dir" => Ok(json!({ "path": self.dir.display().to_string() })),
                 _ => Err(CoreError::new(
                     ErrorCode::InvalidInput,
                     format!("no control harness.{name}"),
