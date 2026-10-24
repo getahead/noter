@@ -100,12 +100,12 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 - The window falls behind: `ended { lagged }`; it subscribes again.
 
 **Steps**:
-1. [ ] - `p1` - API: `transcript_subscribe { call_id }` with a Channel from the call window or main window - `inst-subscribe-call`
-2. [ ] - `p1` - **IF** the call does not exist **RETURN** `not_found` - `inst-if-unknown`
-3. [ ] - `p1` - Stream hub runs `cpt-noter-algo-core-ipc-host-subscribe`; the snapshot is read through the writer connection: committed segments of the current pass, current hypotheses, speakers, gaps, marks - `inst-snapshot`
-4. [ ] - `p1` - **RETURN** `TranscriptSnapshot { subscription_id, call_id, live, pass, archive, segments, hypotheses, last_seq }` - `inst-return-snapshot`
-5. [ ] - `p1` - Deliver `TranscriptMsg` events as `cpt-noter-algo-core-live-transcript-batch` publishes them - `inst-deliver`
-6. [ ] - `p1` - On stop or discard, end with `call_stopped` or `discarded` - `inst-end-stream`
+1. [x] - `p1` - API: `transcript_subscribe { call_id }` with a Channel from the call window or main window - `inst-subscribe-call`
+2. [x] - `p1` - **IF** the call does not exist **RETURN** `not_found` - `inst-if-unknown`
+3. [x] - `p1` - Stream hub runs `cpt-noter-algo-core-ipc-host-subscribe`; the snapshot is read through the writer connection: committed segments of the current pass, current hypotheses, speakers, gaps, marks - `inst-snapshot`
+4. [x] - `p1` - **RETURN** `TranscriptSnapshot { subscription_id, call_id, live, pass, archive, segments, hypotheses, last_seq }` - `inst-return-snapshot`
+5. [x] - `p1` - Deliver `TranscriptMsg` events as `cpt-noter-algo-core-live-transcript-batch` publishes them - `inst-deliver`
+6. [x] - `p1` - On stop or discard, end with `call_stopped` or `discarded` - `inst-end-stream`
 
 ### Watch levels
 
@@ -120,10 +120,10 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 - No call and no self-test running: the subscription stays open with no messages until one starts or the window unsubscribes.
 
 **Steps**:
-1. [ ] - `p1` - API: `levels_subscribe { call_id? }` with a Channel - `inst-levels-call`
-2. [ ] - `p1` - **RETURN** a `SubscriptionHandle` - `inst-levels-handle`
-3. [ ] - `p1` - Forward engine `levels` as `LevelsMsg { seq, at_ms, mic_db, sys_db }`, coalesced to one per 100 ms per stream, before a `seq` is assigned - `inst-levels-forward`
-4. [ ] - `p1` - End with `stream_unsubscribe` or a webview reload - `inst-levels-end`
+1. [x] - `p1` - API: `levels_subscribe { call_id? }` with a Channel - `inst-levels-call`
+2. [x] - `p1` - **RETURN** a `SubscriptionHandle` - `inst-levels-handle`
+3. [x] - `p1` - Forward engine `levels` as `LevelsMsg { seq, at_ms, mic_db, sys_db }`, coalesced to one per 100 ms per stream, before a `seq` is assigned - `inst-levels-forward`
+4. [x] - `p1` - End with `stream_unsubscribe` or a webview reload - `inst-levels-end`
 
 ### Preview a span
 
@@ -139,9 +139,9 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 - The archive pass replaced the lines the span pointed to (from M2): `transcript_upgraded`, with `upgraded_by_archive` set on the preview when it can still be resolved.
 
 **Steps**:
-1. [ ] - `p1` - API: `transcript_span { span }` - `inst-span-call`
-2. [ ] - `p1` - DB: SELECT `segments` of the call's current pass overlapping the span - `inst-span-select`
-3. [ ] - `p1` - **RETURN** `SpanPreview { span, call, segments, audio_available, upgraded_by_archive }` - `inst-span-return`
+1. [x] - `p1` - API: `transcript_span { span }` - `inst-span-call`
+2. [x] - `p1` - DB: SELECT `segments` of the call's current pass overlapping the span - `inst-span-select`
+3. [x] - `p1` - **RETURN** `SpanPreview { span, call, segments, audio_available, upgraded_by_archive }` - `inst-span-return`
 
 ### Replay a line
 
@@ -180,13 +180,13 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 **Output**: Confirmed segments in `segments`, live speakers in `speakers`, messages on the transcript stream.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the segment is a hypothesis - `inst-if-hypothesis`
-   1. [ ] - `p1` - Publish `hypothesis` (it replaces the channel's grey line); never persist it - `inst-publish-hypothesis`
-2. [ ] - `p1` - **ELSE** assign a segment id, map the live speaker label with `cpt-noter-algo-core-live-transcript-speakers`, compute the normalised shadow text, add it to the open batch - `inst-add-confirmed`
-3. [ ] - `p1` - When the batch is 250 ms old or the call stops, DB: INSERT the batch into `segments` (pass `live`) in one writer transaction - `inst-commit-batch`
-4. [ ] - `p1` - After the commit, publish `confirmed` for each segment in order (it removes the hypothesis) - `inst-publish-confirmed`
-5. [ ] - `p1` - Publish `gap` and `mark` messages as the session manager writes them - `inst-publish-gap-mark`
-6. [ ] - `p1` - **RETURN** - `inst-return-batch`
+1. [x] - `p1` - **IF** the segment is a hypothesis - `inst-if-hypothesis`
+   1. [x] - `p1` - Publish `hypothesis` (it replaces the channel's grey line); never persist it - `inst-publish-hypothesis`
+2. [x] - `p1` - **ELSE** assign a segment id, map the live speaker label with `cpt-noter-algo-core-live-transcript-speakers`, compute the normalised shadow text, add it to the open batch - `inst-add-confirmed`
+3. [x] - `p1` - When the batch is 250 ms old or the call stops, DB: INSERT the batch into `segments` (pass `live`) in one writer transaction - `inst-commit-batch`
+4. [x] - `p1` - After the commit, publish `confirmed` for each segment in order (it removes the hypothesis) - `inst-publish-confirmed`
+5. [x] - `p1` - Publish `gap` and `mark` messages as the session manager writes them - `inst-publish-gap-mark`
+6. [x] - `p1` - **RETURN** - `inst-return-batch`
 
 ### Live speakers
 
@@ -197,9 +197,9 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 **Output**: `speakers` rows of pass `live` for the call.
 
 **Steps**:
-1. [ ] - `p1` - The microphone channel's main speaker is **You** - `inst-you`
-2. [ ] - `p1` - **FOR EACH** new label on the system channel, DB: INSERT `speakers { call_id, label, pass: live, n }` as an unnamed speaker - `inst-new-speaker`
-3. [ ] - `p1` - **RETURN** the speaker id for the segment - `inst-return-speaker`
+1. [x] - `p1` - The microphone channel's main speaker is **You** - `inst-you`
+2. [x] - `p1` - **FOR EACH** new label on the system channel, DB: INSERT `speakers { call_id, label, pass: live, n }` as an unnamed speaker - `inst-new-speaker`
+3. [x] - `p1` - **RETURN** the speaker id for the segment - `inst-return-speaker`
 
 ### Replay route rule
 
@@ -225,9 +225,9 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 **Output**: `audio/<call_id>/transcript.jsonl`, 0600, for re-import after a corruption.
 
 **Steps**:
-1. [ ] - `p1` - Flush the open batch - `inst-file-flush`
-2. [ ] - `p1` - Write every segment of the call's current pass, one JSON line each, to a temporary file and rename it into place - `inst-file-write`
-3. [ ] - `p1` - **RETURN** - `inst-file-return`
+1. [x] - `p1` - Flush the open batch - `inst-file-flush`
+2. [x] - `p1` - Write every segment of the call's current pass, one JSON line each, to a temporary file and rename it into place - `inst-file-write`
+3. [x] - `p1` - **RETURN** - `inst-file-return`
 
 ## 4. States (CDSL)
 
@@ -253,8 +253,8 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 **Initial State**: hypothesis
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** hypothesis **TO** confirmed **WHEN** the engine confirms the utterance and its batch commits - `inst-st-confirm`
-2. [ ] - `p1` - **FROM** hypothesis **TO** hypothesis **WHEN** a newer hypothesis for the channel replaces it - `inst-st-replace`
+1. [x] - `p1` - **FROM** hypothesis **TO** confirmed **WHEN** the engine confirms the utterance and its batch commits - `inst-st-confirm`
+2. [x] - `p1` - **FROM** hypothesis **TO** hypothesis **WHEN** a newer hypothesis for the channel replaces it - `inst-st-replace`
 
 ## 5. Definitions of Done
 
