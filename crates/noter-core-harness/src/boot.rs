@@ -173,9 +173,7 @@ impl Harness {
     }
 
     /// Writes the world's calls, speakers, segments, marks and gaps as rows, the way capture
-    /// writes them (`cpt-noter-algo-core-library-calls-fixture-parity`, `inst-parity-seed`).
     fn seed_calls(&self, wanted: &Value) -> Result<(), CoreError> {
-        // @cpt-begin:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
             table,
             values,
@@ -305,7 +303,6 @@ impl Harness {
                 ));
             }
         }
-        // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         self.core.store().insert_batch(rows)
     }
 
