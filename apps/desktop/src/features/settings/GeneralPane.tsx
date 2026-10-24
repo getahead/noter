@@ -1,3 +1,4 @@
+import { permissionState } from "../notifications/notifications";
 import { useState } from "react";
 
 import { useWindow } from "../../app/use-window";
@@ -27,6 +28,10 @@ const Warn = ({ children }: { children: string }) => (
 export function GeneralPane({ bridge, settings }: PaneProps) {
   const { general, today } = settings;
   const selfTestPassed = useWindow(bridge, (s) => s.whole.setup?.self_test.type === "passed");
+  // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
+  // off means macOS says so (`env:changed`), whether they were denied at the prompt or turned off in System Settings
+  const notificationsOff = useWindow(bridge, (s) => permissionState(s.whole.environment?.notifications) === "DENIED");
+  // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
   const [selfTest, setSelfTest] = useState(false);
   const rowError = useRowErrors(bridge);
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
@@ -39,7 +44,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.general.offer")} error={rowError("general", "offer_to_record")} note={selfTestPassed ? t("settings.general.offer_note") : <><Warn>{t("settings.general.needs_self_test")}</Warn> <PushButton label={t("settings.general.run_self_test")} size="small" onAction={() => setSelfTest(true)} /></>}>
           <Toggle on={selfTestPassed && general.offer_to_record} size="small" disabled={!selfTestPassed} ariaLabel={t("settings.general.offer")} onAction={(offer_to_record) => general_({ offer_to_record })} />
         </Row>
-        {!general.notifications_enabled && (
+        {notificationsOff && (
           <Row label={t("settings.general.notifications")} note={t("settings.general.notifications_note")}>
             <Warn>{t("settings.general.notifications_off")}</Warn>
             {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}

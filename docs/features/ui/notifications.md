@@ -91,7 +91,7 @@ It implements `cpt-noter-component-screen-notifications`.
 **Steps**:
 1. [ ] - `p1` - Flow: `cpt-noter-flow-ui-call-page-frame-notifications-banner` shows the banner and asks macOS through `permission_request` - `inst-banner-flow`
 2. [ ] - `p1` - **IF** the user denied, or turned notifications off in System Settings - `inst-if-denied`
-   1. [ ] - `p1` - Core: `env:changed` reports notifications off; Settings › General shows **Notifications are off for Noter** with **Open System Settings…** (`open_external`) - `inst-off-line`
+   1. [x] - `p1` - Core: `env:changed` reports notifications off; Settings › General shows **Notifications are off for Noter** with **Open System Settings…** (`open_external`) - `inst-off-line`
    2. [ ] - `p1` - UI: nothing else changes; the menu bar keeps **Open Last Summary** - `inst-nothing-else`
 3. [ ] - `p1` - **RETURN** notifications allowed, or off with every state still visible in Noter - `inst-return-allow`
 
@@ -124,20 +124,20 @@ It implements `cpt-noter-component-screen-notifications`.
 
 ### Send rule
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-notifications-send-rule`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-notifications-send-rule`
 
 **Input**: the kind (NT-1, NT-2, NT-3), the call, whether notifications were allowed, capture state, presenting state, which call page the main window reports (`window_report_view`) and whether it is frontmost, whether a call surface is visible
 
 **Output**: send now, hold, or drop
 
 **Steps**:
-1. [ ] - `p1` - **IF** notifications were never allowed or are off: **RETURN** drop (the state stays visible in Noter) - `inst-not-allowed`
-2. [ ] - `p1` - **IF** the kind is NT-3 - `inst-if-nt3`
-   1. [ ] - `p1` - **IF** Noter is hidden for presenting or a call surface is visible: **RETURN** drop (the menu bar's degraded line shows it) - `inst-nt3-drop`
-   2. [ ] - `p1` - **RETURN** send now (never held) - `inst-nt3-send`
-3. [ ] - `p1` - **IF** the frontmost main window shows this call's page: **RETURN** drop; the page announces **Summary ready** - `inst-window-front`
-4. [ ] - `p1` - **IF** a call is being recorded or Noter is hidden for presenting: **RETURN** hold - `inst-hold`
-5. [ ] - `p1` - **RETURN** send now; held ones are sent one per call (combined per call after hidden mode) when capture stops or Noter is shown - `inst-send`
+1. [x] - `p1` - **IF** notifications were never allowed or are off: **RETURN** drop (the state stays visible in Noter) - `inst-not-allowed`
+2. [x] - `p1` - **IF** the kind is NT-3 - `inst-if-nt3`
+   1. [x] - `p1` - **IF** Noter is hidden for presenting or a call surface is visible: **RETURN** drop (the menu bar's degraded line shows it) - `inst-nt3-drop`
+   2. [x] - `p1` - **RETURN** send now (never held) - `inst-nt3-send`
+3. [x] - `p1` - **IF** the frontmost main window shows this call's page: **RETURN** drop; the page announces **Summary ready** - `inst-window-front`
+4. [x] - `p1` - **IF** a call is being recorded or Noter is hidden for presenting: **RETURN** hold - `inst-hold`
+5. [x] - `p1` - **RETURN** send now; held ones are sent one per call (combined per call after hidden mode) when capture stops or Noter is shown - `inst-send`
 
 ## 4. States (CDSL)
 
@@ -150,8 +150,8 @@ It implements `cpt-noter-component-screen-notifications`.
 **Initial State**: NOT_ASKED
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** NOT_ASKED **TO** ALLOWED **WHEN** the user clicks **Notify Me When Summaries Are Ready** and allows the prompt - `inst-notasked-allowed`
-2. [ ] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the user clicks **Don't Allow** - `inst-notasked-denied`
+1. [x] - `p1` - **FROM** NOT_ASKED **TO** ALLOWED **WHEN** the user clicks **Notify Me When Summaries Are Ready** and allows the prompt - `inst-notasked-allowed`
+2. [x] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the user clicks **Don't Allow** - `inst-notasked-denied`
 3. [ ] - `p1` - **FROM** DENIED **TO** ALLOWED **WHEN** the user turns notifications on in System Settings - `inst-denied-allowed`
 4. [ ] - `p1` - **FROM** ALLOWED **TO** DENIED **WHEN** the user turns them off in System Settings - `inst-allowed-denied`
 
