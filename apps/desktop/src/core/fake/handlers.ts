@@ -873,7 +873,7 @@ export const defaultHandlers: Handlers = {
     if (d) return d;
     const c = call(world, a.call_id);
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
-    return { call: c, calendar_event: null, speakers: t?.speakers ?? [], marks: t?.marks ?? [], gaps: t?.gaps ?? [], mode_used: world.app.privacy.effective, audio_not_stored: false, first_recorded_call: false };
+    return { call: c, calendar_event: null, speakers: t?.speakers ?? [], marks: t?.marks ?? [], gaps: t?.gaps ?? [], mode_used: world.app.privacy.effective, audio_not_stored: false, first_recorded_call: false, folder: `/Users/you/Library/Application Support/Noter/audio/${a.call_id}` };
   },
   call_update: (a, { world, emit }) => {
     const c = call(world, a.call_id);
@@ -1647,6 +1647,11 @@ export const defaultHandlers: Handlers = {
     return fake.callWindow;
   },
   window_call_state: (_a, { fake }) => fake.callWindow,
+  window_share_warning_seen: (_a, { fake, publish }) => {
+    fake.callWindow.show_share_warning = false;
+    publish("window:call");
+    return fake.callWindow;
+  },
   window_set_call_layout: (a, { world, fake, publish }) => {
     const twoDisplays = world.app.environment.displays.length > 1;
     fake.callWindow.layout = a.preference === "floating" || !twoDisplays ? "floating" : "dedicated";

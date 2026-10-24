@@ -1250,6 +1250,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `window_call_state` | Windows. `NoArgs → CallWindowState`. Windows: CM. | frozen |
 | Command | `window_set_call_layout` | Windows. `CallLayoutArgs → CallWindowState`. Windows: CM. | frozen |
 | Command | `window_set_collapsed` | Windows. `CollapseArgs → CallWindowState`. Windows: C. | frozen |
+| Command | `window_share_warning_seen` | Windows. **Got It** on the share warning: `show_share_warning` stays off (D-18). `NoArgs → CallWindowState`. Windows: C. | frozen |
 | Command | `app_set_hidden_for_presenting` | Windows. Hide for Presenting (wanted state). `HiddenArgs → PresentingState`. Windows: CM. | frozen |
 | Command | `window_navigate` | Windows. Show Noter / Open in Noter at a place (main window or Settings window). `NavigateArgs → Ack`. Windows: MCRSF. | frozen |
 | Command | `window_announce` | Windows. Native announcement for a panel that is not key (D55). `AnnounceArgs → Ack`. Windows: CR. | frozen |

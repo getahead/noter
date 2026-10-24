@@ -384,6 +384,11 @@ async fn call_get_serves_the_record_with_speakers_marks_and_gaps() {
         .unwrap();
     assert_eq!(detail.call.id.as_str(), "call_a");
     assert_eq!(detail.mode_used, EffectiveMode::CloudRedacted);
+    assert_eq!(
+        std::path::Path::new(&detail.folder),
+        dir.path().join("audio").join("call_a"),
+        "the call's folder, for Show in Finder"
+    );
     assert!(!detail.audio_not_stored && detail.calendar_event.is_none());
     let labels: Vec<_> = detail
         .speakers

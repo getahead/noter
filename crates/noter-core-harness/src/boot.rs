@@ -251,6 +251,9 @@ impl Harness {
         let mut rows = vec![];
         for call in wanted["calls"].as_array().unwrap_or(&empty) {
             let id = &call["id"];
+            // The call's folder exists, as capture leaves it, so **Show in Finder** finds it.
+            let folder = self.dir.join("audio").join(id.as_str().unwrap_or_default());
+            std::fs::create_dir_all(folder).map_err(crate::internal)?;
             let detail = wanted["call_details"]
                 .as_array()
                 .unwrap_or(&empty)

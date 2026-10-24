@@ -595,6 +595,7 @@ commands! {
     window_call_state(NoArgs) -> CallWindowState [Windows, Frozen, CallScreen | Main];
     window_set_call_layout(CallLayoutArgs) -> CallWindowState [Windows, Frozen, CallScreen | Main];
     window_set_collapsed(CollapseArgs) -> CallWindowState [Windows, Frozen, CallScreen];
+    window_share_warning_seen(NoArgs) -> CallWindowState [Windows, Frozen, CallScreen];
     /// Hide for Presenting (wanted state).
     app_set_hidden_for_presenting(HiddenArgs) -> PresentingState [Windows, Frozen, CallScreen | Main];
     /// Show Noter / Open in Noter at a place (main window or Settings window).

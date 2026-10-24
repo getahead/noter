@@ -64,6 +64,7 @@ export function navRoute(target: NavTarget): Route | null {
       return { section: "topics", key: ["topic", target.topic_id].join(":") };
     case "settings":
     case "first_run":
+    case "delete_old_audio": // a sheet over the current page (D-17), not a route
       return null;
   }
 }
