@@ -894,6 +894,7 @@ impl Core {
 
     /// The capture state as `harness.world_set` asks: the call row it names exists and the
     /// machine continues from there (harness only).
+    #[cfg(feature = "harness")]
     pub(crate) async fn seed_capture(&self, wanted: CaptureState) -> Result<(), CoreError> {
         let mut session = self.capture.lock().await;
         let now = self.deps.clock.now().0;
