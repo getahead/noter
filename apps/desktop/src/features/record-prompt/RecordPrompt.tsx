@@ -134,7 +134,7 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     "data-component": "cpt-noter-component-ui-record-prompt",
     "data-variant": variant,
     "data-state": view.state,
-    className: `rp-panel${local.closing ? " is-closing" : ""}`,
+    className: local.closing ? "rp-panel is-closing" : "rp-panel",
     role: "dialog",
     ref: panel,
     // an enter the browser dispatches after the pointer already left (a layout change under it) must not hold the panel
