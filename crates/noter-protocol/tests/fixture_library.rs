@@ -5,6 +5,7 @@
 //! the transcript snapshot from data, not from guesses, and the real core seeded with the same
 //! rows can be compared field by field.
 
+// @cpt-dod:cpt-noter-dod-core-library-calls-parity:p2
 use std::collections::HashMap;
 
 use noter_protocol::fixtures::world;

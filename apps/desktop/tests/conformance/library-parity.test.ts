@@ -5,6 +5,7 @@
 // speakers, marks and gaps by noter-core-harness) it is the parity test. M1 commands go through
 // `ahead()`, so a core that does not answer them yet stops at that step.
 // @cpt-algo:cpt-noter-algo-core-library-calls-fixture-parity:p2
+// @cpt-dod:cpt-noter-dod-core-library-calls-parity:p2
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { FakeWorld } from "../../src/core/bindings";

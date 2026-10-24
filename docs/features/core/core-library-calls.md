@@ -40,7 +40,7 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-core-library-calls`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-core-library-calls`
 
 - [x] `p2` - `cpt-noter-feature-core-library-calls`
 
@@ -292,7 +292,7 @@ The system **MUST** delete calls with every row and file recorded for them, refu
 
 ### Fixture parity from M1
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-library-calls-parity`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-library-calls-parity`
 
 The system **MUST** run the fixture-parity test for `calls_list`, `call_get` and the transcript snapshot in CI; a difference between the fake world and the real read models fails it and is fixed in the contract or the fixtures first (contract lane for the generator change).
 
