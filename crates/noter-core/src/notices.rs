@@ -341,13 +341,16 @@ impl Core {
     /// Stops the call when `notice` still shows after `ms`.
     fn stop_when_due(&self, notice: CaptureNotice, ms: i64) {
         self.after(ms, move |core| async move {
+            // Checked and stopped under one lock: an answer that lands first wins.
+            let mut session = core.capture.lock().await;
             let state = core.capture_now();
             let Some(call_id) = state.call_id.filter(|_| state.notice == Some(notice)) else {
                 return;
             };
             // @cpt-begin:cpt-noter-flow-core-capture-session-call-end:p1:inst-auto-stop
-            core.capture.lock().await.auto_stop = true;
-            let _ = core.stop_call(&timer_ctx(), CallIdArgs { call_id }).await;
+            session.auto_stop = true;
+            let args = CallIdArgs { call_id };
+            let _ = core.stop_locked(session, &timer_ctx(), args, None).await;
             // @cpt-end:cpt-noter-flow-core-capture-session-call-end:p1:inst-auto-stop
         });
     }
@@ -499,8 +502,9 @@ impl Core {
     // shortcut: the saved call is not offered Continue (one CaptureState holds one call); add a
     // second Continue slot when the UI needs it.
     async fn split_call(&self, ctx: &CommandCtx) -> Result<CaptureState, CoreError> {
+        // The notice is checked and the old call stopped under one lock.
+        let mut session = self.capture.lock().await;
         let (call_id, detected_at, app, title) = {
-            let mut session = self.capture.lock().await;
             let state = self.capture_now();
             let (
                 Some(call_id),
@@ -518,7 +522,8 @@ impl Core {
             (call_id, detected_at.0, session.new_meeting.take(), title)
         };
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-split
-        self.stop_call_at(ctx, CallIdArgs { call_id }, Some(detected_at))
+        let args = CallIdArgs { call_id };
+        self.stop_locked(session, ctx, args, Some(detected_at))
             .await?;
         let begin = Begin {
             at: detected_at,

@@ -630,8 +630,19 @@ impl Core {
         args: CallIdArgs,
         ended: Option<i64>,
     ) -> Result<CaptureState, CoreError> {
+        let session = self.capture.lock().await;
+        self.stop_locked(session, ctx, args, ended).await
+    }
+
+    /// The stop, from a caller that already holds the capture lock (and checked under it).
+    pub(crate) async fn stop_locked(
+        &self,
+        mut session: tokio::sync::MutexGuard<'_, Session>,
+        ctx: &CommandCtx,
+        args: CallIdArgs,
+        ended: Option<i64>,
+    ) -> Result<CaptureState, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-stop-call
-        let mut session = self.capture.lock().await;
         let state = self.capture_now();
         let now = self.deps.clock.now().0;
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-stop-call
