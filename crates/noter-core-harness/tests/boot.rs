@@ -767,9 +767,7 @@ async fn engine_fact_reaches_a_running_engine_and_kill_is_accepted() {
     let mut r = start().await;
     let fact =
         json!({ "event": { "type": "levels", "call_id": null, "mic_db": -30.0, "sys_db": -30.0 } });
-    // No command has started the engine yet.
-    let (idle, _) = r.call("main", "harness.engine_fact", fact.clone()).await;
-    assert_eq!(idle["ok"]["delivered"], false, "{idle}");
+    // The fixture's live call runs the engine from boot, so the fact lands.
     let id = r.next;
     r.next += 1;
     let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });

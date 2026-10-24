@@ -196,6 +196,10 @@ impl Harness {
         tokio::spawn(async move {
             noter_core::testing::engine_ready(&core).await;
             for tick in 0_u64.. {
+                // The call ended (a scenario started another, or went idle): the feed ends too.
+                if noter_core::testing::capturing(&core).as_ref() != Some(&call_id) {
+                    break;
+                }
                 engine.inject(EngineEvent::Levels {
                     call_id: Some(call_id.clone()),
                     mic_db: -32.0,
