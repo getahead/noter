@@ -504,6 +504,20 @@ impl Core {
                 .iter()
                 .filter(|g| g.speaker.speaker_id == s.id)
                 .count() as u32;
+            s.sample = (s.label != SpeakerLabel::You)
+                .then(|| {
+                    segments
+                        .iter()
+                        .filter(|g| g.speaker.speaker_id == s.id)
+                        .min_by_key(|g| g.t0_ms)
+                })
+                .flatten()
+                .map(|g| TimeSpan {
+                    call_id: call_id.clone(),
+                    channel: None,
+                    t0_ms: g.t0_ms,
+                    t1_ms: g.t1_ms,
+                });
         }
         Ok(TranscriptSnapshot {
             subscription_id: None,

@@ -291,6 +291,17 @@ async fn live_speakers_become_rows_once_per_label() {
     );
     assert_eq!(snapshot.speakers[2].segment_count, 2);
     assert_eq!(snapshot.speakers[0].named_by, Some(NamedBy::You));
+    // The sample is the speaker's first line (`You` has none), as the library serves it.
+    let sample = |i: usize| {
+        snapshot.speakers[i]
+            .sample
+            .as_ref()
+            .map(|t| (t.t0_ms.0, t.t1_ms.0))
+    };
+    assert_eq!(
+        [sample(0), sample(1), sample(2), sample(3)],
+        [None, Some((1000, 2000)), Some((2000, 3000)), None]
+    );
 }
 
 #[tokio::test(start_paused = true)]
