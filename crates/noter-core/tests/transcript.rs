@@ -217,6 +217,8 @@ async fn confirmed_segments_commit_in_one_batch_and_publish_after_it() {
     let dir = tempfile::tempdir().unwrap();
     let r = open(dir.path());
     new_call(&r.core, "recording");
+    let changes = |core: &Core| stored(core, "SELECT CAST(COUNT(*) AS TEXT) FROM changes");
+    let before = changes(&r.core);
     let (_, got) = subscribe(&r).await;
     engine_up(&r).await;
     r.engine
@@ -236,6 +238,8 @@ async fn confirmed_segments_commit_in_one_batch_and_publish_after_it() {
         stored(&r.core, "SELECT text_norm FROM segments ORDER BY t0_ms"),
         vec!["елка strasse", "second"]
     );
+    // Capture data carries no change-log rows (D-22).
+    assert_eq!(changes(&r.core), before);
     let texts: Vec<_> = events(&got)
         .iter()
         .filter_map(|e| match e {
