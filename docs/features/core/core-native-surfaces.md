@@ -208,7 +208,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Place the call window
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-native-surfaces-placement`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-native-surfaces-placement`
 
 **Input**: Displays by identity, the chosen call display, the layout preference, the saved frames per display.
 
@@ -217,7 +217,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Steps**:
 1. [x] - `p1` - **IF** the chosen call display is connected, use it with the preferred layout (dedicated by default) - `inst-chosen-display`
 2. [x] - `p1` - **ELSE** use the display with the main window, the floating layout, and set `chosen_display_missing` - `inst-fallback-display`
-3. [ ] - `p1` - Restore the saved frame for that display and layout, clamped to the visible frame - `inst-frame`
+3. [x] - `p1` - Restore the saved frame for that display and layout, clamped to the visible frame - `inst-frame`
 4. [x] - `p1` - **RETURN** the placement - `inst-return-placement`
 
 ### Non-activating, content-protected panels
@@ -250,17 +250,17 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Native E2E command log
 
-- [ ] `p2` - **ID**: `cpt-noter-algo-core-native-surfaces-e2e-log`
+- [x] `p2` - **ID**: `cpt-noter-algo-core-native-surfaces-e2e-log`
 
 **Input**: A debug build started with `NOTER_E2E_LOG_DIR`.
 
 **Output**: `commands-native-app-<pid>.json` with the names of commands the core ran successfully, from windows and native callers, written on quit.
 
 **Steps**:
-1. [ ] - `p1` - **IF** `NOTER_E2E_LOG_DIR` is not set or the build is a release build, do nothing - `inst-log-off`
-2. [ ] - `p1` - Record the name of every command that returned a result, whatever the caller - `inst-log-record`
-3. [ ] - `p1` - On quit, write `{ "suite": "native", "target": "app", "commands": [...], "stories": [] }` with names only, no content - `inst-log-write`
-4. [ ] - `p1` - **RETURN** - `inst-log-return`
+1. [x] - `p1` - **IF** `NOTER_E2E_LOG_DIR` is not set or the build is a release build, do nothing - `inst-log-off`
+2. [x] - `p1` - Record the name of every command that returned a result, whatever the caller - `inst-log-record`
+3. [x] - `p1` - On quit, write `{ "suite": "native", "target": "app", "commands": [...], "stories": [] }` with names only, no content - `inst-log-write`
+4. [x] - `p1` - **RETURN** - `inst-log-return`
 
 ## 4. States (CDSL)
 
@@ -304,7 +304,7 @@ The system **MUST** make the call window and the record prompt non-activating, c
 
 ### Every surface hides at once
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-presenting`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-presenting`
 
 The system **MUST** hide every surface with one action while recording continues, show state only on the menu bar while hidden, route a new meeting to a menu bar line, and restore what was visible.
 
@@ -317,7 +317,7 @@ The system **MUST** hide every surface with one action while recording continues
 
 ### Menu bar and native callers
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-menu-bar`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-menu-bar`
 
 The system **MUST** show recording state, the call and the privacy mode in the tray menu with the four glyphs, and call the core in process as `Caller::Native` from menu items, so each action takes effect within a second; XCUITest drives every menu item (UI lane writes the tests; this feature provides the behaviour and the command log).
 
@@ -343,7 +343,7 @@ The system **MUST** use `UNUserNotificationCenter` through `noter-native` (not `
 
 ### Navigation, announcements, external opens and calendar
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-native-surfaces-navigation`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-native-surfaces-navigation`
 
 The system **MUST** answer `window_navigate`, `window_announce`, `window_report_view` and `open_external` (allowed targets only), and read EventKit for detection matching only after calendar access was granted.
 

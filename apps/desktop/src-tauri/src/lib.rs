@@ -4,6 +4,7 @@
 
 // @cpt-component:cpt-noter-component-core-ipc-host:p1
 
+pub mod e2e_log;
 mod native;
 pub mod surfaces;
 pub mod updater;
@@ -50,6 +51,14 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             WindowEvent::Destroyed => {
                 reset(window.label(), window.try_state::<Booted>().as_deref())
             }
+            // The user moved or resized the call window: its frame is saved (inst-frame).
+            WindowEvent::Moved(_) | WindowEvent::Resized(_)
+                if window.label() == WindowLabel::CallScreen.as_str() =>
+            {
+                if let Some(surfaces) = window.try_state::<Arc<surfaces::TauriSurfaces<R>>>() {
+                    surfaces.call_window_changed(window);
+                }
+            }
             // Noter became active: the core re-checks what macOS cannot report (D-19).
             WindowEvent::Focused(true) => {
                 if let Some(Ok(core)) = window.try_state::<Booted>().map(|b| b.0.clone()) {
@@ -80,6 +89,7 @@ pub fn run() {
                 .map(|dir| noter_native::app_group_container().unwrap_or(dir))
                 .unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group);
+            app.manage(surfaces.clone());
             app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
             // Without a feed (M0) the check ends at once and nothing is ever ready.
             tauri::async_runtime::spawn(async move {
@@ -91,6 +101,7 @@ pub fn run() {
         .expect("Noter could not build its windows");
     app.run(move |app, event| {
         if let RunEvent::Exit = event {
+            e2e_log::write_on_quit();
             if let Some(Ok(core)) = app.try_state::<Booted>().map(|b| b.0.clone()) {
                 tauri::async_runtime::block_on(core.shutdown());
             }
@@ -218,6 +229,9 @@ pub async fn handle<R: Runtime>(
     // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-allowed
     // @cpt-begin:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-refused
     let result = dispatch_json(core.as_ref(), &ctx, name, args, sink).await;
+    if result.is_ok() {
+        e2e_log::record(name);
+    }
     // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-refused
     // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-return-allowed
     // @cpt-end:cpt-noter-algo-core-ipc-host-scope-check:p1:inst-if-in-scope
@@ -282,6 +296,9 @@ pub fn hotkey_pressed<R: Runtime>(
     let chord = chord.to_string();
     Some(tauri::async_runtime::spawn(async move {
         let answer = core.hotkey_pressed(&chord).await;
+        if let (Ok(_), Ok((_, name, _))) = (&answer, core.hotkey_command(&chord)) {
+            e2e_log::record(name);
+        }
         // Refusals (not_recording, not_implemented) are expected; a failure leaves a trace without content.
         if matches!(&answer, Err(e) if e.code == ErrorCode::Internal) {
             eprintln!("noter: the hotkey {chord} failed (internal)");
