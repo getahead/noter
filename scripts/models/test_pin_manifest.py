@@ -80,5 +80,25 @@ class DownloadChecks(unittest.TestCase):
             self.assertEqual(output.read_text(), "previous manifest")
 
 
+
+class Files(unittest.TestCase):
+    def test_a_repo_root_source_keeps_whole_paths_and_only_the_files_named(self):
+        tree = [
+            {"type": "file", "path": "model.safetensors", "size": 9, "lfs": {"oid": "big"}},
+            {"type": "file", "path": "tokenizer.json", "size": 3},
+            {"type": "directory", "path": "onnx"},
+        ]
+        spec = {"bundle": "b", "repo": "o/r", "commit": "c", "folder": "", "only": ["tokenizer.json"],
+                "required_for_capture": True}
+        with (
+            mock.patch.object(manifest, "get_json", return_value=tree) as get,
+            mock.patch.object(manifest, "sha256_of", return_value="small"),
+        ):
+            files = manifest.files_of(spec)
+        get.assert_called_once_with(f"{manifest.API}/o/r/tree/c?recursive=true")
+        self.assertEqual([(f["path"], f["sha256"]) for f in files], [("tokenizer.json", "small")])
+        self.assertEqual(files[0]["url"], "https://huggingface.co/o/r/resolve/c/tokenizer.json")
+
+
 if __name__ == "__main__":
     unittest.main()
