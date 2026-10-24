@@ -12,10 +12,11 @@
   margin: 0;
   box-shadow: none;
 }
-.cw-win--dedicated {
+/* borderless: it fills the visible frame of its display */
+.np-win.cw-win--dedicated {
   border-radius: 0;
 }
-.cw-win--floating {
+.np-win.cw-win--floating {
   border-radius: var(--r-panel);
 }
 .cw-win--floating.is-collapsed {
