@@ -2230,6 +2230,28 @@ async fn notifications_wait_for_the_call_to_end_and_skip_the_call_the_main_windo
 }
 
 #[tokio::test(start_paused = true)]
+async fn notifications_held_while_hidden_for_presenting_go_out_when_it_ends() {
+    let r = rig();
+    let call = CallId::new("call_1".to_string());
+    let ready = Notification {
+        call_id: call.clone(),
+        kind: NotificationKind::SummaryReady,
+    };
+    r.core
+        .app_set_hidden_for_presenting(&main_window(), HiddenArgs { hidden: true })
+        .await
+        .unwrap();
+    r.core.notify(ready.clone());
+    r.core.notify(ready.clone());
+    assert!(r.posted().is_empty(), "held while hidden for presenting");
+    r.core
+        .app_set_hidden_for_presenting(&main_window(), HiddenArgs { hidden: false })
+        .await
+        .unwrap();
+    assert_eq!(r.posted(), [ready], "one per call, once showing again");
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_engine_that_cannot_be_restarted_fails_the_call_and_try_again_resumes_it() {
     let r = rig_with(Setup {
         // The call's engine, then two restarts that fail: three failures in 30 s.

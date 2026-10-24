@@ -2,10 +2,13 @@
 //! `noter_core::Core` through its own write path, behind scripted platform seams, and the
 //! scenario controls of docs/TEST-PLAN.md (W12–W15) work against it.
 
+use std::sync::Arc;
 use std::time::Duration;
 
+use noter_core::Core;
 use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::{serve_with, Output};
+use noter_engine_client::scripted::Script;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream, Lines as LineReader};
 use tokio::task::JoinHandle;
@@ -15,28 +18,33 @@ struct Runner {
     output: LineReader<BufReader<DuplexStream>>,
     served: JoinHandle<std::io::Result<()>>,
     next: u64,
+    core: Arc<Core>,
 }
 
 async fn start() -> Runner {
+    start_with(Options {
+        fixture: true,
+        fixed_clock: true,
+        ..Options::default()
+    })
+    .await
+}
+
+async fn start_with(options: Options) -> Runner {
     let (input, core_in) = tokio::io::duplex(1 << 20);
     let (core_out, output) = tokio::io::duplex(1 << 20);
     let out = Output::new(core_out);
-    let harness = Harness::start(
-        Options {
-            fixture: true,
-            fixed_clock: true,
-            ..Options::default()
-        },
-        out.lines(),
-    )
-    .await
-    .expect("the harness boots on the fixture world");
-    let served = tokio::spawn(serve_with(harness.core(), harness, core_in, out));
+    let harness = Harness::start(options, out.lines())
+        .await
+        .expect("the harness boots on the fixture world");
+    let core = harness.core();
+    let served = tokio::spawn(serve_with(core.clone(), harness, core_in, out));
     Runner {
         input,
         output: BufReader::new(output).lines(),
         served,
         next: 1,
+        core,
     }
 }
 
@@ -952,4 +960,139 @@ async fn the_fixture_calls_are_seeded_as_capture_rows() {
         })
         .unwrap();
     assert_eq!(changes, 0, "capture rows carry no change rows (D-22)");
+}
+
+/// A replayed call: on every `start_session`, the first and each capture-first restart, the
+/// engine reports the session, then levels every 200 ms. The supervisor runs one session and
+/// does not read these call ids; the harness answers the first `start_session` with the real one.
+const REPLAYED_CALL: &str = r#"
+{"on": "start_session", "after_ms": 0, "event": {"type": "session_started", "call_id": "call_replayed", "mic_device": "Scripted Microphone", "output_device": "Scripted Speakers"}}
+{"on": "start_session", "after_ms": 200, "event": {"type": "levels", "call_id": "call_replayed", "mic_db": -30.0, "sys_db": -30.0}}
+{"on": "start_session", "after_ms": 400, "event": {"type": "levels", "call_id": "call_replayed", "mic_db": -30.0, "sys_db": -30.0}}
+{"on": "start_session", "after_ms": 600, "event": {"type": "levels", "call_id": "call_replayed", "mic_db": -30.0, "sys_db": -30.0}}
+"#;
+
+/// The fixture world with no call recording, on the real clock, the engine playing `script`.
+async fn drill(script: &str) -> (Runner, Value) {
+    let mut r = start_with(Options {
+        fixture: true,
+        engine_script: Some(Script::parse(script).unwrap()),
+        ..Options::default()
+    })
+    .await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({ "source": "today", "sensitive": false }),
+        )
+        .await;
+    assert_eq!(started["phase"], "recording", "{started}");
+    let call_id = started["call_id"].clone();
+    (r, call_id)
+}
+
+impl Runner {
+    /// `(t0_ms, t1_ms)` of the call's `engine_restart` gap rows.
+    fn restart_gaps(&self, call_id: &Value) -> Vec<(i64, i64)> {
+        self.core
+            .store()
+            .read(|c| {
+                let mut q = c.prepare(
+                    "SELECT t0_ms, t1_ms FROM gaps WHERE call_id = ?1 AND reason = 'engine_restart'",
+                )?;
+                let rows = q.query_map([call_id.as_str().unwrap()], |r| Ok((r.get(0)?, r.get(1)?)))?;
+                rows.collect()
+            })
+            .unwrap()
+    }
+
+    /// Polls `app_snapshot` until `ok` holds, failing after 10 s.
+    async fn until(&mut self, what: &str, ok: impl Fn(&Value) -> bool) -> Value {
+        for _ in 0..500 {
+            let snapshot = self.ok("main", "app_snapshot", json!({})).await;
+            if ok(&snapshot) {
+                return snapshot;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("{what} within 10 s");
+    }
+}
+
+/// The capture states of the degraded set.
+fn degraded(snapshot: &Value) -> Vec<String> {
+    snapshot["degraded"]["states"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["type"].as_str().unwrap().to_string())
+        .collect()
+}
+
+// Q7 engine-kill drill (DoD cpt-noter-dod-core-engine-capture-restart; feature acceptance
+// criterion 2), first half: the engine dies during a replayed call, the capture-first restart
+// brings it back on the same call with one `engine_restart` gap of at most 2 s, and the call goes on.
+#[tokio::test(flavor = "multi_thread")]
+async fn q7_an_engine_killed_during_a_replayed_call_comes_back_with_one_gap_of_at_most_2_s() {
+    let (mut r, call_id) = drill(REPLAYED_CALL).await;
+    tokio::time::sleep(Duration::from_millis(500)).await; // levels flow
+    assert!(r.restart_gaps(&call_id).is_empty());
+
+    let (kill, _) = r.call("main", "harness.engine_kill", json!({})).await;
+    assert!(kill.get("ok").is_some(), "{kill}");
+    for _ in 0..500 {
+        if !r.restart_gaps(&call_id).is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(700)).await; // the restarted engine replays its levels
+    let gaps = r.restart_gaps(&call_id);
+    assert_eq!(gaps.len(), 1, "one gap per restart: {gaps:?}");
+    let (t0, t1) = gaps[0];
+    assert!(
+        t0 <= t1 && t1 - t0 <= 2_000,
+        "the gap is at most 2 s: {t0}..{t1}"
+    );
+
+    let snapshot = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(
+        snapshot["capture"]["phase"], "recording",
+        "the call goes on"
+    );
+    assert_eq!(snapshot["capture"]["call_id"], call_id, "on the same call");
+    assert!(!degraded(&snapshot).contains(&"capture_failed".to_string()));
+    let stopped = r
+        .ok("main", "capture_stop", json!({ "call_id": call_id }))
+        .await;
+    assert_eq!(stopped["phase"], "stopped");
+    r.finish().await;
+}
+
+// Q7 drill, second half: an engine that dies on every restart gives up after three tries in
+// 30 s; the call fails with `capture_failed` and is not ended.
+#[tokio::test(flavor = "multi_thread")]
+async fn q7_an_engine_that_dies_on_every_restart_fails_the_call_with_capture_failed() {
+    let script = format!(
+        "{REPLAYED_CALL}\n{{\"on\": \"start_session\", \"after_ms\": 300, \"kill\": true}}\n"
+    );
+    let (mut r, call_id) = drill(&script).await;
+    let failed = r
+        .until("phase failed", |s| s["capture"]["phase"] == "failed")
+        .await;
+    assert_eq!(
+        failed["capture"]["call_id"], call_id,
+        "the call is not ended"
+    );
+    assert!(
+        degraded(&failed).contains(&"capture_failed".to_string()),
+        "{failed}"
+    );
+    r.finish().await;
 }

@@ -47,7 +47,7 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-core-capture-session`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-core-capture-session`
 
 - [x] `p2` - `cpt-noter-feature-core-capture-session`
 
@@ -443,7 +443,7 @@ The system **MUST** offer **Resume Recording** after a quit or crash until the b
 
 ### Sensitive calls and notifications
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-core-capture-session-sensitive-notify`
+- [x] `p2` - **ID**: `cpt-noter-dod-core-capture-session-sensitive-notify`
 
 The system **MUST** keep the sensitive flag on the call (refusing to turn it off during capture) and decide every notification by the hold rule of DESIGN-core 3.2: NT-3 at once unless hidden for presenting or a call surface is visible, everything else held while recording or hidden and released one per call afterwards, nothing for the call the frontmost main window shows.
 

@@ -1,67 +1,35 @@
 # M1 week one on the MacBook: kill drill, live capture checks, real-call latency
 
-For the owner. Closes, on real hardware, what CI cannot run (it has no TCC prompts and no
-speakers): the Q7 engine-kill drill (`cpt-noter-dod-core-engine-capture-restart`), the live half
-of the capture pipeline (one clock, exclusions, device changes, the self-test clip:
-`cpt-noter-dod-core-engine-capture-pipeline`), and the Q4 real-call latency measurement
-(`cpt-noter-dod-core-engine-capture-latency`). Parts A and B take about an hour and need
-#139 and the one-clock capture PR on `main`; part C (one real call) needs the live ASR PR too.
+For the owner. What is left for you, in order: **C** (one real EN/RU/DE call, about 45 min with
+setup) → DoD `cpt-noter-dod-core-engine-capture-latency`; **G** (golden set) only if you keep it
+in M1; **B** when convenient (§6 criteria of the live pipeline). **A is done** (24 Oct, below).
+Each part is one copy-paste block; send back the lines it says.
 
-Send back the table at the end. The backend team records the results in
-`docs/features/core/core-engine-capture.md` and ticks what they prove.
-
-## 0. Build (5 min, once)
-
-From the repository root on a current `main`, in Terminal (the prompts then name Terminal; it
-already has Microphone and System Audio Recording from the Q4 spike, so no prompt is expected):
+## 0. Once per shell
 
 ```sh
-export PATH=/opt/homebrew/bin:/usr/bin:$PATH
-swift build -c release --package-path engine                      # engine/.build/release/noter-engine
-cargo build --release -p noter-engine-client --example kill_drill # target/release/examples/kill_drill
+cd ~/projects/noter && git switch -q main && git pull -q
+export PATH=/opt/homebrew/bin:/usr/bin:$PATH NOTER_APP_GROUP_DIR=$HOME/noter-week-one
+mkdir -p "$NOTER_APP_GROUP_DIR" && swift build -c release --package-path engine
 ENGINE=$PWD/engine/.build/release/noter-engine
-DRILL=$PWD/target/release/examples/kill_drill
 ```
 
-A recorded call as two 16 kHz WAV files, for the replayed runs (any real call of a few minutes,
-ideally the EN/RU/DE one; your side and the others' side, or the same file twice):
+## A. Q7 engine-kill drill: done by the backend team, 24 Oct 2026
+
+Release build on this MacBook, replayed call (file mode, no TCC prompt needed), command
+`kill_drill $ENGINE 120 3 --mic mic.wav --sys sys.wav`:
+- **A1 PASS:** 3 kills, capturing again after 115–119 ms, supervisor gaps 108/184/185 ms,
+  `timeline.json` with three `engine_restart` gaps and `"parts":4`.
+- **A3 as designed:** 3 kills in 30 s → `session is Failed` (`CaptureFailed`, Try Again in the app).
+- The same drill runs on the real core in every `just gate` (`noter-core-harness` tests `q7_*`).
+
+Optional, not needed for any DoD: **A2**, the same drill on live capture. Play a recording through
+the speakers, talk now and then, and paste the last line:
 
 ```sh
-afconvert -f WAVE -d LEI16@16000 -c 1 my-side.m4a  /tmp/mic.wav
-afconvert -f WAVE -d LEI16@16000 -c 1 their-side.m4a /tmp/sys.wav
+cargo build -q --release -p noter-engine-client --example kill_drill
+target/release/examples/kill_drill $ENGINE 120 3     # pass: "PASS: 3 engine_restart gap(s) …"
 ```
-
-## A. Q7 engine-kill drill (15 min)
-
-The drill runs the real supervisor (`noter-engine-client`) against the real engine, kills the
-engine with SIGKILL during the call, and prints every gap. It kills only its own child process.
-
-**A1. Replayed call (file mode), three kills over two minutes:**
-
-```sh
-$DRILL $ENGINE 120 3 --mic /tmp/mic.wav --sys /tmp/sys.wav
-```
-
-**A2. Live capture of a call played through the speakers.** Start the recording playing
-(`afplay their-side.m4a &` or the call app's own recording), talk now and then, and run:
-
-```sh
-$DRILL $ENGINE 120 3
-```
-
-**Pass (both):** the last line is `PASS: 3 engine_restart gap(s) for 3 kill(s), bound 2000 ms`;
-each `kill N: capturing again after … ms` and each `supervisor gap EngineRestart … (N ms)` is at
-most 2000; `timeline.json` lists the same three `engine_restart` gaps and `"parts":4`. (A debug
-build came in at ~1.8 s in file mode on 24 Oct; use the release build.)
-
-**A3. Restarts that cannot keep up end in `CaptureFailed`:** three kills within 30 s.
-
-```sh
-$DRILL $ENGINE 30 3 --mic /tmp/mic.wav --sys /tmp/sys.wav
-```
-
-**Expected:** `kill 3: session is Failed, not capturing` and a final `FAIL` line. That is the
-designed outcome (3 restarts in 30 s → `CaptureFailed`, the app offers Try Again), not a defect.
 
 ## B. Live capture checks (35 min)
 
@@ -163,19 +131,14 @@ and staying silent, run
 `SHOW=levels session 30 '[]' '{"id":5,"cmd":{"type":"play","call_id":"old","from_ms":0,"to_ms":null,"channel":null}}'`.
 **Pass:** you hear the replay, and `sys_db` stays near -160 throughout.
 
-## C. Q4 real-call latency, EN/RU/DE (one real call, 30-60 min)
+## C. Q4 real-call latency, EN/RU/DE (DoD `-latency`)
 
-What it measures (`cpt-noter-dod-core-engine-capture-latency`): one real call that mixes English,
-Russian and German, captured live through this pipeline on both channels with one WhisperKit
-Turbo instance and per-utterance language ID. For every segment line: **lag** = when the line
-arrived minus when its words ended (session start + `t1_ms`), for hypotheses and for confirmed
-segments.
+One real call mixing English, Russian and German, captured live on both channels with one
+WhisperKit Turbo instance. **Pass:** p95 hypothesis lag ≤ 2 s and p95 confirmed lag ≤ 4 s, with
+segments in all three languages; if not, the numbers decide between a new streaming policy and
+Parakeet as a second backend (PRD › Roadmap).
 
-**Pass:** p95 hypothesis lag ≤ 2 s and p95 confirmed lag ≤ 4 s, with segments in all three
-languages. If not met, the backend team changes the streaming policy or adds Parakeet as a second
-backend (PRD › Roadmap); the numbers decide which.
-
-**C1. The model, once** (about 1.6 GB, from the pinned manifest, every file checked):
+**C1. The model, once** (about 1.6 GB from the pinned manifest, every file checked). After §0:
 
 ```sh
 python3 - "$NOTER_APP_GROUP_DIR/models/whisper-turbo" <<'EOF'
@@ -193,28 +156,51 @@ print("model ready:", out)
 EOF
 ```
 
-**C2. The call.** Start this as the call starts (set the seconds to the call's length plus a
-minute), then hold the call as usual, switching languages as you naturally would:
+**C2. The call.** Paste this as the call starts, then talk as usual, switching languages as you
+naturally would. It records up to an hour; when the call ends, press Ctrl-C once (the report
+works on what was captured):
 
 ```sh
-LANGS='["en","ru","de"]' session 3600 '[]' > /tmp/q4-call.jsonl
-python3 engine/scripts/latency.py /tmp/q4-call.jsonl
+{ echo '{"id":1,"cmd":{"type":"start_session","call_id":"q4","session_dir":"audio/q4","store_audio":true,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en","ru","de"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}'
+  sleep 3600; echo '{"id":2,"cmd":{"type":"stop","call_id":"q4"}}'; sleep 3
+  echo '{"id":3,"cmd":{"type":"shutdown"}}'; } | $ENGINE > ~/q4-call.jsonl
 ```
 
-The first lines after `session_started` come once the model has loaded (taps first, then the
-model): a few seconds of the call's start are transcribed late, which is expected; say how long
-the load took (the first `segment` line's `at` minus `session_started`'s).
+Then the report:
 
-**Send back:** the report's lines (count, p50 and p95 per state and language, the two PASS/FAIL
-lines), and a few confirmed segments per language as they are, for a look at the quality.
+```sh
+python3 engine/scripts/latency.py ~/q4-call.jsonl
+```
+
+**Send back:** the report's lines (count, p50/p95 per state and language, the two PASS/FAIL lines)
+and `~/q4-call.jsonl` (or a few confirmed segments per language). The first seconds come late
+while the model loads (taps first, then the model): expected.
+
+## G. Golden set (DoD `-asr`): first a decision
+
+The `-asr` budget check is the `live-hypothesis-lag` / `live-confirmed-lag` scenarios over the
+golden set, and your 24 Oct order puts "live-*-lag, golden-set perf" out of development. Say
+either **"G out of M1"** (the DoD gets the same D-30 note as `-replay` and does not hold the box;
+the C call still measures the budgets) or **"G in"**, then:
+
+1. Put ten hand-corrected calls in `evals/golden/<name>/` as `mic.wav` and `sys.wav` (16 kHz mono:
+   `afconvert -f WAVE -d LEI16@16000 -c 1 in.m4a mic.wav`) and commit them yourself
+   (`evals/golden/**` is owner-only baseline data; agents never write it).
+2. After §0 and C1, run and paste the output:
+
+```sh
+for d in evals/golden/*/; do n=$(basename "$d"); echo "== $n"
+  { echo '{"id":1,"cmd":{"type":"start_session","call_id":"'$n'","session_dir":"audio/'$n'","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en","ru","de"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}'
+    sleep $(( $(afinfo "$d/mic.wav" | awk '/duration/{print int($3)}') + 10 )); echo '{"id":2,"cmd":{"type":"shutdown"}}'
+  } | $ENGINE --mic "$d/mic.wav" --sys "$d/sys.wav" > "/tmp/golden-$n.jsonl"
+  python3 engine/scripts/latency.py "/tmp/golden-$n.jsonl"; done
+```
 
 ## What to send back
 
 | Step | Result | Numbers / anything odd |
 | --- | --- | --- |
-| A1 replay, 3 kills | PASS / FAIL | restart times, gap ms |
-| A2 live, 3 kills | PASS / FAIL | restart times, gap ms |
-| A3 3 kills in 30 s | Failed as expected? | |
+| A2 live, 3 kills (optional) | PASS / FAIL | last line |
 | B1 one clock | mic vs sys duration | |
 | B2 sides | mic_db / sys_db talking, then playing | |
 | B3 exclusions | sys_db with Music excluded; after `exclude_process` | |
@@ -225,5 +211,6 @@ lines), and a few confirmed segments per language as they are, for a look at the
 | B8 silent system audio | `system_audio_silent` lines (since, confidence); none with the permission on | |
 | B9 replay | positions 5000→15000, error for an unknown call, `sys_db` during a replay | |
 | C latency | p95 hypothesis / confirmed per language, model load time | |
+| G golden set | out of M1 / per-call report lines | |
 
-Paste the final lines of A1–A3 and the `device_changed` line as they are.
+Paste the `device_changed` line (B4) as it is.
