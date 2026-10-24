@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CallDetection, CaptureNotice, CaptureState, ModelBundle } from "../../core/bindings";
-import { chooseView, countdownSeconds, createPromptTimer, modelPercent, sourceLine, type PromptInput } from "./logic";
+import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptInput } from "./logic";
 
 const detection = (o: Partial<CallDetection> = {}): CallDetection => ({ id: "det_teams", app_name: "Microsoft Teams", bundle_id: "com.microsoft.teams2", matched_event: null, detected_at: 0, prompt_until: 30_000, blocked: null, ...o });
 const capture = (o: Partial<CaptureState> = {}): CaptureState => ({ phase: "idle", notice: null, ...o }) as CaptureState;
@@ -105,5 +105,56 @@ describe("createPromptTimer (15 s, paused while the pointer or focus is on the p
     t.stop();
     vi.advanceTimersByTime(5_000);
     expect(done).not.toHaveBeenCalled();
+  });
+});
+
+describe("the panel's own state (localReduce)", () => {
+  const run = (...events: Parameters<typeof localReduce>[1][]) => events.reduce(localReduce, INITIAL_LOCAL);
+
+  it("opens the Don't Ask confirmation and Back returns", () => {
+    expect(run({ type: "dont-ask" }).dontAsk).toBe(true);
+    expect(run({ type: "dont-ask" }, { type: "back" }).dontAsk).toBe(false);
+  });
+  it("closes in two steps: closing for the 200 ms fade, then gone", () => {
+    const closing = run({ type: "closing", key: "det:1" });
+    expect(closing.closing).toBe("det:1");
+    expect(localReduce(closing, { type: "gone" })).toMatchObject({ closing: null, gone: "det:1" });
+  });
+  it("remembers who is holding it and forgets everything when the prompt is over", () => {
+    expect(isHeld(run({ type: "pointer", on: true }))).toBe(true);
+    expect(isHeld(run({ type: "focus", on: true }))).toBe(true);
+    expect(isHeld(run({ type: "pointer", on: true }, { type: "focus", on: true }, { type: "pointer", on: false }))).toBe(true); // focus still holds it
+    expect(isHeld(run({ type: "pointer", on: true }, { type: "pointer", on: false }))).toBe(false);
+    expect(run({ type: "dont-ask" }, { type: "closing", key: "k" }, { type: "gone" }, { type: "reset" })).toEqual(INITIAL_LOCAL);
+  });
+  it("a refusal shows its reason only while the world it was refused in has not changed", () => {
+    const s = run({ type: "refused", reason: "disk_full", freeMb: 420, at: "env-1" });
+    expect(activeRefusal(s, "env-1")).toEqual({ reason: "disk_full", freeMb: 420 });
+    expect(activeRefusal(s, "env-2")).toBeNull(); // old audio deleted: the reason clears
+    expect(activeRefusal(INITIAL_LOCAL, "env-1")).toBeNull();
+  });
+});
+
+describe("what identifies a prompt, and the browsers", () => {
+  it("is the detection, else the notice, else nothing", () => {
+    expect(viewKey(detection(), null)).toBe("det:det_teams");
+    expect(viewKey(null, { type: "call_ended", stops_at: 1 })).toBe("notice:call_ended");
+    expect(viewKey(null, null)).toBeNull();
+  });
+  it("knows a browser by its bundle id, so the Don't Ask line is the browser's", () => {
+    expect(isBrowser("com.apple.Safari")).toBe(true);
+    expect(isBrowser("com.google.Chrome")).toBe(true);
+    expect(isBrowser("com.microsoft.teams2")).toBe(false);
+  });
+});
+
+describe("meetingTitle", () => {
+  const meeting = (o: Partial<Extract<CaptureNotice, { type: "new_meeting" }>>): CaptureNotice => ({ type: "new_meeting", event: null, app_name: null, detected_at: 0, expires_at: 1, default_choice: "start_as_new_call", ...o });
+  it("is the event's title, else the app, else empty", () => {
+    expect(meetingTitle(meeting({ event: { id: "e", title: "1:1 with Anna K.", starts_at: 0, ends_at: 1 } }))).toBe("1:1 with Anna K.");
+    expect(meetingTitle(meeting({ app_name: "Zoom" }))).toBe("Zoom");
+    expect(meetingTitle(meeting({}))).toBe("");
+    expect(meetingTitle(null)).toBe("");
+    expect(meetingTitle({ type: "call_ended", stops_at: 1 })).toBe("");
   });
 });

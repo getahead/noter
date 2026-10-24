@@ -1,6 +1,7 @@
 import "./app.css";
 import { SettingsWindow } from "../features/settings/SettingsWindow";
 import { FirstRun } from "../features/first-run/first-run";
+import { RecordPrompt } from "../features/record-prompt/RecordPrompt";
 import { MainWindow } from "../features/shell/main-window";
 import { t } from "../i18n/format";
 import { InlineBanner } from "../ui/feedback/inline-banner";
@@ -23,6 +24,7 @@ export function App({ bridge }: { bridge: Bridge }) {
       )}
       {bridge.label === "main" && !error && <MainWindow bridge={bridge} />}
       {bridge.label === "first-run" && !error && <FirstRun bridge={bridge} />}
+      {bridge.label === "record-prompt" && status === "READY" && <RecordPrompt bridge={bridge} />}
       {bridge.label === "settings" && status === "READY" && <SettingsWindow bridge={bridge} />}
     </div>
   );

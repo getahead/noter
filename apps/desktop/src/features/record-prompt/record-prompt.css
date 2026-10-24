@@ -1,0 +1,22 @@
+/* The record prompt (prototype 10-a.css `.rp-*`, 01-macos27.css panel material), ported as-is. */
+.rp-panel { width: 400px; min-width: 360px; max-width: 440px; background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); padding: 12px 14px; display: grid; gap: 10px; opacity: 1; transition: opacity 200ms ease-in; }
+.rp-panel.is-closing { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .rp-panel { transition: none; } }
+.rp-r1 { display: flex; align-items: flex-start; gap: 10px; }
+.rp-r1__text { flex: 1 1 auto; min-width: 0; display: grid; gap: 3px; }
+.rp-appicon { width: 32px; height: 32px; border-radius: var(--r-row); background: var(--sel-accent); color: var(--accent-text); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.rp-title { font: 600 13px/18px var(--font); }
+.rp-sub { color: var(--label-2); font-size: 12px; line-height: 16px; }
+.rp-r3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rp-r3--stack { display: grid; gap: 8px; }
+.rp-btnrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rp-reason { display: flex; gap: 6px; align-items: center; color: var(--warning); font-size: 12px; }
+.rp-reason span { color: var(--label); }
+.rp-inline { display: grid; gap: 8px; padding: 8px 10px; border-radius: var(--r-row); background: var(--sel-unemph); }
+.rp-inline p { margin: 0; font-size: 12px; }
+.rp-inline__btns { display: flex; justify-content: flex-end; gap: 8px; }
+.rp-countdown { height: 3px; border-radius: 2px; background: var(--sel-unemph); margin-top: 6px; overflow: hidden; }
+.rp-countdown span { display: block; height: 100%; background: var(--label-3); transition: width 1s linear; }
+@media (prefers-reduced-motion: reduce) { .rp-countdown { display: none; } }
+/* The panel window is the panel and its shadow (the prototype's .rp-pos offsets it 12 pt from the corner). */
+[data-window="record-prompt"] { padding: 12px; }
