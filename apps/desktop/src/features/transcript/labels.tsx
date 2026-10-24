@@ -16,9 +16,9 @@ export function SpeakerLabel({ text, variant }: { text: string; variant: Speaker
 }
 
 // @cpt-component:cpt-noter-component-ui-language-tag:p1
-/** **RU**, or **RU?** with a dashed outline under low confidence; VoiceOver reads the language's name. */
-export function LanguageTag({ lang, confidence = null, variant = "segment" }: { lang: Lang; confidence?: number | null; variant?: "segment" | "call" | "filter" }) {
-  const tag = langTag(lang, confidence);
+/** **RU**, or **RU?** with a dashed outline when language ID was unsure; VoiceOver reads the language's name. */
+export function LanguageTag({ lang, langP = null, variant = "segment" }: { lang: Lang; langP?: number | null; variant?: "segment" | "call" | "filter" }) {
+  const tag = langTag(lang, langP);
   return (
     <span data-component="cpt-noter-component-ui-language-tag" data-variant={variant} data-state={tag.low ? "low-confidence" : "default"} className={cx("np-lang", tag.low && "is-low")} title={tag.label} aria-label={tag.label} role="img">
       {tag.text}

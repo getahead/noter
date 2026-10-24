@@ -27,7 +27,7 @@ describe("speaker label and language tag", () => {
     expect(you).toContain('data-component="cpt-noter-component-ui-speaker-label"');
     expect(you).toContain('class="np-spk"');
     expect(renderToString(<SpeakerLabel text="Speaker 2" variant="unresolved" />)).toContain("np-spk is-secondary");
-    const low = renderToString(<LanguageTag lang="ru" confidence={0.6} />);
+    const low = renderToString(<LanguageTag lang="ru" langP={0.6} />);
     expect(low).toContain('data-state="low-confidence"');
     expect(low).toContain('aria-label="Russian, low confidence"');
     expect(low).toContain(">RU?<");

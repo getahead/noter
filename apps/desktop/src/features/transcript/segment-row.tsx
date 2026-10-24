@@ -132,7 +132,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
             {status && <InlineStatus text={status} variant="notice" onExpire={() => onStatusDone?.()} />}
           </span>
         )}
-        <LanguageTag lang={seg.lang} confidence={seg.confidence} />
+        <LanguageTag lang={seg.lang} langP={seg.lang_p} />
       </span>
     </div>
   );

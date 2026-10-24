@@ -110,9 +110,9 @@ export function langName(lang: Lang): string {
   }
 }
 
-/** The language tag: **RU**, or **RU?** under low confidence, read as the language's name. */
-export function langTag(lang: Lang, confidence: number | null = null): { text: string; label: string; low: boolean } {
-  const low = confidence != null && confidence < LOW_CONFIDENCE;
+/** The language tag: **RU**, or **RU?** when language ID was unsure (`lang_p` under 0.7: the speaker prior decided). */
+export function langTag(lang: Lang, langP: number | null = null): { text: string; label: string; low: boolean } {
+  const low = langP != null && langP < LOW_CONFIDENCE;
   const code = langAttr(lang).toUpperCase();
   const name = langName(lang);
   return { text: low ? `${code}?` : code, label: low ? t("transcript.lang_low", { lang: name }) : name, low };
