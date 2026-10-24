@@ -9,14 +9,14 @@ A FEATURE, a task or a pull request is done when `just gate` passes. CI runs the
 | Command | When | What it runs |
 | --- | --- | --- |
 | `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, trace coverage, unit tests |
-| `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, native UI tests (XCUITest, macOS only; skipped with a notice on Linux), E2E and E2E coverage, screenshots, performance, `cfs validate`, the gate-config guard |
+| `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, native UI tests (XCUITest, macOS only; skipped with a notice on Linux), E2E and E2E coverage, screenshots, `cfs validate`, the gate-config guard |
 | `just setup` | Once per machine (idempotent; `just doctor` only checks) | Git hooks, Rust toolchain and components (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install`, Playwright WebKit, the Constructor Studio core; then verifies and prints every version |
 
-Individual gates: `just lint` (`lint-rust`, `lint-ui`), `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e` (`e2e-tests`, then `e2e-coverage`), `just visual`, `just perf`, `just docs`, `just config-guard`. Requirements on the Mac, with versions: [DEVELOPMENT.md › Prerequisites](DEVELOPMENT.md#prerequisites). In short: Rust via rustup, Node 22+ with pnpm, Python 3.11+, `just`, and Xcode for `just native`. Docker is optional (screenshots outside CI, rendered in the pinned container as linux/amd64); valgrind exists only on Linux, so `just perf` on the Mac reports wall time without gating.
+Individual gates: `just lint` (`lint-rust`, `lint-ui`), `just contract`, `just arch`, `just trace`, `just test-unit`, `just cov-unit`, `just native`, `just e2e` (`e2e-tests`, then `e2e-coverage`), `just visual`, `just docs`, `just config-guard`. Requirements on the Mac, with versions: [DEVELOPMENT.md › Prerequisites](DEVELOPMENT.md#prerequisites). In short: Rust via rustup, Node 22+ with pnpm, Python 3.11+, `just`, and Xcode for `just native`. Docker is optional (screenshots outside CI, rendered in the pinned container as linux/amd64); `just perf` (not part of the gate) runs the performance scenarios by hand.
 
 ## The quality bars
 
-All numbers live in `harness/harness.toml`. On 17 Oct 2026 the owner set them to realistic goals: unit coverage 80% (was 90%), E2E 60% (was 80%), screenshots 98% (was 99%), performance ≤ 10% regression and 60% scenario coverage (was 5% and 80%), and added the trace-coverage ratchet. A pull request that loosens any of them (a lower minimum, a higher maximum, fewer timed runs, a new coverage exclusion, the milestone moved back, work moved to a later milestone, a frozen command turned back to draft) or changes the harness itself (gate scripts, CI, hooks, `justfile`, test configs) fails the config guard unless the owner adds the `harness-change-approved` label. Coverage pragmas (`v8 ignore`, `istanbul ignore`, `coverage(off)`) and skipped, focused or todo tests are rejected by the architecture checks.
+All numbers live in `harness/harness.toml`. On 17 Oct 2026 the owner set them to realistic goals: unit coverage 80% (was 90%), E2E 60% (was 80%), screenshots 98% (was 99%), and added the trace-coverage ratchet. A pull request that loosens any of them (a lower minimum, a higher maximum, fewer timed runs, a new coverage exclusion, the milestone moved back, work moved to a later milestone, a frozen command turned back to draft) or changes the harness itself (gate scripts, CI, hooks, `justfile`, test configs) fails the config guard unless the owner adds the `harness-change-approved` label. Coverage pragmas (`v8 ignore`, `istanbul ignore`, `coverage(off)`) and skipped, focused or todo tests are rejected by the architecture checks.
 
 | Bar (owner's wording) | How it is measured | Hard gate |
 | --- | --- | --- |
@@ -129,7 +129,7 @@ Codex has no hooks; it gets the same rules from `AGENTS.md`, the pre-commit hook
 
 ## CI on GitHub
 
-`.github/workflows/ci.yml` runs on every pull request to `main` (opened, pushed to, reopened; never for a label or a title edit), on every push to `main` and on demand: `lint-rust`, `lint-ui`, `contract`, `arch` (with trace coverage), `unit`, `e2e`, `e2e-coverage`, `visual` (in the pinned Playwright container), `perf`, `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. `e2e` runs the suites next to it and uploads their logs; `e2e-coverage` waits for both, downloads the logs (and `coverage-native` when the native suite exists) and judges E2E coverage over both. The `gate` job is the harness's one required check. The `Default ruleset` on `main` also requires `hygiene` (PR title, the owner's approval labels, dependency review, cargo-deny, workflow lint) and CodeQL, which are about the change as a delivery unit rather than the quality bars; builds, releases and the rest of the delivery pipeline are in [DELIVERY.md](DELIVERY.md). `nightly.yml` runs the full gate on `main` every night, plus the wall-clock performance job on the Mac runner when it exists.
+`.github/workflows/ci.yml` runs on every pull request to `main` (opened, pushed to, reopened; never for a label or a title edit), on every push to `main` and on demand: `lint-rust`, `lint-ui`, `contract`, `arch` (with trace coverage), `unit`, `e2e`, `e2e-coverage`, `visual` (in the pinned Playwright container), `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. `e2e` runs the suites next to it and uploads their logs; `e2e-coverage` waits for both, downloads the logs (and `coverage-native` when the native suite exists) and judges E2E coverage over both. The `gate` job is the harness's one required check. The `Default ruleset` on `main` also requires `hygiene` (PR title, the owner's approval labels, dependency review, cargo-deny, workflow lint) and CodeQL, which are about the change as a delivery unit rather than the quality bars; builds, releases and the rest of the delivery pipeline are in [DELIVERY.md](DELIVERY.md). `nightly.yml` runs the full gate on `main` every night.
 
 ### What a pull request runs
 
@@ -137,8 +137,8 @@ On a pull request each job runs only if the change can affect what it checks (ow
 
 | A PR that changes only | runs |
 | --- | --- |
-| UI code (`apps/desktop/**` outside `src-tauri` and `tests/native`) | `lint-ui`, `arch`, `unit`, `e2e`, `e2e-coverage`, `visual`, `perf` (UI scenarios), `docs` |
-| Rust crates, `Cargo.*` | `lint-rust`, `arch`, `unit`, `e2e`, `e2e-coverage`, `perf`, `docs`, `macos` |
+| UI code (`apps/desktop/**` outside `src-tauri` and `tests/native`) | `lint-ui`, `arch`, `unit`, `e2e`, `e2e-coverage`, `visual`, `docs` |
+| Rust crates, `Cargo.*` | `lint-rust`, `arch`, `unit`, `e2e`, `e2e-coverage`, `docs`, `macos` |
 | the contract (`noter-protocol`, `contracts/`, `apps/desktop/src/core/`) | the above for its side, plus `contract` |
 | the Tauri host or the engine | `arch`, `docs`, `macos` |
 | documentation (`docs/`, `.cf-studio/`, Markdown) | `arch` (trace coverage) and `docs` (`cfs validate`); `docs/DESIGN.md` also the E2E jobs, since its stories set the E2E bar |
@@ -160,7 +160,7 @@ Labels: `harness-change-approved` (owner accepts a loosened gate), `visual-chang
 
 * `harness/milestones.toml` places every IPC command and every DESIGN.md story in the milestone that delivers it. The harness self-tests fail if a command or story is missing or listed twice, so a new command or story must be placed in the same PR.
 * `harness/perf.toml` lists what must be performance-tested, by milestone, and how each scenario is built and run (`{target}` is the cargo target directory of the checkout being measured).
-* `harness.toml [milestone].current` moves forward when a milestone gate passes; that is when the E2E and performance coverage gates start counting the new milestone.
+* `harness.toml [milestone].current` moves forward when a milestone gate passes; that is when the E2E coverage gate starts counting the new milestone.
 
 ## noter-core-harness wire format (built in M0)
 
