@@ -99,7 +99,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Steps**:
 1. [ ] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
-2. [ ] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
+2. [x] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
 5. [ ] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
@@ -179,10 +179,10 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The live model is not downloaded: no `self_test_line`; the result is judged on the buffers alone, as in M0.
 
 **Steps**:
-1. [ ] - `p1` - Engine opens the tap and the microphone for the self-test on one clock, as for a session - `inst-self-test-one-clock`
+1. [x] - `p1` - Engine opens the tap and the microphone for the self-test on one clock, as for a session - `inst-self-test-one-clock`
 2. [ ] - `p1` - **IF** the live model is present, engine emits `self_test_line` per channel - `inst-self-test-lines`
-3. [ ] - `p1` - **IF** `play_clip`, engine plays its clip and checks the tap does not hear it; a leak fails with `OwnSoundsLeak` (moved from `cpt-noter-flow-core-engine-foundation-self-test`, decision D-12) - `inst-play-clip`
-4. [ ] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
+3. [x] - `p1` - **IF** `play_clip`, engine plays its clip and checks the tap does not hear it; a leak fails with `OwnSoundsLeak` (moved from `cpt-noter-flow-core-engine-foundation-self-test`, decision D-12) - `inst-play-clip`
+4. [x] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
 
 ## 3. Processes / Business Logic (CDSL)
 
