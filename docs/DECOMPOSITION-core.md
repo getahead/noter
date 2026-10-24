@@ -660,7 +660,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p2` - **ID**: `cpt-noter-feature-core-native-surfaces`
 
-- **Milestone**: M1 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-native-surfaces.md](features/core/core-native-surfaces.md)
+- **Milestone**: M1 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IN_PROGRESS: blocked on NB10 (owner) for `inst-convert`/`inst-return-panels`/`-panels`; the XCUITest ACs are the UI lane's (`just native`), per D-23 and D-26. FEATURE spec: [features/core/core-native-surfaces.md](features/core/core-native-surfaces.md)
 
 - **Purpose**: Show the call where the user needs it without stealing focus: non-activating panels, the call window's two layouts across displays, hide for presenting, the menu bar and tray, notifications through `UNUserNotificationCenter`, announcements, navigation and external opens, with menu and hotkey actions calling the core as native callers.
 
