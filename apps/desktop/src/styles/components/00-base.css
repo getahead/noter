@@ -319,3 +319,5 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-del { background: var(--diff-del); text-decoration: line-through; }
 
 .np-stub { border: 1px dashed var(--ctrl-border-soft); border-radius: 6px; padding: 4px 8px; color: var(--label-3); font: 11px var(--mono); }
+.np-menu__sub { position: relative; display: grid; }
+.np-menu__subpanel { position: absolute; left: 100%; top: -5px; }

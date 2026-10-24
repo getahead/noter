@@ -9,7 +9,7 @@ import { find, rendered } from "../../ui/testing";
 import { MainWindow } from "./main-window";
 import { registerPage, pageFor } from "./pages";
 import { Sidebar } from "./sidebar";
-import { MainToolbar } from "./toolbar";
+import { ToolbarHost } from "./toolbar";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
 
 let bridge: Bridge | null = null;
@@ -126,7 +126,7 @@ describe("MainWindow controls", () => {
     side.onShowCall();
     side.onOpenPrivacy();
 
-    const bar = find(tree, (_, type) => type === MainToolbar).props as never as Parameters<typeof MainToolbar>[0];
+    const bar = find(tree, (_, type) => type === ToolbarHost).props as never as Parameters<typeof ToolbarHost>[0];
     bar.onBack();
     bar.onForward();
     bar.onToggleSidebar();

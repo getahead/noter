@@ -21,6 +21,12 @@ describe("shell state", () => {
     expect(run([{ type: "close-overlay" }])).toBe(INITIAL_SHELL);
   });
 
+  it("open-inspector opens it once and leaves an open one as it is", () => {
+    const open = run([{ type: "open-inspector" }]);
+    expect(open.history.inspectorOpen).toBe(true);
+    expect(run([{ type: "open-inspector" }], open)).toBe(open);
+  });
+
   it("opens and closes the inspector", () => {
     const open = run([{ type: "toggle-inspector" }]);
     expect(open.history.inspectorOpen).toBe(true);
