@@ -48,3 +48,5 @@ allow-wildcard-paths = true
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# NB10 (owner-approved 24 Oct): tauri-nspanel v2.1.1, rev ef6e3090a6083c653955ca0b6e7f6c6ae1453d40, for the non-activating call-window panels.
+allow-git = ["https://github.com/ahkohd/tauri-nspanel"]
