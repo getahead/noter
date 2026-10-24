@@ -231,8 +231,33 @@ impl Harness {
         Ok(())
     }
 
+    /// Removes every call (and with it its segments, speakers, marks, gaps and tags).
+    fn clear_calls(&self) -> Result<(), CoreError> {
+        let ids: Vec<String> = self.core.store().read(|c| {
+            c.prepare("SELECT id FROM calls")?
+                .query_map([], |r| r.get(0))?
+                .collect()
+        })?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let meta = noter_db::ChangeMeta {
+            actor: Actor::You,
+            summary: "harness world_set".into(),
+            reason: "harness".into(),
+            evidence_ids: vec![],
+            batch_id: None,
+            undoable: false,
+            surface: None,
+        };
+        self.core.store().delete("call", "calls", ids, meta)?;
+        Ok(())
+    }
+
     /// Writes the world's calls, speakers, segments, marks and gaps as rows, the way capture
+    /// writes them (`cpt-noter-algo-core-library-calls-fixture-parity`, `inst-parity-seed`).
     fn seed_calls(&self, wanted: &Value) -> Result<(), CoreError> {
+        // @cpt-begin:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
             table,
             values,
@@ -282,6 +307,17 @@ impl Harness {
                     ),
                 ],
             ));
+            for tag in call["tags"].as_array().unwrap_or(&empty) {
+                let text = tag.as_str().unwrap_or_default();
+                rows.push(ins(
+                    "call_tags",
+                    vec![
+                        ("call_id", id.clone()),
+                        ("tag", json!(text)),
+                        ("tag_norm", json!(text.to_lowercase())),
+                    ],
+                ));
+            }
             let transcript = transcripts.iter().find(|t| t["call_id"] == *id);
             let pass = transcript.map_or(json!("live"), |t| t["pass"].clone());
             let Some(d) = detail else { continue };
@@ -362,6 +398,7 @@ impl Harness {
                 ));
             }
         }
+        // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         self.core.store().insert_batch(rows)
     }
 
@@ -533,6 +570,24 @@ impl Harness {
         w["app"]["setup"] = self
             .call(WindowLabel::FirstRun, "setup_status", json!({}))
             .await?;
+        // The library's read models: what `calls_list` and `call_get` serve over the seeded rows.
+        let page = self
+            .call(
+                WindowLabel::Main,
+                "calls_list",
+                json!({ "filter": {}, "sort": "newest", "page": { "limit": 500 } }),
+            )
+            .await?;
+        let mut details = vec![];
+        for call in page["rows"].as_array().into_iter().flatten() {
+            let args = json!({ "call_id": call["id"] });
+            details.push(self.call(WindowLabel::Main, "call_get", args).await?);
+        }
+        w["calls"] = page["rows"].clone();
+        w["call_details"] = Value::Array(details);
+        w["call_types"] = self
+            .call(WindowLabel::Main, "call_types_list", json!({}))
+            .await?;
         Ok(w)
     }
 
@@ -552,7 +607,11 @@ impl Harness {
         let current = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
         let mut refused = vec![];
         for (key, value) in wanted.as_object().into_iter().flatten() {
-            if current.get(key) == Some(value) || matches!(key.as_str(), "now" | "settings" | "app")
+            if current.get(key) == Some(value)
+                || matches!(
+                    key.as_str(),
+                    "now" | "settings" | "app" | "calls" | "call_details"
+                )
             {
                 continue;
             }
@@ -574,6 +633,16 @@ impl Harness {
         }
         self.write_settings(&wanted["settings"]).await?;
         self.write_setup(&wanted["app"]["setup"]).await?;
+        // Compared with the last accepted world: the rows the core serves differ from the
+        // fixture in the fields later features own (people, items).
+        let accepted = to_json(&*lock(&self.world));
+        if ["calls", "call_details"]
+            .iter()
+            .any(|k| accepted[k] != wanted[k])
+        {
+            self.clear_calls()?;
+            self.seed_calls(&wanted)?;
+        }
         if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
             noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());
         }
