@@ -737,6 +737,15 @@ async fn set_free_disk_changes_the_free_space_the_core_reports() {
     r.finish().await;
 }
 
+#[tokio::test]
+async fn data_dir_names_the_folder_the_running_core_keeps_its_database_in() {
+    let mut r = start().await;
+    let shown = r.ok("main", "harness.data_dir", json!({})).await;
+    let path = std::path::PathBuf::from(shown["path"].as_str().expect("a path"));
+    assert!(path.join("noter.db").is_file(), "{path:?}");
+    r.finish().await;
+}
+
 // W15
 #[tokio::test]
 async fn push_reaches_the_running_self_test_as_an_engine_fact() {
