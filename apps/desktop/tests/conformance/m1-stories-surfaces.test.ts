@@ -173,7 +173,7 @@ describe("the window commands", () => {
     ok(await s.core("call-screen").windowAnnounce({ text: "Recording paused", politeness: "polite" }));
     ok(await main.openExternal({ target: { type: "system_settings", permission: "system_audio" } }));
     if (real()) expect(await asked()).toEqual(expect.arrayContaining(["open_external system_settings"]));
-    expect(ok(await s.core("call-screen").windowSetCallLayout({ preference: "auto" })).layout).toBeDefined();
+    expect(ok(await s.core("call-screen").windowSetCallLayout({ preference: "auto" })).layout).toMatch(/^(dedicated|floating)$/);
     ok(await s.core("call-screen").windowShowCall({}));
     ok(await s.core("call-screen").windowHideCall({}));
     ok(await s.core("call-screen").windowSetCollapsed({ collapsed: false }));
