@@ -6,7 +6,7 @@ import { t } from "../../i18n/format";
 import { modeIndicator } from "../shell/mode-indicator";
 import { ModeIndicator } from "../shell/mode-indicator-view";
 import { Toggle } from "../../ui/primitives/toggle";
-import { setSensitive } from "./actions";
+import { openPrivacySettings, setSensitive } from "./actions";
 import { useExtras, useTypes } from "./cache";
 import { callInfo } from "./logic";
 
@@ -49,7 +49,7 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.privacy")}</h3>
         <div className="pc-info__row">
-          <ModeIndicator view={mode} variant="call-info" onOpenPrivacy={() => void bridge.core.windowNavigate({ target: { type: "settings", pane: "privacy" } })} onMarkSensitive={() => void setSensitive(bridge, callId, true)} />
+          <ModeIndicator view={mode} variant="call-info" onOpenPrivacy={() => void openPrivacySettings(bridge)} onMarkSensitive={() => void setSensitive(bridge, callId, true)} />
         </div>
         <Toggle label={t("callpage.sensitive")} on={info.sensitive} size="small" onAction={() => void setSensitive(bridge, callId, !info.sensitive)} />
       </div>

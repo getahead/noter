@@ -2,11 +2,17 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { loadCall, rename, reportView, requestNotifications, revealFolder, setCallType, setSensitive, loadTypes } from "./actions";
+import { loadCall, loadTypes, menuActs, openCallPage, openPrivacySettings, readCall, rename, reportView, requestNotifications, revealFolder, saveTitle, setCallType, setSensitive } from "./actions";
+import { holdExtras, resetCache, useExtras } from "./cache";
+import { slots } from "./slots";
 
 let bridge: Bridge;
 let fake: FakeCore;
-afterEach(() => bridge.close());
+afterEach(() => {
+  slots.deleteCall = null;
+  resetCache();
+  return bridge.close();
+});
 
 async function ready(seed?: (w: FakeCore["world"]) => void) {
   fake = new FakeCore({ window: "main" });
@@ -99,5 +105,71 @@ describe("call page commands", () => {
     await reportView(bridge, id);
     await reportView(bridge, null);
     expect(seen.filter((s) => s[0] === "window_report_view").map((s) => s[1])).toEqual([{ call_id: id }, { call_id: null }]);
+  });
+});
+
+describe("opening the page and its controls", () => {
+  const settle = () => new Promise((r) => setTimeout(r));
+
+  it("openCallPage reads the call and the call types once each", async () => {
+    const id = await ready();
+    const seen = sent();
+    const [call, types] = await openCallPage(bridge, id);
+    expect([call.status, types.status]).toEqual(["ok", "ok"]);
+    expect(seen.map((s) => s[0]).sort()).toEqual(["call_get", "call_types_list"]);
+  });
+
+  it("readCall keeps what the call row does not hold (first recorded call) for the banner", async () => {
+    const id = await ready();
+    const detail = fake.world.call_details.find((d) => d.call.id === id);
+    if (detail) detail.first_recorded_call = true;
+    await readCall(bridge, id);
+    let held: unknown;
+    const { renderToString } = await import("react-dom/server");
+    const Probe = () => ((held = useExtras(id)), null);
+    renderToString(<Probe />);
+    expect(held).toMatchObject({ first_recorded_call: !!detail });
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud" });
+  });
+
+  it("saveTitle saves a changed title, ignores an empty or unchanged one and reads the call again after a refusal", async () => {
+    const id = await ready();
+    const call = fake.world.calls.find((c) => c.id === id)!;
+    const seen = sent();
+    await saveTitle(bridge, call, "  ");
+    await saveTitle(bridge, call, call.title);
+    expect(seen).toEqual([]);
+    await saveTitle(bridge, call, "A new title");
+    expect(seen.map((s) => s[0])).toEqual(["call_update"]);
+    await saveTitle(bridge, { ...call, rev: 1 }, "Stale rev");
+    expect(seen.map((s) => s[0]).filter((c) => c !== "log_ui")).toEqual(["call_update", "call_update", "call_get"]);
+  });
+
+  it("the Mode indicator opens Settings › Privacy", async () => {
+    await ready();
+    const seen = sent();
+    await openPrivacySettings(bridge);
+    expect(seen).toContainEqual(["window_navigate", { target: { type: "settings", pane: "privacy" } }]);
+  });
+
+  it("menuActs sends each item's command and has no Delete Call… until the dialogs host registers", async () => {
+    const id = await ready();
+    const call = { id, rev: fake.world.calls.find((c) => c.id === id)!.rev, privacy: "normal" as const };
+    const seen = sent();
+    let renamed = 0;
+    const acts = menuActs(bridge, call, () => void renamed++);
+    acts.rename();
+    acts.type(fake.world.call_types.call_types[0]!.id);
+    acts.sensitive();
+    acts.finder();
+    await settle();
+    expect(renamed).toBe(1);
+    expect(seen.map((s) => s[0])).toEqual(["call_update", "capture_set_sensitive", "open_external"]);
+    expect(seen[1]![1]).toEqual({ call_id: id, sensitive: true });
+    expect(acts.remove).toBeNull();
+    const asked: string[] = [];
+    slots.deleteCall = (_b, callId) => void asked.push(callId);
+    menuActs(bridge, call, () => {}).remove?.();
+    expect(asked).toEqual([id]);
   });
 });

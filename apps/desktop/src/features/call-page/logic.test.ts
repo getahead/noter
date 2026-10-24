@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { CommandState } from "../../app/store/window-store";
 import type { CallRow, UiPrefs } from "../../core/bindings";
-import { callInfo, callKey, callViews, pageState, parseCallKey, subtitleOf } from "./logic";
+import { afterTimer, callInfo, callKey, callViews, pageState, parseCallKey, subtitleOf } from "./logic";
 
 const PREFS: UiPrefs = { time_format: "h24", time_zone: "UTC", first_weekday: 1 };
 const NOW = Date.UTC(2026, 9, 24, 12, 0);
@@ -99,5 +99,25 @@ describe("callInfo (PC-R4)", () => {
     const i = callInfo(row({ privacy: "sensitive", platform: null }), { audio_not_stored: false }, NOW, PREFS, "x");
     expect(i.sensitive).toBe(true);
     expect(i.call.find((r) => r.label === "App")!.value).toBe("—");
+  });
+});
+
+describe("afterTimer (the skeleton after 300 ms)", () => {
+  it("says late only once active has held for the time, and clears on cleanup or when it stops being active", () => {
+    vi.useFakeTimers();
+    const seen: boolean[] = [];
+    const clean = afterTimer(300, true, (v) => seen.push(v))!;
+    vi.advanceTimersByTime(299);
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(seen).toEqual([true]);
+    const quick = afterTimer(300, true, (v) => seen.push(v))!;
+    quick();
+    vi.advanceTimersByTime(500);
+    expect(seen).toEqual([true]); // the cleaned-up timer never fired
+    clean();
+    expect(afterTimer(300, false, (v) => seen.push(v))).toBeUndefined();
+    expect(seen.at(-1)).toBe(false);
+    vi.useRealTimers();
   });
 });
