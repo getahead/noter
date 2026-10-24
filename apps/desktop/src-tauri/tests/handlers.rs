@@ -209,12 +209,8 @@ fn a_pressed_hotkey_reaches_the_core_as_a_native_caller() {
     let app = app(dir.path());
     let pressed = hotkey_pressed(app.handle(), "Ctrl+Alt+Super+N").expect("the core is up");
     let answer = tauri::async_runtime::block_on(pressed).unwrap();
-    // Open Call Screen runs window_show_call, which answers not_implemented until M1.
-    let err = answer.unwrap_err();
-    assert_eq!(
-        (err.code, err.message.as_str()),
-        (ErrorCode::NotImplemented, "window_show_call")
-    );
+    // Open Call Screen runs window_show_call as a native caller: the call window state comes back.
+    assert_eq!(answer.unwrap()["visible"], true);
     let unbound =
         tauri::async_runtime::block_on(hotkey_pressed(app.handle(), "Ctrl+Alt+Super+Q").unwrap())
             .unwrap();

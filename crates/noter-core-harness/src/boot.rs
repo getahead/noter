@@ -15,8 +15,8 @@ use std::sync::{Arc, Mutex};
 
 use noter_core::{
     BoxFuture as CoreFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Surfaces,
-    SystemClock, Updater,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Placement, Surfaces,
+    SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -619,6 +619,9 @@ impl Harness {
         if unversioned(&current["app"]["capture"]) != unversioned(&wanted["app"]["capture"]) {
             noter_core::testing::seed_capture(&self.core, parsed.app.capture.clone()).await?;
         }
+        if unversioned(&current["app"]["presenting"]) != unversioned(&wanted["app"]["presenting"]) {
+            noter_core::testing::seed_presenting(&self.core, parsed.app.presenting.hidden);
+        }
         // Derived fields are the core's to compute; a world that disagrees with it is a preset
         // that drifted from the core's rules (what was applied stays applied).
         let after = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
@@ -710,7 +713,14 @@ fn parse<T: serde::de::DeserializeOwned>(args: Value, usage: &str) -> Result<T, 
 
 /// App snapshot slices the harness can set on the M0 core; `window` is the caller's own and the
 /// version-only slices follow their owners.
-const OWNED_APP: &[&str] = &["setup", "environment", "banners", "window", "capture"];
+const OWNED_APP: &[&str] = &[
+    "setup",
+    "environment",
+    "banners",
+    "window",
+    "capture",
+    "presenting",
+];
 
 impl Controls for Harness {
     fn control<'a>(
@@ -1088,23 +1098,71 @@ fn hex(bytes: &[u8]) -> String {
 /// the harness's.
 /// The native layer's windows, as the calls the core made (TL-2).
 #[derive(Default)]
-struct ScriptedSurfaces(Mutex<Vec<&'static str>>);
+struct ScriptedSurfaces(Mutex<Vec<String>>, AtomicBool, AtomicBool);
+
+impl ScriptedSurfaces {
+    fn note(&self, call: impl Into<String>) {
+        lock(&self.0).push(call.into());
+    }
+}
 
 impl Surfaces for ScriptedSurfaces {
     fn show_record_prompt(&self) {
-        lock(&self.0).push("show_record_prompt");
+        self.note("show_record_prompt");
     }
     fn close_record_prompt(&self) {
-        lock(&self.0).push("close_record_prompt");
+        self.note("close_record_prompt");
     }
-    fn open_call_window_inactive(&self) {
-        lock(&self.0).push("open_call_window_inactive");
+    fn show_call_window(&self, placement: &Placement) {
+        self.1.store(true, Ordering::SeqCst);
+        self.note(format!("show_call_window {:?}", placement.layout));
+    }
+    fn make_call_window_key(&self) {
+        self.note("make_call_window_key");
+    }
+    fn place_call_window(&self, placement: &Placement, collapsed: bool) {
+        self.note(format!(
+            "place_call_window {:?} collapsed={collapsed}",
+            placement.layout
+        ));
+    }
+    fn hide_call_window(&self) {
+        self.1.store(false, Ordering::SeqCst);
+        self.note("hide_call_window");
+    }
+    fn hide_all(&self) {
+        self.2
+            .store(self.1.swap(false, Ordering::SeqCst), Ordering::SeqCst);
+        self.note("hide_all");
+    }
+    fn restore_all(&self) {
+        self.1
+            .store(self.2.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.note("restore_all");
+    }
+    fn set_tray(&self, tray: &TrayModel) {
+        self.note(format!("set_tray {:?} {}", tray.glyph, tray.status));
+    }
+    fn announce(&self, text: &str, _politeness: Politeness) {
+        self.note(format!("announce {text}"));
+    }
+    fn open_external(&self, target: &ExternalTarget) {
+        let kind = match target {
+            ExternalTarget::Url { .. } => "url",
+            ExternalTarget::Document { .. } => "document",
+            ExternalTarget::SystemSettings { .. } => "system_settings",
+            ExternalTarget::RevealInFinder { .. } => "reveal_in_finder",
+        };
+        self.note(format!("open_external {kind}"));
+    }
+    fn show_window(&self, window: WindowLabel) {
+        self.note(format!("show_window {}", window.as_str()));
     }
     fn call_surface_visible(&self) -> bool {
-        false
+        self.1.load(Ordering::SeqCst)
     }
     fn post_notification(&self, _: &noter_core::Notification) {
-        lock(&self.0).push("post_notification");
+        self.note("post_notification");
     }
 }
 

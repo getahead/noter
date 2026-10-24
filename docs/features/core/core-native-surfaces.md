@@ -103,10 +103,10 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 **Steps**:
 1. [ ] - `p1` - API: `window_show_call` from the main window, the record prompt or the call window, or the same call from a native surface - `inst-show-call`
-2. [ ] - `p1` - **IF** the window is visible and not key, make it key; **ELSE** show it without activation on the display chosen by `cpt-noter-algo-core-native-surfaces-placement` - `inst-show-or-key`
+2. [x] - `p1` - **IF** the window is visible and not key, make it key; **ELSE** show it without activation on the display chosen by `cpt-noter-algo-core-native-surfaces-placement` - `inst-show-or-key`
 3. [ ] - `p1` - API: `window_set_call_layout { preference }`, `window_set_collapsed { collapsed }`, `window_hide_call {}` change the layout, the strip state or visibility - `inst-layout-commands`
-4. [ ] - `p1` - Emit `window:call` with the whole `CallWindowState` and a new version - `inst-emit-window`
-5. [ ] - `p1` - **RETURN** `CallWindowState`; `window_call_state {}` returns it unchanged - `inst-return-window`
+4. [x] - `p1` - Emit `window:call` with the whole `CallWindowState` and a new version - `inst-emit-window`
+5. [x] - `p1` - **RETURN** `CallWindowState`; `window_call_state {}` returns it unchanged - `inst-return-window`
 
 ### Follow a display change
 
@@ -121,9 +121,9 @@ During a call Noter must never steal focus from the call app, never appear in a 
 - No display matches any saved identity: the main display and the floating layout are used.
 
 **Steps**:
-1. [ ] - `p1` - Receive the screen-parameters change and re-read displays by identity - `inst-read-displays`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-native-surfaces-placement` for the call window - `inst-replace`
-3. [ ] - `p1` - Emit `env:changed` (displays) and `window:call` - `inst-emit-displays`
+1. [x] - `p1` - Receive the screen-parameters change and re-read displays by identity - `inst-read-displays`
+2. [x] - `p1` - Run `cpt-noter-algo-core-native-surfaces-placement` for the call window - `inst-replace`
+3. [x] - `p1` - Emit `env:changed` (displays) and `window:call` - `inst-emit-displays`
 4. [ ] - `p1` - **RETURN** - `inst-return-display`
 
 ### Hide for presenting
@@ -140,11 +140,11 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 **Steps**:
 1. [ ] - `p1` - API: `app_set_hidden_for_presenting { hidden }` from the call window or main window, or the hotkey as a native caller - `inst-presenting-call`
-2. [ ] - `p1` - **IF** `hidden`, remember which surfaces were visible and hide every window and panel; **ELSE** restore them - `inst-hide-restore`
-3. [ ] - `p1` - Tell the capture session (notification hold, `CallSeemsEnded` timing) and unregister card keys while hidden (they are registered by the copilot from M4) - `inst-tell-session`
-4. [ ] - `p1` - While hidden, show a new-meeting notice as a menu bar line whose start item calls `capture_answer_new_meeting(start_as_new_call)` - `inst-menu-new-meeting`
-5. [ ] - `p1` - Emit `app:presenting` with the whole `PresentingState` - `inst-emit-presenting`
-6. [ ] - `p1` - **RETURN** `PresentingState` - `inst-return-presenting`
+2. [x] - `p1` - **IF** `hidden`, remember which surfaces were visible and hide every window and panel; **ELSE** restore them - `inst-hide-restore`
+3. [x] - `p1` - Tell the capture session (notification hold, `CallSeemsEnded` timing) and unregister card keys while hidden (they are registered by the copilot from M4) - `inst-tell-session`
+4. [x] - `p1` - While hidden, show a new-meeting notice as a menu bar line whose start item calls `capture_answer_new_meeting(start_as_new_call)` - `inst-menu-new-meeting`
+5. [x] - `p1` - Emit `app:presenting` with the whole `PresentingState` - `inst-emit-presenting`
+6. [x] - `p1` - **RETURN** `PresentingState` - `inst-return-presenting`
 
 ### Use the menu bar
 
@@ -159,8 +159,8 @@ During a call Noter must never steal focus from the call app, never appear in a 
 - The core refuses an action (for example `not_recording`): the menu item is shown disabled at the next update; no dialog appears.
 
 **Steps**:
-1. [ ] - `p1` - Build the tray menu and title from `CaptureState`, the call title and `PrivacyStatus`; update them on `capture:state` and `privacy:changed` - `inst-build-menu`
-2. [ ] - `p1` - Set the tray glyph: idle, recording, paused, or copilot muted - `inst-glyph`
+1. [x] - `p1` - Build the tray menu and title from `CaptureState`, the call title and `PrivacyStatus`; update them on `capture:state` and `privacy:changed` - `inst-build-menu`
+2. [x] - `p1` - Set the tray glyph: idle, recording, paused, or copilot muted - `inst-glyph`
 3. [ ] - `p1` - On a menu click, call the matching core command in process as a native caller from the menu bar surface - `inst-menu-click`
 4. [ ] - `p1` - **RETURN** - `inst-return-menu`
 
@@ -198,10 +198,10 @@ During a call Noter must never steal focus from the call app, never appear in a 
 - `open_external` with a scheme outside the allowed list: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `window_navigate { target }`: show the right window and emit `nav:request` to it - `inst-navigate`
-2. [ ] - `p1` - API: `window_announce { text, politeness }`: post an NSAccessibility announcement - `inst-announce`
-3. [ ] - `p1` - API: `window_report_view { call_id }`: store it for the notification rule - `inst-report-view`
-4. [ ] - `p1` - API: `open_external { target }`: open through Launch Services (`https`, document paths the core gave the UI, `x-apple.systempreferences:` panes, reveal in Finder); **IF** the target is not allowed **RETURN** `invalid_input` - `inst-open-external`
+1. [x] - `p1` - API: `window_navigate { target }`: show the right window and emit `nav:request` to it - `inst-navigate`
+2. [x] - `p1` - API: `window_announce { text, politeness }`: post an NSAccessibility announcement - `inst-announce`
+3. [x] - `p1` - API: `window_report_view { call_id }`: store it for the notification rule - `inst-report-view`
+4. [x] - `p1` - API: `open_external { target }`: open through Launch Services (`https`, document paths the core gave the UI, `x-apple.systempreferences:` panes, reveal in Finder); **IF** the target is not allowed **RETURN** `invalid_input` - `inst-open-external`
 5. [ ] - `p1` - **RETURN** `Ack` - `inst-return-nav`
 
 ## 3. Processes / Business Logic (CDSL)
@@ -215,10 +215,10 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Output**: Display, layout and frame for the call window; `chosen_display_missing`.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the chosen call display is connected, use it with the preferred layout (dedicated by default) - `inst-chosen-display`
-2. [ ] - `p1` - **ELSE** use the display with the main window, the floating layout, and set `chosen_display_missing` - `inst-fallback-display`
+1. [x] - `p1` - **IF** the chosen call display is connected, use it with the preferred layout (dedicated by default) - `inst-chosen-display`
+2. [x] - `p1` - **ELSE** use the display with the main window, the floating layout, and set `chosen_display_missing` - `inst-fallback-display`
 3. [ ] - `p1` - Restore the saved frame for that display and layout, clamped to the visible frame - `inst-frame`
-4. [ ] - `p1` - **RETURN** the placement - `inst-return-placement`
+4. [x] - `p1` - **RETURN** the placement - `inst-return-placement`
 
 ### Non-activating, content-protected panels
 
@@ -266,20 +266,20 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Call window
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-native-surfaces-call-window`
+- [x] `p1` - **ID**: `cpt-noter-state-core-native-surfaces-call-window`
 
 **States**: hidden, shown_inactive, key, collapsed, hidden_for_presenting
 
 **Initial State**: hidden
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** hidden **TO** shown_inactive **WHEN** capture starts or `window_show_call` - `inst-st-show`
-2. [ ] - `p1` - **FROM** shown_inactive **TO** key **WHEN** a second `window_show_call`, or the user clicks into a text field - `inst-st-key`
-3. [ ] - `p1` - **FROM** shown_inactive **TO** collapsed **WHEN** `window_set_collapsed(true)` in the floating layout - `inst-st-collapse`
-4. [ ] - `p1` - **FROM** collapsed **TO** shown_inactive **WHEN** `window_set_collapsed(false)` - `inst-st-expand`
-5. [ ] - `p1` - **FROM** shown_inactive **TO** hidden **WHEN** `window_hide_call` - `inst-st-hide`
-6. [ ] - `p1` - **FROM** shown_inactive **TO** hidden_for_presenting **WHEN** `app_set_hidden_for_presenting(true)` (also from key and collapsed) - `inst-st-presenting`
-7. [ ] - `p1` - **FROM** hidden_for_presenting **TO** shown_inactive **WHEN** `app_set_hidden_for_presenting(false)` and it was visible before - `inst-st-unhide`
+1. [x] - `p1` - **FROM** hidden **TO** shown_inactive **WHEN** capture starts or `window_show_call` - `inst-st-show`
+2. [x] - `p1` - **FROM** shown_inactive **TO** key **WHEN** a second `window_show_call`, or the user clicks into a text field - `inst-st-key`
+3. [x] - `p1` - **FROM** shown_inactive **TO** collapsed **WHEN** `window_set_collapsed(true)` in the floating layout - `inst-st-collapse`
+4. [x] - `p1` - **FROM** collapsed **TO** shown_inactive **WHEN** `window_set_collapsed(false)` - `inst-st-expand`
+5. [x] - `p1` - **FROM** shown_inactive **TO** hidden **WHEN** `window_hide_call` - `inst-st-hide`
+6. [x] - `p1` - **FROM** shown_inactive **TO** hidden_for_presenting **WHEN** `app_set_hidden_for_presenting(true)` (also from key and collapsed) - `inst-st-presenting`
+7. [x] - `p1` - **FROM** hidden_for_presenting **TO** shown_inactive **WHEN** `app_set_hidden_for_presenting(false)` and it was visible before - `inst-st-unhide`
 
 ## 5. Definitions of Done
 
