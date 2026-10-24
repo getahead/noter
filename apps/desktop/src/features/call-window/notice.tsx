@@ -1,6 +1,6 @@
 // The capture notice (C.captureNotice of the prototype's src/js/20-b-components.js) in the notice slot
 // CS-R0 / FP-R0, and the closing state after any stop (closingView of src/js/20-b-surface.js).
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { CaptureNotice as Notice } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -77,6 +77,9 @@ export interface CaptureNoticeProps {
 // @cpt-component:cpt-noter-component-ui-capture-notice:p1
 export function CaptureNotice({ notice: n, floating, seconds, detectedAt, levels, on }: CaptureNoticeProps) {
   const [confirming, setConfirming] = useState(false);
+  const actions = useRef<HTMLSpanElement>(null);
+  // the inline confirmation has no default button: focus waits on Back (D38)
+  useEffect(() => void (confirming && actions.current?.parentElement?.querySelector<HTMLElement>('[data-back="true"]')?.focus()), [confirming]);
   const size = floating ? "regular" : "large";
   switch (n.type) {
     case "call_ended":
@@ -163,9 +166,11 @@ export function CaptureNotice({ notice: n, floating, seconds, detectedAt, levels
             // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-nothing-heard
             confirming ? (
               <>
-                <span className="cw-notice__confirm">{t("cw.notice.discard_confirm")}</span>
+                <span ref={actions} className="cw-notice__confirm">
+                  {t("cw.notice.discard_confirm")}
+                </span>
                 <PushButton label={t("cw.notice.discard")} variant="destructive" size={size} onAction={on.discard} />
-                <PushButton label={t("cw.notice.back")} size={size} onAction={() => setConfirming(false)} />
+                <PushButton label={t("cw.notice.back")} size={size} attrs={{ "data-back": "true" }} onAction={() => setConfirming(false)} />
               </>
             ) : (
               <>

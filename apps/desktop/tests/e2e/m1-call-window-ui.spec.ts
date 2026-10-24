@@ -14,6 +14,7 @@ import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
 import { calls, openWindow, type Steer } from "./support/app";
+import { alerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
 const FAKE = process.env.NOTER_CORE !== "stdio";
@@ -398,9 +399,7 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
     await coreWindow(page, { visible: false });
     await coreWindow(page, { visible: true }); // ⌃⌥⌘N or Open Call Screen: the core shows it, not key
     await expect(floating(page)).toBeVisible();
-    // the real core keeps transcribing, so its tail moves on; the fake's stays as it was
-    if (FAKE) await expect(transcript(page)).toHaveText(before, { useInnerText: true });
-    else await expect(transcript(page)).not.toBeEmpty();
+    await expect(transcript(page)).toHaveText(before, { useInnerText: true });
     await expect(word(page, "Recording")).toBeVisible();
   });
 
@@ -472,5 +471,53 @@ test.describe("cpt-noter-flow-ui-call-window-controls", () => {
     await expect(chips.filter({ hasText: "You" })).toHaveCount(1);
     await expect(chips.filter({ hasText: "Speaker 3" })).toHaveCount(1);
     await expect(chips.filter({ hasText: "Anna K." })).toHaveCount(1);
+  });
+});
+
+// From m1-dialogs-host-ui.spec.ts (ui-e2e): the call window's inline confirmation, delivered with the call window.
+test.describe("cpt-noter-flow-ui-dialogs-host-inline-confirm", () => {
+  const nothingHeard = (w: Parameters<typeof W.idle>[0]) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN });
+
+  test("UI — happy path (cpt-noter-seq-call-screen-recover-capture, Empty — Nothing heard yet): Discard Recording asks inline, Back has focus, Discard sends capture_discard, no alert", async ({ page }) => {
+    await watchAlerts(page);
+    await openWindow(page, "call-screen", { world: nothingHeard });
+    await button(page, "Discard Recording").click();
+
+    await expect(page.getByText("Discard this recording? This can't be undone.")).toBeVisible();
+    await expect(button(page, "Back")).toBeFocused(); // and no default button on Discard
+    await expect(button(page, "Discard Recording")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0); // never an alert or a sheet in the call window
+    expect(await sent(page, "capture_discard")).toHaveLength(0);
+
+    await button(page, "Discard").click();
+    await expect.poll(() => sent(page, "capture_discard")).toContainEqual({ call_id: W.LIVE_CALL });
+    expect(await alerts(page)).toHaveLength(0);
+  });
+
+  test("UI — error path: Back returns to the notice's actions and nothing is deleted", async ({ page }) => {
+    await openWindow(page, "call-screen", { world: nothingHeard });
+    await button(page, "Discard Recording").click();
+    await expect(button(page, "Back")).toBeFocused();
+    await page.keyboard.press("Enter"); // Return on the focused Back, not on Discard
+
+    await expect(button(page, "Discard Recording")).toBeVisible();
+    await expect(button(page, "Keep Recording")).toBeVisible();
+    await expect(page.getByText("Discard this recording?")).toHaveCount(0);
+    expect(await sent(page, "capture_discard")).toHaveLength(0);
+  });
+
+  test("UI — error path (cpt-noter-seq-call-screen-recover-capture, Disk nearly full): Delete Old Audio… opens no sheet or alert in the call window and deletes nothing", async ({ page }) => {
+    await watchAlerts(page);
+    await openWindow(page, "call-screen", {
+      world: (w) => {
+        w.app.environment.disk_free_mb = 2_000;
+        W.degrade(w, { type: "disk_low", free_mb: 2_000 });
+      },
+    });
+    await expect(page.getByText("2 GB free on this Mac. Recording continues.")).toBeVisible();
+    await page.getByRole("button", { name: "Delete Old Audio…" }).or(page.getByRole("link", { name: "Delete Old Audio…" })).first().click();
+    await expect(page.getByRole("dialog")).toHaveCount(0); // the sheet opens in the main window, never here
+    expect(await alerts(page)).toHaveLength(0);
+    expect(await sent(page, "audio_delete_older")).toHaveLength(0);
   });
 });
