@@ -298,8 +298,11 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await expect(jump(page)).toHaveCount(0); // following
 
     await log(page).hover();
-    await page.mouse.wheel(0, -20_000);
-    await expect(rowWith(page, ANNA_LINE)).toBeInViewport();
+    // Linux Chromium animates a wheel scroll and the log's row-height correction cuts it short (CI): wheel until the row is in view
+    await expect(async () => {
+      await page.mouse.wheel(0, -20_000);
+      await expect(rowWith(page, ANNA_LINE)).toBeInViewport({ timeout: 500 });
+    }).toPass({ timeout: 10_000 });
     const at = (await rowWith(page, ANNA_LINE).boundingBox())!.y;
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible(); // plural rules
