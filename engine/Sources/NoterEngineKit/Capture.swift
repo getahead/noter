@@ -201,6 +201,7 @@ struct Timeline: Codable {
     enum CodingKeys: String, CodingKey { case callId = "call_id", durationMs = "duration_ms", gaps, parts }
 }
 
+// @cpt-dod:cpt-noter-dod-core-engine-capture-pipeline:p1
 /// One call being captured. Chunks arrive on the audio threads; commands on the engine's.
 final class CaptureSession: @unchecked Sendable {
     let callId: String
@@ -224,6 +225,8 @@ final class CaptureSession: @unchecked Sendable {
     private var meetingAppPlaying = false
     /// The live transcript of this call, fed the 16 kHz audio in call time.
     let asr: LiveASR
+    /// After a restart: the call ms where the crashed engine's audio ends in the ring.
+    private var ringEnd: Int?
 
     init(
         start: StartSession, container: URL, writer: EventWriter, now: @escaping () -> Int64,
@@ -243,6 +246,7 @@ final class CaptureSession: @unchecked Sendable {
         // After a crash the call went on while no engine ran: resume in call time, with the gap.
         if start.resumeFromMs != nil, let last = ring.last {
             spanStart = last.callMs + max(0, Int(now() - last.epochMs))
+            ringEnd = last.callMs
             if spanStart > last.callMs {
                 timeline.gaps.append(.init(t0Ms: last.callMs, t1Ms: spanStart, reason: "engine_restart"))
             }
@@ -268,6 +272,23 @@ final class CaptureSession: @unchecked Sendable {
 
     /// Whether a meeting app plays now: exact zeros on the system channel then mean no permission.
     func meetingApp(_ playing: Bool) { lock.withLock { meetingAppPlaying = playing } }
+
+    /// After a restart, decodes again what the crashed engine heard but never confirmed: the
+    /// ring's tail after its last pause, in call time, then confirmed (no hypotheses).
+    func decodeRingTail() {
+        guard let end = ringEnd else { return }
+        let window = LiveASR.rate / 10
+        let tails = lock.withLock {
+            [Channel.mic, .sys].map { ($0, LiveASR.openTail(ring.read($0, last: LiveASR.rate * LiveASR.maxUtteranceMs / 1000))) }
+        }
+        for (channel, tail) in tails where !tail.isEmpty {
+            let from = end - tail.count * 1000 / LiveASR.rate
+            for at in stride(from: 0, to: tail.count, by: window) {
+                asr.feed(channel, Array(tail[at..<min(at + window, tail.count)]), atMs: from + at * 1000 / LiveASR.rate, hypotheses: false)
+            }
+        }
+        asr.cut()
+    }
 
     /// Audio flows to the ring and files from now on (after `session_started`).
     func go() { lock.withLock { live = true } }

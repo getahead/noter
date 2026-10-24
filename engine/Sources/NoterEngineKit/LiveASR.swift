@@ -113,8 +113,9 @@ final class LiveASR: @unchecked Sendable {
         }
     }
 
-    /// 16 kHz samples of one channel starting at `atMs` of call time.
-    func feed(_ channel: Channel, _ samples: [Float], atMs: Int) {
+    /// 16 kHz samples of one channel starting at `atMs` of call time; `hypotheses: false` for
+    /// audio decoded again after a restart, which only needs its confirmation.
+    func feed(_ channel: Channel, _ samples: [Float], atMs: Int, hypotheses: Bool = true) {
         let endMs = atMs + samples.count * 1000 / Self.rate
         var (jobs, facts) = ([Job](), [EngineEvent]())
         lock.withLock {
@@ -150,7 +151,7 @@ final class LiveASR: @unchecked Sendable {
             u.audio += samples
             (u.speechEndMs, u.speechSamples) = (endMs, u.audio.count)
             // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-hypothesis
-            let hypothesis = endMs - u.lastHypothesisMs >= Self.hypothesisEveryMs
+            let hypothesis = hypotheses && endMs - u.lastHypothesisMs >= Self.hypothesisEveryMs
             if hypothesis { u.lastHypothesisMs = endMs }
             open[channel] = u
             if endMs - u.startMs >= Self.maxUtteranceMs {
@@ -163,6 +164,25 @@ final class LiveASR: @unchecked Sendable {
         }
         facts.forEach(writer.emit)
         jobs.forEach(schedule)
+    }
+
+    /// The end of `samples` (16 kHz) after their last pause: the utterance still open when capture
+    /// stopped, so never confirmed; empty when they end in a pause (that utterance was confirmed).
+    static func openTail(_ samples: [Float]) -> [Float] {
+        let (w, n) = (rate / 10, samples.count / (rate / 10))
+        let base = samples.count - n * w
+        let speech = (0..<n).map { k in Levels.db(Array(samples[base + k * w..<base + (k + 1) * w])) > speechDb }
+        guard let last = speech.lastIndex(of: true), (n - 1 - last) * 100 < pauseMs else { return [] }
+        var (first, quiet) = (last, 0)
+        for k in stride(from: last, through: 0, by: -1) {
+            if speech[k] {
+                (first, quiet) = (k, 0)
+            } else {
+                quiet += 1
+                if quiet * 100 >= pauseMs { break }
+            }
+        }
+        return Array(samples[(base + first * w)...])
     }
 
     /// Ends the utterance of `channel` (caller holds the lock).

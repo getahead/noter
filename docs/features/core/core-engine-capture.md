@@ -84,7 +84,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Capture a session
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-session`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-session`
 
 **Actor**: Engine supervisor (on behalf of the session manager)
 
@@ -98,7 +98,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The live model fails to load: `error { model_load_failed }`; the supervisor reports `engine_unavailable`.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
+1. [x] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
 2. [x] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
@@ -107,7 +107,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
    1. [x] - `p1` - Engine stops both streams (no audio kept while paused) until `resume` - `inst-pause-streams`
 7. [x] - `p1` - **IF** the supervisor sends `stop` - `inst-if-stop`
    1. [x] - `p1` - Engine flushes the decoder and writers, writes `timeline.json`, emits `session_stopped { call_id, timeline_path, mic_path, sys_path }` - `inst-stop`
-8. [ ] - `p1` - **RETURN** - `inst-return-session`
+8. [x] - `p1` - **RETURN** - `inst-return-session`
 
 ### Detect a call
 
@@ -129,7 +129,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Recover from an engine crash during capture
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-recover`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-capture-recover`
 
 **Actor**: Engine supervisor
 
@@ -142,7 +142,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Steps**:
 1. [x] - `p1` - Supervisor sees the process exit or miss `ping` while a session runs, instead of the idle restart of `cpt-noter-algo-core-engine-foundation-restart` (moved from its `inst-if-capture`, decision D-12) - `inst-see-crash`
 2. [x] - `p1` - Supervisor respawns the engine and sends `start_session` with the same `call_id` and `resume_from_ms` = the ring's last written offset - `inst-respawn`
-3. [ ] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
+3. [x] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
 4. [x] - `p1` - Supervisor reports a gap `engine_restart` from the last confirmed audio to the resumed offset - `inst-report-gap`
 5. [x] - `p1` - **IF** the restart fails three times within 30 s - `inst-if-restart-fails`
    1. [x] - `p1` - **RETURN** `CaptureFailed { call_id, since }` to the session manager - `inst-return-failed`
@@ -258,7 +258,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 ### Capture pipeline
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
 
 The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container, write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop.
 
@@ -297,7 +297,7 @@ The system **MUST** report `call_detected`, `call_audio_released` and `audio_sou
 
 ### Capture-first restart
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
 
 The system **MUST** restart a crashed engine with taps before models, resume from the ring's write position with one `engine_restart` gap of at most 2 s per restart, and raise `CaptureFailed` when it cannot; an engine-kill drill during a replayed call proves the gap bound (the Q7 test, M1 week one alongside the real-call latency measurement).
 

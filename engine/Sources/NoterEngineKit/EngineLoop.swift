@@ -156,12 +156,18 @@ public final class EngineLoop: @unchecked Sendable {
             writer.emit(.ack(cmdId: id))
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
             writer.emit(.sessionStarted(callId: start.callId, micDevice: audio.devices.mic, outputDevice: audio.devices.output))
-            capture.go()
             // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
-            // The taps run already; the model loads behind them, and what was said meanwhile is decoded then.
-            // shortcut: after a restart, decoding starts with the new engine's audio; what the crashed
-            // one heard but had not confirmed stays in the ring and the files, not in the live transcript.
-            if let model { capture.asr.load(model.get) }
+            // @cpt-begin:cpt-noter-flow-core-engine-capture-recover:p1:inst-capture-first
+            // The taps run already; the model loads behind them (what was said meanwhile is decoded
+            // then), and after a restart the ring's unconfirmed tail is decoded behind the load.
+            if let model {
+                capture.asr.load(model.get)
+                capture.decodeRingTail()
+            }
+            // @cpt-end:cpt-noter-flow-core-engine-capture-recover:p1:inst-capture-first
+            // Only now does audio reach the ring and the transcript, so neither the ring's tail
+            // nor the utterance it opens can mix with the successor's first chunks.
+            capture.go()
         } catch {
             writer.emit(.error(cmdId: id, code: .deviceUnavailable, message: "\(error)"))
         }
@@ -197,7 +203,9 @@ public final class EngineLoop: @unchecked Sendable {
             let (capture, writer) = (session.capture, self.writer)
             stops.async {
                 capture.asr.finish()
+                // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-return-session
                 writer.emit(capture.stop())
+                // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-return-session
             }
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
         case let .excludeProcess(_, bundleId):

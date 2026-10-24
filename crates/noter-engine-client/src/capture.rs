@@ -218,9 +218,11 @@ impl<L: EngineLauncher> EngineClient<L> {
             });
             // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-starting
         }
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
         let Err(e) = self.command(EngineCommand::StartSession(start)).await else {
             return Ok(());
         };
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
         let mut s = self.shared();
         match s.session.as_ref().map(|x| (x.state, x.failures.is_empty())) {
             // The engine died after taking the command: the capture-first restart has it.
@@ -347,6 +349,7 @@ impl<L: EngineLauncher> EngineClient<L> {
     }
 
     // @cpt-flow:cpt-noter-flow-core-engine-capture-recover:p1
+    // @cpt-dod:cpt-noter-dod-core-engine-capture-restart:p1
     /// Respawns the engine at once and starts the same call again from where the audio stopped.
     pub(crate) async fn restart_capture(self) {
         // @cpt-begin:cpt-noter-flow-core-engine-capture-recover:p1:inst-respawn
