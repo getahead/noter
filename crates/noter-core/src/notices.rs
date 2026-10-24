@@ -631,7 +631,7 @@ impl Core {
         });
     }
 
-    fn edit_degraded(&self, edit: impl FnOnce(&mut Vec<DegradedState>)) {
+    pub(crate) fn edit_degraded(&self, edit: impl FnOnce(&mut Vec<DegradedState>)) {
         let mut app = self.app();
         let mut states = app.degraded.states.clone();
         edit(&mut states);

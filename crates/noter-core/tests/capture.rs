@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use noter_core::{
     BoxFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Surfaces,
+    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Notification,
+    NotificationKind, Surfaces,
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
@@ -86,9 +87,14 @@ impl ModelSource for Whisper {
     }
 }
 
-/// What the core asked the native layer to show.
+/// What the core asked the native layer to show, the notifications it posted, and whether a
+/// call surface is visible.
 #[derive(Default)]
-struct Shown(Mutex<Vec<&'static str>>);
+struct Shown(
+    Mutex<Vec<&'static str>>,
+    Mutex<Vec<Notification>>,
+    std::sync::atomic::AtomicBool,
+);
 
 impl Surfaces for Shown {
     fn show_record_prompt(&self) {
@@ -99,6 +105,12 @@ impl Surfaces for Shown {
     }
     fn open_call_window_inactive(&self) {
         self.0.lock().unwrap().push("open_call_window_inactive");
+    }
+    fn call_surface_visible(&self) -> bool {
+        self.2.load(Ordering::SeqCst)
+    }
+    fn post_notification(&self, notification: &Notification) {
+        self.1.lock().unwrap().push(notification.clone());
     }
 }
 
@@ -116,6 +128,12 @@ struct Setup {
     disk_free_mb: u32,
     model: bool,
     engine: Behaviour,
+    /// The first engine launch fails; later ones work.
+    first_launch_fails: bool,
+    /// Behaviours of the next launches (after a failing first one), then the default one.
+    then: Vec<Behaviour>,
+    /// The self-test passed before this launch (setup done: detection is on from the start).
+    self_test_passed: bool,
 }
 
 impl Default for Setup {
@@ -124,19 +142,36 @@ impl Default for Setup {
             disk_free_mb: 10_000,
             model: true,
             engine: Behaviour::default(),
+            first_launch_fails: false,
+            then: Vec::new(),
+            self_test_passed: false,
         }
     }
 }
 
 fn rig_with(setup: Setup) -> Rig {
-    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(TestClock(AtomicI64::new(T0)));
+    rig_in(tempfile::tempdir().unwrap(), clock, setup)
+}
+
+/// A core on `dir` (a new one, or the data folder of a core that quit).
+fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
     if setup.model {
         std::fs::create_dir_all(dir.path().join("models")).unwrap();
         std::fs::write(dir.path().join("models/whisper-turbo"), b"model").unwrap();
     }
-    let engine = ScriptedEngine::new().with_default(setup.engine);
+    let mut engine = ScriptedEngine::new();
+    if setup.first_launch_fails {
+        engine = engine.then(Behaviour {
+            launch_fails: true,
+            ..Behaviour::default()
+        });
+    }
+    for behaviour in setup.then {
+        engine = engine.then(behaviour);
+    }
+    let engine = engine.with_default(setup.engine);
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let clock = Arc::new(TestClock(AtomicI64::new(T0)));
     let events = Arc::new(Events::default());
     let shown = Arc::new(Shown::default());
     let deps = CoreDeps::new(clock.clone(), events.clone())
@@ -147,6 +182,14 @@ fn rig_with(setup: Setup) -> Rig {
         .with_models(Arc::new(Whisper))
         .with_surfaces(shown.clone());
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
+    if setup.self_test_passed {
+        noter_core::testing::seed_self_test(
+            &core,
+            SelfTestState::Passed {
+                at: TimestampMs(T0),
+            },
+        );
+    }
     core.start_first_run();
     let captured = Arc::new(Mutex::new(Vec::new()));
     let c = captured.clone();
@@ -1771,4 +1814,499 @@ async fn the_continue_window_closes_after_five_minutes() {
     r.pass(1_000).await;
     let idle = r.phase_becomes(CapturePhase::Idle).await;
     assert_eq!(idle.continue_until, None);
+}
+
+// === Part 3: recovery and disk ======================================================
+
+impl Rig {
+    /// Noter quits without stopping (a crash): the next core opens the same data folder.
+    async fn crash_and_reopen(self) -> Rig {
+        let Rig {
+            core, clock, _dir, ..
+        } = self;
+        drop(core);
+        tokio::task::yield_now().await;
+        rig_in(_dir, clock, Setup::default())
+    }
+
+    async fn banners(&self) -> Vec<AppBanner> {
+        self.core
+            .app_snapshot(&main_window(), NoArgs {})
+            .await
+            .unwrap()
+            .banners
+            .banners
+    }
+
+    fn call_row(&self, call_id: &CallId) -> (String, Option<i64>) {
+        let id = call_id.clone();
+        self.core
+            .store()
+            .read(move |c| {
+                c.query_row(
+                    "SELECT status, ended_at FROM calls WHERE id = ?1",
+                    [id.as_str()],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+            })
+            .unwrap()
+    }
+
+    /// A call recorded until a mark at 60 s, then cut by a crash at 600 s.
+    async fn interrupted() -> (Rig, CallId) {
+        let r = rig();
+        let call_id = r.recording().await;
+        r.advance(60_000);
+        r.core
+            .capture_mark_moment(
+                &main_window(),
+                MarkMomentArgs {
+                    call_id: call_id.clone(),
+                    note: None,
+                },
+            )
+            .await
+            .unwrap();
+        r.advance(540_000);
+        (r.crash_and_reopen().await, call_id)
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_call_cut_by_a_quit_is_offered_resume_with_an_interrupted_gap() {
+    let (r, call_id) = Rig::interrupted().await;
+    assert_eq!(
+        r.banners().await,
+        [AppBanner::RecordingInterruptedByQuit {
+            call: CallRef {
+                id: call_id.clone(),
+                title: "Untitled call".into(),
+                started_at: TimestampMs(T0),
+                call_type: CallTypeId("unclassified".into()),
+            }
+        }]
+    );
+    assert_eq!(r.state().await.phase, CapturePhase::Idle);
+    r.advance(30_000);
+    let resumed = r
+        .core
+        .capture_resume_interrupted(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(resumed.phase, CapturePhase::Recording);
+    assert_eq!(resumed.call_id, Some(call_id.clone()));
+    assert_eq!(resumed.started_at, Some(TimestampMs(T0)));
+    let EngineCommand::StartSession(session) = r
+        .sent(|c| matches!(c, EngineCommand::StartSession(_)))
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!(session.call_id, call_id);
+    assert_eq!(session.resume_from_ms, Some(OffsetMs(630_000)));
+    assert_eq!(
+        r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'interrupted'"),
+        "60000-630000"
+    );
+    assert!(r.banners().await.is_empty());
+    assert_eq!(r.call_row(&call_id).0, "recording");
+    // Resumed once: the banner is gone.
+    assert_eq!(
+        code(
+            r.core
+                .capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                .await
+        ),
+        ErrorCode::NoticeExpired
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_dismissed_banner_ends_the_interrupted_call_at_its_last_audio() {
+    let (r, call_id) = Rig::interrupted().await;
+    r.core
+        .banner_dismiss(
+            &main_window(),
+            BannerDismissArgs {
+                banner: BannerKind::RecordingInterruptedByQuit,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        code(
+            r.core
+                .capture_resume_interrupted(
+                    &main_window(),
+                    CallIdArgs {
+                        call_id: call_id.clone()
+                    }
+                )
+                .await
+        ),
+        ErrorCode::NoticeExpired
+    );
+    assert_eq!(
+        r.call_row(&call_id),
+        ("processing".into(), Some(T0 + 60_000))
+    );
+    let r = r.crash_and_reopen().await;
+    assert!(r.banners().await.is_empty(), "never offered again");
+}
+
+#[tokio::test(start_paused = true)]
+async fn another_capture_ends_the_interrupted_call() {
+    let (r, call_id) = Rig::interrupted().await;
+    let next = r.recording().await;
+    assert_ne!(next, call_id);
+    assert!(r.banners().await.is_empty());
+    assert_eq!(r.call_row(&call_id).0, "processing");
+}
+
+#[tokio::test(start_paused = true)]
+async fn try_again_restarts_the_engine_on_the_same_call() {
+    let r = rig_with(Setup {
+        first_launch_fails: true,
+        ..Setup::default()
+    });
+    let failed = r
+        .core
+        .capture_start(&main_window(), start_args())
+        .await
+        .unwrap();
+    assert_eq!(failed.phase, CapturePhase::Failed);
+    let call_id = failed.call_id.unwrap();
+    r.advance(5_000);
+    let again = r
+        .core
+        .capture_resume_interrupted(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(again.phase, CapturePhase::Recording);
+    let EngineCommand::StartSession(session) = r
+        .sent(|c| matches!(c, EngineCommand::StartSession(_)))
+        .await
+    else {
+        unreachable!()
+    };
+    assert_eq!(session.resume_from_ms, Some(OffsetMs(5_000)));
+    assert_eq!(
+        r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'engine_restart'"),
+        "0-5000"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn low_and_full_disks_are_degraded_states_and_a_full_one_stops_audio_only() {
+    let r = rig();
+    let disk = |free: u32| EnvironmentReading {
+        disk_free_mb: free,
+        ..EnvironmentReading::default()
+    };
+    let disk_states = |states: Vec<DegradedState>| {
+        states
+            .into_iter()
+            .filter(|s| {
+                matches!(
+                    s,
+                    DegradedState::DiskLow { .. } | DegradedState::DiskFull { .. }
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    r.core.environment_changed(disk(1_500));
+    assert_eq!(
+        disk_states(r.degraded().await),
+        [DegradedState::DiskLow { free_mb: 1_500 }],
+        "a warning, also with no call"
+    );
+    r.core.environment_changed(disk(10_000));
+    let call_id = r.recording().await;
+    r.core.environment_changed(disk(400));
+    assert_eq!(
+        disk_states(r.degraded().await),
+        [DegradedState::DiskFull { free_mb: 400 }]
+    );
+    let s = r.state().await;
+    assert_eq!((s.phase, s.audio_writing), (CapturePhase::Recording, false));
+    assert_eq!(s.call_id, Some(call_id));
+    r.core.environment_changed(disk(5_000));
+    assert!(disk_states(r.degraded().await).is_empty());
+    assert!(r.state().await.audio_writing);
+}
+
+// --- Engine gaps, degraded states, notifications ------------------------------------------
+
+impl Rig {
+    fn inject(&self, event: EngineEvent) {
+        assert!(self.engine.inject(event));
+    }
+
+    /// Polls until `check` holds on the degraded set.
+    async fn degraded_until(&self, check: impl Fn(&[DegradedState]) -> bool) -> Vec<DegradedState> {
+        for _ in 0..500 {
+            let states = self.degraded().await;
+            if check(&states) {
+                return states;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("degraded set never matched: {:?}", self.degraded().await);
+    }
+
+    fn posted(&self) -> Vec<Notification> {
+        self.shown.1.lock().unwrap().clone()
+    }
+}
+
+fn is_engine_state(s: &DegradedState) -> bool {
+    matches!(
+        s,
+        DegradedState::MicrophoneOff { .. }
+            | DegradedState::SystemAudioSilent { .. }
+            | DegradedState::TranscriptionStalled { .. }
+            | DegradedState::DeviceChanged { .. }
+            | DegradedState::CaptureFailed { .. }
+    )
+}
+
+#[tokio::test(start_paused = true)]
+async fn engine_gaps_and_degraded_states_reach_the_rows_the_set_and_nt3() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.inject(EngineEvent::DeviceChanged {
+        call_id: call_id.clone(),
+        device_name: "AirPods Pro".into(),
+        gap_from_ms: OffsetMs(1_000),
+        gap_to_ms: OffsetMs(1_500),
+    });
+    let states = r
+        .degraded_until(|s| {
+            s.iter()
+                .any(|d| matches!(d, DegradedState::DeviceChanged { .. }))
+        })
+        .await;
+    assert!(states.contains(&DegradedState::DeviceChanged {
+        call_id: call_id.clone(),
+        device_name: "AirPods Pro".into(),
+        gap_ms: DurationMs(500),
+    }));
+    assert_eq!(
+        r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'device_changed'"),
+        "1000-1500"
+    );
+    assert!(r
+        .captured
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|e| matches!(e, CaptureEvent::Gap(g) if g.reason == GapReason::DeviceChanged)));
+    assert!(r.posted().is_empty(), "a device change is not NT-3");
+
+    // NT-3 with no call surface visible and not hidden for presenting: sent at once, once.
+    r.inject(EngineEvent::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since_ms: OffsetMs(2_000),
+        confidence: 0.8,
+    });
+    let silent = DegradedState::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since: TimestampMs(T0 + 2_000),
+        confidence: 0.8,
+    };
+    r.degraded_until(|s| s.contains(&silent)).await;
+    assert_eq!(
+        r.posted(),
+        [Notification {
+            call_id: call_id.clone(),
+            kind: NotificationKind::CaptureProblem(silent.clone()),
+        }]
+    );
+    r.inject(EngineEvent::Levels {
+        call_id: Some(call_id.clone()),
+        mic_db: -30.0,
+        sys_db: -30.0,
+    });
+    r.degraded_until(|s| !s.contains(&silent)).await;
+
+    // A visible call surface shows NT-3 itself: no notification.
+    r.shown.2.store(true, Ordering::SeqCst);
+    r.inject(EngineEvent::Levels {
+        call_id: Some(call_id.clone()),
+        mic_db: -120.0,
+        sys_db: -30.0,
+    });
+    r.degraded_until(|s| {
+        s.iter()
+            .any(|d| matches!(d, DegradedState::MicrophoneOff { .. }))
+    })
+    .await;
+    assert_eq!(r.posted().len(), 1);
+
+    // The call ends: no engine state of it stays.
+    r.stop(&main_window(), &call_id).await;
+    assert!(!r.degraded().await.iter().any(is_engine_state));
+}
+
+#[tokio::test(start_paused = true)]
+async fn notifications_wait_for_the_call_to_end_and_skip_the_call_the_main_window_shows() {
+    let r = rig();
+    let first = r.recording().await;
+    let ready = |call_id: &CallId| Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::SummaryReady,
+    };
+    // Held while a capture runs, released one per call when it ends.
+    r.core.notify(ready(&first));
+    r.core.notify(ready(&first));
+    assert!(r.posted().is_empty());
+    r.stop(&main_window(), &first).await;
+    assert_eq!(r.posted(), [ready(&first)]);
+
+    // Nothing for the call the frontmost main window shows.
+    r.core.report_view(Some(first.clone()));
+    r.core.notify(ready(&first));
+    assert_eq!(r.posted().len(), 1);
+    r.core.report_view(None);
+    r.core.notify(ready(&first));
+    assert_eq!(r.posted().len(), 2);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_engine_that_cannot_be_restarted_fails_the_call_and_try_again_resumes_it() {
+    let r = rig_with(Setup {
+        // The call's engine, then two restarts that fail: three failures in 30 s.
+        then: vec![
+            Behaviour::default(),
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+        ],
+        ..Setup::default()
+    });
+    let call_id = r.recording().await;
+    r.engine.kill_current();
+    let failed = r.phase_becomes(CapturePhase::Failed).await;
+    assert_eq!(failed.call_id.as_ref(), Some(&call_id));
+    r.degraded_until(|s| {
+        s.iter()
+            .any(|d| matches!(d, DegradedState::CaptureFailed { .. }))
+    })
+    .await;
+    assert!(r.posted().iter().any(|n| matches!(
+        &n.kind,
+        NotificationKind::CaptureProblem(DegradedState::CaptureFailed { .. })
+    )));
+
+    let starts = r.sessions().len();
+    let again = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+        .await;
+    r.session_started(&call_id);
+    assert_eq!(again.await.unwrap().unwrap().phase, CapturePhase::Recording);
+    r.degraded_until(|s| {
+        !s.iter()
+            .any(|d| matches!(d, DegradedState::CaptureFailed { .. }))
+    })
+    .await;
+    for _ in 0..500 {
+        if r.query::<i64>("SELECT count(*) FROM gaps WHERE reason = 'engine_restart'") > 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM gaps WHERE reason = 'engine_restart'"),
+        1,
+        "one gap, the engine's"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_call_paused_when_the_engine_failed_comes_back_paused() {
+    let r = rig_with(Setup {
+        then: vec![
+            Behaviour::default(),
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+            Behaviour {
+                launch_fails: true,
+                ..Behaviour::default()
+            },
+        ],
+        ..Setup::default()
+    });
+    let call_id = r.recording().await;
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    r.advance(1_000);
+    r.engine.kill_current();
+    r.phase_becomes(CapturePhase::Failed).await;
+    r.advance(4_000);
+    let starts = r.sessions().len();
+    let again = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
+        .await;
+    r.session_started(&call_id);
+    let back = again.await.unwrap().unwrap();
+    assert_eq!(back.phase, CapturePhase::Paused);
+    assert!(back.pause.is_some());
+    // Recorded time stops at the pause, not at the failure.
+    assert_eq!(back.recorded_ms, DurationMs(0));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_core_that_starts_with_detection_on_tells_the_engine() {
+    let r = rig_with(Setup {
+        self_test_passed: true,
+        ..Setup::default()
+    });
+    let EngineCommand::SetDetection {
+        known_bundle_ids, ..
+    } = r
+        .sent(|c| matches!(c, EngineCommand::SetDetection { enabled: true, .. }))
+        .await
+    else {
+        unreachable!()
+    };
+    assert!(known_bundle_ids.iter().any(|b| b == TEAMS));
 }

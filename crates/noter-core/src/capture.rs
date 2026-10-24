@@ -16,6 +16,7 @@ use serde_json::{json, Value};
 use tokio::sync::broadcast::error::RecvError;
 
 use crate::app::WholeState;
+use crate::notify::Notification;
 use crate::{internal, lock, Core};
 
 /// Windows and panels the core asks the native layer for (TL-2). The app implements it over
@@ -26,6 +27,10 @@ pub trait Surfaces: Send + Sync {
     fn close_record_prompt(&self);
     /// The call window on the call display, without taking focus.
     fn open_call_window_inactive(&self);
+    /// The call window or the floating panel is on screen.
+    fn call_surface_visible(&self) -> bool;
+    /// Delivers a notification now (`UNUserNotificationCenter`); when is the core's rule.
+    fn post_notification(&self, notification: &Notification);
 }
 
 /// No native layer: nothing is shown.
@@ -35,6 +40,10 @@ impl Surfaces for NoSurfaces {
     fn show_record_prompt(&self) {}
     fn close_record_prompt(&self) {}
     fn open_call_window_inactive(&self) {}
+    fn call_surface_visible(&self) -> bool {
+        false
+    }
+    fn post_notification(&self, _: &Notification) {}
 }
 
 /// What capture hands the live transcript: marks and gaps as they are stored, and the end of
@@ -51,6 +60,8 @@ pub enum CaptureEvent {
 
 /// Under this much free disk a start is refused (`disk_full`).
 const NEEDED_MB: u32 = 500;
+/// Under this much free disk, `DiskLow` warns; it never refuses anything.
+const LOW_MB: u32 = 2_048;
 /// Continue Recording is offered this long after any stop.
 const CONTINUE_MS: i64 = 5 * 60_000;
 /// The menu bar's "Paused for 5 minutes" reminder.
@@ -69,7 +80,9 @@ pub(crate) struct Session {
     /// Wall time of offset 0: the call's start.
     origin: i64,
     /// Time spent paused, or stopped before Continue; closed spans only.
-    away_ms: i64,
+    pub(crate) away_ms: i64,
+    /// When the engine failed and the call stopped recording (Try Again counts the gap from it).
+    pub(crate) failed_at: Option<i64>,
     /// When the last stop was asked for, and by whom (its change row names the surface).
     stop: Option<(i64, CommandCtx)>,
     /// The meeting app of the live call (bundle id, name), when a detection started it.
@@ -87,6 +100,9 @@ pub(crate) struct Session {
     pub(crate) kept_sources: Vec<String>,
     /// The stop under way was the countdown's, not the user's.
     pub(crate) auto_stop: bool,
+    /// Call offset of the engine session's offset 0 (its first `session_started`); the
+    /// supervisor's gaps and degraded states count from there.
+    pub(crate) engine_base: Option<i64>,
 }
 
 /// Where a new call starts: when, under which title, and from which meeting app.
@@ -108,12 +124,17 @@ impl Session {
         }
     }
 
-    fn offset(&self, at: i64) -> i64 {
+    pub(crate) fn offset(&self, at: i64) -> i64 {
         at - self.origin
     }
 
+    /// Wall time of a call offset.
+    pub(crate) fn at(&self, offset: i64) -> i64 {
+        self.origin + offset
+    }
+
     /// Audio time recorded at `at`: the call so far, minus pauses (an open one too) and stops.
-    fn recorded(&self, at: i64, pause: Option<&PauseInfo>) -> DurationMs {
+    pub(crate) fn recorded(&self, at: i64, pause: Option<&PauseInfo>) -> DurationMs {
         let open = pause.map_or(0, |p| at - p.since.0);
         DurationMs(ms(at - self.origin - self.away_ms - open))
     }
@@ -130,6 +151,7 @@ fn ms(v: i64) -> u32 {
     v.clamp(0, u32::MAX.into()) as u32
 }
 
+// @cpt-state:cpt-noter-state-core-capture-session-phase:p1
 /// The idle state: no call.
 pub(crate) fn to_idle(c: &mut CaptureState) {
     c.phase = CapturePhase::Idle;
@@ -204,6 +226,35 @@ impl Core {
                 }
             }
         });
+        let weak: Weak<Core> = Arc::downgrade(self);
+        let mut facts = self.engine.capture_facts();
+        self.spawn(async move {
+            loop {
+                match facts.recv().await {
+                    Ok(fact) => match weak.upgrade() {
+                        Some(core) => core.capture_fact(fact).await,
+                        None => return,
+                    },
+                    Err(RecvError::Lagged(_)) => continue,
+                    Err(RecvError::Closed) => return,
+                }
+            }
+        });
+        // Setup done and the self-test passed before this launch: detection is on, so the
+        // engine starts to hear calls.
+        let on = {
+            let fr = lock(&self.first_run);
+            crate::first_run::detection(fr.offer_to_record, &fr.stored.self_test).0
+        };
+        if on {
+            let core = self.clone();
+            self.spawn(async move { core.send_detection(true).await });
+        }
+        if let Err(e) = self.find_interrupted() {
+            self.log(crate::object(json!({
+                "level": "error", "module": "capture", "code": e.code
+            })));
+        }
         let weak = Arc::downgrade(self);
         self.on_glossary_changed(move |list| {
             let Some(core) = weak.upgrade() else { return };
@@ -290,7 +341,7 @@ impl Core {
     }
 
     /// Columns of the `calls` row, through the change log. Capture moves are not undoable.
-    fn write_call(
+    pub(crate) fn write_call(
         &self,
         ctx: &CommandCtx,
         call_id: &CallId,
@@ -311,7 +362,8 @@ impl Core {
         self.store().write(mutation, meta).map(drop)
     }
 
-    fn insert_gap(
+    // @cpt-algo:cpt-noter-algo-core-capture-session-degraded:p1
+    pub(crate) fn insert_gap(
         &self,
         call_id: &CallId,
         t0: i64,
@@ -322,7 +374,6 @@ impl Core {
         if t1 <= t0 {
             return Ok(());
         }
-        // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
         self.store().insert_batch(vec![Insert {
             table: "gaps",
             values: vec![
@@ -332,7 +383,6 @@ impl Core {
                 ("reason", serde_json::to_value(reason).map_err(internal)?),
             ],
         }])?;
-        // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
         self.capture_event(CaptureEvent::Gap(GapView {
             call_id: call_id.clone(),
             t0_ms: OffsetMs(ms(t0)),
@@ -343,7 +393,7 @@ impl Core {
     }
 
     /// The engine session for `call_id`; `resume_from_ms` continues its offsets.
-    fn session_for(
+    pub(crate) fn session_for(
         &self,
         call_id: &CallId,
         resume_from_ms: Option<i64>,
@@ -410,6 +460,8 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-guard
         self.start_guard(self.capture_now().phase)?;
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-guard
+        // Another capture ends the call a quit cut, and its Resume Recording offer.
+        self.drop_interrupted()?;
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // A stopped call's Continue window closes: the new call replaces it.
         *session = Session {
@@ -467,15 +519,13 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-start
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-phase-starting
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-engine
-        let started = self
-            .engine
-            .command(EngineCommand::StartSession(start))
-            .await;
-        drop(session);
-        if started.is_err() {
+        session.engine_base = None;
+        if self.engine.start_session(start).await.is_err() {
             // Never refused (O1): the call stays; Stop ends it, Try Again restarts the engine.
+            session.failed_at = Some(now);
             return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
         }
+        drop(session);
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-engine
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-return-started
         Ok(self.phase_leaves(CapturePhase::Starting).await)
@@ -487,9 +537,12 @@ impl Core {
         match event {
             EngineEvent::SessionStarted { call_id, .. } => {
                 let mut session = self.capture.lock().await;
+                let state = self.capture_now();
+                if state.call_id.as_ref() == Some(&call_id) && session.engine_base.is_none() {
+                    session.engine_base = Some(session.offset(self.deps.clock.now().0));
+                }
                 // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-phase-recording
                 // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-recording
-                let state = self.capture_now();
                 if state.phase == CapturePhase::Starting && state.call_id == Some(call_id) {
                     self.set_capture(|c| c.phase = CapturePhase::Recording);
                     self.deps.surfaces.open_call_window_inactive();
@@ -546,10 +599,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-pause-mark:p1:inst-apply-pause
         let call_id = args.call_id;
         if args.paused {
-            let pause_engine = EngineCommand::Pause {
-                call_id: call_id.clone(),
-            };
-            let _ = self.engine.command(pause_engine).await;
+            let _ = self.engine.pause_session().await;
             let status = vec![("status", json!("paused"))];
             self.write_call(ctx, &call_id, "Paused recording", false, status)?;
             let pause = PauseInfo {
@@ -565,10 +615,7 @@ impl Core {
             }));
             // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-pause
         }
-        let resume_engine = EngineCommand::Resume {
-            call_id: call_id.clone(),
-        };
-        let _ = self.engine.command(resume_engine).await;
+        let _ = self.engine.resume_session().await;
         let since = state.pause.map_or(now, |p| p.since.0);
         let (t0, t1) = (session.offset(since), session.offset(now));
         self.insert_gap(&call_id, t0, t1, GapReason::Paused)?;
@@ -671,10 +718,7 @@ impl Core {
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
         if state.phase != CapturePhase::Failed {
             drop(session);
-            let stop = EngineCommand::Stop {
-                call_id: args.call_id.clone(),
-            };
-            if self.engine.command(stop).await.is_ok() {
+            if self.engine.stop_session().await.is_ok() {
                 self.phase_leaves(CapturePhase::Stopping).await;
             }
             session = self.capture.lock().await;
@@ -725,6 +769,8 @@ impl Core {
             c.notice = notice;
         });
         self.drop_sources_of(call_id);
+        self.clear_engine_states();
+        self.release_held();
         self.close_continue_at(call_id.clone(), until, CONTINUE_MS);
         // The post-call hand-off is a no-op until the PostCall job (M2).
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopped
@@ -767,12 +813,9 @@ impl Core {
             c.recorded_ms = recorded;
         });
         self.listen_for_speech(&mut session);
-        if self
-            .engine
-            .command(EngineCommand::StartSession(start))
-            .await
-            .is_err()
-        {
+        session.engine_base = None;
+        if self.engine.start_session(start).await.is_err() {
+            session.failed_at = Some(now);
             return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
         }
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-continue
@@ -798,10 +841,7 @@ impl Core {
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
         let call_id = args.call_id;
         self.set_capture(|c| c.phase = CapturePhase::Stopping);
-        let stop = EngineCommand::Stop {
-            call_id: call_id.clone(),
-        };
-        let _ = self.engine.command(stop).await;
+        let _ = self.engine.stop_session().await;
         let meta = self.change_meta(ctx, "Discarded recording".into(), "capture_discard");
         let id = call_id.as_str().to_string();
         self.store().delete("call", "calls", vec![id], meta)?;
@@ -817,8 +857,10 @@ impl Core {
             reason: StreamEndReason::Discarded,
         });
         self.drop_sources_of(&call_id);
+        self.clear_engine_states();
         *session = session.restart(0);
         let idle = self.set_capture(to_idle);
+        self.release_held();
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-discard
         Ok(idle)
@@ -921,5 +963,31 @@ impl Core {
             return Ok(state);
         }
         Ok(self.set_capture(|c| c.sensitive = args.sensitive))
+    }
+
+    /// A new disk reading: `DiskLow` under 2 GB, `DiskFull` under 500 MB, when a call stops
+    /// writing audio while the transcript goes on.
+    pub(crate) fn disk_changed(&self, free_mb: u32) {
+        // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-disk
+        self.edit_degraded(|states| {
+            states.retain(|s| {
+                !matches!(
+                    s,
+                    DegradedState::DiskLow { .. } | DegradedState::DiskFull { .. }
+                )
+            });
+            if free_mb < NEEDED_MB {
+                states.push(DegradedState::DiskFull { free_mb });
+            } else if free_mb < LOW_MB {
+                states.push(DegradedState::DiskLow { free_mb });
+            }
+        });
+        let state = self.capture_now();
+        let writing = !state.audio_not_stored && free_mb >= NEEDED_MB;
+        let running = !matches!(state.phase, CapturePhase::Idle | CapturePhase::Stopped);
+        if running && state.audio_writing != writing {
+            self.set_capture(|c| c.audio_writing = writing);
+        }
+        // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-disk
     }
 }

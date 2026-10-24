@@ -237,7 +237,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Resume after a quit, a crash or an engine failure
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-capture-session-resume`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-capture-session-resume`
 
 **Actor**: Primary user (main window banner, call window **Try Again**)
 
@@ -250,12 +250,12 @@ Capture is the release-blocking function, and its rules must live in one machine
 - The engine still cannot start: phase stays `failed`, `engine_unavailable`.
 
 **Steps**:
-1. [ ] - `p1` - At core start, find calls left with status `recording` or `paused`; mark them interrupted and show the banner (`banners:changed`) - `inst-find-interrupted`
-2. [ ] - `p1` - API: `capture_resume_interrupted { call_id }` - `inst-resume-call`
-3. [ ] - `p1` - **IF** the call is interrupted and the banner still shows, start the engine session for the same call with an `interrupted` gap - `inst-resume-interrupted`
-4. [ ] - `p1` - **ELSE IF** the phase is `failed` for this call, restart the engine and resume with an `engine_restart` gap - `inst-try-again`
-5. [ ] - `p1` - **ELSE RETURN** `notice_expired` - `inst-else-expired`
-6. [ ] - `p1` - **RETURN** `CaptureState` with phase `recording` - `inst-return-resume`
+1. [x] - `p1` - At core start, find calls left with status `recording` or `paused`; mark them interrupted and show the banner (`banners:changed`) - `inst-find-interrupted`
+2. [x] - `p1` - API: `capture_resume_interrupted { call_id }` - `inst-resume-call`
+3. [x] - `p1` - **IF** the call is interrupted and the banner still shows, start the engine session for the same call with an `interrupted` gap - `inst-resume-interrupted`
+4. [x] - `p1` - **ELSE IF** the phase is `failed` for this call, restart the engine and resume with an `engine_restart` gap - `inst-try-again`
+5. [x] - `p1` - **ELSE RETURN** `notice_expired` - `inst-else-expired`
+6. [x] - `p1` - **RETURN** `CaptureState` with phase `recording` - `inst-return-resume`
 
 ### Make a call sensitive
 
@@ -325,38 +325,38 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 ### Notification rule
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-capture-session-notify`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-capture-session-notify`
 
 **Input**: A notification request (NT-3 capture problem now; summary ready from M2), phase, presenting state, visible call surfaces, the call the frontmost main window reports (`window_report_view`).
 
 **Output**: Send now, hold, or drop.
 
 **Steps**:
-1. [ ] - `p1` - **IF** it is NT-3 (system audio silent, microphone off, capture failed) - `inst-if-nt3`
-   1. [ ] - `p1` - **IF** hidden for presenting, show it only on the menu bar icon; **ELSE IF** a call surface is visible, show it there; **ELSE** send now - `inst-nt3-route`
-2. [ ] - `p1` - **IF** a capture runs or Noter is hidden for presenting, hold it; release held notifications one per call after the call ends - `inst-hold-rule`
-3. [ ] - `p1` - **IF** the frontmost main window shows that call, drop it - `inst-drop-visible`
-4. [ ] - `p1` - **RETURN** the decision; delivery is the native layer's (`cpt-noter-feature-core-native-surfaces`) - `inst-notify-return`
+1. [x] - `p1` - **IF** it is NT-3 (system audio silent, microphone off, capture failed) - `inst-if-nt3`
+   1. [x] - `p1` - **IF** hidden for presenting, show it only on the menu bar icon; **ELSE IF** a call surface is visible, show it there; **ELSE** send now - `inst-nt3-route`
+2. [x] - `p1` - **IF** a capture runs or Noter is hidden for presenting, hold it; release held notifications one per call after the call ends - `inst-hold-rule`
+3. [x] - `p1` - **IF** the frontmost main window shows that call, drop it - `inst-drop-visible`
+4. [x] - `p1` - **RETURN** the decision; delivery is the native layer's (`cpt-noter-feature-core-native-surfaces`) - `inst-notify-return`
 
 ### Capture degraded states and disk
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-capture-session-degraded`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-capture-session-degraded`
 
 **Input**: Degraded states from the supervisor (`cpt-noter-algo-core-engine-capture-degraded`), free disk samples.
 
 **Output**: The capture rows of `degraded:changed`, `CaptureState.audio_writing`, gap rows.
 
 **Steps**:
-1. [ ] - `p1` - Publish engine-derived states for the live call (`MicrophoneOff`, `SystemAudioSilent`, `TranscriptionStalled`, `DeviceChanged`, `SecondAudioSource`, `CaptureFailed`) - `inst-publish-engine-states`
-2. [ ] - `p1` - Free disk under 2 GB → `DiskLow` (never a refusal); disk full → `DiskFull`, stop audio writing (`audio_writing: false`), keep the transcript - `inst-disk`
-3. [ ] - `p1` - DB: write a `gaps` row for every gap reason the engine or the session produces - `inst-write-gaps`
-4. [ ] - `p1` - **RETURN** the new `DegradedSet` with a new version - `inst-degraded-return`
+1. [x] - `p1` - Publish engine-derived states for the live call (`MicrophoneOff`, `SystemAudioSilent`, `TranscriptionStalled`, `DeviceChanged`, `SecondAudioSource`, `CaptureFailed`) - `inst-publish-engine-states`
+2. [x] - `p1` - Free disk under 2 GB → `DiskLow` (never a refusal); disk full → `DiskFull`, stop audio writing (`audio_writing: false`), keep the transcript - `inst-disk`
+3. [x] - `p1` - DB: write a `gaps` row for every gap reason the engine or the session produces - `inst-write-gaps`
+4. [x] - `p1` - **RETURN** the new `DegradedSet` with a new version - `inst-degraded-return`
 
 ## 4. States (CDSL)
 
 ### Capture phase
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-capture-session-phase`
+- [x] `p1` - **ID**: `cpt-noter-state-core-capture-session-phase`
 
 **States**: idle, starting, recording, paused, stopping, stopped, failed
 
@@ -373,9 +373,9 @@ Capture is the release-blocking function, and its rules must live in one machine
 8. [x] - `p1` - **FROM** recording **TO** idle **WHEN** `capture_discard` after the nothing-heard notice (through stopping) - `inst-st-discard`
 9. [x] - `p1` - **FROM** stopped **TO** recording **WHEN** `capture_continue` before `continue_until` - `inst-st-continue`
 10. [x] - `p1` - **FROM** stopped **TO** idle **WHEN** `continue_until` passes or another capture starts - `inst-st-idle`
-11. [ ] - `p1` - **FROM** idle **TO** recording **WHEN** `capture_resume_interrupted` while the interrupted banner shows - `inst-st-resume-interrupted`
-12. [ ] - `p1` - **FROM** recording **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
-13. [ ] - `p1` - **FROM** failed **TO** recording **WHEN** **Try Again** (`capture_resume_interrupted`) restarts the engine - `inst-st-try-again`
+11. [x] - `p1` - **FROM** idle **TO** recording **WHEN** `capture_resume_interrupted` while the interrupted banner shows - `inst-st-resume-interrupted`
+12. [x] - `p1` - **FROM** recording **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
+13. [x] - `p1` - **FROM** failed **TO** recording **WHEN** **Try Again** (`capture_resume_interrupted`) restarts the engine - `inst-st-try-again`
 14. [x] - `p1` - **FROM** failed **TO** stopped **WHEN** `capture_stop` (the call ends at the last audio) - `inst-st-failed-stop`
 15. [x] - `p1` - **FROM** recording **TO** recording **WHEN** a new meeting is answered or expires (Start as New Call splits into a new call; Keep in This Call keeps one) - `inst-st-split`
 
@@ -429,7 +429,7 @@ The system **MUST** raise and resolve the call-ended (with hold), call-seems-end
 
 ### Recovery and degraded states
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-capture-session-recovery`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-capture-session-recovery`
 
 The system **MUST** offer **Resume Recording** after a quit or crash until the banner is dismissed or another capture starts, offer **Try Again** in phase `failed`, record every gap with its reason, publish the capture degraded states, and stop audio writing (not the transcript) when the disk fills.
 

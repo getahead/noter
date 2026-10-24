@@ -906,6 +906,12 @@ impl Surfaces for ScriptedSurfaces {
     fn open_call_window_inactive(&self) {
         lock(&self.0).push("open_call_window_inactive");
     }
+    fn call_surface_visible(&self) -> bool {
+        false
+    }
+    fn post_notification(&self, _: &noter_core::Notification) {
+        lock(&self.0).push("post_notification");
+    }
 }
 
 struct ScriptedUpdater(Mutex<Option<UpdateInfo>>);
