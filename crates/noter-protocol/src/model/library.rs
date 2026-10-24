@@ -56,6 +56,9 @@ pub struct CallDetail {
     pub audio_not_stored: bool,
     /// First recorded call: offer **Notify Me When Summaries Are Ready** (D68).
     pub first_recorded_call: bool,
+    /// The call's folder on disk (its audio and transcript files), absolute, for **Show in Finder**
+    /// (`open_external { reveal_in_finder }`); it may be gone once the audio was deleted.
+    pub folder: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]

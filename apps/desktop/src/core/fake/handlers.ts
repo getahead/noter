@@ -198,6 +198,16 @@ function copilot(fake: FakeCore, change: (c: CopilotStatus) => void): CopilotSta
 const skills = new Map<string, { rev: number; body: string }>();
 const defaultSkill = (a: AgentView) => `---\nname: ${a.name}\n---\n\nYou are the ${a.name} of the council. Ask one question at a time; cite the call.`;
 
+/** The call a scripted transcript event belongs to, if it names one. */
+function scriptCall(e: World["live_script"][number]): string | undefined {
+  if ("segment" in e) return e.segment.call_id;
+  if ("gap" in e) return e.gap.call_id;
+  if ("mark" in e) return e.mark.call_id;
+  if ("segments" in e) return e.segments[0]?.call_id;
+  if ("speakers" in e) return e.speakers[0]?.call_id;
+  return undefined;
+}
+
 // ── handlers ─────────────────────────────────────────────────────────────
 
 export const defaultHandlers: Handlers = {
@@ -316,7 +326,16 @@ export const defaultHandlers: Handlers = {
     if (cap.call_id !== a.call_id || !cap.notice || cap.notice.type !== "new_meeting") throw coreError("notice_expired");
     if (a.choice === "keep_in_this_call") return setCapture(fake, { notice: null });
     const title = cap.notice.event?.title ?? "New call";
-    return setCapture(fake, { call_id: newId("call"), title, started_at: cap.notice.detected_at, recorded_ms: 0, notice: null });
+    const id = newId("call");
+    const started_at = cap.notice.detected_at;
+    // Like the real core: the new call has its row and an empty live transcript at once (D-37).
+    const template = world.calls.find((c) => c.id === cap.call_id) ?? world.calls[0];
+    if (template) {
+      const row = { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], audio_kept_until: null, audio_deleted: false, open_items: 0, review_waiting: 0 };
+      world.calls = [row, ...world.calls];
+    }
+    world.transcripts.push({ subscription_id: null, call_id: id, live: true, pass: "live", archive: "not_started", segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true });
+    return setCapture(fake, { call_id: id, title, started_at, recorded_ms: 0, notice: null });
   },
   capture_keep_recording: (a, { world, fake }) => {
     const cap = world.app.capture;
@@ -328,14 +347,17 @@ export const defaultHandlers: Handlers = {
     world.calls = world.calls.filter((c) => c.id !== a.call_id);
     return setCapture(fake, { phase: "idle", call_id: null, title: null, started_at: null, recorded_ms: 0, pause: null, notice: null, continue_until: null });
   },
-  capture_set_sensitive: (a, { world, fake }) => {
+  capture_set_sensitive: (a, { world, fake, emit }) => {
     const cap = world.app.capture;
     const capturing = cap.call_id === a.call_id && live(cap);
     if (capturing && !a.sensitive) {
       throw coreError("invalid_input", "a call can only be made sensitive during capture", { type: "validation", field: "sensitive", rule: "out_of_range" });
     }
     const row = world.calls.find((c) => c.id === a.call_id);
-    if (row) row.privacy = a.sensitive ? "sensitive" : "normal";
+    // The row and its details are one record in the real core: both change, and windows hear it (D-37).
+    const detail = world.call_details.find((d) => d.call.id === a.call_id)?.call;
+    for (const c of [row, detail]) if (c) c.privacy = a.sensitive ? "sensitive" : "normal";
+    if (detail ?? row) emit("entity:changed", { type: "call", call: (detail ?? row)! });
     if (capturing || cap.call_id === a.call_id) return setCapture(fake, { sensitive: a.sensitive });
     if (!row) throw coreError("not_found", `call ${a.call_id}`);
     return cap;
@@ -384,7 +406,8 @@ export const defaultHandlers: Handlers = {
     // Like the real core, messages can reach the page before this snapshot resolves: one the
     // snapshot already contains (seq = last_seq) and the first new one. The client drops the
     // first and holds the second until the snapshot is in (R23).
-    const [first, ...rest] = world.live_script;
+    // The script is the fixture call's speech: a call started at runtime waits for its own (D-37).
+    const [first, ...rest] = world.live_script.filter((e) => scriptCall(e) === undefined || scriptCall(e) === a.call_id);
     send({ seq: snap.last_seq, event: { type: "segments_updated", segments: snap.segments.slice(-1) } });
     if (first) fake.push(sub, { event: first });
     rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => fake.push(sub, { event })));
@@ -873,7 +896,7 @@ export const defaultHandlers: Handlers = {
     if (d) return d;
     const c = call(world, a.call_id);
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
-    return { call: c, calendar_event: null, speakers: t?.speakers ?? [], marks: t?.marks ?? [], gaps: t?.gaps ?? [], mode_used: world.app.privacy.effective, audio_not_stored: false, first_recorded_call: false };
+    return { call: c, calendar_event: null, speakers: t?.speakers ?? [], marks: t?.marks ?? [], gaps: t?.gaps ?? [], mode_used: world.app.privacy.effective, audio_not_stored: false, first_recorded_call: false, folder: `/Users/you/Library/Application Support/Noter/audio/${a.call_id}` };
   },
   call_update: (a, { world, emit }) => {
     const c = call(world, a.call_id);
@@ -1647,6 +1670,11 @@ export const defaultHandlers: Handlers = {
     return fake.callWindow;
   },
   window_call_state: (_a, { fake }) => fake.callWindow,
+  window_share_warning_seen: (_a, { fake, publish }) => {
+    fake.callWindow.show_share_warning = false;
+    publish("window:call");
+    return fake.callWindow;
+  },
   window_set_call_layout: (a, { world, fake, publish }) => {
     const twoDisplays = world.app.environment.displays.length > 1;
     fake.callWindow.layout = a.preference === "floating" || !twoDisplays ? "floating" : "dedicated";

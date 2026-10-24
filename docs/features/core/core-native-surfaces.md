@@ -64,7 +64,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Principles**: `cpt-noter-principle-core-degrade`
 
 **Delivers**:
-- Frozen commands (M1): `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `window_report_view`, `open_external`.
+- Frozen commands (M1): `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_share_warning_seen`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `window_report_view`, `open_external`.
 - Events: `window:call`, `app:presenting`, `nav:request`.
 - DESIGN.md stories (M1): `cpt-noter-seq-call-screen-hide-for-presenting`, `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen`, `cpt-noter-seq-menu-bar-check-state`, `cpt-noter-seq-notifications-allow-notifications`; the menu bar half of `cpt-noter-seq-menu-bar-control-recording`.
 - The app's E2E command log for native callers (`NOTER_E2E_LOG_DIR`), so XCUITest runs count toward the E2E bar.

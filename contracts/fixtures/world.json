@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.0",
+    "contract_version": "2.1",
     "copilot": {
       "agents": [
         {
@@ -712,6 +712,7 @@
         "unnamed_speakers": 1
       },
       "first_recorded_call": false,
+      "folder": "/Users/you/Library/Application Support/Noter/audio/call_live",
       "gaps": [
         {
           "call_id": "call_live",
@@ -897,6 +898,7 @@
         "unnamed_speakers": 0
       },
       "first_recorded_call": false,
+      "folder": "/Users/you/Library/Application Support/Noter/audio/call_backend",
       "gaps": [
         {
           "call_id": "call_backend",

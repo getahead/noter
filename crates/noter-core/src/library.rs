@@ -406,6 +406,7 @@ impl Core {
         self.ready()?;
         let now = self.deps.clock.now().0;
         let id = args.call_id.0;
+        let folder = self.audio_dir.join(&id).display().to_string();
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-call
         let found = self.store().read(|c| {
             // @cpt-begin:cpt-noter-flow-core-library-calls-get:p1:inst-get-select
@@ -450,6 +451,7 @@ impl Core {
                 mode_used,
                 audio_not_stored,
                 first_recorded_call: calls == 1,
+                folder,
             }))
             // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-select
         })?;

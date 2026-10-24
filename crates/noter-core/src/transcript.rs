@@ -379,6 +379,12 @@ impl Core {
     /// `transcript.jsonl` is written for a stop, and every subscription ends with the reason.
     /// Idempotent: the engine's `session_stopped` and the session's own call both land here.
     // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-end-stream
+    /// Ends the live stream only (a lagged subscriber resubscribes); the call goes on.
+    #[cfg(feature = "harness")]
+    pub(crate) fn end_transcript_stream(&self, call_id: &CallId, reason: StreamEndReason) {
+        self.transcript_hub().end_stream(call_id.as_str(), reason);
+    }
+
     pub(crate) fn call_ended(&self, call_id: &CallId, reason: StreamEndReason) {
         if reason != StreamEndReason::Discarded {
             // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush

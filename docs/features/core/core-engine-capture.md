@@ -277,6 +277,8 @@ The system **MUST** capture the tap (excluding the engine and app PIDs) and the 
 
 The system **MUST** emit hypotheses about once a second and confirmed segments with language and live speaker label, with hypothesis lag ≤ 2 s and confirmed lag ≤ 4 s on the golden set replayed through file mode; the `live-hypothesis-lag` and `live-confirmed-lag` scenarios report wall time on the Mac runner.
 
+> **Not a box criterion in M1 (D-30, 24 Oct 2026).** Performance scenarios are out of active development, and a feature box is not held back by a missing perf scenario. The streaming decode and the hypothesis and confirmed segments are delivered and proven in the pipeline DoD. The lag budgets on the golden set are the `live-hypothesis-lag` and `live-confirmed-lag` perf scenarios, so this DoD stays open until the owner brings perf back, and it does not hold the 2.8 box. The real-call latency DoD below stays owner-measured.
+
 **Implements**:
 - `cpt-noter-algo-core-engine-capture-live-asr`
 

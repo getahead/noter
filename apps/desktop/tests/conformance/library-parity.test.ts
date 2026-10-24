@@ -31,9 +31,11 @@ function owned(row: Row): Omit<Row, "participants" | "open_items" | "review_wait
 
 // Speakers: a named speaker's chip comes from the people table (M2) and name suggestions from
 // voice profiles and the calendar (M2), and the replay sample is the transcript's (live-transcript); compare who the speaker is, not the chip.
+// The folder is the core's own data dir (compared by shape below).
 function ownedDetail(d: Detail) {
+  const { folder: _f, ...rest } = d;
   return {
-    ...d,
+    ...rest,
     call: owned(d.call),
     speakers: d.speakers.map((sp) => {
       const { suggestion: _s, sample: _m, label, ...rest } = sp;
@@ -89,6 +91,7 @@ describe.each(fixture.calls.map((c) => [c.id, c] as const))("fixture parity of %
     const got = ahead(await s.core("main").callGet({ call_id: id }));
     if (!got) return;
     expect(ownedDetail(got)).toEqual(ownedDetail(detail));
+    expect(got.folder).toMatch(new RegExp(`^/.*/audio/${id}$`)); // absolute, the call's own
   });
 
   it("the transcript snapshot serves the fixture's segments, speakers, marks and gaps", async () => {

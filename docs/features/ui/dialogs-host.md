@@ -91,13 +91,13 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 **Steps**:
 1. [ ] - `p1` - User chooses **Delete Call…** on a call's page, or **Delete…** or ⌘⌫ with rows selected in Calls - `inst-user-delete`
-2. [ ] - `p1` - Algorithm: build the alert with `cpt-noter-algo-ui-dialogs-host-delete-alert` - `inst-build-alert`
-3. [ ] - `p1` - UI: request the native alert from the core's dialog plugin, attached to the main window as a sheet where the plugin allows; **Cancel** is the default (Return and Esc) - `inst-request-alert`
-4. [ ] - `p1` - **IF** the user chooses **Cancel** or presses Return or Esc - `inst-if-cancel`
-   1. [ ] - `p1` - **RETURN** nothing deleted; focus returns to the control that asked - `inst-return-cancel`
-5. [ ] - `p1` - API: `calls_delete` (the call ids) - `inst-api-delete`
-6. [ ] - `p1` - **IF** the result is an error - `inst-if-delete-error`
-   1. [ ] - `p1` - **RETURN** the calling page's section error, with **Try Again** when retryable - `inst-return-delete-error`
+2. [x] - `p1` - Algorithm: build the alert with `cpt-noter-algo-ui-dialogs-host-delete-alert` - `inst-build-alert`
+3. [x] - `p1` - UI: request the native alert from the core's dialog plugin, attached to the main window as a sheet where the plugin allows; **Cancel** is the default (Return and Esc) - `inst-request-alert`
+4. [x] - `p1` - **IF** the user chooses **Cancel** or presses Return or Esc - `inst-if-cancel`
+   1. [x] - `p1` - **RETURN** nothing deleted; focus returns to the control that asked - `inst-return-cancel`
+5. [x] - `p1` - API: `calls_delete` (the call ids) - `inst-api-delete`
+6. [x] - `p1` - **IF** the result is an error - `inst-if-delete-error`
+   1. [x] - `p1` - **RETURN** the calling page's section error, with **Try Again** when retryable - `inst-return-delete-error`
 7. [ ] - `p1` - UI: from a call's page, navigate to Library › **Calls**; in Calls, the rows leave the list as `entity:changed` reports them gone - `inst-after-delete`
 8. [ ] - `p1` - **RETURN** the calls deleted for good - `inst-return-deleted`
 
@@ -117,7 +117,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 1. [ ] - `p1` - User chooses **Quit Noter** or presses ⌘Q - `inst-user-quit`
 2. [ ] - `p1` - **IF** nothing is recording - `inst-if-idle`
    1. [ ] - `p1` - **RETURN** Noter quits at once (the core) - `inst-return-quit`
-3. [ ] - `p1` - Core: shows the native alert with **Cancel** as the default; the UI supplies its strings from the catalogue - `inst-quit-alert`
+3. [x] - `p1` - Core: shows the native alert with **Cancel** as the default; the UI supplies its strings from the catalogue - `inst-quit-alert`
 4. [ ] - `p1` - **IF** the user chooses **Stop and Quit** - `inst-if-stop-quit`
    1. [ ] - `p1` - Core: stops and saves the recording, then quits - `inst-stop-quit`
 5. [ ] - `p1` - **RETURN** the recording kept, or stopped and saved before Noter quits - `inst-return-quit-done`
@@ -136,7 +136,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 **Steps**:
 1. [ ] - `p1` - User clicks **Discard Recording** in the capture notice - `inst-user-discard`
-2. [ ] - `p1` - UI: replace the notice's actions with the inline confirmation; focus moves to **Back**; no default button - `inst-inline`
+2. [x] - `p1` - UI: replace the notice's actions with the inline confirmation; focus moves to **Back**; no default button - `inst-inline`
 3. [ ] - `p1` - **IF** the user clicks **Discard** - `inst-if-discard`
    1. [ ] - `p1` - API: `capture_discard` (through `cpt-noter-feature-ui-call-window`); the window closes and nothing is kept - `inst-api-discard`
 4. [ ] - `p1` - **ELSE** the actions come back - `inst-else-back`
@@ -157,7 +157,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 **Steps**:
 1. [ ] - `p1` - User triggers an action whose label ends in an ellipsis, or a control that opens a popover - `inst-user-trigger`
-2. [ ] - `p1` - UI: the owning feature opens its registered sheet (480 to 640 pt) or popover (280 to 360 pt) in the host - `inst-open-host`
+2. [x] - `p1` - UI: the owning feature opens its registered sheet (480 to 640 pt) or popover (280 to 360 pt) in the host - `inst-open-host`
 3. [ ] - `p1` - User fills it and presses the primary button - `inst-user-submit`
 4. [ ] - `p1` - UI: the primary button shows a spinner and keeps its label (**Sheet busy**); fields stay readable - `inst-busy`
 5. [ ] - `p1` - **IF** the command fails with invalid input - `inst-if-invalid`
@@ -168,19 +168,19 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Build a delete alert
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-dialogs-host-delete-alert`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-dialogs-host-delete-alert`
 
 **Input**: the selected call ids and the first call's title
 
 **Output**: the alert's title, message and buttons
 
 **Steps**:
-1. [ ] - `p1` - **IF** one call - `inst-if-one`
-   1. [ ] - `p1` - Title **Delete “<title>”?**; message **This removes its audio, transcript, summary, items and cards. You can't undo this.**; buttons **Cancel** (default) and **Delete** (destructive) - `inst-one`
-2. [ ] - `p1` - **ELSE** - `inst-else-many`
-   1. [ ] - `p1` - Title **Delete N calls?** and button **Delete N Calls** through the plural rules; message **This removes their audio, transcripts, summaries, items and cards. You can't undo this.** - `inst-many`
-3. [ ] - `p1` - The title keeps the call's own script inside “…” - `inst-script`
-4. [ ] - `p1` - **RETURN** the alert - `inst-return-alert`
+1. [x] - `p1` - **IF** one call - `inst-if-one`
+   1. [x] - `p1` - Title **Delete “<title>”?**; message **This removes its audio, transcript, summary, items and cards. You can't undo this.**; buttons **Cancel** (default) and **Delete** (destructive) - `inst-one`
+2. [x] - `p1` - **ELSE** - `inst-else-many`
+   1. [x] - `p1` - Title **Delete N calls?** and button **Delete N Calls** through the plural rules; message **This removes their audio, transcripts, summaries, items and cards. You can't undo this.** - `inst-many`
+3. [x] - `p1` - The title keeps the call's own script inside “…” - `inst-script`
+4. [x] - `p1` - **RETURN** the alert - `inst-return-alert`
 
 ## 4. States (CDSL)
 
@@ -208,12 +208,12 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 **Initial State**: CLOSED
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** CLOSED **TO** OPEN **WHEN** a feature opens a registered sheet - `inst-closed-open`
+1. [x] - `p1` - **FROM** CLOSED **TO** OPEN **WHEN** a feature opens a registered sheet - `inst-closed-open`
 2. [ ] - `p1` - **FROM** OPEN **TO** BUSY **WHEN** the primary button runs its command - `inst-open-busy`
 3. [ ] - `p1` - **FROM** BUSY **TO** INVALID **WHEN** the command fails with invalid input - `inst-busy-invalid`
 4. [ ] - `p1` - **FROM** INVALID **TO** BUSY **WHEN** the user submits again - `inst-invalid-busy`
 5. [ ] - `p1` - **FROM** BUSY **TO** CLOSED **WHEN** the command succeeds - `inst-busy-closed`
-6. [ ] - `p1` - **FROM** OPEN **TO** CLOSED **WHEN** the user cancels - `inst-open-closed`
+6. [x] - `p1` - **FROM** OPEN **TO** CLOSED **WHEN** the user cancels - `inst-open-closed`
 
 ## 5. Definitions of Done
 

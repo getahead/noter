@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0](https://github.com/getahead/noter/compare/v0.9.0...v0.10.0) (2026-10-24)
+
+
+### Features
+
+* **host:** tauri-plugin-dialog for the M1 alerts in main and call-screen (UI M1 ask 6) ([#200](https://github.com/getahead/noter/issues/200)) ([bc8e6d3](https://github.com/getahead/noter/commit/bc8e6d310bf7f6552c24e8ba48ee86db97b39900))
+* **ui:** dialogs host and the M1 alerts ([#182](https://github.com/getahead/noter/issues/182)) ([73c587f](https://github.com/getahead/noter/commit/73c587f5b8dc043d3ac04abaf03189bee2b67d33))
+
+
+### Bug fixes
+
+* **contract:** fake core mirrors capture_set_sensitive and start-as-new-call like the real core ([#192](https://github.com/getahead/noter/issues/192)) ([286a609](https://github.com/getahead/noter/commit/286a60926aa992d9ca2b5f8de7951b20dd5c0b84))
+
 ## [0.9.0](https://github.com/getahead/noter/compare/v0.8.0...v0.9.0) (2026-10-24)
 
 

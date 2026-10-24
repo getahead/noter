@@ -666,6 +666,14 @@ impl CoreApi for Core {
         Ok(self.call_window_now())
     }
 
+    async fn window_share_warning_seen(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<CallWindowState, CoreError> {
+        Ok(self.share_warning_seen())
+    }
+
     async fn window_set_call_layout(
         &self,
         ctx: &CommandCtx,

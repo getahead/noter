@@ -140,6 +140,8 @@ pub enum NavTarget {
         #[serde(default)]
         step: Option<SetupStep>,
     },
+    /// The **Delete Old Audio…** sheet over the main window's current page (D-17).
+    DeleteOldAudio,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
