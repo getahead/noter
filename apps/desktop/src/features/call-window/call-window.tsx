@@ -72,8 +72,18 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // the newest of each in this window's store, beside the transcript, so a layout switch or a hide loses nothing.
   const cap = useWindow(bridge, (s) => s.whole.capture);
   const degraded = useWindow(bridge, (s) => s.whole.degraded?.states) ?? NO_STATES;
+  // @cpt-begin:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-user-reopen
+  // @cpt-begin:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-core-show
   const cw = useWindow(bridge, (s) => s.whole.callWindow);
+  // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-core-show
+  // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-user-reopen
+  // @cpt-begin:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-core-hide
+  // @cpt-begin:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-user-show
+  // @cpt-begin:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-return-present
   const presenting = useWindow(bridge, (s) => s.whole.presenting?.hidden ?? false);
+  // @cpt-end:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-return-present
+  // @cpt-end:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-user-show
+  // @cpt-end:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-core-hide
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-store-presenting
   // @cpt-end:cpt-noter-flow-ui-call-window-display-change:p1:inst-store-window
   // @cpt-end:cpt-noter-flow-ui-call-window-display-change:p1:inst-core-display
@@ -142,7 +152,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
 
   if (!cap || !cw || !callId) return null;
   const view = windowState(cw, presenting, cap);
+  // @cpt-begin:cpt-noter-algo-ui-call-window-closing-state:p1:inst-auto-close
   if (view === "CLOSED") return null;
+  // @cpt-end:cpt-noter-algo-ui-call-window-closing-state:p1:inst-auto-close
 
   /** A command of this window: WAITING until the core answers; a capture command's failure shows in the strip. */
   async function run<T>(cmd: CommandName, call: () => Promise<Result<T>>, opts: ActOptions = {}, strip = true): Promise<Result<T>> {
@@ -313,6 +325,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const speakers = transcript?.call_id === callId ? transcript.speakers : [];
   const twoDisplays = displays > 1;
 
+  // @cpt-begin:cpt-noter-flow-ui-call-window-controls:p1:inst-return-control
   const strip = (variant: "dedicated" | "compact") => (
     <CallStatusStrip
       variant={variant}
@@ -339,6 +352,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
       onRetry={banners.retry}
     />
   );
+  // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-return-control
   const shareGlyph = (
     <span className="cw-shield" role="img" aria-label={t("cw.share_glyph")} title={t("cw.share_help")}>
       <Icon name="shield" size={15} />
@@ -394,7 +408,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   );
   // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-map-degraded
   // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-show-banner
+  // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-return-recover
   const bannerSlot = <BannerSlot banners={bannerList} />;
+  // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-return-recover
   // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-show-banner
   // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-map-degraded
 
@@ -402,6 +418,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-closing
   // @cpt-begin:cpt-noter-algo-ui-call-window-closing-state:p1:inst-open-close
   // @cpt-begin:cpt-noter-algo-ui-call-window-closing-state:p1:inst-return-closing
+  // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-stop
   const closing = view === "CLOSING" && (
     <ClosingState
       title={closingTitle(cap, prefs?.time_zone, prefs?.time_format === "h12")}
@@ -413,11 +430,11 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
       onClose={hide}
     />
   );
+  // @cpt-end:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-stop
   // @cpt-end:cpt-noter-algo-ui-call-window-closing-state:p1:inst-return-closing
   // @cpt-end:cpt-noter-algo-ui-call-window-closing-state:p1:inst-open-close
   // @cpt-end:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-closing
   // @cpt-end:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-stopped
-  // After 10 s without a choice the core closes the window (inst-auto-close): nothing to do here.
 
   const state = view === "CLOSING" ? "closing" : captureView(cap, degraded).toLowerCase().replace(/_/g, "-");
   // @cpt-begin:cpt-noter-flow-ui-call-window-display-change:p1:inst-render-layout
