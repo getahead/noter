@@ -845,6 +845,20 @@ async fn a_live_call_can_be_made_sensitive_but_not_turned_back() {
         r.query::<String>("SELECT privacy_class FROM calls"),
         "sensitive"
     );
+    // Windows that show the call replace it from entity:changed.
+    let changed: Vec<Value> = r
+        .events
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(name, _)| *name == event_names::ENTITY_CHANGED)
+        .map(|(_, v)| v.clone())
+        .collect();
+    let call = changed.last().expect("entity:changed for the call");
+    assert_eq!(call["type"], "call");
+    assert_eq!(call["call"]["id"], call_id.as_str());
+    assert_eq!(call["call"]["privacy"], "sensitive");
     assert_eq!(
         code(
             r.core
