@@ -105,3 +105,30 @@ fn fixture_seeding_emits_no_events() {
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(String::from_utf8(out.stdout).unwrap(), "");
 }
+
+#[test]
+fn bad_engine_script_exits_two_naming_the_line_before_reading() {
+    let dir = std::env::temp_dir().join(format!("engine-script-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("bad.jsonl");
+    std::fs::write(
+        &file,
+        "// ok\n{\"on\": \"stop\", \"after_ms\": 0, \"kill\": true}\nnot json\n",
+    )
+    .unwrap();
+    let out = run(&["--engine-script", file.to_str().unwrap()], "");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("line 3"));
+    std::fs::write(
+        &file,
+        "{\"on\": \"stop\", \"after_ms\": 0, \"kill\": true}\n",
+    )
+    .unwrap();
+    assert_eq!(
+        run(&["--engine-script", file.to_str().unwrap()], "")
+            .status
+            .code(),
+        Some(0)
+    );
+    let _ = std::fs::remove_dir_all(dir);
+}

@@ -32,6 +32,7 @@ fn snapshots(rounds: usize) -> usize {
         let options = Options {
             fixture: true,
             fixed_clock: true,
+            ..Options::default()
         };
         let harness = Harness::start(options, out.lines())
             .await

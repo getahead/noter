@@ -18,7 +18,7 @@ use noter_core::{
     EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, SystemClock,
     Updater,
 };
-use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
+use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{EngineErrorCode, EngineEvent};
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
@@ -32,12 +32,14 @@ use sha2::{Digest, Sha256};
 use crate::{lock, BoxFuture, Controls, Lines};
 
 /// Command-line options of the harness.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Options {
     /// `--fixture world`: seed the fixture world of noter-protocol.
     pub fixture: bool,
     /// `--clock fixed`: the core's clock stands at the fixture's `now`.
     pub fixed_clock: bool,
+    /// `--engine-script <file>`: the scripted engine plays these steps (`.plans/engine-script-format.md`).
+    pub engine_script: Option<Script>,
 }
 
 /// The harness around one real core.
@@ -94,6 +96,10 @@ impl Harness {
             self_test_line: Some("Welcome to Noter".into()),
             ..Behaviour::default()
         });
+        let engine = match options.engine_script {
+            Some(script) => engine.with_script(script),
+            None => engine,
+        };
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
         let deps = CoreDeps::new(clock, Arc::new(EventLines(lines, seeding.clone())))
             .with_native(native.clone())
@@ -467,6 +473,25 @@ impl Harness {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct EngineFactArgs {
+    event: EngineEvent,
+}
+
+/// The engine's side of a scenario: a fact it reports, or its death.
+impl Harness {
+    /// `delivered` is false while no engine runs (it starts on the first command that needs it).
+    fn engine_fact(&self, args: Value) -> Result<Value, CoreError> {
+        let a: EngineFactArgs = parse(args, "harness.engine_fact needs { event: EngineEvent }")?;
+        Ok(json!({ "delivered": self.engine.inject(a.event) }))
+    }
+
+    fn engine_kill(&self) -> Result<Value, CoreError> {
+        self.engine.kill_current();
+        Ok(json!({}))
+    }
+}
+
 fn parse<T: serde::de::DeserializeOwned>(args: Value, usage: &str) -> Result<T, CoreError> {
     serde_json::from_value(args).map_err(|_| CoreError::new(ErrorCode::InvalidInput, usage))
 }
@@ -516,6 +541,8 @@ impl Controls for Harness {
                 }
                 "set_output_route" => self.set_output_route(args),
                 "set_free_disk" => self.set_free_disk(args),
+                "engine_fact" => self.engine_fact(args),
+                "engine_kill" => self.engine_kill(),
                 _ => Err(CoreError::new(
                     ErrorCode::InvalidInput,
                     format!("no control harness.{name}"),

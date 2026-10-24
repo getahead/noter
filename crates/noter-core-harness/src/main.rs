@@ -6,8 +6,10 @@ use std::process::ExitCode;
 
 use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::{serve_with, Output};
+use noter_engine_client::scripted::Script;
 
-/// The command line: `--fixture world` (the fixture world of noter-protocol) and `--clock fixed`.
+/// The command line: `--fixture world` (the fixture world of noter-protocol), `--clock fixed` and
+/// `--engine-script <file>` (the scripted engine's steps; a bad file is `Err` with its line).
 // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-start
 fn parse_args(args: &[String]) -> Result<Options, String> {
     let mut options = Options::default();
@@ -17,7 +19,13 @@ fn parse_args(args: &[String]) -> Result<Options, String> {
             ("--fixture", Some("world")) => options.fixture = true,
             ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
             ("--clock", Some("fixed")) => options.fixed_clock = true,
-            _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed]")),
+            ("--engine-script", Some(file)) => {
+                let text = std::fs::read_to_string(file)
+                    .map_err(|e| format!("engine script {file}: {e}"))?;
+                let script = Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
+                options.engine_script = Some(script);
+            }
+            _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--engine-script <file>]")),
         }
     }
     Ok(options)

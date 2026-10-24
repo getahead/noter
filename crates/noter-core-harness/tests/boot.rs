@@ -25,6 +25,7 @@ async fn start() -> Runner {
         Options {
             fixture: true,
             fixed_clock: true,
+            ..Options::default()
         },
         out.lines(),
     )
@@ -758,5 +759,37 @@ async fn system_audio_the_world_denies_is_denied_by_the_engine() {
         )
         .await;
     assert_eq!(reply["error"]["code"], "permission_denied", "{reply}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn engine_fact_reaches_a_running_engine_and_kill_is_accepted() {
+    let mut r = start().await;
+    let fact =
+        json!({ "event": { "type": "levels", "call_id": null, "mic_db": -30.0, "sys_db": -30.0 } });
+    // No command has started the engine yet.
+    let (idle, _) = r.call("main", "harness.engine_fact", fact.clone()).await;
+    assert_eq!(idle["ok"]["delivered"], false, "{idle}");
+    let id = r.next;
+    r.next += 1;
+    let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
+    r.input
+        .write_all(format!("{req}\n").as_bytes())
+        .await
+        .unwrap();
+    let mut delivered = json!(false);
+    for _ in 0..50 {
+        let (fact, _) = r.call("main", "harness.engine_fact", fact.clone()).await;
+        delivered = fact["ok"]["delivered"].clone();
+        if delivered == true {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(delivered, true);
+    let (bad, _) = r.call("main", "harness.engine_fact", json!({})).await;
+    assert_eq!(bad["error"]["code"], "invalid_input");
+    let (kill, _) = r.call("main", "harness.engine_kill", json!({})).await;
+    assert!(kill.get("ok").is_some(), "{kill}");
     r.finish().await;
 }
