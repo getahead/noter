@@ -102,7 +102,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const [marked, setMarked] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [continueClosed, setContinueClosed] = useState<string | null>(null);
-  const [warningSeen, setWarningSeen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const callId = cap?.call_id ?? null;
@@ -198,8 +197,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     retry: () => void run("capture_resume_interrupted", () => bridge.core.captureResumeInterrupted(id), capture),
     // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-case-retry
     // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-case-delete-old
-    // shortcut: Settings › Maintenance until NavTarget::DeleteOldAudio (D-17) is in the contract; then the main window's sheet.
-    deleteOldAudio: () => navigate({ type: "settings", pane: "maintenance" }),
+    deleteOldAudio: () => navigate({ type: "delete_old_audio" }),
     // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-case-delete-old
   };
   // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-match-action
@@ -308,7 +306,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
 
   const layout = layoutState(cw, !!noticeShown);
   const floating = layout !== "DEDICATED";
-  const shareWarning = layout === "FLOATING" && cw.show_share_warning && !warningSeen;
+  const shareWarning = layout === "FLOATING" && cw.show_share_warning;
   const bannerList = degradedBanners(degraded, callId, floating, banners, kept.call === callId ? kept.ids : NO_IDS);
   const replaying = !!tr.replay && tr.bar !== "CLOSED";
   const regions = new Set(
@@ -524,7 +522,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                 {bannerSlot}
                 {/* @cpt-begin:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-if-warning */}
                 {shareWarning && (
-                  // shortcut: Got It hides the warning for this window only until window_share_warning_seen (D-18) is in the contract.
                   <InlineBanner
                     banner={{
                       id: "share-warning",
@@ -535,10 +532,12 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                         key: key("hide_for_presenting"),
                       }),
                       actions: [
+                        // @cpt-begin:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-share-warning
                         {
                           label: t("cw.banner.got_it"),
-                          onAction: () => setWarningSeen(true),
+                          onAction: () => void run("window_share_warning_seen", () => bridge.core.windowShareWarningSeen({}), { slice: "callWindow" }, false),
                         },
+                        // @cpt-end:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-share-warning
                       ],
                     }}
                   />

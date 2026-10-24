@@ -151,7 +151,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 ### Hide Noter while presenting
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-window-hide-for-presenting`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-window-hide-for-presenting`
 
 **Actor**: Primary user
 
@@ -170,7 +170,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 4. [x] - `p1` - Store: keep the presenting copy; the window keeps its whole state for the return - `inst-store-presenting`
 5. [x] - `p1` - User presses ⌃⌥⌘0 or chooses **Show Noter**; the core shows the windows as they were - `inst-user-show`
 6. [x] - `p1` - **IF** the floating layout opens for the first time and `show_share_warning` is set - `inst-if-warning`
-   1. [ ] - `p1` - UI: the info banner in FP-R3 with **Got It**, which `window_share_warning_seen` records so it does not come back (D-18; the window never calls `settings_update`) - `inst-share-warning`
+   1. [x] - `p1` - UI: the info banner in FP-R3 with **Got It**, which `window_share_warning_seen` records so it does not come back (D-18; the window never calls `settings_update`) - `inst-share-warning`
 7. [x] - `p1` - **RETURN** Noter shown again with the recording and transcript complete - `inst-return-present`
 
 ### Keep the call when a display is unplugged
