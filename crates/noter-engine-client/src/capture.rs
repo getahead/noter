@@ -349,6 +349,7 @@ impl<L: EngineLauncher> EngineClient<L> {
     }
 
     // @cpt-flow:cpt-noter-flow-core-engine-capture-recover:p1
+    // @cpt-dod:cpt-noter-dod-core-engine-capture-restart:p1
     /// Respawns the engine at once and starts the same call again from where the audio stopped.
     pub(crate) async fn restart_capture(self) {
         // @cpt-begin:cpt-noter-flow-core-engine-capture-recover:p1:inst-respawn

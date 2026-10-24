@@ -297,9 +297,11 @@ The system **MUST** report `call_detected`, `call_audio_released` and `audio_sou
 
 ### Capture-first restart
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-restart`
 
 The system **MUST** restart a crashed engine with taps before models, resume from the ring's write position with one `engine_restart` gap of at most 2 s per restart, and raise `CaptureFailed` when it cannot; an engine-kill drill during a replayed call proves the gap bound (the Q7 test, M1 week one alongside the real-call latency measurement).
+
+> **Proof (24 Oct 2026).** Real engine, replayed call: runbook A1 (release build, file mode, 120 s, 3 SIGKILLs) printed `PASS`, with gaps of 108, 184 and 185 ms and a `timeline.json` holding three `engine_restart` gaps and four parts. A3 (3 kills in 30 s) ended in `Failed`, which is `CaptureFailed`, as designed. Real core, scripted engine, on every `just gate`: `crates/noter-core-harness/tests/boot.rs` › `q7_*` (one kill gives one gap of at most 2 s on the same, still-recording call; an engine that dies on every restart gives `capture_failed`). The live-capture run (A2) is not part of this DoD.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-recover`
@@ -341,6 +343,8 @@ The system **MUST** detect exact digital zeros on the system channel as `system_
 
 The system **MUST** play spans natively on `play` with positions reported and its own process excluded from the tap, and keep extra memory during a 60-minute replayed call within 4 GB (`call-memory-footprint`, reported on the Mac runner).
 
+> **Not a box criterion in M1 (D-30, 24 Oct 2026).** Performance scenarios are out of active development, and a feature box is not held back by a missing perf scenario. The playback half is delivered and proven (`cpt-noter-flow-core-engine-capture-replay`, runbook B9). The footprint half is the `call-memory-footprint` perf scenario, so this DoD stays open until the owner brings perf back, and it does not hold the 2.8 box.
+
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-replay`
 
@@ -350,7 +354,7 @@ The system **MUST** play spans natively on `play` with positions reported and it
 ## 6. Acceptance Criteria
 
 - [ ] A golden-set call replayed through file mode produces confirmed segments within the lag budget, on the Mac runner.
-- [ ] Killing the engine during a replayed capture yields one `engine_restart` gap of at most 2 s and the call goes on; making restarts fail yields `CaptureFailed`.
+- [x] Killing the engine during a replayed capture yields one `engine_restart` gap of at most 2 s and the call goes on; making restarts fail yields `CaptureFailed`.
 - [ ] Muting the system channel to exact zeros yields `system_audio_silent`; unplugging the microphone yields `device_changed` and a gap.
 - [ ] Replay never appears in the recording (the tap excludes the engine and app PIDs).
 - [ ] Engine tests pass on the macOS runner; `just gate` passes.
