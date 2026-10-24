@@ -38,7 +38,7 @@ extension EngineCommand: Encodable {
     private enum Keys: String, CodingKey {
         case type, enabled, known_bundle_ids, play_clip, timeout_ms, call_id, bundle_id, entries, languages
         case session_dir, store_audio, mic_device_uid, exclude_bundle_ids, backend, glossary, speaker_priors
-        case enrolled_embeddings_path, resume_from_ms
+        case enrolled_embeddings_path, resume_from_ms, from_ms, to_ms, channel
     }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: Keys.self)
@@ -80,6 +80,13 @@ extension EngineCommand: Encodable {
         case let .setLanguages(languages):
             try c.encode("set_languages", forKey: .type)
             try c.encode(languages, forKey: .languages)
+        case let .play(callId, fromMs, toMs, channel):
+            try c.encode("play", forKey: .type)
+            try c.encode(callId, forKey: .call_id)
+            try c.encode(fromMs, forKey: .from_ms)
+            try c.encode(toMs, forKey: .to_ms)
+            try c.encode(channel, forKey: .channel)
+        case .stopPlayback: try c.encode("stop_playback", forKey: .type)
         case let .other(type):
             throw EncodingError.invalidValue(type, .init(codingPath: [], debugDescription: "a command the engine does not answer"))
         }
@@ -93,7 +100,7 @@ extension EngineEvent: Decodable {
     private enum Keys: String, CodingKey {
         case type, protocol_version, engine_version, models, sandboxed, cmd_id, code, message, call_id, mic_db, sys_db
         case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path, mic_device, output_device
-        case device_name, gap_from_ms, gap_to_ms
+        case device_name, gap_from_ms, gap_to_ms, bundle_id, app_name, pid, since_ms, confidence, at_ms, playing
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -130,6 +137,23 @@ extension EngineEvent: Decodable {
             self = .deviceChanged(
                 callId: try c.decode(String.self, forKey: .call_id), deviceName: try c.decode(String.self, forKey: .device_name),
                 gapFromMs: try c.decode(Int.self, forKey: .gap_from_ms), gapToMs: try c.decode(Int.self, forKey: .gap_to_ms))
+        case "call_detected":
+            self = .callDetected(
+                bundleId: try c.decode(String.self, forKey: .bundle_id), appName: try c.decode(String.self, forKey: .app_name),
+                pid: try c.decode(Int32.self, forKey: .pid))
+        case "call_audio_released": self = .callAudioReleased(bundleId: try c.decode(String.self, forKey: .bundle_id))
+        case "audio_source_added":
+            self = .audioSourceAdded(
+                callId: try c.decode(String.self, forKey: .call_id), bundleId: try c.decode(String.self, forKey: .bundle_id),
+                appName: try c.decode(String.self, forKey: .app_name))
+        case "system_audio_silent":
+            self = .systemAudioSilent(
+                callId: try c.decode(String.self, forKey: .call_id), sinceMs: try c.decode(Int.self, forKey: .since_ms),
+                confidence: try c.decode(Float.self, forKey: .confidence))
+        case "playback_position":
+            self = .playbackPosition(
+                callId: try c.decode(String.self, forKey: .call_id), atMs: try c.decode(Int.self, forKey: .at_ms),
+                playing: try c.decode(Bool.self, forKey: .playing))
         default: throw NotWritten()
         }
     }
@@ -158,8 +182,8 @@ final class RoundTripTests: XCTestCase {
         XCTAssertEqual(
             answered.sorted(),
             [
-                "exclude_process", "pause", "ping", "resume", "self_test", "set_detection", "set_glossary", "set_languages",
-                "shutdown", "start_session", "stop",
+                "exclude_process", "pause", "ping", "play", "resume", "self_test", "set_detection", "set_glossary",
+                "set_languages", "shutdown", "start_session", "stop", "stop_playback",
             ])
     }
 
@@ -182,8 +206,9 @@ final class RoundTripTests: XCTestCase {
         XCTAssertEqual(
             written.sorted(),
             [
-                "ack", "device_changed", "error", "levels", "pong", "ready", "self_test_result", "self_test_stream",
-                "session_started", "session_stopped",
+                "ack", "audio_source_added", "call_audio_released", "call_detected", "device_changed", "error", "levels",
+                "playback_position", "pong", "ready", "self_test_result", "self_test_stream", "session_started",
+                "session_stopped", "system_audio_silent",
             ])
     }
 

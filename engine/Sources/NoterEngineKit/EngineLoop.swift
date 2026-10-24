@@ -14,18 +14,29 @@ public final class EngineLoop: @unchecked Sendable {
     private let encoder: (URL) throws -> AudioEncoder
     private let selfTests = DispatchQueue(label: "ai.noter.engine.self-test")
     private let decoder = JSONDecoder()
+    private let player: Player
+    private let processes: @Sendable () -> [ProcessAudio]
     /// The call being captured and its audio; commands arrive on one thread.
     private var session: (capture: CaptureSession, audio: AudioSource)?
+    private var replaying = false
+    /// Detection and the running capture, shared with `poll`, which runs on its own timer.
+    private let facts = NSLock()
+    private var detector = Detector()
+    private var capturing: CaptureSession?
+    private var watcher: DispatchSourceTimer?
 
     /// `models` are the installed model folders; `source` opens the audio for a session or, given
     /// nil, a self-test (the live taps, or WAV files in file mode and tests); `container` is the
     /// App Group container sessions write into; `now` gives epoch milliseconds; `play` plays the
-    /// self-test's clip.
+    /// self-test's clip; `player` replays stored audio; `processes` lists the processes playing or
+    /// recording now (`ProcessWatcher.snapshot` live).
     public init(
         writer: EventWriter, engineVersion: String, models: [String], sandboxed: Bool,
         container: URL? = nil, now: @escaping () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
         encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
         play: @escaping @Sendable ([Float]) -> Void = { Clip.play($0) },
+        player: Player = FilePlayer(),
+        processes: @escaping @Sendable () -> [ProcessAudio] = { [] },
         source: @escaping (StartSession?) -> AudioSource?
     ) {
         self.writer = writer
@@ -37,7 +48,31 @@ public final class EngineLoop: @unchecked Sendable {
         self.encoder = encoder
         self.source = source
         self.play = play
+        self.player = player
+        self.processes = processes
     }
+
+    /// Checks the processes every `interval` for detection facts, new sound sources and whether
+    /// a meeting app plays (live mode).
+    /// shortcut: polls once a second instead of a listener per process; listen to
+    /// `kAudioProcessPropertyIsRunning*` if a second is too slow for the detection notice.
+    public func watchProcesses(every interval: TimeInterval = 1) {
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "ai.noter.engine.processes"))
+        timer.schedule(deadline: .now() + interval, repeating: interval)
+        timer.setEventHandler { [weak self] in self?.poll() }
+        timer.resume()
+        watcher = timer
+    }
+
+    // @cpt-begin:cpt-noter-flow-core-engine-capture-detect:p1:inst-listen
+    /// One look at the processes: the facts it brings out, and the meeting app for the zero check.
+    func poll() {
+        let snapshot = processes()
+        let (events, capture, meetingApp) = facts.withLock { (detector.update(snapshot), capturing, detector.meetingAppPlaying) }
+        capture?.meetingApp(meetingApp)
+        events.forEach(writer.emit)
+    }
+    // @cpt-end:cpt-noter-flow-core-engine-capture-detect:p1:inst-listen
 
     /// Announces the engine; the core checks the protocol major.
     public func start() {
@@ -59,8 +94,8 @@ public final class EngineLoop: @unchecked Sendable {
         case .shutdown:
             writer.emit(.ack(cmdId: command.id))
             return false
-        case .setDetection:
-            // shortcut: acknowledged only; the call-detection listeners arrive with capture (M1).
+        case let .setDetection(enabled, known):
+            facts.withLock { detector.rule(enabled: enabled, known: known) }
             writer.emit(.ack(cmdId: command.id))
         case let .selfTest(playClip, timeoutMs):
             writer.emit(.ack(cmdId: command.id))
@@ -73,6 +108,12 @@ public final class EngineLoop: @unchecked Sendable {
                 break
             }
             sessionCommand(command, session)
+        case let .play(callId, fromMs, toMs, channel):
+            replay(command.id, callId, fromMs, toMs, channel)
+        case .stopPlayback:
+            player.stop()
+            replaying = false
+            writer.emit(.ack(cmdId: command.id))
         case .setGlossary, .setLanguages:
             // shortcut: kept for the live ASR loop, which arrives with it; acknowledged now.
             writer.emit(.ack(cmdId: command.id))
@@ -98,6 +139,11 @@ public final class EngineLoop: @unchecked Sendable {
             try audio.start { capture.feed($0) }
             // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
             session = (capture, audio)
+            let current = processes()
+            facts.withLock {
+                detector.startSession(callId: start.callId, current: current, excluded: start.excludeBundleIds)
+                capturing = capture
+            }
             writer.emit(.ack(cmdId: id))
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
             writer.emit(.sessionStarted(callId: start.callId, micDevice: audio.devices.mic, outputDevice: audio.devices.output))
@@ -128,12 +174,17 @@ public final class EngineLoop: @unchecked Sendable {
         case .stop:
             session.audio.stop()
             writer.emit(.ack(cmdId: command.id))
+            facts.withLock {
+                detector.stopSession()
+                capturing = nil
+            }
             writer.emit(session.capture.stop())
             self.session = nil
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
         case let .excludeProcess(_, bundleId):
             do {
                 try session.audio.exclude(bundleId: bundleId)
+                facts.withLock { detector.exclude(bundleId) }
                 writer.emit(.ack(cmdId: command.id))
             } catch {
                 writer.emit(.error(cmdId: command.id, code: .internal, message: "\(error)"))
@@ -142,6 +193,32 @@ public final class EngineLoop: @unchecked Sendable {
             break
         }
     }
+
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-replay:p2
+    // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-play
+    /// Plays the call's stored files (`audio/<call_id>/`); a new `play` replaces the one before.
+    private func replay(_ id: UInt64, _ callId: String, _ fromMs: Int, _ toMs: Int?, _ channel: Channel?) {
+        let dir = container?.appendingPathComponent("audio/\(callId)", isDirectory: true)
+        let files = (channel.map { [$0] } ?? [.mic, .sys]).compactMap { dir?.appendingPathComponent("\($0.rawValue).m4a") }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !files.isEmpty else {
+            // The core reads an error for `play` as `audio_deleted`.
+            writer.emit(.error(cmdId: id, code: .badCommand, message: "no stored audio for \(callId)"))
+            return
+        }
+        if replaying { player.stop() }
+        let writer = self.writer
+        do {
+            try player.play(files, fromMs: fromMs, toMs: toMs) { at, playing in
+                writer.emit(.playbackPosition(callId: callId, atMs: at, playing: playing))
+            }
+            replaying = true
+            writer.emit(.ack(cmdId: id))
+        } catch {
+            writer.emit(.error(cmdId: id, code: .internal, message: "\(error)"))
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-play
 
     // @cpt-flow:cpt-noter-flow-core-engine-foundation-self-test:p1
     // @cpt-flow:cpt-noter-flow-core-engine-capture-self-test:p1
