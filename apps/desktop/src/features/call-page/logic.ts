@@ -30,6 +30,13 @@ export function callViews(registered: readonly CallPageTab[], requested: CallPag
   // @cpt-end:cpt-noter-algo-ui-call-page-frame-views:p1:inst-return-views
 }
 
+export const VIEW_LABEL: Record<CallPageTab, MsgKey> = {
+  summary: "callpage.view.summary",
+  transcript: "callpage.view.transcript",
+  agent_reviews: "callpage.view.agent_reviews",
+  history: "callpage.view.history",
+};
+
 export type PageState = "LOADING" | "READY" | "NOT_FOUND" | "ERROR";
 
 // @cpt-state:cpt-noter-state-ui-call-page-frame-page:p1

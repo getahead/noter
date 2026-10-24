@@ -427,6 +427,7 @@ export const en = {
   "settings.error.row": "Couldn’t save this change. The stored value is shown.",
   "settings.updates.check_failed": "Couldn’t check for updates.",
   "settings.error.hotkeys_read": "Couldn’t read your hotkeys.",
+  "callpage.title": "Call",
   "callpage.view": "Call page view",
   "callpage.view.summary": "Summary",
   "callpage.view.transcript": "Transcript",

@@ -1,7 +1,7 @@
 // MW-R1: the unified toolbar of the prototype's `toolbar()`: Back and Forward in one capsule, the page title and
 // subtitle, the page's actions and the search field. At Narrow, actions overflow into » from the trailing side
 // and the search field becomes an icon button; Back, the title and the primary action never overflow.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -10,10 +10,20 @@ import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { Toolbar, ToolbarSpacer } from "../../ui/primitives/toolbar";
+import type { Bridge } from "../../app/bridge/bridge";
 import type { PageDef } from "./pages";
+import type { Route } from "./history";
 
 export interface ToolbarProps {
+  /** The toolbar's region: MW-R1, or the page's own (PC-R1). */
+  region?: string;
   title: string;
+  /** Replaces the title's text (a title being renamed in place); the heading stays. */
+  titleNode?: ReactNode;
+  /** The page's centre item (the Call page's view control). */
+  center?: ReactNode;
+  /** The page's trailing items, after its actions and before the search field. */
+  trailing?: ReactNode;
   subtitle?: string;
   actions: NonNullable<PageDef["actions"]>;
   hasSearch: boolean;
@@ -58,7 +68,7 @@ export function MainToolbar(p: ToolbarProps) {
   const shown = p.narrow ? primary : p.actions;
   const overflow = p.narrow ? p.actions.filter((a) => !a.primary) : [];
   return (
-    <Toolbar region="MW-R1">
+    <Toolbar region={p.region ?? "MW-R1"}>
       {p.showToggle && <IconButton icon="sidebar" label={t("shell.show_sidebar")} help={t("shell.show_sidebar_help")} onAction={p.onToggleSidebar} />}
       <span className="np-toolbar__nav">
         <IconButton icon="back" label={t("shell.back")} help={t("shell.back_help")} disabled={!p.canBack} onAction={p.onBack} />
@@ -66,11 +76,17 @@ export function MainToolbar(p: ToolbarProps) {
       </span>
       <div className="np-toolbar__titles">
         <h1 className="np-toolbar__title" title={p.title}>
-          {p.title}
+          {p.titleNode ?? p.title}
         </h1>
         {p.subtitle && <span className="np-toolbar__sub">{p.subtitle}</span>}
       </div>
       <ToolbarSpacer />
+      {p.center && (
+        <>
+          {p.center}
+          <ToolbarSpacer />
+        </>
+      )}
       {(shown.length > 0 || overflow.length > 0) && (
         <div className="np-toolbar__actions">
           {shown.map((a) => (
@@ -84,6 +100,7 @@ export function MainToolbar(p: ToolbarProps) {
           )}
         </div>
       )}
+      {p.trailing}
       {p.hasSearch &&
         (p.narrow && !p.searchOpen ? (
           <IconButton icon="search" label={t("shell.search")} onAction={p.onOpenSearch} />
@@ -92,4 +109,10 @@ export function MainToolbar(p: ToolbarProps) {
         ))}
     </Toolbar>
   );
+}
+
+/** The page's own toolbar when it registered one, the shell's otherwise. */
+export function ToolbarHost({ page, route, bridge, inspectorOpen, onToggleInspector, ...base }: ToolbarProps & { page: PageDef; route: Route; bridge: Bridge; inspectorOpen: boolean; onToggleInspector: () => void }) {
+  const Own = page.toolbar;
+  return Own ? <Own route={route} bridge={bridge} base={base} inspectorOpen={inspectorOpen} onToggleInspector={onToggleInspector} /> : <MainToolbar {...base} />;
 }
