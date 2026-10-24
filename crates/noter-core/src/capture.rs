@@ -949,12 +949,23 @@ impl Core {
                 self.write_call(&main, call_id, "Seeded call", false, values)?;
             }
         }
+        let phase = wanted.phase;
         self.set_capture(|c| {
             *c = CaptureState {
                 version: c.version,
                 ..wanted
             }
         });
+        // A seeded live call has its window up, as the engine's session start shows it.
+        match phase {
+            CapturePhase::Recording | CapturePhase::Paused => {
+                self.show_call(false);
+            }
+            CapturePhase::Idle => {
+                self.hide_call();
+            }
+            _ => {}
+        }
         Ok(())
     }
 

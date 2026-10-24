@@ -92,6 +92,25 @@ impl Runner {
             .to_string()
     }
 
+    /// Sends one subscribing request (`channel: true`) and returns its answer; the stream's
+    /// messages and event lines before it are skipped.
+    async fn channel(&mut self, window: &str, cmd: &str, args: Value) -> Value {
+        let id = self.next;
+        self.next += 1;
+        let req = json!({ "id": id, "window": window, "cmd": cmd, "args": args, "channel": true });
+        self.input
+            .write_all(format!("{req}\n").as_bytes())
+            .await
+            .unwrap();
+        loop {
+            let line = self.line().await;
+            if line["id"] == id {
+                assert!(line.get("ok").is_some(), "{cmd}: {line}");
+                return line["ok"].clone();
+            }
+        }
+    }
+
     async fn finish(mut self) {
         self.input.shutdown().await.unwrap();
         drop(self.input);
@@ -862,8 +881,14 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
             .map(String::from)
             .collect()
     };
+    // Boot seeded the fixture's live call with its window up; the idle world took it down.
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
-    assert!(windows(shown).is_empty());
+    let before = windows(shown);
+    assert_eq!(
+        before,
+        ["open_call_window_inactive", "hide_call_window"],
+        "{before:?}"
+    );
     // The scripted engine answers the session: the start records and the call window opens.
     let started = r
         .ok(
@@ -880,8 +905,139 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     assert_eq!(stopped["phase"], "stopped");
     let shown = r.ok("main", "harness.surfaces", json!({})).await;
     let windows = windows(shown);
-    assert_eq!(windows.len(), 1, "{windows:?}");
-    assert!(windows[0] == "open_call_window_inactive", "{windows:?}");
+    assert_eq!(windows.len(), before.len() + 1, "{windows:?}");
+    assert!(windows[2] == "open_call_window_inactive", "{windows:?}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_capture_seeded_through_world_set_shows_the_call_window() {
+    let mut r = start().await;
+    // The fixture's live call was seeded at boot: its window is up, as after `capture_start`.
+    let state = r.ok("call-screen", "window_call_state", json!({})).await;
+    assert_eq!(state["visible"], true, "{state}");
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    let (set, events) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "window:call"),
+        "{events:?}"
+    );
+    let state = r.ok("call-screen", "window_call_state", json!({})).await;
+    assert_eq!(state["visible"], false, "{state}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_sets_the_degraded_set() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // The core's own states (setup incomplete, refused hotkeys) stay as it computes them.
+    let own: Vec<Value> = world["app"]["degraded"]["states"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| {
+            matches!(
+                s["type"].as_str(),
+                Some("setup_incomplete" | "hotkey_not_registered")
+            )
+        })
+        .cloned()
+        .collect();
+    assert!(!own.is_empty(), "the fixture's setup is incomplete");
+    world["app"]["degraded"]["states"] = json!([{ "type": "disk_low", "free_mb": 1024 }]);
+    let (set, events) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events.iter().any(|e| e["event"] == "degraded:changed"),
+        "{events:?}"
+    );
+    let states = r.ok("main", "app_snapshot", json!({})).await["degraded"]["states"].clone();
+    let mut expected = vec![json!({ "type": "disk_low", "free_mb": 1024 })];
+    expected.extend(own);
+    assert_eq!(states, json!(expected));
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_accepts_transcripts_and_seeds_their_rows() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // The past call's stored transcript, replaced by one archive line of its own.
+    let transcripts = world["transcripts"].as_array_mut().unwrap();
+    let mut line = transcripts[0]["segments"][0].clone();
+    line["id"] = json!("seg_stored_0");
+    line["call_id"] = json!("call_backend");
+    line["text"] = json!("Stored line 0");
+    line["pass"] = json!("archive");
+    transcripts.retain(|t| t["call_id"] != "call_backend");
+    transcripts.push(json!({
+        "subscription_id": null, "call_id": "call_backend", "live": false, "pass": "archive",
+        "archive": "done", "segments": [line], "hypotheses": [], "marks": [], "gaps": [],
+        "speakers": [], "last_seq": 1, "audio_available": true
+    }));
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let snapshot = r
+        .channel(
+            "main",
+            "transcript_subscribe",
+            json!({ "call_id": "call_backend" }),
+        )
+        .await;
+    assert_eq!(snapshot["live"], false, "{snapshot}");
+    assert_eq!(
+        snapshot["segments"][0]["text"], "Stored line 0",
+        "{snapshot}"
+    );
+    assert_eq!(snapshot["segments"][0]["pass"], "archive", "{snapshot}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_pushed_transcript_line_reaches_the_open_channel() {
+    let mut r = start().await;
+    let world = r.ok("main", "harness.world_get", json!({})).await;
+    let mut line = world["transcripts"][0]["segments"][0].clone();
+    line["call_id"] = json!("call_live");
+    line["text"] = json!("Hello, can you hear me?");
+    let snapshot = r
+        .channel(
+            "call-screen",
+            "transcript_subscribe",
+            json!({ "call_id": "call_live" }),
+        )
+        .await;
+    assert_eq!(snapshot["live"], true, "{snapshot}");
+    let push = r
+        .call(
+            "main",
+            "harness.push",
+            json!({ "cmd": "transcript_subscribe", "body": { "event": { "type": "confirmed", "segment": line } } }),
+        )
+        .await;
+    assert!(push.0.get("ok").is_some(), "{push:?}");
+    let mut seen = vec![];
+    loop {
+        let line = r.line().await;
+        let event = &line["message"]["event"];
+        seen.push(event["type"].as_str().unwrap_or("").to_string());
+        if event["type"] == "confirmed" {
+            assert_eq!(
+                event["segment"]["text"], "Hello, can you hear me?",
+                "{line}"
+            );
+            break;
+        }
+    }
+    assert!(seen.contains(&"confirmed".to_string()), "{seen:?}");
     r.finish().await;
 }
 
