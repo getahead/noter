@@ -74,6 +74,7 @@ impl Core {
     }
 
     /// Sends, holds or skips a notification by the hold rule of DESIGN-core 3.2.
+    // @cpt-dod:cpt-noter-dod-core-capture-session-sensitive-notify:p2
     pub fn notify(&self, n: Notification) {
         let viewed = lock(&self.viewed).clone();
         match route(&n, &self.screen(viewed.as_ref())) {

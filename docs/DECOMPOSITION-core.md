@@ -538,7 +538,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p2` - **ID**: `cpt-noter-feature-core-capture-session`
 
-- **Milestone**: M1 · **Lane**: core · **Status**: IMPLEMENTED, except the p2 DoD `cpt-noter-dod-core-capture-session-sensitive-notify` (native delivery of the held notifications), which keeps `featstatus` open. FEATURE spec: [features/core/core-capture-session.md](features/core/core-capture-session.md)
+- **Milestone**: M1 · **Lane**: core · **Status**: IMPLEMENTED. FEATURE spec: [features/core/core-capture-session.md](features/core/core-capture-session.md)
 
 - **Purpose**: Own the capture state machine every surface drives the same way: detection and the record prompt, start, pause, stop, notices and their timers, Continue Recording, resume after a quit or crash, the back-to-back split, the sensitive flag and when notifications go out.
 
