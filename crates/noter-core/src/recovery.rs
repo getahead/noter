@@ -2,12 +2,13 @@
 //! and the disk rows of `degraded:changed` (`cpt-noter-algo-core-capture-session-degraded`).
 
 use noter_db::rusqlite::OptionalExtension;
-use noter_protocol::engine::EngineCommand;
+use noter_engine_client::{CaptureFact, Degraded, EngineSession};
 use noter_protocol::ipc::{Caller, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
 
+use crate::notify::{Notification, NotificationKind};
 use crate::Core;
 
 fn main_ctx() -> CommandCtx {
@@ -170,12 +171,8 @@ impl Core {
                 }
             });
             self.listen_for_speech(&mut session);
-            if self
-                .engine
-                .command(EngineCommand::StartSession(start))
-                .await
-                .is_err()
-            {
+            session.engine_base = None;
+            if self.engine.start_session(start).await.is_err() {
                 session.failed_at = Some(now);
                 return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
             }
@@ -195,12 +192,16 @@ impl Core {
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-try-again
         let failed_at = session.failed_at.unwrap_or(now);
         let (t0, t1) = (session.offset(failed_at), session.offset(now));
-        let start = self.session_for(&call_id, Some(t1))?;
         // The engine still cannot start: the phase stays failed.
-        self.engine
-            .command(EngineCommand::StartSession(start))
-            .await?;
-        self.insert_gap(&call_id, t0, t1, GapReason::EngineRestart)?;
+        if self.engine.session() == EngineSession::Failed {
+            // The supervisor restarts its session and reports the `engine_restart` gap itself.
+            self.engine.try_again().await?;
+        } else {
+            let start = self.session_for(&call_id, Some(t1))?;
+            session.engine_base = None;
+            self.engine.start_session(start).await?;
+            self.insert_gap(&call_id, t0, t1, GapReason::EngineRestart)?;
+        }
         session.away_ms += now - failed_at;
         session.failed_at = None;
         let recorded = session.recorded(now, None);
@@ -214,5 +215,120 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-resume:p1:inst-return-resume
         Ok(self.capture_now())
         // @cpt-end:cpt-noter-flow-core-capture-session-resume:p1:inst-return-resume
+    }
+
+    // @cpt-algo:cpt-noter-algo-core-capture-session-degraded:p1
+    /// A supervisor fact about the live call: its gap rows and the capture rows of the
+    /// degraded set; a capture that cannot be restarted fails the call.
+    pub(crate) async fn capture_fact(&self, fact: CaptureFact) {
+        let mut session = self.capture.lock().await;
+        let state = self.capture_now();
+        let base = session.engine_base.unwrap_or(0);
+        let ours = |call_id: &CallId| {
+            state.call_id.as_ref() == Some(call_id)
+                && !matches!(state.phase, CapturePhase::Idle | CapturePhase::Stopped)
+        };
+        match fact {
+            CaptureFact::Gap(gap) if ours(&gap.call_id) => {
+                // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
+                let (t0, t1) = (base + i64::from(gap.t0_ms.0), base + i64::from(gap.t1_ms.0));
+                if let Err(e) = self.insert_gap(&gap.call_id, t0, t1, gap.reason) {
+                    self.log(crate::object(json!({
+                        "level": "error", "module": "capture", "code": e.code
+                    })));
+                }
+                // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
+            }
+            CaptureFact::Degraded {
+                call_id,
+                state: degraded,
+                since_ms,
+            } if ours(&call_id) => {
+                // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-publish-engine-states
+                let since = TimestampMs(session.at(base + i64::from(since_ms.0)));
+                let failed = degraded == Degraded::CaptureFailed;
+                let new = degraded_state(&call_id, degraded, since);
+                // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-publish-engine-states
+                // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-degraded-return
+                let mut fresh = true;
+                self.edit_degraded(|states| {
+                    fresh = !states.iter().any(|s| same_kind(s, &new));
+                    states.retain(|s| !same_kind(s, &new));
+                    states.push(new.clone());
+                });
+                // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-degraded-return
+                if failed {
+                    // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed
+                    session.failed_at = Some(self.deps.clock.now().0);
+                    self.set_capture(|c| c.phase = CapturePhase::Failed);
+                    // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed
+                }
+                drop(session);
+                let nt3 = matches!(
+                    new,
+                    DegradedState::SystemAudioSilent { .. }
+                        | DegradedState::MicrophoneOff { .. }
+                        | DegradedState::CaptureFailed { .. }
+                );
+                if fresh && nt3 {
+                    self.notify(Notification {
+                        call_id,
+                        kind: NotificationKind::CaptureProblem(new),
+                    });
+                }
+            }
+            CaptureFact::Cleared {
+                call_id,
+                state: degraded,
+            } if state.call_id.as_ref() == Some(&call_id) => {
+                let gone = degraded_state(&call_id, degraded, TimestampMs(0));
+                self.edit_degraded(|states| states.retain(|s| !same_kind(s, &gone)));
+            }
+            _ => {}
+        }
+    }
+
+    /// The engine's states of a call that ended: none outlives it (a failed engine never
+    /// clears its own).
+    pub(crate) fn clear_engine_states(&self) {
+        self.edit_degraded(|states| {
+            states.retain(|s| {
+                !matches!(
+                    s,
+                    DegradedState::MicrophoneOff { .. }
+                        | DegradedState::SystemAudioSilent { .. }
+                        | DegradedState::TranscriptionStalled { .. }
+                        | DegradedState::DeviceChanged { .. }
+                        | DegradedState::CaptureFailed { .. }
+                )
+            })
+        });
+    }
+}
+
+fn same_kind(a: &DegradedState, b: &DegradedState) -> bool {
+    std::mem::discriminant(a) == std::mem::discriminant(b)
+}
+
+/// The supervisor's degraded state as the degraded set carries it.
+fn degraded_state(call_id: &CallId, state: Degraded, since: TimestampMs) -> DegradedState {
+    let call_id = call_id.clone();
+    match state {
+        Degraded::TranscriptionStalled => DegradedState::TranscriptionStalled { call_id, since },
+        Degraded::SystemAudioSilent { confidence } => DegradedState::SystemAudioSilent {
+            call_id,
+            since,
+            confidence,
+        },
+        Degraded::MicrophoneOff => DegradedState::MicrophoneOff { call_id },
+        Degraded::DeviceChanged {
+            device_name,
+            gap_ms,
+        } => DegradedState::DeviceChanged {
+            call_id,
+            device_name,
+            gap_ms: DurationMs(gap_ms),
+        },
+        Degraded::CaptureFailed => DegradedState::CaptureFailed { call_id, since },
     }
 }

@@ -11,6 +11,7 @@ mod hub;
 mod log;
 mod models;
 mod notices;
+mod notify;
 mod recovery;
 mod self_test;
 mod settings;
@@ -39,6 +40,7 @@ pub use models::PinnedModels;
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
 use noter_protocol::ipc::Sink;
+pub use notify::{Notification, NotificationKind};
 pub use settings::default_settings;
 
 /// `~/Library/Application Support/Noter`: where the app keeps `noter.db` and `logs/`.
@@ -214,6 +216,10 @@ pub struct Core {
     capture_hooks: Hooks<CaptureEvent>,
     /// The capture phase as last published, for commands that wait on the engine.
     capture_phase: tokio::sync::watch::Sender<CapturePhase>,
+    /// The call the main window reports it shows (`window_report_view`).
+    viewed: Mutex<Option<CallId>>,
+    /// Notifications waiting for the call to end, one per call.
+    held: Mutex<Vec<Notification>>,
     /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the App Group container).
     audio_dir: std::path::PathBuf,
 }
@@ -290,6 +296,8 @@ impl Core {
             capture: tokio::sync::Mutex::new(capture::Session::default()),
             capture_hooks: Mutex::new(vec![]),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
+            viewed: Mutex::new(None),
+            held: Mutex::new(Vec::new()),
             audio_dir,
         };
         core.start_hotkeys().map_err(BootError::Load)?;
