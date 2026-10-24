@@ -151,6 +151,7 @@ fn ms(v: i64) -> u32 {
     v.clamp(0, u32::MAX.into()) as u32
 }
 
+// @cpt-state:cpt-noter-state-core-capture-session-phase:p1
 /// The idle state: no call.
 pub(crate) fn to_idle(c: &mut CaptureState) {
     c.phase = CapturePhase::Idle;

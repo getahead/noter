@@ -218,6 +218,7 @@ impl Core {
     }
 
     // @cpt-algo:cpt-noter-algo-core-capture-session-degraded:p1
+    // @cpt-dod:cpt-noter-dod-core-capture-session-recovery:p1
     /// A supervisor fact about the live call: its gap rows and the capture rows of the
     /// degraded set; a capture that cannot be restarted fails the call.
     pub(crate) async fn capture_fact(&self, fact: CaptureFact) {
