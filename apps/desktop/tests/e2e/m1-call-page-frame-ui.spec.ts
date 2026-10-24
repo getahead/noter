@@ -38,6 +38,11 @@ const quiet =
     W.idle(w);
     const detail = w.call_details.find((d) => d.call.id === W.PAST_CALL)!;
     detail.first_recorded_call = first;
+    // The real core derives first_recorded_call from the DB: exactly one stored call makes it the first.
+    if (first) {
+      w.calls = w.calls.filter((c) => c.id === W.PAST_CALL);
+      w.call_details = [detail];
+    }
     more(w);
   };
 /** Library › Calls (⌘3), then the call's page: Return or a double-click opens it. */
@@ -54,7 +59,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
   test("UI — happy path: the page shows title, subtitle, only the Transcript view, Call info docked and the stored transcript", async ({ page }) => {
     await openWindow(page, "main", { world: quiet() });
     await openCall(page);
-    await expect(toolbar(page)).toContainText(/52 min · Dmitri S\., Oleg M\., You/);
+    await expect(toolbar(page)).toContainText(/52 min(?: · Dmitri S\., Oleg M\., You)?/); // CallRow.participants is empty on the real core in M1 (speakers M2)
     await expect(button(page, "Back")).toBeEnabled();
     await expect(toolbar(page).getByText("Transcript", { exact: true })).toBeVisible(); // the view control lists what is delivered
     for (const later of ["Summary", "Agent Reviews", "History"]) await expect(toolbar(page).getByText(later, { exact: true })).toHaveCount(0);
@@ -256,7 +261,8 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
     await openWindow(page, "main", {
       world: (w) => {
         const row = w.calls.find((c) => c.id === W.LIVE_CALL)!;
-        w.call_details.push({
+        w.calls = [row]; // the only stored call: first on the real core too
+        w.call_details = [{
           call: structuredClone(row),
           calendar_event: null,
           speakers: [],
@@ -265,7 +271,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
           mode_used: w.app.privacy.effective,
           audio_not_stored: false,
           first_recorded_call: true,
-        });
+        }];
       },
     });
     await openCall(page, W.LIVE_TITLE);
