@@ -225,7 +225,7 @@
       if (ctx.demo === 'transcript-upgraded') out.push({ id: 'upgraded', severity: 'info', text: 'Transcript upgraded · the archive pass changed 41 words and 2 speaker labels; summary regenerated', actions: [{ label: 'Show Diff', action: ['pc.showArchiveDiff', { callId: call.id }] }] });
       if (ctx.demo === 'archive-pending') out.push({ id: 'pending', severity: 'info', dismissible: false, text: 'Archive transcript pending' });
       if (isSensitive(call, ctx)) out.push({ id: 'sensitive', severity: 'info', dismissible: false, text: 'Sensitive call · processed on this Mac only' });
-      if (ctx.demo === 'first-call') out.push({ id: 'notify', severity: 'info', text: 'Get a notification when a call’s summary is ready.', actions: [{ label: 'Notify Me When Summaries Are Ready', action: ['proto.flash', { key: 'proto', text: 'macOS asks: “Noter” would like to send you notifications' }] }] });
+      if (ctx.demo === 'first-call') out.push({ id: 'notify', severity: 'info', text: 'Get a notification when a summary is ready.', actions: [{ label: 'Notify Me When Summaries Are Ready', action: ['proto.flash', { key: 'proto', text: 'macOS asks: “Noter” would like to send you notifications' }] }] });
       if (ctx.demo === 'writing' && writingStep(ctx) < 5) out.push({ id: 'writing', severity: 'info', dismissible: false, text: 'Writing the outputs · the transcript is ready to read', actions: [{ label: 'Read Transcript', action: ['pc.view', { value: 'transcript' }] }] });
       return out;
     },
