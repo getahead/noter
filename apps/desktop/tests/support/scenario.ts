@@ -24,6 +24,8 @@ import {
   type EventName,
   type EventPayloads,
   type FakeWorld,
+  type OutputDeviceInfo,
+  type OutputRoute,
   type Transport,
   type WindowLabel,
 } from "../../src/core/bindings";
@@ -50,7 +52,20 @@ export const HARNESS_CONTROLS = {
   push: "harness.push",
   /** `{}` → the next bundle fetch serves wrong bytes once: `models_download` start ends in `checksum_failed`, retry reaches `ready`. */
   corruptNextDownload: "harness.corrupt_next_download",
+  /** `{ event }` → the scripted engine reports `event` (an engine event line's `event`); `{ delivered }` is false while no engine runs. */
+  engineFact: "harness.engine_fact",
+  /** `{}` → the running engine process dies (the supervisor's restart rules take over). */
+  engineKill: "harness.engine_kill",
+  /** `{}` → `{ calls }`: what the core asked the native layer to show, in order (TL-2). */
+  surfaces: "harness.surfaces",
+  /** `{ route, output_device }` → the Mac's output route changes; the core sends `env:changed`. */
+  setOutputRoute: "harness.set_output_route",
+  /** `{ mb }` → the free disk changes; the core sends `env:changed`. */
+  setFreeDisk: "harness.set_free_disk",
 } as const;
+
+/** An engine event as the engine sends it (`noter_protocol::engine::EngineEvent`, tagged by `type`). */
+export type EngineFact = { type: string } & Record<string, unknown>;
 
 /** Everything a listener of one event received, in order. */
 export interface EventLog<E extends EventName> {
@@ -76,6 +91,16 @@ export interface Scenario {
   corruptNextDownload(): Promise<void>;
   /** The engine or runtime sends a message on the newest open Channel of `cmd`. */
   push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null>;
+  /** The engine reports a fact; false when no engine runs (or on the fake, which has no engine). */
+  engineFact(event: EngineFact): Promise<boolean>;
+  /** The engine process dies; false on the fake. */
+  engineKill(): Promise<boolean>;
+  /** What the core asked the native layer to show, in order; null on the fake. */
+  surfaces(): Promise<string[] | null>;
+  /** The Mac's output route (and device) changes. */
+  setOutputRoute(route: OutputRoute, outputDevice: OutputDeviceInfo | null): Promise<void>;
+  /** The free disk changes. */
+  setFreeDisk(mb: number): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -115,6 +140,11 @@ abstract class BaseScenario implements Scenario {
   abstract failNext(window: WindowLabel, cmd: CommandName, code: ErrorCode, detail?: ErrorDetail | null): Promise<void>;
   abstract corruptNextDownload(): Promise<void>;
   abstract push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null>;
+  abstract engineFact(event: EngineFact): Promise<boolean>;
+  abstract engineKill(): Promise<boolean>;
+  abstract surfaces(): Promise<string[] | null>;
+  abstract setOutputRoute(route: OutputRoute, outputDevice: OutputDeviceInfo | null): Promise<void>;
+  abstract setFreeDisk(mb: number): Promise<void>;
   protected abstract close(): Promise<void>;
 
   core(window: WindowLabel): Core {
@@ -194,6 +224,30 @@ class FakeScenario extends BaseScenario {
     return null;
   }
 
+  // The fake has no engine and no native layer: the story stops at a pending check.
+  async engineFact(): Promise<boolean> {
+    return false;
+  }
+
+  async engineKill(): Promise<boolean> {
+    return false;
+  }
+
+  async surfaces(): Promise<string[] | null> {
+    return null;
+  }
+
+  async setOutputRoute(route: OutputRoute, outputDevice: OutputDeviceInfo | null): Promise<void> {
+    await this.change((w) => {
+      w.app.environment.output_route = route;
+      w.app.environment.output_device = outputDevice;
+    });
+  }
+
+  async setFreeDisk(mb: number): Promise<void> {
+    await this.change((w) => (w.app.environment.disk_free_mb = mb));
+  }
+
   protected async close(): Promise<void> {
     this.all.forEach((f) => f.dispose());
   }
@@ -247,6 +301,32 @@ class StdioScenario extends BaseScenario {
   async push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null> {
     await this.ready;
     return ((await this.control(HARNESS_CONTROLS.push, { cmd, body })) as { seq: number | null } | null)?.seq ?? null;
+  }
+
+  async engineFact(event: EngineFact): Promise<boolean> {
+    await this.ready;
+    return ((await this.control(HARNESS_CONTROLS.engineFact, { event })) as { delivered: boolean }).delivered;
+  }
+
+  async engineKill(): Promise<boolean> {
+    await this.ready;
+    await this.control(HARNESS_CONTROLS.engineKill, {});
+    return true;
+  }
+
+  async surfaces(): Promise<string[] | null> {
+    await this.ready;
+    return ((await this.control(HARNESS_CONTROLS.surfaces, {})) as { calls: string[] }).calls;
+  }
+
+  async setOutputRoute(route: OutputRoute, outputDevice: OutputDeviceInfo | null): Promise<void> {
+    await this.ready;
+    await this.control(HARNESS_CONTROLS.setOutputRoute, { route, output_device: outputDevice });
+  }
+
+  async setFreeDisk(mb: number): Promise<void> {
+    await this.ready;
+    await this.control(HARNESS_CONTROLS.setFreeDisk, { mb });
   }
 
   protected async close(): Promise<void> {
