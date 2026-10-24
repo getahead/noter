@@ -151,7 +151,7 @@ _in-playwright cmd:
       -v "$PWD":/work -v /work/node_modules -v /work/apps/desktop/node_modules -w /work {{playwright_image}} \
       bash -c 'npm install -g --silent pnpm@10.28.0 && { out=$(pnpm install --frozen-lockfile --store-dir /root/.pnpm-store 2>&1) || { echo "$out"; exit 1; }; } && {{cmd}}'
 
-# Performance: scenario coverage (60%) and head vs base (<= 10% worse). Instruction counts on Linux, wall time (report only) elsewhere
+# Performance (NOT in `gate` or CI since 24 Oct 2026, owner): run by hand. Scenario coverage (60%) and head vs base (<= 10% worse). Instruction counts on Linux, wall time (report only) elsewhere
 perf:
     python3 scripts/harness/perf_gate.py coverage
     if command -v valgrind >/dev/null; then python3 scripts/harness/perf_gate.py ab --base {{base}} --mode ir; \
@@ -182,7 +182,7 @@ review-publish pr="":
 gate-fast: lint contract arch trace test-unit
 
 # Full gate: the exit criteria of every FEATURE and of every pull request
-gate: lint contract arch trace cov-unit native e2e visual perf docs config-guard
+gate: lint contract arch trace cov-unit native e2e visual docs config-guard
     @echo "All gates passed."
 
 # Alias used by FEATURE definitions of done

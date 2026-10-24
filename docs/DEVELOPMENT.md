@@ -40,8 +40,8 @@ valgrind and the linters. It fails while anything `just gate` needs is missing; 
 | Command | When |
 | --- | --- |
 | `just gate-fast` | Continuously while working (lint, contract, architecture, trace, unit tests; about a minute). In Claude Code the Stop hook runs it and will not let an agent finish while it is red |
-| `just gate` | Before opening a PR, and what CI runs: adds unit coverage, native UI tests, E2E and E2E coverage, screenshots, performance, `cfs validate` and the gate-config guard |
-| `just <gate>` | One gate: `lint`, `contract`, `arch`, `trace`, `test-unit`, `cov-unit`, `native`, `e2e`, `visual`, `perf`, `docs`, `config-guard` |
+| `just gate` | Before opening a PR, and what CI runs: adds unit coverage, native UI tests, E2E and E2E coverage, screenshots, `cfs validate` and the gate-config guard |
+| `just <gate>` | One gate: `lint`, `contract`, `arch`, `trace`, `test-unit`, `cov-unit`, `native`, `e2e`, `visual`, `docs`, `config-guard` |
 | `just fmt` | Format Rust (the pre-commit hook refuses unformatted staged Rust) |
 
 Several worktrees on one machine share port 5173: export `NOTER_E2E_LOCK=<path to a lock file>` (one file for the
@@ -49,7 +49,7 @@ machine) and `just e2e`, `just visual` and `just visual-update` wait for each ot
 
 What runs where on a Mac: `just native` passes with a notice until `apps/desktop/tests/native` exists, then needs
 Xcode. `just visual` needs a running Docker daemon (without one it says screenshots are checked in CI only).
-`just perf` gates scenario coverage and reports wall time only; the 10% instruction-count bar is enforced in CI.
+`just perf` is not part of `just gate` or CI (owner, 24 Oct 2026); run it by hand when you want the numbers.
 Gates that compare with the base branch use `origin/main` (`NOTER_BASE_REF` overrides it): `git fetch origin`
 first, so the comparison is with the current `main`.
 

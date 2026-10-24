@@ -110,7 +110,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
     if (!started) return; // capture_start (M1)
     expect(recording(started)).toBe(true);
     // …and the call screen says System audio silent until it is allowed and Noter reopens.
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) return; // degraded (M1)
+    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: 0.9 })))) return; // degraded (M1)
     expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.some((d) => d.type === "system_audio_silent")).toBe(true);
     ahead(await scenario.core("call-screen").openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // M1 command
   });
@@ -182,7 +182,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false })); // O1: never gated on permissions
     if (started) expect(recording(started)).toBe(true); // capture_start (M1)
     expect(ok(await main.permissionRequest({ kind: "microphone" })).state).toBe("granted"); // the macOS prompt, allowed
-    if (started && (await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: null })))) {
+    if (started && (await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: started.call_id!, since: Date.now(), confidence: 0.9 })))) {
       expect(ok(await scenario.core("call-screen").appSnapshot({})).degraded.states.map((d) => d.type)).toContain("system_audio_silent"); // Recording · mic only (degraded, M1)
     }
 

@@ -25,10 +25,11 @@ public enum Mix {
         }
     }
 
-    /// Linear-interpolation resampling (speech models want 16 kHz).
-    public static func resample(_ samples: [Float], from: Double, to: Double) -> [Float] {
+    /// Linear-interpolation resampling (speech models want 16 kHz). A stream cut into chunks
+    /// passes each chunk's `count` (see `Resampled`), so rounding never adds up.
+    public static func resample(_ samples: [Float], from: Double, to: Double, count: Int? = nil) -> [Float] {
         guard from != to, !samples.isEmpty else { return samples }
-        let count = Int((Double(samples.count) * to / from).rounded())
+        let count = count ?? Int((Double(samples.count) * to / from).rounded())
         let step = from / to
         return (0..<count).map { i in
             let x = Double(i) * step
@@ -40,10 +41,32 @@ public enum Mix {
     }
 }
 
+/// One channel's samples in and out of `Mix.resample` since its rate last changed: each chunk
+/// gets the output count the whole stream is owed, so call time stays exact.
+struct Resampled {
+    private var rate = 0.0
+    private var input = 0
+    private var output = 0
+
+    mutating func count(_ samples: Int, from: Double, to: Double) -> Int {
+        if from != rate { (rate, input, output) = (from, 0, 0) }
+        input += samples
+        let owed = Int(Double(input) * to / from) - output
+        output += owed
+        return owed
+    }
+}
+
 /// A source of audio chunks on both channels; `start` delivers chunks on any thread.
 public protocol AudioSource: AnyObject, Sendable {
     func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws
     func stop()
+    /// The microphone and the output device by name, for `session_started`.
+    var devices: (mic: String, output: String) { get }
+}
+
+extension AudioSource {
+    public var devices: (mic: String, output: String) { ("", "") }
 }
 
 public enum Levels {

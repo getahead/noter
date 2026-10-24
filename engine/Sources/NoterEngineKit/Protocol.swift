@@ -1,11 +1,12 @@
 // The core ↔ engine protocol, as the engine speaks it (`cpt-noter-interface-engine-stdio`).
 //
 // The source of truth is `crates/noter-protocol/src/engine.rs` and its export
-// `contracts/engine.schema.json`. These are the M0 messages the engine answers;
-// commands it does not implement yet decode as `.other` and are refused with `bad_command`.
-// The types are hand-written (D13); RoundTripTests decodes and re-encodes every line of
-// `contracts/fixtures/engine-lines.json` with them, so a drift from the Rust types fails there.
-// shortcut: the M0 subset only; capture (M1) adds its commands and events the same way.
+// `contracts/engine.schema.json`. These are the messages the engine answers so far (M0 and
+// capture sessions); commands it does not implement yet decode as `.other` and are refused with
+// `bad_command`. The types are hand-written (D13, TL-9); RoundTripTests decodes and re-encodes
+// every line of `contracts/fixtures/engine-lines.json` with them, so a drift from the Rust types
+// fails there. Nested values the engine does not read yet (glossary, languages, speaker priors)
+// stay `JSONValue`, kept exactly as sent.
 
 import Foundation
 
@@ -28,12 +29,63 @@ public enum EngineErrorCode: String, Codable, Sendable {
     case `internal` = "internal"
 }
 
+/// Any JSON value, for nested fields the engine passes on or does not read yet.
+public enum JSONValue: Codable, Equatable, Sendable {
+    case null, bool(Bool), number(Double), string(String), array([JSONValue]), object([String: JSONValue])
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null }
+        else if let v = try? c.decode(Bool.self) { self = .bool(v) }
+        else if let v = try? c.decode(Double.self) { self = .number(v) }
+        else if let v = try? c.decode(String.self) { self = .string(v) }
+        else if let v = try? c.decode([JSONValue].self) { self = .array(v) }
+        else { self = .object(try c.decode([String: JSONValue].self)) }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .null: try c.encodeNil()
+        case let .bool(v): try c.encode(v)
+        case let .number(v): try c.encode(v)
+        case let .string(v): try c.encode(v)
+        case let .array(v): try c.encode(v)
+        case let .object(v): try c.encode(v)
+        }
+    }
+}
+
+/// `start_session`: everything the engine needs to capture one call.
+public struct StartSession: Equatable, Sendable {
+    public var callId: String
+    /// `audio/<call_id>/`, relative to the App Group container.
+    public var sessionDir: String
+    public var storeAudio: Bool
+    public var micDeviceUid: String?
+    public var excludeBundleIds: [String]
+    public var languages: JSONValue
+    public var backend: String
+    public var glossary: JSONValue
+    public var speakerPriors: JSONValue
+    public var enrolledEmbeddingsPath: String?
+    /// Set after an engine restart in the same call: resume from the capture ring.
+    public var resumeFromMs: UInt32?
+}
+
 // @cpt-dod:cpt-noter-dod-core-engine-foundation-package:p1
 public enum EngineCommand: Equatable, Sendable {
     case ping
     case shutdown
     case setDetection(enabled: Bool, knownBundleIds: [String])
     case selfTest(playClip: Bool, timeoutMs: UInt32)
+    case startSession(StartSession)
+    case pause(callId: String)
+    case resume(callId: String)
+    case stop(callId: String)
+    case excludeProcess(callId: String, bundleId: String)
+    case setGlossary(entries: JSONValue)
+    case setLanguages(languages: JSONValue)
     /// A command of the protocol this engine does not answer yet.
     case other(type: String)
 }
@@ -71,6 +123,30 @@ extension EngineCommand: Decodable {
             self = .selfTest(
                 playClip: try c.decode(Bool.self, forKey: AnyKey("play_clip")),
                 timeoutMs: try c.decode(UInt32.self, forKey: AnyKey("timeout_ms")))
+        case "start_session":
+            func key(_ k: String) -> AnyKey { AnyKey(k) }
+            self = .startSession(
+                StartSession(
+                    callId: try c.decode(String.self, forKey: key("call_id")),
+                    sessionDir: try c.decode(String.self, forKey: key("session_dir")),
+                    storeAudio: try c.decode(Bool.self, forKey: key("store_audio")),
+                    micDeviceUid: try c.decode(String?.self, forKey: key("mic_device_uid")),
+                    excludeBundleIds: try c.decode([String].self, forKey: key("exclude_bundle_ids")),
+                    languages: try c.decode(JSONValue.self, forKey: key("languages")),
+                    backend: try c.decode(String.self, forKey: key("backend")),
+                    glossary: try c.decode(JSONValue.self, forKey: key("glossary")),
+                    speakerPriors: try c.decode(JSONValue.self, forKey: key("speaker_priors")),
+                    enrolledEmbeddingsPath: try c.decode(String?.self, forKey: key("enrolled_embeddings_path")),
+                    resumeFromMs: try c.decode(UInt32?.self, forKey: key("resume_from_ms"))))
+        case "pause": self = .pause(callId: try c.decode(String.self, forKey: AnyKey("call_id")))
+        case "resume": self = .resume(callId: try c.decode(String.self, forKey: AnyKey("call_id")))
+        case "stop": self = .stop(callId: try c.decode(String.self, forKey: AnyKey("call_id")))
+        case "exclude_process":
+            self = .excludeProcess(
+                callId: try c.decode(String.self, forKey: AnyKey("call_id")),
+                bundleId: try c.decode(String.self, forKey: AnyKey("bundle_id")))
+        case "set_glossary": self = .setGlossary(entries: try c.decode(JSONValue.self, forKey: AnyKey("entries")))
+        case "set_languages": self = .setLanguages(languages: try c.decode(JSONValue.self, forKey: AnyKey("languages")))
         default: self = .other(type: type)
         }
     }
@@ -84,6 +160,7 @@ public enum EngineEvent: Equatable, Sendable {
     case levels(callId: String?, micDb: Float, sysDb: Float)
     case selfTestStream(channel: Channel)
     case selfTestResult(passed: Bool, failure: EngineErrorCode?, ownSoundsLeak: Bool)
+    case sessionStarted(callId: String, micDevice: String, outputDevice: String)
     case sessionStopped(callId: String, timelinePath: String, micPath: String?, sysPath: String?)
 }
 
@@ -124,6 +201,11 @@ extension EngineEvent: Encodable {
             try put("passed", passed)
             try put("failure", failure)
             try put("own_sounds_leak", ownSoundsLeak)
+        case let .sessionStarted(callId, micDevice, outputDevice):
+            try put("type", "session_started")
+            try put("call_id", callId)
+            try put("mic_device", micDevice)
+            try put("output_device", outputDevice)
         case let .sessionStopped(callId, timelinePath, micPath, sysPath):
             try put("type", "session_stopped")
             try put("call_id", callId)

@@ -35,7 +35,11 @@ extension EngineCommandLine: Encodable {
 }
 
 extension EngineCommand: Encodable {
-    private enum Keys: String, CodingKey { case type, enabled, known_bundle_ids, play_clip, timeout_ms }
+    private enum Keys: String, CodingKey {
+        case type, enabled, known_bundle_ids, play_clip, timeout_ms, call_id, bundle_id, entries, languages
+        case session_dir, store_audio, mic_device_uid, exclude_bundle_ids, backend, glossary, speaker_priors
+        case enrolled_embeddings_path, resume_from_ms
+    }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: Keys.self)
         switch self {
@@ -49,6 +53,33 @@ extension EngineCommand: Encodable {
             try c.encode("self_test", forKey: .type)
             try c.encode(playClip, forKey: .play_clip)
             try c.encode(timeoutMs, forKey: .timeout_ms)
+        case let .startSession(s):
+            try c.encode("start_session", forKey: .type)
+            try c.encode(s.callId, forKey: .call_id)
+            try c.encode(s.sessionDir, forKey: .session_dir)
+            try c.encode(s.storeAudio, forKey: .store_audio)
+            try c.encode(s.micDeviceUid, forKey: .mic_device_uid)
+            try c.encode(s.excludeBundleIds, forKey: .exclude_bundle_ids)
+            try c.encode(s.languages, forKey: .languages)
+            try c.encode(s.backend, forKey: .backend)
+            try c.encode(s.glossary, forKey: .glossary)
+            try c.encode(s.speakerPriors, forKey: .speaker_priors)
+            try c.encode(s.enrolledEmbeddingsPath, forKey: .enrolled_embeddings_path)
+            try c.encode(s.resumeFromMs, forKey: .resume_from_ms)
+        case let .pause(callId), let .resume(callId), let .stop(callId):
+            let type = switch self { case .pause: "pause"; case .resume: "resume"; default: "stop" }
+            try c.encode(type, forKey: .type)
+            try c.encode(callId, forKey: .call_id)
+        case let .excludeProcess(callId, bundleId):
+            try c.encode("exclude_process", forKey: .type)
+            try c.encode(callId, forKey: .call_id)
+            try c.encode(bundleId, forKey: .bundle_id)
+        case let .setGlossary(entries):
+            try c.encode("set_glossary", forKey: .type)
+            try c.encode(entries, forKey: .entries)
+        case let .setLanguages(languages):
+            try c.encode("set_languages", forKey: .type)
+            try c.encode(languages, forKey: .languages)
         case let .other(type):
             throw EncodingError.invalidValue(type, .init(codingPath: [], debugDescription: "a command the engine does not answer"))
         }
@@ -61,7 +92,7 @@ private struct NotWritten: Error {}
 extension EngineEvent: Decodable {
     private enum Keys: String, CodingKey {
         case type, protocol_version, engine_version, models, sandboxed, cmd_id, code, message, call_id, mic_db, sys_db
-        case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path
+        case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path, mic_device, output_device
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -86,6 +117,10 @@ extension EngineEvent: Decodable {
             self = .selfTestResult(
                 passed: try c.decode(Bool.self, forKey: .passed), failure: try c.decode(EngineErrorCode?.self, forKey: .failure),
                 ownSoundsLeak: try c.decode(Bool.self, forKey: .own_sounds_leak))
+        case "session_started":
+            self = .sessionStarted(
+                callId: try c.decode(String.self, forKey: .call_id), micDevice: try c.decode(String.self, forKey: .mic_device),
+                outputDevice: try c.decode(String.self, forKey: .output_device))
         case "session_stopped":
             self = .sessionStopped(
                 callId: try c.decode(String.self, forKey: .call_id), timelinePath: try c.decode(String.self, forKey: .timeline_path),
@@ -115,7 +150,12 @@ final class RoundTripTests: XCTestCase {
             XCTAssertEqual(try object(JSONEncoder().encode(decoded)), try object(data), type)
         }
         // The commands the engine answers: each has a fixture line, and none decoded as `.other`.
-        XCTAssertEqual(answered.sorted(), ["ping", "self_test", "set_detection", "shutdown"])
+        XCTAssertEqual(
+            answered.sorted(),
+            [
+                "exclude_process", "pause", "ping", "resume", "self_test", "set_detection", "set_glossary", "set_languages",
+                "shutdown", "start_session", "stop",
+            ])
     }
 
     func testEveryFixtureEventTheEngineWritesDecodesAndReencodesEqual() throws {
@@ -136,7 +176,10 @@ final class RoundTripTests: XCTestCase {
         // Every case of `EngineEvent` has a fixture line.
         XCTAssertEqual(
             written.sorted(),
-            ["ack", "error", "levels", "pong", "ready", "self_test_result", "self_test_stream", "session_stopped"])
+            [
+                "ack", "error", "levels", "pong", "ready", "self_test_result", "self_test_stream", "session_started",
+                "session_stopped",
+            ])
     }
 
     func testEventWriterWritesTheLineShapeOfTheFixture() throws {

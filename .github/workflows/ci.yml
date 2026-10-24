@@ -216,28 +216,6 @@ jobs:
             apps/desktop/test-results
           if-no-files-found: ignore
 
-  perf:
-    name: Performance (60% scenarios, <= 10% regression)
-    needs: changes
-    if: fromJSON(needs.changes.outputs.jobs)['perf']
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - uses: ./.github/actions/setup
-        with:
-          node: "false"
-      - run: sudo apt-get update -q && sudo apt-get install -y -q valgrind
-      - run: just perf
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: perf
-          path: target/perf
-          if-no-files-found: ignore
-
   docs:
     name: Constructor Studio validate
     needs: changes
@@ -290,7 +268,7 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, lint-rust, lint-ui, contract, arch, unit, e2e, e2e-coverage, visual, perf, docs, macos]
+    needs: [changes, lint-rust, lint-ui, contract, arch, unit, e2e, e2e-coverage, visual, docs, macos]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
