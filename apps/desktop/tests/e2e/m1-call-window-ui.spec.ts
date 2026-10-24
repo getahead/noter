@@ -51,6 +51,19 @@ const gapAt = (steer: Steer, t0_ms: number, t1_ms: number, reason: string) =>
   steer.push("transcript_subscribe", { event: { type: "gap", gap: { call_id: W.LIVE_CALL, t0_ms, t1_ms, reason: reason as never } } });
 /** No scripted lines after the snapshot, so a before/after comparison of the transcript is stable. */
 const still = (w: Parameters<typeof W.idle>[0]) => void (FAKE && ((w as unknown as { live_script: unknown[] }).live_script = []));
+/** The transcript once its snapshot and the first streamed rows are in (two equal reads 400 ms apart), so pushes reach a subscribed window and before/after compare like with like. */
+async function settled(page: Page): Promise<string> {
+  let last = "";
+  await expect
+    .poll(async () => {
+      const now = await transcript(page).innerText();
+      const same = now !== "" && now === last;
+      last = now;
+      return same;
+    }, { intervals: [400], timeout: 15_000 })
+    .toBe(true);
+  return last;
+}
 const startLive = (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = () => {}) => openWindow(page, "call-screen", { world });
 
 test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
@@ -123,6 +136,7 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
   test("UI — error path: Headphones connected — Microphone changed · 2 s lost is a row, never a banner", async ({ page }) => {
     const steer = await startLive(page, (w) => W.degrade(w, { type: "device_changed", call_id: W.LIVE_CALL, device_name: "AirPods Pro", gap_ms: 2000 }));
 
+    await settled(page);
     await gapAt(steer, 1_420_000, 1_422_000, "device_changed");
     await expect(transcript(page)).toContainText("Microphone changed · 2 s lost");
     await expect(bannerSlot(page)).toHaveCount(0);
@@ -272,7 +286,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
 test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("UI — happy path: Hide Noter for Presenting sends the wanted state, the window keeps its state for the return", async ({ page }) => {
     const steer = await startLive(page, still);
-    const before = await transcript(page).innerText();
+    const before = await settled(page);
 
     await header(page).getByRole("button", { name: "Hide Noter for Presenting" }).click();
     expect(await sent(page, "app_set_hidden_for_presenting")).toContainEqual({ hidden: true });
@@ -390,7 +404,7 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
   test("UI — happy path: Hide (Hide to the menu bar) — recording goes on, the panel comes back as it was", async ({ page }) => {
     await startLive(page, still);
     await toFloating(page);
-    const before = await transcript(page).innerText();
+    const before = await settled(page);
 
     const hide = header(page).getByRole("button", { name: "Hide", exact: true });
     await expect(hide).toHaveAttribute("title", "Hide to the menu bar");
