@@ -151,7 +151,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 ### Hide Noter while presenting
 
-- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-window-hide-for-presenting`
+- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-window-hide-for-presenting`
 
 **Actor**: Primary user
 
@@ -313,7 +313,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 ### Choose what the layout shows
 
-- [x] `p1` - **ID**: `cpt-noter-algo-ui-call-window-layout-content`
+- [ ] `p1` - **ID**: `cpt-noter-algo-ui-call-window-layout-content`
 
 **Input**: the layout, the panel height (floating), the display width (dedicated), the copilot feature flag and whether **Show Transcript** is on
 
