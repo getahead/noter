@@ -11,8 +11,8 @@ use noter_core::{
     TrayAction, TrayGlyph,
 };
 use noter_desktop::surfaces::{
-    action_of, call_frame, clamp_frame, frame_of, is_panel, notification_clicked, posted, settings_url,
-    tray_command, tray_label, tray_title, SavedFrames, TauriSurfaces,
+    action_of, call_frame, clamp_frame, frame_of, is_panel, notification_clicked, posted,
+    settings_url, tray_command, tray_label, tray_title, SavedFrames, TauriSurfaces,
 };
 use noter_native::Frame;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
@@ -277,7 +277,11 @@ fn the_menu_bar_title_and_the_settings_panes() {
 fn the_call_window_and_the_record_prompt_are_panels_the_other_windows_stay_windows() {
     assert!(is_panel(WindowLabel::CallScreen));
     assert!(is_panel(WindowLabel::RecordPrompt));
-    for label in [WindowLabel::Main, WindowLabel::Settings, WindowLabel::FirstRun] {
+    for label in [
+        WindowLabel::Main,
+        WindowLabel::Settings,
+        WindowLabel::FirstRun,
+    ] {
         assert!(!is_panel(label), "{label:?}");
     }
 }
