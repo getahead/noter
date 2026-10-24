@@ -536,9 +536,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.9 [Capture session manager](features/core/core-capture-session.md) - HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-core-capture-session`
+- [x] `p2` - **ID**: `cpt-noter-feature-core-capture-session`
 
-- **Milestone**: M1 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-capture-session.md](features/core/core-capture-session.md)
+- **Milestone**: M1 · **Lane**: core · **Status**: IMPLEMENTED, except the p2 DoD `cpt-noter-dod-core-capture-session-sensitive-notify` (native delivery of the held notifications), which keeps `featstatus` open. FEATURE spec: [features/core/core-capture-session.md](features/core/core-capture-session.md)
 
 - **Purpose**: Own the capture state machine every surface drives the same way: detection and the record prompt, start, pause, stop, notices and their timers, Continue Recording, resume after a quit or crash, the back-to-back split, the sensitive flag and when notifications go out.
 
@@ -562,8 +562,8 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p2` - `cpt-noter-principle-core-degrade`
-  - [ ] `p2` - `cpt-noter-principle-core-intent-commands`
+  `cpt-noter-principle-core-degrade`
+  `cpt-noter-principle-core-intent-commands`
 
 - **Design Constraints Covered**:
 
@@ -578,7 +578,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-core-session`
+  `cpt-noter-component-core-session`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `capture_start`, `capture_stop`, `capture_set_paused`, `capture_mark_moment`, `capture_answer_call_end`, `capture_continue`, `capture_answer_new_meeting`, `capture_discard`, `capture_set_sensitive`, `capture_exclude_source`, `capture_dismiss_detection`, `capture_ignore_app`, `capture_hold_notice`, `capture_keep_recording`, `capture_keep_source`, `capture_resume_interrupted`
