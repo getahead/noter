@@ -186,6 +186,28 @@ final class EngineASRTests: XCTestCase {
         XCTAssertEqual(segment["state"] as? String, "confirmed")
     }
 
+    func testStopAnswersPingWhileTheModelIsStillLoading() throws {
+        let (lines, source, loading) = (Lines(), DeviceSource(), DispatchSemaphore(value: 0))
+        let e = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false, container: try root(),
+            transcriber: {
+                loading.wait()  // a slow model load
+                return FakeTranscriber("late words")
+            }, source: { _ in source })
+        _ = e.handle(startLine)
+        for _ in 0..<15 { source.push(mic: speech(), sys: quiet()) }
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        _ = e.handle(#"{"id":3,"cmd":{"type":"ping"}}"#)
+        XCTAssertEqual(lines.types.suffix(2), ["ack", "pong"], "the command thread is free while the call finishes")
+        XCTAssertFalse(lines.types.contains("session_stopped"))
+        loading.signal()
+        _ = try XCTUnwrap(lines.waitFor("session_stopped"))
+        let segment = try XCTUnwrap(lines.events.compactMap { $0["segment"] as? [String: Any] }.last)
+        XCTAssertEqual(segment["text"] as? String, "late words", "what was said before the model loaded is still confirmed")
+        XCTAssertLessThan(
+            try XCTUnwrap(lines.types.lastIndex(of: "segment")), try XCTUnwrap(lines.types.firstIndex(of: "session_stopped")))
+    }
+
     func testAModelThatFailsToLoadIsReportedAndCaptureGoesOn() throws {
         let (lines, source) = (Lines(), DeviceSource())
         let e = EngineLoop(
