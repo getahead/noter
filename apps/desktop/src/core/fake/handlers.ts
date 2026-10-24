@@ -198,6 +198,16 @@ function copilot(fake: FakeCore, change: (c: CopilotStatus) => void): CopilotSta
 const skills = new Map<string, { rev: number; body: string }>();
 const defaultSkill = (a: AgentView) => `---\nname: ${a.name}\n---\n\nYou are the ${a.name} of the council. Ask one question at a time; cite the call.`;
 
+/** The call a scripted transcript event belongs to, if it names one. */
+function scriptCall(e: World["live_script"][number]): string | undefined {
+  if ("segment" in e) return e.segment.call_id;
+  if ("gap" in e) return e.gap.call_id;
+  if ("mark" in e) return e.mark.call_id;
+  if ("segments" in e) return e.segments[0]?.call_id;
+  if ("speakers" in e) return e.speakers[0]?.call_id;
+  return undefined;
+}
+
 // ── handlers ─────────────────────────────────────────────────────────────
 
 export const defaultHandlers: Handlers = {
@@ -390,7 +400,8 @@ export const defaultHandlers: Handlers = {
     // Like the real core, messages can reach the page before this snapshot resolves: one the
     // snapshot already contains (seq = last_seq) and the first new one. The client drops the
     // first and holds the second until the snapshot is in (R23).
-    const [first, ...rest] = world.live_script;
+    // The script is the fixture call's speech: a call started at runtime waits for its own (D-37).
+    const [first, ...rest] = world.live_script.filter((e) => scriptCall(e) === undefined || scriptCall(e) === a.call_id);
     send({ seq: snap.last_seq, event: { type: "segments_updated", segments: snap.segments.slice(-1) } });
     if (first) fake.push(sub, { event: first });
     rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => fake.push(sub, { event })));
