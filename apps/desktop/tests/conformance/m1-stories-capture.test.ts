@@ -157,6 +157,16 @@ describe("cpt-noter-seq-call-screen-recover-capture", () => {
     ok(await s.core("call-screen").captureExcludeSource({ call_id: callId, bundle_id: SLACK.bundle_id }));
     expect(types(await degraded())).not.toContain("second_audio_source");
     expect(ok(await s.core("main").appSnapshot({})).capture.phase).toBe("recording");
+
+    // Keep: a source that belongs to the call stays, and is not asked about again.
+    const zoom = { bundle_id: "us.zoom.xos", app_name: "zoom.us" };
+    await fact({ type: "audio_source_added", call_id: callId, ...zoom });
+    await until(async () => types(await degraded()).includes("second_audio_source"), "second_audio_source (Zoom)");
+    ok(await s.core("call-screen").captureKeepSource({ call_id: callId, bundle_id: zoom.bundle_id }));
+    expect(types(await degraded())).not.toContain("second_audio_source");
+    await fact({ type: "audio_source_added", call_id: callId, ...zoom });
+    await sleep(100);
+    expect(types(await degraded())).not.toContain("second_audio_source");
   });
 
   it("error paths — system audio silent, microphone off and a microphone change show while the recording carries on", async () => {
