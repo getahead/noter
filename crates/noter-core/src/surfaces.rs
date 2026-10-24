@@ -354,6 +354,9 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-emit-displays
         self.publish_call(&mut w);
         // @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-emit-displays
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-return-display
+        drop(w);
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-return-display
     }
 
     /// Hide for presenting (wanted state): every surface goes, recording carries on.
