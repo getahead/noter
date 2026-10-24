@@ -11,6 +11,10 @@
 //!   authorization, reachability and free disk; [`watch`] reports changes.
 //! * [`set_login_item`] / [`login_item`] use SMAppService.
 //! * [`app_group_container`] finds the App Group container shared with the engine (D14).
+//! * Native surfaces (`docs/features/core/core-native-surfaces.md`), for the app's `Surfaces`:
+//!   [`display_frame`], [`post_notification`] and [`on_notification_click`], [`announce`],
+//!   [`calendar_event_near`]. They work from any thread (the macOS half hops to the main thread
+//!   where AppKit needs it) and do nothing elsewhere.
 //!
 //! The request functions block until macOS answers: call them off the async runtime. On other
 //! systems nothing is granted and the environment is empty, so the workspace builds and tests
@@ -24,8 +28,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use noter_protocol::model::{DisplayInfo, NotificationAuth, OutputDeviceInfo, OutputRoute};
-use noter_protocol::{PermissionKind, PermissionState};
+use noter_protocol::model::{
+    CalendarEventRef, DisplayInfo, NavTarget, NotificationAuth, OutputDeviceInfo, OutputRoute,
+    Politeness,
+};
+use noter_protocol::{CallId, DisplayId, PermissionKind, PermissionState};
 
 /// The login item as SMAppService reports it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -275,4 +282,130 @@ pub fn login_item() -> LoginItem {
     return mac::login_item();
     #[cfg(not(target_os = "macos"))]
     LoginItem::Disabled
+}
+
+// ── native surfaces ─────────────────────────────────────────────────────────
+
+/// A display's bounds in Quartz global display coordinates: points, origin at the top left of
+/// the main display.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Frame {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// A notification the capture session decided to send: one thread per call, and the place a
+/// click opens.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PostedNotification {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub thread: CallId,
+    pub target: NavTarget,
+}
+
+/// The bounds of the display with this id (the same ids as [`Reading::displays`]).
+pub fn display_frame(id: &DisplayId) -> Option<Frame> {
+    #[cfg(target_os = "macos")]
+    return mac::display_frame(id);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = id;
+        None
+    }
+}
+
+// @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
+/// Posts through `UNUserNotificationCenter`: `threadIdentifier` is the call, `userInfo` the
+/// target. Whether to send is the core's rule; without permission macOS drops it silently.
+pub fn post_notification(n: &PostedNotification) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return mac::post_notification(n);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = n;
+        Ok(())
+    }
+}
+// @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
+
+/// Sets the handler for clicks on Noter's notifications. Call it once, before the app's event
+/// loop runs, so a click that launched the app is delivered too; the handler runs on the main
+/// thread.
+pub fn on_notification_click(handler: Box<dyn Fn(NavTarget) + Send + Sync>) {
+    #[cfg(target_os = "macos")]
+    mac::on_notification_click(handler);
+    #[cfg(not(target_os = "macos"))]
+    drop(handler);
+}
+
+/// An NSAccessibility announcement (VoiceOver), for panels that are not key (D55).
+pub fn announce(text: &str, politeness: Politeness) {
+    #[cfg(target_os = "macos")]
+    mac::announce(text, announcement_priority(politeness));
+    #[cfg(not(target_os = "macos"))]
+    let _ = (text, politeness);
+}
+
+/// The calendar event at `at_ms` (epoch ms): the one running then, or the next starting within
+/// 10 minutes. Never asks for access: none without it.
+pub fn calendar_event_near(at_ms: i64) -> Option<CalendarEventRef> {
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
+    if permission(PermissionKind::Calendar) != PermissionState::Granted {
+        return None;
+    }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
+    let (from, to) = (at_ms - DAY_MS, at_ms + CALENDAR_LOOKAHEAD_MS);
+    #[cfg(target_os = "macos")]
+    let events = mac::calendar_events(from, to);
+    #[cfg(not(target_os = "macos"))]
+    let events = {
+        let _ = (from, to);
+        Vec::new()
+    };
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
+    nearest_event(events, at_ms)
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
+}
+
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
+/// How far ahead an event still counts as the call about to start.
+const CALENDAR_LOOKAHEAD_MS: i64 = 10 * 60 * 1000;
+
+/// The notification's `userInfo` payload for a target.
+pub fn nav_user_info(target: &NavTarget) -> String {
+    serde_json::to_string(target).unwrap_or_default()
+}
+
+/// The target a clicked notification carries; none for anything Noter did not post.
+pub fn nav_from_user_info(info: &str) -> Option<NavTarget> {
+    serde_json::from_str(info).ok()
+}
+
+/// `NSAccessibilityPriorityLevel`: polite is medium, assertive high.
+pub fn announcement_priority(politeness: Politeness) -> isize {
+    match politeness {
+        Politeness::Polite => 50,
+        Politeness::Assertive => 90,
+    }
+}
+
+/// The event running at `at_ms` (the latest started, if several), else the earliest starting
+/// within 10 minutes.
+pub fn nearest_event(events: Vec<CalendarEventRef>, at_ms: i64) -> Option<CalendarEventRef> {
+    let running = events
+        .iter()
+        .filter(|e| e.starts_at.0 <= at_ms && at_ms < e.ends_at.0)
+        .max_by_key(|e| e.starts_at.0);
+    running
+        .or_else(|| {
+            events
+                .iter()
+                .filter(|e| e.starts_at.0 > at_ms && e.starts_at.0 <= at_ms + CALENDAR_LOOKAHEAD_MS)
+                .min_by_key(|e| e.starts_at.0)
+        })
+        .cloned()
 }

@@ -179,9 +179,9 @@ During a call Noter must never steal focus from the call app, never appear in a 
 - The system prompt must not appear during a meeting: the UI offers the request only from the call's page after a call (DESIGN.md), and the core never asks on its own.
 
 **Steps**:
-1. [ ] - `p1` - `permission_request { kind: notifications }` (`cpt-noter-flow-core-first-run-permission`) calls `requestAuthorization` through `noter-native` - `inst-request-auth`
+1. [x] - `p1` - `permission_request { kind: notifications }` (`cpt-noter-flow-core-first-run-permission`) calls `requestAuthorization` through `noter-native` - `inst-request-auth`
 2. [ ] - `p1` - Read the notification settings into `EnvironmentState.notifications` (`not_determined`, `denied`, `authorized`) at launch and on change; emit `env:changed` - `inst-read-auth`
-3. [ ] - `p1` - When the session's rule (`cpt-noter-algo-core-capture-session-notify`) says send, post through `UNUserNotificationCenter` with `threadIdentifier` = call id and `userInfo` = `NavTarget` - `inst-post`
+3. [x] - `p1` - When the session's rule (`cpt-noter-algo-core-capture-session-notify`) says send, post through `UNUserNotificationCenter` with `threadIdentifier` = call id and `userInfo` = `NavTarget` - `inst-post`
 4. [ ] - `p1` - On a click, emit `nav:request` with the `NavTarget` and bring the main window forward - `inst-click`
 5. [ ] - `p1` - **RETURN** - `inst-return-notify`
 
@@ -243,10 +243,10 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Output**: Events running now or starting within 10 minutes, for detection matching and new-meeting notices.
 
 **Steps**:
-1. [ ] - `p1` - **IF** calendar access is not granted, **RETURN** none (never ask here; asking is `permission_request`) - `inst-no-access`
-2. [ ] - `p1` - Read events from EventKit for the window - `inst-read-events`
+1. [x] - `p1` - **IF** calendar access is not granted, **RETURN** none (never ask here; asking is `permission_request`) - `inst-no-access`
+2. [x] - `p1` - Read events from EventKit for the window - `inst-read-events`
 3. [ ] - `p1` - **IF** the read fails, add `CalendarAccessDenied` or log it, and **RETURN** none - `inst-read-fail`
-4. [ ] - `p1` - **RETURN** the events as `CalendarEventRef` - `inst-return-events`
+4. [x] - `p1` - **RETURN** the events as `CalendarEventRef` - `inst-return-events`
 
 ### Native E2E command log
 
