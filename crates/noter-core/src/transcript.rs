@@ -18,7 +18,7 @@ use std::time::Duration;
 use noter_db::rusqlite::{Connection, OptionalExtension};
 use noter_db::Insert;
 use noter_protocol::engine::{EngineEvent, EngineEventLine, EngineSegment, EngineSegmentState};
-use noter_protocol::ipc::{CommandCtx, Sink};
+use noter_protocol::ipc::{Caller, CommandCtx, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
@@ -384,14 +384,49 @@ impl Core {
             // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
             self.flush(call_id);
             // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
-            if let Err(e) = self.write_transcript_file(call_id) {
-                self.log_error("file", &e);
+            match self.write_transcript_file(call_id) {
+                Ok(()) => self.mark_ready(call_id),
+                Err(e) => self.log_error("file", &e),
             }
         }
         lock(&self.transcript.state).calls.remove(call_id);
         self.transcript_hub().end_stream(call_id.as_str(), reason);
     }
     // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-end-stream
+
+    /// processing -> ready once the transcript file is there. Only a call still processing moves:
+    /// the engine's `session_stopped` and the session's own stop both end up here, and a call
+    /// that was continued meanwhile is recording again. From M2 the post-call job writes the
+    /// outputs and moves the call to ready again after its own processing.
+    fn mark_ready(&self, call_id: &CallId) {
+        let processing = self
+            .store
+            .read(|c| {
+                c.query_row(
+                    "SELECT status = 'processing' FROM calls WHERE id = ?1",
+                    [call_id.as_str()],
+                    |r| r.get::<_, bool>(0),
+                )
+                .optional()
+            })
+            .ok()
+            .flatten()
+            .unwrap_or(false);
+        if !processing {
+            return;
+        }
+        let ctx = CommandCtx {
+            caller: Caller::Window {
+                label: WindowLabel::Main,
+            },
+        };
+        // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-ready
+        let values = vec![("status", json!("ready"))];
+        if let Err(e) = self.write_call(&ctx, call_id, "Call ready", false, values) {
+            self.log_error("status", &e);
+        }
+        // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-ready
+    }
 
     /// `audio/<call_id>/transcript.jsonl`, 0600: a temporary file renamed into place.
     // @cpt-dod:cpt-noter-dod-core-live-transcript-span-file:p2

@@ -915,10 +915,11 @@ async fn start_pause_mark_and_stop_work_from_the_menu_bar() {
         .unwrap();
     r.stop(&menu_bar(), &call_id).await;
     assert_eq!(r.query::<i64>("SELECT count(*) FROM marks"), 1);
-    // Every change row of the call names the menu bar: start, pause and stop.
+    // Every change row of the call names the menu bar: start, pause and stop. The ready row
+    // follows the transcript file, not the command, so it names no surface.
     assert_eq!(
         r.query::<i64>(
-            "SELECT count(*) FROM changes WHERE entity_type = 'call' AND surface IS NOT 'menu_bar'"
+            "SELECT count(*) FROM changes WHERE entity_type = 'call' AND surface IS NOT 'menu_bar' AND summary != 'Call ready'"
         ),
         0
     );
