@@ -166,23 +166,31 @@ final class LiveASR: @unchecked Sendable {
         jobs.forEach(schedule)
     }
 
-    /// The end of `samples` (16 kHz) after their last pause: the utterance still open when capture
-    /// stopped, so never confirmed; empty when they end in a pause (that utterance was confirmed).
-    static func openTail(_ samples: [Float]) -> [Float] {
+    /// The utterance still open when capture stopped (so never confirmed), from the end of
+    /// `samples` (16 kHz): it began after the last pause, at the last 20 s mark since then (a
+    /// longer utterance was closed every 20 s). Empty when they end in a pause, or when speech
+    /// fills them and they do not reach back to the call's start (where it was cut is unknown).
+    static func openTail(_ samples: [Float], fromCallStart: Bool) -> [Float] {
         let (w, n) = (rate / 10, samples.count / (rate / 10))
         let base = samples.count - n * w
         let speech = (0..<n).map { k in Levels.db(Array(samples[base + k * w..<base + (k + 1) * w])) > speechDb }
         guard let last = speech.lastIndex(of: true), (n - 1 - last) * 100 < pauseMs else { return [] }
-        var (first, quiet) = (last, 0)
+        var (first, quiet, paused) = (last, 0, false)
         for k in stride(from: last, through: 0, by: -1) {
             if speech[k] {
                 (first, quiet) = (k, 0)
             } else {
                 quiet += 1
-                if quiet * 100 >= pauseMs { break }
+                if quiet * 100 >= pauseMs {
+                    paused = true
+                    break
+                }
             }
         }
-        return Array(samples[(base + first * w)...])
+        guard paused || fromCallStart else { return [] }
+        let windows = maxUtteranceMs / 100
+        first += (n - first) / windows * windows
+        return first < n ? Array(samples[(base + first * w)...]) : []
     }
 
     /// Ends the utterance of `channel` (caller holds the lock).

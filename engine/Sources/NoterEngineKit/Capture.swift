@@ -278,8 +278,11 @@ final class CaptureSession: @unchecked Sendable {
     func decodeRingTail() {
         guard let end = ringEnd else { return }
         let window = LiveASR.rate / 10
+        // The whole ring, to find the last pause before the crash.
         let tails = lock.withLock {
-            [Channel.mic, .sys].map { ($0, LiveASR.openTail(ring.read($0, last: LiveASR.rate * LiveASR.maxUtteranceMs / 1000))) }
+            [Channel.mic, .sys].map {
+                ($0, LiveASR.openTail(ring.read($0, last: CaptureRing.capacity), fromCallStart: ring.written($0) <= CaptureRing.capacity))
+            }
         }
         for (channel, tail) in tails where !tail.isEmpty {
             let from = end - tail.count * 1000 / LiveASR.rate
