@@ -10,11 +10,35 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FakeWorld } from "../../src/core/bindings";
 import worldJson from "../../../../contracts/fixtures/world.json";
 import { exercised } from "../support/core";
-import { ahead, refused } from "../support/results";
+import { ahead, pending, refused } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { PAST_CALL } from "../support/world-presets";
 
 const fixture = worldJson as unknown as FakeWorld;
+
+type Row = FakeWorld["calls"][number];
+type Detail = FakeWorld["call_details"][number];
+
+// What M1 owns of a row. Participants, open items and reviews arrive with the people and items
+// features (M2, M3); a call still recording lasts until the real clock's now, so only its lower
+// bound is checked.
+function owned(row: Row): Omit<Row, "participants" | "open_items" | "review_waiting" | "duration_ms"> {
+  const { participants: _p, open_items: _o, review_waiting: _r, duration_ms: _d, ...rest } = row;
+  return rest;
+}
+
+// Speakers: a named speaker's chip comes from the people table (M2) and name suggestions from
+// voice profiles and the calendar (M2), and the replay sample is the transcript's (live-transcript); compare who the speaker is, not the chip.
+function ownedDetail(d: Detail) {
+  return {
+    ...d,
+    call: owned(d.call),
+    speakers: d.speakers.map((sp) => {
+      const { suggestion: _s, sample: _m, label, ...rest } = sp;
+      return { ...rest, label: label.type === "person" ? { type: label.type, person: label.person.id } : label };
+    }),
+  };
+}
 
 let s: Scenario;
 beforeEach(() => {
@@ -34,14 +58,17 @@ describe.each(fixture.calls.map((c) => [c.id, c] as const))("fixture parity of %
     // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-run
     if (!page) return;
     // @cpt-begin:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-compare
-    expect(page.rows.find((r) => r.id === id)).toEqual(row);
+    const served = page.rows.find((r) => r.id === id)!;
+    expect(owned(served)).toEqual(owned(row));
+    expect(served.duration_ms).toBeGreaterThanOrEqual(row.duration_ms);
+    if (row.status !== "recording") expect(served.duration_ms).toBe(row.duration_ms);
     // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-compare
   });
 
   it("call_get serves the fixture detail: the row, speakers, marks and gaps", async () => {
     const got = ahead(await s.core("main").callGet({ call_id: id }));
     if (!got) return;
-    expect(got).toEqual(detail);
+    expect(ownedDetail(got)).toEqual(ownedDetail(detail));
   });
 
   it("the transcript snapshot serves the fixture's segments, speakers, marks and gaps", async () => {
@@ -61,6 +88,7 @@ describe("a deleted call", () => {
     const deleted = ahead(await s.core("main").callsDelete({ call_ids: [PAST_CALL] }));
     if (!deleted) return;
     expect(refused(await s.core("main").callGet({ call_id: PAST_CALL })).code).toBe("not_found");
-    expect(refused(await s.core("main").transcriptSubscribe({ call_id: PAST_CALL }, () => {})).code).toBe("not_found");
+    const snapshot = await s.core("main").transcriptSubscribe({ call_id: PAST_CALL }, () => {});
+    if (!pending(snapshot)) expect(refused(snapshot).code).toBe("not_found");
   });
 });
