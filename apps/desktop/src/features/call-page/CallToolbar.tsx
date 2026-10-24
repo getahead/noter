@@ -15,10 +15,9 @@ import type { PageToolbarProps } from "../shell/pages";
 import { MainToolbar } from "../shell/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow, CallTypeInfo } from "../../core/bindings";
-import { loadCall, rename, revealFolder, setCallType, setSensitive } from "./actions";
+import { menuActs, saveTitle } from "./actions";
 import { useTypes } from "./cache";
 import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
-import { slots } from "./slots";
 import type { CallPageTab } from "../../core/bindings";
 
 /** The views a delivered feature registered: Transcript in M1; Summary, Agent Reviews and History join in M2 and M4. */
@@ -64,13 +63,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
           {menu && call && (
             <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
               <Menu
-                items={moreItems(call, types, {
-                  rename: () => setRenaming(true),
-                  type: (id) => void setCallType(bridge, call.id, call.rev, id),
-                  sensitive: () => void setSensitive(bridge, call.id, call.privacy !== "sensitive"),
-                  finder: () => void revealFolder(bridge, call.id),
-                  remove: slots.deleteCall ? () => slots.deleteCall?.(bridge, call.id) : null,
-                })}
+                items={moreItems(call, types, menuActs(bridge, call, () => setRenaming(true)))}
                 onClose={() => setMenu(null)}
               />
             </Popover>
@@ -93,11 +86,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
 function TitleField({ bridge, call, onDone }: { bridge: Bridge; call: CallRow; onDone: () => void }) {
   const [value, setValue] = useState(call.title);
   useEffect(() => globalThis.document?.getElementById("pc-title-edit")?.focus(), []);
-  const save = () => {
-    onDone();
-    // a conflict or a refusal leaves the store's values showing; the core's current call is read again below
-    if (value.trim() && value !== call.title) void rename(bridge, call.id, call.rev, value).then((r) => r.status === "error" && void loadCall(bridge, call.id));
-  };
+  const save = () => (onDone(), void saveTitle(bridge, call, value));
   return (
     <span onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onDone())}>
       <TextField value={value} ariaLabel={t("callpage.rename_field")} onChange={setValue} onEnter={save} id="pc-title-edit" />

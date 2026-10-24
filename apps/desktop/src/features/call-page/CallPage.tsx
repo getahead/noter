@@ -8,9 +8,9 @@ import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
-import { loadCall, loadTypes, readKey, reportView } from "./actions";
-import { holdExtras, holdTypes, useExtras } from "./cache";
-import { pageState } from "./logic";
+import { openCallPage, readCall, readKey, reportView } from "./actions";
+import { useExtras } from "./cache";
+import { afterTimer, pageState } from "./logic";
 import { slots } from "./slots";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
@@ -25,8 +25,7 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   useEffect(() => {
     if (asked.current === callId) return;
     asked.current = callId;
-    void loadCall(bridge, callId).then((r) => r.status === "ok" && holdExtras(callId, r.data));
-    void loadTypes(bridge).then((r) => r.status === "ok" && holdTypes(r.data.call_types));
+    void openCallPage(bridge, callId);
   }, [bridge, callId]);
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
   // the core sends no notification for the call this window shows; null once the page closes
@@ -37,7 +36,7 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
 
   const state = pageState(read, call !== undefined);
   const skeleton = useAfter(300, state === "LOADING");
-  const tryAgain = () => void loadCall(bridge, callId).then((r) => r.status === "ok" && holdExtras(callId, r.data));
+  const tryAgain = () => void readCall(bridge, callId);
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-gone
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-gone
@@ -64,13 +63,9 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
 }
 
 /** True once `active` has held for `ms` (skeleton rows after 300 ms, never a flash for a quick read). */
-export function useAfter(ms: number, active: boolean): boolean {
+function useAfter(ms: number, active: boolean): boolean {
   const [late, setLate] = useState(false);
-  useEffect(() => {
-    if (!active) return void setLate(false);
-    const id = setTimeout(() => setLate(true), ms);
-    return () => clearTimeout(id);
-  }, [ms, active]);
+  useEffect(() => afterTimer(ms, active, setLate), [ms, active]);
   return active && late;
 }
 

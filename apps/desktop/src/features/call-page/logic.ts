@@ -132,3 +132,10 @@ export function callInfo(c: CallRow, extra: { audio_not_stored: boolean }, now: 
     processing: t(STATUS[c.status]),
   };
 }
+
+/** Calls `set(true)` once `active` has held for `ms` (and `set(false)` while it does not); returns the cleanup. */
+export function afterTimer(ms: number, active: boolean, set: (late: boolean) => void): (() => void) | undefined {
+  if (!active) return void set(false);
+  const id = setTimeout(() => set(true), ms);
+  return () => clearTimeout(id);
+}

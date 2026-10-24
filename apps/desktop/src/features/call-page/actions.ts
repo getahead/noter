@@ -1,5 +1,8 @@
 import type { Bridge } from "../../app/bridge/bridge";
+import type { CallRow } from "../../core/bindings";
+import { holdExtras, holdTypes } from "./cache";
 import { callFolder } from "./folder";
+import { slots } from "./slots";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-open:p1
 /** `call_get`; the call goes into the store by identity, and a `not_found` or failure is the command's error state. */
@@ -8,6 +11,14 @@ export function loadCall(bridge: Bridge, callId: string) {
   return bridge.act(readKey(callId), "call_get", () => bridge.core.callGet({ call_id: callId }), { entity: "call" });
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-api-get
 }
+/** `call_get`, and what it returns beyond the call row held for the toolbar, the banner and Call info. */
+export const readCall = (bridge: Bridge, callId: string) => loadCall(bridge, callId).then((r) => (r.status === "ok" && holdExtras(callId, r.data), r));
+
+/** Everything the page reads when it opens: the call, and the types for **Call Type ▸** and Call info's **Type**. */
+export function openCallPage(bridge: Bridge, callId: string) {
+  return Promise.all([readCall(bridge, callId), loadTypes(bridge).then((r) => (r.status === "ok" && holdTypes(r.data.call_types), r))]);
+}
+
 export const readKey = (callId: string) => `call:get:${callId}`;
 
 /** `window_report_view`: the call this window shows, so the core sends no notification for it; `null` when the page closes. */
@@ -51,4 +62,25 @@ export function requestNotifications(bridge: Bridge) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-api-permission
   return bridge.act("call:notify", "permission_request", () => bridge.core.permissionRequest({ kind: "notifications" }));
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-api-permission
+}
+
+/** Return in the title field: save a changed, non-empty title; after a refusal the core's current call is read again. */
+export async function saveTitle(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "title">, value: string): Promise<void> {
+  if (!value.trim() || value === call.title) return;
+  const r = await rename(bridge, call.id, call.rev, value);
+  if (r.status === "error") await loadCall(bridge, call.id);
+}
+
+/** Call Info's Mode indicator opens Settings › Privacy. */
+export const openPrivacySettings = (bridge: Bridge) => bridge.core.windowNavigate({ target: { type: "settings", pane: "privacy" } });
+
+/** What the ⋯ menu's items do for this call. Delete Call… is the dialogs host's alert, absent until it registers. */
+export function menuActs(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "privacy">, startRename: () => void) {
+  return {
+    rename: startRename,
+    type: (id: string) => void setCallType(bridge, call.id, call.rev, id),
+    sensitive: () => void setSensitive(bridge, call.id, call.privacy !== "sensitive"),
+    finder: () => void revealFolder(bridge, call.id),
+    remove: slots.deleteCall ? () => slots.deleteCall?.(bridge, call.id) : null,
+  };
 }
