@@ -202,11 +202,20 @@ impl Core {
             self.engine.start_session(start).await?;
             self.insert_gap(&call_id, t0, t1, GapReason::EngineRestart)?;
         }
-        session.away_ms += now - failed_at;
+        // A call paused before the failure comes back paused (the supervisor pauses its session
+        // again); its open pause already counts the time away.
+        let pause = state.pause.clone();
+        if pause.is_none() {
+            session.away_ms += now - failed_at;
+        }
         session.failed_at = None;
-        let recorded = session.recorded(now, None);
+        let recorded = session.recorded(now, pause.as_ref());
         self.set_capture(|c| {
-            c.phase = CapturePhase::Recording;
+            c.phase = if pause.is_some() {
+                CapturePhase::Paused
+            } else {
+                CapturePhase::Recording
+            };
             c.recorded_ms = recorded;
         });
         self.listen_for_speech(&mut session);
