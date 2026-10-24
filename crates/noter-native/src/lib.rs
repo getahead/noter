@@ -358,10 +358,14 @@ pub fn calendar_event_near(at_ms: i64) -> Option<CalendarEventRef> {
         return None;
     }
     // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
+    let (from, to) = (at_ms - DAY_MS, at_ms + CALENDAR_LOOKAHEAD_MS);
     #[cfg(target_os = "macos")]
-    let events = mac::calendar_events(at_ms - DAY_MS, at_ms + CALENDAR_LOOKAHEAD_MS);
+    let events = mac::calendar_events(from, to);
     #[cfg(not(target_os = "macos"))]
-    let events = Vec::new();
+    let events = {
+        let _ = (from, to);
+        Vec::new()
+    };
     // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
     nearest_event(events, at_ms)
     // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
