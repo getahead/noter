@@ -725,11 +725,11 @@ class CiChangesTests(unittest.TestCase):
 
     def test_ui_change_skips_rust_lints_contract_and_macos(self):
         self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"]),
-                         {"lint-ui", "arch", "unit", "e2e", "e2e-coverage", "visual", "perf", "docs"})
+                         {"lint-ui", "arch", "unit", "e2e", "e2e-coverage", "visual", "docs"})
 
     def test_rust_change_skips_typecheck_and_screenshots(self):
         self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs"]),
-                         {"lint-rust", "arch", "unit", "e2e", "e2e-coverage", "perf", "docs", "macos"})
+                         {"lint-rust", "arch", "unit", "e2e", "e2e-coverage", "docs", "macos"})
 
     def test_contract_runs_for_the_protocol_and_the_generated_files(self):
         for f in ["crates/noter-protocol/src/lib.rs", "contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
