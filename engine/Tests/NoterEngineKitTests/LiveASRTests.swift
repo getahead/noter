@@ -82,6 +82,17 @@ final class LiveASRTests: XCTestCase {
         XCTAssertEqual(t.asked.last?.languages, ["en", "de"])
     }
 
+    func testLanguageIDRunsOncePerHypothesisRunAndAgainOnTheWholeUtterance() throws {
+        let t = FakeTranscriber("hallo zusammen")
+        t.lang = "de"
+        let a = asr(t)
+        play(a, .mic, from: 0, 3500, speaking: true)
+        play(a, .mic, from: 3500, 1000, speaking: false)
+        XCTAssertEqual(
+            t.asked.map(\.languages), [["en", "de"], ["de"], ["de"], ["en", "de"]],
+            "hypotheses reuse the first one's language; the confirmation decides on the whole utterance")
+    }
+
     func testTheGlossaryCorrectsTermsAndSaysSo() throws {
         let glossary: JSONValue = .array([
             .object([
