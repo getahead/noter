@@ -314,9 +314,10 @@ impl Core {
     pub(crate) fn set_call_collapsed(&self, collapsed: bool) -> CallWindowState {
         self.sync_call_window();
         let mut w = lock(&self.windows);
-        // Only the floating panel has a strip.
+        // Only the floating panel has a strip; the state goes out whole either way (the flow's
+        // last step), so a window that asked sees its answer as an event too.
         if w.call.layout != CallLayout::Floating || w.call.collapsed == collapsed {
-            return w.call.clone();
+            return self.publish_call(&mut w);
         }
         // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-collapse
         // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-expand
