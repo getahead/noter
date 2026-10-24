@@ -89,7 +89,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Show and place the call window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-call-window`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-call-window`
 
 **Actor**: Primary user (Open Call Screen, the hotkey, the menu), or the capture session at start
 
@@ -102,15 +102,15 @@ During a call Noter must never steal focus from the call app, never appear in a 
 - Collapse is asked in the dedicated layout: the state is returned unchanged.
 
 **Steps**:
-1. [ ] - `p1` - API: `window_show_call` from the main window, the record prompt or the call window, or the same call from a native surface - `inst-show-call`
+1. [x] - `p1` - API: `window_show_call` from the main window, the record prompt or the call window, or the same call from a native surface - `inst-show-call`
 2. [x] - `p1` - **IF** the window is visible and not key, make it key; **ELSE** show it without activation on the display chosen by `cpt-noter-algo-core-native-surfaces-placement` - `inst-show-or-key`
-3. [ ] - `p1` - API: `window_set_call_layout { preference }`, `window_set_collapsed { collapsed }`, `window_hide_call {}` change the layout, the strip state or visibility - `inst-layout-commands`
+3. [x] - `p1` - API: `window_set_call_layout { preference }`, `window_set_collapsed { collapsed }`, `window_hide_call {}` change the layout, the strip state or visibility - `inst-layout-commands`
 4. [x] - `p1` - Emit `window:call` with the whole `CallWindowState` and a new version - `inst-emit-window`
 5. [x] - `p1` - **RETURN** `CallWindowState`; `window_call_state {}` returns it unchanged - `inst-return-window`
 
 ### Follow a display change
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-display-change`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-display-change`
 
 **Actor**: macOS (a display is unplugged or plugged in)
 
@@ -124,11 +124,11 @@ During a call Noter must never steal focus from the call app, never appear in a 
 1. [x] - `p1` - Receive the screen-parameters change and re-read displays by identity - `inst-read-displays`
 2. [x] - `p1` - Run `cpt-noter-algo-core-native-surfaces-placement` for the call window - `inst-replace`
 3. [x] - `p1` - Emit `env:changed` (displays) and `window:call` - `inst-emit-displays`
-4. [ ] - `p1` - **RETURN** - `inst-return-display`
+4. [x] - `p1` - **RETURN** - `inst-return-display`
 
 ### Hide for presenting
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-presenting`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-surfaces-presenting`
 
 **Actor**: Primary user (one key, the menu, the call window)
 
@@ -139,7 +139,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 - Asked to hide while already hidden (wanted state): the current state is returned.
 
 **Steps**:
-1. [ ] - `p1` - API: `app_set_hidden_for_presenting { hidden }` from the call window or main window, or the hotkey as a native caller - `inst-presenting-call`
+1. [x] - `p1` - API: `app_set_hidden_for_presenting { hidden }` from the call window or main window, or the hotkey as a native caller - `inst-presenting-call`
 2. [x] - `p1` - **IF** `hidden`, remember which surfaces were visible and hide every window and panel; **ELSE** restore them - `inst-hide-restore`
 3. [x] - `p1` - Tell the capture session (notification hold, `CallSeemsEnded` timing) and unregister card keys while hidden (they are registered by the copilot from M4) - `inst-tell-session`
 4. [x] - `p1` - While hidden, show a new-meeting notice as a menu bar line whose start item calls `capture_answer_new_meeting(start_as_new_call)` - `inst-menu-new-meeting`
@@ -187,7 +187,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ### Navigate, announce, report and open
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-core-native-surfaces-navigation`
+- [x] `p2` - **ID**: `cpt-noter-flow-core-native-surfaces-navigation`
 
 **Actor**: UI window
 
@@ -202,7 +202,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 2. [x] - `p1` - API: `window_announce { text, politeness }`: post an NSAccessibility announcement - `inst-announce`
 3. [x] - `p1` - API: `window_report_view { call_id }`: store it for the notification rule - `inst-report-view`
 4. [x] - `p1` - API: `open_external { target }`: open through Launch Services (`https`, document paths the core gave the UI, `x-apple.systempreferences:` panes, reveal in Finder); **IF** the target is not allowed **RETURN** `invalid_input` - `inst-open-external`
-5. [ ] - `p1` - **RETURN** `Ack` - `inst-return-nav`
+5. [x] - `p1` - **RETURN** `Ack` - `inst-return-nav`
 
 ## 3. Processes / Business Logic (CDSL)
 

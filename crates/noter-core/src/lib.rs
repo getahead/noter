@@ -595,7 +595,9 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         _args: NoArgs,
     ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-show-call
         Ok(self.show_call(true))
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-show-call
     }
 
     async fn window_hide_call(
@@ -603,7 +605,9 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         _args: NoArgs,
     ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
         Ok(self.hide_call())
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
     }
 
     async fn window_call_state(
@@ -619,7 +623,9 @@ impl CoreApi for Core {
         ctx: &CommandCtx,
         args: CallLayoutArgs,
     ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
         self.set_call_layout(ctx, args)
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
     }
 
     async fn window_set_collapsed(
@@ -627,7 +633,9 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         args: CollapseArgs,
     ) -> Result<CallWindowState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
         Ok(self.set_call_collapsed(args.collapsed))
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
     }
 
     async fn app_set_hidden_for_presenting(
@@ -635,7 +643,9 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         args: HiddenArgs,
     ) -> Result<PresentingState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-presenting-call
         Ok(self.set_hidden_for_presenting(args.hidden))
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-presenting-call
     }
 
     async fn window_navigate(
@@ -644,7 +654,9 @@ impl CoreApi for Core {
         args: NavigateArgs,
     ) -> Result<Ack, CoreError> {
         self.navigate(args.target);
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-return-nav
         Ok(Ack {})
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-return-nav
     }
 
     async fn window_report_view(

@@ -100,7 +100,6 @@ impl crate::app::WholeState for CallWindowState {
     }
 }
 
-// @cpt-algo:cpt-noter-algo-core-native-surfaces-placement:p1
 pub(crate) fn place(
     displays: &[DisplayInfo],
     chosen: &Option<DisplayId>,
@@ -315,10 +314,9 @@ impl Core {
     pub(crate) fn set_call_collapsed(&self, collapsed: bool) -> CallWindowState {
         self.sync_call_window();
         let mut w = lock(&self.windows);
-        // Only the floating panel has a strip; the state goes out whole either way (the flow's
-        // last step), so a window that asked sees its answer as an event too.
+        // Only the floating panel has a strip.
         if w.call.layout != CallLayout::Floating || w.call.collapsed == collapsed {
-            return self.publish_call(&mut w);
+            return w.call.clone();
         }
         // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-collapse
         // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-expand
@@ -408,7 +406,6 @@ impl Core {
 
     /// Builds the tray model and hands it to the native layer when it changed. `privacy` is the
     /// mode from a settings write that is in progress (its lock is held).
-    // @cpt-flow:cpt-noter-flow-core-native-surfaces-menu-bar:p1
     pub(crate) fn refresh_tray(&self, privacy: Option<PrivacyMode>) {
         let (capture, hidden) = {
             let app = self.app();

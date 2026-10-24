@@ -1113,9 +1113,10 @@ impl Surfaces for ScriptedSurfaces {
     fn close_record_prompt(&self) {
         self.note("close_record_prompt");
     }
-    fn show_call_window(&self, placement: &Placement) {
+    fn show_call_window(&self, _: &Placement) {
         self.1.store(true, Ordering::SeqCst);
-        self.note(format!("show_call_window {:?}", placement.layout));
+        // The name the capture stories look for: the call window opens without taking focus.
+        self.note("open_call_window_inactive");
     }
     fn make_call_window_key(&self) {
         self.note("make_call_window_key");
