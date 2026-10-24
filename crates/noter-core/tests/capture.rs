@@ -560,7 +560,8 @@ async fn an_engine_that_cannot_start_leaves_the_call_failed_not_refused() {
         .await
         .unwrap();
     assert_eq!(stopped.phase, CapturePhase::Stopped);
-    assert_eq!(r.query::<String>("SELECT status FROM calls"), "processing");
+    // The transcript file is written at the call's end: processing becomes ready.
+    assert_eq!(r.query::<String>("SELECT status FROM calls"), "ready");
 }
 
 // --- Pause, resume, mark -------------------------------------------------------------
@@ -723,7 +724,7 @@ async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
             })
         })
         .unwrap();
-    assert_eq!(row, ("processing".into(), T0 + 140_000));
+    assert_eq!(row, ("ready".into(), T0 + 140_000));
     // Stopping while paused closes the paused gap at the stop.
     assert_eq!(
         r.query::<i64>("SELECT t1_ms FROM gaps WHERE reason = 'paused'"),
@@ -914,10 +915,11 @@ async fn start_pause_mark_and_stop_work_from_the_menu_bar() {
         .unwrap();
     r.stop(&menu_bar(), &call_id).await;
     assert_eq!(r.query::<i64>("SELECT count(*) FROM marks"), 1);
-    // Every change row of the call names the menu bar: start, pause and stop.
+    // Every change row of the call names the menu bar: start, pause and stop. The ready row
+    // follows the transcript file, not the command, so it names no surface.
     assert_eq!(
         r.query::<i64>(
-            "SELECT count(*) FROM changes WHERE entity_type = 'call' AND surface IS NOT 'menu_bar'"
+            "SELECT count(*) FROM changes WHERE entity_type = 'call' AND surface IS NOT 'menu_bar' AND summary != 'Call ready'"
         ),
         0
     );
