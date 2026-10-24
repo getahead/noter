@@ -116,7 +116,9 @@ impl Core {
     // @cpt-flow:cpt-noter-flow-core-live-transcript-replay:p1
     // @cpt-dod:cpt-noter-dod-core-live-transcript-replay:p1
     pub(crate) async fn play_audio(&self, args: PlayAudioArgs) -> Result<PlaybackState, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-live-transcript-replay:p1:inst-play-call
         let id = args.call_id.clone();
+        // @cpt-end:cpt-noter-flow-core-live-transcript-replay:p1:inst-play-call
         let found = self.store.read(|c| {
             use noter_db::rusqlite::OptionalExtension;
             c.query_row(
