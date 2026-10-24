@@ -78,7 +78,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   handoff_copy: {"item_id": "itm_virt"},
   calls_list: {"filter": {}, "sort": "newest", "page": {}},
   call_get: {"call_id": "call_backend"},
-  call_update: {"call_id": "call_backend", "rev": 1},
+  call_update: {"call_id": "call_backend", "rev": 1, "title": "noter"},
   call_tags_set: {"call_ids": [], "add": [], "remove": []},
   tags_list: {},
   calls_delete: {"call_ids": []},
