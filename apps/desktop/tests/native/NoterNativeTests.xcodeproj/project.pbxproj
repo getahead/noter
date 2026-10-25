@@ -1,0 +1,198 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* NoterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* NoterApp.swift */; };
+		A10000000000000000000002 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* MenuBarTests.swift */; };
+		A10000000000000000000003 /* DialogsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* DialogsTests.swift */; };
+		A10000000000000000000004 /* NotificationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* NotificationsTests.swift */; };
+		A10000000000000000000005 /* RecordPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* RecordPromptTests.swift */; };
+		A10000000000000000000006 /* CallWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* CallWindowTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* NoterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoterApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* MenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* DialogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogsTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* NotificationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* RecordPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordPromptTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* CallWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallWindowTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* NoterNativeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NoterNativeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* NoterNativeUITests */,
+				A40000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* NoterNativeUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* NoterApp.swift */,
+				A20000000000000000000002 /* MenuBarTests.swift */,
+				A20000000000000000000003 /* DialogsTests.swift */,
+				A20000000000000000000004 /* NotificationsTests.swift */,
+				A20000000000000000000005 /* RecordPromptTests.swift */,
+				A20000000000000000000006 /* CallWindowTests.swift */,
+			);
+			path = NoterNativeUITests;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000010 /* NoterNativeUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* NoterNativeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXNativeTarget "NoterNativeUITests" */;
+			buildPhases = (
+				A60000000000000000000001 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NoterNativeUITests;
+			productName = NoterNativeUITests;
+			productReference = A20000000000000000000010 /* NoterNativeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A70000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = A80000000000000000000002 /* Build configuration list for PBXProject "NoterNativeTests" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			productRefGroup = A40000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* NoterNativeUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* NoterApp.swift in Sources */,
+				A10000000000000000000002 /* MenuBarTests.swift in Sources */,
+				A10000000000000000000003 /* DialogsTests.swift in Sources */,
+				A10000000000000000000004 /* NotificationsTests.swift in Sources */,
+				A10000000000000000000005 /* RecordPromptTests.swift in Sources */,
+				A10000000000000000000006 /* CallWindowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A90000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A90000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A90000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.getahead.noter.native-ui-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A90000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.getahead.noter.native-ui-tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A80000000000000000000001 /* Build configuration list for PBXNativeTarget "NoterNativeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000003 /* Debug */,
+				A90000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A80000000000000000000002 /* Build configuration list for PBXProject "NoterNativeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A90000000000000000000001 /* Debug */,
+				A90000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A70000000000000000000001 /* Project object */;
+}
