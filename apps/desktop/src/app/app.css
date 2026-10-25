@@ -1,11 +1,26 @@
 /* Every window fills the WebView: its screens hang off this box (the shared height rule of D114-1; the call, Settings
    and first-run windows size themselves inside it). */
-html, body, #root { height: 100%; }
-[data-region="window"] { min-height: 100%; display: flex; flex-direction: column; }
+html,
+body,
+#root {
+  height: 100%;
+}
+[data-region="window"] {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
 
 /* The window's section-level error is an inline banner at the top of the window (MB-2). Its action never wraps:
    long localised labels (German +30 %, Cyrillic +40 %) move the text, not the button. The button is as tall as its
    24-pt hit area (hit-area.css), so the invisible hit box does not overflow it and read as a clipped label. */
-[data-region="section-error"] .np-banner__actions { flex: none; }
-[data-region="section-error"] .np-banner__actions .np-btn { white-space: nowrap; flex: none; }
-[data-region="section-error"] .np-btn--small { height: 24px; }
+[data-region="section-error"] .np-banner__actions {
+  flex: none;
+}
+[data-region="section-error"] .np-banner__actions .np-btn {
+  white-space: nowrap;
+  flex: none;
+}
+[data-region="section-error"] .np-btn--small {
+  height: 24px;
+}

@@ -14,7 +14,9 @@ afterEach(async () => {
 describe("App", () => {
   it("renders the window's state from its store", async () => {
     bridge = createBridge("main", new FakeCore({ window: "main" }));
-    expect(renderToString(<App bridge={bridge} />)).toContain('data-state="empty"');
+    expect(renderToString(<App bridge={bridge} />)).toContain(
+      'data-state="empty"',
+    );
     await bridge.open();
     const html = renderToString(<App bridge={bridge} />);
     expect(html).toContain('data-window="main"');

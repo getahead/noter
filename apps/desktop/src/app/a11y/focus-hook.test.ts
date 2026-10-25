@@ -2,7 +2,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const effects: (() => void | (() => void))[] = [];
-vi.mock("react", () => ({ useRef: (v: unknown) => ({ current: v }), useEffect: (f: () => void | (() => void)) => void effects.push(f) }));
+vi.mock("react", () => ({
+  useRef: (v: unknown) => ({ current: v }),
+  useEffect: (f: () => void | (() => void)) => void effects.push(f),
+}));
 
 const { useFocusReturn } = await import("./focus");
 
@@ -14,14 +17,39 @@ afterEach(() => {
 function setup(open: boolean) {
   const l: Record<string, (e: unknown) => void> = {};
   const opener = { focus: vi.fn(), isConnected: true };
-  const first = { focus: vi.fn(), closest: () => null, getClientRects: () => [{}] };
-  const hidden = { focus: vi.fn(), closest: () => ({}), getClientRects: () => [] }; // in a [hidden] part of the overlay
-  vi.stubGlobal("document", { activeElement: opener, addEventListener: (t: string, f: never) => void (l[t] = f), removeEventListener: (t: string) => void delete l[t] });
+  const first = {
+    focus: vi.fn(),
+    closest: () => null,
+    getClientRects: () => [{}],
+  };
+  const hidden = {
+    focus: vi.fn(),
+    closest: () => ({}),
+    getClientRects: () => [],
+  }; // in a [hidden] part of the overlay
+  vi.stubGlobal("document", {
+    activeElement: opener,
+    addEventListener: (t: string, f: never) => void (l[t] = f),
+    removeEventListener: (t: string) => void delete l[t],
+  });
   const inside = {};
-  const overlay = { current: { querySelectorAll: () => [hidden, first], contains: (n: unknown) => n === inside } };
+  const overlay = {
+    current: {
+      querySelectorAll: () => [hidden, first],
+      contains: (n: unknown) => n === inside,
+    },
+  };
   const onClose = vi.fn();
   useFocusReturn(open, overlay as never, onClose);
-  return { l, opener, first, hidden, inside, onClose, run: () => effects.at(-1)!() as (() => void) | undefined };
+  return {
+    l,
+    opener,
+    first,
+    hidden,
+    inside,
+    onClose,
+    run: () => effects.at(-1)!() as (() => void) | undefined,
+  };
 }
 
 describe("useFocusReturn", () => {

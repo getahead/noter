@@ -58,11 +58,25 @@ export const WHOLE_STATE = {
 } as const satisfies Partial<Record<EventName, string>>;
 
 type WholeEvent = keyof typeof WHOLE_STATE;
-export type WholeSlices = { [E in WholeEvent as (typeof WHOLE_STATE)[E]]: EventPayloads[E] };
+export type WholeSlices = {
+  [E in WholeEvent as (typeof WHOLE_STATE)[E]]: EventPayloads[E];
+};
 export type WholeName = keyof WholeSlices;
 
 /** The `app_snapshot` fields that are whole-state slices (named as the store names them). */
-const SNAPSHOT_SLICES = ["setup", "capture", "detection", "copilot", "privacy", "presenting", "degraded", "accounts", "proposals", "banners", "environment"] as const satisfies readonly (WholeName & keyof AppSnapshot)[];
+const SNAPSHOT_SLICES = [
+  "setup",
+  "capture",
+  "detection",
+  "copilot",
+  "privacy",
+  "presenting",
+  "degraded",
+  "accounts",
+  "proposals",
+  "banners",
+  "environment",
+] as const satisfies readonly (WholeName & keyof AppSnapshot)[];
 
 export interface Entities {
   call: Record<string, CallRow>;
@@ -80,7 +94,9 @@ export interface Entities {
 export interface StreamData {
   transcript_subscribe: TranscriptSnapshot;
   levels_subscribe: SubscriptionHandle & { levels: LevelsMsg | null };
-  cards_subscribe: CardsSnapshot & { feedback: { key: number; outcome: string; card_id: string | null } | null };
+  cards_subscribe: CardsSnapshot & {
+    feedback: { key: number; outcome: string; card_id: string | null } | null;
+  };
   ask_start: AskHandle & { messages: AskMsg[] };
   self_test_run: SubscriptionHandle & { messages: SelfTestMsg[] };
 }
@@ -106,7 +122,8 @@ export interface CommandState {
 }
 
 // @cpt-state:cpt-noter-state-ui-core-bridge-window-store:p1
-export type WindowStatus = "EMPTY" | "LOADING" | "READY" | "RESYNCING" | "FAILED" | "CLOSED";
+export type WindowStatus =
+  "EMPTY" | "LOADING" | "READY" | "RESYNCING" | "FAILED" | "CLOSED";
 
 export interface WindowState {
   label: WindowLabel;
@@ -115,7 +132,10 @@ export interface WindowState {
   slow: boolean;
   error: ErrorState | null;
   /** The snapshot's plain parts. */
-  app: Pick<AppSnapshot, "contract_version" | "app_version" | "window" | "features" | "prefs"> | null;
+  app: Pick<
+    AppSnapshot,
+    "contract_version" | "app_version" | "window" | "features" | "prefs"
+  > | null;
   whole: Partial<WholeSlices>;
   entities: Entities;
   /** `outputs:progress`, keyed `call_id/section`. */
@@ -129,9 +149,14 @@ export interface WindowState {
   commands: Record<string, CommandState>;
 }
 
-export type AnyEvent = { [E in EventName]: { event: E; payload: EventPayloads[E] } }[EventName];
+export type AnyEvent = {
+  [E in EventName]: { event: E; payload: EventPayloads[E] };
+}[EventName];
 
-export function initialState(label: WindowLabel, status: WindowStatus = "EMPTY"): WindowState {
+export function initialState(
+  label: WindowLabel,
+  status: WindowStatus = "EMPTY",
+): WindowState {
   return {
     label,
     status,
@@ -139,7 +164,16 @@ export function initialState(label: WindowLabel, status: WindowStatus = "EMPTY")
     error: null,
     app: null,
     whole: {},
-    entities: { call: {}, item: {}, person: {}, topic: {}, agent: {}, source: {}, handoff: {}, speaker: {} },
+    entities: {
+      call: {},
+      item: {},
+      person: {},
+      topic: {},
+      agent: {},
+      source: {},
+      handoff: {},
+      speaker: {},
+    },
     outputs: {},
     jobs: {},
     signin: {},
@@ -158,7 +192,11 @@ export function createWindowStore(label: WindowLabel) {
 export type WindowStore = ReturnType<typeof createWindowStore>;
 
 // @cpt-algo:cpt-noter-algo-ui-core-bridge-apply-whole-state:p1
-export function applyWhole<N extends WholeName>(s: WindowState, name: N, payload: WholeSlices[N] | null): WindowState {
+export function applyWhole<N extends WholeName>(
+  s: WindowState,
+  name: N,
+  payload: WholeSlices[N] | null,
+): WindowState {
   if (!payload) return s;
   // @cpt-begin:cpt-noter-algo-ui-core-bridge-apply-whole-state:p1:inst-read-version
   const held = s.whole[name];
@@ -180,22 +218,40 @@ export function applyWhole<N extends WholeName>(s: WindowState, name: N, payload
 
 export function applySnapshot(s: WindowState, snap: AppSnapshot): WindowState {
   const { contract_version, app_version, window, features, prefs } = snap;
-  let next: WindowState = { ...s, app: { contract_version, app_version, window, features, prefs } };
-  for (const name of SNAPSHOT_SLICES) next = applyWhole(next, name, snap[name] as never);
+  let next: WindowState = {
+    ...s,
+    app: { contract_version, app_version, window, features, prefs },
+  };
+  for (const name of SNAPSHOT_SLICES)
+    next = applyWhole(next, name, snap[name] as never);
   return next;
 }
 
-function setEntity<K extends keyof Entities>(s: WindowState, kind: K, id: string, record: Entities[K][string]): WindowState {
-  return { ...s, entities: { ...s.entities, [kind]: { ...s.entities[kind], [id]: record } } };
+function setEntity<K extends keyof Entities>(
+  s: WindowState,
+  kind: K,
+  id: string,
+  record: Entities[K][string],
+): WindowState {
+  return {
+    ...s,
+    entities: { ...s.entities, [kind]: { ...s.entities[kind], [id]: record } },
+  };
 }
 
 /**
  * Write the record a command returned (`{<kind>: record, change_id}`, a bare record, or a
  * speakers list), keyed like its entity:changed event; an answer older than the held `rev` is dropped.
  */
-export function applyRecord(s: WindowState, kind: keyof Entities, data: unknown): WindowState {
+export function applyRecord(
+  s: WindowState,
+  kind: keyof Entities,
+  data: unknown,
+): WindowState {
   const d = data as Record<string, unknown>;
-  const records = (kind === "speaker" ? (d.speakers ?? [d]) : [d[kind] ?? d]) as Array<{ id?: string; rev?: number | null; item?: { id: string } }>;
+  const records = (
+    kind === "speaker" ? (d.speakers ?? [d]) : [d[kind] ?? d]
+  ) as Array<{ id?: string; rev?: number | null; item?: { id: string } }>;
   return records.reduce((acc, r) => {
     const id = kind === "handoff" ? r.item!.id : r.id!;
     const held = acc.entities[kind][id] as { rev?: number | null } | undefined;
@@ -225,9 +281,14 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
         case "handoff":
           return setEntity(s, "handoff", c.handoff.item.id, c.handoff);
         case "speakers":
-          return c.speakers.reduce((acc, sp) => setEntity(acc, "speaker", sp.id, sp), s);
+          return c.speakers.reduce(
+            (acc, sp) => setEntity(acc, "speaker", sp.id, sp),
+            s,
+          );
         case "removed": {
-          const slice = (s.entities as unknown as Record<string, Record<string, unknown>>)[c.kind];
+          const slice = (
+            s.entities as unknown as Record<string, Record<string, unknown>>
+          )[c.kind];
           if (!slice || !(c.id in slice)) return s;
           const { [c.id]: _gone, ...rest } = slice;
           return { ...s, entities: { ...s.entities, [c.kind]: rest } };
@@ -235,11 +296,20 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
       }
     }
     case "outputs:progress":
-      return { ...s, outputs: { ...s.outputs, [`${e.payload.call_id}/${e.payload.section}`]: e.payload } };
+      return {
+        ...s,
+        outputs: {
+          ...s.outputs,
+          [`${e.payload.call_id}/${e.payload.section}`]: e.payload,
+        },
+      };
     case "jobs:progress":
       return { ...s, jobs: { ...s.jobs, [e.payload.run.id]: e.payload.run } };
     case "signin:progress":
-      return { ...s, signin: { ...s.signin, [e.payload.session_id]: e.payload } };
+      return {
+        ...s,
+        signin: { ...s.signin, [e.payload.session_id]: e.payload },
+      };
     case "nav:request":
       return { ...s, nav: e.payload };
     default:
@@ -262,7 +332,10 @@ function insertAt<T>(list: T[], row: T, at: (r: T) => number): T[] {
 }
 
 // @cpt-algo:cpt-noter-algo-ui-core-bridge-flush-buffer:p1
-function flushTranscript(d: TranscriptSnapshot, msgs: TranscriptMsg[]): TranscriptSnapshot {
+function flushTranscript(
+  d: TranscriptSnapshot,
+  msgs: TranscriptMsg[],
+): TranscriptSnapshot {
   const t = { ...d };
   // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-for-each-tr
   for (const { event: e } of msgs) {
@@ -271,12 +344,17 @@ function flushTranscript(d: TranscriptSnapshot, msgs: TranscriptMsg[]): Transcri
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-confirmed
       case "confirmed":
         t.segments = [...t.segments, e.segment];
-        t.hypotheses = t.hypotheses.filter((h) => h.channel !== e.segment.channel);
+        t.hypotheses = t.hypotheses.filter(
+          (h) => h.channel !== e.segment.channel,
+        );
         break;
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-confirmed
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-hypothesis
       case "hypothesis":
-        t.hypotheses = [...t.hypotheses.filter((h) => h.channel !== e.segment.channel), e.segment];
+        t.hypotheses = [
+          ...t.hypotheses.filter((h) => h.channel !== e.segment.channel),
+          e.segment,
+        ];
         break;
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-hypothesis
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-updated
@@ -302,7 +380,10 @@ function flushTranscript(d: TranscriptSnapshot, msgs: TranscriptMsg[]): Transcri
   return t;
 }
 
-function flushCards(d: StreamData["cards_subscribe"], msgs: CardMsg[]): StreamData["cards_subscribe"] {
+function flushCards(
+  d: StreamData["cards_subscribe"],
+  msgs: CardMsg[],
+): StreamData["cards_subscribe"] {
   let { visible, earlier, status, feedback } = d;
   const toEarlier = (id: string, state: CardView["state"]) => {
     const card = visible.find((c) => c.id === id);
@@ -317,30 +398,48 @@ function flushCards(d: StreamData["cards_subscribe"], msgs: CardMsg[]): StreamDa
   for (const { event: e } of msgs) {
     if (e.type === "added") visible = [e.card, ...visible];
     else if (e.type === "updated") patch(e.card.id, () => e.card);
-    else if (e.type === "merged") patch(e.card_id, (c) => ({ ...c, merged_agents: e.merged_agents }));
+    else if (e.type === "merged")
+      patch(e.card_id, (c) => ({ ...c, merged_agents: e.merged_agents }));
     else if (e.type === "removed") toEarlier(e.card_id, e.state);
     else if (e.type === "expired") toEarlier(e.card_id, "expired");
-    else if (e.type === "key_feedback") feedback = { key: e.key, outcome: e.outcome, card_id: e.card_id };
+    else if (e.type === "key_feedback")
+      feedback = { key: e.key, outcome: e.outcome, card_id: e.card_id };
     else if (e.type === "status") status = e.status;
   }
   return { ...d, visible, earlier, status, feedback };
 }
 
 /** Flush one Channel's buffered messages into its slice (one store update per flush, by the bridge). */
-export function reduceStream<K extends ChannelCommand>(cmd: K, data: StreamData[K], msgs: ChannelMessages[K][]): StreamData[K] {
+export function reduceStream<K extends ChannelCommand>(
+  cmd: K,
+  data: StreamData[K],
+  msgs: ChannelMessages[K][],
+): StreamData[K] {
   switch (cmd) {
     case "transcript_subscribe":
-      return flushTranscript(data as TranscriptSnapshot, msgs as TranscriptMsg[]) as StreamData[K];
+      return flushTranscript(
+        data as TranscriptSnapshot,
+        msgs as TranscriptMsg[],
+      ) as StreamData[K];
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-levels-newest
     case "levels_subscribe":
-      return { ...data, levels: (msgs as LevelsMsg[]).at(-1) ?? null } as StreamData[K];
+      return {
+        ...data,
+        levels: (msgs as LevelsMsg[]).at(-1) ?? null,
+      } as StreamData[K];
     // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-levels-newest
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-cards
     case "cards_subscribe":
-      return flushCards(data as StreamData["cards_subscribe"], msgs as CardMsg[]) as StreamData[K];
+      return flushCards(
+        data as StreamData["cards_subscribe"],
+        msgs as CardMsg[],
+      ) as StreamData[K];
     // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-cards
   }
   // ask_start and self_test_run: kept in order as sent; their screens read the events.
   const d = data as StreamData["self_test_run"];
-  return { ...d, messages: [...d.messages, ...(msgs as SelfTestMsg[])] } as StreamData[K];
+  return {
+    ...d,
+    messages: [...d.messages, ...(msgs as SelfTestMsg[])],
+  } as StreamData[K];
 }
