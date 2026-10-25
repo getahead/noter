@@ -75,6 +75,11 @@ export function CallsView(p: CallsViewProps) {
       )}
       <div
         data-region="LC-R3"
+        // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
+        // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
+        data-state={selection.ids.length > 1 ? "selected-several" : state.status.toLowerCase()}
+        // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
+        // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         role="region"
         aria-label={t("library.calls.title")}
       >
@@ -107,6 +112,7 @@ function Body(p: CallsViewProps) {
         }}
       />
     );
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-if-empty
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
   if (state.status === "EMPTY")
     return (
@@ -122,6 +128,7 @@ function Body(p: CallsViewProps) {
       />
     );
   // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
+  // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-if-empty
   if (state.status === "LOADING")
     // the area keeps its place (and says it is busy) from the first moment; the skeleton rows follow after 300 ms
     return (

@@ -216,6 +216,20 @@ test.describe("cpt-noter-algo-ui-library-calls-status-cell", () => {
   });
 });
 
+test.describe("cpt-noter-algo-ui-library-calls-status-cell (Medium)", () => {
+  test("UI — Medium width: the status shows its icon only, the text stays in the help tag and for VoiceOver", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await openCalls(page, (w) => Object.assign(first(w), { outputs: "writing" }));
+    await expect(page.locator('[data-width="medium"]')).not.toHaveCount(0);
+    const status = rowOf(page, "Backend sync").first().locator(".lb-status");
+    await expect(status).toHaveAttribute("title", "Writing summary…");
+    await expect(status.locator(".lb-status__text")).toHaveText("Writing summary…");
+    await expect(status.locator(".lb-status__text")).toHaveCSS("width", "1px");
+  });
+});
+
 test.describe("cpt-noter-flow-ui-library-calls-delete", () => {
   test("UI — error path: a right-click on an unselected row selects only it; Delete… from its menu asks about that one call and Cancel keeps it", async ({
     page,

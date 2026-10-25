@@ -70,6 +70,17 @@ describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
     expect(h).toContain('data-variant="table-row"');
   });
 
+  it("states the page's state on the table region, SELECTED_SEVERAL once more than one row is selected", () => {
+    expect(html({})).toContain('data-region="LC-R3" data-state="listed"');
+    expect(html({ selection: { ids: ["a"], anchor: "a" } })).toContain('data-state="listed"');
+    expect(html({ selection: { ids: ["a", "b"], anchor: "a" } })).toContain('data-state="selected-several"');
+  });
+
+  it("keeps the status text in the row for the Medium width, which hides it visually", () => {
+    const h = html({ state: state({ rows: [call("a", { outputs: "writing" })] }) });
+    expect(h).toContain('<span class="lb-status__text">Writing summary…</span>');
+  });
+
   it("adds the selection count to the subtitle and marks the rows", () => {
     const h = html({ selection: { ids: ["a", "b"], anchor: "a" } });
     expect(h).toContain("· 2 selected");

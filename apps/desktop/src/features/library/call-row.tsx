@@ -89,11 +89,13 @@ export function CallRowView({
       aria-label={title}
       tabIndex={0}
       onClick={onPress}
+      // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
       onDoubleClick={onOpen}
       onContextMenu={onContext}
       onKeyDown={(e) =>
         e.key === "Enter" && !e.metaKey && (e.preventDefault(), onOpen())
       }
+      // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
     >
       <td className="lb-crow__when np-tnum">{whenOf(c.started_at)}</td>
       <td className="lb-crow__call">
@@ -101,6 +103,7 @@ export function CallRowView({
           <span className="lb-crow__title" title={title}>
             {title}
           </span>
+          {/* @cpt-begin:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-local-only */}
           {sensitive && (
             <Badge
               text={t("library.row.local_only")}
@@ -109,6 +112,7 @@ export function CallRowView({
               icon="lock"
             />
           )}
+          {/* @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-local-only */}
         </div>
         <div className="lb-crow__l2">
           <span className="lb-crow__people">{peopleOf(c)}</span>
@@ -141,6 +145,7 @@ export function CallRowView({
           <Badge text={String(c.open_items)} kind="count" />
         ) : null}
       </td>
+      {/* @cpt-begin:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-return-cell */}
       <td className="lb-crow__status">
         {st && (
           <span
@@ -152,11 +157,11 @@ export function CallRowView({
             ) : (
               <Icon name={st.icon!} size={12} />
             )}
-            {st.link ? (
-              <Link label={st.text} onAction={onOpen} />
-            ) : (
-              <span>{st.text}</span>
-            )}
+            {/* @cpt-begin:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-medium */}
+            <span className="lb-status__text">
+              {st.link ? <Link label={st.text} onAction={onOpen} /> : st.text}
+            </span>
+            {/* @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-medium */}
           </span>
         )}
         {audioHelp && (
@@ -166,6 +171,7 @@ export function CallRowView({
           </span>
         )}
       </td>
+      {/* @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-return-cell */}
       <td className="lb-crow__chev">
         <IconButton
           icon="chevronRight"
