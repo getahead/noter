@@ -29,12 +29,17 @@ async function openCallPage(page: Page) {
 }
 
 // the banner is for the first recorded call (D68: `first_recorded_call`) while the permission was never asked
-const notAsked = (w: Parameters<typeof W.idle>[0]) => (
-  W.idle(w),
-  (w.app.environment.notifications = "not_determined"),
-  W.permission(w, "notifications", "not_asked"),
-  (w.call_details.find((d) => d.call.id === W.PAST_CALL)!.first_recorded_call = true)
-);
+const notAsked = (w: Parameters<typeof W.idle>[0]) => {
+  W.idle(w);
+  w.app.environment.notifications = "not_determined";
+  W.permission(w, "notifications", "not_asked");
+  const detail = w.call_details.find((d) => d.call.id === W.PAST_CALL)!;
+  detail.first_recorded_call = true;
+  // the real core derives the flag from the store (one call recorded), so the first call is the only one
+  w.calls = w.calls.filter((c) => c.id === W.PAST_CALL);
+  w.call_details = [detail];
+  w.transcripts = w.transcripts.filter((t) => t.call_id === W.PAST_CALL);
+};
 
 test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
   test("UI — happy path: Notify Me When Summaries Are Ready on the call's page, Allow, the banner goes and the page is reported", async ({ page }) => {
@@ -100,8 +105,13 @@ test.describe("cpt-noter-flow-ui-notifications-receive", () => {
   test("UI — other path: a notification click (nav:request to the call's page) opens that page in the main window", async ({ page }) => {
     await openWindow(page, "main", { world: (w) => W.idle(w) });
     await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
-    // NEEDS: a Steer control that emits an event on any target; today only the fake can, through the page's FakeCore.
-    await page.evaluate((id) => (globalThis as unknown as { __noterFake: { emit(e: string, p: unknown): void } }).__noterFake.emit("nav:request", { type: "call_page", call_id: id, tab: "transcript" }), W.PAST_CALL);
+    // the real core emits nav:request itself when asked to navigate (what a click does); the fake can also be told to
+    await page.evaluate(async (id) => {
+      const g = globalThis as unknown as { __noterFake?: { emit(e: string, p: unknown): void }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
+      const target = { type: "call_page", call_id: id, tab: "transcript" };
+      if (g.__noterFake) g.__noterFake.emit("nav:request", target);
+      else await g.__TAURI_INTERNALS__!.invoke("window_navigate", { args: { target } });
+    }, W.PAST_CALL);
     await expect(page.getByRole("heading", { name: new RegExp(PAST_TITLE) }).first()).toBeVisible();
     expect((await sent(page, "window_report_view")).some((a) => a.call_id === W.PAST_CALL)).toBe(true);
   });

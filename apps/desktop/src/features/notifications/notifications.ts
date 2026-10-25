@@ -65,11 +65,15 @@ export function sendRule(i: SendInput): "send" | "hold" | "drop" {
 // @cpt-state:cpt-noter-state-ui-notifications-permission:p1
 /** NOT_ASKED, ALLOWED or DENIED, from what macOS reports (`env:changed`). */
 export function permissionState(auth: NotificationAuth | undefined): "NOT_ASKED" | "ALLOWED" | "DENIED" {
+  // @cpt-begin:cpt-noter-state-ui-notifications-permission:p1:inst-denied-allowed
   // @cpt-begin:cpt-noter-state-ui-notifications-permission:p1:inst-notasked-allowed
   if (auth === "authorized") return "ALLOWED";
   // @cpt-end:cpt-noter-state-ui-notifications-permission:p1:inst-notasked-allowed
+  // @cpt-begin:cpt-noter-state-ui-notifications-permission:p1:inst-allowed-denied
   // @cpt-begin:cpt-noter-state-ui-notifications-permission:p1:inst-notasked-denied
   if (auth === "denied") return "DENIED";
   // @cpt-end:cpt-noter-state-ui-notifications-permission:p1:inst-notasked-denied
+  // @cpt-end:cpt-noter-state-ui-notifications-permission:p1:inst-allowed-denied
+  // @cpt-end:cpt-noter-state-ui-notifications-permission:p1:inst-denied-allowed
   return "NOT_ASKED";
 }

@@ -89,10 +89,10 @@ It implements `cpt-noter-component-screen-notifications`.
 - Other — Turn notifications on later: Settings › General shows **Notifications are off for Noter** · **Open System Settings…**; after turning them on, **Summary ready** arrives after the next call and the line goes away
 
 **Steps**:
-1. [ ] - `p1` - Flow: `cpt-noter-flow-ui-call-page-frame-notifications-banner` shows the banner and asks macOS through `permission_request` - `inst-banner-flow`
-2. [ ] - `p1` - **IF** the user denied, or turned notifications off in System Settings - `inst-if-denied`
+1. [x] - `p1` - Flow: `cpt-noter-flow-ui-call-page-frame-notifications-banner` shows the banner and asks macOS through `permission_request` - `inst-banner-flow`
+2. [x] - `p1` - **IF** the user denied, or turned notifications off in System Settings - `inst-if-denied`
    1. [x] - `p1` - Core: `env:changed` reports notifications off; Settings › General shows **Notifications are off for Noter** with **Open System Settings…** (`open_external`) - `inst-off-line`
-   2. [ ] - `p1` - UI: nothing else changes; the menu bar keeps **Open Last Summary** - `inst-nothing-else`
+   2. [x] - `p1` - UI: nothing else changes; the menu bar keeps **Open Last Summary** - `inst-nothing-else`
 3. [ ] - `p1` - **RETURN** notifications allowed, or off with every state still visible in Noter - `inst-return-allow`
 
 ### Receive and open a notification
@@ -143,7 +143,7 @@ It implements `cpt-noter-component-screen-notifications`.
 
 ### Notification permission
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-notifications-permission`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-notifications-permission`
 
 **States**: NOT_ASKED, ALLOWED, DENIED
 
@@ -152,8 +152,8 @@ It implements `cpt-noter-component-screen-notifications`.
 **Transitions**:
 1. [x] - `p1` - **FROM** NOT_ASKED **TO** ALLOWED **WHEN** the user clicks **Notify Me When Summaries Are Ready** and allows the prompt - `inst-notasked-allowed`
 2. [x] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the user clicks **Don't Allow** - `inst-notasked-denied`
-3. [ ] - `p1` - **FROM** DENIED **TO** ALLOWED **WHEN** the user turns notifications on in System Settings - `inst-denied-allowed`
-4. [ ] - `p1` - **FROM** ALLOWED **TO** DENIED **WHEN** the user turns them off in System Settings - `inst-allowed-denied`
+3. [x] - `p1` - **FROM** DENIED **TO** ALLOWED **WHEN** the user turns notifications on in System Settings - `inst-denied-allowed`
+4. [x] - `p1` - **FROM** ALLOWED **TO** DENIED **WHEN** the user turns them off in System Settings - `inst-allowed-denied`
 
 ### One notification
 

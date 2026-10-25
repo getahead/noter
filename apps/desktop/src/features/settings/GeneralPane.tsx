@@ -28,10 +28,12 @@ const Warn = ({ children }: { children: string }) => (
 export function GeneralPane({ bridge, settings }: PaneProps) {
   const { general, today } = settings;
   const selfTestPassed = useWindow(bridge, (s) => s.whole.setup?.self_test.type === "passed");
+  // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
   // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
   // off means macOS says so (`env:changed`), whether they were denied at the prompt or turned off in System Settings
   const notificationsOff = useWindow(bridge, (s) => permissionState(s.whole.environment?.notifications) === "DENIED");
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
+  // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
   const [selfTest, setSelfTest] = useState(false);
   const rowError = useRowErrors(bridge);
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
