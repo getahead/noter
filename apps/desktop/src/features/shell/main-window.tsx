@@ -214,6 +214,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
           bridge={bridge}
           inspectorOpen={shell.history.inspectorOpen}
           onToggleInspector={() => act({ type: "toggle-inspector" })}
+          onReplace={(r) => dispatch({ type: "move", move: { type: "replace", route: r } })}
           title={page.title(route)}
           subtitle={subtitle}
           actions={page.actions ?? []}

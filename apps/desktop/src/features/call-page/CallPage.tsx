@@ -17,8 +17,12 @@ import { afterTimer, pageState } from "./logic";
 import "./call-page.css";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
+// @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p2
 export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: TimeSpan | null }) {
+  // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-ready
+  // entity:changed replaces the stored call (title, type, sensitivity, audio): the page draws again from it
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
+  // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-ready
   const read = useWindow(bridge, (s) => s.commands[readKey(callId)]);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const extras = useExtras(callId);
@@ -55,6 +59,7 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   // the page already read the call: the transcript asks the core for nothing more
   const detail = call ? { call, audio_not_stored: extras?.audio_not_stored ?? false } : null;
   const meta = audioLine(detail, prefs);
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-open
   return (
     <div className="pc pc--transcript" data-state="ready">
       <section className="pc-tr" data-region="PC-R5" aria-label={t("callpage.transcript")}>
@@ -70,6 +75,7 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
       </section>
     </div>
   );
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-open
 }
 
 /** True once `active` has held for `ms` (skeleton rows after 300 ms, never a flash for a quick read). */

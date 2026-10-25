@@ -1,7 +1,9 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow } from "../../core/bindings";
+import { deleteCalls } from "../../ui/dialogs/delete-calls";
+import type { Ask } from "../../ui/dialogs/alerts";
+import type { Route } from "../shell/history";
 import { extrasOf, holdExtras, holdTypes } from "./cache";
-import { slots } from "./slots";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-open:p1
 /** `call_get`; the call goes into the store by identity, and a `not_found` or failure is the command's error state. */
@@ -34,13 +36,17 @@ export const loadTypes = (bridge: Bridge) => bridge.act("call:types", "call_type
 /** Rename in place: the title with the call's `rev`; a `conflict` leaves the core's values to be read again. */
 export function rename(bridge: Bridge, callId: string, rev: number, title: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-rename
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   return bridge.act(`call:update:${callId}`, "call_update", () => bridge.core.callUpdate({ call_id: callId, rev, title }), { entity: "call" });
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-rename
 }
 
 export function setCallType(bridge: Bridge, callId: string, rev: number, callType: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-type
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   return bridge.act(`call:update:${callId}`, "call_update", () => bridge.core.callUpdate({ call_id: callId, rev, call_type: callType }), { entity: "call" });
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-type
 }
 
@@ -77,13 +83,30 @@ export async function saveTitle(bridge: Bridge, call: Pick<CallRow, "id" | "rev"
 /** Call Info's Mode indicator opens Settings › Privacy. */
 export const openPrivacySettings = (bridge: Bridge) => bridge.core.windowNavigate({ target: { type: "settings", pane: "privacy" } });
 
-/** What the ⋯ menu's items do for this call. Delete Call… is the dialogs host's alert, absent until it registers. */
-export function menuActs(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "privacy">, startRename: () => void) {
+/** **Delete Call…**: the dialogs host's alert first; after **Delete** the page gives way to Library › Calls. */
+export async function removeCall(bridge: Bridge, call: Pick<CallRow, "id" | "title">, replace: (route: Route) => void, ask?: Ask) {
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
+  const res = await deleteCalls(bridge, [{ id: call.id, title: call.title }], ask);
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-return-more
+  // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-deleted
+  // replaced, not pushed: Back must not return to a call that no longer exists
+  if (res.outcome === "deleted") replace({ section: "library", key: "root" });
+  // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-deleted
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-return-more
+  return res;
+}
+
+// @cpt-dod:cpt-noter-dod-ui-call-page-frame-actions:p2
+/** What the ⋯ menu's items do for this call. */
+export function menuActs(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "privacy" | "title">, startRename: () => void, replace: (route: Route) => void) {
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-match-more
   return {
     rename: startRename,
     type: (id: string) => void setCallType(bridge, call.id, call.rev, id),
     sensitive: () => void setSensitive(bridge, call.id, call.privacy !== "sensitive"),
     finder: () => void revealFolder(bridge, call.id),
-    remove: slots.deleteCall ? () => slots.deleteCall?.(bridge, call.id) : null,
+    remove: () => void removeCall(bridge, call, replace),
   };
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-match-more
 }

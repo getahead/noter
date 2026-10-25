@@ -112,7 +112,7 @@ export function MainToolbar(p: ToolbarProps) {
 }
 
 /** The page's own toolbar when it registered one, the shell's otherwise. */
-export function ToolbarHost({ page, route, bridge, inspectorOpen, onToggleInspector, ...base }: ToolbarProps & { page: PageDef; route: Route; bridge: Bridge; inspectorOpen: boolean; onToggleInspector: () => void }) {
+export function ToolbarHost({ page, route, bridge, inspectorOpen, onToggleInspector, onReplace, ...base }: ToolbarProps & { page: PageDef; route: Route; bridge: Bridge; inspectorOpen: boolean; onToggleInspector: () => void; onReplace: (route: Route) => void }) {
   const Own = page.toolbar;
-  return Own ? <Own route={route} bridge={bridge} base={base} inspectorOpen={inspectorOpen} onToggleInspector={onToggleInspector} /> : <MainToolbar {...base} />;
+  return Own ? <Own route={route} bridge={bridge} base={base} inspectorOpen={inspectorOpen} onToggleInspector={onToggleInspector} onReplace={onReplace} /> : <MainToolbar {...base} />;
 }

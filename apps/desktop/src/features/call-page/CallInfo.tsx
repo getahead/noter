@@ -5,8 +5,9 @@ import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { modeIndicator } from "../shell/mode-indicator";
 import { ModeIndicator } from "../shell/mode-indicator-view";
+import { PopupButton } from "../../ui/primitives/popup-button";
 import { Toggle } from "../../ui/primitives/toggle";
-import { openPrivacySettings, setSensitive } from "./actions";
+import { openPrivacySettings, setCallType, setSensitive } from "./actions";
 import { useExtras, useTypes } from "./cache";
 import { callInfo } from "./logic";
 
@@ -43,7 +44,16 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.call")}</h3>
         <dl className="np-kv">
-          {info.call.flatMap((r) => [<dt key={`${r.label}-t`}>{r.label}</dt>, <dd key={`${r.label}-d`}>{r.value}</dd>])}
+          {info.call.flatMap((r) => [
+            <dt key={`${r.label}-t`}>{r.label}</dt>,
+            <dd key={`${r.label}-d`}>
+              {r.label === t("callpage.info.type") && types.length ? (
+                <PopupButton variant="inline" label={r.label} value={call.call_type} options={types.map((x) => ({ value: x.id, label: x.label }))} onAction={(v) => void setCallType(bridge, call.id, call.rev, v)} />
+              ) : (
+                r.value
+              )}
+            </dd>,
+          ])}
         </dl>
       </div>
       <div className="pc-info__sec">

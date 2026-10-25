@@ -124,7 +124,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Rename or retype a call from its row
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-ui-library-calls-edit`
+- [x] `p2` - **ID**: `cpt-noter-flow-ui-library-calls-edit`
 
 **Actor**: Primary user
 
@@ -135,8 +135,8 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 - `conflict`: the row keeps the core's current values
 
 **Steps**:
-1. [ ] - `p2` - User renames or retypes the call (Call page ⋯ › **Rename…**, **Call Type ▸**) - `inst-user-edit`
-2. [ ] - `p2` - API: `call_update` (call id, `rev`, title or type); the call types come from `call_types_list` - `inst-api-update`
+1. [x] - `p2` - User renames or retypes the call (Call page ⋯ › **Rename…**, **Call Type ▸**) - `inst-user-edit`
+2. [x] - `p2` - API: `call_update` (call id, `rev`, title or type); the call types come from `call_types_list` - `inst-api-update`
 3. [x] - `p2` - Store: `entity:changed` updates the row - `inst-row-update`
 4. [x] - `p2` - **RETURN** the row with the new values - `inst-return-edit`
 

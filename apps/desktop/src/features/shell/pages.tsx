@@ -36,6 +36,8 @@ export interface PageToolbarProps {
   base: ToolbarProps;
   inspectorOpen: boolean;
   onToggleInspector: () => void;
+  /** Puts another route in this page's place in the history (a deleted call's page gives way to Library › Calls). */
+  onReplace: (route: Route) => void;
 }
 
 interface Registered {
