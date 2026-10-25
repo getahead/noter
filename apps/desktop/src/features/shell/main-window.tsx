@@ -25,6 +25,8 @@ import { searchRoute } from "./sections";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
 import "../call-page/register";
+import { slots } from "../call-page/slots";
+import { deleteFromPage } from "../../ui/dialogs/delete-calls";
 import "./shell.css";
 
 const NO_NEED = { full: 0, singleColumn: 0, fewerColumns: 0 };
@@ -35,6 +37,12 @@ const NO_NEED = { full: 0, singleColumn: 0, fewerColumns: 0 };
 // @cpt-flow:cpt-noter-flow-ui-main-window-shell-resize:p1
 export function MainWindow({ bridge }: { bridge: Bridge }) {
   const [shell, dispatch] = useReducer(shellReduce, INITIAL_SHELL);
+  // Delete Call… on a call's page: the dialogs host's alert, then Library › Calls replaces the deleted page. Set while
+  // rendering because the call page's toolbar, a child, reads it before any effect of this window runs.
+  slots.deleteCall = (b, id) =>
+    void deleteFromPage(b, { id, title: b.store.getState().entities.call[id]?.title ?? "" }, () =>
+      dispatch({ type: "move", move: { type: "replace", route: { section: "library", key: "root" } } }),
+    );
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [viewport, setViewport] = useState(() => globalThis.innerWidth ?? 1280);

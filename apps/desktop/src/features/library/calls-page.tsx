@@ -158,8 +158,10 @@ export function CallsPage() {
 
   // @cpt-begin:cpt-noter-flow-ui-library-calls-delete:p1:inst-user-delete
   const onKeyDown = (e: KeyboardEvent) => {
+    // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
     if (e.metaKey && e.key === "Backspace" && chosen.length)
       return (e.preventDefault(), void remove(chosen));
+    // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
     if (e.metaKey && e.key.toLowerCase() === "a")
       return (e.preventDefault(), setSelection(selectAll(order)));
     if (e.shiftKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -196,7 +198,9 @@ export function CallsPage() {
       }}
       onKeyDown={onKeyDown}
       onRetry={() => void list.load()}
+      // @cpt-begin:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-user-trigger
       onSelfTest={() => sheets.open("self-test")}
+      // @cpt-end:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-user-trigger
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}

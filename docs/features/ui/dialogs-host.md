@@ -77,7 +77,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Delete a call for good
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-delete-call`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-delete-call`
 
 **Actor**: Primary user
 
@@ -90,7 +90,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 - The delete fails (`not_found`, `internal`): the page shows its section error; the call stays listed until the core reports it gone
 
 **Steps**:
-1. [ ] - `p1` - User chooses **Delete Call…** on a call's page, or **Delete…** or ⌘⌫ with rows selected in Calls - `inst-user-delete`
+1. [x] - `p1` - User chooses **Delete Call…** on a call's page, or **Delete…** or ⌘⌫ with rows selected in Calls - `inst-user-delete`
 2. [x] - `p1` - Algorithm: build the alert with `cpt-noter-algo-ui-dialogs-host-delete-alert` - `inst-build-alert`
 3. [x] - `p1` - UI: request the native alert from the core's dialog plugin, attached to the main window as a sheet where the plugin allows; **Cancel** is the default (Return and Esc) - `inst-request-alert`
 4. [x] - `p1` - **IF** the user chooses **Cancel** or presses Return or Esc - `inst-if-cancel`
@@ -98,8 +98,8 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 5. [x] - `p1` - API: `calls_delete` (the call ids) - `inst-api-delete`
 6. [x] - `p1` - **IF** the result is an error - `inst-if-delete-error`
    1. [x] - `p1` - **RETURN** the calling page's section error, with **Try Again** when retryable - `inst-return-delete-error`
-7. [ ] - `p1` - UI: from a call's page, navigate to Library › **Calls**; in Calls, the rows leave the list as `entity:changed` reports them gone - `inst-after-delete`
-8. [ ] - `p1` - **RETURN** the calls deleted for good - `inst-return-deleted`
+7. [x] - `p1` - UI: from a call's page, navigate to Library › **Calls**; in Calls, the rows leave the list as `entity:changed` reports them gone - `inst-after-delete`
+8. [x] - `p1` - **RETURN** the calls deleted for good - `inst-return-deleted`
 
 ### Quit while recording
 
@@ -124,7 +124,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Confirm a discard in the call window
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-inline-confirm`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-inline-confirm`
 
 **Actor**: Primary user
 
@@ -135,12 +135,12 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 - **Back** returns to the notice's actions; nothing is deleted
 
 **Steps**:
-1. [ ] - `p1` - User clicks **Discard Recording** in the capture notice - `inst-user-discard`
+1. [x] - `p1` - User clicks **Discard Recording** in the capture notice - `inst-user-discard`
 2. [x] - `p1` - UI: replace the notice's actions with the inline confirmation; focus moves to **Back**; no default button - `inst-inline`
-3. [ ] - `p1` - **IF** the user clicks **Discard** - `inst-if-discard`
-   1. [ ] - `p1` - API: `capture_discard` (through `cpt-noter-feature-ui-call-window`); the window closes and nothing is kept - `inst-api-discard`
-4. [ ] - `p1` - **ELSE** the actions come back - `inst-else-back`
-5. [ ] - `p1` - **RETURN** the decision - `inst-return-inline`
+3. [x] - `p1` - **IF** the user clicks **Discard** - `inst-if-discard`
+   1. [x] - `p1` - API: `capture_discard` (through `cpt-noter-feature-ui-call-window`); the window closes and nothing is kept - `inst-api-discard`
+4. [x] - `p1` - **ELSE** the actions come back - `inst-else-back`
+5. [x] - `p1` - **RETURN** the decision - `inst-return-inline`
 
 ### Open a sheet or a popover
 
@@ -156,10 +156,10 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 - The sheet's command fails: the primary button leaves its busy state and the error shows under the first invalid field or as a sheet banner
 
 **Steps**:
-1. [ ] - `p1` - User triggers an action whose label ends in an ellipsis, or a control that opens a popover - `inst-user-trigger`
+1. [x] - `p1` - User triggers an action whose label ends in an ellipsis, or a control that opens a popover - `inst-user-trigger`
 2. [x] - `p1` - UI: the owning feature opens its registered sheet (480 to 640 pt) or popover (280 to 360 pt) in the host - `inst-open-host`
 3. [ ] - `p1` - User fills it and presses the primary button - `inst-user-submit`
-4. [ ] - `p1` - UI: the primary button shows a spinner and keeps its label (**Sheet busy**); fields stay readable - `inst-busy`
+4. [x] - `p1` - UI: the primary button shows a spinner and keeps its label (**Sheet busy**); fields stay readable - `inst-busy`
 5. [ ] - `p1` - **IF** the command fails with invalid input - `inst-if-invalid`
    1. [ ] - `p1` - UI: focus moves to the first invalid field with its message under it - `inst-invalid`
 6. [ ] - `p1` - **RETURN** the sheet closed and the result shown where it applies - `inst-return-sheet`
@@ -186,18 +186,18 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Alert
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-dialogs-host-alert`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-dialogs-host-alert`
 
 **States**: CLOSED, ASKED, CONFIRMED, CANCELLED
 
 **Initial State**: CLOSED
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** CLOSED **TO** ASKED **WHEN** an irreversible action is chosen (Delete asked, Several calls selected, Quit while recording) - `inst-closed-asked`
-2. [ ] - `p1` - **FROM** ASKED **TO** CANCELLED **WHEN** the user chooses **Cancel**, presses Return (Return pressed by habit) or Esc - `inst-asked-cancelled`
-3. [ ] - `p1` - **FROM** ASKED **TO** CONFIRMED **WHEN** the user chooses the destructive button (Call deleted) - `inst-asked-confirmed`
-4. [ ] - `p1` - **FROM** CONFIRMED **TO** CLOSED **WHEN** the core reports the result - `inst-confirmed-closed`
-5. [ ] - `p1` - **FROM** CANCELLED **TO** CLOSED **WHEN** focus returns to the opener - `inst-cancelled-closed`
+1. [x] - `p1` - **FROM** CLOSED **TO** ASKED **WHEN** an irreversible action is chosen (Delete asked, Several calls selected, Quit while recording) - `inst-closed-asked`
+2. [x] - `p1` - **FROM** ASKED **TO** CANCELLED **WHEN** the user chooses **Cancel**, presses Return (Return pressed by habit) or Esc - `inst-asked-cancelled`
+3. [x] - `p1` - **FROM** ASKED **TO** CONFIRMED **WHEN** the user chooses the destructive button (Call deleted) - `inst-asked-confirmed`
+4. [x] - `p1` - **FROM** CONFIRMED **TO** CLOSED **WHEN** the core reports the result - `inst-confirmed-closed`
+5. [x] - `p1` - **FROM** CANCELLED **TO** CLOSED **WHEN** focus returns to the opener - `inst-cancelled-closed`
 
 ### Sheet
 
@@ -253,7 +253,7 @@ The system **MUST** ask before deleting one or several calls with the prototype'
 
 ### Inline confirmation in the call window
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-dialogs-host-inline`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-dialogs-host-inline`
 
 The system **MUST** confirm discarding a recording inline in the capture notice, never with an alert or sheet in the call window, with focus on **Back** and no default button.
 
@@ -269,10 +269,10 @@ The system **MUST** confirm discarding a recording inline in the capture notice,
 ## 6. Acceptance Criteria
 
 - [ ] Every irreversible action in M1 asks first, and Return never confirms a delete
-- [ ] No alert or sheet ever appears in the call window
-- [ ] Deleting from a call's page lands on Library › **Calls** without the call
-- [ ] Sheets keep focus inside until they close and return it to the opener
-- [ ] Plural titles and buttons follow the plural rules (**Delete 3 calls?**, **Delete 3 Calls**)
+- [x] No alert or sheet ever appears in the call window
+- [x] Deleting from a call's page lands on Library › **Calls** without the call
+- [x] Sheets keep focus inside until they close and return it to the opener
+- [x] Plural titles and buttons follow the plural rules (**Delete 3 calls?**, **Delete 3 Calls**)
 
 ## 7. Additional Context
 

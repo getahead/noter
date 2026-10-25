@@ -8,6 +8,7 @@ export type DeleteOutcome =
   | { outcome: "failed"; error: CoreError };
 
 // @cpt-flow:cpt-noter-flow-ui-dialogs-host-delete-call:p1
+// @cpt-state:cpt-noter-state-ui-dialogs-host-alert:p1
 /** Asks first, then deletes through `calls_delete`; the caller shows the error and goes to Library › Calls. Never retries (D-31: a live call answers `already_recording`). */
 export async function deleteCalls(
   bridge: Bridge,
@@ -19,12 +20,19 @@ export async function deleteCalls(
   const alert = deleteAlert(calls);
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-build-alert
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-cancel
+  // @cpt-begin:cpt-noter-state-ui-dialogs-host-alert:p1:inst-closed-asked
+  // @cpt-begin:cpt-noter-state-ui-dialogs-host-alert:p1:inst-asked-cancelled
   if (!(await askAlert(alert, ask))) {
     // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-cancel
-    return { outcome: "cancelled" };
+    // @cpt-begin:cpt-noter-state-ui-dialogs-host-alert:p1:inst-cancelled-closed
+    return { outcome: "cancelled" }; // a native alert gives focus back to the control that asked
+    // @cpt-end:cpt-noter-state-ui-dialogs-host-alert:p1:inst-cancelled-closed
     // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-cancel
   }
+  // @cpt-end:cpt-noter-state-ui-dialogs-host-alert:p1:inst-asked-cancelled
+  // @cpt-end:cpt-noter-state-ui-dialogs-host-alert:p1:inst-closed-asked
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-cancel
+  // @cpt-begin:cpt-noter-state-ui-dialogs-host-alert:p1:inst-asked-confirmed
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-api-delete
   const res = await bridge.act(
     "calls_delete",
@@ -33,10 +41,29 @@ export async function deleteCalls(
     { screen: "dialogs-host" },
   );
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-api-delete
+  // @cpt-end:cpt-noter-state-ui-dialogs-host-alert:p1:inst-asked-confirmed
+  // @cpt-begin:cpt-noter-state-ui-dialogs-host-alert:p1:inst-confirmed-closed
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-delete-error
+  // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-deleted
   if (res.status === "ok") return { outcome: "deleted" };
+  // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-deleted
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-delete-error
   return { outcome: "failed", error: res.error };
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-delete-error
   // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-if-delete-error
+  // @cpt-end:cpt-noter-state-ui-dialogs-host-alert:p1:inst-confirmed-closed
+}
+
+/** **Delete Call…** on a call's page: asks and deletes, then `leave` puts Library › Calls in the page's place. */
+export async function deleteFromPage(
+  bridge: Bridge,
+  call: { id: string; title: string },
+  leave: () => void,
+  ask: Ask = nativeAsk,
+): Promise<DeleteOutcome> {
+  const res = await deleteCalls(bridge, [call], ask);
+  // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-after-delete
+  if (res.outcome === "deleted") leave();
+  // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-after-delete
+  return res;
 }

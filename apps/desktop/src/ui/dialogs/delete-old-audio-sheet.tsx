@@ -26,6 +26,7 @@ export function DeleteOldAudioSheet({
       </div>
       <SheetFooter
         defaultButton={
+          // @cpt-begin:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-busy
           <PushButton
             label={t("dialogs.old_audio.confirm")}
             variant="destructive"
@@ -33,6 +34,7 @@ export function DeleteOldAudioSheet({
             disabled={!onDelete}
             onAction={onDelete}
           />
+          // @cpt-end:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-busy
         }
       >
         <PushButton label={t("dialogs.cancel")} onAction={close} />
