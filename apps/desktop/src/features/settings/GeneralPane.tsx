@@ -1,4 +1,3 @@
-import { permissionState } from "../notifications/notifications";
 import { useState } from "react";
 
 import { useWindow } from "../../app/use-window";
@@ -9,6 +8,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { Toggle } from "../../ui/primitives/toggle";
+import { permissionState } from "../notifications/notifications";
 import { saveSection, unignoreKey, useRowErrors } from "./actions";
 import { SelfTestSheet } from "./SelfTestSheet";
 import { Group, Row } from "./form";
