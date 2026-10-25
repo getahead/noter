@@ -25,16 +25,12 @@ const ROW =
   '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
 const rowOf = (page: Page, title: string) =>
   page.locator(ROW).filter({ hasText: title });
-const button = (page: Page, name: string) =>
-  page.getByRole("button", { name, exact: true });
 const sent = async (page: Page, name: string): Promise<unknown[]> =>
   (await calls(page))
     .filter((c) => c.kind === "invoke" && c.name === name)
     .map((c) => c.args);
 
 const TITLE = "Backend sync";
-const ONE =
-  "This removes its audio, transcript, summary, items and cards. You can't undo this.";
 const MANY =
   "This removes their audio, transcripts, summaries, items and cards. You can't undo this.";
 
@@ -50,14 +46,6 @@ async function openCalls(
   await page.keyboard.press("Meta+Digit3");
   await expect(rowOf(page, TITLE).first()).toBeVisible();
   return steer;
-}
-
-/** Calls → the call's page (double-click on its row). */
-async function openCallPage(page: Page, title = TITLE) {
-  await rowOf(page, title).first().dblclick();
-  await expect(
-    page.locator('[data-region="MW-R1"]').getByRole("heading", { name: title }),
-  ).toBeVisible();
 }
 
 test.describe("cpt-noter-seq-dialogs-delete-call", () => {
@@ -102,6 +90,4 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
 test.describe("cpt-noter-flow-ui-dialogs-host-sheet", () => {});
 
 test.describe("cpt-noter-flow-ui-dialogs-host-inline-confirm", () => {
-  const nothingHeard = (w: Parameters<typeof W.idle>[0]) =>
-    W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN });
 });
