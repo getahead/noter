@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CallRow } from "../../core/bindings";
-import { groupByMonth, nextSort, sortOf, subtitle } from "./calls-model";
+import type { OutputsProgress } from "../../core/bindings";
+import { groupByMonth, nextSort, sortOf, subtitle, withProgress, writing } from "./calls-model";
 
 const at = (y: number, m: number, d: number, ms = 60 * 60_000) =>
   ({
@@ -54,5 +55,25 @@ describe("subtitle", () => {
   it("adds how many are selected and uses the core's total when it has one", () => {
     expect(subtitle([at(2026, 9, 2)], 212, 3, "UTC")).toContain("212 calls · ");
     expect(subtitle([at(2026, 9, 2)], 212, 3, "UTC")).toMatch(/ · 3 selected$/);
+  });
+});
+
+describe("outputs:progress on the rows (inst-live-status)", () => {
+  const sec = (call_id: string, section: string, type: string) =>
+    ({ [`${call_id}/${section}`]: { call_id, section, state: { type } } }) as unknown as Record<string, OutputsProgress>;
+  const row = (id: string, outputs: string) => ({ id, outputs }) as CallRow;
+
+  it("shows Writing while a section is being written, and ready or failed when none is", () => {
+    const rows = [row("a", "ready"), row("b", "writing"), row("c", "ready")];
+    const progress = { ...sec("a", "summary", "writing"), ...sec("b", "summary", "ready"), ...sec("b", "actions", "failed") };
+    expect(withProgress(rows, progress).map((r) => r.outputs)).toEqual(["writing", "failed", "ready"]);
+    expect(withProgress(rows, {})).toBe(rows);
+  });
+
+  it("keeps a row the progress agrees with, and reads the sidebar's glyph off any writing section", () => {
+    const rows = [row("a", "ready")];
+    expect(withProgress(rows, sec("a", "summary", "ready"))).toBe(rows);
+    expect(writing(sec("a", "summary", "writing"))).toBe(true);
+    expect(writing({ ...sec("a", "summary", "ready"), ...sec("b", "actions", "pending") })).toBe(false);
   });
 });

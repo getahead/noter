@@ -9,6 +9,7 @@ const bridge = {
   store: {
     getState: () => ({
       entities: { call: {} },
+      outputs: {},
       whole: { setup: { self_test: { type: "skipped" } } },
     }),
     subscribe: () => () => {},

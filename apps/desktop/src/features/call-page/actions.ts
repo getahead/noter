@@ -34,13 +34,17 @@ export const loadTypes = (bridge: Bridge) => bridge.act("call:types", "call_type
 /** Rename in place: the title with the call's `rev`; a `conflict` leaves the core's values to be read again. */
 export function rename(bridge: Bridge, callId: string, rev: number, title: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-rename
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   return bridge.act(`call:update:${callId}`, "call_update", () => bridge.core.callUpdate({ call_id: callId, rev, title }), { entity: "call" });
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-rename
 }
 
 export function setCallType(bridge: Bridge, callId: string, rev: number, callType: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-type
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   return bridge.act(`call:update:${callId}`, "call_update", () => bridge.core.callUpdate({ call_id: callId, rev, call_type: callType }), { entity: "call" });
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-type
 }
 
@@ -79,6 +83,7 @@ export const openPrivacySettings = (bridge: Bridge) => bridge.core.windowNavigat
 
 /** What the ⋯ menu's items do for this call. Delete Call… is the dialogs host's alert, absent until it registers. */
 export function menuActs(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "privacy">, startRename: () => void) {
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
   return {
     rename: startRename,
     type: (id: string) => void setCallType(bridge, call.id, call.rev, id),
@@ -86,4 +91,5 @@ export function menuActs(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "pri
     finder: () => void revealFolder(bridge, call.id),
     remove: slots.deleteCall ? () => slots.deleteCall?.(bridge, call.id) : null,
   };
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
 }

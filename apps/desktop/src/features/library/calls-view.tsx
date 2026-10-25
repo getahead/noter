@@ -47,6 +47,7 @@ const selectedRows = (rows: CallRow[], s: Selection) =>
   rows.filter((r) => s.ids.includes(r.id));
 
 /** Library › Calls as the prototype draws it: LC-R1 (title and counts) and LC-R3 (table, empty state, skeleton or error). */
+// @cpt-dod:cpt-noter-dod-ui-library-calls-table:p2
 export function CallsView(p: CallsViewProps) {
   const { state, selection } = p;
   const chosen = selectedRows(state.rows, selection);

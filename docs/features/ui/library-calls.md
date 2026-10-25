@@ -74,7 +74,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Browse and open calls
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-library-calls-browse`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-library-calls-browse`
 
 **Actor**: Primary user
 
@@ -99,7 +99,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 8. [x] - `p1` - API: `calls_list` with the new sort; the sort state is announced ("sorted descending") - `inst-api-sort`
 9. [x] - `p1` - User presses Return, double-clicks or clicks › on a row - `inst-user-row`
 10. [x] - `p1` - UI: push the Call page route for the call (`cpt-noter-feature-ui-call-page-frame`), which reads it with `call_get` - `inst-open-call`
-11. [ ] - `p1` - Core: `entity:changed` and `outputs:progress` update a row's status cell (**Writing summary…**) and the sidebar's progress glyph; status changes are not announced - `inst-live-status`
+11. [x] - `p1` - Core: `entity:changed` and `outputs:progress` update a row's status cell (**Writing summary…**) and the sidebar's progress glyph; status changes are not announced - `inst-live-status`
 12. [x] - `p1` - **RETURN** the Calls page - `inst-return-browse`
 
 ### Select and delete calls
@@ -124,7 +124,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Rename or retype a call from its row
 
-- [ ] `p2` - **ID**: `cpt-noter-flow-ui-library-calls-edit`
+- [x] `p2` - **ID**: `cpt-noter-flow-ui-library-calls-edit`
 
 **Actor**: Primary user
 
@@ -135,8 +135,8 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 - `conflict`: the row keeps the core's current values
 
 **Steps**:
-1. [ ] - `p2` - User renames or retypes the call (Call page ⋯ › **Rename…**, **Call Type ▸**) - `inst-user-edit`
-2. [ ] - `p2` - API: `call_update` (call id, `rev`, title or type); the call types come from `call_types_list` - `inst-api-update`
+1. [x] - `p2` - User renames or retypes the call (Call page ⋯ › **Rename…**, **Call Type ▸**) - `inst-user-edit`
+2. [x] - `p2` - API: `call_update` (call id, `rev`, title or type); the call types come from `call_types_list` - `inst-api-update`
 3. [x] - `p2` - Store: `entity:changed` updates the row - `inst-row-update`
 4. [x] - `p2` - **RETURN** the row with the new values - `inst-return-edit`
 
@@ -181,7 +181,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Calls table and call row
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-library-calls-table`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-library-calls-table`
 
 The system **MUST** render LC-R1 and LC-R3 as the prototype's Calls view does, with `C.callRow` in its table-row variant (and the compact and result-group-header variants for later pages), month groups, sort, multi-select, the status cell order, the **Local only** tag, column hiding at Medium and Narrow, keyboard behaviour and VoiceOver row labels, from `calls_list` pages.
 
