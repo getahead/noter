@@ -82,8 +82,8 @@ final class MenuBarTests: NoterTestCase {
 
     func test_cpt_noter_seq_record_prompt_record_after_missed_prompt__call_detected_start_recording() {
         let menu = openMenu()
-        XCTAssertTrue(menu.staticTexts.matching(NSPredicate(format: "label CONTAINS 'call detected'")).firstMatch.exists)
-        item("Start Recording", in: menu).click()
+        XCTAssertTrue(item("Call Detected · Start Recording", in: menu).exists)
+        item("Call Detected · Start Recording", in: menu).click()
         XCTAssertTrue(openMenu().staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Recording'")).firstMatch.waitForExistence(timeout: 5))
     }
 

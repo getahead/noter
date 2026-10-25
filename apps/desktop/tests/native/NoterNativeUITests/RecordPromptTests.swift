@@ -12,7 +12,7 @@ final class RecordPromptTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_record_prompt_record_after_missed_prompt__hotkey_records() {
-        XCTAssertTrue(openMenu().staticTexts.matching(NSPredicate(format: "label CONTAINS 'call detected'")).firstMatch.exists)
+        XCTAssertTrue(item("Call Detected · Start Recording", in: openMenu()).exists)
         app.typeKey(.escape, modifierFlags: [])
         hotkey("r")
         XCTAssertTrue(openMenu().staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Recording'")).firstMatch.waitForExistence(timeout: 5))
