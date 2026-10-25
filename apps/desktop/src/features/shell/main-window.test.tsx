@@ -145,7 +145,6 @@ describe("MainWindow controls", () => {
     bar.onSearch("zoom");
     bar.onRunSearch(" zoom ");
     bar.onOpenSearch();
-    bar.onReplace({ section: "library", key: "root" });
 
     const slot = find(tree, (_, type) => type === BannerSlot).props as never as Parameters<typeof BannerSlot>[0];
     for (const b of slot.banners) for (const a of b.actions ?? []) a.onAction?.();

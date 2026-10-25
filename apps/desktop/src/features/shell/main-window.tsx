@@ -41,7 +41,11 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // rendering because the call page's toolbar, a child, reads it before any effect of this window runs.
   slots.deleteCall = (b, id) =>
     void deleteFromPage(b, { id, title: b.store.getState().entities.call[id]?.title ?? "" }, () =>
+      // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-return-more
+      // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-deleted
       dispatch({ type: "move", move: { type: "replace", route: { section: "library", key: "root" } } }),
+      // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-deleted
+      // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-return-more
     );
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -214,7 +218,6 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
           bridge={bridge}
           inspectorOpen={shell.history.inspectorOpen}
           onToggleInspector={() => act({ type: "toggle-inspector" })}
-          onReplace={(r) => dispatch({ type: "move", move: { type: "replace", route: r } })}
           title={page.title(route)}
           subtitle={subtitle}
           actions={page.actions ?? []}

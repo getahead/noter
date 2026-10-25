@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { loadCall, loadTypes, menuActs, openCallPage, openPrivacySettings, readCall, removeCall, rename, reportView, requestNotifications, revealFolder, saveTitle, setCallType, setSensitive } from "./actions";
+import { loadCall, loadTypes, menuActs, openCallPage, openPrivacySettings, readCall, rename, reportView, requestNotifications, revealFolder, saveTitle, setCallType, setSensitive } from "./actions";
 import { holdExtras, resetCache, useExtras } from "./cache";
+import { slots } from "./slots";
 
 let bridge: Bridge;
 let fake: FakeCore;
 afterEach(() => {
+  slots.deleteCall = null;
   resetCache();
   return bridge.close();
 });
@@ -153,13 +155,13 @@ describe("opening the page and its controls", () => {
     expect(seen).toContainEqual(["window_navigate", { target: { type: "settings", pane: "privacy" } }]);
   });
 
-  it("menuActs sends each item's command", async () => {
+  it("menuActs sends each item's command and has no Delete Call… until the dialogs host registers", async () => {
     const id = await ready();
-    const call = { id, rev: fake.world.calls.find((c) => c.id === id)!.rev, privacy: "normal" as const, title: "x" };
+    const call = { id, rev: fake.world.calls.find((c) => c.id === id)!.rev, privacy: "normal" as const };
     await readCall(bridge, id);
     const seen = sent();
     let renamed = 0;
-    const acts = menuActs(bridge, call, () => void renamed++, () => {});
+    const acts = menuActs(bridge, call, () => void renamed++);
     acts.rename();
     acts.type(fake.world.call_types.call_types[0]!.id);
     acts.sensitive();
@@ -168,30 +170,10 @@ describe("opening the page and its controls", () => {
     expect(renamed).toBe(1);
     expect(seen.map((s) => s[0])).toEqual(["call_update", "capture_set_sensitive", "open_external"]);
     expect(seen[1]![1]).toEqual({ call_id: id, sensitive: true });
-    expect(typeof acts.remove).toBe("function");
-  });
-
-  it("removeCall asks first: Cancel sends nothing and stays, Delete sends calls_delete and leaves for Library › Calls", async () => {
-    await ready();
-    const call = fake.world.calls.find((c) => c.status === "ready")!;
-    const id = call.id;
-    const seen = sent();
-    const left: unknown[] = [];
+    expect(acts.remove).toBeNull();
     const asked: string[] = [];
-    expect(await removeCall(bridge, call, (r) => left.push(r), async (o) => (asked.push(o.title), false))).toEqual({ outcome: "cancelled" });
-    expect(seen.filter((s) => s[0] === "calls_delete")).toEqual([]);
-    expect(left).toEqual([]);
-    expect(await removeCall(bridge, call, (r) => left.push(r), async () => true)).toEqual({ outcome: "deleted" });
-    expect(seen).toContainEqual(["calls_delete", { call_ids: [id] }]);
-    expect(left).toEqual([{ section: "library", key: "root" }]);
-    expect(asked[0]).toContain(call.title);
-  });
-
-  it("removeCall stays on the page when the core refuses", async () => {
-    const id = await ready();
-    const left: unknown[] = [];
-    fake.failNext("calls_delete", "internal");
-    expect((await removeCall(bridge, fake.world.calls.find((c) => c.id === id)!, (r) => left.push(r), async () => true)).outcome).toBe("failed");
-    expect(left).toEqual([]);
+    slots.deleteCall = (_b, callId) => void asked.push(callId);
+    menuActs(bridge, call, () => {}).remove?.();
+    expect(asked).toEqual([id]);
   });
 });

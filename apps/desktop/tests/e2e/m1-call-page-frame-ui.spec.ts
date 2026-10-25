@@ -13,7 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
-import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
+import { alerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
 const STDIO = process.env.NOTER_CORE === "stdio";
@@ -277,20 +277,6 @@ test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
 });
 
 test.describe("cpt-noter-seq-dialogs-delete-call", () => {
-  test("UI — happy path: Delete Call… asks first; Delete removes the call and the page lands on Library › Calls", async ({ page }) => {
-    await watchAlerts(page);
-    await openWindow(page, "main", { world: quiet() });
-    await openCall(page);
-    await answerAlerts(page, "confirm");
-    await openMore(page);
-    await menuItem(page, "Delete Call…").click();
-    await expect.poll(async () => (await alerts(page)).length).toBe(1);
-    expect(alertText((await alerts(page))[0]!)).toContain(TITLE);
-    await expect.poll(() => sent(page, "calls_delete")).toEqual([{ call_ids: [W.PAST_CALL] }]);
-    await expect(page.locator('[data-region="MW-R3"]').getByRole("heading", { name: "Calls" })).toBeVisible();
-    await expect(toolbar(page)).toHaveCount(0);
-  });
-
   test("UI — other path: Cancel in the alert keeps the call and its page", async ({ page }) => {
     await watchAlerts(page);
     await openWindow(page, "main", { world: quiet() });

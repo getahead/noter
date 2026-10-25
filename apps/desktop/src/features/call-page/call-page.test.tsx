@@ -14,6 +14,7 @@ import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
 import { CallToolbar, moreItems, REGISTERED_VIEWS } from "./CallToolbar";
 import { loadCall, loadTypes } from "./actions";
+import { slots } from "./slots";
 import { StoredTranscript } from "../transcript/hosts";
 import "./register";
 
@@ -21,7 +22,10 @@ let bridge: Bridge;
 let fake: FakeCore;
 let id: string;
 beforeEach(resetCache);
-afterEach(() => bridge.close());
+afterEach(() => {
+  slots.deleteCall = null;
+  return bridge.close();
+});
 
 async function ready(more: (w: FakeCore["world"]) => void = () => {}) {
   fake = new FakeCore({ window: "main" });
@@ -78,7 +82,7 @@ describe("CallToolbar", () => {
 
   it("lists only the delivered view, with the call's title and subtitle in PC-R1", async () => {
     await ready();
-    const html = renderToString(<CallToolbar route={route()} bridge={bridge} base={base} inspectorOpen onToggleInspector={() => {}} onReplace={() => {}} />);
+    const html = renderToString(<CallToolbar route={route()} bridge={bridge} base={base} inspectorOpen onToggleInspector={() => {}} />);
     expect(html).toContain('data-region="PC-R1"');
     expect(html).toContain(fake.world.calls.find((c) => c.id === id)!.title);
     expect(html).toContain("Transcript");
@@ -89,7 +93,7 @@ describe("CallToolbar", () => {
 
   it("at Narrow width the view control is a pop-up button with the same views", async () => {
     await ready();
-    const html = renderToString(<CallToolbar route={route()} bridge={bridge} base={{ ...base, narrow: true }} inspectorOpen onToggleInspector={() => {}} onReplace={() => {}} />);
+    const html = renderToString(<CallToolbar route={route()} bridge={bridge} base={{ ...base, narrow: true }} inspectorOpen onToggleInspector={() => {}} />);
     expect(html).toContain('data-primitive="popup-button"');
     expect(html).toContain("<option");
     expect(html).not.toContain('data-primitive="segmented-control"');
@@ -100,36 +104,35 @@ describe("CallToolbar", () => {
     const call = bridge.store.getState().entities.call[id]!;
     fake.emit("entity:changed", { type: "call", call: { ...call, title: "Renamed in the list", rev: call.rev + 1 } });
     await settle();
-    expect(renderToString(<CallToolbar route={route()} bridge={bridge} base={base} inspectorOpen onToggleInspector={() => {}} onReplace={() => {}} />)).toContain("Renamed in the list");
+    expect(renderToString(<CallToolbar route={route()} bridge={bridge} base={base} inspectorOpen onToggleInspector={() => {}} />)).toContain("Renamed in the list");
   });
 
   it("the inspector toggle runs the shell's toggle", async () => {
     await ready();
     let toggled = 0;
-    const tree = rendered(CallToolbar, { route: route(), bridge, base, inspectorOpen: false, onToggleInspector: () => void toggled++, onReplace() {} });
+    const tree = rendered(CallToolbar, { route: route(), bridge, base, inspectorOpen: false, onToggleInspector: () => void toggled++ });
     (find(tree.props.trailing as ReactNode, (p) => p.label === "Show Inspector").props.onAction as () => void)();
     expect(toggled).toBe(1);
   });
 
-  it("the ⋯ menu offers the M1 items, each running its action", async () => {
+  it("the ⋯ menu offers the M1 items, Delete Call… disabled until the dialogs host registers", async () => {
     await ready();
     const call = fake.world.calls.find((c) => c.id === id)!;
     const calls: string[] = [];
-    const act = { rename: () => calls.push("rename"), type: (t: string) => calls.push(`type:${t}`), sensitive: () => calls.push("sensitive"), finder: () => calls.push("finder"), remove: () => calls.push("remove") };
+    const act = { rename: () => calls.push("rename"), type: (t: string) => calls.push(`type:${t}`), sensitive: () => calls.push("sensitive"), finder: () => calls.push("finder"), remove: null };
     const items = moreItems(call, fake.world.call_types.call_types, act);
     const labels = items.flatMap((i) => ("label" in i ? [i.label] : []));
     expect(labels).toEqual(["Rename…", "Call Type", "Mark as Sensitive", "Show in Finder", "Delete Call…"]);
     const del = items.find((i) => "label" in i && i.label === "Delete Call…") as { disabled?: boolean; kbd?: string };
-    expect(del).toMatchObject({ kbd: "⌘⌫" });
-    expect(del.disabled).toBeFalsy();
+    expect(del).toMatchObject({ disabled: true, kbd: "⌘⌫" });
     for (const i of items) if ("label" in i && !i.children && !i.disabled) i.onSelect?.();
     const type = items.find((i) => "label" in i && i.children) as { children: Array<{ label: string; checked?: boolean; onSelect?: () => void }> };
     type.children[0]!.onSelect?.();
-    expect(calls).toEqual(["rename", "sensitive", "finder", "remove", `type:${fake.world.call_types.call_types[0]!.id}`]);
+    expect(calls).toEqual(["rename", "sensitive", "finder", `type:${fake.world.call_types.call_types[0]!.id}`]);
     expect(type.children.some((c) => c.checked)).toBe(call_has_type(call, type.children, fake.world.call_types.call_types));
   });
 
-  it("a sensitive call's item reads Sensitive and is checked, and Delete Call… runs its action", async () => {
+  it("a sensitive call's item reads Sensitive and is checked, and Delete Call… runs the host's alert once registered", async () => {
     await ready();
     const call = { ...fake.world.calls.find((c) => c.id === id)!, privacy: "sensitive" as const };
     let removed = 0;

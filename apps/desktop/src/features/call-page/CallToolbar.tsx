@@ -25,7 +25,7 @@ import type { CallPageTab } from "../../core/bindings";
 export const REGISTERED_VIEWS: readonly CallPageTab[] = ["transcript"];
 
 /** The ⋯ menu's items for a call (the later items join with their features). */
-export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: () => void }): MenuItem[] {
+export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null }): MenuItem[] {
   const sensitive = call.privacy === "sensitive";
   return [
     // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
@@ -36,11 +36,11 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
     { divider: true },
     { label: t("callpage.show_in_finder"), onSelect: act.finder },
     { divider: true },
-    { label: t("callpage.delete"), destructive: true, kbd: "⌘⌫", onSelect: act.remove },
+    { label: t("callpage.delete"), destructive: true, kbd: "⌘⌫", disabled: act.remove === null, onSelect: act.remove ?? undefined },
   ];
 }
 
-export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspector, onReplace }: PageToolbarProps) {
+export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspector }: PageToolbarProps) {
   const at = parseCallKey(route.key)!;
   const call = useWindow(bridge, (s) => s.entities.call[at.callId]);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
@@ -72,7 +72,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
           {menu && call && (
             <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
               <Menu
-                items={moreItems(call, types, menuActs(bridge, call, () => setRenaming(true), onReplace))}
+                items={moreItems(call, types, menuActs(bridge, call, () => setRenaming(true)))}
                 onClose={() => setMenu(null)}
               />
             </Popover>
