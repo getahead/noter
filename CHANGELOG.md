@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.12.0](https://github.com/getahead/noter/compare/v0.11.0...v0.12.0) (2026-10-25)
+
+
+### Features
+
+* **ui:** call page frame finish ([#214](https://github.com/getahead/noter/issues/214)) ([945df6e](https://github.com/getahead/noter/commit/945df6e5a2fe7631e04e4ee82af706a6e814b2f4))
+* **ui:** dialogs host tick pass ([#213](https://github.com/getahead/noter/issues/213)) ([a856078](https://github.com/getahead/noter/commit/a85607874429f18315a0399866cd8992b78efd45))
+* **ui:** library-calls live status and edit flow ([#212](https://github.com/getahead/noter/issues/212)) ([8ee8bea](https://github.com/getahead/noter/commit/8ee8bea76d62d22208a272ed33d8b554fcb63442))
+
 ## [0.11.0](https://github.com/getahead/noter/compare/v0.10.0...v0.11.0) (2026-10-25)
 
 
