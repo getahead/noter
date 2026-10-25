@@ -30,6 +30,7 @@ public protocol Transcriber: AnyObject, Sendable {
     func decode(_ samples: [Float], languages: [String]) throws -> Decoded
 }
 
+// @cpt-dod:cpt-noter-dod-core-engine-capture-latency:p1
 // @cpt-algo:cpt-noter-algo-core-engine-capture-live-asr:p1
 final class LiveASR: @unchecked Sendable {
     static let rate = 16_000
