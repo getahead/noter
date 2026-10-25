@@ -1,10 +1,14 @@
 // The app under test: the debug bundle `just native` builds (TEST_RUNNER_NOTER_APP_PATH), launched with the
 // command log directory (TEST_RUNNER_NOTER_E2E_LOG_DIR) so what the core ran counts toward the E2E bar.
 // Story tests are named after the DESIGN story they prove (`cpt-noter-seq-…` with underscores, docs/HARNESS.md).
+import AppKit
+import ApplicationServices
 import XCTest
 
 class NoterTestCase: XCTestCase {
     var app: XCUIApplication!
+    /// The app a test brings to the front to prove Noter does not take focus; hotkeys are typed on it.
+    let other = XCUIApplication(bundleIdentifier: "com.apple.finder")
 
     override func setUp() {
         continueAfterFailure = false
@@ -16,6 +20,11 @@ class NoterTestCase: XCTestCase {
         if let dir = ProcessInfo.processInfo.environment["NOTER_E2E_LOG_DIR"] {
             app.launchEnvironment["NOTER_E2E_LOG_DIR"] = dir
         }
+        // Each test starts from a fresh data folder (the core keeps it under $HOME), so what one test
+        // changes (settings, hotkeys) never reaches the next one or the Mac's own Noter.
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("noter-home-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        app.launchEnvironment["HOME"] = home.path
         app.launch()
     }
 
@@ -25,17 +34,27 @@ class NoterTestCase: XCTestCase {
     /// The menu bar extra.
     var statusItem: XCUIElement { app.menuBars.statusItems.firstMatch }
 
-    /// Opens the menu and returns it.
+    /// Opens the menu (or returns it when it is already open).
     @discardableResult
     func openMenu(file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         XCTAssertTrue(statusItem.waitForExistence(timeout: 10), "the menu bar extra is not in the menu bar", file: file, line: line)
-        statusItem.click()
         let menu = statusItem.menus.firstMatch
+        if !menu.exists { statusItem.click() }
         XCTAssertTrue(menu.waitForExistence(timeout: 5), "the menu did not open", file: file, line: line)
         return menu
     }
 
     func item(_ title: String, in menu: XCUIElement) -> XCUIElement { menu.menuItems[title] }
+
+    /// An info line of the menu (macOS draws it as a disabled item) that starts with `prefix`.
+    func infoLine(_ prefix: String, in menu: XCUIElement) -> XCUIElement {
+        menu.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", prefix)).firstMatch
+    }
+
+    /// The state line while recording: **Recording · <title> · 23:14** (not **Recording stopped**).
+    func recordingLine(in menu: XCUIElement) -> XCUIElement {
+        menu.menuItems.matching(NSPredicate(format: "title == 'Recording' OR title BEGINSWITH 'Recording · '")).firstMatch
+    }
 
     func assertItems(_ titles: [String], in menu: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         for t in titles {
@@ -43,14 +62,53 @@ class NoterTestCase: XCTestCase {
         }
     }
 
+    /// Starts a capture with **Start Recording** and waits until the menu reads Recording.
+    func startRecording(file: StaticString = #filePath, line: UInt = #line) {
+        item("Start Recording", in: openMenu(file: file, line: line)).click()
+        XCTAssertTrue(recordingLine(in: openMenu(file: file, line: line)).waitForExistence(timeout: 10),
+                      "Start Recording did not start a capture", file: file, line: line)
+    }
+
+    /// The key macOS draws next to a menu item of the open status menu (AXMenuItemCmdChar, which XCUITest
+    /// does not expose), or nil when the item shows none.
+    func keyOf(_ title: String) -> String? {
+        guard let pid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.getahead.noter").first?.processIdentifier
+        else { return nil }
+        func attr(_ e: AXUIElement, _ name: String) -> AnyObject? {
+            var v: AnyObject?
+            return AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success ? v : nil
+        }
+        func children(_ e: AXUIElement) -> [AXUIElement] { attr(e, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
+        guard let bar = attr(AXUIElementCreateApplication(pid), "AXExtrasMenuBar") else { return nil }
+        for menu in children(bar as! AXUIElement).flatMap(children) {
+            for item in children(menu) where attr(item, kAXTitleAttribute) as? String == title {
+                let key = attr(item, kAXMenuItemCmdCharAttribute) as? String
+                return key?.isEmpty == false ? key : nil
+            }
+        }
+        return nil
+    }
+
+    /// Opens Calls (⌘3) and selects the call with this title.
+    func openCall(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
+        app.typeKey("3", modifierFlags: .command)
+        let row = app.staticTexts[title].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "no call “\(title)” in the library", file: file, line: line)
+        row.click()
+    }
+
     /// A window of the app with this title (the main window is “Noter”).
     func window(_ title: String) -> XCUIElement { app.windows[title] }
 
-    /// The native alert sheet or dialog the app shows.
+    /// The call window: a non-activating panel, which the accessibility tree lists as a dialog, not a window.
+    var callWindow: XCUIElement { app.dialogs.matching(NSPredicate(format: "label != %@", "Record this call?")).firstMatch }
+
+    /// The native alert sheet or dialog the app shows (the one with **Cancel**: the call panel is a dialog too).
     var alert: XCUIElement {
         let sheet = app.sheets.firstMatch
-        return sheet.exists ? sheet : app.dialogs.firstMatch
+        return sheet.exists ? sheet : app.dialogs.containing(NSPredicate(format: "title == 'Cancel' OR label == 'Cancel'")).firstMatch
     }
 
-    func hotkey(_ key: String) { app.typeKey(key, modifierFlags: [.control, .option, .command]) }
+    /// A global hotkey, typed while `other` is in front so it reaches Noter as a global shortcut.
+    func hotkey(_ key: String) { other.typeKey(key, modifierFlags: [.control, .option, .command]) }
 }
