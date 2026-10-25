@@ -9,6 +9,7 @@ const props = (over: Partial<SidebarProps> = {}): SidebarProps => ({
   selected: "today",
   waiting: 0,
   problems: 0,
+  writing: false,
   live: null,
   mode: modeIndicator({ mode: "cloud_redacted", degraded: [], sensitiveCall: false }),
   footer: "Idle · API key · local fallback ready",
@@ -33,6 +34,13 @@ describe("Sidebar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(html).toContain("Idle · API key · local fallback ready");
     expect(html).not.toContain("np-srclist__live");
     expect(html).not.toContain("is-overlay");
+  });
+
+  it("shows a progress glyph beside Calls while any call's outputs are being written", () => {
+    expect(renderToString(<Sidebar {...props()} />)).not.toContain("np-spin");
+    const html = renderToString(<Sidebar {...props({ writing: true })} />);
+    expect(html.match(/np-spin/g)).toHaveLength(1);
+    expect(html.indexOf("np-spin")).toBeGreaterThan(html.indexOf(">Calls<"));
   });
 
   it("reads the Activity badge as Activity, 3 waiting, 1 problem", () => {

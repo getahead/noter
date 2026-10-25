@@ -1,4 +1,4 @@
-import type { CallRow, CallSort } from "../../core/bindings";
+import type { CallRow, CallSort, OutputsProgress, OutputsStatus } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { shortDay } from "./status-cell";
 
@@ -76,3 +76,23 @@ export function subtitle(
   return parts.join(" · ");
 }
 // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-render-table
+
+// @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-live-status
+/** Whether any call's outputs are being written (the sidebar's glyph beside Calls). */
+export const writing = (progress: Record<string, OutputsProgress>) =>
+  Object.values(progress).some((p) => p.state.type === "writing");
+
+/** Rows with what `outputs:progress` has said since: Writing while a section is, else failed or ready. */
+export function withProgress(rows: CallRow[], progress: Record<string, OutputsProgress>): CallRow[] {
+  const by = new Map<string, OutputsProgress[]>();
+  for (const p of Object.values(progress)) by.set(p.call_id, [...(by.get(p.call_id) ?? []), p]);
+  if (!by.size) return rows;
+  const next = rows.map((r) => {
+    const ps = by.get(r.id);
+    if (!ps) return r;
+    const outputs: OutputsStatus = ps.some((p) => p.state.type === "writing") ? "writing" : ps.some((p) => p.state.type === "failed") ? "failed" : "ready";
+    return outputs === r.outputs ? r : { ...r, outputs };
+  });
+  return next.some((r, i) => r !== rows[i]) ? next : rows;
+}
+// @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-live-status

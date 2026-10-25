@@ -279,4 +279,52 @@ test.describe("cpt-noter-flow-ui-library-calls-delete", () => {
   });
 });
 
-test.describe("cpt-noter-flow-ui-library-calls-edit", () => {});
+/** A contract command sent from the page, as the screens do (fake core or the app's bridge). */
+const invoke = (page: Page, cmd: string, args: unknown) =>
+  page.evaluate(
+    async ([c, a]) => {
+      const g = globalThis as unknown as {
+        __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> };
+        __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> };
+      };
+      await (g.__noterFake ? g.__noterFake.invoke(c as string, a) : g.__TAURI_INTERNALS__!.invoke(c as string, { args: a }));
+    },
+    [cmd, args] as const,
+  );
+const FAKE = process.env.NOTER_CORE !== "stdio";
+const glyph = (page: Page) => page.locator('.np-srclist__item .np-spin');
+
+test.describe("cpt-noter-flow-ui-library-calls-browse (live status)", () => {
+  test("UI — happy path: outputs:progress shows Writing summary… on the row and a glyph beside Calls, and both go when the write ends", async ({ page }) => {
+    await openCalls(page);
+    const row = rowOf(page, "Backend sync").first();
+    await expect(glyph(page)).toHaveCount(0);
+    if (!FAKE) return; // the real core has no outputs writer in M1: it never sends outputs:progress yet
+    await invoke(page, "outputs_regenerate", { call_id: W.PAST_CALL, sections: ["summary"] });
+    // the fake core writes for 300 ms: watch every frame, not every poll
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[data-lib-row="call_backend"]')?.textContent?.includes("Writing summary…") &&
+        document.querySelector(".np-srclist__item .np-spin"),
+      null,
+      { polling: "raf" },
+    );
+    await expect(row).not.toContainText("Writing summary…");
+    await expect(glyph(page)).toHaveCount(0);
+  });
+});
+
+test.describe("cpt-noter-flow-ui-library-calls-edit", () => {
+  test("UI — happy path: a title set on the call's page is the row's title when Back returns to Calls", async ({ page }) => {
+    await openCalls(page);
+    await rowOf(page, "Backend sync").first().getByRole("button", { name: /^Open / }).click();
+    const bar = page.locator('[data-region="PC-R1"]');
+    await bar.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Rename…" }).click();
+    await bar.getByRole("textbox").fill("Backend sync, retro");
+    await bar.getByRole("textbox").press("Enter");
+    await expect(bar).toContainText("Backend sync, retro");
+    await page.getByRole("button", { name: "Back" }).first().click();
+    await expect(rowOf(page, "Backend sync, retro")).toHaveCount(1);
+  });
+});

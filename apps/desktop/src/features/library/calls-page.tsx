@@ -18,7 +18,7 @@ import { useSheet } from "../../ui/dialogs/host";
 import { SelfTestSheet } from "../settings/SelfTestSheet";
 import { createCallsList, type CallsList, type CallsState } from "./calls-list";
 import { CallsView, COLUMNS } from "./calls-view";
-import { nextSort, sortOf, type Column } from "./calls-model";
+import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
 import {
   edgeOf,
   extend,
@@ -54,6 +54,7 @@ export function CallsPage() {
   const announce = useAnnounce(bridge);
   const sheets = useSheet();
   const records = useWindow(bridge, (s) => s.entities.call);
+  const progress = useWindow(bridge, (s) => s.outputs);
   const selfTestPassed = useWindow(
     bridge,
     (s) => s.whole.setup?.self_test.type === "passed",
@@ -95,6 +96,8 @@ export function CallsPage() {
   }, [list, state.rows.length, state.next]);
   // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-scroll
 
+  // shortcut: the latest progress wins over the row's own status until the next read; the core ends every write with a progress event
+  const shown = useMemo(() => ({ ...state, rows: withProgress(state.rows, progress) }), [state, progress]);
   const order = useMemo(() => state.rows.map((r) => r.id), [state.rows]);
   const chosen = useMemo(
     () => state.rows.filter((r) => selection.ids.includes(r.id)),
@@ -177,7 +180,7 @@ export function CallsPage() {
 
   return (
     <CallsView
-      state={state}
+      state={shown}
       selection={selection}
       slow={slow}
       failed={failed}

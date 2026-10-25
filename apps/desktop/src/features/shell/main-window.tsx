@@ -22,6 +22,7 @@ import { shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
 import { actionEvent, createScrollMemory, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
+import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
 import "../call-page/register";
@@ -70,6 +71,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const slow = useWindow(bridge, (s) => s.slow);
   const updateInstall = useWindow(bridge, (s) => s.commands["update_install"]);
   const commands = useWindow(bridge, (s) => s.commands);
+  const outputs = useWindow(bridge, (s) => s.outputs);
 
   const shellRef = useRef(shell);
   shellRef.current = shell;
@@ -190,6 +192,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             selected={route.section}
             waiting={proposals?.waiting ?? 0}
             problems={proposals?.needs_attention ?? 0}
+            writing={writing(outputs)}
             live={live}
             mode={mode}
             footer={footer}

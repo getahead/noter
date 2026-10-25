@@ -5,6 +5,7 @@ import { Fragment } from "react";
 import { callTime, t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { SourceList, SourceListGroup, SourceListItem, SourceListLive } from "../../ui/primitives/source-list";
+import { Progress } from "../../ui/primitives/progress";
 import type { ModeView } from "./mode-indicator";
 import { ModeIndicator } from "./mode-indicator-view";
 import type { SectionKey } from "./history";
@@ -15,6 +16,8 @@ export interface SidebarProps {
   /** `proposals:counts`: the Activity badge. */
   waiting: number;
   problems: number;
+  /** `outputs:progress`: a call's outputs are being written (the glyph beside Calls). */
+  writing?: boolean;
   live: { title: string; paused: boolean; seconds: number } | null;
   mode: ModeView;
   /** The footer line (**Idle · API key · local fallback ready**, **Recording · Planning**…). */
@@ -29,7 +32,7 @@ export interface SidebarProps {
   onOpenPrivacy: () => void;
 }
 
-export function Sidebar({ selected, waiting, problems, live, mode, footer, overlay, width, onSelect, onShowCall, onToggle, onOpenPrivacy }: SidebarProps) {
+export function Sidebar({ selected, waiting, problems, writing, live, mode, footer, overlay, width, onSelect, onShowCall, onToggle, onOpenPrivacy }: SidebarProps) {
   return (
     <aside className={overlay ? "np-sidebar is-overlay" : "np-sidebar"} data-region="MW-R2" style={{ width }} aria-label={t("shell.sidebar")}>
       <div className="np-sidebar__top">
@@ -74,7 +77,11 @@ export function Sidebar({ selected, waiting, problems, live, mode, footer, overl
                   help={t("section.help", { section: label, key: s.digit })}
                   ariaLabel={detail.length ? [label, ...detail].join(", ") : undefined}
                   onSelect={() => onSelect(s.key)}
-                />
+                >
+                  {/* @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-live-status */}
+                  {s.key === "library" && writing && <Progress variant="spinner" label={t("library.status.writing")} />}
+                  {/* @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-live-status */}
+                </SourceListItem>
               );
             })}
           </Fragment>

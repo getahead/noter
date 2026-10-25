@@ -74,7 +74,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Browse and open calls
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-library-calls-browse`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-library-calls-browse`
 
 **Actor**: Primary user
 
@@ -99,7 +99,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 8. [x] - `p1` - API: `calls_list` with the new sort; the sort state is announced ("sorted descending") - `inst-api-sort`
 9. [x] - `p1` - User presses Return, double-clicks or clicks › on a row - `inst-user-row`
 10. [x] - `p1` - UI: push the Call page route for the call (`cpt-noter-feature-ui-call-page-frame`), which reads it with `call_get` - `inst-open-call`
-11. [ ] - `p1` - Core: `entity:changed` and `outputs:progress` update a row's status cell (**Writing summary…**) and the sidebar's progress glyph; status changes are not announced - `inst-live-status`
+11. [x] - `p1` - Core: `entity:changed` and `outputs:progress` update a row's status cell (**Writing summary…**) and the sidebar's progress glyph; status changes are not announced - `inst-live-status`
 12. [x] - `p1` - **RETURN** the Calls page - `inst-return-browse`
 
 ### Select and delete calls
