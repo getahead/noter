@@ -1,23 +1,26 @@
 // The call page's body (PC-R5 and the page states): reads the call and the call types once, tells the core which
-// call this window shows, and draws the stored transcript the live-transcript feature registers (a placeholder
-// until it lands). The toolbar, banner and Call info read the same call from the window store.
+// call this window shows, and draws the PC-R5 header with the live-transcript feature's stored transcript under it.
+// The toolbar, banner and Call info read the same call from the window store.
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import type { TimeSpan } from "../../core/bindings";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { audioLine, StoredTranscript } from "../transcript/hosts";
+import { LanguageTag } from "../transcript/labels";
 import { openCallPage, readCall, readKey, reportView } from "./actions";
 import { useExtras } from "./cache";
 import { afterTimer, pageState } from "./logic";
-import { slots } from "./slots";
 import "./call-page.css";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
-export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: string }) {
+export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: TimeSpan | null }) {
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
   const read = useWindow(bridge, (s) => s.commands[readKey(callId)]);
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const extras = useExtras(callId);
   const asked = useRef<string | null>(null);
 
@@ -49,15 +52,21 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   if (state === "LOADING") return skeleton ? <Skeleton /> : null;
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
 
-  const audioKept = !!call && !call.audio_deleted && !(extras?.audio_not_stored ?? false);
-  const Transcript = slots.transcript;
+  // the page already read the call: the transcript asks the core for nothing more
+  const detail = call ? { call, audio_not_stored: extras?.audio_not_stored ?? false } : null;
+  const meta = audioLine(detail, prefs);
   return (
     <div className="pc pc--transcript" data-state="ready">
       <section className="pc-tr" data-region="PC-R5" aria-label={t("callpage.transcript")}>
         <div className="pc-tr__head">
           <span className="t-headline">{t("callpage.transcript")}</span>
+          {call?.languages.map((l) => <LanguageTag key={typeof l === "string" ? l : l.code} lang={l} variant="call" />)}
+          {meta && <span className="np-dim">{meta}</span>}
         </div>
-        {Transcript ? <Transcript bridge={bridge} callId={callId} audioKept={audioKept} span={span} /> : <p className="np-dim">{t("callpage.transcript_pending")}</p>}
+        {/* @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-transcript */}
+        {/* the header above carries the audio line, so the view draws none */}
+        <StoredTranscript bridge={bridge} callId={callId} detail={detail} span={span} header={null} />
+        {/* @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-transcript */}
       </section>
     </div>
   );

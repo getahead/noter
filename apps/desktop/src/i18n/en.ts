@@ -751,7 +751,6 @@ export const en = {
   "callpage.info.status.ready": "Transcript ready",
   "callpage.info.status.failed": "Processing failed",
   "callpage.transcript": "Transcript",
-  "callpage.transcript_pending": "The transcript appears here.",
   "callpage.banner.notify": "Get a notification when a summary is ready.",
   "callpage.banner.notify_action": "Notify Me When Summaries Are Ready",
 } as const;

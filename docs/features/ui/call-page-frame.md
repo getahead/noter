@@ -94,7 +94,7 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 4. [x] - `p1` - UI: PC-R1 with Back, the title (tail-truncated, full title in a help tag), the subtitle, the view control listing only the views delivered so far (**Transcript** in M1; **Summary**, **Agent Reviews** and **History** join in M2 and M4), ⋯ More and the inspector toggle (⌥⌘I) - `inst-toolbar`
 5. [x] - `p1` - API: `window_report_view` (call id), so the core sends no notification for the call this window shows; `null` when the page closes - `inst-api-report`
 6. [x] - `p1` - UI: PC-R4 Call info at 280 pt in Wide (overlay in Medium and Narrow): **Participants** (person chips), **Call** (**Type**, **App**, **When**, **Length**, **Languages**), **Privacy** (the mode indicator and a **Sensitive** switch), **Audio** (**Kept until 15 Nov**, or **Audio deleted on 15 Nov · transcript kept**), **Processing** - `inst-call-info`
-7. [ ] - `p1` - Flow: the stored transcript with `cpt-noter-flow-ui-live-transcript-stored` in PC-R5, with the playback bar PC-R6 from the first play - `inst-transcript`
+7. [x] - `p1` - Flow: the stored transcript with `cpt-noter-flow-ui-live-transcript-stored` in PC-R5, with the playback bar PC-R6 from the first play - `inst-transcript`
 8. [ ] - `p1` - **IF** the core opened the page after a stop (`nav:request` without activation) - `inst-if-background`
    1. [ ] - `p1` - UI: render without taking focus or activating the window - `inst-background`
 9. [ ] - `p1` - **RETURN** the call's page - `inst-return-open`
@@ -228,5 +228,9 @@ The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive*
 **Prototype reuse.** Rewritten in React with the same structure, classes, tokens and data attributes: the toolbar, view control, ⋯ menu and inspector toggle of `screen('call-page')`, `inspector('call-info')` and the Transcript view in `src/js/30-c-callpage.js`; the notification banner (`Notify Me When Summaries`) there. Styles `.pc-*` (`src/css/30-c.css`) are ported as-is. Not reusable: `NP.local('call-page')`, the regeneration timers and the sample outputs, which belong to M2.
 
 **States coverage.** M1 renders these rows of DESIGN's Call page States table: Loading the stored transcript, First recorded call (prototype Call page › State ▾ first-call banner), Opened from a notification (lands on the page; on **Summary** from M2), Audio no longer kept (Transcript header and Call info). Every other row belongs to `cpt-noter-feature-ui-call-page-outputs`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-handoff` (M2) or `cpt-noter-feature-ui-copilot` (M4).
+
+**Transcript header (PC-R5).** **Transcript**, a language tag per call language and the stored variant's audio line of `cpt-noter-feature-ui-live-transcript` (`52 min · audio kept until 15 Nov`, `Audio deleted · transcript kept`, `Audio not stored for this call`). The prototype's deletion date and retention (`Audio deleted on 15 Nov (kept 30 days)`) wait for the core's deletion date in M2 (D-36). **Play from Start** is the stored transcript's own control, not the frame's.
+
+**Call info Type in M1.** **Type** is plain text in Call info; the call type is changed with ⋯ More › **Call Type ▸**. DESIGN's inline pop-up in Call info is deferred to `cpt-noter-feature-ui-call-page-outputs` (M2).
 
 **Not applicable.** Outputs, items and sharing: M2. Data: the page reads the call view and transcript only.
