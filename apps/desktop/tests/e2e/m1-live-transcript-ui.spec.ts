@@ -156,6 +156,15 @@ function stored(n: number, matching = 0, patch: { audio_deleted?: boolean; audio
 async function openCall(page: Page, _title: string) {
   await page.evaluate((id) => (location.hash = `transcript=${id}`), W.PAST_CALL);
 }
+/** Wheel the log up until the row with `text` is in view: Linux Chromium animates a wheel scroll and the log's row-height
+ *  correction cuts it short (CI), so one wheel may not get there. */
+async function wheelUpTo(page: Page, text: string) {
+  await log(page).hover();
+  await expect(async () => {
+    await page.mouse.wheel(0, -20_000);
+    await expect(rowWith(page, text)).toBeInViewport({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
+}
 /** What the core does by itself when the route flips during replay: it stops and says why (the fake only publishes what a test hands it). */
 async function routeFlips(page: Page, steer: Steer) {
   await steer.change((w) => route(w, "speakers"));
@@ -297,12 +306,7 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await expect(rowWith(page, "Test line number 59")).toBeInViewport();
     await expect(jump(page)).toHaveCount(0); // following
 
-    await log(page).hover();
-    // Linux Chromium animates a wheel scroll and the log's row-height correction cuts it short (CI): wheel until the row is in view
-    await expect(async () => {
-      await page.mouse.wheel(0, -20_000);
-      await expect(rowWith(page, ANNA_LINE)).toBeInViewport({ timeout: 500 });
-    }).toPass({ timeout: 10_000 });
+    await wheelUpTo(page, ANNA_LINE);
     const at = (await rowWith(page, ANNA_LINE).boundingBox())!.y;
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible(); // plural rules
@@ -329,8 +333,8 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     const steer = await openWindow(page, "call-screen", {
       world: liveWith(many(60), false),
     });
-    await log(page).hover();
-    await page.mouse.wheel(0, -20_000);
+    await expect(rowWith(page, "Test line number 59")).toBeInViewport(); // the log has drawn and follows the end
+    await wheelUpTo(page, ANNA_LINE);
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible();
     await page.keyboard.press("Meta+KeyJ");

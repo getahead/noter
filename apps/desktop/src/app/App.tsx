@@ -1,5 +1,5 @@
 import "./app.css";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { SettingsWindow } from "../features/settings/SettingsWindow";
 import { FirstRun } from "../features/first-run/first-run";
 import { MainWindow } from "../features/shell/main-window";
@@ -33,13 +33,7 @@ export function App({ bridge }: { bridge: Bridge }) {
 }
 
 /** Dev server only: `#transcript=<call id>` shows that call's stored transcript in the main window (the E2E reach it this way until the call page, 2.14, lands). */
-function useTranscriptRoute(): string | null {
-  const read = () => (import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.hash.slice(1)).get("transcript")) || null;
-  const [id, setId] = useState(read);
-  useEffect(() => {
-    const on = () => setId(read());
-    addEventListener("hashchange", on);
-    return () => removeEventListener("hashchange", on);
-  }, []);
-  return id;
-}
+const readRoute = () => (import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.hash.slice(1)).get("transcript")) || null;
+const onHash = (on: () => void) => (addEventListener("hashchange", on), () => removeEventListener("hashchange", on));
+// an external store: React re-reads the hash once subscribed, so a hash set right after the first render is not lost
+const useTranscriptRoute = () => useSyncExternalStore(onHash, readRoute, readRoute);
