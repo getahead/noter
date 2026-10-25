@@ -21,6 +21,7 @@ export type ShellEvent =
   | { type: "move"; move: HistoryMove }
   | { type: "toggle-sidebar"; overlay: boolean }
   | { type: "toggle-inspector" }
+  | { type: "open-inspector" }
   | { type: "close-inspector" }
   | { type: "close-overlay" }
   | { type: "resize-sidebar"; width: number }
@@ -45,6 +46,8 @@ export function shellReduce(s: ShellState, e: ShellEvent): ShellState {
       return e.overlay ? { ...s, overlayOpen: !s.overlayOpen } : { ...s, sidebar: !s.sidebar };
     case "toggle-inspector":
       return { ...s, history: { ...s.history, inspectorOpen: !s.history.inspectorOpen } };
+    case "open-inspector":
+      return s.history.inspectorOpen ? s : { ...s, history: { ...s.history, inspectorOpen: true } };
     case "close-inspector":
       return s.history.inspectorOpen ? { ...s, history: { ...s.history, inspectorOpen: false } } : s;
     case "close-overlay":

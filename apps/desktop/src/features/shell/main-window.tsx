@@ -23,7 +23,8 @@ import { pageFor } from "./pages";
 import { actionEvent, createScrollMemory, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
 import { Sidebar } from "./sidebar";
-import { MainToolbar } from "./toolbar";
+import { ToolbarHost } from "./toolbar";
+import "../call-page/register";
 import "./shell.css";
 
 const NO_NEED = { full: 0, singleColumn: 0, fewerColumns: 0 };
@@ -65,7 +66,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const shellRef = useRef(shell);
   shellRef.current = shell;
   const route = currentRoute(shell.history);
-  const page = pageFor(route.section);
+  const page = pageFor(route.section, route);
   const routeId = `${route.section}/${route.key}`;
 
   // Zoom: the layout width the page sees is the window width divided by the zoom (CSS zoom scales every length),
@@ -87,6 +88,9 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     !shell.sidebar,
   );
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-resize:p1:inst-collapse
+  // A page with a default inspector (Call info) docks it open on arrival at Wide width; it stays closed as an overlay.
+  const wide = layout.inspector !== "overlay";
+  useEffect(() => void (page.inspector?.openByDefault && wide && dispatch({ type: "open-inspector" })), [routeId, wide]); // eslint-disable-line react-hooks/exhaustive-deps
   const overlay = layout.sidebar === "overlay";
   const sidebarShown = overlay ? shell.overlayOpen : shell.sidebar;
 
@@ -103,7 +107,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
 
   const act = useCallback(
     (a: ShellAction) => {
-      const e = actionEvent(a, overlay, !!pageFor(currentRoute(shellRef.current.history).section).inspector);
+      const e = actionEvent(a, overlay, !!pageFor(currentRoute(shellRef.current.history).section, currentRoute(shellRef.current.history)).inspector);
       if (e) return dispatch(e);
       if (a.type === "open-settings") return navigate({ type: "settings", pane: "general" });
       setSearchOpen(true);
@@ -196,7 +200,12 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         </>
       )}
       <div className="np-main">
-        <MainToolbar
+        <ToolbarHost
+          page={page}
+          route={route}
+          bridge={bridge}
+          inspectorOpen={shell.history.inspectorOpen}
+          onToggleInspector={() => act({ type: "toggle-inspector" })}
           title={page.title(route)}
           subtitle={subtitle}
           actions={page.actions ?? []}
@@ -224,6 +233,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-empty-one */}
+        {page.banners && <page.banners route={route} bridge={bridge} appBanners={bannerList.length} />}
         <div className="np-body">
           <div ref={contentRef} className="np-content" data-region="MW-R3" role="main" tabIndex={0} aria-label={page.title(route)} data-width={layout.widthClass} data-grid={layout.grid} data-columns={layout.columns}>
             {/* @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
@@ -236,13 +246,13 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             ) : (
               <div className="np-screen" data-state={frame === "LOADING" ? "loading" : undefined}>
                 {/* @cpt-begin:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-return-page */}
-                {page.render(route)}
+                {page.render(route, bridge)}
                 {/* @cpt-end:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-return-page */}
               </div>
             )}
             {/* @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
           </div>
-          <InspectorSlot def={inspector} overlay={layout.inspector === "overlay"} onClose={() => dispatch({ type: "close-inspector" })} />
+          <InspectorSlot def={inspector} route={route} bridge={bridge} overlay={layout.inspector === "overlay"} onClose={() => dispatch({ type: "close-inspector" })} />
         </div>
       </div>
     </div>

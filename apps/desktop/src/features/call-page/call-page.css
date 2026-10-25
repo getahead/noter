@@ -1,0 +1,18 @@
+/* The call page (prototype 30-c.css, `.pc-*`), ported as-is for the frame, Call info, the stored transcript and loading. */
+.pc { max-width: 960px; }
+.pc-skel { display: grid; gap: 8px; padding: 6px 0; }
+.pc-skel__line { height: 11px; border-radius: var(--r-tag); background: linear-gradient(90deg, var(--sel-unemph), var(--sep), var(--sel-unemph)); background-size: 200% 100%; animation: pc-shimmer 1.4s linear infinite; }
+@keyframes pc-shimmer { to { background-position: -200% 0; } }
+.pc-tr { display: grid; gap: 12px; max-width: 960px; }
+.pc-tr__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.pc-play { position: sticky; bottom: -40px; }
+.pc-info { display: grid; gap: 0; font-size: 13px; }
+.pc-info dl { margin: 0; }
+.pc-info__head { display: flex; align-items: center; gap: 6px; padding: 12px 14px 8px; position: sticky; top: 0; background: var(--content-bg); z-index: 2; }
+.pc-info__sec { padding: 10px 14px; border-top: 1px solid var(--sep); display: grid; gap: 8px; justify-items: start; }
+.pc-info__sec .np-kv { width: 100%; }
+.pc-info__h { font: 600 11px/14px var(--font); color: var(--label-3); margin-top: 4px; }
+.pc-info__people { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.pc-info__row { display: flex; align-items: center; gap: 6px; }
+.pc-chip { display: inline-flex; align-items: center; gap: 6px; }
+.pc-chip__dot { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--sel-unemph); font: 600 9px/1 var(--font); }

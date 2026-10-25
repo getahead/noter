@@ -16,11 +16,14 @@ import { TranscriptView } from "./transcript-view";
 
 const HIGHLIGHT_MS = 3000;
 
+/** What the stored variant needs of a call's details: the call (audio deleted, kept until, length) and "Never store audio". */
+export type AudioFacts = Pick<CallDetail, "call" | "audio_not_stored">;
+
 export interface TranscriptOptions {
   /** A span to show (evidence, search result): scrolled to and highlighted for 3 s. */
   span?: TimeSpan | null;
   /** The call's details (call page): audio retention and "Never store audio". */
-  detail?: CallDetail | null;
+  detail?: AudioFacts | null;
   /** The host knows the audio is gone (deleted or never stored): no play controls. */
   audioKept?: boolean;
 }
@@ -187,7 +190,7 @@ export type TranscriptHandle = ReturnType<typeof useTranscript>;
 
 // D-36: M1 shows no deletion date ("audio_deleted_at" comes in M2)
 /** The stored variant's header line about the audio: kept until, deleted, or never stored. */
-export function audioLine(detail: CallDetail | null | undefined, prefs: UiPrefs | undefined): string | null {
+export function audioLine(detail: AudioFacts | null | undefined, prefs: UiPrefs | undefined): string | null {
   if (!detail) return null;
   const { call } = detail;
   if (detail.audio_not_stored) return t("transcript.audio.not_stored");
@@ -263,15 +266,17 @@ export function TranscriptBar({ tr, variant }: { tr: TranscriptHandle; variant: 
 
 /**
  * A call's stored transcript for the call page's PC-R5 (the page draws the region and its heading): the audio line,
- * the view with its play controls, and the playback bar in PC-R6. It reads the call's details for the audio line.
+ * the view with its play controls, and the playback bar in PC-R6. It reads the call's details for the audio line unless
+ * the host passes them (`detail`); `header={null}` leaves the line to a host that draws it in its own heading.
  */
-export function StoredTranscript({ bridge, callId, audioKept, span }: { bridge: Bridge; callId: string; audioKept?: boolean; span?: TimeSpan | null }) {
-  const [detail, setDetail] = useState<CallDetail | null>(null);
-  useEffect(() => void bridge.core.callGet({ call_id: callId }).then((r) => r.status === "ok" && setDetail(r.data)), [bridge, callId]);
-  const tr = useTranscript(bridge, callId, { detail, audioKept, span });
+export function StoredTranscript({ bridge, callId, audioKept, span, detail, header }: { bridge: Bridge; callId: string; audioKept?: boolean; span?: TimeSpan | null; detail?: AudioFacts | null; header?: string | null }) {
+  const [read, setRead] = useState<CallDetail | null>(null);
+  const given = detail !== undefined;
+  useEffect(() => void (!given && bridge.core.callGet({ call_id: callId }).then((r) => r.status === "ok" && setRead(r.data))), [bridge, callId, given]);
+  const tr = useTranscript(bridge, callId, { detail: given ? detail : read, audioKept, span });
   return (
     <>
-      <TranscriptLog tr={tr} variant="stored" />
+      <TranscriptLog tr={tr} variant="stored" header={header} />
       <TranscriptBar tr={tr} variant="stored" />
     </>
   );

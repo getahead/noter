@@ -7,7 +7,7 @@ import type { CallDetail, WindowLabel } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
-import { audioLine, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
+import { audioLine, StoredTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
 import { PlaybackBar } from "./playback-bar";
@@ -251,6 +251,9 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     expect(renderToString(<TranscriptLog tr={hookOf(b, PAST, { detail: { ...detail.data, call: { ...detail.data.call, audio_deleted: true } } })} variant="stored" />)).toContain('title="Audio deleted"');
     expect(hookOf(b, PAST, { audioKept: false }).control({ kind: "segment", key: "x", at: 0, seg: tr.data!.segments[0]! })).toEqual({ state: "hidden" });
     expect(renderToString(<StoredTranscriptRoute bridge={b} callId={PAST} />)).toContain('data-region="PC-R5"');
+    // a host that read the call passes it (no second call_get), and draws the audio line in its own heading
+    expect(renderToString(<StoredTranscript bridge={b} callId={PAST} detail={detail.data} />)).toMatch(/audio kept until/);
+    expect(renderToString(<StoredTranscript bridge={b} callId={PAST} detail={detail.data} header={null} />)).not.toMatch(/audio kept until/);
     expect(tr.waiting).toBe(false);
   });
 

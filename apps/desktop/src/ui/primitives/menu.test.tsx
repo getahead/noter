@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { Menu, menuKey } from "./menu";
+import { Menu, menuKey, submenuKey } from "./menu";
 
 describe("Menu (cpt-noter-dod-ui-primitives-controls)", () => {
   const items = [
@@ -66,5 +66,20 @@ describe("Escape inside a sheet (cpt-noter-flow-ui-primitives-operate-control)",
     expect(closeMenu).toHaveBeenCalledOnce();
     expect(e.stopPropagation).toHaveBeenCalled();
     expect(cancelSheet).not.toHaveBeenCalled();
+  });
+});
+
+describe("Submenu (Call Type ▸)", () => {
+  it("an item with children is a closed pop-up until opened, and lists no child yet", () => {
+    const html = renderToString(<Menu items={[{ label: "Call Type", children: [{ label: "Standup" }] }]} />);
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain("Standup");
+  });
+
+  it("→ opens it and ← closes it; other keys leave it", () => {
+    expect(submenuKey("ArrowRight")).toBe("open");
+    expect(submenuKey("ArrowLeft")).toBe("close");
+    expect(submenuKey("ArrowDown")).toBeNull();
   });
 });
