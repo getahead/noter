@@ -2,7 +2,7 @@
 // headphones, recording on speakers, output not identified, and the stored transcript, rendered against the fake core.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openWindow, type Steer } from "../e2e/support/app";
+import { openWindow, wheelUpTo, type Steer } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -40,12 +40,7 @@ test.describe("cpt-noter-dod-ui-live-transcript-view transcript view", () => {
       for (let i = 0; i < 40; i++) t.segments.push({ ...last, id: `seg_more_${i}`, t0_ms: last.t0_ms + (i + 1) * 8000, t1_ms: last.t1_ms + (i + 1) * 8000 });
       t.last_seq += 40;
     });
-    await log(page).hover();
-    // Linux Chromium animates a wheel scroll and the log's row-height correction cuts it short: wheel until the row is in view
-    await expect(async () => {
-      await page.mouse.wheel(0, -20_000);
-      await expect(row(page, ANNA_LINE)).toBeInViewport({ timeout: 500 });
-    }).toPass({ timeout: 10_000 }); // the view is detached
+    await wheelUpTo(log(page), row(page, ANNA_LINE)); // the view is detached
     for (const i of [1, 2, 3]) {
       const segment = { id: `seg_v${i}`, call_id: W.LIVE_CALL, channel: "sys" as const, speaker: { speaker_id: "spk_1", label: { type: "unnamed" as const, n: 1 } }, crosstalk_with: [], t0_ms: 1_500_000 + i * 8000, t1_ms: 1_506_000 + i * 8000, text: `New line ${i}`, lang: "en" as const, lang_p: 0.9, confidence: 0.9, state: "confirmed" as const, pass: "live" as const, corrections: [] };
       await steer.push("transcript_subscribe", { event: { type: "confirmed", segment } });
