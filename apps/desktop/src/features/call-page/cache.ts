@@ -8,6 +8,7 @@ export interface Extras {
   first_recorded_call: boolean;
   audio_not_stored: boolean;
   mode_used: CallDetail["mode_used"];
+  folder: string;
 }
 
 /** Banners the user closed with × (view state for this window's lifetime). */
@@ -26,8 +27,8 @@ const emit = () => {
 };
 const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
 
-export const holdExtras = (callId: string, d: Pick<CallDetail, "first_recorded_call" | "audio_not_stored" | "mode_used">) => {
-  held.extras.set(callId, { first_recorded_call: d.first_recorded_call, audio_not_stored: d.audio_not_stored, mode_used: d.mode_used });
+export const holdExtras = (callId: string, d: Pick<CallDetail, "first_recorded_call" | "audio_not_stored" | "mode_used" | "folder">) => {
+  held.extras.set(callId, { first_recorded_call: d.first_recorded_call, audio_not_stored: d.audio_not_stored, mode_used: d.mode_used, folder: d.folder });
   emit();
 };
 export const holdTypes = (types: CallTypeInfo[]) => {
@@ -39,6 +40,7 @@ export const resetCache = () => {
   held = { extras: new Map(), types: [] };
   emit();
 };
+export const extrasOf = (callId: string): Extras | undefined => held.extras.get(callId);
 export const useExtras = (callId: string): Extras | undefined => {
   const get = () => held.extras.get(callId);
   return useSyncExternalStore(subscribe, get, get);

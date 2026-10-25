@@ -1,7 +1,6 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow } from "../../core/bindings";
-import { holdExtras, holdTypes } from "./cache";
-import { callFolder } from "./folder";
+import { extrasOf, holdExtras, holdTypes } from "./cache";
 import { slots } from "./slots";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-open:p1
@@ -52,8 +51,12 @@ export function setSensitive(bridge: Bridge, callId: string, sensitive: boolean)
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-sensitive
 }
 
-export function revealFolder(bridge: Bridge, callId: string) {
-  return bridge.act(`call:finder:${callId}`, "open_external", () => bridge.core.openExternal({ target: { type: "reveal_in_finder", path: callFolder(callId) } }));
+/** **Show in Finder**: the folder `call_get` gave; the page reads it on open, so nothing is sent before then. */
+export async function revealFolder(bridge: Bridge, callId: string) {
+  const path = extrasOf(callId)?.folder;
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-finder
+  if (path) await bridge.act(`call:finder:${callId}`, "open_external", () => bridge.core.openExternal({ target: { type: "reveal_in_finder", path } }));
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-finder
 }
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1

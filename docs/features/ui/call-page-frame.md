@@ -121,7 +121,7 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
    - [x] - `p1` - **CASE** **Rename…**: an inline field in the title; Return saves with `call_update` (title, `rev`) - `inst-case-rename`
    - [x] - `p1` - **CASE** **Call Type ▸**: the types from `call_types_list`; `call_update` (type) - `inst-case-type`
    - [x] - `p1` - **CASE** **Mark as Sensitive** or the Call info **Sensitive** switch: `capture_set_sensitive` (call id, true) - `inst-case-sensitive`
-   - [ ] - `p1` - **CASE** **Show in Finder**: `open_external` (the call's folder) - `inst-case-finder`
+   - [x] - `p1` - **CASE** **Show in Finder**: `open_external` (the call's folder) - `inst-case-finder`
    - [ ] - `p1` - **CASE** **Delete Call…**: Flow `cpt-noter-flow-ui-dialogs-host-delete-call` with this call - `inst-case-delete`
 3. [ ] - `p1` - **RETURN** the page with the change, or Library › **Calls** after a delete - `inst-return-more`
 
