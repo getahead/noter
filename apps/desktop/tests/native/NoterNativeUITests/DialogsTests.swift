@@ -36,6 +36,7 @@ final class DialogsTests: NoterTestCase {
         app.typeKey("q", modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Stop and Quit"].waitForExistence(timeout: 5))
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground, "Return chose Cancel: the recording goes on")
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
+        XCTAssertTrue(recordingLine(in: openMenu()).exists, "Return chose Cancel: the recording goes on")
     }
 }
