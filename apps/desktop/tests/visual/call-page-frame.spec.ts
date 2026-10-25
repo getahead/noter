@@ -9,6 +9,12 @@ import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown>; latency: number };
+const ROW = '[data-component="cpt-noter-component-ui-transcript-segment-row"]';
+/** PC-R5 once the header has its audio line and the stored transcript its rows. */
+const stored = async (page: Page, line: string | RegExp) => {
+  await expect(page.locator('[data-region="PC-R5"] .pc-tr__head')).toContainText(line);
+  await expect(page.locator(`[data-region="PC-R5"] ${ROW}`).first()).toBeVisible();
+};
 const ready = (page: Page) => expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
 const quiet = (more: (w: World) => void = () => {}) => (w: World) => {
   W.idle(w);
@@ -41,13 +47,14 @@ const shot = async (page: Page, name: string) => {
 test.describe("cpt-noter-dod-ui-call-page-frame-frame call page", () => {
   test("transcript view with Call info, audio kept", async ({ page }) => {
     await open(page, quiet());
-    await expect(page.locator('[data-region="PC-R5"]')).toBeVisible();
+    await stored(page, /audio kept until/);
     await expect(page.locator('[data-region="MW-R4"]')).toContainText("Kept until");
     await shot(page, "transcript-audio-kept");
   });
 
   test("Call info: audio deleted, transcript kept", async ({ page }) => {
     await open(page, quiet((w) => patch(w, (c) => ((c.audio_deleted = true), (c.audio_kept_until = null)))));
+    await stored(page, "Audio deleted · transcript kept");
     await expect(page.locator('[data-region="MW-R4"]')).toContainText("transcript kept");
     await shot(page, "audio-deleted");
   });
