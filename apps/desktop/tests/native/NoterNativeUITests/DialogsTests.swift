@@ -3,8 +3,7 @@ import XCTest
 
 final class DialogsTests: NoterTestCase {
     func test_cpt_noter_seq_dialogs_delete_call__error_return_pressed_by_habit() {
-        app.typeKey("3", modifierFlags: .command)
-        app.staticTexts["Backend sync"].firstMatch.click()
+        openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Cancel"].waitForExistence(timeout: 5), "Delete Call… shows no alert")
         app.typeKey(.return, modifierFlags: [])
@@ -13,7 +12,7 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__other_several_calls_selected() {
-        app.typeKey("3", modifierFlags: .command)
+        openCall("Backend sync")
         app.typeKey("a", modifierFlags: .command)
         app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(alert.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Delete' AND label ENDSWITH 'calls?'")).firstMatch.waitForExistence(timeout: 5))
@@ -23,8 +22,7 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__alert_has_cancel_as_default() {
-        app.typeKey("3", modifierFlags: .command)
-        app.staticTexts["Backend sync"].firstMatch.click()
+        openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
         let cancel = alert.buttons["Cancel"]
         XCTAssertTrue(cancel.waitForExistence(timeout: 5))
@@ -34,6 +32,7 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording() {
+        startRecording()
         app.typeKey("q", modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Stop and Quit"].waitForExistence(timeout: 5))
         app.typeKey(.return, modifierFlags: [])
