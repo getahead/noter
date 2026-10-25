@@ -481,9 +481,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.8 [Engine capture, live ASR and capture-first restart](features/core/core-engine-capture.md) - HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-core-engine-capture`
+- [x] `p2` - **ID**: `cpt-noter-feature-core-engine-capture`
 
-- **Milestone**: M1 · **Lane**: engine · **Status**: IN_PROGRESS: only the owner-measured real-call latency (`cpt-noter-dod-core-engine-capture-latency`, Q4) holds the box; the golden-set lag (`-asr`) and footprint (`-replay`) DoDs are perf scenarios and do not hold the box per D-30. FEATURE spec: [features/core/core-engine-capture.md](features/core/core-engine-capture.md)
+- **Milestone**: M1 · **Lane**: engine · **Status**: IMPLEMENTED; the real-call latency DoD passed on 25 Oct 2026 (hypothesis p95 1728 ms, confirmed p95 3044 ms), and the golden-set lag (`-asr`) and footprint (`-replay`) DoDs are perf scenarios that do not hold the box per D-30. FEATURE spec: [features/core/core-engine-capture.md](features/core/core-engine-capture.md)
 
 - **Purpose**: Record both channels on one clock into a crash-safe ring, transcribe them live, report the facts the session manager needs, play replay audio, and come back after a crash with at most a 2 s gap.
 
