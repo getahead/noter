@@ -91,28 +91,28 @@ Success criteria: a detected call is recorded with one click or one key while th
 
 **Steps**:
 1. [ ] - `p1` - Core: detects a call and shows the panel at its position (top right; 72 pt lower under the meeting toolbar; the display without the call app when there are two), with `capture:detected` and `app_snapshot.detection` - `inst-core-detect`
-2. [ ] - `p1` - Algorithm: choose the variant with `cpt-noter-algo-ui-record-prompt-variant` - `inst-choose-variant`
+2. [x] - `p1` - Algorithm: choose the variant with `cpt-noter-algo-ui-record-prompt-variant` - `inst-choose-variant`
 3. [x] - `p1` - UI: render RP-R1 (app icon, **Record this call?**, the source line, ×) and RP-R3 for the variant; the panel never takes focus - `inst-render`
 4. [x] - `p1` - API: `window_announce` "Noter: Record this call? Press Control-Option-Command-R to record." (polite) - `inst-api-announce`
 5. [x] - `p1` - User clicks **Record** or **Record as Sensitive**, or presses ⌃⌥⌘R (the core receives the hotkey) - `inst-user-record`
 6. [x] - `p1` - API: `capture_start` (detection, `sensitive` true for **Record as Sensitive**); the button shows loading - `inst-api-start`
 7. [x] - `p1` - **IF** the result is `disk_full` or `model_missing` - `inst-if-refused`
-   1. [ ] - `p1` - UI: switch to the Disk full or Speech model variant with its reason - `inst-refused`
+   1. [x] - `p1` - UI: switch to the Disk full or Speech model variant with its reason - `inst-refused`
 8. [x] - `p1` - **IF** the result is `already_recording` - `inst-if-already`
-   1. [ ] - `p1` - UI: close the prompt; the core shows the running call - `inst-already`
+   1. [x] - `p1` - UI: close the prompt; the core shows the running call - `inst-already`
 9. [x] - `p1` - UI: the panel fades out over 200 ms (in place under Reduce motion); the core opens the call window in the dedicated layout with a second display or the floating layout otherwise; API: `window_announce` "Recording started" - `inst-close-open`
-10. [ ] - `p1` - **IF** the user opens **Not Now ▾** and chooses **Don't Ask for <app>…** - `inst-if-dont-ask`
+10. [x] - `p1` - **IF** the user opens **Not Now ▾** and chooses **Don't Ask for <app>…** - `inst-if-dont-ask`
     1. [x] - `p1` - UI: replace RP-R3 with the inline confirmation for the app, or the browser line for a browser; **Back** returns - `inst-inline-confirm`
     2. [x] - `p1` - User clicks **Don't Ask**; API: `capture_ignore_app` (bundle id); the app is listed in Settings › General › **Apps Noter doesn't ask about** - `inst-api-ignore`
-11. [ ] - `p1` - **IF** the user clicks **Delete Old Audio…** - `inst-if-delete-old`
+11. [x] - `p1` - **IF** the user clicks **Delete Old Audio…** - `inst-if-delete-old`
     1. [x] - `p1` - API: `window_navigate` to the main window with the **Delete Old Audio…** sheet (`cpt-noter-feature-ui-dialogs-host`); after the sheet, the menu bar's **Call Detected · Start Recording** starts the call - `inst-delete-old`
-12. [ ] - `p1` - **IF** the user clicks **Open System Settings…** - `inst-if-open-settings`
+12. [x] - `p1` - **IF** the user clicks **Open System Settings…** - `inst-if-open-settings`
     1. [x] - `p1` - API: `open_external` (the System Audio Recording pane); macOS may then ask to quit and reopen Noter (**Later**, **Quit & Reopen**), a prompt that is macOS's own - `inst-open-settings`
-13. [ ] - `p1` - **RETURN** capture running with the call window open, or the prompt in its refusal or confirmation state - `inst-return-start`
+13. [x] - `p1` - **RETURN** capture running with the call window open, or the prompt in its refusal or confirmation state - `inst-return-start`
 
 ### Let the prompt go and record later
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-record-prompt-missed-prompt`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-record-prompt-missed-prompt`
 
 **Actor**: Primary user
 
@@ -124,12 +124,12 @@ Success criteria: a detected call is recorded with one click or one key while th
 - Error — Setup incomplete, Error — Audio access not granted yet, Empty — Hidden for presenting: no prompt appears; the menu bar paths (`cpt-noter-feature-ui-menu-bar`) start capture
 
 **Steps**:
-1. [ ] - `p1` - User clicks **Not Now** or ×, or leaves the prompt for 15 s - `inst-user-dismiss`
-2. [ ] - `p1` - **WHILE** the pointer or keyboard focus is on the panel - `inst-while-hover`
+1. [x] - `p1` - User clicks **Not Now** or ×, or leaves the prompt for 15 s - `inst-user-dismiss`
+2. [x] - `p1` - **WHILE** the pointer or keyboard focus is on the panel - `inst-while-hover`
    1. [x] - `p1` - UI: the 15-second timer pauses (no visible countdown) - `inst-pause-timer`
 3. [x] - `p1` - API: `capture_dismiss_detection` (reason: not now, close or timeout); the core closes the prompt but keeps the detection, so the menu bar keeps **Call Detected · Start Recording** while the call runs - `inst-api-dismiss`
-4. [ ] - `p1` - UI: the panel fades out in 200 ms - `inst-fade`
-5. [ ] - `p1` - **RETURN** no prompt for this call; the menu bar and ⌃⌥⌘R still start capture - `inst-return-dismiss`
+4. [x] - `p1` - UI: the panel fades out in 200 ms - `inst-fade`
+5. [x] - `p1` - **RETURN** no prompt for this call; the menu bar and ⌃⌥⌘R still start capture - `inst-return-dismiss`
 
 ### Answer a notice while the call window is hidden
 
@@ -150,11 +150,11 @@ Success criteria: a detected call is recorded with one click or one key while th
 2. [x] - `p1` - UI: render the matching variant; API: `window_announce` with the assertive text from the announcement table - `inst-render-notice`
 3. [x] - `p1` - **WHILE** the pointer or focus is on the panel - `inst-while-notice-hover`
    1. [x] - `p1` - API: `capture_hold_notice` (held true); the body reads **Paused while you're here**; on release `capture_hold_notice` (false) - `inst-api-hold`
-4. [ ] - `p1` - User chooses an action, or presses ⌃⌥⌘R (stop now) or ⌃⌥⌘N (shows the call window with the notice; a second press makes it key) - `inst-user-notice`
-5. [ ] - `p1` - **MATCH** the action - `inst-match-notice`
+4. [x] - `p1` - User chooses an action, or presses ⌃⌥⌘R (stop now) or ⌃⌥⌘N (shows the call window with the notice; a second press makes it key) - `inst-user-notice`
+5. [x] - `p1` - **MATCH** the action - `inst-match-notice`
    - [x] - `p1` - **CASE** **Keep Recording** or **Stop Now**: `capture_answer_call_end` (keep or stop) - `inst-case-call-end`
    - [x] - `p1` - **CASE** **Start as New Call** or **Keep in This Call**: `capture_answer_new_meeting` - `inst-case-new-meeting`
-6. [ ] - `p1` - **RETURN** the panel closed; after **Stop Now** the menu bar offers **Continue Recording** for 5 minutes and the main window loads the Call page without taking focus - `inst-return-notice`
+6. [x] - `p1` - **RETURN** the panel closed; after **Stop Now** the menu bar offers **Continue Recording** for 5 minutes and the main window loads the Call page without taking focus - `inst-return-notice`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -179,26 +179,26 @@ Success criteria: a detected call is recorded with one click or one key while th
 
 ### Record prompt panel
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-record-prompt-panel`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-record-prompt-panel`
 
 **States**: HIDDEN, CALL_DETECTED, NOT_A_CALL, REFUSED, CALL_ENDED_COUNTDOWN, COUNTDOWN_PAUSED, NEW_MEETING, CLOSING
 
 **Initial State**: HIDDEN
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** HIDDEN **TO** CALL_DETECTED **WHEN** the core shows the prompt for a detected call or matched event (never while setup is incomplete, while recording or while hidden for presenting) - `inst-hidden-detected`
-2. [ ] - `p1` - **FROM** HIDDEN **TO** REFUSED **WHEN** the detected call cannot start (disk below 500 MB, speech model downloading) - `inst-hidden-refused`
+1. [x] - `p1` - **FROM** HIDDEN **TO** CALL_DETECTED **WHEN** the core shows the prompt for a detected call or matched event (never while setup is incomplete, while recording or while hidden for presenting) - `inst-hidden-detected`
+2. [x] - `p1` - **FROM** HIDDEN **TO** REFUSED **WHEN** the detected call cannot start (disk below 500 MB, speech model downloading) - `inst-hidden-refused`
 3. [x] - `p1` - **FROM** CALL_DETECTED **TO** NOT_A_CALL **WHEN** the user chooses **Don't Ask for <app>…** - `inst-detected-notacall`
 4. [x] - `p1` - **FROM** NOT_A_CALL **TO** CALL_DETECTED **WHEN** the user clicks **Back** - `inst-notacall-detected`
-5. [ ] - `p1` - **FROM** NOT_A_CALL **TO** CLOSING **WHEN** the user clicks **Don't Ask** - `inst-notacall-closing`
+5. [x] - `p1` - **FROM** NOT_A_CALL **TO** CLOSING **WHEN** the user clicks **Don't Ask** - `inst-notacall-closing`
 6. [x] - `p1` - **FROM** CALL_DETECTED **TO** CLOSING **WHEN** capture starts, or the user clicks **Not Now** or ×, or 15 s pass without hover or focus - `inst-detected-closing`
 7. [x] - `p1` - **FROM** REFUSED **TO** CALL_DETECTED **WHEN** the reason clears (old audio deleted, model in) - `inst-refused-detected`
-8. [ ] - `p1` - **FROM** HIDDEN **TO** CALL_ENDED_COUNTDOWN **WHEN** the call-ended notice arrives while the call window is hidden - `inst-hidden-ended`
-9. [ ] - `p1` - **FROM** CALL_ENDED_COUNTDOWN **TO** COUNTDOWN_PAUSED **WHEN** the pointer or focus is on the panel - `inst-ended-paused`
-10. [ ] - `p1` - **FROM** COUNTDOWN_PAUSED **TO** CALL_ENDED_COUNTDOWN **WHEN** pointer and focus leave - `inst-paused-ended`
-11. [ ] - `p1` - **FROM** CALL_ENDED_COUNTDOWN **TO** CLOSING **WHEN** the user answers or the core stops at the end of the countdown - `inst-ended-closing`
-12. [ ] - `p1` - **FROM** HIDDEN **TO** NEW_MEETING **WHEN** the new-meeting notice arrives while the call window is hidden - `inst-hidden-newmeeting`
-13. [ ] - `p1` - **FROM** NEW_MEETING **TO** CLOSING **WHEN** the user answers or 60 s pass (**Start as New Call** applies) - `inst-newmeeting-closing`
+8. [x] - `p1` - **FROM** HIDDEN **TO** CALL_ENDED_COUNTDOWN **WHEN** the call-ended notice arrives while the call window is hidden - `inst-hidden-ended`
+9. [x] - `p1` - **FROM** CALL_ENDED_COUNTDOWN **TO** COUNTDOWN_PAUSED **WHEN** the pointer or focus is on the panel - `inst-ended-paused`
+10. [x] - `p1` - **FROM** COUNTDOWN_PAUSED **TO** CALL_ENDED_COUNTDOWN **WHEN** pointer and focus leave - `inst-paused-ended`
+11. [x] - `p1` - **FROM** CALL_ENDED_COUNTDOWN **TO** CLOSING **WHEN** the user answers or the core stops at the end of the countdown - `inst-ended-closing`
+12. [x] - `p1` - **FROM** HIDDEN **TO** NEW_MEETING **WHEN** the new-meeting notice arrives while the call window is hidden - `inst-hidden-newmeeting`
+13. [x] - `p1` - **FROM** NEW_MEETING **TO** CLOSING **WHEN** the user answers or 60 s pass (**Start as New Call** applies) - `inst-newmeeting-closing`
 14. [x] - `p1` - **FROM** CLOSING **TO** HIDDEN **WHEN** the 200 ms fade ends - `inst-closing-hidden`
 
 ## 5. Definitions of Done

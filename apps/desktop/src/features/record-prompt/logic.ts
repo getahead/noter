@@ -24,23 +24,37 @@ export interface PromptInput {
 // @cpt-algo:cpt-noter-algo-ui-record-prompt-variant:p1
 /** The variant and state to draw, or `null` for no panel (the core shows the prompt only when it should; the UI never draws one it must not). */
 export function chooseView(i: PromptInput): { variant: Variant; state: PanelState } | null {
+  // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-detected
   if (!i.setupComplete || i.presenting) return null;
+  // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-detected
   const notice = i.capture?.notice;
   // @cpt-begin:cpt-noter-algo-ui-record-prompt-variant:p1:inst-call-ended
+  // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-ended
   if (notice?.type === "call_ended" || notice?.type === "call_seems_ended") {
+  // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-ended
+    // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-ended-paused
     const paused = i.held || (notice.type === "call_ended" && notice.stops_at === null);
+    // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-ended-paused
+    // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-paused-ended
     return { variant: "call-ended", state: paused ? "countdown-paused" : "countdown-running" };
+    // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-paused-ended
   }
   // @cpt-end:cpt-noter-algo-ui-record-prompt-variant:p1:inst-call-ended
   // @cpt-begin:cpt-noter-algo-ui-record-prompt-variant:p1:inst-new-meeting
+  // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-newmeeting
   if (notice?.type === "new_meeting") return { variant: "new-meeting", state: "default" };
+  // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-newmeeting
   // @cpt-end:cpt-noter-algo-ui-record-prompt-variant:p1:inst-new-meeting
   const recording = i.capture?.phase === "recording" || i.capture?.phase === "paused";
+  // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-detected
   if (!i.detection || recording) return null;
+  // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-detected
   // @cpt-begin:cpt-noter-algo-ui-record-prompt-variant:p1:inst-not-a-call
   if (i.dontAsk) return { variant: "default", state: "not-a-call" };
   // @cpt-end:cpt-noter-algo-ui-record-prompt-variant:p1:inst-not-a-call
+  // @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-refused
   const blocked = i.refused ?? i.detection.blocked;
+  // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-hidden-refused
   // @cpt-begin:cpt-noter-algo-ui-record-prompt-variant:p1:inst-disk-full
   if (blocked === "disk_full") return { variant: "disk-full", state: "disabled" };
   // @cpt-end:cpt-noter-algo-ui-record-prompt-variant:p1:inst-disk-full
@@ -142,9 +156,9 @@ export function localReduce(s: PanelLocal, e: PanelEvent): PanelLocal {
       return { ...s, closing: null, gone: s.closing ?? s.gone };
     // @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-closing-hidden
     case "pointer":
-      return { ...s, pointer: e.on };
+      return s.pointer === e.on ? s : { ...s, pointer: e.on };
     case "focus":
-      return { ...s, focus: e.on };
+      return s.focus === e.on ? s : { ...s, focus: e.on };
     case "reset":
       return INITIAL_LOCAL;
   }

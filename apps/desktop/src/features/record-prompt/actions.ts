@@ -59,15 +59,19 @@ export function openDeleteOldAudio(bridge: Bridge) {
 
 // @cpt-flow:cpt-noter-flow-ui-record-prompt-notice:p1
 export function answerCallEnd(bridge: Bridge, callId: string, choice: CallEndChoice) {
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-match-notice
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-case-call-end
   return bridge.act("prompt:call_end", "capture_answer_call_end", () => bridge.core.captureAnswerCallEnd({ call_id: callId, choice }), { screen: "record-prompt" });
   // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-case-call-end
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-match-notice
 }
 
 export function answerNewMeeting(bridge: Bridge, callId: string, choice: NewMeetingChoice) {
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-match-notice
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-case-new-meeting
   return bridge.act("prompt:new_meeting", "capture_answer_new_meeting", () => bridge.core.captureAnswerNewMeeting({ call_id: callId, choice }), { screen: "record-prompt" });
   // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-case-new-meeting
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-match-notice
 }
 
 /** The pointer or focus is on the call-ended notice (wanted state): the core holds its countdown. */
