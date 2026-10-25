@@ -11,6 +11,9 @@ import { registerPage, pageFor } from "./pages";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
+import { slots } from "../call-page/slots";
+
+vi.mock("../../core/tauri-transport", () => ({ nativeAsk: vi.fn().mockResolvedValue(true) }));
 
 let bridge: Bridge | null = null;
 afterEach(async () => {
@@ -27,6 +30,15 @@ async function open(mutate: (w: World["app"]) => void = () => {}, label: "main" 
 }
 
 describe("MainWindow (cpt-noter-component-shell-main-window)", () => {
+  it("gives the call page Delete Call…: the dialogs host's alert, then calls_delete", async () => {
+    slots.deleteCall = null;
+    await open();
+    const fake = (bridge as unknown as { core: { callsDelete: (a: unknown) => Promise<unknown> } }).core;
+    const sent = vi.spyOn(fake, "callsDelete");
+    slots.deleteCall!(bridge!, "call_backend");
+    await vi.waitFor(() => expect(sent).toHaveBeenCalledWith({ call_ids: ["call_backend"] }));
+  });
+
   it("draws MW-R1 to MW-R3 and the frame state from the snapshot", async () => {
     const html = await open((a) => {
       a.capture.phase = "idle";

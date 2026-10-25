@@ -1,4 +1,4 @@
-// Only the paths that need nothing but the Calls list are here; the call page's ⋯ menu, the call window's notice and Today's self-test opener bring the rest with their features.
+// The call window's notice and Today's self-test opener bring the rest of the paths with their features.
 // M1 — Dialogs, sheets and alerts (docs/features/ui/dialogs-host.md, DESIGN.md › Screen — Dialogs, sheets and popovers).
 // UI half of cpt-noter-seq-dialogs-delete-call and of the inline confirmation of
 // cpt-noter-seq-call-screen-recover-capture; m1-library-dialogs-notifications.spec.ts proves the
@@ -53,6 +53,26 @@ async function openCalls(
 }
 
 test.describe("cpt-noter-seq-dialogs-delete-call", () => {
+  test("UI — happy path: Delete Call… on a call's page asks Delete “Backend sync”?, then lands on Library › Calls without the call", async ({
+    page,
+  }) => {
+    await openCalls(page);
+    await rowOf(page, TITLE).first().dblclick();
+    const toolbar = page.locator('[data-region="PC-R1"]');
+    await expect(toolbar).toContainText(TITLE);
+    await toolbar.getByRole("button", { name: "More" }).click();
+    await answerAlerts(page, "confirm");
+    await page.getByRole("menuitem", { name: "Delete Call…" }).click();
+
+    await expect.poll(async () => (await alerts(page)).length).toBe(1);
+    expect(alertText((await alerts(page))[0])).toContain(`Delete “${TITLE}”?`);
+    await expect
+      .poll(async () => sent(page, "calls_delete"))
+      .toContainEqual({ call_ids: [W.PAST_CALL] });
+    await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible();
+    await expect(rowOf(page, TITLE)).toHaveCount(0);
+  });
+
   test("UI — other path: Several calls selected, ⌘⌫ asks Delete 3 calls? and Delete 3 Calls removes exactly those rows", async ({
     page,
   }) => {

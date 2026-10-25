@@ -243,7 +243,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
         capture,
       ),
     keepNothingHeard: () => void run("capture_keep_recording", () => bridge.core.captureKeepRecording(id), capture),
+    // @cpt-begin:cpt-noter-flow-ui-dialogs-host-inline-confirm:p1:inst-api-discard
     discard: () => void run("capture_discard", () => bridge.core.captureDiscard(id), capture),
+    // @cpt-end:cpt-noter-flow-ui-dialogs-host-inline-confirm:p1:inst-api-discard
   };
   // @cpt-end:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-user-answer
 

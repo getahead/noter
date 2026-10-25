@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { deleteCalls } from "./delete-calls";
+import { deleteCalls, deleteFromPage } from "./delete-calls";
 
 const calls = [
   { id: "c1", title: "A" },
@@ -47,5 +47,18 @@ describe("deleteCalls (cpt-noter-flow-ui-dialogs-host-delete-call)", () => {
       outcome: "cancelled",
     });
     expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("from a call's page: leaves for Library › Calls only once the call is deleted", async () => {
+    const leave = vi.fn();
+    const ok = bridge({ status: "ok", data: null });
+    expect(await deleteFromPage(ok.b, calls[0], leave, async () => false)).toEqual({ outcome: "cancelled" });
+    expect(leave).not.toHaveBeenCalled();
+    const failed = bridge({ status: "error", error: { code: "internal" } });
+    expect((await deleteFromPage(failed.b, calls[0], leave, async () => true)).outcome).toBe("failed");
+    expect(leave).not.toHaveBeenCalled();
+    expect(await deleteFromPage(ok.b, calls[0], leave, async () => true)).toEqual({ outcome: "deleted" });
+    expect(ok.callsDelete).toHaveBeenCalledWith({ call_ids: ["c1"] });
+    expect(leave).toHaveBeenCalledTimes(1);
   });
 });

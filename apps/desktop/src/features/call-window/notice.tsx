@@ -166,7 +166,9 @@ export function CaptureNotice({ notice: n, floating, seconds, detectedAt, levels
               <InlineConfirm size={size} onConfirm={on.discard} onBack={() => setConfirming(false)} />
             ) : (
               <>
+                {/* @cpt-begin:cpt-noter-flow-ui-dialogs-host-inline-confirm:p1:inst-user-discard */}
                 <PushButton label={t("cw.notice.discard_recording")} size={size} onAction={() => setConfirming(true)} />
+                {/* @cpt-end:cpt-noter-flow-ui-dialogs-host-inline-confirm:p1:inst-user-discard */}
                 <PushButton label={t("cw.notice.keep_recording")} variant="quiet" size={size} onAction={on.keepNothingHeard} />
               </>
             )
