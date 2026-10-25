@@ -112,6 +112,7 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
   }) => {
     const steer = await openCalls(page, (w) => {
       w.calls = [];
+      w.call_details = []; // the core keeps both together
       W.selfTestSkipped(w);
     });
     const empty = table(page).locator(
