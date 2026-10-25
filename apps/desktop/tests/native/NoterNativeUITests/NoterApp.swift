@@ -7,6 +7,7 @@ import XCTest
 
 class NoterTestCase: XCTestCase {
     var app: XCUIApplication!
+    var home: URL?
     /// The app a test brings to the front to prove Noter does not take focus; hotkeys are typed on it.
     let other = XCUIApplication(bundleIdentifier: "com.apple.finder")
 
@@ -24,12 +25,16 @@ class NoterTestCase: XCTestCase {
         // changes (settings, hotkeys) never reaches the next one or the Mac's own Noter.
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("noter-home-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        self.home = home
         app.launchEnvironment["HOME"] = home.path
         app.launch()
     }
 
     // The log is written when the app quits normally.
-    override func tearDown() { app?.terminate() }
+    override func tearDown() {
+        app?.terminate()
+        if let home { try? FileManager.default.removeItem(at: home) }
+    }
 
     /// The menu bar extra.
     var statusItem: XCUIElement { app.menuBars.statusItems.firstMatch }
@@ -39,10 +44,18 @@ class NoterTestCase: XCTestCase {
     func openMenu(file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         XCTAssertTrue(statusItem.waitForExistence(timeout: 10), "the menu bar extra is not in the menu bar", file: file, line: line)
         let menu = statusItem.menus.firstMatch
-        if !menu.exists { statusItem.click() }
+        if !isOpen(menu) { statusItem.click() }
         XCTAssertTrue(menu.waitForExistence(timeout: 5), "the menu did not open", file: file, line: line)
         return menu
     }
+
+    /// Closes the menu with a second click: Escape does not reach a status menu.
+    func closeMenu() {
+        if isOpen(statusItem.menus.firstMatch) { statusItem.click() }
+    }
+
+    /// A closed status menu can stay in the accessibility tree with an empty frame.
+    private func isOpen(_ menu: XCUIElement) -> Bool { menu.exists && menu.frame.height > 0 }
 
     func item(_ title: String, in menu: XCUIElement) -> XCUIElement { menu.menuItems[title] }
 
