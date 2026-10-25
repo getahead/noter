@@ -1,0 +1,68 @@
+/* Ported as-is from the prototype's src/css/20-b.css (.cs-r2*, .cw-meters, .cw-tv*, .cw-seg*, .cw-pb*, .fp-r5 .cw-pb*) and
+   src/css/30-c.css (.pc-tr*, .pc-skel*, .pc-play): the transcript view, its rows and the playback bar. */
+.cs-r2 { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.cs-r2b { flex: none; border-top: 1px solid var(--sep); }
+.cw-meters { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--label-2); }
+.cw-tv { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; position: relative; }
+.cw-tv__scroll { flex: 1 1 auto; overflow: auto; padding: 10px 18px 52px; scroll-behavior: smooth; }
+.cw-tv--tail .cw-tv__scroll, .cw-tv--post-call .cw-tv__scroll { padding: 4px 0; overflow: visible; }
+.cw-tv--post-call .cw-tv__scroll { padding: 6px 0 40px; }
+.cw-tv__find { display: flex; align-items: center; gap: 8px; padding: 0 0 10px; flex-wrap: wrap; }
+.cw-tv__find .np-search { width: 260px; }
+.cw-tv__header { font-size: 12px; padding: 0 0 6px; }
+.cw-tv__jump { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; justify-content: center; pointer-events: none; }
+.cw-jump { pointer-events: auto; box-shadow: var(--shadow-pop); border-radius: var(--r-capsule); }
+.cw-tv__waiting { flex: 1; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 40px; }
+.cw-seg { display: grid; grid-template-columns: 64px 128px minmax(0, 1fr) auto; gap: 0 12px; align-items: baseline; padding: 5px 6px; border-radius: var(--r-control); font: 400 15px/22px var(--font); }
+.cw-seg:hover { background: var(--sel-unemph); }
+.cw-tv--post-call .cw-seg { font: 400 13px/19px var(--font); grid-template-columns: 64px 120px minmax(0, 1fr) auto; }
+.cw-seg__time { font: 400 12px/22px var(--font); color: var(--label-3); font-variant-numeric: tabular-nums; }
+.cw-seg[data-variant="crosstalk"] .cw-seg__spk .np-spk { white-space: normal; }
+.cw-seg__spk { min-width: 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.cw-seg__text { min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
+.cw-seg__text.is-lowconf { text-decoration: underline dotted var(--label-3); text-underline-offset: 3px; }
+.cw-seg__trans { display: block; font-size: 12px; color: var(--label-3); }
+.cw-seg__end { display: inline-flex; align-items: center; gap: 6px; align-self: center; }
+.cw-seg__acts { display: inline-flex; gap: 2px; align-items: center; visibility: hidden; }
+.cw-seg:hover .cw-seg__acts, .cw-seg:focus-within .cw-seg__acts, .cw-seg.is-playing .cw-seg__acts { visibility: visible; }
+.cw-seg--hyp { color: var(--label-2); }
+.cw-seg--mark { color: var(--accent-text); font-size: 13px; }
+.cw-seg__marktext { grid-column: 2 / -1; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.cw-seg--gap .cw-seg__gaptext { grid-column: 2 / -1; font-size: 12px; color: var(--label-3); border-top: 1px dashed var(--sep); border-bottom: 1px dashed var(--sep); padding: 2px 0; }
+.cw-seg--tail { grid-template-columns: 52px 72px minmax(0, 1fr) auto; font: 400 12px/17px var(--font); padding: 2px 0; }
+.cw-seg--tail .cw-seg__time { font-size: 11px; line-height: 17px; }
+.cw-seg--tail .cw-seg__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-seg.is-playing { background: var(--sel-accent); }
+.cw-term { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; cursor: pointer; }
+.cw-term__sugg { font-size: 11px; }
+.cw-pb { display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; background: var(--win-bg); min-width: 0; flex-wrap: nowrap; }
+.cw-pb--post-call { height: 44px; border-top: 1px solid var(--sep); }
+.cw-pb__scrub { width: 160px; min-width: 60px; flex: 0 1 160px; accent-color: var(--accent-fill); }
+.cw-pb__time { font-size: 12px; color: var(--label-2); }
+.cw-pb__spk { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.cw-pb__line { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fp-r5 .cw-pb { padding: 0; background: transparent; }
+.fp-r5 .cw-pb__scrub { width: 80px; flex-basis: 80px; }
+.fp-r5 .cw-pb__line { display: none; }
+.pc-skel { display: grid; gap: 8px; padding: 6px 0; }
+.pc-skel__line { height: 11px; border-radius: var(--r-tag); background: linear-gradient(90deg, var(--sel-unemph), var(--sep), var(--sel-unemph)); background-size: 200% 100%; animation: pc-shimmer 1.4s linear infinite; }
+@keyframes pc-shimmer { to { background-position: -200% 0; } }
+.pc-tr { display: grid; gap: 12px; max-width: 960px; }
+.pc-tr__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+.pc-play { position: sticky; bottom: -40px; }
+
+/* Production additions: the virtualised list (the stored variant scrolls in its own area too), the current find match,
+   and Reduce motion (D-13: no motion under it). */
+.cw-tv__rows { position: relative; }
+.cw-tv--post-call .cw-tv__scroll { overflow: auto; }
+.cw-seg.is-current { box-shadow: inset 0 0 0 2px var(--focus-ring); }
+.cw-tv__findfield { display: contents; }
+@media (prefers-reduced-motion: reduce) {
+  .cw-tv__scroll { scroll-behavior: auto; }
+  .pc-skel__line { animation: none; }
+}
+/* A window that shows only the transcript (the call screen until 2.10, the dev route until 2.14): the regions fill it. */
+.tr-window { height: 100vh; display: flex; flex-direction: column; min-height: 0; }
+.tr-window > .pc-tr { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 16px 24px 0; }
+/* A disabled play control stays focusable (aria-disabled, not disabled), so it takes the primitive's disabled look here. */
+.cw-seg__acts .np-ibtn[aria-disabled="true"] { opacity: .35; cursor: default; background: transparent; }
