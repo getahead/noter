@@ -45,7 +45,7 @@ design: docs/DESIGN-core.md
 
 - [ ] `p2` - **ID**: `cpt-noter-featstatus-core-engine-capture`
 
-- [ ] `p2` - `cpt-noter-feature-core-engine-capture`
+- [x] `p2` - `cpt-noter-feature-core-engine-capture`
 
 ## 1. Feature Context
 
