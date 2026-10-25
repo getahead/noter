@@ -41,7 +41,9 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
         // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-nothing-else
         // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-user-notify
         // the banner goes away whatever macOS answers: Allow, or Don't Allow (Settings › General then says so)
+        // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-return-allow
         onAction: () => void requestNotifications(bridge).then(() => setAsked(true)),
+        // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-return-allow
         // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-user-notify
         // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-nothing-else
       },
