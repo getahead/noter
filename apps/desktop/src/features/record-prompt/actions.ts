@@ -53,8 +53,7 @@ export function openSystemSettings(bridge: Bridge) {
 /** **Delete Old Audio…**: the sheet is the main window's (dialogs host). */
 export function openDeleteOldAudio(bridge: Bridge) {
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-delete-old
-  // shortcut: the contract has no `NavTarget` for the sheet yet (D-17), so this shows the main window; pass the target when it lands
-  return bridge.act("prompt:delete_old", "window_navigate", () => bridge.core.windowNavigate({ target: null }), { screen: "record-prompt" });
+  return bridge.act("prompt:delete_old", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "delete_old_audio" } }), { screen: "record-prompt" });
   // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-delete-old
 }
 

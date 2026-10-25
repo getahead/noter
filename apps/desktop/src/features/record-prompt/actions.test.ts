@@ -67,7 +67,7 @@ describe("record prompt commands", () => {
     await openDeleteOldAudio(bridge);
     await announce(bridge, "x", "assertive");
     expect(seen).toContainEqual(["open_external", { target: { type: "system_settings", permission: "system_audio" } }]);
-    expect(seen.filter(([c]) => c === "window_navigate")).toHaveLength(1);
+    expect(seen).toContainEqual(["window_navigate", { target: { type: "delete_old_audio" } }]);
     expect(seen).toContainEqual(["window_announce", { text: "x", politeness: "assertive" }]);
   });
 });

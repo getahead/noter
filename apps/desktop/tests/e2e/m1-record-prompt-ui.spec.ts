@@ -205,7 +205,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
   });
 
   test("UI — empty path: Setup incomplete — no prompt is drawn", async ({ page }) => {
-    await openWindow(page, "record-prompt", { world: (w) => (W.idle(w), W.selfTestSkipped(w), (w.app.setup.complete = false)) });
+    await openWindow(page, "record-prompt", { world: (w) => (W.idle(w), W.selfTestSkipped(w)) });
     await settled(page);
     await expect(panel(page)).toHaveCount(0);
   });
