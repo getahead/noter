@@ -16,4 +16,3 @@
 .pc-info__row { display: flex; align-items: center; gap: 6px; }
 .pc-chip { display: inline-flex; align-items: center; gap: 6px; }
 .pc-chip__dot { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--sel-unemph); font: 600 9px/1 var(--font); }
-.pc-title-edit { font: inherit; min-width: 240px; }

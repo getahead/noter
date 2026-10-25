@@ -88,7 +88,7 @@ function TitleField({ bridge, call, onDone }: { bridge: Bridge; call: CallRow; o
   useEffect(() => globalThis.document?.getElementById("pc-title-edit")?.focus(), []);
   const save = () => (onDone(), void saveTitle(bridge, call, value));
   return (
-    <span onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onDone())}>
+    <span onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onDone())} onBlur={onDone}>
       <TextField value={value} ariaLabel={t("callpage.rename_field")} onChange={setValue} onEnter={save} id="pc-title-edit" />
     </span>
   );
