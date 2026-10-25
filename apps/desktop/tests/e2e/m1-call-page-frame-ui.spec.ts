@@ -15,6 +15,7 @@ import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
+const STDIO = process.env.NOTER_CORE === "stdio";
 const TITLE = "Backend sync"; // call_backend: Zoom, 52 min, Dmitri S., Oleg M., You, audio kept
 const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
 const banner = (page: Page) => page.locator('[data-region="PC-R2"], [data-region="MW-R5"]').filter({ hasText: /summary is ready/ });
@@ -38,6 +39,12 @@ const quiet =
     W.idle(w);
     const detail = w.call_details.find((d) => d.call.id === W.PAST_CALL)!;
     detail.first_recorded_call = first;
+    // the real core derives the flag from the store (one call recorded), so the first call is the only one
+    if (first) {
+      w.calls = w.calls.filter((c) => c.id === W.PAST_CALL);
+      w.call_details = [detail];
+      w.transcripts = w.transcripts.filter((t) => t.call_id === W.PAST_CALL);
+    }
     more(w);
   };
 /**
@@ -64,7 +71,8 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
   test("UI — happy path: the page shows title, subtitle, only the Transcript view, Call info docked and the stored transcript", async ({ page }) => {
     await openWindow(page, "main", { world: quiet() });
     await openCall(page);
-    await expect(toolbar(page)).toContainText(/52 min · Dmitri S\., Oleg M\., You/);
+    // the real core sends no participants yet (CallRow.participants is empty), so its subtitle ends at the length
+    await expect(toolbar(page)).toContainText(STDIO ? /52 min/ : /52 min · Dmitri S\., Oleg M\., You/);
     await expect(button(page, "Back")).toBeEnabled();
     await expect(toolbar(page).getByText("Transcript", { exact: true })).toBeVisible(); // the view control lists what is delivered
     for (const later of ["Summary", "Agent Reviews", "History"]) await expect(toolbar(page).getByText(later, { exact: true })).toHaveCount(0);

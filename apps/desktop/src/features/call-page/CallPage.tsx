@@ -12,6 +12,7 @@ import { openCallPage, readCall, readKey, reportView } from "./actions";
 import { useExtras } from "./cache";
 import { afterTimer, pageState } from "./logic";
 import { slots } from "./slots";
+import "./call-page.css";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
 export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: string }) {

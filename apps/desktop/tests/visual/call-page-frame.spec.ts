@@ -54,7 +54,8 @@ test.describe("cpt-noter-dod-ui-call-page-frame-frame call page", () => {
 
   test("loading: skeleton rows after 300 ms", async ({ page }) => {
     await open(page, quiet(), 4000);
-    await expect(page.getByRole("status", { name: "Loading the call" })).toBeVisible();
+    // every command waits 4 s, window_navigate included: the skeleton shows ~4.3 s in and holds until call_get answers
+    await expect(page.getByRole("status", { name: "Loading the call" })).toBeVisible({ timeout: 10_000 });
     await shot(page, "loading");
   });
 });
@@ -70,7 +71,7 @@ test.describe("cpt-noter-dod-ui-call-page-frame-actions call page", () => {
     await open(page, quiet());
     await page.locator('[data-region="PC-R1"]').getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: "Call Type" }).hover();
-    await expect(page.getByRole("menuitem").filter({ hasText: /standup/i })).toBeVisible();
+    await expect(page.getByRole("menuitemcheckbox", { name: /standup/i })).toBeVisible();
     await shot(page, "more-menu-call-type");
   });
 });
