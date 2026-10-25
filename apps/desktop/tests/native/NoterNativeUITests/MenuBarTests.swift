@@ -60,19 +60,17 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__glyph_per_state_and_hidden_badge() {
-        XCTAssertTrue(statusItem.waitForExistence(timeout: 10))
-        let visible = statusItem.screenshot().pngRepresentation
+        // The eye-slash badge is drawn in the image, which XCUITest cannot read reliably (two shots of the
+        // same glyph differ by a few pixels); the VoiceOver label carries the hidden state.
         item("Hide for Presenting", in: openMenu()).click()
         XCTAssertTrue(item("Show Noter", in: openMenu()).exists)
-        app.typeKey(.escape, modifierFlags: [])
-        XCTAssertNotEqual(statusItem.screenshot().pngRepresentation, visible, "the hidden form of the glyph carries the eye-slash badge")
         XCTAssertTrue(statusItem.label.contains("hidden for presenting"), "the VoiceOver label adds “hidden for presenting”")
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__no_hotkey_shows_no_key() {
         XCTAssertTrue(openMenu().exists)
         XCTAssertEqual(keyOf("Open Call Screen"), "N", "before: Open Call Screen shows ⌃⌥⌘N")
-        app.typeKey(.escape, modifierFlags: [])
+        closeMenu()
         // Settings › Hotkeys: clear Open call screen.
         app.typeKey(",", modifierFlags: .command)
         let pane = app.staticTexts["Hotkeys"].firstMatch
