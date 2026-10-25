@@ -157,7 +157,11 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
   }) => {
     const steer = await openWindow(page, "main", { world: W.idle });
     await steer.failNext("calls_list", "internal");
-    await page.keyboard.press("Meta+Digit3");
+    // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
+    await expect(async () => {
+      await page.keyboard.press("Meta+Digit3");
+      await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+    }).toPass();
     const banner = page.locator(
       '[data-component="cpt-noter-component-ui-inline-banner"]',
     );
