@@ -167,7 +167,8 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
       },
     });
     await expect(panel(page)).toHaveAttribute("data-state", "disabled");
-    await expect(r3(page)).toContainText("The speech model is still downloading (62 %)");
+    // the real core reports the bundle's real size, so only the fake can hold 62 %
+    await expect(r3(page)).toContainText(process.env.NOTER_CORE === "stdio" ? /The speech model is still downloading \(\d+ %\)/ : "The speech model is still downloading (62 %)");
     await expect(button(page, "Record")).toBeDisabled();
     await expect(button(page, "Record as Sensitive")).toHaveCount(0);
   });

@@ -42,16 +42,10 @@ test.describe("cpt-noter-dod-ui-record-prompt-panel record prompt", () => {
   });
   test("call-ended", ({ page }) =>
     shot(page, "call-ended", (w) => {
-      detected()(w);
-      w.app.detection.detection = null;
-      w.app.capture.phase = "recording";
       W.notice(w, { type: "call_ended", stops_at: Date.now() + 600_000 });
     }));
   test("new-meeting", ({ page }) =>
     shot(page, "new-meeting", (w) => {
-      detected()(w);
-      w.app.detection.detection = null;
-      w.app.capture.phase = "recording";
       W.notice(w, { type: "new_meeting", event: { id: "e", title: "1:1 with Anna K.", starts_at: 0, ends_at: 1 }, app_name: "Microsoft Teams", detected_at: Date.now(), expires_at: Date.now() + 60_000, default_choice: "start_as_new_call" });
     }));
 });
