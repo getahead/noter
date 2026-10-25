@@ -44,7 +44,7 @@ test.describe("states of the prototype's Settings › State menu", () => {
   });
 
   test("notifications-off", async ({ page }) => {
-    await show(page, "general", { world: (w) => (w.settings.general.notifications_enabled = false) });
+    await show(page, "general", { world: (w) => ((w.settings.general.notifications_enabled = false), (w.app.environment.notifications = "denied")) });
     await shot(page, "notifications-off");
   });
 

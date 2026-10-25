@@ -137,6 +137,14 @@ describe("CallBanners", () => {
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={1} />)).toBe("");
   });
 
+  it("shows nothing once macOS reports the permission answered, even on the first recorded call", async () => {
+    for (const answer of ["authorized", "denied"] as const) {
+      await ready((w) => (w.app.environment.notifications = answer));
+      holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
+      expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toBe("");
+    }
+  });
+
   it("shows nothing for the call being recorded", async () => {
     await ready((w) => {
       w.app.capture.phase = "recording";

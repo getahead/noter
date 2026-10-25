@@ -43,7 +43,7 @@ const calls = () => {
 
 describe("General", () => {
   it("every control saves its own setting or runs its command", async () => {
-    await ready((w) => ((w.settings.general.notifications_enabled = false), (w.app.setup.self_test = { type: "not_run" })));
+    await ready((w) => ((w.app.environment.notifications = "denied"), (w.app.setup.self_test = { type: "not_run" })));
     const seen = calls();
     const tree = rendered(GeneralPane, { bridge, settings: stored() });
     on(tree, "Summary language")("ru");
@@ -58,6 +58,16 @@ describe("General", () => {
     expect(seen).toEqual(expect.arrayContaining(["open_external", "window_navigate"]));
     const html = renderToString(<GeneralPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Needs a passed audio self-test");
+    expect(html).toContain("Notifications are off for Noter");
+    expect(html).toContain('<path d="M8 7.2v4M8 4.8v.2"'); // the info icon, not the warning triangle
+    for (const auth of ["authorized", "not_determined"] as const) {
+      fake.world.app.environment.notifications = auth;
+      await bridge.close();
+      bridge = createBridge("settings", fake);
+      await bridge.open();
+      await loadSettings(bridge);
+      expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).not.toContain("Notifications are off for Noter"); // only macOS's denied is off
+    }
     expect(html).toContain("Run Audio Self-Test…");
     expect(html).toContain("Notifications are off for Noter");
   });

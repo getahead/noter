@@ -8,6 +8,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { Toggle } from "../../ui/primitives/toggle";
+import { permissionState } from "../notifications/notifications";
 import { saveSection, unignoreKey, useRowErrors } from "./actions";
 import { SelfTestSheet } from "./SelfTestSheet";
 import { Group, Row } from "./form";
@@ -17,9 +18,9 @@ const LANGUAGES = choices({ en: "settings.general.lang_en", ru: "settings.genera
 const RANKING = choices({ owed_to_todays_people: "settings.general.ranking_owed", due_then_owed_to_you: "settings.general.ranking_due" });
 const HORIZON = choices({ today: "settings.general.horizon_today", this_week: "settings.general.horizon_week" });
 
-const Warn = ({ children }: { children: string }) => (
+const Warn = ({ children, icon = "warning" }: { children: string; icon?: "warning" | "info" }) => (
   <span className="st-warnline">
-    <Icon name="warning" size={12} /> {children}
+    <Icon name={icon} size={12} /> {children}
   </span>
 );
 
@@ -27,6 +28,12 @@ const Warn = ({ children }: { children: string }) => (
 export function GeneralPane({ bridge, settings }: PaneProps) {
   const { general, today } = settings;
   const selfTestPassed = useWindow(bridge, (s) => s.whole.setup?.self_test.type === "passed");
+  // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
+  // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
+  // off means macOS says so (`env:changed`), whether they were denied at the prompt or turned off in System Settings
+  const notificationsOff = useWindow(bridge, (s) => permissionState(s.whole.environment?.notifications) === "DENIED");
+  // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
+  // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
   const [selfTest, setSelfTest] = useState(false);
   const rowError = useRowErrors(bridge);
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
@@ -39,9 +46,9 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.general.offer")} error={rowError("general", "offer_to_record")} note={selfTestPassed ? t("settings.general.offer_note") : <><Warn>{t("settings.general.needs_self_test")}</Warn> <PushButton label={t("settings.general.run_self_test")} size="small" onAction={() => setSelfTest(true)} /></>}>
           <Toggle on={selfTestPassed && general.offer_to_record} size="small" disabled={!selfTestPassed} ariaLabel={t("settings.general.offer")} onAction={(offer_to_record) => general_({ offer_to_record })} />
         </Row>
-        {!general.notifications_enabled && (
+        {notificationsOff && (
           <Row label={t("settings.general.notifications")} note={t("settings.general.notifications_note")}>
-            <Warn>{t("settings.general.notifications_off")}</Warn>
+            <Warn icon="info">{t("settings.general.notifications_off")}</Warn>
             {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}
             <PushButton label={t("settings.general.open_system_settings")} size="small" onAction={() => void bridge.act("open:notifications", "open_external", () => bridge.core.openExternal({ target: { type: "system_settings", permission: "notifications" } }))} />
             {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}

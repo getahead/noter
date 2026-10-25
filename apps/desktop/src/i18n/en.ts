@@ -753,6 +753,18 @@ export const en = {
   "callpage.transcript": "Transcript",
   "callpage.banner.notify": "Get a notification when a summary is ready.",
   "callpage.banner.notify_action": "Notify Me When Summaries Are Ready",
+  "notif.summary_ready": "Summary ready",
+  "notif.summary_ready_body": "{call} · {items}, {decisions}",
+  "notif.action_items": { one: "{count} action item", other: "{count} action items" },
+  "notif.decisions": { one: "{count} decision", other: "{count} decisions" },
+  "notif.summary_failed": "Couldn't write the summary",
+  "notif.summary_failed_body": "{call} · open the call to try again",
+  "notif.system_audio_silent": "System audio silent",
+  "notif.system_audio_silent_body": "Recording continues with your microphone.",
+  "notif.microphone_off": "Microphone off",
+  "notif.microphone_off_body": "Recording continues with the other side only.",
+  "notif.engine_stopped": "Not recording · engine stopped",
+  "notif.engine_stopped_body": "Open the call window to try again.",
 } as const;
 
 export type MsgKey = keyof typeof en;
