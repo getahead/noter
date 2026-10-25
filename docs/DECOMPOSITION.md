@@ -738,11 +738,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.11 [Live and stored transcript](features/ui/live-transcript.md) — M1 · HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-ui-live-transcript`
+- [x] `p2` - **ID**: `cpt-noter-feature-ui-live-transcript`
 
 - **Purpose**: Show a call's transcript as a virtualised log that follows live speech without jumping, with speaker, time and language on every line, gap and mark rows, **Jump to Live**, and replay that is safe: on headphones during the call, on any output afterwards.
 
-- **Milestone**: M1. **Spec**: [`docs/features/ui/live-transcript.md`](features/ui/live-transcript.md). **Status**: NOT_STARTED.
+- **Milestone**: M1. **Spec**: [`docs/features/ui/live-transcript.md`](features/ui/live-transcript.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`
 
@@ -770,11 +770,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-ui-transcript-view`
-  - [ ] `p2` - `cpt-noter-component-ui-transcript-segment-row`
-  - [ ] `p2` - `cpt-noter-component-ui-speaker-label`
-  - [ ] `p2` - `cpt-noter-component-ui-language-tag`
-  - [ ] `p2` - `cpt-noter-component-ui-playback-bar`
+  - [x] `p2` - `cpt-noter-component-ui-transcript-view`
+  - [x] `p2` - `cpt-noter-component-ui-transcript-segment-row`
+  - [x] `p2` - `cpt-noter-component-ui-speaker-label`
+  - [x] `p2` - `cpt-noter-component-ui-language-tag`
+  - [x] `p2` - `cpt-noter-component-ui-playback-bar`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `transcript_subscribe` (Channel `TranscriptMsg`)
