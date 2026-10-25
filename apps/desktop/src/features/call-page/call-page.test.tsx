@@ -8,12 +8,13 @@ import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { pageFor } from "../shell/pages";
-import { holdExtras, holdTypes, resetCache } from "./cache";
+import { holdDeleteError, holdExtras, holdTypes, resetCache } from "./cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
 import { CallToolbar, moreItems, REGISTERED_VIEWS } from "./CallToolbar";
 import { loadCall, loadTypes } from "./actions";
+import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { slots } from "./slots";
 import { StoredTranscript } from "../transcript/hosts";
 import "./register";
@@ -223,6 +224,23 @@ describe("CallPage", () => {
     const html = renderToString(<CallPage bridge={bridge} callId={id} />);
     expect(html).toContain("Couldn’t open this call.");
     expect(html).toContain("Try Again");
+  });
+
+  it("a failed delete shows the section error above the transcript: Try Again deletes again when retryable, × closes it", async () => {
+    await ready();
+    const asked: string[] = [];
+    slots.deleteCall = async (_b, callId) => (asked.push(callId), { outcome: "cancelled" });
+    holdDeleteError(id, { code: "internal", message: "x", retryable: true, detail: null });
+    const error = find(rendered(CallPage, { bridge, callId: id }), (_p, type) => type === InlineBanner);
+    const b = error.props.banner as { severity: string; text: string; actions: { label: string; onAction: () => void }[] };
+    expect(b).toMatchObject({ severity: "error", text: "Couldn’t delete this call.", actions: [{ label: "Try Again" }] });
+    b.actions[0]!.onAction();
+    expect(asked).toEqual([id]);
+    holdDeleteError(id, { code: "already_recording", message: "x", retryable: false, detail: null });
+    const live = find(rendered(CallPage, { bridge, callId: id }), (_p, type) => type === InlineBanner);
+    expect(live.props.banner).toMatchObject({ text: "This call is still recording. Stop the recording first.", actions: [] });
+    (live.props.onDismiss as () => void)();
+    expect(renderToString(<CallPage bridge={bridge} callId={id} />)).not.toContain('role="alert"');
   });
 
   it("draws nothing while the call is read, before the 300 ms skeleton", async () => {

@@ -35,8 +35,9 @@ describe("MainWindow (cpt-noter-component-shell-main-window)", () => {
     await open();
     const fake = (bridge as unknown as { core: { callsDelete: (a: unknown) => Promise<unknown> } }).core;
     const sent = vi.spyOn(fake, "callsDelete");
-    slots.deleteCall!(bridge!, "call_backend");
-    await vi.waitFor(() => expect(sent).toHaveBeenCalledWith({ call_ids: ["call_backend"] }));
+    // the page shows a failure, so the slot hands the outcome back
+    await expect(slots.deleteCall!(bridge!, "call_backend")).resolves.toEqual({ outcome: "deleted" });
+    expect(sent).toHaveBeenCalledWith({ call_ids: ["call_backend"] });
   });
 
   it("draws MW-R1 to MW-R3 and the frame state from the snapshot", async () => {
