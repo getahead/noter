@@ -197,8 +197,11 @@ describe("opening the page and its controls", () => {
     const asked: string[] = [];
     slots.deleteCall = async (_b, callId) => (asked.push(callId), { outcome: "cancelled" });
     let prevented = 0;
+    const c1 = fake.world.calls[0]!.id;
+    await readCall(bridge, c1);
+    pageKey(bridge, "not-read", { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault: () => {}, stopPropagation: () => {} });
     const key = (more: Partial<KeyboardEvent> & { target?: unknown } = {}) =>
-      pageKey(bridge, "c1", { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault: () => void prevented++, ...more } as never);
+      pageKey(bridge, c1, { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault: () => void prevented++, ...more } as never);
     key({ target: { tagName: "INPUT", type: "text" } as unknown as EventTarget });
     key({ shiftKey: true });
     key({ repeat: true });
@@ -206,7 +209,7 @@ describe("opening the page and its controls", () => {
     key({ metaKey: false });
     expect(asked).toEqual([]);
     key();
-    expect(asked).toEqual(["c1"]);
+    expect(asked).toEqual([c1]);
     expect(prevented).toBe(1);
     slots.deleteCall = null;
     key();

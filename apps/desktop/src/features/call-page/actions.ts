@@ -90,10 +90,10 @@ export async function deleteCall(bridge: Bridge, callId: string): Promise<void> 
   if (res.outcome === "failed") holdDeleteError(callId, res.error);
 }
 
-/** ⌘⌫ on the call page is Delete Call…, except in a text field (the title being renamed), where it edits the text. */
+/** ⌘⌫ on the call page is Delete Call… once the call is read (as the ⋯ menu), except in a text field (the title being renamed). */
 export function pageKey(bridge: Bridge, callId: string, e: ShortcutEvent & { repeat: boolean }) {
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
-  if (chord(e) !== "Meta+Backspace" || e.repeat || isTyping(e.target) || !slots.deleteCall) return;
+  if (chord(e) !== "Meta+Backspace" || e.repeat || isTyping(e.target) || !slots.deleteCall || !bridge.store.getState().entities.call[callId]) return;
   e.preventDefault();
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
   void deleteCall(bridge, callId);
