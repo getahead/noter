@@ -43,7 +43,11 @@ async function openCalls(
   const steer = await openWindow(page, "main", {
     world: (w) => (W.idle(w), world(w)),
   });
-  await page.keyboard.press("Meta+Digit3");
+  // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
+  await expect(async () => {
+    await page.keyboard.press("Meta+Digit3");
+    await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(rowOf(page, TITLE).first()).toBeVisible();
   return steer;
 }
