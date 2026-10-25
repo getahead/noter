@@ -9,7 +9,7 @@ import { useFocusInside } from "./sheet";
 export type MenuItem =
   | { divider: true }
   | { header: string }
-  | { label: string; onSelect?: () => void; disabled?: boolean; destructive?: boolean; checked?: boolean; submenu?: boolean; kbd?: string; /** A submenu: opens beside the item on hover, focus, → or a click. */ children?: MenuItem[] };
+  | { label: string; onSelect?: () => void; disabled?: boolean; destructive?: boolean; checked?: boolean; submenu?: boolean; kbd?: string; /** A submenu: opens beside the item on hover, → or a click, and takes focus. */ children?: MenuItem[] };
 
 const ITEM = '[role^="menuitem"]:not(:disabled)';
 
@@ -85,13 +85,30 @@ function leaf(it: Leaf, onClose?: () => void, key?: number, sub?: { open: boolea
 function SubItem({ it, onClose }: { it: Leaf; onClose?: () => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="np-menu__sub" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)} onFocus={() => setOpen(true)}>
+    <div className="np-menu__sub" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       {leaf(it, onClose, undefined, { open, onOpen: setOpen })}
-      {open && (
-        <div className="np-menu np-menu__subpanel" role="menu" aria-label={it.label} onKeyDown={(e) => menuKey(e, onClose)}>
-          {it.children!.map((c, i) => ("label" in c ? leaf(c, onClose, i) : null))}
-        </div>
-      )}
+      {open && <SubPanel it={it} onClose={onClose} onBack={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+function SubPanel({ it, onClose, onBack }: { it: Leaf; onClose?: () => void; onBack: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusInside(ref); // its first item, so the keyboard can choose; focus goes back to the parent item when it closes
+  return (
+    <div
+      ref={ref}
+      className="np-menu np-menu__subpanel"
+      role="menu"
+      aria-label={it.label}
+      onKeyDown={(e) => {
+        if (submenuKey(e.key) !== "close") return menuKey(e, onClose);
+        e.preventDefault();
+        e.stopPropagation();
+        onBack();
+      }}
+    >
+      {it.children!.map((c, i) => ("label" in c ? leaf(c, onClose, i) : null))}
     </div>
   );
 }
