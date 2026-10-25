@@ -520,8 +520,8 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-engine`
-  - [ ] `p2` - `cpt-noter-component-core-engine-supervisor`
+  - `cpt-noter-component-engine`
+  - `cpt-noter-component-core-engine-supervisor`
 
 - **API**:
   - Interface `cpt-noter-interface-engine-stdio`
