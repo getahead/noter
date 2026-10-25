@@ -8,7 +8,7 @@
 //                     the real tauri-transport. The page gets a stand-in for Tauri's IPC internals
 //                     that forwards every call to a noter-core-harness process (NOTER_CORE_CMD)
 //                     this test starts, as the Tauri host would (docs/HARNESS.md).
-import type { Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type WindowLabel } from "../../../src/core/bindings";
 import type { ChannelBody } from "../../../src/core/fake/fake-core";
@@ -215,6 +215,16 @@ export async function openWindow(page: Page, label: WindowLabel | string, plan: 
 }
 
 /** Every command and event subscription the window made, in order. */
+/** Wheel the transcript `log` up until `row` is in view: Linux Chromium animates a wheel scroll and the log's row-height
+ *  correction cuts it short (CI), so one wheel may not get there. */
+export async function wheelUpTo(log: Locator, row: Locator) {
+  await log.hover();
+  await expect(async () => {
+    await log.page().mouse.wheel(0, -20_000);
+    await expect(row).toBeInViewport({ timeout: 500 });
+  }).toPass({ timeout: 10_000 });
+}
+
 export function calls(page: Page): Promise<Call[]> {
   return page.evaluate(() => (globalThis as unknown as { __noterCalls?: Call[] }).__noterCalls ?? []);
 }

@@ -64,6 +64,17 @@ async function settled(page: Page): Promise<string> {
     .toBe(true);
   return last;
 }
+/** The call screen's mark rows (the floating tail draws lines only; pins are the copilot's, M4). */
+const marks = (p: Page) => dedicated(p).locator('[data-region="CS-R2"] [data-variant="mark"]');
+/** Mark Moment once the transcript is in, then every mark row with the new one. */
+async function markMoment(page: Page): Promise<string[]> {
+  await settled(page); // subscribed, so the mark's row reaches this window
+  const n = await marks(page).count();
+  await button(page, "Mark Moment").click();
+  await expect(marks(page)).toHaveCount(n + 1);
+  return marks(page).allInnerTexts();
+}
+const keptMarks = (page: Page, before: string[]) => expect(marks(page)).toHaveText(before, { useInnerText: true });
 const startLive = (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = () => {}) => openWindow(page, "call-screen", { world });
 
 test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
@@ -103,7 +114,7 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
     await expect(bannerSlot(page)).toHaveCount(0);
     await expect(word(page, "Recording")).toBeVisible();
     await expect(transcript(page)).toContainText("System audio silent 00:30:02–00:30:40");
-    expect((await sent(page, "window_announce")).filter((a) => (a as { text: string }).text.startsWith("System audio silent"))).toHaveLength(1); // not again
+    expect(await sent(page, "window_announce")).toHaveLength(1); // not again, and never a transcript line
   });
 
   test("UI — error path: Microphone off — Recording · no mic, Open System Settings…, the recording carries on", async ({ page }) => {
@@ -286,6 +297,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
 test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("UI — happy path: Hide Noter for Presenting sends the wanted state, the window keeps its state for the return", async ({ page }) => {
     const steer = await startLive(page, still);
+    const marked = await markMoment(page);
     const before = await settled(page);
 
     await header(page).getByRole("button", { name: "Hide Noter for Presenting" }).click();
@@ -293,6 +305,7 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
     await steer.change((w) => (w.app.presenting.hidden = true)); // the core hides every surface and sends app:presenting
     await steer.change((w) => (w.app.presenting.hidden = false)); // ⌃⌥⌘0 or Show Noter
     await expect(transcript(page)).toHaveText(before, { useInnerText: true });
+    await keptMarks(page, marked);
     await expect(word(page, "Recording")).toBeVisible();
   });
 
@@ -343,6 +356,7 @@ test.describe("cpt-noter-seq-floating-panel-display-unplugged", () => {
 
   test("UI — other path: by hand — ⋯ › Use Floating Panel, then Move to Display 2 and ⋯ › Open Call Screen on Display 2", async ({ page }) => {
     await startLive(page);
+    const marked = await markMoment(page);
 
     await toFloating(page);
     expect(await sent(page, "window_set_call_layout")).toContainEqual({ preference: "floating" });
@@ -353,6 +367,7 @@ test.describe("cpt-noter-seq-floating-panel-display-unplugged", () => {
     await toFloating(page);
     await more(page, "Open Call Screen on Display 2");
     await expect(dedicated(page)).toBeVisible();
+    await keptMarks(page, marked); // a layout switch keeps the marks
   });
 });
 
@@ -419,7 +434,7 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
 
   test("UI — error path: Panel closed by a crash — a new WebView opens with snapshot, window state, then the transcript", async ({ page }) => {
     await startLive(page);
-    await expect(transcript(page)).not.toBeEmpty();
+    const marked = await markMoment(page);
     const title = await header(page).innerText();
 
     await page.reload(); // the crashed WebView is recreated
@@ -428,6 +443,7 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
     expect(order.indexOf("app_snapshot")).toBeGreaterThanOrEqual(0);
     expect(order.indexOf("window_call_state")).toBeGreaterThan(order.indexOf("app_snapshot"));
     expect(order.indexOf("transcript_subscribe")).toBeGreaterThan(order.indexOf("window_call_state"));
+    if (!FAKE) await keptMarks(page, marked); // the new WebView's snapshot carries the marks (the fake core lives in the page and restarts with it)
     await expect(word(page, "Recording")).toBeVisible();
   });
 });

@@ -261,24 +261,6 @@ export function TranscriptBar({ tr, variant }: { tr: TranscriptHandle; variant: 
 }
 // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-bar
 
-/** The call screen until the call window (2.10) lands around it: the capture's call, live, in CS-R2 and CS-R2b. */
-export function CallScreenTranscript({ bridge }: { bridge: Bridge }) {
-  const callId = useWindow(bridge, (s) => s.whole.capture?.call_id ?? null);
-  return callId ? <LiveHost bridge={bridge} callId={callId} /> : null;
-}
-
-function LiveHost({ bridge, callId }: { bridge: Bridge; callId: string }) {
-  const tr = useTranscript(bridge, callId);
-  return (
-    <div className="tr-window">
-      <section data-region="CS-R2" className="cs-r2" aria-label={t("transcript.label")}>
-        <TranscriptLog tr={tr} variant="live" />
-      </section>
-      <TranscriptBar tr={tr} variant="live" />
-    </div>
-  );
-}
-
 /**
  * A call's stored transcript for the call page's PC-R5 (the page draws the region and its heading): the audio line,
  * the view with its play controls, and the playback bar in PC-R6. It reads the call's details for the audio line.

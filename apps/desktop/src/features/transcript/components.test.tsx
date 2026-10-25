@@ -7,7 +7,7 @@ import type { CallDetail, WindowLabel } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
-import { audioLine, CallScreenTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
+import { audioLine, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
 import { PlaybackBar } from "./playback-bar";
@@ -199,11 +199,10 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
   it("draws the live call in CS-R2 from the Channel, and the call screen mounts it", async () => {
     const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
     await b.subscribe("transcript_subscribe", { call_id: LIVE });
-    const html = renderToString(<CallScreenTranscript bridge={b} />);
+    await b.act("window_call_state", "window_call_state", () => b.core.windowCallState({}), { slice: "callWindow" }); // the call window (2.10) draws once it has its state
+    const html = renderToString(<App bridge={b} />);
     expect(html).toContain('data-region="CS-R2"');
     expect(html).toContain("drawer redesign");
-    await b.act("window_call_state", "window_call_state", () => b.core.windowCallState({}), { slice: "callWindow" }); // the call window (2.10) draws once it has its state
-    expect(renderToString(<App bridge={b} />)).toContain('data-region="CS-R2"');
     const tr = hookOf(b, LIVE);
     expect(renderToString(<TranscriptLog tr={tr} variant="tail" tailLines={2} />).match(/cw-seg--tail/g)).toHaveLength(2);
     expect(renderToString(<TranscriptBar tr={tr} variant="live" />)).toBe("");
