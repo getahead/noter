@@ -119,7 +119,7 @@ const call_has_type = (call: { call_type: string }, children: Array<{ checked?: 
 describe("CallBanners", () => {
   it("offers the notification prompt after the first recorded call, and Notify Me asks for the permission", async () => {
     await ready();
-    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud" });
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
     const html = renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />);
     expect(html).toContain("Get a notification when a summary is ready.");
     expect(html).toContain('data-region="PC-R2"');
@@ -133,7 +133,7 @@ describe("CallBanners", () => {
   it("shows nothing when it is not the first recorded call, when an app banner is up, or before the call is read", async () => {
     await ready();
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toBe("");
-    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud" });
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={1} />)).toBe("");
   });
 
@@ -142,13 +142,13 @@ describe("CallBanners", () => {
       w.app.capture.phase = "recording";
       w.app.capture.call_id = w.calls.find((c) => c.status === "ready")!.id;
     });
-    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud" });
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toBe("");
   });
 
   it("× closes it for this window without sending anything", async () => {
     await ready();
-    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud" });
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
     const seen = sent();
     const tree = rendered(CallBanners, { route: route(), bridge, appBanners: 0 });
     (find(tree, (p) => typeof p.onDismiss === "function").props.onDismiss as (id: string) => void)("notify");

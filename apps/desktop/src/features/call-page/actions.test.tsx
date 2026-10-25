@@ -85,11 +85,14 @@ describe("call page commands", () => {
     ]);
   });
 
-  it("revealFolder asks open_external to reveal the call's folder", async () => {
+  it("revealFolder asks open_external to reveal the folder call_get gave, and sends nothing before it is known", async () => {
     const id = await ready();
     const seen = sent();
     await revealFolder(bridge, id);
-    expect(seen).toContainEqual(["open_external", { target: { type: "reveal_in_finder", path: expect.stringContaining(id) } }]);
+    expect(seen).toEqual([]);
+    const r = await readCall(bridge, id);
+    await revealFolder(bridge, id);
+    expect(seen).toContainEqual(["open_external", { target: { type: "reveal_in_finder", path: r.status === "ok" ? r.data.folder : "?" } }]);
   });
 
   it("requestNotifications asks for the notifications permission", async () => {
@@ -129,7 +132,7 @@ describe("opening the page and its controls", () => {
     const Probe = () => ((held = useExtras(id)), null);
     renderToString(<Probe />);
     expect(held).toMatchObject({ first_recorded_call: !!detail });
-    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud" });
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
   });
 
   it("saveTitle saves a changed title, ignores an empty or unchanged one and reads the call again after a refusal", async () => {
@@ -155,6 +158,7 @@ describe("opening the page and its controls", () => {
   it("menuActs sends each item's command and has no Delete Call… until the dialogs host registers", async () => {
     const id = await ready();
     const call = { id, rev: fake.world.calls.find((c) => c.id === id)!.rev, privacy: "normal" as const };
+    await readCall(bridge, id);
     const seen = sent();
     let renamed = 0;
     const acts = menuActs(bridge, call, () => void renamed++);
