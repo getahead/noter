@@ -110,6 +110,12 @@ describe("createPromptTimer (15 s, paused while the pointer or focus is on the p
 
 describe("the panel's own state (localReduce)", () => {
   const run = (...events: Parameters<typeof localReduce>[1][]) => events.reduce(localReduce, INITIAL_LOCAL);
+  it("keeps the same state object when the pointer or focus does not change, so React skips the render", () => {
+    const held = run({ type: "pointer", on: true }, { type: "focus", on: true });
+    expect(localReduce(held, { type: "pointer", on: true })).toBe(held);
+    expect(localReduce(held, { type: "focus", on: true })).toBe(held);
+    expect(localReduce(INITIAL_LOCAL, { type: "pointer", on: false })).toBe(INITIAL_LOCAL);
+  });
 
   it("opens the Don't Ask confirmation and Back returns", () => {
     expect(run({ type: "dont-ask" }).dontAsk).toBe(true);

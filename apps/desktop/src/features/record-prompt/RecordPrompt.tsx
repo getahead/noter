@@ -17,16 +17,20 @@ import { announce, answerCallEnd, answerNewMeeting, dismiss, holdNotice, ignoreA
 import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptTimer } from "./logic";
 import "./record-prompt.css";
 
+// @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-fade
 const FADE_MS = 200;
 /** The fade is 200 ms, and none under Reduce motion. */
 const fadeMs = (): number => (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : FADE_MS);
+// @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-fade
 
 /** **Not Now ▾**: close for now, or stop being asked for this app. */
+// @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-dont-ask
 export const notNowItems = (app: string, notNow: () => void, dontAsk: () => void): MenuItem[] => [
   { label: t("prompt.not_now"), onSelect: notNow },
   { divider: true },
   { label: t("prompt.dont_ask", { app }), onSelect: dontAsk },
 ];
+// @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-dont-ask
 
 // @cpt-component:cpt-noter-component-ui-record-prompt:p1
 export function RecordPrompt({ bridge }: { bridge: Bridge }) {
@@ -47,6 +51,7 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
   // what a refusal was made in: it clears when the free space, the model or the core's reason changes
   const world = `${env?.disk_free_mb}/${detection?.blocked}/${setup?.models.bundles.map((b) => b.state).join()}`;
   const refusal = activeRefusal(local, world);
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-choose-variant
   const view = chooseView({
     setupComplete: setup?.complete ?? false,
     presenting: presenting?.hidden ?? false,
@@ -57,12 +62,17 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     refused: refusal?.reason ?? null,
     held,
   });
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-choose-variant
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-return-dismiss
   const shown = view !== null && key !== null && local.gone !== key;
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-return-dismiss
 
   // a prompt that is over (the core cleared it) is forgotten, so the next one is drawn
   useEffect(() => void (key === null && dispatch({ type: "reset" })), [key]);
   // the fade lasts 200 ms, then the prompt is gone until the core's next one
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-fade
   useEffect(() => leaveTimer(local.closing !== null, () => dispatch({ type: "gone" }), fadeMs()), [local.closing]);
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-fade
 
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-render
   const variant = view?.variant;
@@ -77,11 +87,13 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
   }, [announceKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-render
 
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-user-dismiss
   const close = (reason?: "not_now" | "closed" | "timed_out") => {
     if (!key) return;
     if (reason && detection) void dismiss(bridge, detection.id, reason);
     dispatch({ type: "closing", key });
   };
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-user-dismiss
 
   // the 15 s the prompt waits: it runs for a detection with its buttons showing, and stops while the pointer or focus is on it
   const timed = shown && !!detection && variant !== "call-ended" && variant !== "new-meeting" && view.state !== "not-a-call";
@@ -91,7 +103,9 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     timer.current = t0;
     return () => t0.stop();
   }, [timed, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-while-hover
   useEffect(() => (held ? timer.current?.pause() : timer.current?.resume()), [held]);
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-while-hover
 
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-while-notice-hover
   // the core holds the call-ended countdown while the pointer or focus is on the panel
@@ -115,19 +129,25 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
   if (!shown || !view || !variant) return null;
 
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-user-record
+  // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-return-start
   const record = async (sensitive: boolean) => {
     if (!detection) return;
     const r = await startRecording(bridge, detection, sensitive);
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-refused
+    // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-refused
     if (!r.ok && (r.reason === "disk_full" || r.reason === "model_missing")) return dispatch({ type: "refused", reason: r.reason, ...(r.freeMb !== undefined ? { freeMb: r.freeMb } : {}), at: world });
+    // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-refused
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-refused
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-already
+    // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-already
     // started, or already running: the core shows the running call
+    // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-already
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-already
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-close-open
     dispatch({ type: "closing", key: key! });
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-close-open
   };
+  // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-return-start
   // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-user-record
 
   const root = {
@@ -161,11 +181,17 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
             </div>
           </div>
         </div>
+        {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-user-notice */}
+        {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
+        {/* @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-ended-closing */}
         <div className="rp-r3" data-region="RP-R3">
           <PushButton label={t("prompt.stop_now")} onAction={() => void answerCallEnd(bridge, callId, "stop_now").then(() => close())} />
           <span className="np-tb__spacer" />
           <PushButton label={t("prompt.keep_recording")} variant="primary" onAction={() => void answerCallEnd(bridge, callId, "keep_recording").then(() => close())} />
         </div>
+        {/* @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-ended-closing */}
+        {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
+        {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-user-notice */}
       </div>
     );
   }
@@ -179,11 +205,17 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
             <div className="rp-sub">{t("prompt.meeting_body", { call: capture?.title ?? "" })}</div>
           </div>
         </div>
+        {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-user-notice */}
+        {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
+        {/* @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-newmeeting-closing */}
         <div className="rp-r3" data-region="RP-R3">
           <PushButton label={t("prompt.meeting_keep")} onAction={() => void answerNewMeeting(bridge, callId, "keep_in_this_call").then(() => close())} />
           <span className="np-tb__spacer" />
           <PushButton label={t("prompt.meeting_new")} variant="primary" onAction={() => void answerNewMeeting(bridge, callId, "start_as_new_call").then(() => close())} />
         </div>
+        {/* @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-newmeeting-closing */}
+        {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
+        {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-user-notice */}
       </div>
     );
   }
@@ -216,11 +248,13 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
         <p>{browser ? t("prompt.browser_line", { app }) : t("prompt.app_line", { app })}</p>
         <div className="rp-inline__btns">
           <PushButton label={t("prompt.back")} onAction={() => dispatch({ type: "back" })} />
+          {/* @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-notacall-closing */}
           <PushButton
             label={t("prompt.dont_ask_action")}
             variant="primary"
             onAction={() => void ignoreApp(bridge, detection).then(() => close())}
           />
+          {/* @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-notacall-closing */}
         </div>
       </div>
     );
@@ -242,7 +276,9 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
         {reason(t("prompt.disk_full", { free: refusal?.freeMb ?? env?.disk_free_mb ?? 0 }))}
         <div className="rp-btnrow">
           {notNow}
+          {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-delete-old */}
           <PushButton label={t("prompt.delete_old")} onAction={() => void openDeleteOldAudio(bridge)} />
+          {/* @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-delete-old */}
           <span className="np-tb__spacer" />
           {recordKey}
         </div>
@@ -254,7 +290,9 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
         {reason(t("prompt.sys_off"))}
         <div className="rp-btnrow">
           {notNow}
+          {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-open-settings */}
           <PushButton label={t("prompt.open_settings")} onAction={() => void openSystemSettings(bridge)} />
+          {/* @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-open-settings */}
           <span className="np-tb__spacer" />
           {recordKey}
         </div>
