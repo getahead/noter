@@ -23,6 +23,9 @@ const info = (page: Page) => page.locator('[data-region="PC-R4"], [data-region="
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 const menuItem = (page: Page, name: string | RegExp) => page.getByRole("menuitem", { name }).or(page.getByRole("menuitemcheckbox", { name }));
 const sent = async (page: Page, name: string) => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
+const pane = (page: Page) => page.locator('[data-region="PC-R5"]');
+const head = (page: Page) => pane(page).locator(".pc-tr__head");
+const storedRows = (page: Page) => pane(page).getByRole("log", { name: "Transcript" }).locator('[data-component="cpt-noter-component-ui-transcript-segment-row"]');
 const NOTIFY = "Notify Me When Summaries Are Ready";
 const ASK = /Get a notification when a summary is ready\./; // D-16
 
@@ -84,7 +87,12 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     for (const row of ["Type", "App", "When", "Length", "Languages"]) await expect(info(page).getByText(row, { exact: true })).toBeVisible();
     await expect(info(page)).toContainText("Kept until");
     await expect(info(page).getByRole("switch", { name: "Sensitive" })).not.toBeChecked();
-    await expect(page.locator('[data-region="PC-R5"]')).toBeVisible();
+    // PC-R5: the header (Transcript, a tag per call language, the audio line) and the stored transcript under it
+    await expect(head(page).getByText("Transcript", { exact: true })).toBeVisible();
+    await expect(head(page).locator('[data-component="cpt-noter-component-ui-language-tag"][data-variant="call"]').first()).toBeVisible();
+    await expect(head(page)).toContainText(/52 min · audio kept until /);
+    await expect(storedRows(page).first()).toBeVisible();
+    await expect(pane(page)).not.toContainText("The transcript appears here.");
 
     // The core knows which call this window shows, so it sends no notification for it; null once the page closes.
     expect(await sent(page, "call_get")).toContainEqual({
@@ -104,6 +112,8 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await openCall(page);
     await expect(info(page)).toContainText(/Audio deleted on .+ · transcript kept/);
     await expect(info(page)).not.toContainText("Kept until");
+    await expect(head(page)).toContainText("Audio deleted · transcript kept"); // D-36: no deletion date in M1
+    await expect(storedRows(page).first()).toBeVisible(); // the transcript stays readable
     await expect(button(page, "Delete Audio Now…")).toHaveCount(0);
   });
 

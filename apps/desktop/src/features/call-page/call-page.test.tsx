@@ -15,6 +15,7 @@ import { CallPage } from "./CallPage";
 import { CallToolbar, moreItems, REGISTERED_VIEWS } from "./CallToolbar";
 import { loadCall, loadTypes } from "./actions";
 import { slots } from "./slots";
+import { StoredTranscript } from "../transcript/hosts";
 import "./register";
 
 let bridge: Bridge;
@@ -22,7 +23,6 @@ let fake: FakeCore;
 let id: string;
 beforeEach(resetCache);
 afterEach(() => {
-  slots.transcript = null;
   slots.deleteCall = null;
   return bridge.close();
 });
@@ -158,17 +158,24 @@ describe("CallBanners", () => {
 });
 
 describe("CallPage", () => {
-  it("draws the PC-R5 region with the stored transcript the live-transcript feature registered", async () => {
+  it("draws PC-R5 with the header (Transcript, language tags, audio meta) and the stored transcript under it", async () => {
     await ready();
-    slots.transcript = ({ callId, audioKept }) => <i data-x={`${callId}:${audioKept}`} />;
+    const tree = rendered(CallPage, { bridge, callId: id });
+    const stored = find(tree, (_p, type) => type === StoredTranscript);
+    expect(stored.props).toMatchObject({ callId: id, detail: { call: { id, audio_deleted: false }, audio_not_stored: false }, header: null });
     const html = renderToString(<CallPage bridge={bridge} callId={id} />);
     expect(html).toContain('data-region="PC-R5"');
-    expect(html).toContain(`data-x="${id}:true"`);
+    expect(html).toMatch(/<span class="t-headline">Transcript<\/span><span data-component="cpt-noter-component-ui-language-tag" data-variant="call"/);
+    expect(html).toMatch(/class="np-dim">\d+ min · audio kept until /);
+    expect(html).not.toContain("The transcript appears here.");
   });
 
-  it("says the transcript appears here until it is registered", async () => {
-    await ready();
-    expect(renderToString(<CallPage bridge={bridge} callId={id} />)).toContain("The transcript appears here.");
+  it("the header says the audio was deleted, or never stored", async () => {
+    await ready((w) => w.calls.concat(w.call_details.map((d) => d.call)).forEach((c) => (c.audio_deleted = true)));
+    await loadCall(bridge, id);
+    expect(renderToString(<CallPage bridge={bridge} callId={id} />)).toContain('class="np-dim">Audio deleted · transcript kept</span>');
+    holdExtras(id, { first_recorded_call: false, audio_not_stored: true, mode_used: "cloud", folder: "/calls/x" });
+    expect(renderToString(<CallPage bridge={bridge} callId={id} />)).toContain('class="np-dim">Audio not stored for this call</span>');
   });
 
   it("shows the empty state when the call is gone, and the section error with Try Again for any other failure", async () => {
@@ -187,11 +194,10 @@ describe("CallPage", () => {
     expect(renderToString(<CallPage bridge={bridge} callId="not-held-yet" />)).toBe("");
   });
 
-  it("no audio kept: the stored transcript gets audioKept false", async () => {
+  it("no audio kept: the stored transcript gets the call the page read, so it draws no play controls and asks nothing", async () => {
     await ready((w) => w.calls.concat(w.call_details.map((d) => d.call)).forEach((c) => (c.audio_deleted = true)));
     await loadCall(bridge, id);
-    slots.transcript = ({ audioKept }) => <i data-kept={String(audioKept)} />;
-    expect(renderToString(<CallPage bridge={bridge} callId={id} />)).toContain('data-kept="false"');
+    expect(find(rendered(CallPage, { bridge, callId: id }), (_p, type) => type === StoredTranscript).props.detail).toMatchObject({ call: { audio_deleted: true } });
   });
 });
 
