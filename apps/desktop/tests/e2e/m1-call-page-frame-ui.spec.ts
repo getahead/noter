@@ -155,6 +155,20 @@ test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
     await expect(toolbar(page)).toContainText("Backend sync, retro");
   });
 
+  test("UI — other path: Rename… then Esc, or a click outside the field, keeps the title and sends nothing", async ({ page }) => {
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    for (const leave of [() => page.keyboard.press("Escape"), () => page.locator('[data-region="PC-R5"]').click()]) {
+      await openMore(page);
+      await menuItem(page, "Rename…").click();
+      await toolbar(page).getByRole("textbox").fill("Not this");
+      await leave();
+      await expect(toolbar(page).getByRole("textbox")).toHaveCount(0);
+      await expect(toolbar(page)).toContainText(TITLE);
+    }
+    expect(await sent(page, "call_update")).toEqual([]);
+  });
+
   test("UI — error path: rename after the core changed the call (conflict) — the page shows the core's current values", async ({ page }) => {
     const steer = await openWindow(page, "main", { world: quiet() });
     await openCall(page);
