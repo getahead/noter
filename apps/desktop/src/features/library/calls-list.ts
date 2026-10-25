@@ -59,6 +59,7 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
   async function first(sort: CallSort): Promise<void> {
     const mine = ++request;
     // a list already on screen stays while it reloads (Back shows it at once)
+    // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-error-loading
     set({
       sort,
       ...(state.status === "ERROR" || !state.rows.length
@@ -66,6 +67,7 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
         : {}),
       error: null,
     });
+    // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-error-loading
     const res = await read(sort);
     if (mine !== request) return;
     // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-loading-error
@@ -115,6 +117,9 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
     sort: (sort: CallSort) => load(sort),
     /** Newer records of the rows held (by `rev`), and a recorded call that is not listed yet, first. */
     merge(records: Record<string, CallRow>, gone: Set<string>) {
+      // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-row-update
+      // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-return-edit
+      // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-empty-listed
       const held = new Set(state.rows.map((r) => r.id));
       const updated = state.rows
         .filter((r) => !gone.has(r.id))
@@ -137,9 +142,13 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
           rows,
           status: state.status === "ERROR" ? "ERROR" : mergeRows(rows),
         });
+      // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-empty-listed
+      // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-return-edit
+      // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-row-update
     },
     /** Calls the core deleted. */
     drop(ids: string[]) {
+      // @cpt-begin:cpt-noter-flow-ui-library-calls-delete:p1:inst-return-delete
       const rows = state.rows.filter((r) => !ids.includes(r.id));
       // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-listed-empty
       set({
@@ -151,6 +160,7 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
             : Math.max(0, state.total - (state.rows.length - rows.length)),
       });
       // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-listed-empty
+      // @cpt-end:cpt-noter-flow-ui-library-calls-delete:p1:inst-return-delete
     },
   };
 }

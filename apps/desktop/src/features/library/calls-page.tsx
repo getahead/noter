@@ -116,6 +116,7 @@ export function CallsPage() {
     [bridge],
   );
   // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-open-call
+  // @cpt-dod:cpt-noter-dod-ui-library-calls-delete:p2
   // @cpt-begin:cpt-noter-flow-ui-library-calls-delete:p1:inst-delete-flow
   const remove = useCallback(
     async (calls: CallRow[]) => {

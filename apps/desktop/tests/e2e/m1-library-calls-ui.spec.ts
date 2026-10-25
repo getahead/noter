@@ -157,7 +157,11 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
   }) => {
     const steer = await openWindow(page, "main", { world: W.idle });
     await steer.failNext("calls_list", "internal");
-    await page.keyboard.press("Meta+Digit3");
+    // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
+    await expect(async () => {
+      await page.keyboard.press("Meta+Digit3");
+      await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+    }).toPass();
     const banner = page.locator(
       '[data-component="cpt-noter-component-ui-inline-banner"]',
     );
@@ -213,6 +217,20 @@ test.describe("cpt-noter-algo-ui-library-calls-status-cell", () => {
         "Audio deleted",
       ),
     ).toBeVisible();
+  });
+});
+
+test.describe("cpt-noter-algo-ui-library-calls-status-cell (Medium)", () => {
+  test("UI — Medium width: the status shows its icon only, the text stays in the help tag and for VoiceOver", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await openCalls(page, (w) => Object.assign(first(w), { outputs: "writing" }));
+    await expect(page.locator('[data-width="medium"]')).not.toHaveCount(0);
+    const status = rowOf(page, "Backend sync").first().locator(".lb-status");
+    await expect(status).toHaveAttribute("title", "Writing summary…");
+    await expect(status.locator(".lb-status__text")).toHaveText("Writing summary…");
+    await expect(status.locator(".lb-status__text")).toHaveCSS("width", "1px");
   });
 });
 
