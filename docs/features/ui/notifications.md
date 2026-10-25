@@ -77,7 +77,7 @@ It implements `cpt-noter-component-screen-notifications`.
 
 ### Turn on summary notifications
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-notifications-allow`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-notifications-allow`
 
 **Actor**: Primary user
 
@@ -93,7 +93,7 @@ It implements `cpt-noter-component-screen-notifications`.
 2. [x] - `p1` - **IF** the user denied, or turned notifications off in System Settings - `inst-if-denied`
    1. [x] - `p1` - Core: `env:changed` reports notifications off; Settings › General shows **Notifications are off for Noter** with **Open System Settings…** (`open_external`) - `inst-off-line`
    2. [x] - `p1` - UI: nothing else changes; the menu bar keeps **Open Last Summary** - `inst-nothing-else`
-3. [ ] - `p1` - **RETURN** notifications allowed, or off with every state still visible in Noter - `inst-return-allow`
+3. [x] - `p1` - **RETURN** notifications allowed, or off with every state still visible in Noter - `inst-return-allow`
 
 ### Receive and open a notification
 
