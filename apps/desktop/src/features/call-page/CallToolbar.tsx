@@ -7,6 +7,7 @@ import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Menu, type MenuItem } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
+import { PopupButton } from "../../ui/primitives/popup-button";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
@@ -27,8 +28,10 @@ export const REGISTERED_VIEWS: readonly CallPageTab[] = ["transcript"];
 export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null }): MenuItem[] {
   const sensitive = call.privacy === "sensitive";
   return [
+    // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
     { label: t("callpage.rename"), onSelect: act.rename },
     { label: t("callpage.call_type"), children: types.map((x) => ({ label: x.label, checked: x.id === call.call_type, onSelect: () => act.type(x.id) })) },
+    // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
     { label: sensitive ? t("callpage.sensitive") : t("callpage.mark_sensitive"), checked: sensitive, onSelect: act.sensitive },
     { divider: true },
     { label: t("callpage.show_in_finder"), onSelect: act.finder },
@@ -45,6 +48,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const [renaming, setRenaming] = useState(false);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const { segments, view } = callViews(REGISTERED_VIEWS, at.tab);
+  const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));
   const title = call ? call.title : "";
   const sub = call && prefs ? subtitleOf(call, Date.now(), prefs) : undefined;
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-toolbar
@@ -55,11 +59,16 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
       title={title}
       subtitle={sub}
       titleNode={call && renaming ? <TitleField bridge={bridge} call={call} onDone={() => setRenaming(false)} /> : undefined}
-      center={<SegmentedControl items={segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }))} value={view} variant="view" label={t("callpage.view")} />}
+      center={
+        // @cpt-begin:cpt-noter-algo-ui-call-page-frame-views:p1:inst-narrow
+        base.narrow ? <PopupButton options={views} value={view} variant="toolbar" label={t("callpage.view")} /> : <SegmentedControl items={views} value={view} variant="view" label={t("callpage.view")} />
+        // @cpt-end:cpt-noter-algo-ui-call-page-frame-views:p1:inst-narrow
+      }
       trailing={
         <>
           <PushButton label={t("callpage.share")} variant="secondary" disabled />
           <PullDownButton id="pc-more" iconOnly icon="ellipsis" label={t("callpage.more")} ariaLabel={t("callpage.more")} variant="item-menu" size="toolbar" open={menu !== null} onAction={() => setMenu(menu ? null : globalThis.document?.getElementById("pc-more") ?? null)} />
+          {/* @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-user-more */}
           {menu && call && (
             <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
               <Menu
@@ -68,6 +77,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
               />
             </Popover>
           )}
+          {/* @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-user-more */}
           <IconButton
             icon="sidebar"
             label={inspectorOpen ? t("callpage.hide_inspector") : t("callpage.show_inspector")}

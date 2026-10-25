@@ -1,6 +1,7 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow } from "../../core/bindings";
-import { extrasOf, holdExtras, holdTypes } from "./cache";
+import { chord, isTyping, type ShortcutEvent } from "../../app/a11y/keys";
+import { extrasOf, holdDeleteError, holdExtras, holdTypes } from "./cache";
 import { slots } from "./slots";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-open:p1
@@ -34,13 +35,17 @@ export const loadTypes = (bridge: Bridge) => bridge.act("call:types", "call_type
 /** Rename in place: the title with the call's `rev`; a `conflict` leaves the core's values to be read again. */
 export function rename(bridge: Bridge, callId: string, rev: number, title: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-rename
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   return bridge.act(`call:update:${callId}`, "call_update", () => bridge.core.callUpdate({ call_id: callId, rev, title }), { entity: "call" });
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-rename
 }
 
 export function setCallType(bridge: Bridge, callId: string, rev: number, callType: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-type
+  // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   return bridge.act(`call:update:${callId}`, "call_update", () => bridge.core.callUpdate({ call_id: callId, rev, call_type: callType }), { entity: "call" });
+  // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-api-update
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-type
 }
 
@@ -77,13 +82,37 @@ export async function saveTitle(bridge: Bridge, call: Pick<CallRow, "id" | "rev"
 /** Call Info's Mode indicator opens Settings › Privacy. */
 export const openPrivacySettings = (bridge: Bridge) => bridge.core.windowNavigate({ target: { type: "settings", pane: "privacy" } });
 
+/** **Delete Call…** (⋯ menu, ⌘⌫, the error's Try Again): the dialogs host's alert; a refusal stays on the page as its section error. */
+export async function deleteCall(bridge: Bridge, callId: string): Promise<void> {
+  if (!slots.deleteCall) return;
+  holdDeleteError(callId, null);
+  const res = await slots.deleteCall(bridge, callId);
+  if (res.outcome === "failed") holdDeleteError(callId, res.error);
+}
+
+/** ⌘⌫ on the call page is Delete Call… once the call is read (as the ⋯ menu), except in a text field (the title being renamed). */
+export function pageKey(bridge: Bridge, callId: string, e: ShortcutEvent & { repeat: boolean }) {
+  // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
+  if (chord(e) !== "Meta+Backspace" || e.repeat || isTyping(e.target) || !slots.deleteCall || !bridge.store.getState().entities.call[callId]) return;
+  e.preventDefault();
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
+  void deleteCall(bridge, callId);
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
+  // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
+}
+
+// @cpt-dod:cpt-noter-dod-ui-call-page-frame-actions:p2
 /** What the ⋯ menu's items do for this call. Delete Call… is the dialogs host's alert, absent until it registers. */
 export function menuActs(bridge: Bridge, call: Pick<CallRow, "id" | "rev" | "privacy">, startRename: () => void) {
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-match-more
   return {
     rename: startRename,
     type: (id: string) => void setCallType(bridge, call.id, call.rev, id),
     sensitive: () => void setSensitive(bridge, call.id, call.privacy !== "sensitive"),
     finder: () => void revealFolder(bridge, call.id),
-    remove: slots.deleteCall ? () => slots.deleteCall?.(bridge, call.id) : null,
+    // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
+    remove: slots.deleteCall ? () => void deleteCall(bridge, call.id) : null,
+    // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-case-delete
   };
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-match-more
 }

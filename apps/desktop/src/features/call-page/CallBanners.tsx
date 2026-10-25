@@ -28,7 +28,9 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
   const offer = !!extras?.first_recorded_call && !!call && notAsked && !live && !asked && !closed.has("notify") && appBanners === 0;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
   if (!offer) return null;
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
   // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-banner-flow
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-banner
   const banner: Banner = {
@@ -51,7 +53,9 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   };
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-banner
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-banner-flow
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-if-close
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-local-dismiss
   return <BannerSlot banners={[banner]} region="PC-R2" onDismiss={() => (closed.add("notify"), redraw((n) => n + 1))} />;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-local-dismiss
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-if-close
 }

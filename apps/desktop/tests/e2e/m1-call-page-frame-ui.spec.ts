@@ -13,6 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
 const STDIO = process.env.NOTER_CORE === "stdio";
@@ -204,7 +205,17 @@ test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
       rev: 5,
       call_type: "standup",
     });
-    await expect(info(page).getByText("Type", { exact: true }).locator("..")).toContainText(/standup/i);
+    await expect(info(page).getByRole("combobox", { name: "Type" })).toHaveValue("standup");
+  });
+
+  test("UI — happy path: the Call info Type pop-up lists the core's types and call_update sets the one chosen", async ({ page }) => {
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    const type = info(page).getByRole("combobox", { name: "Type" });
+    await expect(type.getByRole("option", { name: /standup/i })).toHaveCount(1);
+    await type.selectOption("standup");
+    expect(await sent(page, "call_update")).toContainEqual({ call_id: W.PAST_CALL, rev: 5, call_type: "standup" });
+    await expect(type).toHaveValue("standup");
   });
 
   test("UI — happy path: Call Type ▸ by keyboard — → opens it on its first type, ← goes back, Return sets a type", async ({ page }) => {
@@ -262,6 +273,59 @@ test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
         path: expect.stringContaining(W.PAST_CALL),
       },
     });
+  });
+});
+
+test.describe("cpt-noter-seq-dialogs-delete-call", () => {
+  test("UI — other path: Cancel in the alert keeps the call and its page", async ({ page }) => {
+    await watchAlerts(page);
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    await openMore(page);
+    await menuItem(page, "Delete Call…").click();
+    await expect.poll(async () => (await alerts(page)).length).toBe(1);
+    expect(await sent(page, "calls_delete")).toHaveLength(0);
+    await expect(toolbar(page)).toContainText(TITLE);
+  });
+
+  test("UI — other path: ⌘⌫ on the page asks Delete “Backend sync”?, Delete lands on Library › Calls", async ({ page }) => {
+    await watchAlerts(page);
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    await answerAlerts(page, "confirm");
+    await page.keyboard.press("Meta+Backspace");
+    await expect.poll(async () => (await alerts(page)).length).toBe(1);
+    expect(alertText((await alerts(page))[0]!)).toContain(`Delete “${TITLE}”?`);
+    await expect.poll(async () => sent(page, "calls_delete")).toContainEqual({ call_ids: [W.PAST_CALL] });
+    await expect(page.locator('[data-region="MW-R3"]').getByRole("heading", { name: "Calls" })).toBeVisible();
+  });
+
+  test("UI — other path: ⌘⌫ while renaming edits the title field, it does not delete", async ({ page }) => {
+    await watchAlerts(page);
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    await openMore(page);
+    await menuItem(page, "Rename…").click();
+    await expect(page.getByRole("textbox", { name: /title/i })).toBeFocused();
+    await page.keyboard.press("Meta+Backspace");
+    expect(await alerts(page)).toHaveLength(0);
+    expect(await sent(page, "calls_delete")).toHaveLength(0);
+  });
+
+  test("UI — error path: the delete fails, the page shows its section error and Try Again deletes again", async ({ page }) => {
+    await watchAlerts(page);
+    const steer = await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    await steer.failNext("calls_delete", "internal");
+    await answerAlerts(page, "confirm");
+    await openMore(page);
+    await menuItem(page, "Delete Call…").click();
+    const error = page.getByRole("alert").filter({ hasText: "Couldn’t delete this call." });
+    await expect(error).toBeVisible();
+    await expect(toolbar(page)).toContainText(TITLE);
+    await error.getByRole("button", { name: "Try Again" }).click();
+    await expect.poll(async () => (await sent(page, "calls_delete")).length).toBe(2);
+    await expect(page.locator('[data-region="MW-R3"]').getByRole("heading", { name: "Calls" })).toBeVisible();
   });
 });
 

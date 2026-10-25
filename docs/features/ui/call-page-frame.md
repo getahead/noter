@@ -74,7 +74,7 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 
 ### Open a call's page
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-frame-open`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-frame-open`
 
 **Actor**: Primary user
 
@@ -95,13 +95,13 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 5. [x] - `p1` - API: `window_report_view` (call id), so the core sends no notification for the call this window shows; `null` when the page closes - `inst-api-report`
 6. [x] - `p1` - UI: PC-R4 Call info at 280 pt in Wide (overlay in Medium and Narrow): **Participants** (person chips), **Call** (**Type**, **App**, **When**, **Length**, **Languages**), **Privacy** (the mode indicator and a **Sensitive** switch), **Audio** (**Kept until 15 Nov**, or **Audio deleted on 15 Nov · transcript kept**), **Processing** - `inst-call-info`
 7. [x] - `p1` - Flow: the stored transcript with `cpt-noter-flow-ui-live-transcript-stored` in PC-R5, with the playback bar PC-R6 from the first play - `inst-transcript`
-8. [ ] - `p1` - **IF** the core opened the page after a stop (`nav:request` without activation) - `inst-if-background`
-   1. [ ] - `p1` - UI: render without taking focus or activating the window - `inst-background`
-9. [ ] - `p1` - **RETURN** the call's page - `inst-return-open`
+8. [x] - `p1` - **IF** the core opened the page after a stop (`nav:request` without activation) - `inst-if-background`
+   1. [x] - `p1` - UI: render without taking focus or activating the window - `inst-background`
+9. [x] - `p1` - **RETURN** the call's page - `inst-return-open`
 
 ### Manage the call from its ⋯ menu
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-frame-more-menu`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-frame-more-menu`
 
 **Actor**: Primary user
 
@@ -113,21 +113,22 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 
 **Error Scenarios**:
 - `conflict` on rename or type: the page shows the core's current values
+- The delete fails: the page stays and shows **Couldn’t delete this call.** (or that the call is still recording) above the transcript, with **Try Again** when retryable
 - **Regenerate Outputs…** and **Show Performance** are shown once their features land (M2, M5)
 
 **Steps**:
-1. [ ] - `p1` - User opens ⋯ More - `inst-user-more`
-2. [ ] - `p1` - **MATCH** the item - `inst-match-more`
+1. [x] - `p1` - User opens ⋯ More - `inst-user-more`
+2. [x] - `p1` - **MATCH** the item - `inst-match-more`
    - [x] - `p1` - **CASE** **Rename…**: an inline field in the title; Return saves with `call_update` (title, `rev`) - `inst-case-rename`
    - [x] - `p1` - **CASE** **Call Type ▸**: the types from `call_types_list`; `call_update` (type) - `inst-case-type`
    - [x] - `p1` - **CASE** **Mark as Sensitive** or the Call info **Sensitive** switch: `capture_set_sensitive` (call id, true) - `inst-case-sensitive`
    - [x] - `p1` - **CASE** **Show in Finder**: `open_external` (the call's folder) - `inst-case-finder`
-   - [ ] - `p1` - **CASE** **Delete Call…**: Flow `cpt-noter-flow-ui-dialogs-host-delete-call` with this call - `inst-case-delete`
-3. [ ] - `p1` - **RETURN** the page with the change, or Library › **Calls** after a delete - `inst-return-more`
+   - [x] - `p1` - **CASE** **Delete Call…**: Flow `cpt-noter-flow-ui-dialogs-host-delete-call` with this call - `inst-case-delete`
+3. [x] - `p1` - **RETURN** the page with the change, or Library › **Calls** after a delete - `inst-return-more`
 
 ### Allow summary notifications
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-frame-notifications-banner`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-frame-notifications-banner`
 
 **Actor**: Primary user
 
@@ -143,15 +144,15 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 2. [x] - `p1` - UI: the info banner in PC-R2 (one banner at a time, by the slot order) - `inst-banner`
 3. [x] - `p1` - User clicks **Notify Me When Summaries Are Ready** - `inst-user-notify`
 4. [x] - `p1` - API: `permission_request` (notifications); macOS shows its prompt - `inst-api-permission`
-5. [ ] - `p1` - **IF** the user closes the banner with × - `inst-if-close`
+5. [x] - `p1` - **IF** the user closes the banner with × - `inst-if-close`
    1. [x] - `p1` - UI: hide the banner as local view state for this window's lifetime; send no command and show no prompt (`banner_dismiss` has no notification-consent `BannerKind`; persisting the dismissal is a contract gap for the owner) - `inst-local-dismiss`
-6. [ ] - `p1` - **RETURN** the banner gone, notifications allowed or not - `inst-return-banner`
+6. [x] - `p1` - **RETURN** the banner gone, notifications allowed or not - `inst-return-banner`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Views delivered so far
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-call-page-frame-views`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-call-page-frame-views`
 
 **Input**: the feature flags and registered page views, the requested tab
 
@@ -160,14 +161,14 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 **Steps**:
 1. [x] - `p1` - List the views in DESIGN's order (**Summary**, **Transcript**, **Agent Reviews**, **History**) that a delivered feature has registered - `inst-list-views`
 2. [x] - `p1` - **IF** the requested tab is not registered: show **Transcript** - `inst-fallback`
-3. [ ] - `p1` - At Narrow width render the segments as a pop-up button - `inst-narrow`
+3. [x] - `p1` - At Narrow width render the segments as a pop-up button - `inst-narrow`
 4. [x] - `p1` - **RETURN** the segments and the view - `inst-return-views`
 
 ## 4. States (CDSL)
 
 ### Call page frame
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-call-page-frame-page`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-call-page-frame-page`
 
 **States**: LOADING, READY, NOT_FOUND, ERROR, DELETED
 
@@ -178,14 +179,14 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 2. [x] - `p1` - **FROM** LOADING **TO** NOT_FOUND **WHEN** the call no longer exists - `inst-loading-notfound`
 3. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-loading-error`
 4. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
-5. [ ] - `p1` - **FROM** READY **TO** DELETED **WHEN** the user deletes the call; the route moves to Library › **Calls** - `inst-ready-deleted`
-6. [ ] - `p1` - **FROM** READY **TO** READY **WHEN** `entity:changed` reports a new title, type, sensitivity or audio state; the page re-renders - `inst-ready-ready`
+5. [x] - `p1` - **FROM** READY **TO** DELETED **WHEN** the user deletes the call; the route moves to Library › **Calls** - `inst-ready-deleted`
+6. [x] - `p1` - **FROM** READY **TO** READY **WHEN** `entity:changed` reports a new title, type, sensitivity or audio state; the page re-renders - `inst-ready-ready`
 
 ## 5. Definitions of Done
 
 ### Frame, Call info and stored transcript
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-call-page-frame-frame`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-call-page-frame-frame`
 
 The system **MUST** render PC-R1, PC-R2, PC-R4 Call info, PC-R5 and PC-R6 as the prototype's `screen('call-page')` and `inspector('call-info')` render them, with the view control listing only delivered views, the stored transcript of `cpt-noter-feature-ui-live-transcript`, background loading after a stop, and `window_report_view` on show and close.
 
@@ -202,7 +203,7 @@ The system **MUST** render PC-R1, PC-R2, PC-R4 Call info, PC-R5 and PC-R6 as the
 
 ### ⋯ menu and the notification banner
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-call-page-frame-actions`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-call-page-frame-actions`
 
 The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive**, **Show in Finder** and **Delete Call…** in ⋯ More through their commands, and show the notification-permission banner after the first recorded call with **Notify Me When Summaries Are Ready** and ×.
 
@@ -220,8 +221,8 @@ The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive*
 
 - [ ] Opening a call from Calls, the call window, the menu bar or a notification lands on the same page
 - [ ] After a stop the page loads without the main window becoming active (checked natively)
-- [ ] **Delete Call…** never deletes without the alert, and lands on Library › **Calls**
-- [ ] The notification banner appears only after the first recorded call and never during a call
+- [x] **Delete Call…** never deletes without the alert, and lands on Library › **Calls**
+- [x] The notification banner appears only after the first recorded call and never during a call
 
 ## 7. Additional Context
 
@@ -231,6 +232,6 @@ The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive*
 
 **Transcript header (PC-R5).** **Transcript**, a language tag per call language and the stored variant's audio line of `cpt-noter-feature-ui-live-transcript` (`52 min · audio kept until 15 Nov`, `Audio deleted · transcript kept`, `Audio not stored for this call`). The prototype's deletion date and retention (`Audio deleted on 15 Nov (kept 30 days)`) wait for the core's deletion date in M2 (D-36). **Play from Start** is the stored transcript's own control, not the frame's.
 
-**Call info Type in M1.** **Type** is plain text in Call info; the call type is changed with ⋯ More › **Call Type ▸**. DESIGN's inline pop-up in Call info is deferred to `cpt-noter-feature-ui-call-page-outputs` (M2).
+**Call info Type.** **Type** in Call info is DESIGN's inline pop-up of the core's call types (`call_types_list`); choosing one sends `call_update` (type, `rev`), as ⋯ More › **Call Type ▸** does.
 
 **Not applicable.** Outputs, items and sharing: M2. Data: the page reads the call view and transcript only.

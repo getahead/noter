@@ -73,7 +73,9 @@ export function navEffect(nav: NavTarget | null, flags: NavFlags, dispatch: (e: 
   const route = nav && navRoute(nav);
   const move = nav && navMove(nav);
   if (!route || !move) return;
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-background
   flags.quiet = `${route.section}/${route.key}`;
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-background
   dispatch({ type: "move", move });
 }
 
@@ -89,7 +91,10 @@ export function focusEffect(flags: NavFlags, root: Parameters<typeof focusHeadin
   // a request that moved nowhere leaves its mark behind: it only silences the page it named, once
   const quiet = flags.quiet;
   flags.quiet = null;
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-background
+  // a page the core opened (after a stop: Rust leaves the window inactive) takes no focus either
   if (quiet === routeId) return;
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-background
   focusHeading(root);
 }
 

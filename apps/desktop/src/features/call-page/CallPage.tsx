@@ -11,17 +11,22 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { audioLine, StoredTranscript } from "../transcript/hosts";
 import { LanguageTag } from "../transcript/labels";
-import { openCallPage, readCall, readKey, reportView } from "./actions";
-import { useExtras } from "./cache";
+import { deleteCall, openCallPage, pageKey, readCall, readKey, reportView } from "./actions";
+import { holdDeleteError, useDeleteError, useExtras } from "./cache";
 import { afterTimer, pageState } from "./logic";
 import "./call-page.css";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
+// @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p2
 export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: TimeSpan | null }) {
+  // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-ready
+  // entity:changed replaces the stored call (title, type, sensitivity, audio): the page draws again from it
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
+  // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-ready
   const read = useWindow(bridge, (s) => s.commands[readKey(callId)]);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const extras = useExtras(callId);
+  const deleteError = useDeleteError(callId);
   const asked = useRef<string | null>(null);
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
@@ -36,6 +41,12 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   useEffect(() => {
     void reportView(bridge, callId);
     return () => void reportView(bridge, null);
+  }, [bridge, callId]);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => pageKey(bridge, callId, e);
+    globalThis.addEventListener?.("keydown", on);
+    // a refusal belongs to this visit: the page opened again later shows no old error
+    return () => (globalThis.removeEventListener?.("keydown", on), holdDeleteError(callId, null));
   }, [bridge, callId]);
 
   const state = pageState(read, call !== undefined);
@@ -55,8 +66,23 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   // the page already read the call: the transcript asks the core for nothing more
   const detail = call ? { call, audio_not_stored: extras?.audio_not_stored ?? false } : null;
   const meta = audioLine(detail, prefs);
+  // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-open
   return (
     <div className="pc pc--transcript" data-state="ready">
+      {/* @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-delete-error */}
+      {deleteError && (
+        <InlineBanner
+          banner={{
+            id: "call-delete-error",
+            severity: "error",
+            text: deleteError.code === "already_recording" ? t("dialogs.delete_calls.recording") : t("callpage.delete_error"),
+            actions: deleteError.retryable ? [{ label: t("action.try_again"), onAction: () => void deleteCall(bridge, callId) }] : [],
+            dismissible: true,
+          }}
+          onDismiss={() => holdDeleteError(callId, null)}
+        />
+      )}
+      {/* @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-return-delete-error */}
       <section className="pc-tr" data-region="PC-R5" aria-label={t("callpage.transcript")}>
         <div className="pc-tr__head">
           <span className="t-headline">{t("callpage.transcript")}</span>
@@ -70,6 +96,7 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
       </section>
     </div>
   );
+  // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-open
 }
 
 /** True once `active` has held for `ms` (skeleton rows after 300 ms, never a flash for a quick read). */

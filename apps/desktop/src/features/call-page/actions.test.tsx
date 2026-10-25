@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { loadCall, loadTypes, menuActs, openCallPage, openPrivacySettings, readCall, rename, reportView, requestNotifications, revealFolder, saveTitle, setCallType, setSensitive } from "./actions";
-import { holdExtras, resetCache, useExtras } from "./cache";
+import { deleteCall, loadCall, loadTypes, menuActs, pageKey, openCallPage, openPrivacySettings, readCall, rename, reportView, requestNotifications, revealFolder, saveTitle, setCallType, setSensitive } from "./actions";
+import { deleteErrorOf, holdExtras, resetCache, useExtras } from "./cache";
 import { slots } from "./slots";
 
 let bridge: Bridge;
@@ -172,8 +172,47 @@ describe("opening the page and its controls", () => {
     expect(seen[1]![1]).toEqual({ call_id: id, sensitive: true });
     expect(acts.remove).toBeNull();
     const asked: string[] = [];
-    slots.deleteCall = (_b, callId) => void asked.push(callId);
+    slots.deleteCall = async (_b, callId) => (asked.push(callId), { outcome: "cancelled" });
     menuActs(bridge, call, () => {}).remove?.();
     expect(asked).toEqual([id]);
+  });
+
+  it("a failed delete stays on the page as its error until the next try, which clears it first", async () => {
+    await ready();
+    const id = fake.world.calls[0]!.id;
+    const error = { code: "internal", message: "x", retryable: true, detail: null } as const;
+    let next: Awaited<ReturnType<NonNullable<typeof slots.deleteCall>>> = { outcome: "failed", error };
+    const seen: unknown[] = [];
+    slots.deleteCall = async () => (seen.push(deleteErrorOf(id)), next);
+    await deleteCall(bridge, id);
+    expect(deleteErrorOf(id)).toEqual(error);
+    next = { outcome: "deleted" };
+    await deleteCall(bridge, id);
+    expect(seen).toEqual([undefined, undefined]);
+    expect(deleteErrorOf(id)).toBeUndefined();
+  });
+
+  it("⌘⌫ deletes the call, but not while a text field has the key, nor with another modifier or a repeat", async () => {
+    await ready();
+    const asked: string[] = [];
+    slots.deleteCall = async (_b, callId) => (asked.push(callId), { outcome: "cancelled" });
+    let prevented = 0;
+    const c1 = fake.world.calls[0]!.id;
+    await readCall(bridge, c1);
+    pageKey(bridge, "not-read", { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault: () => {}, stopPropagation: () => {} });
+    const key = (more: Partial<KeyboardEvent> & { target?: unknown } = {}) =>
+      pageKey(bridge, c1, { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault: () => void prevented++, ...more } as never);
+    key({ target: { tagName: "INPUT", type: "text" } as unknown as EventTarget });
+    key({ shiftKey: true });
+    key({ repeat: true });
+    key({ code: "Delete" });
+    key({ metaKey: false });
+    expect(asked).toEqual([]);
+    key();
+    expect(asked).toEqual([c1]);
+    expect(prevented).toBe(1);
+    slots.deleteCall = null;
+    key();
+    expect(prevented).toBe(1);
   });
 });
