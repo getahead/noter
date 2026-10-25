@@ -183,6 +183,22 @@ test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
     await expect(info(page).getByText("Type", { exact: true }).locator("..")).toContainText(/standup/i);
   });
 
+  test("UI — happy path: Call Type ▸ by keyboard — → opens it on its first type, ← goes back, Return sets a type", async ({ page }) => {
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    await openMore(page);
+    await menuItem(page, "Call Type").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("menu", { name: "Call Type" }).getByRole("menuitemcheckbox").first()).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(menuItem(page, "Call Type")).toBeFocused();
+    await expect(page.getByRole("menu", { name: "Call Type" })).toHaveCount(0);
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("menu", { name: "Call Type" }).getByRole("menuitemcheckbox", { name: /standup/i }).focus();
+    await page.keyboard.press("Enter");
+    expect(await sent(page, "call_update")).toContainEqual({ call_id: W.PAST_CALL, rev: 5, call_type: "standup" });
+  });
+
   test("UI — happy path: Mark as Sensitive turns the call sensitive, the menu then shows a checked Sensitive and Call info agrees", async ({ page }) => {
     await openWindow(page, "main", { world: quiet() });
     await openCall(page);
