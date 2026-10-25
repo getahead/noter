@@ -4595,7 +4595,7 @@ An item whose hotkey the system could not register shows no key.
 
 #### Component — Transcript view
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-transcript-view`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-transcript-view`
 
 ##### Why this component exists
 
@@ -4687,7 +4687,7 @@ The transcript view shows a call's transcript as a virtualised log: during the c
 
 #### Component — Transcript segment row
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-transcript-segment-row`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-transcript-segment-row`
 
 ##### Why this component exists
 
@@ -4790,7 +4790,7 @@ The play control follows the output route:
 
 #### Component — Speaker label
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-speaker-label`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-speaker-label`
 
 ##### Why this component exists
 
@@ -4866,7 +4866,7 @@ The speaker label shows who spoke and lets the user fix a wrong label in one cli
 
 #### Component — Language tag
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-language-tag`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-language-tag`
 
 ##### Why this component exists
 
@@ -5018,7 +5018,7 @@ Product names and acronyms come out wrong ("a chi" for ACI). The term fix popove
 
 #### Component — Playback bar
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-playback-bar`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-playback-bar`
 
 ##### Why this component exists
 

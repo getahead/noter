@@ -37,11 +37,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-live-transcript`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-live-transcript`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-live-transcript`
+- [x] `p2` - `cpt-noter-feature-ui-live-transcript`
 
 ### 1.1 Overview
 
