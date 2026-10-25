@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.11.0](https://github.com/getahead/noter/compare/v0.10.0...v0.11.0) (2026-10-25)
+
+
+### Features
+
+* **contract:** nav target for delete old audio, share-warning seen, call folder, transcript pushes (UI M1 asks 1, 2, 7, 11, 12) ([#198](https://github.com/getahead/noter/issues/198)) ([710bef0](https://github.com/getahead/noter/commit/710bef0d726e14aea3463645e3c693421cd7b54a))
+* **ui:** call page frame and stored transcript ([#183](https://github.com/getahead/noter/issues/183)) ([a12b72b](https://github.com/getahead/noter/commit/a12b72b38c5b0c9607382f10ddfd5a363bdad3f5))
+* **ui:** call window ([#188](https://github.com/getahead/noter/issues/188)) ([3ff0baa](https://github.com/getahead/noter/commit/3ff0baa432e131c311d0e447ec8f1780db066ae7))
+* **ui:** call-window tick pass ([#208](https://github.com/getahead/noter/issues/208)) ([cd939a3](https://github.com/getahead/noter/commit/cd939a39211b08f4e849387653853e7385ed8178))
+* **ui:** library calls list ([#197](https://github.com/getahead/noter/issues/197)) ([3e3de43](https://github.com/getahead/noter/commit/3e3de43035c41ccb61107b907c795acf2782eb74))
+* **ui:** library-calls tick pass ([#207](https://github.com/getahead/noter/issues/207)) ([4e2a6de](https://github.com/getahead/noter/commit/4e2a6deb8056fc21078e22453299387e25555d31))
+* **ui:** live and stored transcript ([#186](https://github.com/getahead/noter/issues/186)) ([b7994d4](https://github.com/getahead/noter/commit/b7994d4023282c1605a87d22978216e08a149f62))
+* **ui:** notifications ([#202](https://github.com/getahead/noter/issues/202)) ([634c1a9](https://github.com/getahead/noter/commit/634c1a964c292cc80c05adc4bc1ac9621cff3108))
+* **ui:** record prompt ([#191](https://github.com/getahead/noter/issues/191)) ([1646bb9](https://github.com/getahead/noter/commit/1646bb93e1b2d80052e4fbca4baf1d77fb5f7d5e))
+* **ui:** record prompt tick pass ([#209](https://github.com/getahead/noter/issues/209)) ([82e45e0](https://github.com/getahead/noter/commit/82e45e06b1712cdf86c2a84819ce70a1195cf83d))
+
+
+### Bug fixes
+
+* **engine:** live ASR confirmations first on the decode queue; 10 s utterances; file mode loads the model (Q4 latency) ([#204](https://github.com/getahead/noter/issues/204)) ([a106c8d](https://github.com/getahead/noter/commit/a106c8d4b359f43c409cb52a9f08e5c3ac77abab))
+* **ui:** live transcript follow is steady under CI wheel animation ([#206](https://github.com/getahead/noter/issues/206)) ([9fc7336](https://github.com/getahead/noter/commit/9fc7336df8cdeb32dabcf0830fac9854f7e95b03))
+
 ## [0.10.0](https://github.com/getahead/noter/compare/v0.9.0...v0.10.0) (2026-10-24)
 
 
