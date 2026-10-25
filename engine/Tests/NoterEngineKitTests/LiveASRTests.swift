@@ -10,14 +10,17 @@ final class FakeTranscriber: Transcriber, @unchecked Sendable {
     var lang = "en"
     var noSpeechP: Float = 0.1
     var avgLogprob: Float = -0.3
+    /// Set: every decode waits for a signal, so work piles up behind it (a slow model).
+    var gate: DispatchSemaphore?
     private(set) var asked: [(samples: Int, languages: [String])] = []
 
     init(_ text: String) { self.text = text }
 
     func decode(_ samples: [Float], languages: [String]) throws -> Decoded {
-        lock.withLock {
-            asked.append((samples.count, languages))
-            return Decoded(text: text, lang: lang, langP: 0.9, avgLogprob: avgLogprob, noSpeechP: noSpeechP)
+        lock.withLock { asked.append((samples.count, languages)) }
+        gate?.wait()
+        return lock.withLock {
+            Decoded(text: text, lang: lang, langP: 0.9, avgLogprob: avgLogprob, noSpeechP: noSpeechP)
         }
     }
 }
@@ -93,6 +96,28 @@ final class LiveASRTests: XCTestCase {
             "hypotheses reuse the first one's language; the confirmation decides on the whole utterance")
     }
 
+    func testLanguageIDOutsideTheSessionLanguagesFallsBackToTheFirstOneNotTheStrayLanguage() {
+        // WhisperKit reports only the top language: when it is none of the session's, no filter helps.
+        XCTAssertEqual(LiveASR.language(["uk": -0.1], among: ["ru", "en", "de"]).lang, "ru")
+        XCTAssertEqual(LiveASR.language(["uk": -0.1], among: ["ru", "en", "de"]).p, 0)
+        XCTAssertEqual(LiveASR.language(["de": -0.2], among: ["ru", "en", "de"]).lang, "de")
+        XCTAssertEqual(LiveASR.language(["ja": -0.3], among: []).lang, "ja", "no session languages: any")
+        XCTAssertEqual(LiveASR.language([:], among: []).lang, "en")
+    }
+
+    func testAChannelsLastConfirmedLanguageLeadsItsNextLanguageID() throws {
+        let t = FakeTranscriber("привет")
+        t.lang = "ru"
+        let a = asr(t, languages: .array([.string("en"), .string("de"), .string("ru")]))
+        play(a, .mic, from: 0, 500, speaking: true)
+        play(a, .mic, from: 500, 1000, speaking: false)
+        play(a, .mic, from: 1500, 500, speaking: true)
+        play(a, .mic, from: 2000, 1000, speaking: false)
+        XCTAssertEqual(
+            t.asked.map(\.languages), [["en", "de", "ru"], ["ru", "en", "de"]],
+            "the speaker most likely goes on in the language they spoke last")
+    }
+
     func testTheGlossaryCorrectsTermsAndSaysSo() throws {
         let glossary: JSONValue = .array([
             .object([
@@ -123,8 +148,8 @@ final class LiveASRTests: XCTestCase {
 
     func testALongUtteranceIsConfirmedWithoutWaitingForAPause() throws {
         let a = asr(FakeTranscriber("a long monologue"))
-        play(a, .mic, from: 0, 21_000, speaking: true)
-        XCTAssertEqual(confirmed.first?["t1_ms"] as? Int, 20_000)
+        play(a, .mic, from: 0, 11_000, speaking: true)
+        XCTAssertEqual(confirmed.first?["t1_ms"] as? Int, 10_000, "a hypothesis then decodes at most 10 s (Q4)")
     }
 
     func testAudioBeforeTheModelLoadsIsDecodedOnceItHas() throws {
@@ -166,12 +191,33 @@ final class LiveASRTests: XCTestCase {
         XCTAssertEqual(LiveASR.openTail(audio([(true, 2000), (false, 800)]), fromCallStart: false), [], "ends in a pause")
         XCTAssertEqual(
             seconds(LiveASR.openTail(audio([(false, 1000), (true, 25_000)]), fromCallStart: false)), 5,
-            "the crashed engine closed the first 20 s itself")
+            "the crashed engine closed the first 20 s itself, 10 s at a time")
         XCTAssertEqual(LiveASR.openTail(audio([(false, 1000), (true, 40_000)]), fromCallStart: false), [])
         XCTAssertEqual(
             LiveASR.openTail(audio([(true, 30_000)]), fromCallStart: false), [],
             "speech fills the ring: where it was cut is unknown")
         XCTAssertEqual(seconds(LiveASR.openTail(audio([(true, 25_000)]), fromCallStart: true)), 5)
+    }
+
+    func testAConfirmationIsDecodedBeforeTheHypothesesQueuedAheadOfIt() throws {
+        let t = FakeTranscriber("queued")
+        t.gate = DispatchSemaphore(value: 0)
+        lines = Lines()
+        let a = LiveASR(
+            callId: "call_1", languages: .array([.string("en")]), glossary: .array([]), writer: writer(lines),
+            queue: DispatchQueue(label: "test.asr"))
+        a.use(t)
+        for ms in stride(from: 0, to: 1000, by: 100) { a.feed(.mic, speech(), atMs: ms) }
+        let deadline = Date().addingTimeInterval(5)
+        while t.asked.count < 1, Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
+        XCTAssertEqual(t.asked.count, 1, "the first hypothesis holds the decode queue")
+        // Queued behind it: the mic's next hypothesis (2 s), then the sys utterance's confirmation (1.5 s).
+        for ms in stride(from: 1000, to: 2000, by: 100) { a.feed(.mic, speech(), atMs: ms) }
+        for ms in stride(from: 0, to: 1500, by: 100) { a.feed(.sys, speech(), atMs: ms) }
+        for ms in stride(from: 1500, to: 2300, by: 100) { a.feed(.sys, quiet(), atMs: ms) }
+        for _ in 0..<4 { t.gate?.signal() }
+        a.wait()
+        XCTAssertEqual(t.asked.map(\.samples), [16 * 1000, 16 * 1500, 16 * 2000], "confirmations jump the hypotheses")
     }
 
     func testFinishConfirmsWhatIsStillBeingSaid() throws {

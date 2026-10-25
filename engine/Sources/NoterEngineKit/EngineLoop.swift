@@ -17,7 +17,8 @@ public final class EngineLoop: @unchecked Sendable {
     private let player: Player
     /// The speech model, loaded on first use; nil without one installed.
     private let model: ModelCache?
-    private let asrQueue = DispatchQueue(label: "ai.noter.engine.asr")
+    /// Above builds and other background work: the live transcript is what the user watches.
+    private let asrQueue = DispatchQueue(label: "ai.noter.engine.asr", qos: .userInitiated)
     private let stops = DispatchQueue(label: "ai.noter.engine.stop")
     private let processes: @Sendable () -> [ProcessAudio]
     /// The call being captured and its audio; commands arrive on one thread.

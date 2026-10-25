@@ -19,6 +19,8 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     private let lock = NSLock()
     private let preferredMic: String?
     private let listeners = DispatchQueue(label: "ai.noter.engine.devices")
+    /// Where chunks are handled: the ring, the files, levels and ASR off the real-time IO thread.
+    private let delivery = DispatchQueue(label: "ai.noter.engine.capture", qos: .userInteractive)
     private var excluded: Set<String>
     private var tapDescription: CATapDescription?
     private var tap = AudioObjectID(kAudioObjectUnknown)
@@ -58,6 +60,16 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
             close()
             onChunk = nil
         }
+        delivery.sync {}  // the chunks already captured are handled before `stop` returns
+    }
+
+    /// The IO proc's side of a chunk: it only queues it. Work on the IO thread that overruns its
+    /// cycle (the Q4 call, on a busy Mac) makes Core Audio drop input: lost audio, and call time
+    /// falls behind the wall clock.
+    static func handOff(on queue: DispatchQueue, _ deliver: @escaping @Sendable (AudioChunk) -> Void)
+        -> @Sendable (AudioChunk) -> Void
+    {
+        { chunk in queue.async { deliver(chunk) } }
     }
 
     public func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void) {
@@ -112,8 +124,9 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
 
     /// The aggregate of `mic` and the tap, started after `beforeStart`. Caller holds the lock.
     private func openDevice(mic: String, beforeStart: () -> Void) throws {
-        guard let micDevice = Self.device(uid: mic), let tapUID = tapDescription?.uuid.uuidString, let deliver = onChunk
+        guard let micDevice = Self.device(uid: mic), let tapUID = tapDescription?.uuid.uuidString, let onChunk
         else { throw Failure(description: "no microphone \(mic)") }
+        let deliver = Self.handOff(on: delivery, onChunk)
         let aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Noter capture",
             kAudioAggregateDeviceUIDKey: UUID().uuidString,
@@ -194,8 +207,9 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
             let lost = Self.epochMs()
             closeDevice()
             do {
-                try openDevice(mic: mic) { [onDevice] in
-                    onDevice?(DeviceChange(name: Self.name(uid: mic) ?? mic, lostAtMs: lost, backAtMs: Self.epochMs()))
+                try openDevice(mic: mic) { [onDevice, delivery] in
+                    let change = DeviceChange(name: Self.name(uid: mic) ?? mic, lostAtMs: lost, backAtMs: Self.epochMs())
+                    delivery.async { onDevice?(change) }  // after the old device's chunks
                 }
             } catch {
                 // shortcut: no retry; the core sees silent levels (`MicrophoneOff`) until the
