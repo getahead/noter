@@ -40,7 +40,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // Delete Call… on a call's page: the dialogs host's alert, then Library › Calls replaces the deleted page. Set while
   // rendering because the call page's toolbar, a child, reads it before any effect of this window runs.
   slots.deleteCall = (b, id) =>
-    void deleteFromPage(b, { id, title: b.store.getState().entities.call[id]?.title ?? "" }, () =>
+    deleteFromPage(b, { id, title: b.store.getState().entities.call[id]?.title ?? "" }, () =>
       // @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-return-more
       // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-deleted
       dispatch({ type: "move", move: { type: "replace", route: { section: "library", key: "root" } } }),

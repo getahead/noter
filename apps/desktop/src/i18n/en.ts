@@ -729,6 +729,7 @@ export const en = {
   "callpage.gone_title": "This call is no longer here",
   "callpage.gone_body": "It was deleted or moved. Go back to Calls to pick another.",
   "callpage.error": "Couldn’t open this call.",
+  "callpage.delete_error": "Couldn’t delete this call.",
   "callpage.loading": "Loading the call",
   "callpage.info": "Call info",
   "callpage.info.participants": "Participants",

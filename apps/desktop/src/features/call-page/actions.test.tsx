@@ -199,7 +199,7 @@ describe("opening the page and its controls", () => {
     let prevented = 0;
     const key = (more: Partial<KeyboardEvent> & { target?: unknown } = {}) =>
       pageKey(bridge, "c1", { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault: () => void prevented++, ...more } as never);
-    key({ target: { tagName: "INPUT", type: "text" } });
+    key({ target: { tagName: "INPUT", type: "text" } as unknown as EventTarget });
     key({ shiftKey: true });
     key({ repeat: true });
     key({ code: "Delete" });

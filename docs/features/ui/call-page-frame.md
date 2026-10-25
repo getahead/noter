@@ -113,6 +113,7 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 
 **Error Scenarios**:
 - `conflict` on rename or type: the page shows the core's current values
+- The delete fails: the page stays and shows **Couldn’t delete this call.** (or that the call is still recording) above the transcript, with **Try Again** when retryable
 - **Regenerate Outputs…** and **Show Performance** are shown once their features land (M2, M5)
 
 **Steps**:
