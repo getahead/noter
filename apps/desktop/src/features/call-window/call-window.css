@@ -1,0 +1,356 @@
+/* The call window of the prototype's src/css/20-b.css (.cw-*, .cs-*, .fp-*), framed to fill its WebView:
+   the core sizes and places the panel, so the window is the frame. The transcript's own rules are the
+   live-transcript feature's; the prototype desk (.cw-proto, .cw-desktop, .cw-callapp, .cw-hidden) is not ported. */
+
+/* window frames */
+.cw-win {
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  box-shadow: none;
+}
+/* borderless: it fills the visible frame of its display */
+.np-win.cw-win--dedicated {
+  border-radius: 0;
+}
+.np-win.cw-win--floating {
+  border-radius: var(--r-panel);
+}
+.cw-win--floating.is-collapsed {
+  height: 56px;
+}
+
+/* ---------------- Call screen (dedicated) ---------------- */
+.cs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--content-bg);
+}
+.cs-r0 {
+  flex: none;
+}
+.cs-cols {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+.cs-left {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--sep);
+}
+.cs.is-copilot-off .cs-left {
+  border-right: 0;
+}
+.cs-r1 {
+  flex: none;
+  min-height: 64px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--sep);
+  display: grid;
+  gap: 6px;
+  background: var(--content-bg);
+}
+.cs-r1__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.cs-r1__people {
+  gap: 10px;
+}
+.cs-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  margin: 0;
+}
+.cs-r3 {
+  flex: none;
+  padding: 8px 18px 0;
+}
+.cs-r2 {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.cs-r2b {
+  flex: none;
+  border-top: 1px solid var(--sep);
+}
+.cs--closing {
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------------- Floating panel ---------------- */
+.fp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 300px;
+  background: var(--content-bg);
+}
+.fp-r1 {
+  flex: none;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--sep);
+  background: var(--win-bg);
+  cursor: grab;
+}
+.fp-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: inherit;
+}
+.fp-clock {
+  color: var(--label-2);
+  font-size: 12px;
+}
+.fp-r0 {
+  flex: none;
+  max-height: 70%;
+  overflow: auto;
+}
+.fp-r3 {
+  flex: none;
+  padding: 8px 10px 0;
+  display: grid;
+  gap: 6px;
+}
+.fp-r5 {
+  flex: none;
+  border-top: 1px solid var(--sep);
+  padding: 4px 10px;
+}
+.fp-r5--full {
+  flex: 1 1 auto;
+  overflow: auto;
+  border-top: 0;
+}
+.fp-r6 {
+  flex: none;
+  border-top: 1px solid var(--sep);
+}
+/* compact banners keep the icon beside the sentence */
+.fp-r3 .np-banner.is-compact .np-banner__main {
+  flex: 1 1 0;
+}
+
+/* ---------------- 2. Capture notice ---------------- */
+.cw-notice {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px 16px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--sep);
+  flex-wrap: wrap;
+}
+.cw-notice__icon {
+  color: var(--accent-text);
+  padding-top: 1px;
+  display: inline-flex;
+}
+.cw-notice--warning .cw-notice__icon {
+  color: var(--warning);
+}
+.cw-notice--success .cw-notice__icon {
+  color: var(--success);
+}
+.cw-notice__main {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.cw-notice__title {
+  font: 600 15px/20px var(--font);
+  text-wrap: balance;
+}
+.cw-notice__body {
+  color: var(--label-2);
+}
+.cw-notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.cw-notice__confirm {
+  font-weight: 600;
+  color: var(--error);
+  margin-right: 4px;
+}
+.cw-notice__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--sel-unemph);
+}
+.cw-notice__bar span {
+  display: block;
+  height: 100%;
+  background: var(--warning);
+  transition: width 1s linear;
+}
+.cw-notice.is-floating {
+  padding: 12px;
+  gap: 10px;
+}
+.cw-notice.is-floating .cw-notice__main {
+  flex: 1 1 0;
+}
+.cw-notice.is-floating .cw-notice__actions {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+.cw-notice.is-floating .cw-notice__title {
+  font-size: 13px;
+  line-height: 18px;
+}
+.cw-meters {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--label-2);
+}
+.cw-closing {
+  width: min(760px, 100%);
+  margin: 40px auto;
+  border: 1px solid var(--sep);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+.cw-closing.is-floating {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  width: 100%;
+  flex: 1 1 auto;
+}
+.cw-closing .cw-notice {
+  border-bottom: 0;
+}
+.cw-closing .cw-notice__main {
+  flex-basis: 360px;
+}
+.cw-closing__hint {
+  padding: 0 18px 14px;
+  font-size: 12px;
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cw-notice__bar {
+    display: none;
+  }
+}
+
+/* ---------------- 5. Call status strip ---------------- */
+.cw-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.cw-strip--dedicated {
+  flex: none;
+  height: 60px;
+  padding: 0 18px;
+  border-top: 1px solid var(--sep);
+  background: var(--win-bg);
+}
+.cw-strip__clock {
+  min-width: 84px;
+}
+.cw-strip__fb {
+  min-width: 0;
+  overflow: hidden;
+  display: inline-flex;
+}
+.cw-strip__gap {
+  width: 8px;
+  flex: none;
+}
+.cw-strip--dedicated .np-btn {
+  height: 32px;
+}
+.cw-strip--compact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 10px;
+}
+.cw-strip__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+}
+.cw-strip--compact .cw-strip__fb {
+  padding-top: 6px;
+}
+.cw-stop {
+  color: var(--rec);
+}
+
+/* ---------------- 6. Collapsed strip ---------------- */
+.cw-cstrip {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 12px;
+  background: var(--card-bg);
+  min-width: 300px;
+}
+.cw-cstrip__state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  font-size: 12px;
+}
+.cw-cstrip__ctl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.cw-shield {
+  display: inline-flex;
+  color: var(--label-2);
+  padding: 0 4px;
+}
+.cw-more {
+  display: inline-flex;
+}

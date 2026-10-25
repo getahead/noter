@@ -202,6 +202,7 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     const html = renderToString(<CallScreenTranscript bridge={b} />);
     expect(html).toContain('data-region="CS-R2"');
     expect(html).toContain("drawer redesign");
+    await b.act("window_call_state", "window_call_state", () => b.core.windowCallState({}), { slice: "callWindow" }); // the call window (2.10) draws once it has its state
     expect(renderToString(<App bridge={b} />)).toContain('data-region="CS-R2"');
     const tr = hookOf(b, LIVE);
     expect(renderToString(<TranscriptLog tr={tr} variant="tail" tailLines={2} />).match(/cw-seg--tail/g)).toHaveLength(2);
