@@ -18,9 +18,9 @@ const LANGUAGES = choices({ en: "settings.general.lang_en", ru: "settings.genera
 const RANKING = choices({ owed_to_todays_people: "settings.general.ranking_owed", due_then_owed_to_you: "settings.general.ranking_due" });
 const HORIZON = choices({ today: "settings.general.horizon_today", this_week: "settings.general.horizon_week" });
 
-const Warn = ({ children }: { children: string }) => (
+const Warn = ({ children, icon = "warning" }: { children: string; icon?: "warning" | "info" }) => (
   <span className="st-warnline">
-    <Icon name="warning" size={12} /> {children}
+    <Icon name={icon} size={12} /> {children}
   </span>
 );
 
@@ -48,7 +48,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         </Row>
         {notificationsOff && (
           <Row label={t("settings.general.notifications")} note={t("settings.general.notifications_note")}>
-            <Warn>{t("settings.general.notifications_off")}</Warn>
+            <Warn icon="info">{t("settings.general.notifications_off")}</Warn>
             {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}
             <PushButton label={t("settings.general.open_system_settings")} size="small" onAction={() => void bridge.act("open:notifications", "open_external", () => bridge.core.openExternal({ target: { type: "system_settings", permission: "notifications" } }))} />
             {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-open */}

@@ -59,6 +59,7 @@ describe("General", () => {
     const html = renderToString(<GeneralPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Needs a passed audio self-test");
     expect(html).toContain("Notifications are off for Noter");
+    expect(html).toContain('<path d="M8 7.2v4M8 4.8v.2"'); // the info icon, not the warning triangle
     for (const auth of ["authorized", "not_determined"] as const) {
       fake.world.app.environment.notifications = auth;
       await bridge.close();
