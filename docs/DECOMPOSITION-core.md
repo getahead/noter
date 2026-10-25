@@ -507,12 +507,12 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p2` - `cpt-noter-principle-core-degrade`
+  - `cpt-noter-principle-core-degrade`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p2` - `cpt-noter-constraint-core-macos`
-  - [ ] `p2` - `cpt-noter-constraint-core-engine-offline`
+  - `cpt-noter-constraint-core-macos`
+  - `cpt-noter-constraint-core-engine-offline`
 
 - **Domain Model Entities**:
   - Engine session
