@@ -45,7 +45,8 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   useEffect(() => {
     const on = (e: KeyboardEvent) => pageKey(bridge, callId, e);
     globalThis.addEventListener?.("keydown", on);
-    return () => globalThis.removeEventListener?.("keydown", on);
+    // a refusal belongs to this visit: the page opened again later shows no old error
+    return () => (globalThis.removeEventListener?.("keydown", on), holdDeleteError(callId, null));
   }, [bridge, callId]);
 
   const state = pageState(read, call !== undefined);
