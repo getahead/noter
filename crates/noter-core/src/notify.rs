@@ -39,6 +39,7 @@ struct Screen<'a> {
 }
 
 // @cpt-algo:cpt-noter-algo-core-capture-session-notify:p1
+// @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-send-rule
 fn route(n: &Notification, screen: &Screen) -> Route {
     // @cpt-begin:cpt-noter-algo-core-capture-session-notify:p1:inst-drop-visible
     if screen.viewed == Some(&n.call_id) {
@@ -66,6 +67,7 @@ fn route(n: &Notification, screen: &Screen) -> Route {
     Route::Send
     // @cpt-end:cpt-noter-algo-core-capture-session-notify:p1:inst-notify-return
 }
+// @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-send-rule
 
 impl Core {
     /// `window_report_view`: the call the main window shows (`None`: no call page).
@@ -75,19 +77,28 @@ impl Core {
 
     /// Sends, holds or skips a notification by the hold rule of DESIGN-core 3.2.
     // @cpt-dod:cpt-noter-dod-core-capture-session-sensitive-notify:p2
+    // @cpt-state:cpt-noter-state-ui-notifications-item:p1
+    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-core-trigger
     pub fn notify(&self, n: Notification) {
         let viewed = lock(&self.viewed).clone();
         match route(&n, &self.screen(viewed.as_ref())) {
+            // @cpt-begin:cpt-noter-state-ui-notifications-item:p1:inst-pending-sent
             Route::Send => self.deps.surfaces.post_notification(&n),
+            // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-pending-sent
+            // @cpt-begin:cpt-noter-state-ui-notifications-item:p1:inst-pending-held
             Route::Hold => {
                 // One per call: the latest.
                 let mut held = lock(&self.held);
                 held.retain(|h| h.call_id != n.call_id);
                 held.push(n);
             }
-            Route::Skip => {}
+            // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-pending-held
+            // @cpt-begin:cpt-noter-state-ui-notifications-item:p1:inst-pending-dropped
+            Route::Skip => (),
+            // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-pending-dropped
         }
     }
+    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-core-trigger
 
     /// Sends what was held, once no call is captured and Noter is not hidden for presenting.
     pub(crate) fn release_held(&self) {
@@ -97,9 +108,11 @@ impl Core {
             return;
         }
         let held = std::mem::take(&mut *lock(&self.held));
+        // @cpt-begin:cpt-noter-state-ui-notifications-item:p1:inst-held-sent
         for n in held.iter().filter(|n| route(n, &screen) == Route::Send) {
             self.deps.surfaces.post_notification(n);
         }
+        // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-held-sent
     }
 
     fn screen<'a>(&self, viewed: Option<&'a CallId>) -> Screen<'a> {

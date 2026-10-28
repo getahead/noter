@@ -75,7 +75,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 
 ### Start recording a detected call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-record-prompt-start-recording`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-record-prompt-start-recording`
 
 **Actor**: Primary user
 
@@ -90,7 +90,8 @@ Success criteria: a detected call is recorded with one click or one key while th
 - Speech model not downloaded: **The speech model is still downloading (62 %)**, **Record** dimmed (prototype state; see 7)
 
 **Steps**:
-1. [ ] - `p1` - Core: detects a call and shows the panel at its position (top right; 72 pt lower under the meeting toolbar; the display without the call app when there are two), with `capture:detected` and `app_snapshot.detection` - `inst-core-detect`
+1. [x] - `p1` - Core: detects a call and shows the panel at its position (top right; 72 pt lower under the meeting toolbar; the display without the call app when there are two), with `capture:detected` and `app_snapshot.detection` - `inst-core-detect`
+   The 72 pt offset under a meeting toolbar is not part of the core placement algorithm (`cpt-noter-algo-core-native-surfaces-placement`); recorded as a DESIGN discrepancy for the HoD (28 Oct), not held here.
 2. [x] - `p1` - Algorithm: choose the variant with `cpt-noter-algo-ui-record-prompt-variant` - `inst-choose-variant`
 3. [x] - `p1` - UI: render RP-R1 (app icon, **Record this call?**, the source line, ×) and RP-R3 for the variant; the panel never takes focus - `inst-render`
 4. [x] - `p1` - API: `window_announce` "Noter: Record this call? Press Control-Option-Command-R to record." (polite) - `inst-api-announce`
@@ -133,7 +134,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 
 ### Answer a notice while the call window is hidden
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-record-prompt-notice`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-record-prompt-notice`
 
 **Actor**: Primary user
 
@@ -146,7 +147,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 - No answer: the core stops at the end of the countdown, or applies **Start as New Call** after 60 s; the notice expires (`notice_expired` closes the panel)
 
 **Steps**:
-1. [ ] - `p1` - Core: sends `capture:state` with `notice` `call_seems_ended` or `new_meeting` while the call window is hidden and Noter is not hidden for presenting - `inst-core-notice`
+1. [x] - `p1` - Core: sends `capture:state` with `notice` `call_seems_ended` or `new_meeting` while the call window is hidden and Noter is not hidden for presenting - `inst-core-notice`
 2. [x] - `p1` - UI: render the matching variant; API: `window_announce` with the assertive text from the announcement table - `inst-render-notice`
 3. [x] - `p1` - **WHILE** the pointer or focus is on the panel - `inst-while-notice-hover`
    1. [x] - `p1` - API: `capture_hold_notice` (held true); the body reads **Paused while you're here**; on release `capture_hold_notice` (false) - `inst-api-hold`
@@ -224,10 +225,10 @@ The system **MUST** render the record prompt in its seven variants with the prot
 
 ## 6. Acceptance Criteria
 
-- [ ] Every record-prompt state renders as its `RP_STATES` entry in the prototype
+- [x] Every record-prompt state renders as its `RP_STATES` entry in the prototype
 - [ ] Clicking **Record** leaves keyboard focus in the call app (XCUITest)
-- [ ] **Record** is disabled only in the Disk full and Speech model variants; with system audio off it starts capture
-- [ ] **Don't Ask** confirms inline for every app and adds the app to Settings › General
+- [x] **Record** is disabled only in the Disk full and Speech model variants; with system audio off it starts capture
+- [x] **Don't Ask** confirms inline for every app and adds the app to Settings › General
 - [ ] The countdown bar is absent under Reduce motion while the seconds still update; seconds are never announced
 
 ## 7. Additional Context
