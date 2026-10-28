@@ -40,6 +40,7 @@ function useCallsList(bridge: Bridge): [CallsState, CallsList] {
   return [state, list];
 }
 
+// @cpt-dod:cpt-noter-dod-ui-library-calls-table:p2
 // @cpt-component:cpt-noter-component-screen-library:p1
 /** Library › Calls: the list's state and the commands behind LC-R1 and LC-R3. */
 export function CallsPage() {

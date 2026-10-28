@@ -181,7 +181,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Calls table and call row
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-library-calls-table`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-library-calls-table`
 
 The system **MUST** render LC-R1 and LC-R3 as the prototype's Calls view does, with `C.callRow` in its table-row variant (and the compact and result-group-header variants for later pages), month groups, sort, multi-select, the status cell order, the **Local only** tag, column hiding at Medium and Narrow, keyboard behaviour and VoiceOver row labels, from `calls_list` pages.
 
@@ -215,10 +215,10 @@ The system **MUST** delete one or several selected calls through the dialog host
 
 ## 6. Acceptance Criteria
 
-- [ ] The Calls page renders the prototype's Library states **Normal**, **Calls · No calls yet**, **Calls · Several calls selected**, **Calls · Status cells** and **Loading** identically
-- [ ] Rows never truncate the status icon; long titles tail-truncate with the full title in a help tag and for VoiceOver
-- [ ] Back from a call's page returns to the same scroll position and selection
-- [ ] The list makes one `calls_list` call per page, never one call per row
+- [x] The Calls page renders the prototype's Library states **Normal**, **Calls · No calls yet**, **Calls · Several calls selected**, **Calls · Status cells** and **Loading** identically
+- [x] Rows never truncate the status icon; long titles tail-truncate with the full title in a help tag and for VoiceOver
+- [x] Back from a call's page returns to the same scroll position and selection
+- [x] The list makes one `calls_list` call per page, never one call per row
 
 ## 7. Additional Context
 

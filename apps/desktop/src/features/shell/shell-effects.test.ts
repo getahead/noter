@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, tickWhile, watchWidth } from "./shell-effects";
+import { layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
 
 describe("shell actions", () => {
   it("turns each action into its view-state event", () => {
@@ -46,6 +46,9 @@ describe("page view state", () => {
     expect(focusHeading({ querySelector: () => heading as never })).toBe(true);
     expect(heading.tabIndex).toBe(-1);
     expect(heading.focus).toHaveBeenCalledWith({ preventScroll: true });
+    const root = { scrollTop: 300, querySelector: () => ({ tabIndex: 0, focus: () => void (root.scrollTop = 0) }) as never };
+    expect(focusHeading(root)).toBe(true);
+    expect(root.scrollTop).toBe(300); // focus() that scrolls anyway leaves the scroll position as it was
     expect(focusHeading({ querySelector: () => null })).toBe(false);
     expect(focusHeading(null)).toBe(false);
   });
@@ -77,16 +80,15 @@ describe("effects", () => {
     expect(flags.quiet).toBe("activity/root");
   });
 
-  it("restores the scroll position on arrival and saves it on leaving", () => {
+  it("restores the scroll position on arrival", () => {
     const memory = createScrollMemory();
     memory.save("library/root", 200);
     const el = { scrollTop: 0 };
-    const leave = scrollEffect(el, memory, "library/root");
+    scrollEffect(el, memory, "library/root");
     expect(el.scrollTop).toBe(200);
-    el.scrollTop = 450;
-    leave();
+    scrollSaver(memory, "library/root")({ currentTarget: { scrollTop: 450 } });
     expect(memory.top("library/root")).toBe(450);
-    scrollEffect(null, memory, "x")(); // no content element yet
+    scrollEffect(null, memory, "x"); // no content element yet
   });
 
   it("focuses the heading after navigation, but not on the first render or for the page the core asked for", () => {
