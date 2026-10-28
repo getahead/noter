@@ -172,6 +172,7 @@ impl Core {
             return;
         };
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-run-detection
+        // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-prompt
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-show-prompt
         self.set_detection(Some(detection));
@@ -181,6 +182,7 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-show-prompt
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-prompt
+        // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
     }
 
     // @cpt-algo:cpt-noter-algo-core-capture-session-detection:p1
@@ -337,6 +339,7 @@ impl Core {
             return;
         }
         let now = self.deps.clock.now().0;
+        // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-core-notice
         // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-call-end
         let (notice, stops_in) = if self.app().presenting.hidden {
             let at = TimestampMs(now + SEEMS_ENDED_MS);
@@ -351,6 +354,7 @@ impl Core {
         self.set_notice(Some(notice.clone()));
         self.stop_when_due(notice, stops_in);
         // @cpt-end:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-call-end
+        // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-core-notice
     }
 
     /// Stops the call when `notice` still shows after `ms`.

@@ -260,6 +260,8 @@ pub fn settings_url(permission: PermissionKind) -> &'static str {
 }
 
 /// What a notification says and where its click goes (NT-3 opens the call's transcript).
+// @cpt-flow:cpt-noter-flow-ui-notifications-receive:p1
+// @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-post
 pub fn posted(n: &Notification) -> PostedNotification {
     static NEXT: AtomicU64 = AtomicU64::new(1);
     let (title, body, tab) = match &n.kind {
@@ -292,17 +294,24 @@ pub fn posted(n: &Notification) -> PostedNotification {
         },
     }
 }
+// @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-post
 
 /// A clicked notification: the main window comes forward and is asked to navigate.
 // @cpt-flow:cpt-noter-flow-core-native-surfaces-notifications:p1
 // @cpt-dod:cpt-noter-dod-core-native-surfaces-notifications:p1
 // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
 pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
+    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-user-click
+    // @cpt-begin:cpt-noter-state-ui-notifications-item:p1:inst-sent-opened
     if let Some(main) = window(app, WindowLabel::Main) {
         let _ = main.show();
         let _ = main.set_focus();
     }
+    // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-sent-opened
+    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-user-click
+    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click
     let _ = app.emit(event_names::NAV_REQUEST, target);
+    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click
 }
 // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
 
@@ -557,6 +566,7 @@ impl<R: Runtime> TauriSurfaces<R> {
 }
 
 impl<R: Runtime> Surfaces for TauriSurfaces<R> {
+    // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
     fn show_record_prompt(&self) {
         let Some(prompt) = self.window(WindowLabel::RecordPrompt) else {
             return;
@@ -570,6 +580,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
         show(&prompt, false);
     }
+    // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
 
     fn close_record_prompt(&self) {
         if let Some(prompt) = self

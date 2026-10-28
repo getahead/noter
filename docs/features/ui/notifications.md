@@ -111,12 +111,12 @@ It implements `cpt-noter-component-screen-notifications`.
 - Hidden for presenting: nothing is sent, not even NT-3; held notifications arrive combined per call on **Show Noter**
 
 **Steps**:
-1. [ ] - `p1` - Core: outputs are written or fail, or capture has a problem - `inst-core-trigger`
-2. [ ] - `p1` - Algorithm: decide with `cpt-noter-algo-ui-notifications-send-rule` - `inst-send-rule`
-3. [ ] - `p1` - Core: posts the notification with its title and one-line body, in the call's thread, without sound or buttons - `inst-post`
-4. [ ] - `p1` - User clicks it - `inst-user-click`
-5. [ ] - `p1` - **MATCH** the notification - `inst-match-click`
-   - [ ] - `p1` - **CASE** NT-1 or NT-2: `nav:request` to the call's page (**Summary** from M2) in the main window - `inst-case-nt1`
+1. [x] - `p1` - Core: capture has a problem (the outputs written or failed trigger of NT-1 and NT-2 is the post-call pipeline's, M2, `cpt-noter-feature-ui-call-page-outputs`) - `inst-core-trigger`
+2. [x] - `p1` - Algorithm: decide with `cpt-noter-algo-ui-notifications-send-rule` - `inst-send-rule`
+3. [x] - `p1` - Core: posts the notification with its title and one-line body, in the call's thread, without sound or buttons - `inst-post`
+4. [x] - `p1` - User clicks it - `inst-user-click`
+5. [x] - `p1` - **MATCH** the notification - `inst-match-click`
+   NT-1 and NT-2 clicks (`nav:request` to the call's **Summary**) are M2: `cpt-noter-flow-ui-call-page-outputs-read-edit`, `inst-nt-click`.
    - [ ] - `p1` - **CASE** NT-3: the core shows the call window in its layout with the degraded banner - `inst-case-nt3`
 6. [ ] - `p1` - **RETURN** the place the notification names - `inst-return-receive`
 
@@ -157,18 +157,18 @@ It implements `cpt-noter-component-screen-notifications`.
 
 ### One notification
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-notifications-item`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-notifications-item`
 
 **States**: PENDING, HELD, SENT, DROPPED, OPENED
 
 **Initial State**: PENDING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** PENDING **TO** SENT **WHEN** the send rule says send now - `inst-pending-sent`
-2. [ ] - `p1` - **FROM** PENDING **TO** HELD **WHEN** a call is recording or Noter is hidden for presenting (NT-1, NT-2) - `inst-pending-held`
-3. [ ] - `p1` - **FROM** HELD **TO** SENT **WHEN** capture stops or Noter is shown again - `inst-held-sent`
-4. [ ] - `p1` - **FROM** PENDING **TO** DROPPED **WHEN** the main window shows the call, notifications are off, or NT-3 meets a visible surface or hidden mode - `inst-pending-dropped`
-5. [ ] - `p1` - **FROM** SENT **TO** OPENED **WHEN** the user clicks it - `inst-sent-opened`
+1. [x] - `p1` - **FROM** PENDING **TO** SENT **WHEN** the send rule says send now - `inst-pending-sent`
+2. [x] - `p1` - **FROM** PENDING **TO** HELD **WHEN** a call is recording or Noter is hidden for presenting (NT-1, NT-2) - `inst-pending-held`
+3. [x] - `p1` - **FROM** HELD **TO** SENT **WHEN** capture stops or Noter is shown again - `inst-held-sent`
+4. [x] - `p1` - **FROM** PENDING **TO** DROPPED **WHEN** the main window shows the call, notifications are off, or NT-3 meets a visible surface or hidden mode - `inst-pending-dropped`
+5. [x] - `p1` - **FROM** SENT **TO** OPENED **WHEN** the user clicks it - `inst-sent-opened`
 
 ## 5. Definitions of Done
 
@@ -208,10 +208,10 @@ The system **MUST** ask for the Notifications permission only from **Notify Me W
 
 ## 6. Acceptance Criteria
 
-- [ ] No notification carries a button, a quote or a name of what was said
-- [ ] No notification arrives while a call is recorded, except NT-3 with no call surface visible
-- [ ] Nothing is sent while hidden for presenting; held notifications arrive combined per call on **Show Noter**
-- [ ] With notifications denied, the menu bar and the Call page show every ready and failed state
+- [x] No notification carries a button, a quote or a name of what was said
+- [x] No notification arrives while a call is recorded, except NT-3 with no call surface visible
+- [x] Nothing is sent while hidden for presenting; held notifications arrive combined per call on **Show Noter**
+With notifications denied, the menu bar and the Call page show every ready and failed state: needs the outputs, proven in `cpt-noter-feature-ui-call-page-outputs` (M2).
 
 ## 7. Additional Context
 

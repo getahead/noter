@@ -101,7 +101,8 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 6. [ ] - `p1` - Save or ⌘Return calls `output_edit` with call id, summary id, base rev and Markdown; raw HTML is never rendered - `inst-save`
 7. [ ] - `p1` - **IF** conflict or validation error: keep the draft, refresh current output and show the error; require an explicit new save - `inst-error`
 8. [ ] - `p1` - **ELSE** render the returned section, Edited badge, refreshed version list and **Saved** for 2 s - `inst-saved`
-9. [ ] - `p1` - **RETURN** readable outputs with each item's evidence one action away - `inst-return`
+9. [ ] - `p1` - User clicks the NT-1 or NT-2 notification; `nav:request` opens the call's **Summary** in the main window - `inst-nt-click`
+10. [ ] - `p1` - **RETURN** readable outputs with each item's evidence one action away - `inst-return`
 
 ### Regenerate and compare versions
 
@@ -285,7 +286,7 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 - [ ] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
 - [ ] No success feedback follows a failed or cancelled copy/export/delete
 - [ ] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
-- [ ] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait
+- [ ] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
 
 ## 7. Additional Context
 
