@@ -3,6 +3,7 @@ import XCTest
 
 final class DialogsTests: NoterTestCase {
     func test_cpt_noter_seq_dialogs_delete_call__error_return_pressed_by_habit() {
+        launch()
         openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Cancel"].waitForExistence(timeout: 5), "Delete Call… shows no alert")
@@ -12,6 +13,7 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__other_several_calls_selected() {
+        launch()
         openCall("Backend sync")
         app.typeKey("a", modifierFlags: .command)
         app.typeKey(.delete, modifierFlags: .command)
@@ -22,6 +24,7 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__alert_has_cancel_as_default() {
+        launch()
         openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
         let cancel = alert.buttons["Cancel"]
@@ -32,6 +35,7 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording() {
+        launch("idle")
         startRecording()
         app.typeKey("q", modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Stop and Quit"].waitForExistence(timeout: 5))
