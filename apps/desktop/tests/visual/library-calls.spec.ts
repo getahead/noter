@@ -63,7 +63,11 @@ for (const [width, px] of Object.entries(WIDTHS)) {
 
     test(`loading`, async ({ page }) => {
       await page.setViewportSize({ width: px, height: 800 });
-      await openWindow(page, "main", { latency: 2500, world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 })) });
+      await openWindow(page, "main", { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 })) });
+      await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
+      // only the Calls read is slow, so the rest of the window is as in the other states
+      await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: unknown }).__noterFake);
+      await page.evaluate(() => ((globalThis as unknown as { __noterFake: { latency: number } }).__noterFake.latency = 8000));
       await expect(async () => {
         await page.keyboard.press("Meta+Digit3");
         await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
