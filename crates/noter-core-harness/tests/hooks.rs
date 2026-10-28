@@ -151,7 +151,8 @@ async fn each_scenario_boots_the_fixture_in_its_state() {
     for (name, holds) in cases {
         let (harness, _) = boot(Some(name)).await;
         let app = snapshot(&harness).await;
-        assert!(holds(&app), "{name}: {app}");
+        // The scenario only: the snapshot carries account fields that must not reach a log.
+        assert!(holds(&app), "scenario {name}");
         harness.shutdown().await;
     }
 }
