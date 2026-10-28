@@ -198,7 +198,10 @@
 [data-width="narrow"] .lb-more {
   display: none;
 }
-/* the row itself carries the selection colour, so no gap shows between cells */
+/* the row itself carries the selection colour: per-cell fills leave hairlines at fractional column edges */
 .lb-crow.is-sel {
   background: var(--accent-fill);
+}
+.np-table.lb-table tbody tr.is-sel td {
+  background: transparent;
 }
