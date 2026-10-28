@@ -3,6 +3,7 @@ import XCTest
 
 final class MenuBarTests: NoterTestCase {
     func test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue() {
+        launch("idle")
         startRecording()
         let menu = openMenu()
         assertItems(["Mark Moment", "Pause", "Stop Recording"], in: menu)
@@ -15,12 +16,14 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__paused_for_5_min() {
+        launch("idle")
         startRecording()
         item("Pause", in: openMenu()).click()
         XCTAssertTrue(infoLine("Paused for 5 min", in: openMenu()).waitForExistence(timeout: 330))
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording_alert() {
+        launch("idle")
         startRecording()
         item("Quit Noter", in: openMenu()).click()
         XCTAssertTrue(alert.staticTexts["Quitting stops the recording. The transcript so far is kept."].waitForExistence(timeout: 5))
@@ -28,6 +31,7 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__recording_lines_and_hotkeys() {
+        launch("idle")
         startRecording()
         let menu = openMenu()
         assertItems(["Open Call Screen", "Hide for Presenting"], in: menu)
@@ -35,6 +39,7 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__not_recording_start_and_next_event() {
+        launch("idle")
         let menu = openMenu()
         XCTAssertTrue(infoLine("Noter — Not recording", in: menu).exists, "the first line reads Noter — Not recording")
         assertItems(["Start Recording"], in: menu)
@@ -42,10 +47,12 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__switched_to_local() {
+        launch("switched-to-local")
         XCTAssertTrue(infoLine("Switched to local", in: openMenu()).exists)
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__setup_incomplete() {
+        launch(fixture: "none")
         // A fresh data folder: setup has not run.
         let menu = openMenu()
         XCTAssertTrue(infoLine("Setup incomplete · call detection off", in: menu).exists)
@@ -54,12 +61,13 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__new_meeting_while_hidden() {
-        startRecording()
+        launch("new-meeting")
         item("Hide for Presenting", in: openMenu()).click()
         XCTAssertTrue(infoLine("A new meeting may have started", in: openMenu()).waitForExistence(timeout: 10))
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__glyph_per_state_and_hidden_badge() {
+        launch()
         // The eye-slash badge is drawn in the image, which XCUITest cannot read reliably (two shots of the
         // same glyph differ by a few pixels); the VoiceOver label carries the hidden state.
         item("Hide for Presenting", in: openMenu()).click()
@@ -68,6 +76,7 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__no_hotkey_shows_no_key() {
+        launch()
         XCTAssertTrue(openMenu().exists)
         XCTAssertEqual(keyOf("Open Call Screen"), "N", "before: Open Call Screen shows ⌃⌥⌘N")
         closeMenu()
@@ -88,12 +97,14 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_flow_ui_menu_bar_start__start_recording_dimmed_below_500_mb() {
+        launch("low-disk")
         let start = item("Start Recording", in: openMenu())
         XCTAssertTrue(start.exists)
         XCTAssertFalse(start.isEnabled, "Start Recording is dimmed while less than 500 MB are free")
     }
 
     func test_cpt_noter_flow_ui_menu_bar_start__open_items_open_only_their_windows() {
+        launch("idle")
         startRecording()
         item("Open Call Screen", in: openMenu()).click()
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
@@ -102,6 +113,7 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_record_prompt_record_after_missed_prompt__call_detected_start_recording() {
+        launch("detected")
         let menu = openMenu()
         XCTAssertTrue(item("Call Detected · Start Recording", in: menu).exists)
         item("Call Detected · Start Recording", in: menu).click()
@@ -109,6 +121,7 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_call_screen_hide_for_presenting__hide_and_show_noter_items() {
+        launch()
         item("Hide for Presenting", in: openMenu()).click()
         let hidden = openMenu()
         assertItems(["Show Noter"], in: hidden)

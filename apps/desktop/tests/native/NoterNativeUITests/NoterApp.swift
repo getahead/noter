@@ -1,5 +1,7 @@
 // The app under test: the debug bundle `just native` builds (TEST_RUNNER_NOTER_APP_PATH), launched with the
-// command log directory (TEST_RUNNER_NOTER_E2E_LOG_DIR) so what the core ran counts toward the E2E bar.
+// command log directory (TEST_RUNNER_NOTER_E2E_LOG_DIR) so what the core ran counts toward the E2E bar, on the
+// harness's scripted Mac, engine and models (the launch hooks, NOTER_TEST_FIXTURE): no model, permission or call
+// of the machine it runs on is needed.
 // Story tests are named after the DESIGN story they prove (`cpt-noter-seq-…` with underscores, docs/HARNESS.md).
 import AppKit
 import ApplicationServices
@@ -7,7 +9,6 @@ import XCTest
 
 class NoterTestCase: XCTestCase {
     var app: XCUIApplication!
-    var home: URL?
     /// The app a test brings to the front to prove Noter does not take focus; hotkeys are typed on it.
     let other = XCUIApplication(bundleIdentifier: "com.apple.finder")
 
@@ -21,19 +22,27 @@ class NoterTestCase: XCTestCase {
         if let dir = ProcessInfo.processInfo.environment["NOTER_E2E_LOG_DIR"] {
             app.launchEnvironment["NOTER_E2E_LOG_DIR"] = dir
         }
-        // Each test starts from a fresh data folder (the core keeps it under $HOME), so what one test
-        // changes (settings, hotkeys) never reaches the next one or the Mac's own Noter.
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent("noter-home-\(UUID().uuidString)")
-        try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
-        self.home = home
-        app.launchEnvironment["HOME"] = home.path
+        // Each test starts from a fresh home (saved window frames, web storage) and temporary folder (the
+        // harness's data folder), so what one test changes never reaches the next one or the Mac's own Noter.
+        // The runner is sandboxed: its own temporary folder is in its container, which the app may not write to.
+        // shortcut: the app creates the folder and nothing removes it (the runner may not); macOS clears /tmp.
+        let home = "/tmp/noter-native-\(UUID().uuidString)"
+        app.launchEnvironment["HOME"] = home
+        app.launchEnvironment["TMPDIR"] = home + "/"
+    }
+
+    /// Launches the app on the fixture world (a live call recording, the call “Backend sync” in the library) in
+    /// `scenario` (`idle`, `low-disk`, `detected`, `new-meeting`, `call-seems-ended`, `switched-to-local`), or with
+    /// `fixture: "none"` as a fresh install.
+    func launch(_ scenario: String? = nil, fixture: String = "world") {
+        app.launchEnvironment["NOTER_TEST_FIXTURE"] = fixture
+        if let scenario { app.launchEnvironment["NOTER_TEST_SCENARIO"] = scenario }
         app.launch()
     }
 
     // The log is written when the app quits normally.
     override func tearDown() {
         app?.terminate()
-        if let home { try? FileManager.default.removeItem(at: home) }
     }
 
     /// The menu bar extra.

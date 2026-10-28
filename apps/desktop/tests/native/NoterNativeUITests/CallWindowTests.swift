@@ -4,6 +4,7 @@ import XCTest
 
 final class CallWindowTests: NoterTestCase {
     func test_cpt_noter_seq_floating_panel_hide_and_reopen__hotkey_shows_without_focus() {
+        launch()
         other.activate()
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "⌃⌥⌘N shows the call window")
@@ -11,6 +12,7 @@ final class CallWindowTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_call_screen_hide_for_presenting__hotkey_hides_and_restores_every_surface() {
+        launch()
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
         XCTAssertTrue(window("Noter").exists)
@@ -23,12 +25,12 @@ final class CallWindowTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_call_screen_stop_at_call_end__hidden_for_presenting_menu_carries_notice() {
-        startRecording()
-        hotkey("0")
+        launch("call-seems-ended")
         XCTAssertTrue(infoLine("Call seems to have ended", in: openMenu()).waitForExistence(timeout: 10))
     }
 
     func test_cpt_noter_seq_floating_panel_display_unplugged__panel_lands_inside_remaining_display() {
+        launch()
         hotkey("n")
         let panel = callWindow
         XCTAssertTrue(panel.waitForExistence(timeout: 5))
