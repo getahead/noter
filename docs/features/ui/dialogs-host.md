@@ -103,7 +103,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Quit while recording
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-quit`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-quit`
 
 **Actor**: Primary user
 
@@ -114,13 +114,13 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 - Return chooses **Cancel**; the recording goes on
 
 **Steps**:
-1. [ ] - `p1` - User chooses **Quit Noter** or presses ⌘Q - `inst-user-quit`
-2. [ ] - `p1` - **IF** nothing is recording - `inst-if-idle`
-   1. [ ] - `p1` - **RETURN** Noter quits at once (the core) - `inst-return-quit`
+1. [x] - `p1` - User chooses **Quit Noter** or presses ⌘Q - `inst-user-quit`
+2. [x] - `p1` - **IF** nothing is recording - `inst-if-idle`
+   1. [x] - `p1` - **RETURN** Noter quits at once (the core) - `inst-return-quit`
 3. [x] - `p1` - Core: shows the native alert with **Cancel** as the default; the UI supplies its strings from the catalogue - `inst-quit-alert`
-4. [ ] - `p1` - **IF** the user chooses **Stop and Quit** - `inst-if-stop-quit`
-   1. [ ] - `p1` - Core: stops and saves the recording, then quits - `inst-stop-quit`
-5. [ ] - `p1` - **RETURN** the recording kept, or stopped and saved before Noter quits - `inst-return-quit-done`
+4. [x] - `p1` - **IF** the user chooses **Stop and Quit** - `inst-if-stop-quit`
+   1. [x] - `p1` - Core: stops and saves the recording, then quits - `inst-stop-quit`
+5. [x] - `p1` - **RETURN** the recording kept, or stopped and saved before Noter quits - `inst-return-quit-done`
 
 ### Confirm a discard in the call window
 
@@ -229,7 +229,7 @@ The system **MUST** provide the sheet host and the popover host with the prototy
 
 ### Delete and quit alerts
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-dialogs-host-delete`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-dialogs-host-delete`
 
 The system **MUST** ask before deleting one or several calls with the prototype's titles, messages and buttons, delete through `calls_delete` only after the destructive button, return to Library › **Calls** after deleting from a call's page, and supply the quit-while-recording alert's strings.
 

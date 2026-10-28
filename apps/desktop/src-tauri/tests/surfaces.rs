@@ -12,12 +12,14 @@ use noter_core::{
 };
 use noter_desktop::surfaces::{
     action_of, call_frame, clamp_frame, frame_of, glyph_image, is_panel, notification_clicked,
-    posted, same_shape, settings_url, tray_command, SavedFrames, TauriSurfaces,
+    posted, quit_alert, running_call, same_shape, settings_url, tray_command, SavedFrames,
+    TauriSurfaces,
 };
+use noter_desktop::Booted;
 use noter_native::Frame;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
-    CallLayout, CallPageTab, DegradedState, DisplayInfo, NavTarget, WindowLabel,
+    CallLayout, CallPageTab, CapturePhase, DegradedState, DisplayInfo, NavTarget, WindowLabel,
 };
 use noter_protocol::{CallId, DisplayId, ErrorCode, NoArgs, PermissionKind, TimestampMs};
 use serde_json::{json, Value};
@@ -168,7 +170,7 @@ fn a_notification_click_asks_the_main_window_to_navigate() {
     });
     let target = NavTarget::CallPage {
         call_id: CallId::new("call_1".to_string()),
-        tab: CallPageTab::Transcript,
+        tab: CallPageTab::Summary,
         span: None,
     };
     notification_clicked(app.handle(), target.clone());
@@ -479,4 +481,100 @@ fn the_call_window_frame_is_saved_per_display_and_layout_and_survives_a_restart(
         SavedFrames::load(&path).get(&studio, CallLayout::Floating),
         None
     );
+}
+
+#[test]
+fn a_capture_problem_click_shows_the_call_window_not_the_main_window() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = Arc::new(
+        Core::open(
+            dir.path(),
+            CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)),
+        )
+        .unwrap(),
+    );
+    let app = mock_builder()
+        .manage(Booted(Ok(core.clone())))
+        .build(mock_context(noop_assets()))
+        .unwrap();
+    let heard = Arc::new(Mutex::new(0));
+    let h = heard.clone();
+    app.listen_any(event_names::NAV_REQUEST, move |_| *h.lock().unwrap() += 1);
+    let call_id = CallId::new("call_1".to_string());
+    let silent = Notification {
+        call_id: call_id.clone(),
+        kind: NotificationKind::CaptureProblem(DegradedState::SystemAudioSilent {
+            call_id,
+            since: TimestampMs(0),
+            confidence: 0.9,
+        }),
+    };
+    notification_clicked(app.handle(), posted(&silent).target);
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let shown = (0..100).any(|_| {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        tauri::async_runtime::block_on(core.window_call_state(&main, NoArgs {}))
+            .unwrap()
+            .visible
+    });
+    assert!(shown, "the call window shows in its layout");
+    assert_eq!(*heard.lock().unwrap(), 0, "no nav:request");
+    assert!(app.get_webview_window(WindowLabel::Main.as_str()).is_none());
+}
+
+#[test]
+fn the_quit_alert_takes_its_words_from_the_ui_catalogue() {
+    let [title, message, cancel, confirm] = quit_alert("Planning: VHI 8.0 drawer redesign");
+    assert_eq!(
+        title,
+        "Noter is recording “Planning: VHI 8.0 drawer redesign”"
+    );
+    assert_eq!(
+        message,
+        "Quitting stops the recording. The transcript so far is kept."
+    );
+    assert_eq!(
+        (cancel.as_str(), confirm.as_str()),
+        ("Cancel", "Stop and Quit")
+    );
+}
+
+#[test]
+fn quit_asks_only_while_a_call_records_or_waits_for_try_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = Core::open(
+        dir.path(),
+        CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)),
+    )
+    .unwrap();
+    let ctx = CommandCtx {
+        caller: Caller::Native {
+            surface: NativeSurface::Menu,
+        },
+    };
+    let mut c = tauri::async_runtime::block_on(core.app_snapshot(&ctx, NoArgs {}))
+        .unwrap()
+        .capture;
+    assert_eq!(running_call(&c), None, "idle: Noter quits at once");
+    c.call_id = Some(CallId::new("call_1".to_string()));
+    for (phase, asks) in [
+        (CapturePhase::Starting, true),
+        (CapturePhase::Recording, true),
+        (CapturePhase::Paused, true),
+        (CapturePhase::Failed, true),
+        (CapturePhase::Stopping, false),
+        (CapturePhase::Stopped, false),
+        (CapturePhase::Idle, false),
+    ] {
+        c.phase = phase;
+        assert_eq!(running_call(&c).is_some(), asks, "{phase:?}");
+    }
+    c.phase = CapturePhase::Recording;
+    c.title = Some("Planning".into());
+    let (call, title) = running_call(&c).unwrap();
+    assert_eq!((call.as_str(), title.as_str()), ("call_1", "Planning"));
 }

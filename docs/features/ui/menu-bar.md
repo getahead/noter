@@ -76,7 +76,7 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 
 ### Pause, mark and stop from the menu
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-menu-bar-control-recording`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-menu-bar-control-recording`
 
 **Actor**: Primary user
 
@@ -88,20 +88,20 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 - Error — Quit while recording: the quit alert with **Cancel** as the default and **Stop and Quit**
 
 **Steps**:
-1. [ ] - `p1` - User clicks the status item, or presses ⌃F8 and moves to it - `inst-user-open`
-2. [ ] - `p1` - Core: builds the menu with `cpt-noter-algo-ui-menu-bar-build-menu` and updates its info lines while it is open - `inst-build`
-3. [ ] - `p1` - User chooses **Mark Moment**, **Pause**, **Resume**, **Stop Recording**, **Continue Recording** or **Quit Noter** - `inst-user-item`
-4. [ ] - `p1` - **MATCH** the item - `inst-match-item`
-   - [ ] - `p1` - **CASE** **Mark Moment**: `capture_mark_moment`; nothing opens - `inst-case-mark`
-   - [ ] - `p1` - **CASE** **Pause** or **Resume**: `capture_set_paused` (wanted state); the glyph changes - `inst-case-pause`
-   - [ ] - `p1` - **CASE** **Stop Recording**: `capture_stop`; the closing line and **Continue Recording** show for 5 minutes - `inst-case-stop`
-   - [ ] - `p1` - **CASE** **Continue Recording**: `capture_continue` within `continue_until` - `inst-case-continue`
-   - [ ] - `p1` - **CASE** **Quit Noter** while recording: the quit alert of `cpt-noter-feature-ui-dialogs-host` - `inst-case-quit`
-5. [ ] - `p1` - **RETURN** the action applied within a second, with no dialog except the quit alert - `inst-return-control`
+1. [x] - `p1` - User clicks the status item, or presses ⌃F8 and moves to it - `inst-user-open`
+2. [x] - `p1` - Core: builds the menu with `cpt-noter-algo-ui-menu-bar-build-menu` and updates its info lines while it is open - `inst-build`
+3. [x] - `p1` - User chooses **Mark Moment**, **Pause**, **Resume**, **Stop Recording**, **Continue Recording** or **Quit Noter** - `inst-user-item`
+4. [x] - `p1` - **MATCH** the item - `inst-match-item`
+   - [x] - `p1` - **CASE** **Mark Moment**: `capture_mark_moment`; nothing opens - `inst-case-mark`
+   - [x] - `p1` - **CASE** **Pause** or **Resume**: `capture_set_paused` (wanted state); the glyph changes - `inst-case-pause`
+   - [x] - `p1` - **CASE** **Stop Recording**: `capture_stop`; the closing line and **Continue Recording** show for 5 minutes - `inst-case-stop`
+   - [x] - `p1` - **CASE** **Continue Recording**: `capture_continue` within `continue_until` - `inst-case-continue`
+   - [x] - `p1` - **CASE** **Quit Noter** while recording: the quit alert of `cpt-noter-feature-ui-dialogs-host` - `inst-case-quit`
+5. [x] - `p1` - **RETURN** the action applied within a second, with no dialog except the quit alert - `inst-return-control`
 
 ### Check what Noter is doing
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-menu-bar-check-state`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-menu-bar-check-state`
 
 **Actor**: Primary user
 
@@ -115,17 +115,17 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 - Error — Setup incomplete: **Setup incomplete · call detection off** with the **Finish Setup…** link above **Start Recording**, which works as always
 
 **Steps**:
-1. [ ] - `p1` - User looks at the glyph and opens the menu - `inst-user-check`
-2. [ ] - `p1` - Core: shows the glyph and title by `cpt-noter-algo-ui-menu-bar-glyph` and the info lines by `cpt-noter-algo-ui-menu-bar-build-menu` - `inst-core-show`
-3. [ ] - `p1` - **IF** the user chooses **Finish Setup…** - `inst-if-finish`
-   1. [ ] - `p1` - Core: `window_navigate` to the first-run window at the step where setup stopped - `inst-finish-setup`
-4. [ ] - `p1` - **IF** the user answers the new-meeting lines - `inst-if-new-meeting`
-   1. [ ] - `p1` - Core: `capture_answer_new_meeting` - `inst-new-meeting`
-5. [ ] - `p1` - **RETURN** the state in words, in one click - `inst-return-check`
+1. [x] - `p1` - User looks at the glyph and opens the menu - `inst-user-check`
+2. [x] - `p1` - Core: shows the glyph and title by `cpt-noter-algo-ui-menu-bar-glyph` and the info lines by `cpt-noter-algo-ui-menu-bar-build-menu` - `inst-core-show`
+3. [x] - `p1` - **IF** the user chooses **Finish Setup…** - `inst-if-finish`
+   1. [x] - `p1` - Core: `window_navigate` to the first-run window at the step where setup stopped - `inst-finish-setup`
+4. [x] - `p1` - **IF** the user answers the new-meeting lines - `inst-if-new-meeting`
+   1. [x] - `p1` - Core: `capture_answer_new_meeting` - `inst-new-meeting`
+5. [x] - `p1` - **RETURN** the state in words, in one click - `inst-return-check`
 
 ### Start a call from the menu
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-menu-bar-start`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-menu-bar-start`
 
 **Actor**: Primary user
 
@@ -138,15 +138,15 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 - Not recording · engine stopped: **Try Again** in MB-R3 starts capture again in the same call
 
 **Steps**:
-1. [ ] - `p1` - User chooses a start or surface item - `inst-user-start`
-2. [ ] - `p1` - **MATCH** the item - `inst-match-start`
-   - [ ] - `p1` - **CASE** **Start Recording**, **Call Detected · Start Recording**: `capture_start` - `inst-case-start`
-   - [ ] - `p1` - **CASE** **Try Again**: `capture_continue` - `inst-case-try-again`
-   - [ ] - `p1` - **CASE** **Open Call Screen**: `window_show_call` (not key); ends hidden mode - `inst-case-open-call`
-   - [ ] - `p1` - **CASE** **Use Floating Panel**: `window_set_call_layout` - `inst-case-floating`
-   - [ ] - `p1` - **CASE** **Hide for Presenting** or **Show Noter**: `app_set_hidden_for_presenting` - `inst-case-hide`
-   - [ ] - `p1` - **CASE** **Open Last Summary**, **Open Noter**, **Settings…**: `window_navigate` - `inst-case-navigate`
-3. [ ] - `p1` - **RETURN** the action applied within a second - `inst-return-start`
+1. [x] - `p1` - User chooses a start or surface item - `inst-user-start`
+2. [x] - `p1` - **MATCH** the item - `inst-match-start`
+   - [x] - `p1` - **CASE** **Start Recording**, **Call Detected · Start Recording**: `capture_start` - `inst-case-start`
+   - [x] - `p1` - **CASE** **Try Again**: `capture_resume_interrupted` (the same call, a gap row `engine_restart`) - `inst-case-try-again`
+   - [x] - `p1` - **CASE** **Open Call Screen**: `window_show_call` (not key); ends hidden mode - `inst-case-open-call`
+   - [x] - `p1` - **CASE** **Use Floating Panel**: `window_set_call_layout` - `inst-case-floating`
+   - [x] - `p1` - **CASE** **Hide for Presenting** or **Show Noter**: `app_set_hidden_for_presenting` - `inst-case-hide`
+   - [x] - `p1` - **CASE** **Open Last Summary**, **Open Noter**, **Settings…**: `window_navigate` - `inst-case-navigate`
+3. [x] - `p1` - **RETURN** the action applied within a second - `inst-return-start`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -255,8 +255,8 @@ The system **MUST** have XCUITest cases for every menu item and every glyph, nam
 
 - [ ] Every `MB_STATES` entry of the prototype has a matching native menu, checked by XCUITest
 - [ ] No menu item opens a dialog after setup except the quit alert while recording
-- [ ] **Start Recording** never reads **Finish Setup…** and works in every setup state
-- [ ] The glyphs are template images and change shape, never colour
+- [x] **Start Recording** never reads **Finish Setup…** and works in every setup state
+- [x] The glyphs are template images and change shape, never colour
 
 ## 7. Additional Context
 

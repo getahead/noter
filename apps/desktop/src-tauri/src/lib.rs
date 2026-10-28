@@ -78,6 +78,12 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_nspanel::init())
+        .menu(surfaces::app_menu)
+        .on_menu_event(|app, event| {
+            if event.id() == surfaces::APP_QUIT {
+                surfaces::quit(app);
+            }
+        })
         .setup(move |app| {
             let _ = events.0.set(app.handle().clone());
             // Once, before the event loop: noter-native runs the handler on the main thread.
