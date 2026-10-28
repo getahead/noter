@@ -313,7 +313,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 ### Choose what the layout shows
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-call-window-layout-content`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-call-window-layout-content`
 
 **Input**: the layout, the panel height (floating), the display width (dedicated), the copilot feature flag and whether **Show Transcript** is on
 
@@ -326,7 +326,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 2. [x] - `p1` - **ELSE** (floating) - `inst-else-floating`
    1. [x] - `p1` - Render FP-R0 (notice, in place of FP-R2 and FP-R3), FP-R1, FP-R3, FP-R6 - `inst-floating-regions`
    2. [x] - `p1` - **IF** the copilot flag is off: no FP-R2 mode line or FP-R4 cards; the transcript tail fills the panel with the last 8 lines - `inst-floating-copilot-off`
-   3. [ ] - `p1` - **ELSE** (M4): one card below 380 pt, two from 380 to 599, three from 600, and the tail from 680 or with **Show Transcript** - `inst-floating-heights`
+   With the copilot flag on (M4), the card capacity by panel height is `cpt-noter-algo-ui-copilot-card-stream` step `inst-capacity` in `docs/features/ui/copilot.md` (owner decision A, 28 Oct 2026).
 3. [x] - `p1` - **RETURN** the regions - `inst-return-regions`
 
 ## 4. States (CDSL)
@@ -469,7 +469,7 @@ The system **MUST** show a person chip per participant in CS-R1 (with **You** an
 - [x] Every call-window state the prototype lists for M1 renders as its `surface('call')` state in the copilot-off layout: Copilot flag off, Call seems to have ended, New meeting started, Nothing heard yet, Closing after Stop Recording, Closing after automatic stop, System audio silent, Microphone off, Not recording · engine stopped, Transcription stalled, Disk nearly full, Second audio source, Scrolled up, Replaying on headphones, Recording on speakers, Output not identified, Paused, Hidden for presenting, Display unplugged, Floating collapsed strip
 - [ ] No click on the call window moves focus from the call app (XCUITest)
 - [x] A layout switch, a hide and a WebView crash each keep the transcript position, marks and pins
-- [ ] **Continue Recording** works for 5 minutes after any stop and appends a gap row
+- [x] **Continue Recording** works for 5 minutes after any stop and appends a gap row
 - [x] Capture failures are announced once, assertively; transcript lines never
 
 ## 7. Additional Context
@@ -507,6 +507,6 @@ The system **MUST** show a person chip per participant in CS-R1 (with **You** an
 | No card yet, Card too late, Cards held, Pinned by key, Card key taken, Card keys released, No card with that number, Catch-up being written, Asked about the call, Switched to local, Budget near the cap, Sensitive call (copilot), Copilot muted, Single-agent copilot, Screen context, Degraded copilot banners | `listening`, `held`, `carry`, `single`, `muted`, `switched-local`, `budget`, `sensitive-off`, `key-taken`, `default` — `cpt-noter-feature-ui-copilot` (M4) |
 | No matching person | `cpt-noter-feature-ui-speakers` (M2) |
 
-**Milestone notes.** The M1 stories `cpt-noter-seq-floating-panel-display-unplugged` (step 4 pins card 2) and `cpt-noter-seq-floating-panel-collapse-strip` (card line, **Pin** from the strip, Copilot muted while collapsed) contain copilot steps whose commands are M4 and draft; M1 proves them in the copilot-off layout, and `cpt-noter-feature-ui-copilot` proves the card steps in M4 (discrepancy 4). The **Summary ready** steps of the stop and presenting stories are proven in M2 (discrepancy 6).
+**Milestone notes.** The M1 stories `cpt-noter-seq-floating-panel-display-unplugged` (step 4 pins card 2) and `cpt-noter-seq-floating-panel-collapse-strip` (card line, **Pin** from the strip, Copilot muted while collapsed) contain copilot steps whose commands are M4 and draft; M1 proves them in the copilot-off layout, and `cpt-noter-feature-ui-copilot` proves the card steps in M4 (discrepancy 4). The **Summary ready** steps of the stop and presenting stories are proven in M2 (discrepancy 6). Owner decision A (28 Oct 2026): the M4 card-height step of the layout algorithm (`inst-floating-heights`) moved to `cpt-noter-feature-ui-copilot` (`cpt-noter-algo-ui-copilot-card-stream`, `inst-capacity`); the XCUITest-only criterion (no click moves focus) is proven by the native suite.
 
 **Not applicable.** Alerts and sheets in this window: none by design (D38). Data: the window reads the capture state and the transcript; it writes nothing itself.
