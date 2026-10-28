@@ -2248,6 +2248,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "noter-core-harness"
+version = "0.1.0"
+dependencies = [
+ "noter-core",
+ "noter-db",
+ "noter-engine-client",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tokio",
+]
+
+[[package]]
 name = "noter-db"
 version = "0.1.0"
 dependencies = [
@@ -2265,6 +2279,7 @@ dependencies = [
  "base64 0.22.1",
  "minisign",
  "noter-core",
+ "noter-core-harness",
  "noter-engine-client",
  "noter-native",
  "noter-protocol",

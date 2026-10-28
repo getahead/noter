@@ -7,6 +7,8 @@
 pub mod e2e_log;
 mod native;
 pub mod surfaces;
+#[cfg(debug_assertions)]
+mod test_hooks;
 pub mod updater;
 
 use std::sync::{Arc, OnceLock};
@@ -120,6 +122,11 @@ fn boot<R: Runtime>(
     updater: Arc<dyn noter_core::Updater>,
     surfaces: Arc<surfaces::TauriSurfaces<R>>,
 ) -> Booted {
+    // The native UI tests launch a debug build on the harness's scripted Mac (test_hooks).
+    #[cfg(debug_assertions)]
+    if let Some(booted) = test_hooks::boot(events.clone(), shortcuts.clone(), &surfaces) {
+        return booted;
+    }
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
     };
