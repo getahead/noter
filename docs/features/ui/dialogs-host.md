@@ -144,7 +144,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Open a sheet or a popover
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-sheet`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-dialogs-host-sheet`
 
 **Actor**: Primary user
 
@@ -158,11 +158,8 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 **Steps**:
 1. [x] - `p1` - User triggers an action whose label ends in an ellipsis, or a control that opens a popover - `inst-user-trigger`
 2. [x] - `p1` - UI: the owning feature opens its registered sheet (480 to 640 pt) or popover (280 to 360 pt) in the host - `inst-open-host`
-3. [ ] - `p1` - User fills it and presses the primary button - `inst-user-submit`
-4. [x] - `p1` - UI: the primary button shows a spinner and keeps its label (**Sheet busy**); fields stay readable - `inst-busy`
-5. [ ] - `p1` - **IF** the command fails with invalid input - `inst-if-invalid`
-   1. [ ] - `p1` - UI: focus moves to the first invalid field with its message under it - `inst-invalid`
-6. [ ] - `p1` - **RETURN** the sheet closed and the result shown where it applies - `inst-return-sheet`
+3. [x] - `p1` - UI: the primary button shows a spinner and keeps its label (**Sheet busy**); fields stay readable - `inst-busy`
+Filling a sheet, pressing its primary button, the invalid-input path and the close with its result belong to the first sheet with a command, **Delete Old Audio…** (`audio_delete_older`, M2): steps `inst-sheet-submit`, `inst-sheet-invalid`, `inst-sheet-return` of `cpt-noter-flow-ui-call-page-outputs-tags-audio`. No M1 sheet runs a command (owner decision A, 28 Oct 2026).
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -201,7 +198,7 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 ### Sheet
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-dialogs-host-sheet`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-dialogs-host-sheet`
 
 **States**: OPEN, BUSY, INVALID, CLOSED
 
@@ -209,17 +206,14 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 
 **Transitions**:
 1. [x] - `p1` - **FROM** CLOSED **TO** OPEN **WHEN** a feature opens a registered sheet - `inst-closed-open`
-2. [ ] - `p1` - **FROM** OPEN **TO** BUSY **WHEN** the primary button runs its command - `inst-open-busy`
-3. [ ] - `p1` - **FROM** BUSY **TO** INVALID **WHEN** the command fails with invalid input - `inst-busy-invalid`
-4. [ ] - `p1` - **FROM** INVALID **TO** BUSY **WHEN** the user submits again - `inst-invalid-busy`
-5. [ ] - `p1` - **FROM** BUSY **TO** CLOSED **WHEN** the command succeeds - `inst-busy-closed`
-6. [x] - `p1` - **FROM** OPEN **TO** CLOSED **WHEN** the user cancels - `inst-open-closed`
+2. [x] - `p1` - **FROM** OPEN **TO** CLOSED **WHEN** the user cancels - `inst-open-closed`
+BUSY and INVALID, and the close on success, are entered by the first sheet with a command, **Delete Old Audio…** (`audio_delete_older`, M2): `cpt-noter-flow-ui-call-page-outputs-tags-audio` steps `inst-sheet-submit`, `inst-sheet-invalid`, `inst-sheet-return` (owner decision A, 28 Oct 2026).
 
 ## 5. Definitions of Done
 
 ### Alert, sheet and popover hosts
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-dialogs-host-hosts`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-dialogs-host-hosts`
 
 The system **MUST** provide the sheet host and the popover host with the prototype's markup (`np-sheet` with `data-primitive="sheet"`, `np-pop` with `data-primitive="popover"`), focus trapping and return, Reduce-motion behaviour, and a request path for native alerts through the core's dialog plugin that keeps the safe button as the default unless the alert's entry says otherwise.
 
@@ -282,6 +276,6 @@ The system **MUST** confirm discarding a recording inline in the capture notice,
 
 **DESIGN versus prototype.** DESIGN's Library entry words the delete alert differently (**Their audio, transcripts, summaries and items are deleted from this Mac. This can't be undone.** with **Delete** and **Cancel**); this feature uses the prototype's wording, which matches DESIGN's Dialogs entry (listed in `docs/DECOMPOSITION.md`).
 
-**Milestone notes.** The happy path of `cpt-noter-seq-dialogs-delete-call` starts on a call's page, which `cpt-noter-feature-ui-call-page-frame` ships in M1 (discrepancy 1). The **Delete Old Audio…** sheet opens in M1; `audio_delete_older` is M2 (discrepancy 5).
+**Milestone notes.** The happy path of `cpt-noter-seq-dialogs-delete-call` starts on a call's page, which `cpt-noter-feature-ui-call-page-frame` ships in M1 (discrepancy 1). The **Delete Old Audio…** sheet opens in M1; `audio_delete_older` is M2 (discrepancy 5). Owner decision A (28 Oct 2026): the sheet submit steps (`inst-user-submit`, `inst-if-invalid`, `inst-invalid`, `inst-return-sheet`) and the BUSY/INVALID transitions (`inst-open-busy`, `inst-busy-invalid`, `inst-invalid-busy`, `inst-busy-closed`) moved to `cpt-noter-feature-ui-call-page-outputs` (M2), where the first sheet with a command lives.
 
 **Not applicable.** Undo for deletes: deletes are final in v1 (PM-22). Data: the UI deletes nothing itself.
