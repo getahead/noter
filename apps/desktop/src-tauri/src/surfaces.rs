@@ -444,6 +444,8 @@ pub struct TauriSurfaces<R: Runtime> {
     tray: Mutex<Option<TrayIcon<R>>>,
     /// The menu on screen and the model it shows.
     menu: Mutex<Option<(TrayModel, Menu<R>)>>,
+    /// **Use Floating Panel** is checked in the menu on screen.
+    floating: AtomicBool,
     /// The windows hidden for presenting, shown again on restore.
     hidden: Mutex<Vec<WindowLabel>>,
     frames: SavedFrames,
@@ -462,6 +464,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             core: OnceLock::new(),
             tray: Mutex::new(None),
             menu: Mutex::new(None),
+            floating: AtomicBool::new(false),
             hidden: Mutex::new(Vec::new()),
             frames,
             placed: Mutex::new(None),
@@ -554,13 +557,9 @@ impl<R: Runtime> TauriSurfaces<R> {
             self.app.exit(0);
             return;
         }
-        let checked = self
-            .menu
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-            .and_then(|(model, _)| model.item(action)?.checked)
-            .unwrap_or(false);
+        // Not the menu lock: this runs on the main thread, which `set_tray` waits for under it.
+        let checked =
+            action == TrayAction::UseFloatingPanel && self.floating.load(Ordering::Relaxed);
         let Some(core) = self.core.get().and_then(Weak::upgrade) else {
             return;
         };
@@ -779,6 +778,11 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             let _ = tray.set_tooltip(Some(model.label.as_str()));
             Self::set_accessibility_label(tray, &model.label);
         }
+        let floating = model
+            .item(TrayAction::UseFloatingPanel)
+            .and_then(|i| i.checked);
+        self.floating
+            .store(floating == Some(true), Ordering::Relaxed);
         *shown = Some((model.clone(), menu));
     }
 

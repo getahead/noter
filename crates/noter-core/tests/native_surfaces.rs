@@ -373,12 +373,14 @@ async fn the_tray_follows_capture_privacy_and_presenting() {
     live.phase = CapturePhase::Recording;
     live.call_id = Some(CallId::new("call_x"));
     live.title = Some("Planning".into());
+    // The clock is recorded time, pauses excluded, as the call window counts it.
+    live.recorded_ms = DurationMs(83_000);
     noter_core::testing::seed_capture(&core, live)
         .await
         .unwrap();
     let recording = rec.tray.lock().unwrap().clone().unwrap();
     assert_eq!(recording.glyph, TrayGlyph::Recording);
-    assert!(recording.lines()[0].starts_with("Recording · Planning · "));
+    assert_eq!(recording.lines()[0], "Recording · Planning · 01:23");
     assert_eq!(recording.lines()[1], "Cloud, redacted");
     assert_eq!(item(&recording, TrayAction::StartRecording), None);
     assert_eq!(item(&recording, TrayAction::StopRecording), Some(true));

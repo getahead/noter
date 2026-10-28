@@ -31,6 +31,8 @@ pub(crate) struct Windows {
     /// The share warning goes out with the first floating layout of a run.
     warned: bool,
     tray: Option<TrayModel>,
+    /// The capture state's version and when the tray first saw it: the clock runs from there.
+    clock: (StateVersion, i64),
 }
 
 impl Default for Windows {
@@ -50,6 +52,7 @@ impl Default for Windows {
             was_visible: false,
             warned: false,
             tray: None,
+            clock: (StateVersion(0), 0),
         }
     }
 }
@@ -353,6 +356,21 @@ impl Core {
             .call_id
             .as_ref()
             .map_or(0, |id| self.live_speakers(id));
+        let now = self.deps.clock.now().0;
+        // Recorded time as the call window shows it: `recorded_ms` plus the time since that
+        // state arrived while recording.
+        let since = {
+            let mut w = lock(&self.windows);
+            if w.clock.0 != capture.version {
+                w.clock = (capture.version, now);
+            }
+            w.clock.1
+        };
+        let running = match capture.phase {
+            CapturePhase::Recording => now - since,
+            _ => 0,
+        };
+        let elapsed_ms = i64::from(capture.recorded_ms.0) + running;
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         let model = tray_model(&TrayInputs {
@@ -366,7 +384,8 @@ impl Core {
             hotkeys: &hotkeys,
             start_blocked,
             speakers,
-            now: self.deps.clock.now().0,
+            elapsed_ms,
+            now,
         });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu

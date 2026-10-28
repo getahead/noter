@@ -106,6 +106,8 @@ pub(crate) struct TrayInputs<'a> {
     /// Under 500 MB free or without the speech model: a start would be refused.
     pub start_blocked: bool,
     pub speakers: usize,
+    /// Recorded time so far, pauses excluded (as the call window counts it).
+    pub elapsed_ms: i64,
     pub now: i64,
 }
 
@@ -169,7 +171,7 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
         CapturePhase::Starting | CapturePhase::Recording | CapturePhase::Paused
     );
     let idle = matches!(phase, CapturePhase::Idle | CapturePhase::Stopped);
-    let elapsed = c.started_at.map_or(0, |t| i.now - t.0);
+    let elapsed = i.elapsed_ms;
     // The 5 minutes after any stop: the closing line and **Continue Recording**.
     let closing =
         phase == CapturePhase::Stopped && c.continue_until.is_some_and(|until| i.now <= until.0);
@@ -277,11 +279,8 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
     // @cpt-end:cpt-noter-state-ui-menu-bar-status-item:p1:inst-recording-ended
     let mut entries = vec![TrayEntry::Line(first)];
     if phase == CapturePhase::Failed {
-        let saved = format!(
-            "{} · saved up to {}",
-            named("Call"),
-            clock(c.recorded_ms.0.into())
-        );
+        let call = c.title.as_deref().unwrap_or("This call");
+        let saved = format!("{call} · saved up to {}", clock(c.recorded_ms.0.into()));
         entries.push(TrayEntry::Line(saved));
     } else if live {
         // No call languages are known in M1 (the engine detects them): speakers and privacy.
@@ -484,6 +483,7 @@ mod tests {
         hotkeys: Vec<HotkeyBinding>,
         start_blocked: bool,
         speakers: usize,
+        elapsed_ms: i64,
     }
 
     fn idle() -> State {
@@ -505,6 +505,7 @@ mod tests {
             hotkeys,
             start_blocked: false,
             speakers: 0,
+            elapsed_ms: 0,
         }
     }
 
@@ -513,7 +514,7 @@ mod tests {
         s.capture.phase = CapturePhase::Recording;
         s.capture.call_id = Some(CallId::new("call_x"));
         s.capture.title = Some("Planning: VHI 8.0 drawer redesign".into());
-        s.capture.started_at = Some(TimestampMs(NOW - (23 * 60 + 14) * 1000));
+        s.elapsed_ms = (23 * 60 + 14) * 1000;
         s.speakers = 4;
         s
     }
@@ -530,6 +531,7 @@ mod tests {
             hotkeys: &s.hotkeys,
             start_blocked: s.start_blocked,
             speakers: s.speakers,
+            elapsed_ms: s.elapsed_ms,
             now: NOW,
         })
     }
@@ -616,7 +618,7 @@ mod tests {
         let mut s = recording();
         s.title = MenuBarTitle::ElapsedTime;
         assert_eq!(model(&s).title.as_deref(), Some("23:14"));
-        s.capture.started_at = Some(TimestampMs(NOW - 3_723_000));
+        s.elapsed_ms = 3_723_000;
         assert_eq!(model(&s).title.as_deref(), Some("1:02:03"));
         s.hidden = true;
         assert_eq!(model(&s).title, None);
@@ -811,7 +813,7 @@ mod tests {
         assert_eq!(m.glyph, TrayGlyph::Idle);
         let want = [
             "Not recording · engine stopped",
-            "Call · Planning: VHI 8.0 drawer redesign · saved up to 31:40",
+            "Planning: VHI 8.0 drawer redesign · saved up to 31:40",
             "-",
             "[Try Again]",
             "[Stop Recording Ctrl+Alt+Super+R]",
@@ -870,7 +872,7 @@ mod tests {
     fn counts_are_plural_and_the_clock_pads() {
         let mut s = recording();
         s.speakers = 1;
-        s.capture.started_at = Some(TimestampMs(NOW - 61_000));
+        s.elapsed_ms = 61_000;
         let m = model(&s);
         assert_eq!(m.lines()[1], "1 speaker · Cloud, redacted");
         assert_eq!(m.label, "Noter, recording, 1 minute");
