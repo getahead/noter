@@ -12,6 +12,8 @@ class NoterTestCase: XCTestCase {
     /// The app a test brings to the front to prove Noter does not take focus; hotkeys are typed on it.
     let other = XCUIApplication(bundleIdentifier: "com.apple.finder")
 
+    var home: URL?
+
     override func setUp() {
         continueAfterFailure = false
         guard let path = ProcessInfo.processInfo.environment["NOTER_APP_PATH"], !path.isEmpty else {
@@ -24,11 +26,13 @@ class NoterTestCase: XCTestCase {
         }
         // Each test starts from a fresh home (saved window frames, web storage) and temporary folder (the
         // harness's data folder), so what one test changes never reaches the next one or the Mac's own Noter.
-        // The runner is sandboxed: its own temporary folder is in its container, which the app may not write to.
-        // shortcut: the app creates the folder and nothing removes it (the runner may not); macOS clears /tmp.
-        let home = "/tmp/noter-native-\(UUID().uuidString)"
-        app.launchEnvironment["HOME"] = home
-        app.launchEnvironment["TMPDIR"] = home + "/"
+        // The runner is not sandboxed (NoterNativeUITests.entitlements): a sandboxed one launches the app without
+        // this environment, on the Mac's own data.
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("noter-home-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        self.home = home
+        app.launchEnvironment["HOME"] = home.path
+        app.launchEnvironment["TMPDIR"] = home.path + "/"
     }
 
     /// Launches the app on the fixture world (a live call recording, the call “Backend sync” in the library) in
@@ -43,6 +47,7 @@ class NoterTestCase: XCTestCase {
     // The log is written when the app quits normally.
     override func tearDown() {
         app?.terminate()
+        if let home { try? FileManager.default.removeItem(at: home) }
     }
 
     /// The menu bar extra.
