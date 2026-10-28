@@ -1,6 +1,6 @@
 //! Native surfaces, core side (TL-2): the call window's state and placement, hide for presenting,
-//! the tray model, announcements, navigation and external opens. The core decides and keeps the
-//! state; the native layer behind [`crate::Surfaces`] only draws it.
+//! the tray (its content is `tray`'s), announcements, navigation and external opens. The core
+//! decides and keeps the state; the native layer behind [`crate::Surfaces`] only draws it.
 
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
@@ -8,6 +8,7 @@ use noter_protocol::model::*;
 use noter_protocol::*;
 
 use crate::settings::invalid;
+use crate::tray::{tray_model, TrayInputs, TrayModel};
 use crate::{lock, to_json, Core};
 
 /// Where the call window goes: the display, the layout and whether the chosen display is gone.
@@ -20,48 +21,7 @@ pub struct Placement {
     pub chosen_display_missing: bool,
 }
 
-/// The tray icon: idle, recording, paused, or copilot muted (copilot arrives in M4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TrayGlyph {
-    Idle,
-    Recording,
-    Paused,
-    CopilotMuted,
-}
-
-/// What a menu item does when clicked; the app maps each to a core command as `Caller::Native`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TrayAction {
-    StartRecording,
-    StopRecording,
-    Pause,
-    Resume,
-    MarkMoment,
-    OpenCallScreen,
-    HideForPresenting,
-    ShowAfterPresenting,
-    /// The new-meeting line shown while hidden for presenting.
-    StartAsNewCall,
-    OpenNoter,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrayItem {
-    pub action: TrayAction,
-    pub enabled: bool,
-}
-
-/// Everything the status item shows.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrayModel {
-    pub glyph: TrayGlyph,
-    /// The state line: "Not recording", "Recording", "Paused".
-    pub status: String,
-    pub call_title: Option<String>,
-    /// Where text may go (D-27: the three Settings privacy modes).
-    pub privacy: PrivacyMode,
-    pub items: Vec<TrayItem>,
-}
+const MIC_OFF: &str = "Microphone off";
 
 /// The core's bookkeeping for the windows it asks the native layer to show.
 pub(crate) struct Windows {
@@ -139,55 +99,6 @@ fn placement_of(call: &CallWindowState) -> Placement {
         display_id: call.display_id.clone(),
         layout: call.layout,
         chosen_display_missing: call.chosen_display_missing,
-    }
-}
-
-fn tray_model(capture: &CaptureState, hidden: bool, privacy: PrivacyMode) -> TrayModel {
-    let phase = capture.phase;
-    let live = matches!(
-        phase,
-        CapturePhase::Starting
-            | CapturePhase::Recording
-            | CapturePhase::Paused
-            | CapturePhase::Failed
-    );
-    let (glyph, status) = match phase {
-        CapturePhase::Starting | CapturePhase::Recording => (TrayGlyph::Recording, "Recording"),
-        CapturePhase::Paused => (TrayGlyph::Paused, "Paused"),
-        CapturePhase::Failed => (TrayGlyph::Recording, "Recording stopped"),
-        CapturePhase::Stopping => (TrayGlyph::Idle, "Stopping"),
-        CapturePhase::Idle | CapturePhase::Stopped => (TrayGlyph::Idle, "Not recording"),
-    };
-    let item = |action, enabled| TrayItem { action, enabled };
-    let mut items = vec![
-        item(
-            TrayAction::StartRecording,
-            matches!(phase, CapturePhase::Idle | CapturePhase::Stopped),
-        ),
-        item(TrayAction::StopRecording, live),
-        if phase == CapturePhase::Paused {
-            item(TrayAction::Resume, true)
-        } else {
-            item(TrayAction::Pause, phase == CapturePhase::Recording)
-        },
-        item(TrayAction::MarkMoment, phase == CapturePhase::Recording),
-        item(TrayAction::OpenCallScreen, live),
-    ];
-    if hidden {
-        items.push(item(TrayAction::ShowAfterPresenting, true));
-        if matches!(capture.notice, Some(CaptureNotice::NewMeeting { .. })) {
-            items.push(item(TrayAction::StartAsNewCall, true));
-        }
-    } else {
-        items.push(item(TrayAction::HideForPresenting, true));
-    }
-    items.push(item(TrayAction::OpenNoter, true));
-    TrayModel {
-        glyph,
-        status: status.into(),
-        call_title: capture.title.clone().filter(|_| live),
-        privacy,
-        items,
     }
 }
 
@@ -411,33 +322,69 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-tell-session
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-menu-new-meeting
-        self.refresh_tray(None);
+        self.refresh_tray();
         // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-menu-new-meeting
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-return-presenting
         state
         // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-return-presenting
     }
 
-    /// Builds the tray model and hands it to the native layer when it changed. `privacy` is the
-    /// mode from a settings write that is in progress (its lock is held).
-    pub(crate) fn refresh_tray(&self, privacy: Option<PrivacyMode>) {
-        let (capture, hidden) = {
+    /// Builds the tray model and hands it to the native layer when it changed; the app calls it
+    /// every second for the clock, the countdowns and the states that change without an event.
+    /// It takes the app, settings, hotkeys and downloads locks: no caller may hold one.
+    pub fn refresh_tray(&self) {
+        let (capture, hidden, detected, degraded) = {
             let app = self.app();
-            (app.capture.clone(), app.presenting.hidden)
+            let detected = app.detection.detection.is_some();
+            (
+                app.capture.clone(),
+                app.presenting.hidden,
+                detected,
+                app.degraded.states.clone(),
+            )
         };
-        let mode = privacy.unwrap_or_else(|| lock(&self.settings).privacy.mode);
+        let (privacy, title, layout) = {
+            let s = lock(&self.settings);
+            (s.privacy.mode, s.menu_bar.title, s.call_screen.layout)
+        };
+        let hotkeys = lock(&self.hotkeys).bindings.clone();
+        let start_blocked = self.start_guard(CapturePhase::Idle).is_err();
+        let speakers = capture
+            .call_id
+            .as_ref()
+            .map_or(0, |id| self.live_speakers(id));
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
-        let model = tray_model(&capture, hidden, mode);
+        let model = tray_model(&TrayInputs {
+            capture: &capture,
+            hidden,
+            privacy,
+            title,
+            layout,
+            detected,
+            degraded: &degraded,
+            hotkeys: &hotkeys,
+            start_blocked,
+            speakers,
+            now: self.deps.clock.now().0,
+        });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
         let mut w = lock(&self.windows);
         if w.tray.as_ref() == Some(&model) {
             return;
         }
+        let mic_off = |m: Option<&TrayModel>| m.is_some_and(|m| m.lines().contains(&MIC_OFF));
+        let newly_off = mic_off(Some(&model)) && !mic_off(w.tray.as_ref());
         w.tray = Some(model.clone());
         drop(w);
         self.deps.surfaces.set_tray(&model);
+        // @cpt-begin:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-degraded
+        // With no surface visible the menu bar is the only trace: VoiceOver hears it at once.
+        if newly_off && !self.deps.surfaces.call_surface_visible() {
+            self.deps.surfaces.announce(MIC_OFF, Politeness::Assertive);
+        }
+        // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-degraded
     }
 
     // @cpt-flow:cpt-noter-flow-core-native-surfaces-navigation:p2

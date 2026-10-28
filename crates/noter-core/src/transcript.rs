@@ -260,6 +260,14 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-forward
     }
 
+    /// How many speakers the capturing call has so far (the menu bar's second line).
+    pub(crate) fn live_speakers(&self, call_id: &CallId) -> usize {
+        lock(&self.transcript.state)
+            .calls
+            .get(call_id)
+            .map_or(0, |live| live.speakers.len())
+    }
+
     /// The state of a call that captures, loaded from its stored speakers the first time.
     fn live<'a>(&self, state: &'a mut State, call_id: &CallId) -> Result<&'a mut Live, CoreError> {
         if !state.calls.contains_key(call_id) {

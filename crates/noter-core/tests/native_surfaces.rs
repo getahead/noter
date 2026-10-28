@@ -142,7 +142,7 @@ async fn choose(core: &Core, id: Option<&str>) {
 }
 
 fn item(t: &TrayModel, a: TrayAction) -> Option<bool> {
-    t.items.iter().find(|i| i.action == a).map(|i| i.enabled)
+    t.item(a).map(|i| i.enabled)
 }
 
 #[tokio::test]
@@ -360,10 +360,10 @@ async fn the_tray_follows_capture_privacy_and_presenting() {
     let (core, _, rec) = open(dir.path());
     let idle = rec.tray.lock().unwrap().clone().expect("a tray at start");
     assert_eq!(idle.glyph, TrayGlyph::Idle);
-    assert_eq!(idle.privacy, PrivacyMode::CloudRedacted);
-    assert_eq!(item(&idle, TrayAction::StartRecording), Some(true));
-    assert_eq!(item(&idle, TrayAction::StopRecording), Some(false));
-    assert_eq!(item(&idle, TrayAction::MarkMoment), Some(false));
+    assert_eq!(idle.lines(), ["Noter — Not recording"]);
+    assert!(item(&idle, TrayAction::StartRecording).is_some());
+    assert_eq!(item(&idle, TrayAction::StopRecording), None);
+    assert_eq!(item(&idle, TrayAction::MarkMoment), None);
 
     let mut live = core
         .app_snapshot(&window(WindowLabel::Main), NoArgs {})
@@ -378,7 +378,9 @@ async fn the_tray_follows_capture_privacy_and_presenting() {
         .unwrap();
     let recording = rec.tray.lock().unwrap().clone().unwrap();
     assert_eq!(recording.glyph, TrayGlyph::Recording);
-    assert_eq!(recording.call_title.as_deref(), Some("Planning"));
+    assert!(recording.lines()[0].starts_with("Recording · Planning · "));
+    assert_eq!(recording.lines()[1], "Cloud, redacted");
+    assert_eq!(item(&recording, TrayAction::StartRecording), None);
     assert_eq!(item(&recording, TrayAction::StopRecording), Some(true));
     assert_eq!(item(&recording, TrayAction::MarkMoment), Some(true));
     assert_eq!(item(&recording, TrayAction::Pause), Some(true));
@@ -482,4 +484,33 @@ async fn a_native_caller_may_show_the_call_window_and_hide_for_presenting() {
         .await
         .unwrap();
     assert!(hidden.hidden);
+}
+
+#[tokio::test]
+async fn microphone_off_is_announced_once_when_no_surface_is_visible() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _, rec) = open(dir.path());
+    let call_id = CallId::new("call_x");
+    let mut live = core
+        .app_snapshot(&window(WindowLabel::Main), NoArgs {})
+        .await
+        .unwrap()
+        .capture;
+    live.phase = CapturePhase::Recording;
+    live.call_id = Some(call_id.clone());
+    noter_core::testing::seed_capture(&core, live)
+        .await
+        .unwrap();
+    rec.take();
+    core.set_degraded(vec![DegradedState::MicrophoneOff { call_id }]);
+    core.refresh_tray();
+    core.refresh_tray();
+    let tray = rec.tray.lock().unwrap().clone().unwrap();
+    assert!(tray.lines().contains(&"Microphone off"));
+    let said: Vec<String> = rec
+        .take()
+        .into_iter()
+        .filter(|c| c.starts_with("announce"))
+        .collect();
+    assert_eq!(said, ["announce Microphone off"]);
 }

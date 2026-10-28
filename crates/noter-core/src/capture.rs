@@ -319,7 +319,7 @@ impl Core {
         let state = self.publish(event_names::CAPTURE_STATE, &mut app.capture);
         self.capture_phase.send_replace(state.phase);
         drop(app);
-        self.refresh_tray(None);
+        self.refresh_tray();
         state
     }
 

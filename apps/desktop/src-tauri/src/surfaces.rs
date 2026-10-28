@@ -11,17 +11,19 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use noter_core::{
-    Core, Notification, NotificationKind, Placement, Surfaces, TrayAction, TrayGlyph, TrayModel,
+    Core, Notification, NotificationKind, Placement, Surfaces, TrayAction, TrayEntry, TrayGlyph,
+    TrayModel,
 };
 use noter_native::{Frame, PostedNotification};
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
     AppSnapshot, CallLayout, CallPageTab, DegradedState, DisplayInfo, ExternalTarget, NavTarget,
-    Politeness, WindowLabel,
+    Politeness, SettingsPane, WindowLabel,
 };
-use noter_protocol::{DisplayId, NoArgs, PermissionKind, PrivacyMode};
+use noter_protocol::{DisplayId, NoArgs, PermissionKind};
 use serde_json::{json, Value};
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::image::Image;
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
@@ -147,11 +149,17 @@ pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Frame) -> (f64, 
 }
 
 /// The core command a menu bar item runs, with its arguments from the current snapshot; `None`
-/// when the item needs a call that is gone, or is the host's own (Open Noter).
-pub fn tray_command(action: TrayAction, snap: &AppSnapshot) -> Option<(&'static str, Value)> {
+/// when the item needs a call that is gone, or is the host's own (Quit Noter). `checked` is the
+/// item's checkmark as the menu showed it.
+pub fn tray_command(
+    action: TrayAction,
+    checked: bool,
+    snap: &AppSnapshot,
+) -> Option<(&'static str, Value)> {
     let call = || snap.capture.call_id.clone();
+    let navigate = |target: Option<NavTarget>| ("window_navigate", json!({ "target": target }));
     Some(match action {
-        TrayAction::StartRecording => {
+        TrayAction::StartRecording | TrayAction::StartDetected => {
             let detection_id = snap.detection.detection.as_ref().map(|d| d.id.clone());
             let args =
                 json!({ "source": "menu_bar", "sensitive": false, "detection_id": detection_id });
@@ -167,47 +175,69 @@ pub fn tray_command(action: TrayAction, snap: &AppSnapshot) -> Option<(&'static 
             json!({ "call_id": call()?, "paused": false }),
         ),
         TrayAction::MarkMoment => ("capture_mark_moment", json!({ "call_id": call()? })),
+        TrayAction::KeepRecording => (
+            "capture_answer_call_end",
+            json!({ "call_id": call()?, "choice": "keep_recording" }),
+        ),
+        TrayAction::StopNow => (
+            "capture_answer_call_end",
+            json!({ "call_id": call()?, "choice": "stop_now" }),
+        ),
+        TrayAction::StartAsNewCall => (
+            "capture_answer_new_meeting",
+            json!({ "call_id": call()?, "choice": "start_as_new_call" }),
+        ),
+        TrayAction::KeepInThisCall => (
+            "capture_answer_new_meeting",
+            json!({ "call_id": call()?, "choice": "keep_in_this_call" }),
+        ),
+        TrayAction::TryAgain => ("capture_resume_interrupted", json!({ "call_id": call()? })),
+        TrayAction::ContinueRecording => ("capture_continue", json!({ "call_id": call()? })),
         TrayAction::OpenCallScreen => ("window_show_call", json!({})),
+        TrayAction::UseFloatingPanel => {
+            let preference = if checked { "auto" } else { "floating" };
+            (
+                "window_set_call_layout",
+                json!({ "preference": preference }),
+            )
+        }
         TrayAction::HideForPresenting => {
             ("app_set_hidden_for_presenting", json!({ "hidden": true }))
         }
         TrayAction::ShowAfterPresenting => {
             ("app_set_hidden_for_presenting", json!({ "hidden": false }))
         }
-        TrayAction::StartAsNewCall => (
-            "capture_answer_new_meeting",
-            json!({ "call_id": call()?, "choice": "start_as_new_call" }),
-        ),
-        TrayAction::OpenNoter => return None,
+        // The first-run window opens at the step where setup stopped.
+        TrayAction::FinishSetup => navigate(Some(NavTarget::FirstRun { step: None })),
+        TrayAction::OpenNoter => navigate(None),
+        TrayAction::OpenSettings => navigate(Some(NavTarget::Settings {
+            pane: SettingsPane::General,
+        })),
+        TrayAction::QuitNoter => return None,
     })
 }
 
-pub fn tray_label(action: TrayAction) -> &'static str {
-    match action {
-        TrayAction::StartRecording => "Start Recording",
-        TrayAction::StopRecording => "Stop Recording",
-        TrayAction::Pause => "Pause",
-        TrayAction::Resume => "Resume",
-        TrayAction::MarkMoment => "Mark Moment",
-        TrayAction::OpenCallScreen => "Open Call Screen",
-        TrayAction::HideForPresenting => "Hide for Presenting",
-        TrayAction::ShowAfterPresenting => "Show Noter",
-        TrayAction::StartAsNewCall => "Start as New Call",
-        TrayAction::OpenNoter => "Open Noter",
-    }
-}
-
-const ACTIONS: [TrayAction; 10] = [
+const ACTIONS: [TrayAction; 20] = [
+    TrayAction::StartDetected,
+    TrayAction::FinishSetup,
+    TrayAction::KeepRecording,
+    TrayAction::StopNow,
+    TrayAction::StartAsNewCall,
+    TrayAction::KeepInThisCall,
+    TrayAction::TryAgain,
+    TrayAction::ContinueRecording,
     TrayAction::StartRecording,
     TrayAction::StopRecording,
     TrayAction::Pause,
     TrayAction::Resume,
     TrayAction::MarkMoment,
     TrayAction::OpenCallScreen,
+    TrayAction::UseFloatingPanel,
     TrayAction::HideForPresenting,
     TrayAction::ShowAfterPresenting,
-    TrayAction::StartAsNewCall,
     TrayAction::OpenNoter,
+    TrayAction::OpenSettings,
+    TrayAction::QuitNoter,
 ];
 
 /// A menu item's id is its action's name.
@@ -215,24 +245,40 @@ pub fn action_of(id: &str) -> Option<TrayAction> {
     ACTIONS.into_iter().find(|a| format!("{a:?}") == id)
 }
 
-/// The menu bar title next to the icon.
-// shortcut: the state as text beside the app icon; template glyph images come with the design
-// assets.
-pub fn tray_title(glyph: TrayGlyph) -> &'static str {
-    match glyph {
-        TrayGlyph::Idle => "",
-        TrayGlyph::Recording => "●",
-        TrayGlyph::Paused => "❙❙",
-        TrayGlyph::CopilotMuted => "◌",
+/// The template glyph image: the page, its state mark and, hidden for presenting, the eye-slash
+/// badge (docs/prototype `GLYPH` and `EYE`, 36 px for 18 pt).
+pub fn glyph_image(glyph: TrayGlyph, hidden: bool) -> Image<'static> {
+    match (glyph, hidden) {
+        (TrayGlyph::Idle, false) => tauri::include_image!("icons/tray/idle.png"),
+        (TrayGlyph::Idle, true) => tauri::include_image!("icons/tray/idle-hidden.png"),
+        (TrayGlyph::Recording, false) => tauri::include_image!("icons/tray/recording.png"),
+        (TrayGlyph::Recording, true) => tauri::include_image!("icons/tray/recording-hidden.png"),
+        (TrayGlyph::Paused, false) => tauri::include_image!("icons/tray/paused.png"),
+        (TrayGlyph::Paused, true) => tauri::include_image!("icons/tray/paused-hidden.png"),
+        // @cpt-begin:cpt-noter-algo-ui-menu-bar-glyph:p1:inst-case-muted
+        // Drawn once the copilot can mute (M4, behind its flag); the core never asks for it yet.
+        (TrayGlyph::CopilotMuted, false) => tauri::include_image!("icons/tray/muted.png"),
+        (TrayGlyph::CopilotMuted, true) => tauri::include_image!("icons/tray/muted-hidden.png"),
+        // @cpt-end:cpt-noter-algo-ui-menu-bar-glyph:p1:inst-case-muted
     }
 }
 
-fn privacy_line(mode: PrivacyMode) -> &'static str {
-    match mode {
-        PrivacyMode::CloudAllowed => "Cloud allowed",
-        PrivacyMode::CloudRedacted => "Cloud, redacted",
-        PrivacyMode::LocalOnly => "Local only",
-    }
+/// Two menus with the same items, keys and separators in the same order: the open menu can take
+/// the new texts in place (macOS keeps showing the menu it opened).
+pub fn same_shape(a: &TrayModel, b: &TrayModel) -> bool {
+    let shape = |m: &TrayModel| -> Vec<String> {
+        m.entries
+            .iter()
+            .map(|e| match e {
+                TrayEntry::Line(_) => "line".into(),
+                TrayEntry::Separator => "-".into(),
+                TrayEntry::Item(i) => {
+                    format!("{:?} {:?} {:?}", i.action, i.checked.is_some(), i.key)
+                }
+            })
+            .collect()
+    };
+    shape(a) == shape(b)
 }
 
 /// The System Settings pane a permission's **Open System Settings…** opens.
@@ -396,6 +442,8 @@ pub struct TauriSurfaces<R: Runtime> {
     storage: PathBuf,
     core: OnceLock<Weak<Core>>,
     tray: Mutex<Option<TrayIcon<R>>>,
+    /// The menu on screen and the model it shows.
+    menu: Mutex<Option<(TrayModel, Menu<R>)>>,
     /// The windows hidden for presenting, shown again on restore.
     hidden: Mutex<Vec<WindowLabel>>,
     frames: SavedFrames,
@@ -413,6 +461,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             storage,
             core: OnceLock::new(),
             tray: Mutex::new(None),
+            menu: Mutex::new(None),
             hidden: Mutex::new(Vec::new()),
             frames,
             placed: Mutex::new(None),
@@ -423,8 +472,16 @@ impl<R: Runtime> TauriSurfaces<R> {
     }
 
     /// The core the menu bar's clicks go to, once it opened.
+    /// The core the menu bar's clicks go to, once it opened; it rebuilds the menu every second
+    /// for the clock and the countdowns while the core lives.
     pub fn attach(&self, core: &Arc<Core>) {
         let _ = self.core.set(Arc::downgrade(core));
+        let core = Arc::downgrade(core);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let Some(core) = core.upgrade() else { return };
+            core.refresh_tray();
+        });
     }
 
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
@@ -493,10 +550,17 @@ impl<R: Runtime> TauriSurfaces<R> {
     // @cpt-dod:cpt-noter-dod-core-native-surfaces-menu-bar:p1
     fn menu_clicked(&self, action: TrayAction) {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
-        if action == TrayAction::OpenNoter {
-            self.show_window(WindowLabel::Main);
+        if action == TrayAction::QuitNoter {
+            self.app.exit(0);
             return;
         }
+        let checked = self
+            .menu
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .and_then(|(model, _)| model.item(action)?.checked)
+            .unwrap_or(false);
         let Some(core) = self.core.get().and_then(Weak::upgrade) else {
             return;
         };
@@ -509,7 +573,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             let Ok(snap) = core.app_snapshot(&ctx, NoArgs {}).await else {
                 return;
             };
-            let Some((name, args)) = tray_command(action, &snap) else {
+            let Some((name, args)) = tray_command(action, checked, &snap) else {
                 return;
             };
             // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
@@ -528,31 +592,72 @@ impl<R: Runtime> TauriSurfaces<R> {
 
     fn menu(&self, tray: &TrayModel) -> tauri::Result<Menu<R>> {
         let app = &self.app;
-        let status = match &tray.call_title {
-            Some(title) => format!("{} · {title}", tray.status),
-            None => tray.status.clone(),
-        };
         let menu = Menu::new(app)?;
-        menu.append(&MenuItem::new(app, status, false, None::<&str>)?)?;
-        menu.append(&MenuItem::new(
-            app,
-            privacy_line(tray.privacy),
-            false,
-            None::<&str>,
-        )?)?;
-        menu.append(&PredefinedMenuItem::separator(app)?)?;
-        for item in &tray.items {
-            let id = format!("{:?}", item.action);
-            let label = tray_label(item.action);
-            menu.append(&MenuItem::with_id(
-                app,
-                id,
-                label,
-                item.enabled,
-                None::<&str>,
-            )?)?;
+        for entry in &tray.entries {
+            match entry {
+                TrayEntry::Line(line) => {
+                    menu.append(&MenuItem::new(app, line, false, None::<&str>)?)?;
+                }
+                TrayEntry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
+                TrayEntry::Item(item) => {
+                    let id = format!("{:?}", item.action);
+                    let (label, key) = (&item.label, item.key.as_deref());
+                    match item.checked {
+                        Some(checked) => menu.append(&CheckMenuItem::with_id(
+                            app,
+                            id,
+                            label,
+                            item.enabled,
+                            checked,
+                            key,
+                        )?)?,
+                        None => {
+                            menu.append(&MenuItem::with_id(app, id, label, item.enabled, key)?)?
+                        }
+                    }
+                }
+            }
         }
         Ok(menu)
+    }
+
+    /// The new texts, states and checkmarks into the menu on screen, item by item.
+    fn update_menu(menu: &Menu<R>, tray: &TrayModel) -> tauri::Result<()> {
+        for (entry, kind) in tray.entries.iter().zip(menu.items()?) {
+            match (entry, kind) {
+                (TrayEntry::Line(line), MenuItemKind::MenuItem(i)) => i.set_text(line)?,
+                (TrayEntry::Item(item), MenuItemKind::MenuItem(i)) => {
+                    i.set_text(&item.label)?;
+                    i.set_enabled(item.enabled)?;
+                }
+                (TrayEntry::Item(item), MenuItemKind::Check(i)) => {
+                    i.set_text(&item.label)?;
+                    i.set_enabled(item.enabled)?;
+                    i.set_checked(item.checked == Some(true))?;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// The VoiceOver label of the status item's button (tray-icon sets only its tooltip).
+    fn set_accessibility_label(tray: &TrayIcon<R>, label: &str) {
+        let label = label.to_string();
+        let _ = tray.with_inner_tray_icon(move |inner| {
+            if let Some(item) = inner.ns_status_item() {
+                let label = objc2_foundation::NSString::from_str(&label);
+                // SAFETY: `button` and `setAccessibilityLabel:` are NSStatusItem and NSView API
+                // taking and returning objects; this runs on the main thread (the tray's).
+                unsafe {
+                    let button: Option<objc2::rc::Retained<objc2::runtime::AnyObject>> =
+                        objc2::msg_send![&*item, button];
+                    if let Some(button) = button {
+                        let _: () = objc2::msg_send![&*button, setAccessibilityLabel: &*label];
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -633,13 +738,25 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
 
     fn set_tray(&self, model: &TrayModel) {
-        let Ok(menu) = self.menu(model) else {
+        let mut shown = self.menu.lock().unwrap_or_else(|e| e.into_inner());
+        let glyph = (model.glyph, model.hidden);
+        let new_glyph = shown.as_ref().map(|(m, _)| (m.glyph, m.hidden)) != Some(glyph);
+        let menu = match shown.take() {
+            Some((old, menu)) if same_shape(&old, model) => {
+                let _ = Self::update_menu(&menu, model);
+                Some(menu)
+            }
+            _ => None,
+        };
+        let rebuilt = menu.is_none();
+        let Some(menu) = menu.or_else(|| self.menu(model).ok()) else {
             return;
         };
         let mut tray = self.tray.lock().unwrap_or_else(|e| e.into_inner());
         if tray.is_none() {
             let this = self.this.get().cloned().unwrap_or_default();
-            let mut builder = TrayIconBuilder::with_id("noter")
+            let builder = TrayIconBuilder::with_id("noter")
+                .icon(glyph_image(model.glyph, model.hidden))
                 .icon_as_template(true)
                 .on_menu_event(move |_, event| {
                     let surfaces = this.upgrade();
@@ -649,16 +766,20 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
                         surfaces.menu_clicked(action);
                     }
                 });
-            if let Some(icon) = self.app.default_window_icon() {
-                builder = builder.icon(icon.clone());
-            }
             *tray = builder.build(&self.app).ok();
         }
         if let Some(tray) = tray.as_ref() {
-            let _ = tray.set_menu(Some(menu));
-            let _ = tray.set_title(Some(tray_title(model.glyph)));
-            let _ = tray.set_tooltip(Some(model.status.as_str()));
+            if rebuilt {
+                let _ = tray.set_menu(Some(menu.clone()));
+            }
+            if new_glyph {
+                let _ = tray.set_icon_with_as_template(Some(glyph_image(glyph.0, glyph.1)), true);
+            }
+            let _ = tray.set_title(model.title.as_deref());
+            let _ = tray.set_tooltip(Some(model.label.as_str()));
+            Self::set_accessibility_label(tray, &model.label);
         }
+        *shown = Some((model.clone(), menu));
     }
 
     // @cpt-dod:cpt-noter-dod-core-native-surfaces-navigation:p2
