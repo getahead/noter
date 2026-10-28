@@ -7,7 +7,7 @@ import { openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 
-const WIDTHS = { wide: 1280, medium: 1100, narrow: 820 } as const;
+const WIDTHS = { wide: 1400, medium: 1000, narrow: 700 } as const;
 const ROW = '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
 const rowOf = (page: Page, title: string) => page.locator(ROW).filter({ hasText: title });
 

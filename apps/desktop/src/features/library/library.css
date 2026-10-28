@@ -190,3 +190,15 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+/* Medium and Narrow (content width < 1100): no Length column; Narrow (< 760) also drops Type and the tags, leaving the two-line row */
+[data-width="medium"] .lb-table :is(th, td):nth-child(4),
+[data-width="narrow"] .lb-table :is(th, td):nth-child(4),
+[data-width="narrow"] .lb-table :is(th, td):nth-child(3),
+[data-width="narrow"] .lb-tag,
+[data-width="narrow"] .lb-more {
+  display: none;
+}
+/* the row itself carries the selection colour, so no gap shows between cells */
+.lb-crow.is-sel {
+  background: var(--accent-fill);
+}

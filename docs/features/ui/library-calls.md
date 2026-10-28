@@ -226,4 +226,4 @@ The system **MUST** delete one or several selected calls through the dialog host
 
 **States coverage.** DESIGN's Library states that M1 renders: No calls yet (`empty`), Several calls selected (`selected`), Loading (`loading`), Outputs being written and Outputs failed (`statuses`), Speakers not named, Archive pending and Audio deleted (status cells from the core). The filter, tag, search and topic states belong to `cpt-noter-feature-ui-library-search-topics` (M3); Several calls tagged and No tags yet need the M2 tag commands.
 
-**Not applicable.** Search and filters: M3. Export: M2. Data: the list is one view-ready page from the core.
+**Not applicable.** Search and filters: M3. Export: M2 (`calls_export` ships with `call-page-outputs`, so the toolbar's Export… is absent with a selection until then). Data: the list is one view-ready page from the core.
