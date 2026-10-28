@@ -2268,6 +2268,8 @@ dependencies = [
  "noter-engine-client",
  "noter-native",
  "noter-protocol",
+ "objc2",
+ "objc2-foundation",
  "serde_json",
  "tauri",
  "tauri-build",

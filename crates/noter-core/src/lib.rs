@@ -21,6 +21,7 @@ mod surfaces;
 #[cfg(feature = "harness")]
 pub mod testing;
 mod transcript;
+mod tray;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -46,7 +47,8 @@ pub use noter_llm::allowed_download_url;
 use noter_protocol::ipc::Sink;
 pub use notify::{Notification, NotificationKind};
 pub use settings::default_settings;
-pub use surfaces::{Placement, TrayAction, TrayGlyph, TrayItem, TrayModel};
+pub use surfaces::Placement;
+pub use tray::{TrayAction, TrayEntry, TrayGlyph, TrayItem, TrayModel};
 
 /// `~/Library/Application Support/Noter`: where the app keeps `noter.db` and `logs/`.
 pub fn default_data_dir() -> Option<std::path::PathBuf> {
@@ -327,7 +329,7 @@ impl Core {
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
         core.init_call_window();
-        core.refresh_tray(None);
+        core.refresh_tray();
         Ok(core)
     }
 

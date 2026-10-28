@@ -8,18 +8,18 @@ use std::sync::Mutex;
 
 use noter_core::{
     Core, CoreDeps, EventEmitter, Notification, NotificationKind, Surfaces, SystemClock,
-    TrayAction, TrayGlyph,
+    TrayAction, TrayEntry, TrayGlyph, TrayItem, TrayModel,
 };
 use noter_desktop::surfaces::{
-    action_of, call_frame, clamp_frame, frame_of, is_panel, notification_clicked, posted,
-    settings_url, tray_command, tray_label, tray_title, SavedFrames, TauriSurfaces,
+    action_of, call_frame, clamp_frame, frame_of, glyph_image, is_panel, notification_clicked,
+    posted, same_shape, settings_url, tray_command, SavedFrames, TauriSurfaces,
 };
 use noter_native::Frame;
-use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
+use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
     CallLayout, CallPageTab, DegradedState, DisplayInfo, NavTarget, WindowLabel,
 };
-use noter_protocol::{CallId, DisplayId, NoArgs, PermissionKind, TimestampMs};
+use noter_protocol::{CallId, DisplayId, ErrorCode, NoArgs, PermissionKind, TimestampMs};
 use serde_json::{json, Value};
 use tauri::test::{mock_builder, mock_context, noop_assets};
 use tauri::{Listener, Manager};
@@ -196,79 +196,199 @@ fn every_menu_item_runs_its_command_with_the_live_call() {
     };
     let mut snap = tauri::async_runtime::block_on(core.app_snapshot(&menu_bar, NoArgs {})).unwrap();
     // No call: only the items that need none.
-    assert_eq!(tray_command(TrayAction::StopRecording, &snap), None);
+    assert_eq!(tray_command(TrayAction::StopRecording, false, &snap), None);
     assert_eq!(
-        tray_command(TrayAction::OpenNoter, &snap),
+        tray_command(TrayAction::QuitNoter, false, &snap),
         None,
         "the host's own"
     );
-    assert_eq!(
-        tray_command(TrayAction::StartRecording, &snap),
-        Some((
-            "capture_start",
-            json!({ "source": "menu_bar", "sensitive": false, "detection_id": null })
-        ))
-    );
+    let start = json!({ "source": "menu_bar", "sensitive": false, "detection_id": null });
     snap.capture.call_id = Some(CallId::new("call_1".to_string()));
     let call = json!("call_1");
-    for (action, name, args) in [
+    let first_run = json!({ "target": { "type": "first_run", "step": null } });
+    for (action, checked, name, args) in [
+        (
+            TrayAction::StartRecording,
+            false,
+            "capture_start",
+            start.clone(),
+        ),
+        (TrayAction::StartDetected, false, "capture_start", start),
         (
             TrayAction::StopRecording,
+            false,
             "capture_stop",
             json!({ "call_id": call }),
         ),
         (
             TrayAction::Pause,
+            false,
             "capture_set_paused",
             json!({ "call_id": call, "paused": true }),
         ),
         (
             TrayAction::Resume,
+            false,
             "capture_set_paused",
             json!({ "call_id": call, "paused": false }),
         ),
         (
             TrayAction::MarkMoment,
+            false,
             "capture_mark_moment",
             json!({ "call_id": call }),
         ),
-        (TrayAction::OpenCallScreen, "window_show_call", json!({})),
+        (
+            TrayAction::KeepRecording,
+            false,
+            "capture_answer_call_end",
+            json!({ "call_id": call, "choice": "keep_recording" }),
+        ),
+        (
+            TrayAction::StopNow,
+            false,
+            "capture_answer_call_end",
+            json!({ "call_id": call, "choice": "stop_now" }),
+        ),
+        (
+            TrayAction::StartAsNewCall,
+            false,
+            "capture_answer_new_meeting",
+            json!({ "call_id": call, "choice": "start_as_new_call" }),
+        ),
+        (
+            TrayAction::KeepInThisCall,
+            false,
+            "capture_answer_new_meeting",
+            json!({ "call_id": call, "choice": "keep_in_this_call" }),
+        ),
+        (
+            TrayAction::TryAgain,
+            false,
+            "capture_resume_interrupted",
+            json!({ "call_id": call }),
+        ),
+        (
+            TrayAction::ContinueRecording,
+            false,
+            "capture_continue",
+            json!({ "call_id": call }),
+        ),
+        (
+            TrayAction::OpenCallScreen,
+            false,
+            "window_show_call",
+            json!({}),
+        ),
+        (
+            TrayAction::UseFloatingPanel,
+            false,
+            "window_set_call_layout",
+            json!({ "preference": "floating" }),
+        ),
+        (
+            TrayAction::UseFloatingPanel,
+            true,
+            "window_set_call_layout",
+            json!({ "preference": "auto" }),
+        ),
         (
             TrayAction::HideForPresenting,
+            false,
             "app_set_hidden_for_presenting",
             json!({ "hidden": true }),
         ),
         (
             TrayAction::ShowAfterPresenting,
+            false,
             "app_set_hidden_for_presenting",
             json!({ "hidden": false }),
         ),
+        (TrayAction::FinishSetup, false, "window_navigate", first_run),
         (
-            TrayAction::StartAsNewCall,
-            "capture_answer_new_meeting",
-            json!({ "call_id": call, "choice": "start_as_new_call" }),
+            TrayAction::OpenNoter,
+            false,
+            "window_navigate",
+            json!({ "target": null }),
+        ),
+        (
+            TrayAction::OpenSettings,
+            false,
+            "window_navigate",
+            json!({ "target": { "type": "settings", "pane": "general" } }),
         ),
     ] {
         assert_eq!(
-            tray_command(action, &snap),
-            Some((name, args)),
+            tray_command(action, checked, &snap),
+            Some((name, args.clone())),
             "{action:?}"
         );
-        // Each command exists in the contract and is allowed for a native caller.
+        // Each command exists in the contract, is allowed for a native caller and takes the args.
         let spec = noter_protocol::ipc::command(name).unwrap();
         assert!(spec.check_caller(&menu_bar.caller).is_ok(), "{name}");
+        let ran = tauri::async_runtime::block_on(dispatch_json(&core, &menu_bar, name, args, None));
+        assert!(
+            !matches!(&ran, Err(e) if e.code == ErrorCode::InvalidInput),
+            "{name}: {ran:?}"
+        );
         assert_eq!(action_of(&format!("{action:?}")), Some(action));
-        assert!(!tray_label(action).is_empty());
     }
 }
 
 #[test]
-fn the_menu_bar_title_and_the_settings_panes() {
-    assert_eq!(tray_title(TrayGlyph::Idle), "");
-    assert_ne!(
-        tray_title(TrayGlyph::Recording),
-        tray_title(TrayGlyph::Paused)
-    );
+fn every_glyph_has_its_own_template_image_and_hidden_form() {
+    let mut seen = Vec::new();
+    for glyph in [
+        TrayGlyph::Idle,
+        TrayGlyph::Recording,
+        TrayGlyph::Paused,
+        TrayGlyph::CopilotMuted,
+    ] {
+        for hidden in [false, true] {
+            let image = glyph_image(glyph, hidden);
+            assert_eq!((image.width(), image.height()), (36, 36));
+            // Template: black, the shape in the alpha channel.
+            assert!(image.rgba().chunks(4).all(|p| p[..3] == [0, 0, 0]));
+            seen.push(image.rgba().to_vec());
+        }
+    }
+    seen.dedup();
+    assert_eq!(seen.len(), 8);
+}
+
+#[test]
+fn a_ticking_clock_updates_the_open_menu_and_a_new_item_rebuilds_it() {
+    let line = |t: &str| TrayEntry::Line(t.into());
+    let item = |action, key: Option<&str>| {
+        TrayEntry::Item(TrayItem {
+            action,
+            label: format!("{action:?}"),
+            enabled: true,
+            checked: None,
+            key: key.map(str::to_string),
+        })
+    };
+    let model = |first: &str, entries: Vec<TrayEntry>| TrayModel {
+        glyph: TrayGlyph::Recording,
+        hidden: false,
+        title: None,
+        label: "Noter, recording, 0 minutes".into(),
+        entries: [vec![line(first)], entries].concat(),
+    };
+    let stop = || item(TrayAction::StopRecording, Some("Ctrl+Alt+Super+R"));
+    let a = model("Recording · 00:01", vec![stop()]);
+    assert!(same_shape(&a, &model("Recording · 00:02", vec![stop()])));
+    let pause = item(TrayAction::Pause, None);
+    assert!(!same_shape(
+        &a,
+        &model("Recording · 00:02", vec![stop(), pause])
+    ));
+    let unkeyed = item(TrayAction::StopRecording, None);
+    assert!(!same_shape(&a, &model("Recording · 00:02", vec![unkeyed])));
+}
+
+#[test]
+fn the_settings_panes() {
     assert!(settings_url(PermissionKind::Microphone).ends_with("Privacy_Microphone"));
     assert!(settings_url(PermissionKind::SystemAudio).ends_with("Privacy_AudioCapture"));
 }

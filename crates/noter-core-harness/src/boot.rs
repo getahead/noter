@@ -1334,7 +1334,7 @@ impl Surfaces for ScriptedSurfaces {
         self.note("restore_all");
     }
     fn set_tray(&self, tray: &TrayModel) {
-        self.note(format!("set_tray {:?} {}", tray.glyph, tray.status));
+        self.note(format!("set_tray {:?} {}", tray.glyph, tray.lines()[0]));
     }
     fn announce(&self, text: &str, _politeness: Politeness) {
         self.note(format!("announce {text}"));

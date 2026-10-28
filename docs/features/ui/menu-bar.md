@@ -152,22 +152,22 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 
 ### Choose the glyph and title
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-menu-bar-glyph`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-menu-bar-glyph`
 
 **Input**: capture phase, copilot mute (M4), presenting state, **Menu bar title** setting, elapsed time
 
 **Output**: the template glyph, its hidden form and the title
 
 **Steps**:
-1. [ ] - `p1` - **MATCH** the state - `inst-match-glyph`
-   - [ ] - `p1` - **CASE** copilot muted while recording (M4): the muted glyph (the page with a slash) - `inst-case-muted`
-   - [ ] - `p1` - **CASE** paused: the paused glyph (the page with two bars) - `inst-case-paused`
-   - [ ] - `p1` - **CASE** recording: the recording glyph (the filled page with a hollow dot) - `inst-case-recording`
-   - [ ] - `p1` - **DEFAULT**: the idle glyph (the outlined page with three lines), also for **Not recording · engine stopped** - `inst-case-idle`
-2. [ ] - `p1` - **IF** hidden for presenting: add the eye-slash badge and clear the title - `inst-hidden-badge`
-3. [ ] - `p1` - **ELSE** show the title the setting asks for, which is no title by default, the running clock for **Elapsed Time**, or from M4 the newest card's type and first words for **Newest Card**, at most 24 characters; it never animates - `inst-title`
-4. [ ] - `p1` - VoiceOver label: "Noter, recording, 23 minutes", adding "hidden for presenting" when hidden - `inst-vo-label`
-5. [ ] - `p1` - **RETURN** glyph and title; colour is never used - `inst-return-glyph`
+1. [x] - `p1` - **MATCH** the state - `inst-match-glyph`
+   - [x] - `p1` - **CASE** copilot muted while recording (M4): the muted glyph (the page with a slash) - `inst-case-muted`
+   - [x] - `p1` - **CASE** paused: the paused glyph (the page with two bars) - `inst-case-paused`
+   - [x] - `p1` - **CASE** recording: the recording glyph (the filled page with a hollow dot) - `inst-case-recording`
+   - [x] - `p1` - **DEFAULT**: the idle glyph (the outlined page with three lines), also for **Not recording · engine stopped** - `inst-case-idle`
+2. [x] - `p1` - **IF** hidden for presenting: add the eye-slash badge and clear the title - `inst-hidden-badge`
+3. [x] - `p1` - **ELSE** show the title the setting asks for, which is no title by default, the running clock for **Elapsed Time**, or from M4 the newest card's type and first words for **Newest Card**, at most 24 characters; it never animates - `inst-title`
+4. [x] - `p1` - VoiceOver label: "Noter, recording, 23 minutes", adding "hidden for presenting" when hidden - `inst-vo-label`
+5. [x] - `p1` - **RETURN** glyph and title; colour is never used - `inst-return-glyph`
 
 ### Build the menu
 
@@ -178,43 +178,43 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 **Output**: the ordered menu items MB-R2 to MB-R7
 
 **Steps**:
-1. [ ] - `p1` - MB-R2 first line by state: **Noter — Not recording**; **Recording · <title> · 23:14** then **4 speakers · EN / RU · Cloud, redacted**; **Paused for 5 min** after five minutes paused; **Call seems to have ended · stopping in 8 s** (no countdown while hidden); **A new meeting may have started: <title>** while hidden; the closing line for 5 minutes after any stop - `inst-mbr2-first`
-2. [ ] - `p1` - Add one degraded line when it applies: **Switched to local**, **System audio silent**, **Microphone off** (announced assertively when no surface is visible), **Not recording · engine stopped**; while hidden and recording, **Hidden for presenting** - `inst-mbr2-degraded`
-3. [ ] - `p1` - **IF** setup is incomplete: **Setup incomplete · call detection off** and the **Finish Setup…** link; never in place of **Start Recording** - `inst-mbr2-setup`
-4. [ ] - `p1` - **IF** a call is detected and not recorded (visible or hidden for presenting): **Call Detected · Start Recording** as the one enabled item in MB-R2; never while a capture runs (HoD decision D-1, see 7) - `inst-mbr2-detected`
-5. [ ] - `p1` - MB-R3: **Keep Recording** and **Stop Now** while the call-ended notice is open; **Start as New Call** and **Keep in This Call** for a new meeting while hidden; **Start Recording** or **Stop Recording** ⌃⌥⌘R (dimmed only below 500 MB or without the speech model); **Try Again** while capture failed; **Pause** or **Resume** ⌃⌥⌘P; **Continue Recording** for 5 minutes after any stop - `inst-mbr3`
-6. [ ] - `p1` - MB-R4 while recording: **Mark Moment** ⌃⌥⌘M; with the copilot on (M4) also **Catch Me Up**, **Ask About This Call…**, **Unmute** while muted and **Mute Copilot ▸** - `inst-mbr4`
-7. [ ] - `p1` - MB-R5: **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel** (checkmark), **Open Last Summary — <title> · <time>**, **Hide for Presenting** or **Show Noter** ⌃⌥⌘0 - `inst-mbr5`
+1. [x] - `p1` - MB-R2 first line by state: **Noter — Not recording**; **Recording · <title> · 23:14** then **4 speakers · EN / RU · Cloud, redacted**; **Paused for 5 min** after five minutes paused; **Call seems to have ended · stopping in 8 s** (no countdown while hidden); **A new meeting may have started: <title>** while hidden; the closing line for 5 minutes after any stop - `inst-mbr2-first`
+2. [x] - `p1` - Add one degraded line when it applies: **Switched to local**, **System audio silent**, **Microphone off** (announced assertively when no surface is visible), **Not recording · engine stopped**; while hidden and recording, **Hidden for presenting** - `inst-mbr2-degraded`
+3. [x] - `p1` - **IF** setup is incomplete: **Setup incomplete · call detection off** and the **Finish Setup…** link; never in place of **Start Recording** - `inst-mbr2-setup`
+4. [x] - `p1` - **IF** a call is detected and not recorded (visible or hidden for presenting): **Call Detected · Start Recording** as the one enabled item in MB-R2; never while a capture runs (HoD decision D-1, see 7) - `inst-mbr2-detected`
+5. [x] - `p1` - MB-R3: **Keep Recording** and **Stop Now** while the call-ended notice is open; **Start as New Call** and **Keep in This Call** for a new meeting while hidden; **Start Recording** or **Stop Recording** ⌃⌥⌘R (dimmed only below 500 MB or without the speech model); **Try Again** while capture failed; **Pause** or **Resume** ⌃⌥⌘P; **Continue Recording** for 5 minutes after any stop - `inst-mbr3`
+6. [x] - `p1` - MB-R4 while recording: **Mark Moment** ⌃⌥⌘M; with the copilot on (M4) also **Catch Me Up**, **Ask About This Call…**, **Unmute** while muted and **Mute Copilot ▸** - `inst-mbr4`
+7. [x] - `p1` - MB-R5: **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel** (checkmark), **Open Last Summary — <title> · <time>**, **Hide for Presenting** or **Show Noter** ⌃⌥⌘0 - `inst-mbr5`
 8. [ ] - `p1` - MB-R6: **Next: <event> <time>** (disabled); MB-R7: **Open Noter**, **Settings…** ⌘,, **Quit Noter** ⌘Q - `inst-mbr6-7`
-9. [ ] - `p1` - An item whose hotkey did not register shows no key - `inst-no-key`
-10. [ ] - `p1` - **RETURN** the items, in title case, with plural rules for counts - `inst-return-menu`
+9. [x] - `p1` - An item whose hotkey did not register shows no key - `inst-no-key`
+10. [x] - `p1` - **RETURN** the items, in title case, with plural rules for counts - `inst-return-menu`
 
 ## 4. States (CDSL)
 
 ### Status item
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-menu-bar-status-item`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-menu-bar-status-item`
 
 **States**: IDLE, CALL_DETECTED, RECORDING, PAUSED, CALL_ENDED_NOTICE, CLOSING, ENGINE_STOPPED, HIDDEN
 
 **Initial State**: IDLE
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** IDLE **TO** CALL_DETECTED **WHEN** a call is detected and not recorded (prompt missed, closed or suppressed) - `inst-idle-detected`
-2. [ ] - `p1` - **FROM** CALL_DETECTED **TO** RECORDING **WHEN** the user chooses **Call Detected · Start Recording** - `inst-detected-recording`
-3. [ ] - `p1` - **FROM** IDLE **TO** RECORDING **WHEN** capture starts from any surface - `inst-idle-recording`
-4. [ ] - `p1` - **FROM** RECORDING **TO** PAUSED **WHEN** the user pauses - `inst-recording-paused`
-5. [ ] - `p1` - **FROM** PAUSED **TO** RECORDING **WHEN** the user resumes - `inst-paused-recording`
-6. [ ] - `p1` - **FROM** RECORDING **TO** CALL_ENDED_NOTICE **WHEN** the call seems to have ended - `inst-recording-ended`
-7. [ ] - `p1` - **FROM** CALL_ENDED_NOTICE **TO** RECORDING **WHEN** the user keeps recording - `inst-ended-recording`
-8. [ ] - `p1` - **FROM** CALL_ENDED_NOTICE **TO** CLOSING **WHEN** the user stops or the countdown ends - `inst-ended-closing`
-9. [ ] - `p1` - **FROM** RECORDING **TO** CLOSING **WHEN** the user stops - `inst-recording-closing`
-10. [ ] - `p1` - **FROM** CLOSING **TO** RECORDING **WHEN** the user continues within 5 minutes - `inst-closing-recording`
-11. [ ] - `p1` - **FROM** CLOSING **TO** IDLE **WHEN** 5 minutes pass - `inst-closing-idle`
-12. [ ] - `p1` - **FROM** RECORDING **TO** ENGINE_STOPPED **WHEN** the engine stops and cannot restart - `inst-recording-engine`
-13. [ ] - `p1` - **FROM** ENGINE_STOPPED **TO** RECORDING **WHEN** **Try Again** succeeds - `inst-engine-recording`
-14. [ ] - `p1` - **FROM** RECORDING **TO** HIDDEN **WHEN** Noter hides for presenting (the glyph gains the eye-slash; recording goes on) - `inst-recording-hidden`
-15. [ ] - `p1` - **FROM** HIDDEN **TO** RECORDING **WHEN** the user chooses **Show Noter** or presses ⌃⌥⌘0 - `inst-hidden-recording`
+1. [x] - `p1` - **FROM** IDLE **TO** CALL_DETECTED **WHEN** a call is detected and not recorded (prompt missed, closed or suppressed) - `inst-idle-detected`
+2. [x] - `p1` - **FROM** CALL_DETECTED **TO** RECORDING **WHEN** the user chooses **Call Detected · Start Recording** - `inst-detected-recording`
+3. [x] - `p1` - **FROM** IDLE **TO** RECORDING **WHEN** capture starts from any surface - `inst-idle-recording`
+4. [x] - `p1` - **FROM** RECORDING **TO** PAUSED **WHEN** the user pauses - `inst-recording-paused`
+5. [x] - `p1` - **FROM** PAUSED **TO** RECORDING **WHEN** the user resumes - `inst-paused-recording`
+6. [x] - `p1` - **FROM** RECORDING **TO** CALL_ENDED_NOTICE **WHEN** the call seems to have ended - `inst-recording-ended`
+7. [x] - `p1` - **FROM** CALL_ENDED_NOTICE **TO** RECORDING **WHEN** the user keeps recording - `inst-ended-recording`
+8. [x] - `p1` - **FROM** CALL_ENDED_NOTICE **TO** CLOSING **WHEN** the user stops or the countdown ends - `inst-ended-closing`
+9. [x] - `p1` - **FROM** RECORDING **TO** CLOSING **WHEN** the user stops - `inst-recording-closing`
+10. [x] - `p1` - **FROM** CLOSING **TO** RECORDING **WHEN** the user continues within 5 minutes - `inst-closing-recording`
+11. [x] - `p1` - **FROM** CLOSING **TO** IDLE **WHEN** 5 minutes pass - `inst-closing-idle`
+12. [x] - `p1` - **FROM** RECORDING **TO** ENGINE_STOPPED **WHEN** the engine stops and cannot restart - `inst-recording-engine`
+13. [x] - `p1` - **FROM** ENGINE_STOPPED **TO** RECORDING **WHEN** **Try Again** succeeds - `inst-engine-recording`
+14. [x] - `p1` - **FROM** RECORDING **TO** HIDDEN **WHEN** Noter hides for presenting (the glyph gains the eye-slash; recording goes on) - `inst-recording-hidden`
+15. [x] - `p1` - **FROM** HIDDEN **TO** RECORDING **WHEN** the user chooses **Show Noter** or presses ⌃⌥⌘0 - `inst-hidden-recording`
 
 ## 5. Definitions of Done
 
