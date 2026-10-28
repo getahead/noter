@@ -171,7 +171,7 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 
 ### Build the menu
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-menu-bar-build-menu`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-menu-bar-build-menu`
 
 **Input**: capture state with notice and `continue_until`, detection, setup status, presenting state, degraded set, privacy mode, call people and languages, last summary, next calendar event, hotkey registrations
 
@@ -185,7 +185,8 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 5. [x] - `p1` - MB-R3: **Keep Recording** and **Stop Now** while the call-ended notice is open; **Start as New Call** and **Keep in This Call** for a new meeting while hidden; **Start Recording** or **Stop Recording** ⌃⌥⌘R (dimmed only below 500 MB or without the speech model); **Try Again** while capture failed; **Pause** or **Resume** ⌃⌥⌘P; **Continue Recording** for 5 minutes after any stop - `inst-mbr3`
 6. [x] - `p1` - MB-R4 while recording: **Mark Moment** ⌃⌥⌘M; with the copilot on (M4) also **Catch Me Up**, **Ask About This Call…**, **Unmute** while muted and **Mute Copilot ▸** - `inst-mbr4`
 7. [x] - `p1` - MB-R5: **Open Call Screen** ⌃⌥⌘N, **Use Floating Panel** (checkmark), **Open Last Summary — <title> · <time>**, **Hide for Presenting** or **Show Noter** ⌃⌥⌘0 - `inst-mbr5`
-8. [ ] - `p1` - MB-R6: **Next: <event> <time>** (disabled); MB-R7: **Open Noter**, **Settings…** ⌘,, **Quit Noter** ⌘Q - `inst-mbr6-7`
+8. [x] - `p1` - MB-R7: **Open Noter**, **Settings…** ⌘,, **Quit Noter** ⌘Q - `inst-mbr6-7`
+MB-R6, the disabled **Next: <event> <time>** line, needs the upcoming calendar call that `cpt-noter-feature-ui-today` reads (M2): `cpt-noter-flow-ui-today-review` step `inst-menu-next` (owner decision A, 28 Oct 2026). No M1 surface reads the calendar for display.
 9. [x] - `p1` - An item whose hotkey did not register shows no key - `inst-no-key`
 10. [x] - `p1` - **RETURN** the items, in title case, with plural rules for counts - `inst-return-menu`
 
@@ -220,7 +221,7 @@ It implements `cpt-noter-component-screen-menu-bar` and `cpt-noter-component-ui-
 
 ### Menu content model and glyphs
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-menu-bar-content`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-menu-bar-content`
 
 The system **MUST** provide the menu bar's content per state as listed in this feature (info lines, groups, item labels in title case, hotkeys), the four template glyphs with their hidden forms as monochrome template images, and the strings for the quit alert, for the core to build the native status item and menu.
 
@@ -285,5 +286,7 @@ The system **MUST** have XCUITest cases for every menu item and every glyph, nam
 | — | `closing` (After a stop, **Continue Recording**) |
 
 **DESIGN versus prototype.** (1) The prototype's `closing` state (the 5 minutes after any stop) has no row in DESIGN's menu-bar States table; this feature includes it. (2) While hidden for presenting and recording, the prototype also lists **Call Detected · Start Recording**, which DESIGN offers only while not recording; HoD decision D-1 (18 Oct 2026) follows DESIGN, because the core rejects a second capture (`already_recording`): hidden and recording, MB-R2 shows **Hidden for presenting** and the capture group offers Stop and Pause as when visible. (3) DESIGN's line **Stopped at 11:12 · the call had ended** after 10 minutes hidden is not drawn by the prototype; this feature keeps **Call seems to have ended** until the core reports the stop. All three are listed in `docs/DECOMPOSITION.md`.
+
+**Milestone notes.** Owner decision A (28 Oct 2026): the MB-R6 **Next:** line of `inst-mbr6-7` moved to `cpt-noter-feature-ui-today` (M2, `inst-menu-next`), which brings the upcoming calendar call; the step keeps MB-R7. **Open Last Summary** (M2) and the copilot items and muted glyph (M4) stay in their rows as D-39 says: absent or behind the flag in M1. The XCUITest rows (`cpt-noter-dod-ui-menu-bar-native-tests`, the two native acceptance criteria) are proven by the native suite.
 
 **Not applicable.** WebView rendering, screenshots: none (native). Data: the core builds the menu from its own state.

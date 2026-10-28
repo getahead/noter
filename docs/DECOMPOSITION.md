@@ -825,7 +825,7 @@ Every state in a screen's or component's States table must match a prototype sta
   - [ ] `p2` - `cpt-noter-constraint-no-dialog-after-setup`
 
 - **Domain Model Entities**:
-  - Capture state, detection, setup status, presenting state, degraded set, next calendar event
+  - Capture state, detection, setup status, presenting state, degraded set; the next calendar event (MB-R6) comes with Today in M2 (owner decision A, 28 Oct 2026)
 
 - **Design Components**:
 
