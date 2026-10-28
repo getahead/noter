@@ -19,6 +19,9 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 noter-core = { path = "../../../crates/noter-core" }
+# The native UI tests' launch hooks (src/test_hooks.rs): only a debug build references it, so a
+# release binary links none of its code.
+noter-core-harness = { path = "../../../crates/noter-core-harness" }
 noter-engine-client = { path = "../../../crates/noter-engine-client" }
 noter-native = { path = "../../../crates/noter-native" }
 noter-protocol = { path = "../../../crates/noter-protocol" }

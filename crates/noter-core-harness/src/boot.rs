@@ -22,11 +22,13 @@ use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
     EngineCommand, EngineErrorCode, EngineEvent, EngineSegment, EngineSegmentState,
 };
+use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::{
-    AudioChannel, CallId, CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs,
+    AudioChannel, CallId, CoreError, DetectionId, DurationMs, ErrorCode, PermissionKind,
+    PermissionState, TimestampMs,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -42,6 +44,124 @@ pub struct Options {
     pub fixed_clock: bool,
     /// `--engine-script <file>`: the scripted engine plays these steps (`.plans/engine-script-format.md`).
     pub engine_script: Option<Script>,
+    /// A named state of the fixture world ([`scenario`]), applied with `world_set` once seeded.
+    pub scenario: Option<String>,
+}
+
+impl Options {
+    /// The command line: `--fixture world` (the fixture world of noter-protocol), `--clock fixed` and
+    /// `--engine-script <file>` (the scripted engine's steps; a bad file is `Err` with its line).
+    // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-start
+    pub fn parse(args: &[String]) -> Result<Options, String> {
+        let mut options = Options::default();
+        let mut rest = args.iter();
+        while let Some(flag) = rest.next() {
+            match (flag.as_str(), rest.next().map(String::as_str)) {
+                ("--fixture", Some("world")) => options.fixture = true,
+                ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
+                ("--clock", Some("fixed")) => options.fixed_clock = true,
+                ("--engine-script", Some(file)) => {
+                    let text = std::fs::read_to_string(file)
+                        .map_err(|e| format!("engine script {file}: {e}"))?;
+                    let script =
+                        Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
+                    options.engine_script = Some(script);
+                }
+                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--engine-script <file>]")),
+            }
+        }
+        Ok(options)
+    }
+    // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-start
+
+    /// The app's launch hooks, read with `var`: `None` unless `NOTER_TEST_FIXTURE` is set, to
+    /// `world` (the fixture world) or `none` (a fresh install); `NOTER_TEST_CLOCK=fixed`,
+    /// `NOTER_TEST_ENGINE_SCRIPT=<file>` and `NOTER_TEST_SCENARIO=<name>` as the flags say.
+    pub fn from_env(var: impl Fn(&str) -> Option<String>) -> Result<Option<Options>, String> {
+        let Some(fixture) = var("NOTER_TEST_FIXTURE") else {
+            return Ok(None);
+        };
+        let mut args = vec![];
+        if fixture != "none" {
+            args.extend(["--fixture".to_string(), fixture]);
+        }
+        if let Some(clock) = var("NOTER_TEST_CLOCK") {
+            args.extend(["--clock".to_string(), clock]);
+        }
+        if let Some(file) = var("NOTER_TEST_ENGINE_SCRIPT") {
+            args.extend(["--engine-script".to_string(), file]);
+        }
+        let mut options = Options::parse(&args)?;
+        if let Some(name) = var("NOTER_TEST_SCENARIO") {
+            if !options.fixture {
+                return Err(format!("scenario {name}: needs NOTER_TEST_FIXTURE=world"));
+            }
+            scenario(&name, TimestampMs(0), &mut world())?;
+            options.scenario = Some(name);
+        }
+        Ok(Some(options))
+    }
+}
+
+/// Puts the fixture world (a live call recording) in a state the native UI tests start from,
+/// with its times counted from `now`.
+pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), String> {
+    let idle = CaptureState {
+        phase: CapturePhase::Idle,
+        call_id: None,
+        title: None,
+        started_at: None,
+        recorded_ms: DurationMs(0),
+        pause: None,
+        notice: None,
+        continue_until: None,
+        audio_writing: false,
+        ..w.app.capture.clone()
+    };
+    let at = |ms: i64| TimestampMs(now.0 + ms);
+    match name {
+        "idle" => w.app.capture = idle,
+        "low-disk" => {
+            w.app.capture = idle;
+            w.app.environment.disk_free_mb = 100;
+        }
+        "detected" => {
+            w.app.capture = idle;
+            w.app.detection.detection = Some(CallDetection {
+                id: DetectionId::new("det_harness"),
+                app_name: "zoom.us".into(),
+                bundle_id: "us.zoom.xos".into(),
+                matched_event: None,
+                detected_at: now,
+                prompt_until: at(15_000),
+                blocked: None,
+            });
+        }
+        "new-meeting" => {
+            w.app.capture.notice = Some(CaptureNotice::NewMeeting {
+                event: None,
+                app_name: Some("zoom.us".into()),
+                detected_at: now,
+                expires_at: at(60_000),
+                default_choice: NewMeetingChoice::StartAsNewCall,
+            })
+        }
+        "call-seems-ended" => {
+            w.app.presenting.hidden = true;
+            w.app.capture.notice = Some(CaptureNotice::CallSeemsEnded {
+                stops_at: at(600_000),
+            });
+        }
+        "switched-to-local" => {
+            w.app.degraded.states = vec![DegradedState::SwitchedToLocal {
+                call_id: w.app.capture.call_id.clone(),
+                reason: RuntimeUnavailableReason::RateLimited,
+                retry_at: None,
+            }]
+        }
+        _ => return Err(format!("unknown scenario {name}; known: idle, low-disk, detected, new-meeting, call-seems-ended, switched-to-local")),
+    }
+    Ok(())
 }
 
 /// The harness around one real core.
@@ -61,6 +181,16 @@ impl Harness {
     /// Boots the core; `Err` with the reason when the data folder or the store cannot open.
     // @cpt-algo:cpt-noter-algo-core-harness-boot:p1
     pub async fn start(options: Options, lines: Lines) -> Result<Arc<Harness>, String> {
+        Self::start_with(options, Arc::new(lines), |deps| deps).await
+    }
+
+    /// [`Harness::start`] for the app's launch hooks: the core's events go to `events` and `host`
+    /// puts the app's own seams (windows, hotkeys, version) over the scripted ones.
+    pub async fn start_with(
+        options: Options,
+        events: Arc<dyn EventEmitter>,
+        host: impl FnOnce(CoreDeps) -> CoreDeps,
+    ) -> Result<Arc<Harness>, String> {
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-temp-dir
         static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -106,14 +236,15 @@ impl Harness {
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
         let surfaces = Arc::new(ScriptedSurfaces::default());
         let deps = CoreDeps::new(
-            clock,
-            Arc::new(EventLines(lines, seeding.clone(), engine.clone())),
+            clock.clone(),
+            Arc::new(EventLines(events, seeding.clone(), engine.clone())),
         )
         .with_native(native.clone())
         .with_models(models.clone())
         .with_engine(Arc::new(engine.clone()))
         .with_updater(updater.clone())
         .with_surfaces(surfaces.clone());
+        let deps = host(deps);
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-inject
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
@@ -141,6 +272,17 @@ impl Harness {
         }
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-seed
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
+        if let Some(name) = &options.scenario {
+            let failed = |e: CoreError| format!("scenario {name}: {}", e.message);
+            let mut w: FakeWorld =
+                serde_json::from_value(harness.world_get().await.map_err(failed)?)
+                    .map_err(|e| format!("scenario {name}: {e}"))?;
+            scenario(name, clock.now(), &mut w)?;
+            harness
+                .world_set(json!({ "world": w }))
+                .await
+                .map_err(failed)?;
+        }
         if options.fixture {
             harness.feed_engine();
         }
@@ -1003,8 +1145,14 @@ impl Clock for Fixed {
     }
 }
 
-/// Core events as event lines.
-struct EventLines(Lines, Arc<AtomicBool>, ScriptedEngine);
+impl EventEmitter for Lines {
+    fn emit(&self, event: &'static str, payload: Value) {
+        self.event(event, payload);
+    }
+}
+
+/// Core events to the wire (or the app's windows), once seeding is over.
+struct EventLines(Arc<dyn EventEmitter>, Arc<AtomicBool>, ScriptedEngine);
 
 impl EventEmitter for EventLines {
     fn emit(&self, event: &'static str, payload: Value) {
@@ -1013,7 +1161,7 @@ impl EventEmitter for EventLines {
         }
         // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-write-events
         if !self.1.load(Ordering::SeqCst) {
-            self.0.event(event, payload);
+            self.0.emit(event, payload);
         }
         // @cpt-end:cpt-noter-flow-core-harness-session:p1:inst-write-events
     }
