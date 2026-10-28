@@ -160,6 +160,7 @@ fn entry(action: TrayAction, label: &str, enabled: bool, key: Option<String>) ->
     })
 }
 
+// @cpt-dod:cpt-noter-dod-ui-menu-bar-content:p2
 // @cpt-algo:cpt-noter-algo-ui-menu-bar-glyph:p1
 // @cpt-algo:cpt-noter-algo-ui-menu-bar-build-menu:p1
 // @cpt-state:cpt-noter-state-ui-menu-bar-status-item:p1
@@ -447,12 +448,14 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
     // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr5
     entries.push(TrayEntry::Separator);
 
-    // MB-R6 (**Next:**) needs the calendar, which no M1 surface reads yet. MB-R7:
+    // MB-R6 (**Next:**) is Today's in M2 (menu-bar.md, owner decision A). MB-R7:
+    // @cpt-begin:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr6-7
     entries.push(entry(TrayAction::OpenNoter, "Open Noter", true, None));
     let settings = Some("Super+Comma".to_string());
     entries.push(entry(TrayAction::OpenSettings, "Settings…", true, settings));
     let quit = Some("Super+Q".to_string());
     entries.push(entry(TrayAction::QuitNoter, "Quit Noter", true, quit));
+    // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr6-7
 
     // @cpt-begin:cpt-noter-algo-ui-menu-bar-glyph:p1:inst-return-glyph
     // @cpt-begin:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-return-menu

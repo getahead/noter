@@ -103,7 +103,8 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 4. [ ] - `p1` - Render TD-R5 due_without_call, TD-R6 at most three proposal previews, TD-R7 Done today disclosure and TD-R8 while review is waiting - `inst-regions`
 5. [ ] - `p1` - Review links open the corresponding Call page Summary with Start Review applied; evidence and Last time use typed routes, preserving the Today return state - `inst-links`
 6. [ ] - `p1` - Card More offers Call Type, Mark as Sensitive and Show Previous Call; apply changes through existing call/capture commands and refresh the card, showing Local only after attendees - `inst-menu`
-7. [ ] - `p1` - **RETURN** Today with core order, plural counts and each row's language, or the calendar-specific empty/error state - `inst-return`
+7. [ ] - `p1` - Menu bar MB-R6: the next calendar call as the disabled line **Next: <event> <time>** in the status menu, from the same upcoming-call read (from `cpt-noter-algo-ui-menu-bar-build-menu`, owner decision A, 28 Oct 2026) - `inst-menu-next`
+8. [ ] - `p1` - **RETURN** Today with core order, plural counts and each row's language, or the calendar-specific empty/error state - `inst-return`
 
 ### Tick an item and take back a mistake
 

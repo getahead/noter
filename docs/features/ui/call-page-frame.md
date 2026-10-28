@@ -219,7 +219,7 @@ The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive*
 
 ## 6. Acceptance Criteria
 
-- [ ] Opening a call from Calls, the call window, the menu bar or a notification lands on the same page
+- [x] Opening a call from Calls, the call window, the menu bar or a notification lands on the same page
 - [ ] After a stop the page loads without the main window becoming active (checked natively)
 - [x] **Delete Call…** never deletes without the alert, and lands on Library › **Calls**
 - [x] The notification banner appears only after the first recorded call and never during a call
