@@ -17,10 +17,10 @@ use noter_core::{
 use noter_native::{Frame, PostedNotification};
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
-    AppSnapshot, CallLayout, CallPageTab, DegradedState, DisplayInfo, ExternalTarget, NavTarget,
-    Politeness, SettingsPane, WindowLabel,
+    AppSnapshot, CallLayout, CallPageTab, CapturePhase, CaptureState, DegradedState, DisplayInfo,
+    ExternalTarget, NavTarget, Politeness, SettingsPane, WindowLabel,
 };
-use noter_protocol::{DisplayId, NoArgs, PermissionKind};
+use noter_protocol::{CallId, DisplayId, NoArgs, PermissionKind};
 use serde_json::{json, Value};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
@@ -29,6 +29,7 @@ use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
 };
 use tauri_nspanel::{tauri_panel, ManagerExt, StyleMask, WebviewPanelManager, WebviewWindowExt};
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 
 tauri_panel! {
     panel!(CallPanel {
@@ -158,14 +159,21 @@ pub fn tray_command(
 ) -> Option<(&'static str, Value)> {
     let call = || snap.capture.call_id.clone();
     let navigate = |target: Option<NavTarget>| ("window_navigate", json!({ "target": target }));
+    // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-match-item
+    // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-match-start
     Some(match action {
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-start
         TrayAction::StartRecording | TrayAction::StartDetected => {
             let detection_id = snap.detection.detection.as_ref().map(|d| d.id.clone());
             let args =
                 json!({ "source": "menu_bar", "sensitive": false, "detection_id": detection_id });
             ("capture_start", args)
         }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-start
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-stop
         TrayAction::StopRecording => ("capture_stop", json!({ "call_id": call()? })),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-stop
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-pause
         TrayAction::Pause => (
             "capture_set_paused",
             json!({ "call_id": call()?, "paused": true }),
@@ -174,7 +182,10 @@ pub fn tray_command(
             "capture_set_paused",
             json!({ "call_id": call()?, "paused": false }),
         ),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-pause
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-mark
         TrayAction::MarkMoment => ("capture_mark_moment", json!({ "call_id": call()? })),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-mark
         TrayAction::KeepRecording => (
             "capture_answer_call_end",
             json!({ "call_id": call()?, "choice": "keep_recording" }),
@@ -183,6 +194,8 @@ pub fn tray_command(
             "capture_answer_call_end",
             json!({ "call_id": call()?, "choice": "stop_now" }),
         ),
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-if-new-meeting
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-new-meeting
         TrayAction::StartAsNewCall => (
             "capture_answer_new_meeting",
             json!({ "call_id": call()?, "choice": "start_as_new_call" }),
@@ -191,9 +204,18 @@ pub fn tray_command(
             "capture_answer_new_meeting",
             json!({ "call_id": call()?, "choice": "keep_in_this_call" }),
         ),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-new-meeting
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-if-new-meeting
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-try-again
         TrayAction::TryAgain => ("capture_resume_interrupted", json!({ "call_id": call()? })),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-try-again
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-continue
         TrayAction::ContinueRecording => ("capture_continue", json!({ "call_id": call()? })),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-continue
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
         TrayAction::OpenCallScreen => ("window_show_call", json!({})),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-floating
         TrayAction::UseFloatingPanel => {
             let preference = if checked { "auto" } else { "floating" };
             (
@@ -201,20 +223,31 @@ pub fn tray_command(
                 json!({ "preference": preference }),
             )
         }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-floating
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-hide
         TrayAction::HideForPresenting => {
             ("app_set_hidden_for_presenting", json!({ "hidden": true }))
         }
         TrayAction::ShowAfterPresenting => {
             ("app_set_hidden_for_presenting", json!({ "hidden": false }))
         }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-hide
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-if-finish
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-finish-setup
         // The first-run window opens at the step where setup stopped.
         TrayAction::FinishSetup => navigate(Some(NavTarget::FirstRun { step: None })),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-finish-setup
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-if-finish
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-navigate
         TrayAction::OpenNoter => navigate(None),
         TrayAction::OpenSettings => navigate(Some(NavTarget::Settings {
             pane: SettingsPane::General,
         })),
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-navigate
         TrayAction::QuitNoter => return None,
     })
+    // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-match-start
+    // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-match-item
 }
 
 const ACTIONS: [TrayAction; 20] = [
@@ -305,7 +338,8 @@ pub fn settings_url(permission: PermissionKind) -> &'static str {
     }
 }
 
-/// What a notification says and where its click goes (NT-3 opens the call's transcript).
+/// What a notification says and where its click goes: NT-3 names the call's transcript, which
+/// `notification_clicked` reads as "show the call window".
 // @cpt-flow:cpt-noter-flow-ui-notifications-receive:p1
 // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-post
 pub fn posted(n: &Notification) -> PostedNotification {
@@ -342,24 +376,182 @@ pub fn posted(n: &Notification) -> PostedNotification {
 }
 // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-post
 
-/// A clicked notification: the main window comes forward and is asked to navigate.
+/// The core, once it opened.
+fn core_of<R: Runtime>(app: &AppHandle<R>) -> Option<Arc<Core>> {
+    app.try_state::<crate::Booted>()?.0.clone().ok()
+}
+
+fn native(surface: NativeSurface) -> CommandCtx {
+    CommandCtx {
+        caller: Caller::Native { surface },
+    }
+}
+
+/// NT-3 (a capture problem) is the one notification that names the call's transcript.
+// shortcut: the posted target carries the kind (noter-native passes back only a `NavTarget`);
+// give NT-3 its own target if another notification ever opens the transcript.
+fn is_capture_problem(target: &NavTarget) -> bool {
+    matches!(
+        target,
+        NavTarget::CallPage {
+            tab: CallPageTab::Transcript,
+            ..
+        }
+    )
+}
+
+/// A clicked notification: NT-3 shows the call window in its layout with the degraded banner,
+/// without bringing Noter forward; NT-1 and NT-2 bring the main window forward and ask it to
+/// navigate to the call's page.
 // @cpt-flow:cpt-noter-flow-core-native-surfaces-notifications:p1
 // @cpt-dod:cpt-noter-dod-core-native-surfaces-notifications:p1
+// @cpt-dod:cpt-noter-dod-ui-notifications-content:p2
 // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
 pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
     // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-user-click
     // @cpt-begin:cpt-noter-state-ui-notifications-item:p1:inst-sent-opened
+    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click
+    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-case-nt3
+    if is_capture_problem(&target) {
+        let Some(core) = core_of(app) else {
+            return;
+        };
+        tauri::async_runtime::spawn(async move {
+            let ctx = native(NativeSurface::Notification);
+            let name = "window_show_call";
+            if dispatch_json(core.as_ref(), &ctx, name, json!({}), None)
+                .await
+                .is_ok()
+            {
+                crate::e2e_log::record(name);
+            }
+        });
+        return;
+    }
+    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-case-nt3
     if let Some(main) = window(app, WindowLabel::Main) {
         let _ = main.show();
         let _ = main.set_focus();
     }
-    // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-sent-opened
-    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-user-click
-    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click
     let _ = app.emit(event_names::NAV_REQUEST, target);
     // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click
+    // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-sent-opened
+    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-user-click
+    // @cpt-begin:cpt-noter-flow-ui-notifications-receive:p1:inst-return-receive
+    // The call window or the call's page: the place the notification names.
+    // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-return-receive
 }
 // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
+
+/// The UI string catalogue the quit alert's words come from (`apps/desktop/src/i18n/en.ts`).
+const CATALOGUE: &str = include_str!("../../src/i18n/en.ts");
+
+/// The catalogue's string for `key`: the first quoted text after `"key":`.
+fn catalogue(key: &str) -> String {
+    let after = CATALOGUE
+        .split(&format!("\"{key}\":"))
+        .nth(1)
+        .unwrap_or_default();
+    after.split('"').nth(1).unwrap_or_default().to_string()
+}
+
+/// The quit-while-recording alert: title, message, the default **Cancel** and **Stop and Quit**.
+// @cpt-dod:cpt-noter-dod-ui-dialogs-host-delete:p2
+pub fn quit_alert(call_title: &str) -> [String; 4] {
+    [
+        catalogue("dialogs.quit.title").replace("{title}", call_title),
+        catalogue("dialogs.quit.message"),
+        catalogue("dialogs.cancel"),
+        catalogue("dialogs.quit.confirm"),
+    ]
+}
+
+/// The call a quit would end, with its title: a capture is running or waits for **Try Again**.
+pub fn running_call(c: &CaptureState) -> Option<(CallId, String)> {
+    let open = matches!(
+        c.phase,
+        CapturePhase::Starting
+            | CapturePhase::Recording
+            | CapturePhase::Paused
+            | CapturePhase::Failed
+    );
+    let title = c.title.clone().unwrap_or_else(|| "this call".into());
+    Some((c.call_id.clone().filter(|_| open)?, title))
+}
+
+/// **Quit Noter** from the menu bar or ⌘Q: Noter quits at once when nothing is recording;
+/// otherwise the alert asks, with **Cancel** as the default, and **Stop and Quit** saves first.
+// @cpt-flow:cpt-noter-flow-ui-dialogs-host-quit:p1
+pub fn quit<R: Runtime>(app: &AppHandle<R>) {
+    // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-user-quit
+    let Some(core) = core_of(app) else {
+        app.exit(0);
+        return;
+    };
+    let app = app.clone();
+    // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-user-quit
+    tauri::async_runtime::spawn(async move {
+        let ctx = native(NativeSurface::Menu);
+        let capture = core.app_snapshot(&ctx, NoArgs {}).await.map(|s| s.capture);
+        // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-idle
+        let Some((call_id, title)) = capture.ok().as_ref().and_then(running_call) else {
+            // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
+            app.exit(0);
+            return;
+            // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
+        };
+        // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-idle
+        // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-quit-alert
+        // NSAlert makes the first button the default: Cancel goes first, so Return keeps recording.
+        let [title, message, cancel, confirm] = quit_alert(&title);
+        let stop = MessageDialogResult::Custom(confirm.clone());
+        let dialog = app
+            .dialog()
+            .message(message)
+            .title(title)
+            .buttons(MessageDialogButtons::OkCancelCustom(cancel, confirm));
+        // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-quit-alert
+        dialog.show_with_result(move |answer| {
+            // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-stop-quit
+            if answer != stop {
+                return;
+            }
+            // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-stop-quit
+            // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-stop-quit
+            tauri::async_runtime::spawn(async move {
+                let args = json!({ "call_id": call_id });
+                if dispatch_json(core.as_ref(), &ctx, "capture_stop", args, None)
+                    .await
+                    .is_ok()
+                {
+                    crate::e2e_log::record("capture_stop");
+                }
+                app.exit(0);
+            });
+            // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-stop-quit
+        });
+        // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit-done
+        // Cancel keeps the recording; Stop and Quit saves it before Noter quits.
+        // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit-done
+    });
+}
+
+/// The app menu's id for **Quit Noter** ⌘Q.
+pub const APP_QUIT: &str = "AppQuit";
+
+/// The default app menu with Noter's own **Quit Noter** ⌘Q in place of the predefined one, which
+/// ends the app with no event to stop it (the quit alert could not ask).
+pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let menu = Menu::default(app)?;
+    if let Some(MenuItemKind::Submenu(first)) = menu.items()?.into_iter().next() {
+        if let Some(quit) = first.items()?.pop() {
+            first.remove(&quit)?;
+        }
+        let item = MenuItem::with_id(app, APP_QUIT, "Quit Noter", true, Some("CmdOrCtrl+Q"))?;
+        first.append(&item)?;
+    }
+    Ok(menu)
+}
 
 /// The windows that are non-activating panels; the others are ordinary windows.
 // @cpt-algo:cpt-noter-algo-core-native-surfaces-panels:p1
@@ -489,11 +681,13 @@ impl<R: Runtime> TauriSurfaces<R> {
     pub fn attach(&self, core: &Arc<Core>) {
         let _ = self.core.set(Arc::downgrade(core));
         let core = Arc::downgrade(core);
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
         std::thread::spawn(move || loop {
             std::thread::sleep(std::time::Duration::from_secs(1));
             let Some(core) = core.upgrade() else { return };
             core.refresh_tray();
         });
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
     }
 
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
@@ -562,10 +756,12 @@ impl<R: Runtime> TauriSurfaces<R> {
     // @cpt-dod:cpt-noter-dod-core-native-surfaces-menu-bar:p1
     fn menu_clicked(&self, action: TrayAction) {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-quit
         if action == TrayAction::QuitNoter {
-            self.app.exit(0);
+            quit(&self.app);
             return;
         }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-quit
         // Not the menu lock: this runs on the main thread, which `set_tray` waits for under it.
         let checked =
             action == TrayAction::UseFloatingPanel && self.floating.load(Ordering::Relaxed);
@@ -584,6 +780,14 @@ impl<R: Runtime> TauriSurfaces<R> {
             let Some((name, args)) = tray_command(action, checked, &snap) else {
                 return;
             };
+            // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
+            // Open Call Screen ends hidden mode before it shows the window.
+            if action == TrayAction::OpenCallScreen && snap.presenting.hidden {
+                let show = json!({ "hidden": false });
+                let unhide = "app_set_hidden_for_presenting";
+                let _ = dispatch_json(core.as_ref(), &ctx, unhide, show, None).await;
+            }
+            // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
             // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
             // shows the item disabled at the next update.
             if dispatch_json(core.as_ref(), &ctx, name, args, None)
@@ -595,6 +799,11 @@ impl<R: Runtime> TauriSurfaces<R> {
         });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-return-control
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-return-start
+        // Every item runs one command as the menu bar and opens no dialog but the quit alert.
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-return-start
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-return-control
     }
     // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
 
@@ -763,21 +972,30 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             return;
         };
         let mut tray = self.tray.lock().unwrap_or_else(|e| e.into_inner());
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
         if tray.is_none() {
             let this = self.this.get().cloned().unwrap_or_default();
             let builder = TrayIconBuilder::with_id("noter")
                 .icon(glyph_image(model.glyph, model.hidden))
                 .icon_as_template(true)
                 .on_menu_event(move |_, event| {
+                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
+                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
                     let surfaces = this.upgrade();
                     if let (Some(surfaces), Some(action)) =
                         (surfaces, action_of(event.id().as_ref()))
                     {
                         surfaces.menu_clicked(action);
                     }
+                    // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
+                    // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
                 });
             *tray = builder.build(&self.app).ok();
         }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
         if let Some(tray) = tray.as_ref() {
             if rebuilt {
                 let _ = tray.set_menu(Some(menu.clone()));
@@ -789,12 +1007,15 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             let _ = tray.set_tooltip(Some(model.label.as_str()));
             Self::set_accessibility_label(tray, &model.label);
         }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
         let floating = model
             .item(TrayAction::UseFloatingPanel)
             .and_then(|i| i.checked);
         self.floating
             .store(floating == Some(true), Ordering::Relaxed);
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
         *shown = Some((model.clone(), menu));
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
     }
 
     // @cpt-dod:cpt-noter-dod-core-native-surfaces-navigation:p2

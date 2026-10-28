@@ -97,7 +97,7 @@ It implements `cpt-noter-component-screen-notifications`.
 
 ### Receive and open a notification
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-notifications-receive`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-notifications-receive`
 
 **Actor**: Noter core
 
@@ -117,8 +117,8 @@ It implements `cpt-noter-component-screen-notifications`.
 4. [x] - `p1` - User clicks it - `inst-user-click`
 5. [x] - `p1` - **MATCH** the notification - `inst-match-click`
    NT-1 and NT-2 clicks (`nav:request` to the call's **Summary**) are M2: `cpt-noter-flow-ui-call-page-outputs-read-edit`, `inst-nt-click`.
-   - [ ] - `p1` - **CASE** NT-3: the core shows the call window in its layout with the degraded banner - `inst-case-nt3`
-6. [ ] - `p1` - **RETURN** the place the notification names - `inst-return-receive`
+   - [x] - `p1` - **CASE** NT-3: the core shows the call window in its layout with the degraded banner - `inst-case-nt3`
+6. [x] - `p1` - **RETURN** the place the notification names - `inst-return-receive`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -174,7 +174,7 @@ It implements `cpt-noter-component-screen-notifications`.
 
 ### Content, send rules and clicks
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-notifications-content`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-notifications-content`
 
 The system **MUST** supply the titles and bodies of NT-1, NT-2 and NT-3 from the string catalogue with plural rules (**1 action item**, **4 action items**), report the shown call page through `window_report_view`, and route a click to the call's page or the call window; the core applies the send rule and posts them natively.
 
