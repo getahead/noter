@@ -124,9 +124,12 @@ async fn the_host_keeps_its_own_deps_and_gets_the_events() {
     harness.shutdown().await;
 }
 
+/// What a scenario's app snapshot shows.
+type Holds = fn(&Value) -> bool;
+
 #[tokio::test]
 async fn each_scenario_boots_the_fixture_in_its_state() {
-    let cases: [(&str, fn(&Value) -> bool); 6] = [
+    let cases: [(&str, Holds); 6] = [
         ("idle", |a| a["capture"]["phase"] == "idle"),
         ("low-disk", |a| {
             a["capture"]["phase"] == "idle" && a["environment"]["disk_free_mb"].as_u64() < Some(500)
