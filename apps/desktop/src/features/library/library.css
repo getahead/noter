@@ -198,10 +198,10 @@
 [data-width="narrow"] .lb-more {
   display: none;
 }
-/* the row itself carries the selection colour: per-cell fills leave hairlines at fractional column edges */
-.np-table.lb-table tbody tr.is-sel {
-  background: var(--accent-fill);
-}
+/* selected cells repeat the fill and bleed 1px sideways: Chromium anti-aliases hairlines at fractional column edges */
 .np-table.lb-table tbody tr.is-sel td {
-  background: transparent;
+  background: var(--accent-fill);
+  box-shadow:
+    1px 0 0 var(--accent-fill),
+    -1px 0 0 var(--accent-fill);
 }
