@@ -85,6 +85,7 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
   test("UI — happy path: ⌘3 lists the calls newest first with one calls_list read, sort headers toggle and are announced", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1400, height: 800 }); // Wide: Medium hides the Length column
     await openCalls(page);
     await expect(toolbar(page)).toContainText("Calls");
     await expect(toolbar(page)).toContainText(/\d+ calls? · /);
