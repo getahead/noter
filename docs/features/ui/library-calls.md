@@ -181,7 +181,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 
 ### Calls table and call row
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-library-calls-table`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-library-calls-table`
 
 The system **MUST** render LC-R1 and LC-R3 as the prototype's Calls view does, with `C.callRow` in its table-row variant (and the compact and result-group-header variants for later pages), month groups, sort, multi-select, the status cell order, the **Local only** tag, column hiding at Medium and Narrow, keyboard behaviour and VoiceOver row labels, from `calls_list` pages.
 
@@ -215,10 +215,10 @@ The system **MUST** delete one or several selected calls through the dialog host
 
 ## 6. Acceptance Criteria
 
-- [ ] The Calls page renders the prototype's Library states **Normal**, **Calls · No calls yet**, **Calls · Several calls selected**, **Calls · Status cells** and **Loading** identically
-- [ ] Rows never truncate the status icon; long titles tail-truncate with the full title in a help tag and for VoiceOver
-- [ ] Back from a call's page returns to the same scroll position and selection
-- [ ] The list makes one `calls_list` call per page, never one call per row
+- [x] The Calls page renders the prototype's Library states **Normal**, **Calls · No calls yet**, **Calls · Several calls selected**, **Calls · Status cells** and **Loading** identically
+- [x] Rows never truncate the status icon; long titles tail-truncate with the full title in a help tag and for VoiceOver
+- [x] Back from a call's page returns to the same scroll position and selection
+- [x] The list makes one `calls_list` call per page, never one call per row
 
 ## 7. Additional Context
 
@@ -226,4 +226,4 @@ The system **MUST** delete one or several selected calls through the dialog host
 
 **States coverage.** DESIGN's Library states that M1 renders: No calls yet (`empty`), Several calls selected (`selected`), Loading (`loading`), Outputs being written and Outputs failed (`statuses`), Speakers not named, Archive pending and Audio deleted (status cells from the core). The filter, tag, search and topic states belong to `cpt-noter-feature-ui-library-search-topics` (M3); Several calls tagged and No tags yet need the M2 tag commands.
 
-**Not applicable.** Search and filters: M3. Export: M2. Data: the list is one view-ready page from the core.
+**Not applicable.** Search and filters: M3. Export: M2 (`calls_export` ships with `call-page-outputs`, so the toolbar's Export… is absent with a selection until then). Data: the list is one view-ready page from the core.

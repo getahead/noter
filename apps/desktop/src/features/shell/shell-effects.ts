@@ -45,11 +45,14 @@ export function createScrollMemory() {
 }
 
 /** Moves focus to the page's first heading after navigation; false when the page has none. */
-export function focusHeading(root: { querySelector(selector: string): HTMLElement | null } | null): boolean {
+export function focusHeading(root: { querySelector(selector: string): HTMLElement | null; scrollTop?: number } | null): boolean {
   const heading = root?.querySelector("h1, h2, h3");
   if (!heading) return false;
   heading.tabIndex = -1;
+  const top = root!.scrollTop;
   heading.focus({ preventScroll: true });
+  // WebKit scrolls to the heading despite preventScroll, which would undo the restored scroll position
+  if (top !== undefined) root!.scrollTop = top;
   return true;
 }
 
@@ -79,11 +82,13 @@ export function navEffect(nav: NavTarget | null, flags: NavFlags, dispatch: (e: 
   dispatch({ type: "move", move });
 }
 
-/** Restores the page's scroll position on arrival; the cleanup saves it on leaving. */
-export function scrollEffect(el: { scrollTop: number } | null, memory: ReturnType<typeof createScrollMemory>, id: string): () => void {
+/** Restores the page's scroll position on arrival; it is saved as the user scrolls, because on leaving the content has already shrunk and `scrollTop` is clamped. */
+export function scrollEffect(el: { scrollTop: number } | null, memory: ReturnType<typeof createScrollMemory>, id: string): void {
   if (el) el.scrollTop = memory.top(id);
-  return () => void (el && memory.save(id, el.scrollTop));
 }
+
+/** The content's `scroll` handler: the position is remembered as the user scrolls. */
+export const scrollSaver = (memory: ReturnType<typeof createScrollMemory>, id: string) => (e: { currentTarget: { scrollTop: number } }): void => memory.save(id, e.currentTarget.scrollTop);
 
 /** After navigation the page heading takes focus, except on the first render and for a page the core asked for. */
 export function focusEffect(flags: NavFlags, root: Parameters<typeof focusHeading>[0], routeId: string): void {

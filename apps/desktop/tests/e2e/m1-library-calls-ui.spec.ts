@@ -48,6 +48,19 @@ function nameNoOne(w: World, id: string, n = 2): void {
   w.call_details = w.call_details.filter((x) => x.call.id !== id).concat(d);
   w.calls.find((c) => c.id === id)!.unnamed_speakers = n;
 }
+/** n more calls after the seeded ones, each with a call page (the core keeps call and detail together). */
+function manyCalls(w: World, n: number): void {
+  const base = w.call_details.find((d) => d.call.id === W.PAST_CALL)!;
+  for (let i = 0; i < n; i++) {
+    const d = structuredClone(base);
+    d.call.id = `call_more_${i}`;
+    d.call.title = `Weekly sync ${i}`;
+    d.call.started_at = base.call.started_at - (i + 1) * 3_600_000;
+    Object.assign(d, { marks: [], gaps: [], speakers: [] });
+    w.call_details.push(d);
+    w.calls.push({ ...structuredClone(w.calls.find((c) => c.id === W.PAST_CALL)!), id: d.call.id, title: d.call.title, started_at: d.call.started_at, unnamed_speakers: 0 });
+  }
+}
 const first = (w: World) => w.calls.find((c) => c.id === W.PAST_CALL)!;
 
 async function openCalls(
@@ -72,6 +85,7 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
   test("UI — happy path: ⌘3 lists the calls newest first with one calls_list read, sort headers toggle and are announced", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1400, height: 800 }); // Wide: Medium hides the Length column
     await openCalls(page);
     await expect(toolbar(page)).toContainText("Calls");
     await expect(toolbar(page)).toContainText(/\d+ calls? · /);
@@ -326,5 +340,39 @@ test.describe("cpt-noter-flow-ui-library-calls-edit", () => {
     await expect(bar).toContainText("Backend sync, retro");
     await page.getByRole("button", { name: "Back" }).first().click();
     await expect(rowOf(page, "Backend sync, retro")).toHaveCount(1);
+  });
+});
+
+test.describe("cpt-noter-dod-ui-library-calls-table acceptance", () => {
+  test("UI — a long title tail-truncates with the full title in its help tag and for VoiceOver, and the status icon is never clipped", async ({ page }) => {
+    const long = "Quarterly planning with the whole platform team about the roadmap, hiring, budget and the migration plan";
+    await page.setViewportSize({ width: 820, height: 800 });
+    await openCalls(page, (w) => Object.assign(first(w), { title: long, outputs: "writing" }));
+    const row = rowOf(page, long.slice(0, 30)).first();
+    const title = row.locator(".lb-crow__title");
+    await expect(title).toHaveAttribute("title", long);
+    await expect(row).toHaveAttribute("aria-label", long);
+    await expect(title).toHaveCSS("text-overflow", "ellipsis");
+    expect(await title.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+    const cell = (await row.locator(".lb-crow__status").boundingBox())!;
+    const icon = (await row.locator(".lb-status").first().locator("svg, [role=progressbar], .np-spinner").first().boundingBox())!;
+    expect(icon.width).toBeGreaterThanOrEqual(12);
+    expect(icon.x).toBeGreaterThanOrEqual(cell.x);
+    expect(icon.x + icon.width).toBeLessThanOrEqual(cell.x + cell.width + 0.5);
+  });
+
+  test("UI — Back from a call's page returns to the same scroll position and selection", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await openCalls(page, (w) => manyCalls(w, 30));
+    const content = page.locator('[data-region="MW-R3"]');
+    await rowOf(page, "Weekly sync 12").click();
+    await content.evaluate((e) => e.scrollTo(0, 600));
+    const top = await content.evaluate((e) => e.scrollTop);
+    expect(top).toBeGreaterThan(300);
+    await rowOf(page, "Weekly sync 12").getByRole("button", { name: /^Open / }).click();
+    await expect(page.locator('[data-region="PC-R1"]')).toBeVisible();
+    await page.getByRole("button", { name: "Back" }).first().click();
+    await expect(rowOf(page, "Weekly sync 12")).toHaveAttribute("aria-selected", "true");
+    await expect.poll(() => content.evaluate((e) => e.scrollTop)).toBe(top);
   });
 });
