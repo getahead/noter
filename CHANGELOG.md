@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.13.0](https://github.com/getahead/noter/compare/v0.12.0...v0.13.0) (2026-10-29)
+
+
+### Features
+
+* **core:** launch hooks run the built app on the harness seams ([#220](https://github.com/getahead/noter/issues/220)) ([d961eca](https://github.com/getahead/noter/commit/d961eca96c35ba975e7fc3852be34fa7321f4b44))
+* **core:** menu bar tray content per menu-bar.md ([#219](https://github.com/getahead/noter/issues/219)) ([0c3b059](https://github.com/getahead/noter/commit/0c3b0594822c37778f1ac70e9cc5bdb37e7fbdca))
+* **core:** quit-while-recording alert, menu bar flows, NT-3 click to the call window ([#222](https://github.com/getahead/noter/issues/222)) ([588b466](https://github.com/getahead/noter/commit/588b466bac311184d67c4ee9f6ae1109404982b2))
+* **ui:** calls list acceptance tests and back keeps the scroll position (2.13) ([#223](https://github.com/getahead/noter/issues/223)) ([a6fda13](https://github.com/getahead/noter/commit/a6fda13fcabb5c89edf8971072fb8a308aea5eab))
+
 ## [0.12.0](https://github.com/getahead/noter/compare/v0.11.0...v0.12.0) (2026-10-25)
 
 
