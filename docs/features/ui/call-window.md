@@ -44,11 +44,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-call-window`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-call-window`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-call-window`
+- [x] `p2` - `cpt-noter-feature-ui-call-window`
 
 ### 1.1 Overview
 

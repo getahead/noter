@@ -37,11 +37,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-dialogs-host`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-dialogs-host`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-dialogs-host`
+- [x] `p2` - `cpt-noter-feature-ui-dialogs-host`
 
 ### 1.1 Overview
 

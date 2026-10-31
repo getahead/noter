@@ -34,11 +34,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-call-page-frame`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-call-page-frame`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-call-page-frame`
+- [x] `p2` - `cpt-noter-feature-ui-call-page-frame`
 
 ### 1.1 Overview
 

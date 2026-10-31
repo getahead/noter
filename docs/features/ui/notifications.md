@@ -34,11 +34,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-notifications`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-notifications`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-notifications`
+- [x] `p2` - `cpt-noter-feature-ui-notifications`
 
 ### 1.1 Overview
 

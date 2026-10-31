@@ -33,11 +33,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-record-prompt`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-record-prompt`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-record-prompt`
+- [x] `p2` - `cpt-noter-feature-ui-record-prompt`
 
 ### 1.1 Overview
 

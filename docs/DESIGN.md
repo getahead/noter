@@ -846,7 +846,7 @@ The app menu is native and belongs to the main window and the Settings window wh
 
 #### Shell — Call window
 
-- [ ] `p1` - **ID**: `cpt-noter-component-shell-call-window`
+- [x] `p1` - **ID**: `cpt-noter-component-shell-call-window`
 
 ##### Why this component exists
 
@@ -1304,7 +1304,7 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 
 #### Screen — Record prompt
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-record-prompt`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-record-prompt`
 
 ##### Why this component exists
 
@@ -1573,7 +1573,7 @@ Today is the first screen after launch: what matters before today's and this wee
 
 #### Screen — Call screen
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-call-screen`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-call-screen`
 
 ##### Why this component exists
 
@@ -1770,7 +1770,7 @@ The call screen is the dedicated layout of the call window on a second display. 
 
 #### Screen — Floating panel
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-floating-panel`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-floating-panel`
 
 ##### Why this component exists
 
@@ -1931,7 +1931,7 @@ Collapsed strip, 56 high:
 
 #### Screen — Menu bar extra
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-menu-bar`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-menu-bar`
 
 ##### Why this component exists
 
@@ -2068,7 +2068,7 @@ MB-R1  idle glyph, no title (None)                    MB-R1  recording glyph, no
 
 #### Screen — Call page
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-call-page`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-call-page`
 
 ##### Why this component exists
 
@@ -2278,7 +2278,7 @@ The Call page is where the user confirms and shares what came out of a call with
 | Audio deleted from Call info | PC-R4 Call info | After **Delete Audio** in the alert, **Audio deleted on 15 Nov · transcript kept** in **Audio** | PM-22 | `cpt-noter-seq-call-page-name-speakers` (Empty — Audio no longer kept) |
 #### Screen — Notifications
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-notifications`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-notifications`
 
 ##### Why this component exists
 
@@ -2362,7 +2362,7 @@ Notifications tell the user that outputs are ready or failed, or that capture ha
 
 #### Screen — Dialogs, sheets and popovers
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-dialogs`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-dialogs`
 
 ##### Why this component exists
 
@@ -3964,7 +3964,7 @@ Every in-app shortcut also appears in a menu (D51). App-menu shortcuts never rea
 
 #### Component — Record prompt
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-record-prompt`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-record-prompt`
 
 ##### Why this component exists
 
@@ -4057,7 +4057,7 @@ The panel is 360 pt wide, grows up to 440 pt for longer strings, and its height 
 
 #### Component — Capture notice
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-capture-notice`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-capture-notice`
 
 ##### Why this component exists
 
@@ -4152,7 +4152,7 @@ The call-ended variant of `cpt-noter-component-ui-record-prompt` repeats this no
 
 #### Component — Recording indicator
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-recording-indicator`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-recording-indicator`
 
 ##### Why this component exists
 
@@ -4319,7 +4319,7 @@ The mode indicator shows where text may go right now: to the cloud, to the cloud
 
 #### Component — Call status strip
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-call-status-strip`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-call-status-strip`
 
 ##### Why this component exists
 
@@ -4415,7 +4415,7 @@ The call status strip puts the call's state and its controls in one line at the 
 
 #### Component — Collapsed call strip
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-collapsed-call-strip`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-collapsed-call-strip`
 
 ##### Why this component exists
 
@@ -4498,7 +4498,7 @@ The strip is 56 pt high, at least 300 pt wide, and as wide as the expanded panel
 
 #### Component — Status item
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-status-item`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-status-item`
 
 ##### Why this component exists
 
@@ -6857,7 +6857,7 @@ Ask mode answers a question over all calls and documents with citations to speci
 
 #### Component — Person chip
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-person-chip`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-person-chip`
 
 ##### Why this component exists
 
