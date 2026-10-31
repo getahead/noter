@@ -229,7 +229,7 @@ The system **MUST** render the record prompt in its seven variants with the prot
 - [ ] Clicking **Record** leaves keyboard focus in the call app (XCUITest)
 - [x] **Record** is disabled only in the Disk full and Speech model variants; with system audio off it starts capture
 - [x] **Don't Ask** confirms inline for every app and adds the app to Settings › General
-- [ ] The countdown bar is absent under Reduce motion while the seconds still update; seconds are never announced
+- [x] The countdown bar is absent under Reduce motion while the seconds still update; seconds are never announced
 
 ## 7. Additional Context
 

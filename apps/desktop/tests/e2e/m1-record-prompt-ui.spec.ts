@@ -241,6 +241,26 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     await steer.change((w) => expect(w.app.capture.phase).toBe("recording")); // the call goes on
   });
 
+  test("UI — error path: Call window hidden — under Reduce motion the countdown bar is absent, the seconds still update and are never announced", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.clock.install();
+    await openWindow(page, "record-prompt", { world: live(callEnded()) });
+    await expect(panel(page)).toHaveAttribute("data-state", "countdown-running");
+    await expect(panel(page).locator(".rp-countdown")).toBeHidden();
+
+    const seconds = panel(page).locator(".rp-sub .np-tnum");
+    const before = await seconds.textContent();
+    expect(before).toMatch(/^Stopping in \d+ s\.$/);
+    await page.clock.fastForward(3_000);
+    await expect(seconds).not.toHaveText(before ?? "");
+    await expect(seconds).toHaveText(/^Stopping in \d+ s\.$/);
+
+    const announced = (await sent(page, "window_announce")).map((a) => String(a.text));
+    expect(announced.length).toBeGreaterThan(0); // the "seems to have ended" notice is announced once, without a number
+    expect(announced.filter((text) => /Stopping in|\d+ s\b/.test(text))).toEqual([]);
+    await expect(panel(page).locator("[aria-live]").filter({ hasText: /Stopping in/ })).toHaveCount(0);
+  });
+
   test("UI — error path: Call window hidden — Stop Now stops the call and the panel closes", async ({ page }) => {
     await openWindow(page, "record-prompt", { world: live(callEnded()) });
     await button(page, "Stop Now").click();
