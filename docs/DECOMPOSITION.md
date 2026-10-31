@@ -848,11 +848,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.13 [Library: Calls list](features/ui/library-calls.md) — M1 · MEDIUM
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-ui-library-calls`
+- [x] `p2` - **ID**: `cpt-noter-feature-ui-library-calls`
 
 - **Purpose**: Show every recorded call in a sortable, multi-select table with its status, open any call, and delete one or several calls after the native alert.
 
-- **Milestone**: M1. **Spec**: [`docs/features/ui/library-calls.md`](features/ui/library-calls.md). **Status**: NOT_STARTED.
+- **Milestone**: M1. **Spec**: [`docs/features/ui/library-calls.md`](features/ui/library-calls.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-dialogs-host`, `cpt-noter-feature-ui-live-transcript`
 
@@ -880,8 +880,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-screen-library`
-  - [ ] `p2` - `cpt-noter-component-ui-call-row`
+  - [x] `p2` - `cpt-noter-component-screen-library`
+  - [x] `p2` - `cpt-noter-component-ui-call-row`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `calls_list`

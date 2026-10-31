@@ -87,6 +87,7 @@ codebase = [
   { name = "Rust crates", path = "crates", extensions = [".rs"] },
   { name = "Desktop UI", path = "apps/desktop/src", extensions = [".ts", ".tsx"] },
   { name = "Conformance suite", path = "apps/desktop/tests/conformance", extensions = [".ts"] },
+  { name = "Native UI tests", path = "apps/desktop/tests/native", extensions = [".swift"] },
   { name = "Tauri host", path = "apps/desktop/src-tauri/src", extensions = [".rs"] },
   { name = "Engine", path = "engine/Sources", extensions = [".swift"] },
 ]
