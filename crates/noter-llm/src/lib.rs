@@ -16,6 +16,8 @@ use reqwest::{StatusCode, Url};
 
 #[cfg(test)]
 mod fetch_tests;
+#[cfg(test)]
+mod runtime_tests;
 
 fn model_hosts() -> &'static [&'static str] {
     ALLOW_WITHOUT_AUDIT
