@@ -714,3 +714,20 @@ fn offline_errors_become_typed_core_errors() {
         assert_eq!(code(e), ErrorCode::Internal);
     }
 }
+
+#[tokio::test(start_paused = true)]
+async fn shutdown_rejects_every_pending_request() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = scripted(dir.path(), RUNS);
+    let c = client(&engine);
+    c.ensure_ready().await.unwrap();
+    let archive = spawn({
+        let c = c.clone();
+        async move { pass(&c, "audio/call_1/r.json").await }
+    });
+    ms(5).await;
+    assert_eq!(c.offline_state(&key()), Some(OfflineState::Running));
+    c.shutdown().await;
+    assert_eq!(archive.await.unwrap(), Err(OfflineError::Unavailable));
+    assert_eq!(c.offline_state(&key()), None);
+}

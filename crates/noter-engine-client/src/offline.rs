@@ -369,7 +369,8 @@ impl<L: EngineLauncher> EngineClient<L> {
     // @cpt-flow:cpt-noter-flow-core-engine-offline-archive:p1
     /// Runs the archive pass of a stopped call and returns its complete result file (an
     /// [`ArchiveResult`] whose word timings exist). The caller (the post-call scheduler) only
-    /// asks outside live capture; the engine never writes the database.
+    /// asks outside live capture; the engine never writes the database. Use a fresh
+    /// `result_path` per attempt: it is what tells a superseded pass's late `done` apart.
     pub async fn offline_pass(
         &self,
         call_id: CallId,

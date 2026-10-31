@@ -460,6 +460,8 @@ impl<L: EngineLauncher> EngineClient<L> {
             }
         }
         *conn = None;
+        // Dropping the connection aborts its reader before it may see the end of stdout.
+        self.shared().offline.fail_all();
     }
     // @cpt-end:cpt-noter-state-core-engine-foundation-process:p1:inst-st-stopped
 
