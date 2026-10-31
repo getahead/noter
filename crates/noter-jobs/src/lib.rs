@@ -183,15 +183,15 @@ impl Scheduler {
         }))
     }
 
-    /// The handler for a kind; its job definition is seeded at `start`.
+    /// The handler for a kind; its job definition is created with its defaults on the first
+    /// `define` or `trigger` (nothing is written to the change log before work is asked for).
     pub fn register(&self, kind: JobKind, handler: Arc<dyn JobHandler>) {
         lock(&self.0.handlers).insert(kind, handler);
     }
 
-    /// Seeds the job definitions, reconciles runs a previous process left unfinished, fires the
+    /// Reconciles runs a previous process left unfinished, fires the
     /// startup trigger and starts the loop (guard changes, power and scheduled triggers).
     pub async fn start(&self) -> Result<(), CoreError> {
-        self.0.seed()?;
         self.0.reconcile()?;
         self.0.fire(|d| d.trigger == Trigger::Startup)?;
         let weak = Arc::downgrade(&self.0);
@@ -218,10 +218,7 @@ impl Scheduler {
     pub fn trigger(&self, req: Request) -> Result<Option<JobRunId>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-trigger
         let now = self.0.deps.clock.now().0;
-        let defs = rows::defs(&self.0.deps.store)?;
-        let Some(def) = defs.into_iter().find(|d| d.kind == req.kind) else {
-            return Err(CoreError::new(ErrorCode::NotFound, "no job of this kind"));
-        };
+        let def = self.0.define(req.kind)?;
         let own = req.trigger == Trigger::OnDemand || def.trigger == req.trigger;
         let on_time = req.trigger != Trigger::NightlyWindow || in_window(&def.schedule, now);
         if !def.enabled || !own || !on_time {
@@ -233,6 +230,11 @@ impl Scheduler {
         // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-return
         Ok(Some(id))
         // @cpt-end:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-return
+    }
+
+    /// Creates a job's settings row with its defaults if it has none.
+    pub fn define(&self, kind: JobKind) -> Result<(), CoreError> {
+        self.0.define(kind).map(|_| ())
     }
 
     /// Cancels a queued, running or paused run; a running one stops at its next boundary.
@@ -260,45 +262,56 @@ impl Scheduler {
 }
 
 impl Inner {
-    fn seed(&self) -> Result<(), CoreError> {
-        let have = rows::defs(&self.deps.store)?;
-        let kinds: Vec<JobKind> = lock(&self.handlers).keys().copied().collect();
-        for kind in kinds
+    /// The job's settings row, created with its defaults if it is missing.
+    fn define(&self, kind: JobKind) -> Result<Def, CoreError> {
+        if let Some(def) = rows::defs(&self.deps.store)?
             .into_iter()
-            .filter(|k| !have.iter().any(|d| d.kind == *k))
+            .find(|d| d.kind == kind)
         {
-            let (trigger, battery) = rows::default_def(kind);
-            let id = rows::job_id(kind);
-            let row = JobRunRow {
-                id: JobRunId::new(""),
-                job_id: id.clone(),
-                kind,
-                name: rows::name_of(kind),
-                started_at: self.deps.clock.now(),
-                finished_at: None,
-                status: JobRunStatus::Queued,
-                counts: vec![],
-                error: None,
-                progress: None,
-            };
-            self.deps.store.write(
-                Mutation {
-                    entity_type: "job",
-                    table: "jobs",
-                    id: id.0,
-                    base_rev: None,
-                    bump_rev: false,
-                    values: vec![
-                        ("kind", json!(rows::kind_str(kind))),
-                        ("trigger", json!(trigger.as_str())),
-                        ("enabled", json!(1)),
-                        ("allow_on_battery", json!(battery)),
-                    ],
-                },
-                rows::meta(&row, "defined"),
-            )?;
+            return Ok(def);
         }
-        Ok(())
+        if !lock(&self.handlers).contains_key(&kind) {
+            return Err(CoreError::new(ErrorCode::NotFound, "no job of this kind"));
+        }
+        let (trigger, battery) = rows::default_def(kind);
+        let id = rows::job_id(kind);
+        let row = JobRunRow {
+            id: JobRunId::new(""),
+            job_id: id.clone(),
+            kind,
+            name: rows::name_of(kind),
+            started_at: self.deps.clock.now(),
+            finished_at: None,
+            status: JobRunStatus::Queued,
+            counts: vec![],
+            error: None,
+            progress: None,
+        };
+        self.deps.store.write(
+            Mutation {
+                entity_type: "job",
+                table: "jobs",
+                id: id.0.clone(),
+                base_rev: None,
+                bump_rev: false,
+                values: vec![
+                    ("kind", json!(rows::kind_str(kind))),
+                    ("trigger", json!(trigger.as_str())),
+                    ("enabled", json!(1)),
+                    ("allow_on_battery", json!(battery)),
+                ],
+            },
+            rows::meta(&row, "defined"),
+        )?;
+        Ok(Def {
+            id,
+            kind,
+            trigger,
+            schedule: None,
+            enabled: true,
+            allow_on_battery: battery,
+            last_run_at: None,
+        })
     }
 
     // @cpt-state:cpt-noter-state-core-jobs-scheduler-run:p1
@@ -355,7 +368,7 @@ impl Inner {
                 Trigger::NightlyWindow => continue,
                 _ => 0,
             };
-            if def.last_run_at.is_none_or(|last| now - last >= gap) {
+            if def.last_run_at.map_or(true, |last| now - last >= gap) {
                 self.enqueue(&def, None)?;
             }
         }
@@ -530,6 +543,8 @@ impl Inner {
         for (row, subject) in started {
             self.record(&row, &subject);
             let handler = lock(&self.handlers).get(&row.kind).cloned();
+            // @cpt-begin:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-admit-return
+            // The handler runs on its own task, with no writer held.
             match handler {
                 Some(handler) => self.spawn(row, subject, handler),
                 None => self.finish(
@@ -542,8 +557,6 @@ impl Inner {
             }
         }
         // @cpt-end:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-start
-        // @cpt-begin:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-admit-return
-        // @cpt-end:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-admit-return
     }
 
     fn spawn(
@@ -697,7 +710,9 @@ impl Inner {
             .into_iter()
             .find(|d| d.kind == kind);
         let guard = self.deps.guard.borrow().clone();
-        let hold = def.is_none_or(|d| held(&d, subject, self.deps.power.on_battery(), &guard));
+        let hold = def.map_or(true, |d| {
+            held(&d, subject, self.deps.power.on_battery(), &guard)
+        });
         let changed = {
             let mut open = lock(&self.open);
             let Some(entry) = open.get_mut(id) else {

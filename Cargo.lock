@@ -726,6 +726,7 @@ dependencies = [
  "noter-core",
  "noter-db",
  "noter-engine-client",
+ "noter-jobs",
  "noter-llm",
  "noter-protocol",
  "serde",

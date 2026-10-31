@@ -173,6 +173,9 @@ async fn rig() -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let store = open_store(&dir);
     let r = rig_on(dir, store, 1_000);
+    for kind in KINDS {
+        r.sched.define(kind).unwrap();
+    }
     r.sched.start().await.unwrap();
     r
 }

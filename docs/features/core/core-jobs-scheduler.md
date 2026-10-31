@@ -77,7 +77,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 
 ### Queue and execute pipeline work
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-jobs-scheduler-run`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-jobs-scheduler-run`
 
 **Actor**: Session manager, setup task or another internal trigger
 
@@ -99,7 +99,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 
 ### React to capture, power and cancellation
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-jobs-scheduler-interrupt`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-jobs-scheduler-interrupt`
 
 **Actor**: Session manager or power environment
 
@@ -123,7 +123,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 
 ### Admit work without disturbing capture
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-jobs-scheduler-admit`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-jobs-scheduler-admit`
 
 **Input**: Enabled jobs, queued runs, trigger time, battery state and current capture state.
 
@@ -139,7 +139,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 
 ### Commit bounded job batches
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-jobs-scheduler-batch`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-jobs-scheduler-batch`
 
 **Input**: Run id, current generation, pending mutations and cancellation or pause state.
 
@@ -157,7 +157,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 
 ### Durable job run
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-jobs-scheduler-run`
+- [x] `p1` - **ID**: `cpt-noter-state-core-jobs-scheduler-run`
 
 **States**: queued, running, paused, succeeded, failed, cancelled
 
