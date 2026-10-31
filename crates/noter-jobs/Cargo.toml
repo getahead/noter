@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 noter-db = { path = "../noter-db" }
 noter-protocol = { path = "../noter-protocol" }
+serde = "1"
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "sync", "time"] }
 ulid = "3"

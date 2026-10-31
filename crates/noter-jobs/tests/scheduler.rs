@@ -435,10 +435,11 @@ async fn a_new_capture_pauses_a_running_archive_and_it_resumes_from_its_checkpoi
 #[tokio::test(start_paused = true)]
 async fn continue_recording_cancels_the_same_calls_pipeline_and_rejects_late_results() {
     let mut r = rig().await;
+    r.live(true, None);
+    settle().await;
     let running = r.go(r.post_call("call_1"));
     let waiting = r.go(r.archive("call_1"));
     let other = r.go(r.post_call("call_2"));
-    r.live(true, None);
     settle().await;
     assert_eq!(r.started.recv().await.unwrap().0, JobKind::PostCall);
     assert_eq!(r.status(&waiting), JobRunStatus::Queued);
@@ -499,8 +500,8 @@ async fn runs_start_in_priority_order() {
         [
             JobKind::PostCall,
             JobKind::ModelDownload,
-            JobKind::Regeneration,
-            JobKind::ArchivePass
+            JobKind::ArchivePass,
+            JobKind::Regeneration
         ]
     );
 }
@@ -518,6 +519,7 @@ async fn a_run_cancels_from_queued_running_and_paused() {
     r.sched.cancel(&queued).unwrap();
     assert_eq!(r.status(&queued), JobRunStatus::Cancelled);
     r.sched.cancel(&running).unwrap();
+    r.step(JobKind::PostCall, Step::Checkpoint);
     settle().await;
     let row = r.run(&running);
     assert_eq!(row.status, JobRunStatus::Cancelled);
