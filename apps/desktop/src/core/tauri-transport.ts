@@ -28,5 +28,8 @@ export const tauriTransport: Transport = {
   },
 };
 
-/** The dialog plugin's native alert (macOS draws it); resolves true when the OK button was chosen. */
-export const nativeAsk = (o: { title: string; message: string; kind: "info" | "warning"; okLabel: string; cancelLabel: string }): Promise<boolean> => invoke<boolean>("plugin:dialog|ask", o);
+/** The dialog plugin's native alert (macOS draws it); resolves true when the OK button was chosen. The plugin has no
+ * `ask` command: an ask is a two-button message. NSAlert makes the first button the default and gives Escape to the
+ * one titled Cancel, so Cancel goes first and neither key confirms. */
+export const nativeAsk = async (o: { title: string; message: string; kind: "info" | "warning"; okLabel: string; cancelLabel: string }): Promise<boolean> =>
+  (await invoke<string>("plugin:dialog|message", { message: o.message, title: o.title, kind: o.kind, buttons: { OkCancelCustom: [o.cancelLabel, o.okLabel] } })) === o.okLabel;
