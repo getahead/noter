@@ -136,6 +136,16 @@ class NoterTestCase: XCTestCase {
         return sheet.exists ? sheet : app.dialogs.containing(NSPredicate(format: "title == 'Cancel' OR label == 'Cancel'")).firstMatch
     }
 
+    /// The record prompt: a panel titled Noter around the group “Record this call?”.
+    var recordPrompt: XCUIElement { app.dialogs.containing(NSPredicate(format: "label == 'Record this call?'")).firstMatch }
+
+    /// Clicks `element` as a user clicks the menu bar: XCUITest activates the app whose element it clicks, so the
+    /// click goes through `other`, which stays in front unless Noter itself takes focus.
+    func clickKeepingFocus(_ element: XCUIElement) {
+        let (at, origin) = (element.frame, other.frame.origin)
+        other.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: at.midX - origin.x, dy: at.midY - origin.y)).click()
+    }
+
     /// A global hotkey, typed while `other` is in front so it reaches Noter as a global shortcut.
     func hotkey(_ key: String) { other.typeKey(key, modifierFlags: [.control, .option, .command]) }
 }
