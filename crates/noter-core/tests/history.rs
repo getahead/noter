@@ -170,7 +170,6 @@ fn rev_of(core: &Core, id: &'static str) -> u32 {
         .unwrap()
 }
 
-// @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
 #[tokio::test]
 async fn history_lists_the_change_with_who_what_and_whether_it_can_be_reversed() {
     let dir = tempfile::tempdir().unwrap();
@@ -206,7 +205,6 @@ async fn history_lists_the_change_with_who_what_and_whether_it_can_be_reversed()
     assert_eq!(history(&core, list_args(mine)).await.rows.len(), 1);
 }
 
-// @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
 #[tokio::test]
 async fn history_pages_newest_first_and_filters_by_actor_job_and_period() {
     let dir = tempfile::tempdir().unwrap();
@@ -281,7 +279,6 @@ async fn history_pages_newest_first_and_filters_by_actor_job_and_period() {
     );
 }
 
-// @cpt-flow:cpt-noter-flow-core-history-undo-reverse:p1
 #[tokio::test]
 async fn undo_and_redo_much_later_with_the_same_handle_publish_the_whole_call() {
     let dir = tempfile::tempdir().unwrap();
@@ -331,7 +328,6 @@ async fn undo_and_redo_much_later_with_the_same_handle_publish_the_whole_call() 
     );
 }
 
-// @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
 #[tokio::test]
 async fn a_batch_with_one_row_edited_later_reverses_two_and_counts_one() {
     let dir = tempfile::tempdir().unwrap();
@@ -380,7 +376,6 @@ async fn a_batch_with_one_row_edited_later_reverses_two_and_counts_one() {
     assert_eq!(title_of(&core, "call_a"), "Bulk");
 }
 
-// @cpt-flow:cpt-noter-flow-core-history-undo-reverse:p1
 #[tokio::test]
 async fn every_wrong_state_returns_its_typed_error() {
     let dir = tempfile::tempdir().unwrap();

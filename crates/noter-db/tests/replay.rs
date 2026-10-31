@@ -112,7 +112,6 @@ fn batch_of_three(store: &Store) -> BatchId {
     written[0].batch_id.clone().unwrap()
 }
 
-// @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
 #[test]
 fn undo_and_redo_with_the_same_handle_any_number_of_times() {
     let dir = tempfile::tempdir().unwrap();

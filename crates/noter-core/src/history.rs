@@ -148,6 +148,7 @@ impl Core {
     }
 
     // @cpt-flow:cpt-noter-flow-core-history-undo-reverse:p1
+    // @cpt-dod:cpt-noter-dod-core-history-undo-reversal:p1
     pub(crate) fn reverse_change(
         &self,
         dir: Direction,
