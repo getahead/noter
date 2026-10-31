@@ -4,13 +4,15 @@
 //! Callers read with plain SQL through `rusqlite` (re-exported) and write only through
 //! [`Store::write`] / [`Store::write_batch`] / [`Store::write_with`], which commit each row with
 //! its `changes` row, [`Store::insert_batch`] for capture data (no change row) and
-//! [`Store::delete`] (one content-free change row per record).
+//! [`Store::delete`] (one content-free change row per record). [`Store::reverse`] undoes and
+//! redoes logged changes.
 
 // @cpt-component:cpt-noter-component-core-storage:p1
 // @cpt-component:cpt-noter-component-core-changelog:p1
 
 mod change;
 mod migrate;
+mod replay;
 
 use std::fs::{DirBuilder, OpenOptions};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
@@ -24,6 +26,7 @@ use rusqlite::{Connection, ErrorCode as SqliteCode, OpenFlags};
 
 pub use change::{ChangeMeta, Custom, Insert, Logged, Mutation, Written};
 pub use migrate::{Migration, MIGRATIONS};
+pub use replay::{redoable, replayable, Direction, Handle, Reversed};
 pub use rusqlite;
 
 /// Read-only connections opened with the store; more are opened when all are busy.
