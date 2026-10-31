@@ -89,13 +89,13 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 - A repeated trigger must not create duplicate work for the same call revision; a worker failure records its typed error and preserves completed batches.
 
 **Steps**:
-1. [ ] - `p1` - Receive startup, after-call, hourly, nightly-window, source-change or on-demand trigger and resolve enabled job definitions - `inst-run-trigger`
-2. [ ] - `p1` - DB: INSERT a queued `job_runs` row for due work or return the existing run for the same pending work generation - `inst-run-enqueue`
-3. [ ] - `p1` - Apply `cpt-noter-algo-core-jobs-scheduler-admit` before dispatch - `inst-run-admit`
-4. [ ] - `p1` - Mark the admitted run running and publish `jobs:progress`; execute its pipeline handler with a cancellation signal - `inst-run-start`
-5. [ ] - `p1` - Persist counts and progress after each completed stage or logged batch, then publish the updated run - `inst-run-progress`
-6. [ ] - `p1` - On completion set `finished_at`, succeeded status and final counts; on failure set failed and the typed `error_code` - `inst-run-finish`
-7. [ ] - `p1` - **RETURN** the run id to the trigger caller; worker completion is asynchronous - `inst-run-return`
+1. [x] - `p1` - Receive startup, after-call, hourly, nightly-window, source-change or on-demand trigger and resolve enabled job definitions - `inst-run-trigger`
+2. [x] - `p1` - DB: INSERT a queued `job_runs` row for due work or return the existing run for the same pending work generation - `inst-run-enqueue`
+3. [x] - `p1` - Apply `cpt-noter-algo-core-jobs-scheduler-admit` before dispatch - `inst-run-admit`
+4. [x] - `p1` - Mark the admitted run running and publish `jobs:progress`; execute its pipeline handler with a cancellation signal - `inst-run-start`
+5. [x] - `p1` - Persist counts and progress after each completed stage or logged batch, then publish the updated run - `inst-run-progress`
+6. [x] - `p1` - On completion set `finished_at`, succeeded status and final counts; on failure set failed and the typed `error_code` - `inst-run-finish`
+7. [x] - `p1` - **RETURN** the run id to the trigger caller; worker completion is asynchronous - `inst-run-return`
 
 ### React to capture, power and cancellation
 
@@ -111,13 +111,13 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 - The worker dies: the run records failure; a restart does not pretend an unfinished run succeeded.
 
 **Steps**:
-1. [ ] - `p1` - Re-evaluate queued and running jobs when capture or power state changes - `inst-interrupt-change`
-2. [ ] - `p1` - **IF** a running job is no longer eligible, signal pause at its next safe checkpoint and persist paused status - `inst-interrupt-pause`
-3. [ ] - `p1` - **IF** it is PostCall for a previous call, keep it runnable below live ASR priority; no maintenance job gains this exception - `inst-interrupt-postcall`
-4. [ ] - `p1` - **IF** Continue Recording resumes the source call, cancel its queued or running pipeline generation and invalidate pending results - `inst-interrupt-continue`
-5. [ ] - `p1` - **IF** cancellation is requested, stop dispatch, stop or abandon the worker at a safe boundary and mark cancelled with final counts - `inst-interrupt-cancel`
-6. [ ] - `p1` - When guards clear, resume paused work from its checkpoint and reconsider queued work; a later stop queues fresh PostCall work with prior edits retained - `inst-interrupt-resume`
-7. [ ] - `p1` - **RETURN** updated run state through `jobs:progress` - `inst-interrupt-return`
+1. [x] - `p1` - Re-evaluate queued and running jobs when capture or power state changes - `inst-interrupt-change`
+2. [x] - `p1` - **IF** a running job is no longer eligible, signal pause at its next safe checkpoint and persist paused status - `inst-interrupt-pause`
+3. [x] - `p1` - **IF** it is PostCall for a previous call, keep it runnable below live ASR priority; no maintenance job gains this exception - `inst-interrupt-postcall`
+4. [x] - `p1` - **IF** Continue Recording resumes the source call, cancel its queued or running pipeline generation and invalidate pending results - `inst-interrupt-continue`
+5. [x] - `p1` - **IF** cancellation is requested, stop dispatch, stop or abandon the worker at a safe boundary and mark cancelled with final counts - `inst-interrupt-cancel`
+6. [x] - `p1` - When guards clear, resume paused work from its checkpoint and reconsider queued work; a later stop queues fresh PostCall work with prior edits retained - `inst-interrupt-resume`
+7. [x] - `p1` - **RETURN** updated run state through `jobs:progress` - `inst-interrupt-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -130,12 +130,12 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 **Output**: Runnable work in priority order or a waiting reason.
 
 **Steps**:
-1. [ ] - `p1` - Ignore disabled definitions and triggers outside their configured schedule; deduplicate a still-pending trigger - `inst-admit-enabled`
-2. [ ] - `p1` - **IF** on battery and the job does not allow battery operation, keep it queued or paused until power permits - `inst-admit-battery`
-3. [ ] - `p1` - **IF** a call is live and the job is not the previous call's PostCall, keep it queued or paused - `inst-admit-call`
-4. [ ] - `p1` - **IF** PostCall belongs to the currently resumed call, cancel its obsolete generation instead of admitting it - `inst-admit-same-call`
-5. [ ] - `p1` - Order eligible jobs by configured priority with capture and live ASR ahead of all pipeline work - `inst-admit-priority`
-6. [ ] - `p1` - **RETURN** runnable jobs and guards; do not hold the SQLite writer while models or native services run - `inst-admit-return`
+1. [x] - `p1` - Ignore disabled definitions and triggers outside their configured schedule; deduplicate a still-pending trigger - `inst-admit-enabled`
+2. [x] - `p1` - **IF** on battery and the job does not allow battery operation, keep it queued or paused until power permits - `inst-admit-battery`
+3. [x] - `p1` - **IF** a call is live and the job is not the previous call's PostCall, keep it queued or paused - `inst-admit-call`
+4. [x] - `p1` - **IF** PostCall belongs to the currently resumed call, cancel its obsolete generation instead of admitting it - `inst-admit-same-call`
+5. [x] - `p1` - Order eligible jobs by configured priority with capture and live ASR ahead of all pipeline work - `inst-admit-priority`
+6. [x] - `p1` - **RETURN** runnable jobs and guards; do not hold the SQLite writer while models or native services run - `inst-admit-return`
 
 ### Commit bounded job batches
 
@@ -146,12 +146,12 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 **Output**: A committed batch and checkpoint, or no mutation when work is obsolete.
 
 **Steps**:
-1. [ ] - `p1` - Check cancellation, call guard and run generation before each batch - `inst-batch-check`
-2. [ ] - `p1` - Take at most 200 target rows and submit their mutations through the change-log writer with the run actor and batch id - `inst-batch-limit`
-3. [ ] - `p1` - **TRY** commit mutations, changes and progress checkpoint consistently - `inst-batch-try`
-4. [ ] - `p1` - **CATCH** a failure: roll back the current batch, persist the typed run failure and keep earlier committed batches readable - `inst-batch-fail`
-5. [ ] - `p1` - Yield before the next batch; publish only committed progress and re-check capture and power guards - `inst-batch-yield`
-6. [ ] - `p1` - **RETURN** the next checkpoint or completed counts - `inst-batch-return`
+1. [x] - `p1` - Check cancellation, call guard and run generation before each batch - `inst-batch-check`
+2. [x] - `p1` - Take at most 200 target rows and submit their mutations through the change-log writer with the run actor and batch id - `inst-batch-limit`
+3. [x] - `p1` - **TRY** commit mutations, changes and progress checkpoint consistently - `inst-batch-try`
+4. [x] - `p1` - **CATCH** a failure: roll back the current batch, persist the typed run failure and keep earlier committed batches readable - `inst-batch-fail`
+5. [x] - `p1` - Yield before the next batch; publish only committed progress and re-check capture and power guards - `inst-batch-yield`
+6. [x] - `p1` - **RETURN** the next checkpoint or completed counts - `inst-batch-return`
 
 ## 4. States (CDSL)
 
@@ -164,12 +164,12 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 **Initial State**: queued
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** queued **TO** running **WHEN** trigger, call, power and priority guards permit dispatch - `inst-st-start`
-2. [ ] - `p1` - **FROM** running **TO** paused **WHEN** a call or battery guard blocks it at a safe checkpoint - `inst-st-pause`
-3. [ ] - `p1` - **FROM** paused **TO** running **WHEN** guards clear and the worker resumes its checkpoint - `inst-st-resume`
-4. [ ] - `p1` - **FROM** running **TO** succeeded **WHEN** the final stage and checkpoint commit - `inst-st-success`
-5. [ ] - `p1` - **FROM** running **TO** failed **WHEN** the worker reports a typed failure or recovery detects unfinished interrupted work - `inst-st-failed`
-6. [ ] - `p1` - **FROM** queued **TO** cancelled **WHEN** its generation is cancelled; the same applies from running or paused at the next safe boundary - `inst-st-cancel`
+1. [x] - `p1` - **FROM** queued **TO** running **WHEN** trigger, call, power and priority guards permit dispatch - `inst-st-start`
+2. [x] - `p1` - **FROM** running **TO** paused **WHEN** a call or battery guard blocks it at a safe checkpoint - `inst-st-pause`
+3. [x] - `p1` - **FROM** paused **TO** running **WHEN** guards clear and the worker resumes its checkpoint - `inst-st-resume`
+4. [x] - `p1` - **FROM** running **TO** succeeded **WHEN** the final stage and checkpoint commit - `inst-st-success`
+5. [x] - `p1` - **FROM** running **TO** failed **WHEN** the worker reports a typed failure or recovery detects unfinished interrupted work - `inst-st-failed`
+6. [x] - `p1` - **FROM** queued **TO** cancelled **WHEN** its generation is cancelled; the same applies from running or paused at the next safe boundary - `inst-st-cancel`
 
 Terminal runs are retained; retries create a new run linked to the same job definition. On startup, reconcile unfinished records with checkpoints before dispatching a retry. M5 exposes user job controls; M2 internal cancellation already uses this machine.
 

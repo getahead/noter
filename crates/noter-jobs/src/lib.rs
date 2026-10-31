@@ -555,6 +555,7 @@ impl Inner {
                     ))),
                 ),
             }
+            // @cpt-end:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-admit-return
         }
         // @cpt-end:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-start
     }
@@ -635,7 +636,6 @@ impl RunCtx {
         self.subject.as_deref()
     }
 
-    // @cpt-flow:cpt-noter-flow-core-jobs-scheduler-interrupt:p1
     /// A safe boundary: returns when the run may go on, holding it paused while a guard blocks
     /// it, or `Stop::Cancelled` once it was cancelled.
     pub async fn checkpoint(&mut self) -> Result<(), Stop> {
