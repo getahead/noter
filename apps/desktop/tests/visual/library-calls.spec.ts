@@ -62,9 +62,12 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     });
 
     test(`loading`, async ({ page }) => {
+      await page.clock.install();
       await page.setViewportSize({ width: px, height: 800 });
       await openWindow(page, "main", { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 })) });
       await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
+      // Let the shell finish its startup timers, then hold the delayed Calls read pending.
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
       // only the Calls read is slow, so the rest of the window is as in the other states
       await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: unknown }).__noterFake);
       await page.evaluate(() => ((globalThis as unknown as { __noterFake: { latency: number } }).__noterFake.latency = 8000));
@@ -73,6 +76,10 @@ for (const [width, px] of Object.entries(WIDTHS)) {
         await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
       }).toPass();
       await expect(page.locator('[data-region="LC-R3"] [aria-busy="true"], [data-region="LC-R3"] [data-state="loading"]').first()).toBeVisible({ timeout: 3000 });
+      // Busy is set before the 300 ms skeleton delay; advance it without letting the read finish.
+      await expect(page.locator(".lb-skel__row")).toHaveCount(0);
+      await page.clock.runFor(300);
+      await expect(page.locator(".lb-skel__row")).toHaveCount(6);
       await shot(page, "loading", width);
     });
   });
