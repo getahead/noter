@@ -4,10 +4,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_db::{rusqlite, Store};
+use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::model::settings::AuditWhat;
 use noter_protocol::{
-    CallId, ErrorCode, ErrorDetail, PrivacyMode, RuntimeChoice, RuntimeUnavailableReason,
-    TimestampMs,
+    CallId, Effort, ErrorCode, ErrorDetail, PrivacyMode, RuntimeChoice, TimestampMs,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -177,6 +177,11 @@ async fn a_cloud_run_commits_its_audit_row_before_the_adapter_gets_the_exact_byt
     assert_eq!(done.provenance.adapter, "scripted");
     let received = f.scripted.received();
     assert_eq!(received.len(), 1);
+    // The adapter starts with the app-owned schema, the routed model and no tools (M2).
+    assert_eq!(received[0].schema, Skill::PostCall.schema());
+    assert_eq!(received[0].model, "scripted");
+    assert_eq!(received[0].effort, Effort::Medium);
+    assert!(received[0].tools.is_empty());
     let sent = &received[0].bytes;
     let audit = f.row("SELECT * FROM audit_log");
     assert_eq!(audit["kind"], "run");
@@ -531,6 +536,11 @@ fn an_unknown_cli_major_is_refused() {
     {
         a.version = Some("9.0.1".into());
     }
+    // The untested CLIs are skipped, never run: the order falls through to local.
+    let post = TaskKind::PostCall;
+    let chosen = choose(post, Some(RuntimeChoice::ClaudeApiKey), &available, cloud());
+    assert_eq!(chosen.unwrap(), RuntimeChoice::Local);
+    let available = without(&available, &[RuntimeChoice::Local]);
     let failed = choose(
         TaskKind::PostCall,
         Some(RuntimeChoice::ClaudeApiKey),
