@@ -1,9 +1,9 @@
 // The core ↔ engine protocol, as the engine speaks it (`cpt-noter-interface-engine-stdio`).
 //
 // The source of truth is `crates/noter-protocol/src/engine.rs` and its export
-// `contracts/engine.schema.json`. These are the messages the engine answers so far (M0 and
-// capture sessions); commands it does not implement yet decode as `.other` and are refused with
-// `bad_command`. The types are hand-written (D13, TL-9); RoundTripTests decodes and re-encodes
+// `contracts/engine.schema.json`. These are the messages the engine answers (M0, capture
+// sessions, the offline pass and embeddings); a command of a later protocol decodes as `.other`
+// and is refused with `bad_command`. The types are hand-written (D13, TL-9); RoundTripTests decodes and re-encodes
 // every line of `contracts/fixtures/engine-lines.json` with them, so a drift from the Rust types
 // fails there. Nested values the engine does not read yet (glossary, languages, speaker priors)
 // stay `JSONValue`, kept exactly as sent.
@@ -138,6 +138,12 @@ public enum EngineCommand: Equatable, Sendable {
     /// Replay a span of the stored audio; no `channel` plays both.
     case play(callId: String, fromMs: Int, toMs: Int?, channel: Channel?)
     case stopPlayback
+    /// Archive pass of a stopped call into `result_path` (Large v3, clustering, constraints).
+    case offlinePass(OfflinePass)
+    /// The 256-value speaker embedding of spans, written to `out_path`.
+    case speakerEmbedding(SpeakerEmbedding)
+    /// 1024-value text embeddings: one text inline, a batch into `out_path`.
+    case embedTexts(requestId: String, texts: [String], outPath: String?)
     /// A command of the protocol this engine does not answer yet.
     case other(type: String)
 }
@@ -206,6 +212,27 @@ extension EngineCommand: Decodable {
                 toMs: try c.decode(Int?.self, forKey: AnyKey("to_ms")),
                 channel: try c.decode(Channel?.self, forKey: AnyKey("channel")))
         case "stop_playback": self = .stopPlayback
+        case "offline_pass":
+            self = .offlinePass(
+                OfflinePass(
+                    callId: try c.decode(String.self, forKey: AnyKey("call_id")),
+                    sessionDir: try c.decode(String.self, forKey: AnyKey("session_dir")),
+                    resultPath: try c.decode(String.self, forKey: AnyKey("result_path")),
+                    constraintsPath: try c.decode(String?.self, forKey: AnyKey("constraints_path")),
+                    backend: try c.decode(String.self, forKey: AnyKey("backend"))))
+        case "speaker_embedding":
+            self = .speakerEmbedding(
+                SpeakerEmbedding(
+                    requestId: try c.decode(String.self, forKey: AnyKey("request_id")),
+                    callId: try c.decode(String.self, forKey: AnyKey("call_id")),
+                    channel: try c.decode(Channel.self, forKey: AnyKey("channel")),
+                    spans: try c.decode([Span].self, forKey: AnyKey("spans")),
+                    outPath: try c.decode(String.self, forKey: AnyKey("out_path"))))
+        case "embed_texts":
+            self = .embedTexts(
+                requestId: try c.decode(String.self, forKey: AnyKey("request_id")),
+                texts: try c.decode([String].self, forKey: AnyKey("texts")),
+                outPath: try c.decode(String?.self, forKey: AnyKey("out_path")))
         default: self = .other(type: type)
         }
     }
@@ -231,6 +258,11 @@ public enum EngineEvent: Equatable, Sendable {
     case noSegments(callId: String, sinceMs: Int)
     case silence(callId: String, sinceMs: Int)
     case selfTestLine(channel: Channel, text: String)
+    case offlineProgress(callId: String, progress: Float)
+    case offlineDone(callId: String, resultPath: String)
+    case offlineFailed(callId: String, code: EngineErrorCode)
+    case speakerEmbeddingDone(requestId: String, outPath: String)
+    case embeddings(requestId: String, inline: [Float]?, outPath: String?, count: UInt32)
 }
 
 extension EngineEvent: Encodable {
@@ -325,6 +357,28 @@ extension EngineEvent: Encodable {
             try put("type", "self_test_line")
             try put("channel", channel)
             try put("text", text)
+        case let .offlineProgress(callId, progress):
+            try put("type", "offline_progress")
+            try put("call_id", callId)
+            try put("progress", progress)
+        case let .offlineDone(callId, resultPath):
+            try put("type", "offline_done")
+            try put("call_id", callId)
+            try put("result_path", resultPath)
+        case let .offlineFailed(callId, code):
+            try put("type", "offline_failed")
+            try put("call_id", callId)
+            try put("code", code)
+        case let .speakerEmbeddingDone(requestId, outPath):
+            try put("type", "speaker_embedding_done")
+            try put("request_id", requestId)
+            try put("out_path", outPath)
+        case let .embeddings(requestId, inline, outPath, count):
+            try put("type", "embeddings")
+            try put("request_id", requestId)
+            try put("inline", inline)
+            try put("out_path", outPath)
+            try put("count", count)
         }
     }
 }
