@@ -231,8 +231,12 @@ fn reverse_tx(
     for latest in &chosen {
         // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-check-later
         let Some(act) = plan(tx, latest, dir)? else {
+            // @cpt-begin:cpt-noter-state-core-history-undo-change:p1:inst-st-ineligible
+            // @cpt-begin:cpt-noter-state-core-history-undo-change:p1:inst-st-redo-blocked
             skipped += 1;
             continue;
+            // @cpt-end:cpt-noter-state-core-history-undo-change:p1:inst-st-redo-blocked
+            // @cpt-end:cpt-noter-state-core-history-undo-change:p1:inst-st-ineligible
         };
         // @cpt-end:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-check-later
         let target = match &act {
@@ -245,13 +249,19 @@ fn reverse_tx(
         act.run(tx)?;
         match dir {
             Direction::Undo => {
+                // @cpt-begin:cpt-noter-state-core-history-undo-change:p1:inst-st-undo
                 tx.execute(
                     "UPDATE changes SET status = 'undone' WHERE id = ?1",
                     [&latest.id],
                 )
                 .map_err(internal)?;
+                // @cpt-end:cpt-noter-state-core-history-undo-change:p1:inst-st-undo
             }
-            Direction::Redo => append_redo(tx, latest, now)?,
+            Direction::Redo => {
+                // @cpt-begin:cpt-noter-state-core-history-undo-change:p1:inst-st-redo
+                append_redo(tx, latest, now)?
+                // @cpt-end:cpt-noter-state-core-history-undo-change:p1:inst-st-redo
+            }
         }
         // @cpt-end:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-after
         // @cpt-end:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-before
