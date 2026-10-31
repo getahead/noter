@@ -2549,7 +2549,7 @@ The ChatGPT sheet is the same with **ChatGPT account**, **Codex**, **chatgpt.com
 
 #### Screen — Library
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-library`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-library`
 
 ##### Why this component exists
 
@@ -6462,7 +6462,7 @@ Before a call the user needs to see what this person or group agreed last time a
 
 #### Component — Call row
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-call-row`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-call-row`
 
 ##### Why this component exists
 

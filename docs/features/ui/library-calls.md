@@ -34,11 +34,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-library-calls`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-library-calls`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-library-calls`
+- [x] `p2` - `cpt-noter-feature-ui-library-calls`
 
 ### 1.1 Overview
 
