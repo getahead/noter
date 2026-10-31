@@ -1,4 +1,194 @@
 {
+  "archive_result": {
+    "$defs": {
+      "AsrBackend": {
+        "enum": [
+          "whisper_turbo",
+          "whisper_large_v3",
+          "parakeet_tdt_v3"
+        ],
+        "type": "string"
+      },
+      "AudioChannel": {
+        "description": "The two capture channels, kept separate end to end.",
+        "oneOf": [
+          {
+            "const": "mic",
+            "description": "The user's microphone (\"you\").",
+            "type": "string"
+          },
+          {
+            "const": "sys",
+            "description": "System audio: everyone else.",
+            "type": "string"
+          }
+        ]
+      },
+      "CallId": {
+        "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
+        "type": "string"
+      },
+      "EngineCorrection": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "EngineSegment": {
+        "description": "The PRD segment schema, as the engine emits it.",
+        "properties": {
+          "avg_logprob": {
+            "format": "float",
+            "type": "number"
+          },
+          "call_id": {
+            "$ref": "#/$defs/CallId"
+          },
+          "channel": {
+            "$ref": "#/$defs/AudioChannel"
+          },
+          "corrections": {
+            "items": {
+              "$ref": "#/$defs/EngineCorrection"
+            },
+            "type": "array"
+          },
+          "crosstalk_labels": {
+            "description": "Overlap detected (offline pass); both candidates.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Engine-local id; the core assigns the `seg_` id when it persists a confirmed segment.",
+            "type": "string"
+          },
+          "lang": {
+            "$ref": "#/$defs/Lang"
+          },
+          "lang_p": {
+            "format": "float",
+            "type": "number"
+          },
+          "no_speech_p": {
+            "format": "float",
+            "type": "number"
+          },
+          "speaker_label": {
+            "description": "Provisional live diarization label (\"spk_3\"); `mic` channel is always \"you\".",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/$defs/EngineSegmentState"
+          },
+          "t0_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "t1_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "text": {
+            "type": "string"
+          },
+          "words_path": {
+            "description": "Word timings in a file, for confirmed segments.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "call_id",
+          "channel",
+          "t0_ms",
+          "t1_ms",
+          "state",
+          "lang",
+          "lang_p",
+          "speaker_label",
+          "text",
+          "avg_logprob",
+          "no_speech_p",
+          "corrections",
+          "crosstalk_labels"
+        ],
+        "type": "object"
+      },
+      "EngineSegmentState": {
+        "enum": [
+          "hypothesis",
+          "confirmed"
+        ],
+        "type": "string"
+      },
+      "Lang": {
+        "anyOf": [
+          {
+            "enum": [
+              "en",
+              "ru",
+              "de"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+            "properties": {
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
+      },
+      "OffsetMs": {
+        "description": "Milliseconds from the start of a call (session-relative audio time).",
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The archive result file `offline_done` names (`result_path`): the whole call after the\noffline pass, written completely before the event. Segments are `confirmed`, in call time,\non both channels; `speaker_label` is the final cluster label (the `mic` channel keeps the\nuser or guest attribution), `lang`/`lang_p`/`avg_logprob` are language and confidence,\n`corrections` the glossary and filter metadata, `crosstalk_labels` both candidates of an\noverlap, and `words_path` the segment's word timings. The core maps clusters to live labels.",
+    "properties": {
+      "backend": {
+        "$ref": "#/$defs/AsrBackend"
+      },
+      "call_id": {
+        "$ref": "#/$defs/CallId"
+      },
+      "segments": {
+        "items": {
+          "$ref": "#/$defs/EngineSegment"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "call_id",
+      "backend",
+      "segments"
+    ],
+    "title": "ArchiveResult",
+    "type": "object"
+  },
   "command_line": {
     "$defs": {
       "AsrBackend": {
@@ -1381,5 +1571,47 @@
     "title": "EngineEventLine",
     "type": "object"
   },
-  "protocol_version": "2.0"
+  "protocol_version": "2.0",
+  "words_file": {
+    "$defs": {
+      "EngineWord": {
+        "description": "One word and its time in the call: a word-timings file (`words_path`) holds a list of them.",
+        "properties": {
+          "p": {
+            "description": "Word probability 0..1.",
+            "format": "float",
+            "type": "number"
+          },
+          "t0_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "t1_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "t0_ms",
+          "t1_ms",
+          "text",
+          "p"
+        ],
+        "type": "object"
+      },
+      "OffsetMs": {
+        "description": "Milliseconds from the start of a call (session-relative audio time).",
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "items": {
+      "$ref": "#/$defs/EngineWord"
+    },
+    "title": "Array_of_EngineWord",
+    "type": "array"
+  }
 }
