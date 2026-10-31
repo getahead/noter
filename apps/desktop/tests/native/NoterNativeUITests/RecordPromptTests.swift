@@ -5,7 +5,7 @@ final class RecordPromptTests: NoterTestCase {
     func test_cpt_noter_seq_record_prompt_start_recording__hotkey_keeps_focus() {
         launch("detected")
         other.activate()
-        XCTAssertTrue(app.dialogs.matching(NSPredicate(format: "label == 'Record this call?'")).firstMatch.waitForExistence(timeout: 10), "no record prompt")
+        XCTAssertTrue(recordPrompt.waitForExistence(timeout: 10), "no record prompt")
         hotkey("r")
         XCTAssertEqual(other.state, .runningForeground, "the prompt never takes focus from the call app")
         XCTAssertTrue(recordingLine(in: openMenu()).waitForExistence(timeout: 5))
