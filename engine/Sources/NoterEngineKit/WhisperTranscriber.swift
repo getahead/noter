@@ -39,7 +39,7 @@ public final class WhisperTranscriber: Transcriber, @unchecked Sendable {
 
     /// Runs async WhisperKit work on the caller's thread (the decode queue).
     /// WhisperKit is not `Sendable`; the decode queue is its only user, one call at a time.
-    private static func blocking<T>(_ work: @escaping () async throws -> T) throws -> T {
+    static func blocking<T>(_ work: @escaping () async throws -> T) throws -> T {
         let done = DispatchSemaphore(value: 0)
         let (job, result) = (Locked(work), Locked<Result<T, Error>?>(nil))
         Task {

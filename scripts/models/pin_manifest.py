@@ -28,9 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "scripts" / "models" / "manifest.json"
 API = "https://huggingface.co/api/models"
 
-# What Noter downloads: one entry per bundle, each at a pinned commit. M0 pins the capture model
-# only; WhisperKit Large v3, FluidAudio VAD and diarization (M1 capture) and bge-m3 (retrieval)
-# are added here with the features that use them.
+# What Noter downloads: one entry per source of a bundle, each at a pinned commit; `only` names
+# the files to take (`name/` takes a folder). The capture model is required; the offline models
+# (2.14: the archive decode, speaker and text vectors) download after it.
 BUNDLES = [
     {
         "bundle": "whisper-turbo",
@@ -48,6 +48,49 @@ BUNDLES = [
         "folder": "",
         "only": ["tokenizer.json", "tokenizer_config.json"],
         "required_for_capture": True,
+    },
+    # The archive pass: full Large v3 and its tokenizer, as the live model is pinned.
+    {
+        "bundle": "whisper-large-v3",
+        "repo": "argmaxinc/whisperkit-coreml",
+        "commit": "0f63a7800b00dd0226abd051b906c246e1907482",
+        "folder": "openai_whisper-large-v3",
+        "required_for_capture": False,
+    },
+    {
+        "bundle": "whisper-large-v3",
+        "repo": "openai/whisper-large-v3",
+        "commit": "06f233fe06e710322aca913c1bc4249a0d71fce1",
+        "folder": "",
+        "only": ["tokenizer.json", "tokenizer_config.json"],
+        "required_for_capture": False,
+    },
+    # Speaker vectors: WeSpeaker ResNet34 as pyannote community-1's FBank and Embedding CoreML
+    # conversions (CC-BY-4.0, attribution in NOTICE.md).
+    {
+        "bundle": "wespeaker",
+        "repo": "FluidInference/speaker-diarization-coreml",
+        "commit": "7eab74f3463c736418d0eb10296261ae581146c9",
+        "folder": "",
+        "only": ["FBank.mlmodelc/", "Embedding.mlmodelc/", "NOTICE.md"],
+        "required_for_capture": False,
+    },
+    # Text vectors: bge-m3 as a CoreML conversion (MIT), with bge-m3's own tokenizer.
+    {
+        "bundle": "bge-m3",
+        "repo": "JGKarlin/ohia-bge-m3-coreml",
+        "commit": "cb67d6bcbdb0c68efc2448752717cbbf925034c6",
+        "folder": "",
+        "only": ["bge-m3.mlpackage/"],
+        "required_for_capture": False,
+    },
+    {
+        "bundle": "bge-m3",
+        "repo": "BAAI/bge-m3",
+        "commit": "5617a9f61b028005a4858fdac845db406aefb181",
+        "folder": "",
+        "only": ["tokenizer.json", "tokenizer_config.json"],
+        "required_for_capture": False,
     },
 ]
 
@@ -69,6 +112,11 @@ def sha256_of(url: str) -> str:
     return h.hexdigest()
 
 
+def wanted(path: str, only: list[str] | None) -> bool:
+    """Every file without `only`; else a file it names, or one under a folder it names (`name/`)."""
+    return only is None or any(path == o or (o.endswith("/") and path.startswith(o)) for o in only)
+
+
 def files_of(spec: dict) -> list[dict]:
     """A source's files: everything under `folder` (the repo root when empty), or only those named."""
     folder = spec["folder"]
@@ -76,7 +124,7 @@ def files_of(spec: dict) -> list[dict]:
     out = []
     for entry in sorted(tree, key=lambda e: e["path"]):
         path = entry["path"][len(folder) + 1:] if folder else entry["path"]
-        if entry["type"] != "file" or path not in spec.get("only", [path]):
+        if entry["type"] != "file" or not wanted(path, spec.get("only")):
             continue
         url = resolve_url(spec["repo"], spec["commit"], entry["path"])
         lfs = entry.get("lfs") or {}

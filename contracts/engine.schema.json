@@ -166,7 +166,7 @@
       }
     },
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "The archive result file `offline_done` names (`result_path`): the whole call after the\noffline pass, written completely before the event. Segments are `confirmed`, in call time,\non both channels; `speaker_label` is the final cluster label (the `mic` channel keeps the\nuser or guest attribution), `lang`/`lang_p`/`avg_logprob` are language and confidence,\n`corrections` the glossary and filter metadata, `crosstalk_labels` both candidates of an\noverlap, and `words_path` the segment's word timings. The core maps clusters to live labels.",
+    "description": "The archive result file `offline_done` names (`result_path`): the whole call after the\noffline pass, written completely before the event. Segments are `confirmed`, in call time,\non both channels; `speaker_label` is the final cluster label (the `mic` channel keeps the\nuser or guest attribution; empty for a voice with under three seconds of speech in the\ncall, which stays unlabelled), `lang`/`lang_p`/`avg_logprob` are language and confidence,\n`corrections` the glossary and filter metadata, `crosstalk_labels` both candidates of an\noverlap, and `words_path` the segment's word timings. The core maps clusters to live labels.",
     "properties": {
       "backend": {
         "$ref": "#/$defs/AsrBackend"
@@ -1569,6 +1569,182 @@
       "event"
     ],
     "title": "EngineEventLine",
+    "type": "object"
+  },
+  "offline_constraints": {
+    "$defs": {
+      "EngineSpan": {
+        "properties": {
+          "t0_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          },
+          "t1_ms": {
+            "$ref": "#/$defs/OffsetMs"
+          }
+        },
+        "required": [
+          "t0_ms",
+          "t1_ms"
+        ],
+        "type": "object"
+      },
+      "GlossaryEntry": {
+        "properties": {
+          "spoken_forms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "term": {
+            "type": "string"
+          },
+          "variants_cyrillic": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "variants_latin": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "term",
+          "variants_latin",
+          "variants_cyrillic",
+          "spoken_forms"
+        ],
+        "type": "object"
+      },
+      "Lang": {
+        "anyOf": [
+          {
+            "enum": [
+              "en",
+              "ru",
+              "de"
+            ],
+            "type": "string"
+          },
+          {
+            "description": "A language outside the three, set by hand on a call or a glossary term.\n`code` is the ISO 639-1 code, lower case (`\"fr\"`).",
+            "properties": {
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "Content language. Detection is restricted to English, Russian and German\n(PRD › Transcription pipeline); any other language is `other` with its code.\nOn the wire the three are plain strings (`\"en\"`) and `other` is an object\n(`{\"code\": \"fr\"}`)."
+      },
+      "OffsetMs": {
+        "description": "Milliseconds from the start of a call (session-relative audio time).",
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "SpanLink": {
+        "description": "Two spans of call time on the system channel, from one user correction.",
+        "properties": {
+          "a": {
+            "$ref": "#/$defs/EngineSpan"
+          },
+          "b": {
+            "$ref": "#/$defs/EngineSpan"
+          }
+        },
+        "required": [
+          "a",
+          "b"
+        ],
+        "type": "object"
+      },
+      "SpeakerPrior": {
+        "properties": {
+          "de": {
+            "format": "float",
+            "type": "number"
+          },
+          "en": {
+            "description": "Share of each language in this speaker's history.",
+            "format": "float",
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "ru": {
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "en",
+          "ru",
+          "de"
+        ],
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The constraints file `offline_pass` names (`constraints_path`), written by the core before\nthe pass: what the user corrected and what the call was configured with. Spans are call ms on\nthe system channel; `must_link` spans are one voice, `cannot_link` spans two different ones;\n`speaker_names` maps live labels to the names the user gave them (labels sharing a name are\none voice). A malformed file refuses the command with a correlated `error`.",
+    "properties": {
+      "cannot_link": {
+        "items": {
+          "$ref": "#/$defs/SpanLink"
+        },
+        "type": "array"
+      },
+      "glossary": {
+        "items": {
+          "$ref": "#/$defs/GlossaryEntry"
+        },
+        "type": "array"
+      },
+      "languages": {
+        "description": "The call's languages: language ID picks among them (empty: any).",
+        "items": {
+          "$ref": "#/$defs/Lang"
+        },
+        "type": "array"
+      },
+      "must_link": {
+        "items": {
+          "$ref": "#/$defs/SpanLink"
+        },
+        "type": "array"
+      },
+      "speaker_names": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "speaker_priors": {
+        "items": {
+          "$ref": "#/$defs/SpeakerPrior"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "languages",
+      "glossary",
+      "speaker_priors",
+      "must_link",
+      "cannot_link",
+      "speaker_names"
+    ],
+    "title": "OfflineConstraints",
     "type": "object"
   },
   "protocol_version": "2.0",

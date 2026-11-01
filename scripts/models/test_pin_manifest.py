@@ -100,5 +100,18 @@ class Files(unittest.TestCase):
         self.assertEqual(files[0]["url"], "https://huggingface.co/o/r/resolve/c/tokenizer.json")
 
 
+
+
+class Selection(unittest.TestCase):
+    def test_only_takes_named_files_and_folders(self):
+        only = ["NOTICE.md", "FBank.mlmodelc/"]
+        self.assertTrue(manifest.wanted("FBank.mlmodelc/weights/weight.bin", only))
+        self.assertTrue(manifest.wanted("NOTICE.md", only))
+        self.assertFalse(manifest.wanted("FBank.mlmodelcx/a", only))
+        self.assertFalse(manifest.wanted("mlpackages/FBank.mlmodelc/a", only))
+        self.assertFalse(manifest.wanted("README.md", only))
+        self.assertTrue(manifest.wanted("anything", None))
+
+
 if __name__ == "__main__":
     unittest.main()
