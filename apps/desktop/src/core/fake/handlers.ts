@@ -796,6 +796,7 @@ export const defaultHandlers: Handlers = {
     return { meta: { id: a.version_id, n, kind: n === 1 ? "generated" : s.user_edited ? "user_edit" : "generated", writer: s.writer, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: n === s.version_count ? (s.body_md ?? "") : `${s.body_md ?? ""}\n\n(Version ${n}.)` };
   },
   share_copy: (a, { world }) => {
+    call(world, a.call_id);
     const out = world.outputs.find((o) => o.call_id === a.call_id);
     if (!out || out.status === "writing" || out.status === "not_started") throw coreError("outputs_not_ready");
     const sections = out.sections.filter((s) => !a.scope.sections.length || a.scope.sections.includes(s.kind));
