@@ -194,7 +194,7 @@ async fn on_the_macs_own_displays_the_live_call_window_floats_on_the_main_one() 
     )
     .await
     .unwrap();
-    assert_eq!(call["layout"], json!(CallLayout::Floating), "{call}");
+    assert_eq!(call["layout"], json!(CallLayout::Floating));
     harness.shutdown().await;
 }
 
