@@ -1,11 +1,16 @@
 //! Share content: the scope of a call's outputs rendered for Slack, Jira or Markdown
 //! (`cpt-noter-algo-core-items-today-format`), as plain text plus the rich forms for the clipboard.
 
+use std::path::{Path, PathBuf};
+
+use noter_db::rusqlite::OptionalExtension;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::*;
-use noter_protocol::{CoreError, ErrorCode};
+use noter_protocol::{CallId, CoreError, ErrorCode};
 
 use crate::settings::invalid;
+use crate::transcript::segments_of;
+use crate::{internal, ClipboardText, Core, SaveKind};
 
 /// What a scope renders to: the chosen format's text, the Markdown and HTML twins, and the counts.
 pub(crate) struct Rendered {
@@ -79,11 +84,13 @@ fn line_of(item: &ItemView) -> Line {
     }
 }
 
+// @cpt-algo:cpt-noter-algo-core-items-today-format:p1
 pub(crate) fn render(
     outputs: &CallOutputs,
     scope: &ShareScope,
     format: ShareFormat,
 ) -> Result<Rendered, CoreError> {
+    // @cpt-begin:cpt-noter-algo-core-items-today-format:p1:inst-format-scope
     let chosen: Vec<&OutputSection> = outputs
         .sections
         .iter()
@@ -94,14 +101,18 @@ pub(crate) fn render(
     if !scope.item_ids.iter().all(known) {
         return Err(invalid("scope.item_ids", ValidationRule::OutOfRange));
     }
+    // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-scope
+    // @cpt-begin:cpt-noter-algo-core-items-today-format:p1:inst-format-ready
     let ready: Vec<&OutputSection> = chosen
         .into_iter()
         .filter(|s| s.state == SectionState::Ready)
         .collect();
+    // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-ready
     let picked = |i: &&ItemView| {
         i.review != ReviewState::Rejected
             && (scope.item_ids.is_empty() || scope.item_ids.contains(&i.id))
     };
+    // @cpt-begin:cpt-noter-algo-core-items-today-format:p1:inst-format-review
     let unreviewed = ready
         .iter()
         .flat_map(|s| s.items.iter().filter(picked))
@@ -113,6 +124,8 @@ pub(crate) fn render(
             format!("{unreviewed} suggested items are not reviewed"),
         ));
     }
+    // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-review
+    // @cpt-begin:cpt-noter-algo-core-items-today-format:p1:inst-format-render
     let (mut blocks, mut sections, mut items) = (vec![], 0, 0);
     for s in ready {
         let lines: Vec<Line> = s.items.iter().filter(picked).map(line_of).collect();
@@ -137,6 +150,8 @@ pub(crate) fn render(
             "nothing to share yet",
         ));
     }
+    // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-render
+    // @cpt-begin:cpt-noter-algo-core-items-today-format:p1:inst-format-return
     let markdown = markdown(&blocks);
     let text = match format {
         ShareFormat::Markdown => markdown.clone(),
@@ -151,6 +166,7 @@ pub(crate) fn render(
         items,
         unreviewed,
     })
+    // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-return
 }
 
 /// Backslash before each character in `special`.
@@ -341,16 +357,279 @@ fn html(blocks: &[Block]) -> String {
     out
 }
 
-impl crate::Core {
-    pub(crate) async fn copy_share(&self, _args: ShareCopyArgs) -> Result<ShareResult, CoreError> {
-        todo!("share_copy")
+/// What a share or export needs of the `calls` row.
+struct Facts {
+    title: String,
+    sensitive: bool,
+    outputs_ready: bool,
+    audio_kept: bool,
+}
+
+/// A file of an export: its name, and its text or the audio file it copies.
+enum Content {
+    Text(String),
+    Copy(PathBuf),
+}
+
+fn not_found() -> CoreError {
+    CoreError::new(ErrorCode::NotFound, "this call no longer exists")
+}
+
+fn slug(title: &str, id: &str) -> String {
+    let words: String = title
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let words: Vec<&str> = words.split('-').filter(|w| !w.is_empty()).collect();
+    format!(
+        "{}-{id}",
+        words.join("-").chars().take(40).collect::<String>()
+    )
+}
+
+/// `00:01:02,500`.
+fn srt_time(ms: u32) -> String {
+    format!(
+        "{:02}:{:02}:{:02},{:03}",
+        ms / 3_600_000,
+        ms / 60_000 % 60,
+        ms / 1000 % 60,
+        ms % 1000
+    )
+}
+
+fn speaker_name(label: &SpeakerLabel) -> String {
+    match label {
+        SpeakerLabel::You => "You".into(),
+        SpeakerLabel::Person { person } => person.display_name.clone(),
+        SpeakerLabel::Unnamed { n } => format!("Speaker {n}"),
+        SpeakerLabel::GuestYourSide => "Guest (your side)".into(),
+    }
+}
+
+fn srt(segments: &[SegmentView]) -> String {
+    segments
+        .iter()
+        .enumerate()
+        .map(|(n, s)| {
+            format!(
+                "{}\n{} --> {}\n{}: {}\n\n",
+                n + 1,
+                srt_time(s.t0_ms.0),
+                srt_time(s.t1_ms.0),
+                speaker_name(&s.speaker.label),
+                s.text
+            )
+        })
+        .collect()
+}
+
+fn write_all(folder: &Path, files: &[(String, Content)]) -> std::io::Result<()> {
+    std::fs::create_dir_all(folder)?;
+    for (name, content) in files {
+        let to = folder.join(name);
+        match content {
+            Content::Text(text) => std::fs::write(&to, text)?,
+            Content::Copy(from) => drop(std::fs::copy(from, &to)?),
+        }
+    }
+    Ok(())
+}
+
+impl Core {
+    fn call_facts(&self, id: &str) -> Result<Facts, CoreError> {
+        self.store()
+            .read(|c| {
+                c.query_row(
+                    "SELECT title, privacy_class, outputs_status, audio_deleted, audio_not_stored
+                     FROM calls WHERE id = ?1",
+                    [id],
+                    |r| {
+                        let status: String = r.get(2)?;
+                        Ok(Facts {
+                            title: r.get(0)?,
+                            sensitive: r.get::<_, String>(1)? == "sensitive",
+                            outputs_ready: status == "ready" || status == "partially_failed",
+                            audio_kept: r.get::<_, i64>(3)? == 0 && r.get::<_, i64>(4)? == 0,
+                        })
+                    },
+                )
+                .optional()
+            })?
+            .ok_or_else(not_found)
     }
 
+    /// The call's committed output sections as share reads them.
+    // shortcut: only the item sections (decisions, action items, open questions, risks) are read,
+    // from `items`; the text sections live in 2.17's `summaries`: read them through its
+    // `outputs_now` once that is on main.
+    fn outputs_for_share(&self, id: &CallId, facts: &Facts) -> Result<CallOutputs, CoreError> {
+        let items = self.items_of_call(id.as_str())?;
+        let state = if facts.outputs_ready {
+            SectionState::Ready
+        } else {
+            SectionState::Writing
+        };
+        let sections = [
+            (SectionKind::Decisions, ItemKind::Decision),
+            (SectionKind::ActionItems, ItemKind::ActionItem),
+            (SectionKind::OpenQuestions, ItemKind::OpenQuestion),
+            (SectionKind::Risks, ItemKind::Risk),
+        ]
+        .into_iter()
+        .map(|(kind, item_kind)| OutputSection {
+            kind,
+            state: state.clone(),
+            summary_id: None,
+            rev: None,
+            body_md: None,
+            items: items
+                .iter()
+                .filter(|i| i.kind == item_kind)
+                .cloned()
+                .collect(),
+            reviews: vec![],
+            writer: None,
+            user_edited: false,
+            regenerated_with_edits: false,
+            version_count: 1,
+        })
+        .collect();
+        Ok(CallOutputs {
+            call_id: id.clone(),
+            status: if facts.outputs_ready {
+                OutputsStatus::Ready
+            } else {
+                OutputsStatus::Writing
+            },
+            sections,
+            archive: ArchiveStatus::NotStarted,
+            review_waiting: 0,
+            sensitive: facts.sensitive,
+            written_locally: false,
+        })
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-items-today-share:p1
+    // @cpt-dod:cpt-noter-dod-core-items-today-sharing:p1
+    pub(crate) async fn copy_share(&self, args: ShareCopyArgs) -> Result<ShareResult, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-request
+        self.ready()?;
+        let facts = self.call_facts(args.call_id.as_str())?;
+        let outputs = self.outputs_for_share(&args.call_id, &facts)?;
+        let shared = render(&outputs, &args.scope, args.format)?;
+        // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-request
+        // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-copy
+        let board = ClipboardText {
+            plain: shared.text.clone(),
+            markdown: Some(shared.markdown),
+            html: Some(shared.html),
+        };
+        self.deps
+            .native_ops
+            .clipboard_write(&board)
+            .await
+            .map_err(|_| {
+                CoreError::new(ErrorCode::Internal, "the clipboard did not take the copy")
+            })?;
+        // @cpt-begin:cpt-noter-algo-core-items-today-format:p1:inst-format-sensitive
+        Ok(ShareResult {
+            text: shared.text,
+            sections: shared.sections,
+            items: shared.items,
+            unreviewed_in_scope: shared.unreviewed,
+            sensitive: facts.sensitive,
+        })
+        // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-sensitive
+        // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-copy
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-items-today-share:p1
     pub(crate) async fn export_calls(
         &self,
-        _args: ExportCallsArgs,
+        args: ExportCallsArgs,
     ) -> Result<ExportResult, CoreError> {
-        todo!("calls_export")
+        // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-request
+        self.ready()?;
+        let want = &args.include;
+        if args.call_ids.is_empty() {
+            return Err(invalid("call_ids", ValidationRule::Required));
+        }
+        if !(want.summary_and_items || want.transcript || want.audio) {
+            return Err(invalid("include", ValidationRule::Required));
+        }
+        // Everything is read before the panel opens: a call that cannot be exported fails first.
+        let scope = args.scope.clone().unwrap_or(ShareScope {
+            sections: vec![],
+            item_ids: vec![],
+            include_unreviewed: true,
+        });
+        let mut files: Vec<(String, Content)> = vec![];
+        for id in &args.call_ids {
+            let facts = self.call_facts(id.as_str())?;
+            let base = slug(&facts.title, id.as_str());
+            // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-request
+            // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-fail
+            if want.audio && !facts.audio_kept {
+                return Err(CoreError::new(
+                    ErrorCode::AudioDeleted,
+                    "the audio is no longer kept",
+                ));
+            }
+            // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-fail
+            // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-export
+            if want.summary_and_items {
+                let outputs = self.outputs_for_share(id, &facts)?;
+                let shared = render(&outputs, &scope, ShareFormat::Markdown)?;
+                files.push((format!("{base}.md"), Content::Text(shared.markdown)));
+            }
+            // A scope names sections and items: the transcript and audio are not part of it.
+            if args.scope.is_none() && want.transcript {
+                let segments = self.store().read(|c| segments_of(c, id, None))?;
+                let json = serde_json::to_string_pretty(&segments).map_err(internal)?;
+                files.push((format!("{base}.srt"), Content::Text(srt(&segments))));
+                files.push((format!("{base}.json"), Content::Text(json)));
+            }
+            if args.scope.is_none() && want.audio {
+                for track in ["mic", "sys"] {
+                    let from = self
+                        .audio_dir
+                        .join(id.as_str())
+                        .join(format!("{track}.m4a"));
+                    if from.is_file() {
+                        files.push((format!("{base}-{track}.m4a"), Content::Copy(from)));
+                    }
+                }
+            }
+            // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-export
+        }
+        // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-panel
+        let panel = self
+            .deps
+            .native_ops
+            .save_panel("Noter export", SaveKind::Folder)
+            .await;
+        let Some(folder) = panel else {
+            return Err(CoreError::new(ErrorCode::Cancelled, "export cancelled"));
+        };
+        // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-panel
+        // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-return
+        // shortcut: a file that is already there is overwritten, and a failed write leaves the
+        // files before it; stage in a temporary folder when exports grow large.
+        write_all(&folder, &files).map_err(|e| {
+            CoreError::new(ErrorCode::Internal, format!("cannot write the export: {e}"))
+        })?;
+        Ok(ExportResult {
+            path: folder.display().to_string(),
+            files: files.len() as u32,
+        })
+        // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-return
     }
 }
 

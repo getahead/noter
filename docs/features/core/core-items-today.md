@@ -170,7 +170,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Share or export a scope
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-share`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-share`
 
 **Actor**: Primary user (main window)
 
@@ -253,12 +253,12 @@ The user can review what a call produced, check the words behind an item, tick w
 **Output**: Sanitized formatted content and exact scope counts or typed error.
 
 **Steps**:
-1. [ ] - `p1` - Treat empty section or item selectors as all content within their containing selection; reject item ids outside the selected call or sections - `inst-format-scope`
+1. [x] - `p1` - Treat empty section or item selectors as all content within their containing selection; reject item ids outside the selected call or sections - `inst-format-scope`
 2. [ ] - `p1` - Read only committed available sections; **IF** nothing requested is ready **RETURN** `outputs_not_ready` - `inst-format-ready`
-3. [ ] - `p1` - Count suggested items in scope; **IF** present and `include_unreviewed` is false **RETURN** `unreviewed_in_scope`; otherwise include them visibly marked Not reviewed - `inst-format-review`
-4. [ ] - `p1` - Omit rejected items; render Slack, Jira or Markdown with owners, dates and evidence links, escaping target markup and excluding raw HTML - `inst-format-render`
-5. [ ] - `p1` - Keep explicit sensitive-call copies available, reporting sensitivity; this clipboard action is not an automatic cloud request - `inst-format-sensitive`
-6. [ ] - `p1` - **RETURN** the formatted content and actual counts without changing review or status - `inst-format-return`
+3. [x] - `p1` - Count suggested items in scope; **IF** present and `include_unreviewed` is false **RETURN** `unreviewed_in_scope`; otherwise include them visibly marked Not reviewed - `inst-format-review`
+4. [x] - `p1` - Omit rejected items; render Slack, Jira or Markdown with owners, dates and evidence links, escaping target markup and excluding raw HTML - `inst-format-render`
+5. [x] - `p1` - Keep explicit sensitive-call copies available, reporting sensitivity; this clipboard action is not an automatic cloud request - `inst-format-sensitive`
+6. [x] - `p1` - **RETURN** the formatted content and actual counts without changing review or status - `inst-format-return`
 
 ## 4. States (CDSL)
 
