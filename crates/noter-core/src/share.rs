@@ -1,8 +1,11 @@
 //! Share content: the scope of a call's outputs rendered for Slack, Jira or Markdown
 //! (`cpt-noter-algo-core-items-today-format`), as plain text plus the rich forms for the clipboard.
 
+use noter_protocol::error::ValidationRule;
 use noter_protocol::model::*;
-use noter_protocol::CoreError;
+use noter_protocol::{CoreError, ErrorCode};
+
+use crate::settings::invalid;
 
 /// What a scope renders to: the chosen format's text, the Markdown and HTML twins, and the counts.
 pub(crate) struct Rendered {
@@ -14,12 +17,328 @@ pub(crate) struct Rendered {
     pub unreviewed: u32,
 }
 
+/// One line of an item: its text and the facts that follow it.
+struct Line {
+    text: String,
+    /// `Some(done)` for an action item's checkbox.
+    check: Option<bool>,
+    facts: Vec<String>,
+    /// Evidence: the time label and the link to that moment.
+    links: Vec<(String, String)>,
+}
+
+enum Block {
+    Heading(String),
+    /// A line of a text section's Markdown body.
+    Text(String),
+    Item(Line),
+}
+
+fn title(kind: SectionKind) -> &'static str {
+    match kind {
+        SectionKind::Summary => "Summary",
+        SectionKind::Decisions => "Decisions",
+        SectionKind::ActionItems => "Action items",
+        SectionKind::OpenQuestions => "Open questions",
+        SectionKind::PerParticipant => "Per participant",
+        SectionKind::RoleReviews => "Role reviews",
+        SectionKind::Risks => "Risks",
+        SectionKind::CallTypeExtras => "Extras",
+    }
+}
+
+fn line_of(item: &ItemView) -> Line {
+    let mut facts = vec![];
+    if let Some(o) = &item.owner {
+        facts.push(o.display_name.clone());
+    }
+    if let Some(d) = &item.due {
+        facts.push(format!("due {}", d.0));
+    }
+    if item.review == ReviewState::Suggested {
+        facts.push("Not reviewed".into());
+    }
+    // shortcut: no deep-link scheme is registered yet, so evidence links are `noter://` URLs the
+    // app will own; point them at the registered handler when the scheme lands.
+    let links = item
+        .spans
+        .iter()
+        .map(|s| {
+            let s0 = s.t0_ms.0 / 1000;
+            (
+                format!("{}:{:02}", s0 / 60, s0 % 60),
+                format!("noter://call/{}?t={}", s.call_id, s.t0_ms.0),
+            )
+        })
+        .collect();
+    Line {
+        text: item.text.clone(),
+        check: (item.kind == ItemKind::ActionItem).then_some(item.status == ItemStatus::Done),
+        facts,
+        links,
+    }
+}
+
 pub(crate) fn render(
-    _outputs: &CallOutputs,
-    _scope: &ShareScope,
-    _format: ShareFormat,
+    outputs: &CallOutputs,
+    scope: &ShareScope,
+    format: ShareFormat,
 ) -> Result<Rendered, CoreError> {
-    todo!("share rendering")
+    let chosen: Vec<&OutputSection> = outputs
+        .sections
+        .iter()
+        .filter(|s| scope.sections.is_empty() || scope.sections.contains(&s.kind))
+        .collect();
+    let known =
+        |id: &noter_protocol::ItemId| chosen.iter().any(|s| s.items.iter().any(|i| &i.id == id));
+    if !scope.item_ids.iter().all(known) {
+        return Err(invalid("scope.item_ids", ValidationRule::OutOfRange));
+    }
+    let ready: Vec<&OutputSection> = chosen
+        .into_iter()
+        .filter(|s| s.state == SectionState::Ready)
+        .collect();
+    let picked = |i: &&ItemView| {
+        i.review != ReviewState::Rejected
+            && (scope.item_ids.is_empty() || scope.item_ids.contains(&i.id))
+    };
+    let unreviewed = ready
+        .iter()
+        .flat_map(|s| s.items.iter().filter(picked))
+        .filter(|i| i.review == ReviewState::Suggested)
+        .count() as u32;
+    if unreviewed > 0 && !scope.include_unreviewed {
+        return Err(CoreError::new(
+            ErrorCode::UnreviewedInScope,
+            format!("{unreviewed} suggested items are not reviewed"),
+        ));
+    }
+    let (mut blocks, mut sections, mut items) = (vec![], 0, 0);
+    for s in ready {
+        let lines: Vec<Line> = s.items.iter().filter(picked).map(line_of).collect();
+        // Choosing items chooses items only: a text section's body is not one of them.
+        let body = s.body_md.as_deref().filter(|_| scope.item_ids.is_empty());
+        if lines.is_empty() && body.is_none() {
+            continue;
+        }
+        sections += 1;
+        items += lines.len() as u32;
+        blocks.push(Block::Heading(title(s.kind).into()));
+        blocks.extend(
+            body.into_iter()
+                .flat_map(str::lines)
+                .map(|l| Block::Text(l.into())),
+        );
+        blocks.extend(lines.into_iter().map(Block::Item));
+    }
+    if blocks.is_empty() {
+        return Err(CoreError::new(
+            ErrorCode::OutputsNotReady,
+            "nothing to share yet",
+        ));
+    }
+    let markdown = markdown(&blocks);
+    let text = match format {
+        ShareFormat::Markdown => markdown.clone(),
+        ShareFormat::Slack => slack(&blocks),
+        ShareFormat::Jira => jira(&blocks),
+    };
+    Ok(Rendered {
+        text,
+        markdown,
+        html: html(&blocks),
+        sections,
+        items,
+        unreviewed,
+    })
+}
+
+/// Backslash before each character in `special`.
+fn escape(text: &str, special: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if special.contains(c) {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+fn entities(text: &str, quotes: bool) -> String {
+    let t = text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    if quotes {
+        t.replace('"', "&quot;")
+    } else {
+        t
+    }
+}
+
+/// A body line seen from another markup: a heading, a bullet or text, with `**bold**` runs apart.
+enum Body<'a> {
+    Heading(&'a str),
+    Bullet(&'a str),
+    Text(&'a str),
+}
+
+fn body_of(line: &str) -> Body<'_> {
+    let hashes = line.chars().take_while(|c| *c == '#').count();
+    if (1..=6).contains(&hashes) && line[hashes..].starts_with(' ') {
+        return Body::Heading(line[hashes + 1..].trim());
+    }
+    match line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
+        Some(rest) => Body::Bullet(rest),
+        None => Body::Text(line),
+    }
+}
+
+/// `text` with its `**bold**` runs wrapped by `open`/`close` and the rest escaped by `esc`.
+fn inline(text: &str, esc: &dyn Fn(&str) -> String, open: &str, close: &str) -> String {
+    text.split("**")
+        .enumerate()
+        .map(|(n, run)| {
+            if n % 2 == 1 {
+                format!("{open}{}{close}", esc(run))
+            } else {
+                esc(run)
+            }
+        })
+        .collect()
+}
+
+fn facts_of(l: &Line) -> String {
+    if l.facts.is_empty() {
+        String::new()
+    } else {
+        format!(" — {}", l.facts.join(", "))
+    }
+}
+
+fn markdown(blocks: &[Block]) -> String {
+    let mut out = vec![];
+    for b in blocks {
+        out.push(match b {
+            Block::Heading(h) => format!("\n## {h}"),
+            // Raw HTML stays out: Markdown renders the entity as the character.
+            Block::Text(t) => t.replace('<', "&lt;"),
+            Block::Item(l) => {
+                let check = match l.check {
+                    Some(true) => "[x] ",
+                    Some(false) => "[ ] ",
+                    None => "",
+                };
+                let links: String = l
+                    .links
+                    .iter()
+                    .map(|(t, u)| format!(" [{t}]({u})"))
+                    .collect();
+                format!(
+                    "- {check}{}{}{links}",
+                    escape(&l.text, "\\`*_[]<>"),
+                    facts_of(l)
+                )
+            }
+        });
+    }
+    out.join("\n").trim_start().to_string()
+}
+
+fn slack(blocks: &[Block]) -> String {
+    let esc = |t: &str| entities(t, false);
+    let mut out = vec![];
+    for b in blocks {
+        out.push(match b {
+            Block::Heading(h) => format!("\n*{}*", esc(h)),
+            Block::Text(t) => match body_of(t) {
+                Body::Heading(h) => format!("*{}*", esc(h)),
+                Body::Bullet(x) => format!("• {}", inline(x, &esc, "*", "*")),
+                Body::Text(x) => inline(x, &esc, "*", "*"),
+            },
+            Block::Item(l) => {
+                let check = match l.check {
+                    Some(true) => "☑ ",
+                    Some(false) => "☐ ",
+                    None => "",
+                };
+                let links: String = l.links.iter().map(|(t, u)| format!(" <{u}|{t}>")).collect();
+                format!("• {check}{}{}{links}", esc(&l.text), esc(&facts_of(l)))
+            }
+        });
+    }
+    out.join("\n").trim_start().to_string()
+}
+
+fn jira(blocks: &[Block]) -> String {
+    let esc = |t: &str| escape(t, "\\{}[]*_|~^<>");
+    let mut out = vec![];
+    for b in blocks {
+        out.push(match b {
+            Block::Heading(h) => format!("\nh2. {}", esc(h)),
+            Block::Text(t) => match body_of(t) {
+                Body::Heading(h) => format!("h3. {}", esc(h)),
+                Body::Bullet(x) => format!("* {}", inline(x, &esc, "*", "*")),
+                Body::Text(x) => inline(x, &esc, "*", "*"),
+            },
+            Block::Item(l) => {
+                let check = match l.check {
+                    Some(true) => "(/) ",
+                    Some(false) => "(?) ",
+                    None => "",
+                };
+                let links: String = l.links.iter().map(|(t, u)| format!(" [{t}|{u}]")).collect();
+                format!("* {check}{}{}{links}", esc(&l.text), esc(&facts_of(l)))
+            }
+        });
+    }
+    out.join("\n").trim_start().to_string()
+}
+
+fn html(blocks: &[Block]) -> String {
+    let esc = |t: &str| entities(t, true);
+    let mut out = String::new();
+    let mut open = false;
+    for b in blocks {
+        let (list, markup) = match b {
+            Block::Heading(h) => (false, format!("<h2>{}</h2>", esc(h))),
+            Block::Text(t) => match body_of(t) {
+                Body::Heading(h) => (false, format!("<h3>{}</h3>", esc(h))),
+                Body::Bullet(x) => (
+                    true,
+                    format!("<li>{}</li>", inline(x, &esc, "<strong>", "</strong>")),
+                ),
+                Body::Text(x) if x.trim().is_empty() => (open, String::new()),
+                Body::Text(x) => (
+                    false,
+                    format!("<p>{}</p>", inline(x, &esc, "<strong>", "</strong>")),
+                ),
+            },
+            Block::Item(l) => {
+                let links: String = l
+                    .links
+                    .iter()
+                    .map(|(t, u)| format!(" <a href=\"{}\">{}</a>", esc(u), esc(t)))
+                    .collect();
+                (
+                    true,
+                    format!("<li>{}{}{links}</li>", esc(&l.text), esc(&facts_of(l))),
+                )
+            }
+        };
+        if list && !open {
+            out.push_str("<ul>");
+        } else if !list && open {
+            out.push_str("</ul>");
+        }
+        open = list;
+        out.push_str(&markup);
+    }
+    if open {
+        out.push_str("</ul>");
+    }
+    out
 }
 
 #[cfg(test)]
