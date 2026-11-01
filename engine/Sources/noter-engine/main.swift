@@ -15,6 +15,9 @@ let models = Models.installed(container: container)
 let speechModel: (() throws -> Transcriber)? = container.map { $0.appendingPathComponent("models/whisper-turbo") }
     .flatMap { folder in FileManager.default.fileExists(atPath: folder.path) ? { try WhisperTranscriber(folder: folder) } : nil }
 
+/// The offline models (archive decode, embeddings) the core has installed.
+let offline = container.map { LocalOfflineWork.installed(models: $0.appendingPathComponent("models")) }
+
 /// Answers commands from stdin until `shutdown`; end of input also ends live mode, while a
 /// file replay runs to its end.
 func serve(_ engine: EngineLoop, exitAtEndOfInput: Bool) {
@@ -32,7 +35,7 @@ case let .file(mic, sys, realtime):
     // The speech model too: a replayed call is transcribed as a live one (golden set, Q4 replay).
     let engine = EngineLoop(
         writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
-        transcriber: speechModel
+        transcriber: speechModel, offline: offline
     ) { _ in
         guard let m = try? WAV.read(mic), let s = try? WAV.read(sys) else { return nil }
         return FileAudioSource(mic: m, sys: s, realtime: realtime)
@@ -46,7 +49,7 @@ case .live:
     let engine = EngineLoop(
         writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
         processes: { ProcessWatcher.snapshot() },
-        transcriber: speechModel
+        transcriber: speechModel, offline: offline
     ) { start in
         LiveAudioSource(micUid: start?.micDeviceUid, excluding: start?.excludeBundleIds ?? [])
     }

@@ -102,7 +102,7 @@ final class ArchiveTests: XCTestCase {
 
     func testSegmentsKeepCallTimeAcrossGapsOnBothChannels() throws {
         // Paused at 2.5 s of the call for 10 s: the files hold captured audio only.
-        try storeCall(in: session, seconds: 6, mic: [(1, 2), (2.2, 3)], sys: [(3.5, 5)], gaps: [(2_500, 12_500)])
+        try storeCall(in: session, seconds: 7, mic: [(0.5, 1.2), (2.2, 3)], sys: [(3, 6)], gaps: [(2_500, 12_500)])
         let (result, progress) = try archive()
         XCTAssertEqual(result.callId, "call_1")
         XCTAssertEqual(result.backend, "whisper_large_v3")
@@ -110,7 +110,7 @@ final class ArchiveTests: XCTestCase {
         XCTAssertEqual(segments.map(\.channel), [.mic, .mic, .mic, .sys])
         XCTAssertEqual(segments.map(\.t0Ms), segments.map(\.t0Ms).sorted(), "in call order")
         // The second utterance is cut where the call paused, and goes on after the gap.
-        let expected = [(1_000, 2_000), (2_200, 2_500), (12_500, 13_000), (13_500, 15_000)]
+        let expected = [(500, 1_200), (2_200, 2_500), (12_500, 13_000), (13_000, 16_000)]
         for (s, (t0, t1)) in zip(segments, expected) {
             near(s.t0Ms, t0, "t0 of \(s.id)")
             near(s.t1Ms, t1, "t1 of \(s.id)")

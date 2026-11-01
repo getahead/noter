@@ -32,6 +32,8 @@ public final class EngineLoop: @unchecked Sendable {
     private let facts = NSLock()
     private var detector = Detector()
     private var capturing: CaptureSession?
+    /// Whether a call is being captured now (offline work waits for it).
+    var isCapturing: Bool { facts.withLock { capturing != nil } }
     private var watcher: DispatchSourceTimer?
 
     /// `models` are the installed model folders; `source` opens the audio for a session or, given
