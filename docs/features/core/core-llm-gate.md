@@ -250,7 +250,7 @@ The system **MUST** reject audio egress, force sensitive processing local, redac
 
 ### Privacy tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-llm-gate-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-llm-gate-tests`
 
 The system **MUST** pass unit tests for routing, redaction, failed-audit refusal, cancellation, retry and unknown citations; adapter/schema conformance; CI lockdown tests with hostile user hooks, plugins and MCP config; and the macOS network-monitor test with real pinned CLIs and a recording proxy. Every provider connection must match a run's audit evidence by run id and time, other hosts must match `contracts/egress-hosts.json`, and the engine must make no connection. Consuming real-core E2E uses the scripted runtime and owns its story ids. `just gate` passes.
 
@@ -273,5 +273,6 @@ Open: the macOS network-monitor run with real pinned CLIs is the owner's release
 - [x] Unit tests cover cancellation, two consecutive failures, budget and timeout paths; adapter conformance covers all three runtimes and cleanup.
 - [ ] M2 real-core output and handoff E2E passes with the scripted runtime; the network-monitor release test separately proves actual egress behavior.
   Open: the network-monitor half is the owner's run of [.plans/backend/m2-network-monitor-runbook.md](../../../.plans/backend/m2-network-monitor-runbook.md).
-- [ ] `accounts_get` and `api_key_set` succeed in E2E against the real core with the scripted runtime. `noter-core-harness` provides a Keychain stand-in, a scripted secret store, as part of the Platform seam (Backend Teamlead decision D1, `.plans/core-harness.md`).
+- [x] `accounts_get` and `api_key_set` succeed in E2E against the real core with the scripted runtime. `noter-core-harness` provides a Keychain stand-in, a scripted secret store, as part of the Platform seam (Backend Teamlead decision D1, `.plans/core-harness.md`).
+  Proven by `apps/desktop/tests/conformance/m2-llm-gate.test.ts` (real core: `--llm-script`, `harness.llm_run`, `harness.keychain`).
 - [ ] `just gate` passes.

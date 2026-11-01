@@ -1367,6 +1367,7 @@ export const defaultHandlers: Handlers = {
   api_key_set: (a, { world, publish }) => {
     const key = world.app.accounts.keys.find((k) => k.provider === a.provider);
     if (!key) throw coreError("not_found");
+    if (!a.key.trim()) throw coreError("invalid_input", "key", { type: "validation", field: "key", rule: "required" });
     if (a.key.trim().length < 8 || a.key.includes("bad")) {
       key.status = { type: "rejected", reason: "key_rejected" };
       publish("accounts:changed");
