@@ -20,7 +20,7 @@ private func voice(_ samples: ArraySlice<Float>) -> Int { max(0, Int((crossings(
 
 /// pyannote segmentation as a test scripts it: 100 frames of 100 ms per 10 s window, each frame
 /// with sound has the voice its pitch names as the window's local speaker.
-final class FakeSegmentation: SegmentationModel, @unchecked Sendable {
+final class PitchSegmentation: SegmentationModel, @unchecked Sendable {
     var fails = false
     var silent = false
     private(set) var windows = 0
@@ -38,7 +38,7 @@ final class FakeSegmentation: SegmentationModel, @unchecked Sendable {
 
 /// WeSpeaker as a test scripts it: a voice's vector points along its own axis, nudged by the
 /// turn's length so no two are equal.
-final class FakeSpeaker: SpeakerModel, @unchecked Sendable {
+final class PitchSpeaker: SpeakerModel, @unchecked Sendable {
     private(set) var turns = 0
 
     func embed(_ samples: [Float]) throws -> [Float] {
@@ -65,8 +65,8 @@ final class DiarizationTests: XCTestCase {
     private let pass = OfflinePass(
         callId: "call_1", sessionDir: "audio/call_1", resultPath: "audio/call_1/offline-1.json", constraintsPath: nil,
         backend: "whisper_large_v3")
-    private let segmentation = FakeSegmentation()
-    private let speaker = FakeSpeaker()
+    private let segmentation = PitchSegmentation()
+    private let speaker = PitchSpeaker()
 
     override func setUpWithError() throws {
         container = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -121,15 +121,18 @@ final class DiarizationTests: XCTestCase {
             try labels(), ["sys:spk_1", "sys:spk_2", "mic:you", "sys:spk_1", "sys:spk_2"],
             "one label per voice; the microphone stays the user")
         XCTAssertEqual(segmentation.windows, 2, "the system channel in 10 s windows")
-        XCTAssertEqual(speaker.turns, 4, "one vector per speech turn")
+        XCTAssertEqual(speaker.turns, 4, "one vector per speaker of a window")
     }
 
     func testACannotLinkKeepsTwoTurnsOfOneVoiceApart() throws {
-        try store(seconds: 10, sys: [(0.5, 4, 220), (5, 8.5, 220)])
+        try store(seconds: 16, sys: [(0.5, 4, 220), (11, 14.5, 220)])
         XCTAssertEqual(try labels(), ["sys:spk_1", "sys:spk_1"], "one voice")
         XCTAssertEqual(
-            try labels(constraints(cannot: [(500, 4_000, 5_000, 8_500)])), ["sys:spk_1", "sys:spk_2"],
+            try labels(constraints(cannot: [(500, 4_000, 11_000, 14_500)])), ["sys:spk_1", "sys:spk_2"],
             "the user said these are two people")
+        // Within one window the segmentation hears one speaker: the user's split still holds.
+        try store(seconds: 10, sys: [(0.5, 4, 220), (5, 8.5, 220)])
+        XCTAssertEqual(try labels(constraints(cannot: [(500, 4_000, 5_000, 8_500)])), ["sys:spk_1", "sys:spk_2"])
     }
 
     func testAMustLinkJoinsTwoVoicesTheUserSaidAreOne() throws {
@@ -166,12 +169,25 @@ final class DiarizationTests: XCTestCase {
 
     // MARK: the parts
 
-    func testVBxSeparatesTwoVoicesAndAgreesWithTheStartWhereItIsRight() {
-        let x: [[Double]] = [[3, 0], [3.2, 0.1], [2.9, -0.1], [0, 3], [0.1, 3.1], [-0.1, 2.8]]
-        let (gamma, pi) = Diarization.vbx(x, phi: [4, 4], start: [0, 0, 0, 1, 1, 1])
+    func testVBxSeparatesTwoVoicesOfPLDASize() {
+        // Two voices along two of 128 directions, at the length the x-vector transform gives.
+        let x = (0..<6).map { i in (0..<128).map { j in j == i / 3 ? 11.3 : 0 } }
+        let (gamma, pi) = Diarization.vbx(x, phi: Array(repeating: 4, count: 128), start: [0, 0, 0, 1, 1, 1])
         XCTAssertEqual(gamma.map { $0[0] > 0.5 ? 0 : 1 }, [0, 0, 0, 1, 1, 1])
-        XCTAssertEqual(pi.reduce(0, +), 1, accuracy: 1e-9)
+        XCTAssertEqual(pi[0], 0.5, accuracy: 1e-9)
         for row in gamma { XCTAssertEqual(row.reduce(0, +), 1, accuracy: 1e-9) }
+    }
+
+    func testVBxGivesWhatPyannotesVBxGives() {
+        // Expected values: pyannote's `VBx` (numpy) on the same input, Fa 0.07, Fb 0.8, 20 iterations.
+        let x: [[Double]] = [
+            [2, 0.5, -1, 0.3], [1.8, 0.7, -0.8, 0.1], [2.2, 0.4, -1.1, 0.5], [-1, 1.5, 0.9, -0.4], [-0.8, 1.7, 1.1, -0.2],
+            [-1.2, 1.4, 0.8, -0.6],
+        ]
+        let (gamma, pi) = Diarization.vbx(x, phi: [6, 3, 2, 1], start: [0, 0, 0, 1, 1, 1])
+        let expected = [0.514384349006, 0.514408719833, 0.514382503431, 0.514278948874, 0.514344679707, 0.514235743246]
+        for (row, e) in zip(gamma, expected) { XCTAssertEqual(row[0], e, accuracy: 1e-9) }
+        XCTAssertEqual(pi[0], 0.51433915735, accuracy: 1e-9)
     }
 
     func testAgglomerativeStartJoinsCloseVectorsOnly() {
@@ -180,14 +196,13 @@ final class DiarizationTests: XCTestCase {
         XCTAssertEqual(Diarization.ahc(x, threshold: 2), [0, 0, 0, 0])
     }
 
-    func testAssignmentKeepsCannotLinksAndJoinsMustLinks() {
+    func testAssignmentKeepsCannotLinks() {
         let x: [[Double]] = [[1, 0], [1, 0.1], [0, 1]]
         let centroids: [[Double]] = [[1, 0], [0, 1]]
-        XCTAssertEqual(Diarization.assign(x, centroids: centroids, must: [], cannot: []), [0, 0, 1])
-        XCTAssertEqual(Diarization.assign(x, centroids: centroids, must: [], cannot: [(0, 1)]), [0, 1, 1])
-        XCTAssertEqual(Diarization.assign(x, centroids: centroids, must: [(1, 2)], cannot: []), [0, 1, 1])
+        XCTAssertEqual(Diarization.assign(x, centroids: centroids, cannot: []), [0, 0, 1])
+        XCTAssertEqual(Diarization.assign(x, centroids: centroids, cannot: [(0, 1)]), [0, 1, 1], "the less sure one moves")
         // Three turns, each said apart from the others: a third cluster opens.
-        XCTAssertEqual(Set(Diarization.assign(x, centroids: centroids, must: [], cannot: [(0, 1), (0, 2), (1, 2)])).count, 3)
+        XCTAssertEqual(Set(Diarization.assign(x, centroids: centroids, cannot: [(0, 1), (0, 2), (1, 2)])).count, 3)
     }
 
     func testThePinnedPLDAFilesAreReadWithTheirDirectionsByWeight() throws {

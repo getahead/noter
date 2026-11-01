@@ -2,11 +2,9 @@
 // against `timeline.json`, cut into utterances by the live transcript's energy VAD (at pauses, the
 // call's gaps and 30 s), language-identified among the call's languages, decoded by Large v3 and
 // filtered as the live transcript is; an utterance of an unsure language is decoded again in the
-// alternative. The system channel's live label is split and joined by the user's corrections,
-// speech on both channels at once carries both labels, and the result and every word-timings
-// file are complete before the pass returns.
-// shortcut: clustering waits on the owner's backend choice (TL-16, D-32): until then a system
-// voice is the live per-side label as the constraints split and join it.
+// alternative. The system channel's voices are clustered (`Diarization`) and then split and
+// joined by the user's corrections, speech on both channels at once carries both labels, and the
+// result and every word-timings file are complete before the pass returns.
 
 import AVFoundation
 import Foundation
@@ -224,9 +222,11 @@ enum Archive {
 
     /// Decodes the call's stored channels into `result`, every segment's words beside it in
     /// `<result>.words/`; on failure neither is left. `progress` hears 0...1 between utterances.
+    /// Without `diarizer` the system channel keeps its live label.
+    // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
     static func run(
         _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints, decoder: ArchiveDecoder,
-        progress: (Float) -> Void
+        diarizer: (clustering: Clustering, speaker: SpeakerModel)? = nil, progress: (Float) -> Void
     ) throws {
         let wordsDir = result.deletingPathExtension().appendingPathExtension("words")
         let wordsPath = (pass.resultPath as NSString).deletingPathExtension + ".words"
@@ -291,6 +291,11 @@ enum Archive {
                             avgLogprob: best.avgLogprob, noSpeechP: best.noSpeechP, corrections: corrections, crosstalkLabels: []))
                     // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
                 }
+                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
+                if channel == .sys, let diarizer {
+                    try Diarization.label(&segments, samples: samples, time: time, constraints: c, diarizer)
+                }
+                // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
             }
             segments.sort { ($0.t0Ms, $0.channel == .mic ? 0 : 1) < ($1.t0Ms, $1.channel == .mic ? 0 : 1) }
             voices(&segments, c)
@@ -305,9 +310,9 @@ enum Archive {
         }
     }
 
-    /// The system channel's voices: its live label, split where the user said two spans are two
-    /// voices, joined where they said one (a must-link or one name on two labels) unless that
-    /// would join a split; a voice with under three seconds of speech stays unlabelled ("").
+    /// The system channel's voices: its clusters (or its live label), split where the user said
+    /// two spans are two voices, joined where they said one (a must-link or one name on two labels)
+    /// unless that would join a split; a voice with under three seconds of speech stays unlabelled ("").
     static func voices(_ segments: inout [Segment], _ c: OfflineConstraints) {
         let sys = segments.indices.filter { segments[$0].channel == .sys }
         func inside(_ span: Span) -> [Int] { sys.filter { segments[$0].t0Ms < span.t1Ms && span.t0Ms < segments[$0].t1Ms } }

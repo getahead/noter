@@ -1,6 +1,7 @@
 // The offline models on disk, all pinned by `scripts/models/manifest.json` and loaded without the
 // network: Large v3 through the same WhisperKit path as the live model (`models/whisper-large-v3`),
-// WeSpeaker as pyannote community-1's FBank and Embedding CoreML conversions (`models/wespeaker`)
+// WeSpeaker, the segmentation and VBx's PLDA as pyannote community-1's CoreML conversions and
+// tensors (`models/wespeaker`)
 // and bge-m3 as a CoreML conversion with its tokenizer (`models/bge-m3`).
 // shortcut: not exercised by the CI tests (no models on the runner); the owner's golden-set run
 // on the Mac drives them (TL-17).
@@ -17,10 +18,37 @@ extension LocalOfflineWork {
             let url = models.appendingPathComponent(name)
             return FileManager.default.fileExists(atPath: url.path) ? url : nil
         }
+        // A wespeaker folder installed before the segmentation was pinned has none: no clustering.
+        let clustering = folder("wespeaker").flatMap { f in
+            FileManager.default.fileExists(atPath: f.appendingPathComponent("Segmentation.mlmodelc").path) ? f : nil
+        }
         return LocalOfflineWork(
             decoder: folder("whisper-large-v3").map { f in { try WhisperArchiveDecoder(folder: f) } },
             speaker: folder("wespeaker").map { f in { try CoreMLSpeakerModel(folder: f) } },
-            text: folder("bge-m3").map { f in { try CoreMLTextModel(folder: f) } })
+            text: folder("bge-m3").map { f in { try CoreMLTextModel(folder: f) } },
+            clustering: clustering.map { f in
+                { Clustering(segmentation: try CoreMLSegmentationModel(folder: f), plda: try PLDA.read(folder: f)) }
+            })
+    }
+}
+
+/// pyannote community-1 segmentation: a 10 s window to 589 frames of its seven powerset classes
+/// (log probabilities); the likeliest class names who talks.
+final class CoreMLSegmentationModel: SegmentationModel, @unchecked Sendable {
+    /// The classes as pyannote orders them: nobody, each of three speakers, each pair.
+    private static let classes: [Set<Int>] = [[], [0], [1], [2], [0, 1], [0, 2], [1, 2]]
+    private let model: MLModel
+
+    init(folder: URL) throws {
+        model = try MLModel(contentsOf: folder.appendingPathComponent("Segmentation.mlmodelc"))
+    }
+
+    func speakers(_ window: [Float]) throws -> [Set<Int>] {
+        let audio = try array([1, 1, Diarization.window], window[...])
+        let p = try floats(model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["audio": audio])), "log_probs")
+        let n = Self.classes.count
+        guard !p.isEmpty, p.count % n == 0 else { throw OfflineFailure(code: .internal) }
+        return stride(from: 0, to: p.count, by: n).map { f in Self.classes[(f..<f + n).max { p[$0] < p[$1] }! - f] }
     }
 }
 
@@ -97,20 +125,31 @@ final class CoreMLSpeakerModel: SpeakerModel, @unchecked Sendable {
         var (sum, total) = ([Float](repeating: 0, count: Vectors.speakerDims), 0)
         for start in stride(from: 0, to: samples.count, by: Self.window) {
             let chunk = samples[start..<min(start + Self.window, samples.count)]
-            let audio = try array([1, 1, Self.window], chunk)
-            guard let features = try fbank.prediction(from: MLDictionaryFeatureProvider(dictionary: ["audio": audio]))
-                .featureValue(for: "fbank_features")?.multiArrayValue
-            else { throw OfflineFailure(code: .internal) }
             let used = Int((Double(chunk.count) * Double(Self.frames) / Double(Self.window)).rounded(.up))
-            let weights = try array([1, Self.frames], ArraySlice(repeating: 1, count: used))
-            let v = try floats(
-                embedding.prediction(from: MLDictionaryFeatureProvider(dictionary: ["fbank_features": features, "weights": weights])),
-                "embedding")
-            guard v.count == sum.count else { throw OfflineFailure(code: .internal) }
+            let v = try vector(chunk, weights: ArraySlice(repeating: 1, count: used))
             sum = zip(sum, v).map { $0 + $1 * Float(chunk.count) }
             total += chunk.count
         }
         return sum.map { $0 / Float(max(total, 1)) }
+    }
+
+    /// pyannote's way: the whole window through FBank, the speaker's frames weighted 1.
+    func embed(window: [Float], speaking: [Bool]) throws -> [Float] {
+        let weights = (0..<Self.frames).map { f in !speaking.isEmpty && speaking[f * speaking.count / Self.frames] ? Float(1) : 0 }
+        return try vector(window[...], weights: weights[...])
+    }
+
+    private func vector(_ audio: ArraySlice<Float>, weights: ArraySlice<Float>) throws -> [Float] {
+        guard let features = try fbank.prediction(
+            from: MLDictionaryFeatureProvider(dictionary: ["audio": array([1, 1, Self.window], audio)])
+        ).featureValue(for: "fbank_features")?.multiArrayValue
+        else { throw OfflineFailure(code: .internal) }
+        let v = try floats(
+            embedding.prediction(
+                from: MLDictionaryFeatureProvider(dictionary: ["fbank_features": features, "weights": array([1, Self.frames], weights)])),
+            "embedding")
+        guard v.count == Vectors.speakerDims else { throw OfflineFailure(code: .internal) }
+        return v
     }
 }
 
