@@ -927,9 +927,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.16 Job scheduler and pipeline jobs - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-jobs-scheduler`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-jobs-scheduler`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-jobs-scheduler.md](features/core/core-jobs-scheduler.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#230 #240); the post-call story E2E acceptance criterion waits on 2.17. FEATURE spec: [features/core/core-jobs-scheduler.md](features/core/core-jobs-scheduler.md)
 
 - **Purpose**: Run background work without disturbing a live call: triggers, priorities, the battery rule, the live-call rule (post-call keeps running at low priority, owner decision D2) and the pipeline jobs.
 
@@ -947,7 +947,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-degrade`
+  - `cpt-noter-principle-core-degrade`
 
 - **Design Constraints Covered**:
 
@@ -958,7 +958,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-jobs`
+  - `cpt-noter-component-core-jobs`
 
 - **API**:
   - Events: `jobs:progress`
