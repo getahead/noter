@@ -88,19 +88,19 @@ The user can inspect and reverse a correction, review or job batch without losin
 - An unreadable log returns `change_log_unreadable`; an invalid period returns `invalid_input`; closing the save panel returns `cancelled`.
 
 **Steps**:
-1. [ ] - `p1` - API: `history_list { target, actor, job_id, from, to, page }`; validate the target and period - `inst-read-request`
-2. [ ] - `p1` - DB: SELECT `changes` on a read-only connection with target, actor, job and date filters and stable page ordering - `inst-read-select`
-3. [ ] - `p1` - Assemble `ChangeRow` values with actor labels, batch sizes, evidence, undoable and redoable state; return an empty page when no rows match - `inst-read-assemble`
+1. [x] - `p1` - API: `history_list { target, actor, job_id, from, to, page }`; validate the target and period - `inst-read-request`
+2. [x] - `p1` - DB: SELECT `changes` on a read-only connection with target, actor, job and date filters and stable page ordering - `inst-read-select`
+3. [x] - `p1` - Assemble `ChangeRow` values with actor labels, batch sizes, evidence, undoable and redoable state; return an empty page when no rows match - `inst-read-assemble`
 4. [ ] - `p1` - **IF** the user calls `history_export { scope, format }` - `inst-export-request`
    1. [ ] - `p1` - Resolve whole-call or local-date period scope; show the native save panel - `inst-export-panel`
    2. [ ] - `p1` - **IF** cancelled, **RETURN** `cancelled` without creating a file - `inst-export-cancel`
    3. [ ] - `p1` - Read matching rows consistently and write one plain-language line per change for Markdown, or every export field for JSON - `inst-export-write`
    4. [ ] - `p1` - **RETURN** `ExportResult` only after the file is complete - `inst-export-result`
-5. [ ] - `p1` - **RETURN** the page of changes and its next cursor - `inst-read-return`
+5. [x] - `p1` - **RETURN** the page of changes and its next cursor - `inst-read-return`
 
 ### Undo or redo a change or batch
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-history-undo-reverse`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-history-undo-reverse`
 
 **Actor**: Primary user (main window or call screen)
 
@@ -112,50 +112,50 @@ The user can inspect and reverse a correction, review or job batch without losin
 - Wrong state: `already_undone`, `not_undone` or `not_undoable`. Every row edited later: `edited_later`. Missing target: `not_found`.
 
 **Steps**:
-1. [ ] - `p1` - API: `change_undo { target }` or `change_redo { target }`, where `UndoTarget` names a change or batch; a user-pressed mark or a pause gap has no change row and so no target (it is capture data, not undoable here) - `inst-reverse-request`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-history-undo-replay` on the writer queue - `inst-reverse-apply`
-3. [ ] - `p1` - After commit, publish whole changed entities through `entity:changed` or their owning service's state event; refresh transcript snapshots and per-call files for transcript changes - `inst-reverse-publish`
-4. [ ] - `p1` - **RETURN** `UndoResult` with `undone` and `skipped_edited_later`; no undo or redo expiry is applied - `inst-reverse-return`
+1. [x] - `p1` - API: `change_undo { target }` or `change_redo { target }`, where `UndoTarget` names a change or batch; a user-pressed mark or a pause gap has no change row and so no target (it is capture data, not undoable here) - `inst-reverse-request`
+2. [x] - `p1` - Run `cpt-noter-algo-core-history-undo-replay` on the writer queue - `inst-reverse-apply`
+3. [x] - `p1` - After commit, publish whole changed entities through `entity:changed` or their owning service's state event; refresh transcript snapshots and per-call files for transcript changes - `inst-reverse-publish`
+4. [x] - `p1` - **RETURN** `UndoResult` with `undone` and `skipped_edited_later`; no undo or redo expiry is applied - `inst-reverse-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Replay a logged change safely
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-history-undo-replay`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-history-undo-replay`
 
 **Input**: Undo or redo operation, `UndoTarget`, current records and the append-only change history.
 
 **Output**: Committed reversal and counts, or a typed error without mutations.
 
 **Steps**:
-1. [ ] - `p1` - On the single writer, load the target change or every member of its batch; **IF** absent **RETURN** `not_found` - `inst-replay-load`
-2. [ ] - `p1` - **IF** undo is requested for an irreversible change, **RETURN** `not_undoable`; if already undone, **RETURN** `already_undone` - `inst-replay-undo-guard`
-3. [ ] - `p1` - **IF** redo is requested for a target that is not undone, **RETURN** `not_undone` - `inst-replay-redo-guard`
-4. [ ] - `p1` - Decode single deltas or bulk blobs; group operations by target row so reversing several fields never overwrites another field's restoration - `inst-replay-deltas`
-5. [ ] - `p1` - Compare each target with its recorded post-change state for undo, or its restored state for redo; exclude rows with later independent edits and count skipped changes - `inst-replay-check-later`
-6. [ ] - `p1` - **IF** every target was edited later, **RETURN** `edited_later` - `inst-replay-all-skipped`
-7. [ ] - `p1` - **TRY** begin one transaction for eligible changes - `inst-replay-try`
-   1. [ ] - `p1` - For undo, restore before-values in reverse dependency order, increase editable revisions and mark the original changes undone - `inst-replay-before`
-   2. [ ] - `p1` - For redo, apply after-values in forward dependency order, increase revisions and append new applied rows linked by `redo_of`; original undone rows stay undone - `inst-replay-after`
-   3. [ ] - `p1` - Keep reasons, actors, evidence and batch linkage in the log; update derived indexes with primary records and commit - `inst-replay-commit`
-8. [ ] - `p1` - **CATCH** transaction or delta failure: roll back all eligible changes and return the typed storage or log error - `inst-replay-rollback`
-9. [ ] - `p1` - **RETURN** counts of reversed changes and later edits kept - `inst-replay-return`
+1. [x] - `p1` - On the single writer, load the target change or every member of its batch; **IF** absent **RETURN** `not_found` - `inst-replay-load`
+2. [x] - `p1` - **IF** undo is requested for an irreversible change, **RETURN** `not_undoable`; if already undone, **RETURN** `already_undone` - `inst-replay-undo-guard`
+3. [x] - `p1` - **IF** redo is requested for a target that is not undone, **RETURN** `not_undone` - `inst-replay-redo-guard`
+4. [x] - `p1` - Decode single deltas or bulk blobs; group operations by target row so reversing several fields never overwrites another field's restoration - `inst-replay-deltas`
+5. [x] - `p1` - Compare each target with its recorded post-change state for undo, or its restored state for redo; exclude rows with later independent edits and count skipped changes - `inst-replay-check-later`
+6. [x] - `p1` - **IF** every target was edited later, **RETURN** `edited_later` - `inst-replay-all-skipped`
+7. [x] - `p1` - **TRY** begin one transaction for eligible changes - `inst-replay-try`
+   1. [x] - `p1` - For undo, restore before-values in reverse dependency order, increase editable revisions and mark the original changes undone - `inst-replay-before`
+   2. [x] - `p1` - For redo, apply after-values in forward dependency order, increase revisions and append new applied rows linked by `redo_of`; original undone rows stay undone - `inst-replay-after`
+   3. [x] - `p1` - Keep reasons, actors, evidence and batch linkage in the log; update derived indexes with primary records and commit - `inst-replay-commit`
+8. [x] - `p1` - **CATCH** transaction or delta failure: roll back all eligible changes and return the typed storage or log error - `inst-replay-rollback`
+9. [x] - `p1` - **RETURN** counts of reversed changes and later edits kept - `inst-replay-return`
 
 ## 4. States (CDSL)
 
 ### Change reversal
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-history-undo-change`
+- [x] `p1` - **ID**: `cpt-noter-state-core-history-undo-change`
 
 **States**: applied, undone; proposed and rejected are read-only here (proposal decisions belong to M5)
 
 **Initial State**: applied for an applied mutation
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** applied **TO** undone **WHEN** undo commits for an undoable row not edited later - `inst-st-undo`
-2. [ ] - `p1` - **FROM** undone **TO** undone **WHEN** redo commits; new applied rows with `redo_of` represent the reapplied change - `inst-st-redo`
-3. [ ] - `p1` - **FROM** applied **TO** applied **WHEN** a later edit prevents reversal or the row is irreversible - `inst-st-ineligible`
-4. [ ] - `p1` - **FROM** undone **TO** undone **WHEN** a later edit prevents redo - `inst-st-redo-blocked`
+1. [x] - `p1` - **FROM** applied **TO** undone **WHEN** undo commits for an undoable row not edited later - `inst-st-undo`
+2. [x] - `p1` - **FROM** undone **TO** undone **WHEN** redo commits; new applied rows with `redo_of` represent the reapplied change - `inst-st-redo`
+3. [x] - `p1` - **FROM** applied **TO** applied **WHEN** a later edit prevents reversal or the row is irreversible - `inst-st-ineligible`
+4. [x] - `p1` - **FROM** undone **TO** undone **WHEN** a later edit prevents redo - `inst-st-redo-blocked`
 
 History derives `redoable` from current row history, including subsequent redo rows; the same undone handle cannot overwrite a later independent edit. There is no time window and no client-held redo token.
 
@@ -177,7 +177,7 @@ The system **MUST** serve filtered, paged History with before/after text, reason
 
 ### Reversal without lost edits
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-history-undo-reversal`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-history-undo-reversal`
 
 The system **MUST** reverse changes or whole batches through the single writer, skip later-edited rows, return exact counts, increase revisions and publish committed records. Redo must work at any later time by writing new rows, preserving the original history.
 
@@ -206,9 +206,9 @@ The system **MUST** pass unit tests for reversal ordering, partial batches, stal
 
 ## 6. Acceptance Criteria
 
-- [ ] Review an item, undo it and redo it much later using the same handle; revisions advance on each commit and stale edits return `conflict`.
-- [ ] Undo and redo a three-row batch after one row is edited elsewhere: two reverse, one is counted as skipped; an all-skipped batch returns `edited_later`.
-- [ ] Irreversible audio deletion returns `not_undoable`; proposed rows are not applied by these commands.
-- [ ] Unit tests inject a commit failure and prove no partial restoration or orphan log row is visible.
+- [x] Review an item, undo it and redo it much later using the same handle; revisions advance on each commit and stale edits return `conflict`.
+- [x] Undo and redo a three-row batch after one row is edited elsewhere: two reverse, one is counted as skipped; an all-skipped batch returns `edited_later`.
+- [x] Irreversible audio deletion returns `not_undoable`; proposed rows are not applied by these commands.
+- [x] Unit tests inject a commit failure and prove no partial restoration or orphan log row is visible.
 - [ ] Conformance against fake and real cores checks window scope, typed errors, page shape and undo results; real-core E2E successfully calls each of the four commands, including an export via the native panel seam.
 - [ ] `just gate` passes.

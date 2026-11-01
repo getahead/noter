@@ -257,7 +257,7 @@ fn parse_cursor(c: &Cursor) -> Result<(Sql, String), CoreError> {
 }
 
 impl Core {
-    fn ready(&self) -> Result<(), CoreError> {
+    pub(crate) fn ready(&self) -> Result<(), CoreError> {
         if self.store().state() == StoreState::Ready {
             Ok(())
         } else {
@@ -542,6 +542,13 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-library-calls-update:p1:inst-update-return
     }
 
+    /// The call as the Library shows it, `None` when it is gone.
+    pub(crate) fn call_row(&self, id: &str) -> Result<Option<CallRow>, CoreError> {
+        let now = self.deps.clock.now().0;
+        self.store()
+            .read(|c| select_call(c, id)?.map(|s| assemble(c, s, now)).transpose())
+    }
+
     // @cpt-flow:cpt-noter-flow-core-library-calls-types:p2
     pub(crate) fn call_types_now(&self) -> CallTypeList {
         // @cpt-begin:cpt-noter-flow-core-library-calls-types:p2:inst-types-call
@@ -721,7 +728,10 @@ fn note_pending(data_dir: &Path, id: &str) {
 }
 
 /// The speakers of a call as the call record shows them.
-fn speakers_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
+pub(crate) fn speakers_of(
+    c: &Connection,
+    call_id: &str,
+) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
     let mut stmt = c.prepare(&format!(
         "SELECT s.id, s.label, s.n, s.channel, s.person_id, s.named_by,
                 (SELECT count(*) FROM segments g WHERE g.speaker_id = s.id)
