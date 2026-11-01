@@ -97,22 +97,32 @@ e2e-tests: (_locked "_e2e-tests")
 
 _e2e-tests:
     rm -rf coverage/e2e
-    just _e2e-ui
+    pnpm --dir apps/desktop test:conformance
+    just _flows
     if [ -n "${NOTER_CORE_CMD:-}" ]; then just _e2e-core; fi
 
-# The suites against the fake world (CI job e2e-ui; not counted by the E2E coverage gate)
+# CI job e2e-ui carries the real-core UI flows when e2e-core does not run; fake runs are not counted
+# The suites against the fake world, plus the UI flows against the real core with NOTER_E2E_REAL=1
 e2e-ui: (_locked "_e2e-ui")
 
 _e2e-ui:
     pnpm --dir apps/desktop test:conformance
-    pnpm --dir apps/desktop test:e2e
+    just _flows
+    if [ "${NOTER_E2E_REAL:-}" = 1 ]; then NOTER_CORE=stdio just _flows; fi
 
 # The same suites against the real core over stdio (CI job e2e-core; needs NOTER_CORE_CMD, docs/HARNESS.md)
 e2e-core: (_locked "_e2e-core")
 
 _e2e-core:
     NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance
-    NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e
+    NOTER_CORE=stdio just _flows
+
+# The UI flows: every spec, or NOTER_E2E_SPECS (specs relative to apps/desktop, "" for none; CI sets
+# it to the specs of the features a pull request touches, harness.toml [ci.features])
+_flows:
+    if [ "${NOTER_E2E_SPECS-all}" = all ]; then pnpm --dir apps/desktop test:e2e; \
+    elif [ -n "$NOTER_E2E_SPECS" ]; then pnpm --dir apps/desktop test:e2e $NOTER_E2E_SPECS; \
+    else echo "e2e: no UI flow covers what this change touches"; fi
 
 # The E2E coverage gate over coverage/e2e and coverage/native (60% of what is delivered)
 e2e-coverage:

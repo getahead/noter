@@ -19,7 +19,9 @@ base with main. If the changed files cannot be read, every job runs.
 
 With GITHUB_OUTPUT set it writes `jobs` (JSON object job -> bool; for codeql,
 language -> analyse it rather than carry main's result forward), and for ci the
-facts the macOS and E2E jobs need (`engine`, `tauri`, `core_harness`, `native_tests`).
+facts the macOS and E2E jobs need (`engine`, `tauri`, `core_harness`, `native_tests`), the UI
+flows to re-run (`e2e_specs`: "all", the specs of the touched features, or "") and the run of main
+whose E2E logs judge the rest (`e2e_baseline`, NOTER_E2E_BASELINE; none means every flow runs).
 
   ci_changes.py verdict    # in an aggregator: RESULTS=toJSON(needs), EXPECTED=the jobs output
 
@@ -138,6 +140,48 @@ def apply_repo(p: Plan, repo: Repo) -> Plan:
     return Plan(p.workflow, jobs, p.reason, p.files, p.areas)
 
 
+PLAYWRIGHT = ("rust", "ui", "protocol", "e2e-suites")   # areas whose files can change a UI flow's result
+SPEC_DIR = "apps/desktop/tests/e2e/"
+NOT_FLOWS = ["apps/desktop/tests/conformance/**", "apps/desktop/tests/visual/**", "apps/desktop/vitest.conformance.config.ts"]
+
+
+def touched_specs(files: list[str], ci: dict, root: Path = ROOT) -> str:
+    """The UI flows a change must re-run: "all", or the space-separated specs (relative to apps/desktop)
+    of the features it touches (harness.toml [ci.features]); "" when it touches no flow."""
+    every = sorted(p.relative_to(root).as_posix() for p in (root / SPEC_DIR).glob("*.spec.ts"))
+    features = ci.get("features", {}).values()
+    specs: set[str] = set()
+    for f in files:
+        areas, _ = classify(f, ci)
+        if areas is None:
+            return "all"
+        if not any(a in PLAYWRIGHT for a in areas) or matches_any(f, NOT_FLOWS):
+            continue
+        if f.startswith(SPEC_DIR) and f.endswith(".spec.ts"):
+            specs.add(f)  # a deleted spec is passed too: Playwright then finds no test in it and fails loudly
+            continue
+        owners = [feat for feat in features if matches_any(f, feat["code"])]
+        if not owners:
+            return "all"
+        specs.update(s for feat in owners for s in every if matches_any(s, feat["specs"]))
+    return " ".join(sorted(s.removeprefix("apps/desktop/") for s in specs))
+
+
+def e2e_selection(p: Plan, ci: dict, baseline: str, root: Path = ROOT) -> tuple[Plan, str, str]:
+    """ci.yml only: which UI flows run (`e2e_specs`) and which run of main's logs judge the rest
+    (`e2e_baseline`). Without a baseline the change runs everything against the real core."""
+    jobs = dict(p.jobs)
+    if not any(jobs.get(j) for j in ("e2e-core", "e2e-ui", "e2e-coverage")):
+        return p, "", ""
+    specs = "all" if p.reason else touched_specs(p.files, ci, root)
+    if specs == "all" and jobs.get("e2e-core"):
+        return p, "all", ""
+    if not baseline:
+        jobs["e2e-core"] = True
+        return Plan(p.workflow, jobs, p.reason, p.files, p.areas), "all", ""
+    return p, specs, baseline
+
+
 def git(*args: str, root: Path = ROOT) -> str:
     out = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
     if out.returncode != 0:
@@ -197,6 +241,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ref", default=os.environ.get("GITHUB_REF_NAME", ""))
     ap.add_argument("--base", default=os.environ.get("NOTER_BASE_REF", "origin/main"))
     ap.add_argument("--files", nargs="*", help="explain these files instead of reading git")
+    ap.add_argument("--baseline", default=os.environ.get("NOTER_E2E_BASELINE", ""),
+                    help="id of main's latest successful CI run, whose E2E logs judge the flows not re-run")
     args = ap.parse_args(argv)
     try:
         cfg = harness_config()
@@ -209,11 +255,16 @@ def main(argv: list[str] | None = None) -> int:
                 files, reason = None, f"the changed files could not be read ({e})"
         p = plan(files, cfg, args.workflow, reason)
         repo = Repo.at(ROOT)
+        specs = baseline = ""
         if args.workflow == "ci":
-            p = apply_repo(p, repo)
+            # Explaining a list of files assumes main has a run to take the logs from.
+            p, specs, baseline = e2e_selection(apply_repo(p, repo), cfg["ci"], args.baseline or ("main" if args.files is not None else ""))
     except HarnessError as e:
         return fail(str(e))
-    write_summary(p.summary())
+    flows = "" if args.workflow != "ci" or not any(p.jobs.get(j) for j in ("e2e-core", "e2e-ui", "e2e-coverage")) else (
+        f"\nUI flows re-run: {'every spec' if specs == 'all' else specs or 'none'}"
+        + (f"; the rest judged on main's logs (run {baseline})" if baseline else "") + "\n")
+    write_summary(p.summary() + flows)
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as f:
@@ -221,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.workflow == "ci":
                 for k, v in vars(repo).items():
                     f.write(f"{k}={'true' if v else 'false'}\n")
+                f.write(f"e2e_specs={specs}\ne2e_baseline={baseline}\n")
     return 0
 
 

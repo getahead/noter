@@ -25,6 +25,13 @@ changed_min_lines = 80.0
 # Share of what has been delivered so far that the end-to-end suites exercise.
 commands_min = 60.0   # frozen IPC commands of delivered milestones invoked by the E2E suites
 stories_min = 60.0    # DESIGN.md stories of delivered milestones that an E2E test names
+# Per side (owner, 1 Nov 2026), over the same delivered set: backend = the conformance suite against
+# the real core, frontend = the UI flows against the real core and the XCUITest runs of the built app.
+# A side without a key here is reported, not enforced. backend_stories_min waits on conformance tests
+# that prove the M0 stories (0 of 3 on 1 Nov 2026); the owner decides when it is set.
+backend_commands_min = 60.0
+frontend_commands_min = 60.0
+frontend_stories_min = 60.0
 
 [gates.visual]
 min_pixel_match = 98.0        # per screenshot: at most 2% of pixels may differ from the baseline
@@ -178,6 +185,52 @@ js-source = [
 # An area is excluded from a file that also matches one of these.
 [ci.except]
 ui = ["apps/desktop/src-tauri/**", "apps/desktop/tests/native/**"]
+
+# The UI flows (Playwright, apps/desktop/tests/e2e) a pull request re-runs: the specs of the features
+# it touches. A changed spec runs itself; a code file in no feature below (shared UI, src/core, the
+# shell, other core modules and crates, the contract, test support) runs every spec. Pushes to main
+# and the nightly run every spec; e2e-coverage judges the fresh logs with main's for the rest.
+[ci.features.first-run]
+code = ["apps/desktop/src/features/first-run/**", "crates/noter-core/src/first_run.rs", "crates/noter-core/src/self_test.rs"]
+specs = ["apps/desktop/tests/e2e/m0-first-run*.spec.ts"]
+
+[ci.features.settings]
+code = [
+  "apps/desktop/src/features/settings/**", "crates/noter-core/src/settings.rs", "crates/noter-core/src/hotkeys.rs",
+  "crates/noter-core/src/glossary.rs",
+]
+specs = ["apps/desktop/tests/e2e/m0-settings-*.spec.ts"]
+
+[ci.features.record-prompt]
+code = ["apps/desktop/src/features/record-prompt/**", "crates/noter-core/src/capture.rs"]
+specs = ["apps/desktop/tests/e2e/m1-record-prompt*.spec.ts"]
+
+[ci.features.call-window]
+code = ["apps/desktop/src/features/call-window/**", "crates/noter-core/src/capture.rs"]
+specs = [
+  "apps/desktop/tests/e2e/m1-call-screen-*.spec.ts", "apps/desktop/tests/e2e/m1-call-window-ui.spec.ts",
+  "apps/desktop/tests/e2e/m1-floating-panel.spec.ts",
+]
+
+[ci.features.call-page]
+code = ["apps/desktop/src/features/call-page/**"]
+specs = ["apps/desktop/tests/e2e/m1-call-page-*.spec.ts"]
+
+[ci.features.library]
+code = ["apps/desktop/src/features/library/**", "crates/noter-core/src/library.rs"]
+specs = ["apps/desktop/tests/e2e/m1-library-*.spec.ts"]
+
+[ci.features.transcript]
+code = ["apps/desktop/src/features/transcript/**", "crates/noter-core/src/transcript.rs"]
+specs = ["apps/desktop/tests/e2e/m1-live-transcript-*.spec.ts", "apps/desktop/tests/e2e/m1-call-screen-replay-*.spec.ts"]
+
+[ci.features.notifications]
+code = ["apps/desktop/src/features/notifications/**", "crates/noter-core/src/notify.rs"]
+specs = ["apps/desktop/tests/e2e/m1-notifications-*.spec.ts", "apps/desktop/tests/e2e/m1-library-dialogs-notifications.spec.ts"]
+
+[ci.features.menu-bar]
+code = ["crates/noter-core/src/tray.rs"]
+specs = ["apps/desktop/tests/e2e/m1-menu-bar.spec.ts"]
 
 # job = the areas that switch it on ("always": every pull request).
 [ci.jobs.ci]

@@ -43,12 +43,30 @@ jobs:
       tauri: ${{ steps.c.outputs.tauri }}
       core_harness: ${{ steps.c.outputs.core_harness }}
       native_tests: ${{ steps.c.outputs.native_tests }}
+      e2e_specs: ${{ steps.c.outputs.e2e_specs }}
+      e2e_baseline: ${{ steps.c.outputs.e2e_baseline }}
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
+      # A pull request re-runs only the UI flows of the features it touches; main's latest
+      # successful run supplies the E2E logs for the rest. Without one, everything runs.
+      - name: Main's latest successful CI run
+        id: base
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success \
+            -L 1 --json databaseId -q '.[0].databaseId' || true)
+          echo "run=$run" >> "$GITHUB_OUTPUT"
       - id: c
+        env:
+          NOTER_E2E_BASELINE: ${{ steps.base.outputs.run }}
         run: python3 scripts/harness/ci_changes.py --workflow ci
 
   lint-rust:
@@ -154,6 +172,9 @@ jobs:
           path: apps/desktop/coverage/unit
           if-no-files-found: ignore
 
+  # The suites run per core. Main, the nightly and any change that touches shared code run every
+  # UI flow; a pull request otherwise re-runs the flows of the features it touches (`e2e_specs`,
+  # harness.toml [ci.features]) and e2e-coverage judges them with main's logs for the rest.
   e2e-core:
     name: End-to-end tests (real core)
     needs: changes
@@ -172,7 +193,9 @@ jobs:
       - name: Browsers for the UI flows
         run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
       - run: just e2e-core
-      # The logs e2e-coverage judges; a PR that skips this job is judged on main's (same name).
+        env:
+          NOTER_E2E_SPECS: ${{ needs.changes.outputs.e2e_specs }}
+      # On main this is the full set of real-core logs that pull requests are judged against.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-logs
@@ -190,16 +213,33 @@ jobs:
     needs: changes
     if: fromJSON(needs.changes.outputs.jobs)['e2e-ui']
     runs-on: ubuntu-24.04
+    env:
+      # When e2e-core does not run, this job carries the real-core UI flows of the touched features.
+      REAL_FLOWS: ${{ !fromJSON(needs.changes.outputs.jobs)['e2e-core'] && needs.changes.outputs.e2e_specs != '' && needs.changes.outputs.core_harness == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
         with:
-          rust: "false"
+          rust: ${{ env.REAL_FLOWS }}
+      - name: Build the core harness (real core over stdio)
+        if: env.REAL_FLOWS == 'true'
+        run: |
+          cargo build --locked -p noter-core-harness
+          echo "NOTER_CORE_CMD=$PWD/target/debug/noter-core-harness --fixture world" >> "$GITHUB_ENV"
+          echo "NOTER_E2E_REAL=1" >> "$GITHUB_ENV"
       - name: Browsers for the UI flows
         run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
       - run: just e2e-ui
+        env:
+          NOTER_E2E_SPECS: ${{ needs.changes.outputs.e2e_specs }}
+      - if: env.REAL_FLOWS == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-logs-ui
+          path: coverage/e2e
+          if-no-files-found: error
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -210,44 +250,71 @@ jobs:
   e2e-coverage:
     name: E2E coverage (60%)
     # Judged over the real-core logs and the macos job's XCUITest run together (stories and commands
-    # proven against the built app count too, HARNESS.md). Runs against the fake world never count,
-    # so e2e-ui is not waited for. When this change cannot reach the real core (e2e-core skipped),
-    # the real-core logs are those of the latest successful CI run on main.
-    needs: [changes, e2e-core, macos]
+    # proven against the built app count too, HARNESS.md); fake runs never count. A pull request that
+    # re-ran only part of the suites (`e2e_baseline` set) is judged on its fresh logs plus the logs of
+    # main's latest successful run for every suite and spec it did not re-run.
+    needs: [changes, e2e-core, e2e-ui, macos]
     if: >-
       !cancelled() && fromJSON(needs.changes.outputs.jobs)['e2e-coverage'] &&
       (needs.e2e-core.result == 'success' || needs.e2e-core.result == 'skipped') &&
+      (needs.e2e-ui.result == 'success' || needs.e2e-ui.result == 'skipped') &&
       (needs.macos.result == 'success' || needs.macos.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       actions: read
+      pull-requests: write
+    env:
+      SPECS: ${{ needs.changes.outputs.e2e_specs }}
+      BASELINE: ${{ needs.changes.outputs.e2e_baseline }}
+      CORE_RAN: ${{ fromJSON(needs.changes.outputs.jobs)['e2e-core'] }}
+      UI_REAL: ${{ !fromJSON(needs.changes.outputs.jobs)['e2e-core'] && needs.changes.outputs.e2e_specs != '' && needs.changes.outputs.core_harness == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - if: fromJSON(needs.changes.outputs.jobs)['e2e-core']
+      - if: env.CORE_RAN == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e2e-logs
           path: coverage/e2e
-      - name: Real-core logs of the latest successful run on main
-        if: "!fromJSON(needs.changes.outputs.jobs)['e2e-core']"
+      - if: env.UI_REAL == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: e2e-logs-ui
+          path: coverage/e2e
+      - name: Logs of main's latest successful run, for what this change did not re-run
+        if: env.BASELINE != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success \
-            -L 1 --json databaseId -q '.[0].databaseId')
-          [ -n "$run" ] || { echo "::error::no successful CI run on main to take the real-core logs from"; exit 1; }
-          echo "Real-core logs from main's run $run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run" | tee -a "$GITHUB_STEP_SUMMARY"
-          gh run download "$run" -R "$GITHUB_REPOSITORY" -n e2e-logs -D coverage/e2e
+          echo "Not re-run here: judged on main's run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$BASELINE" | tee -a "$GITHUB_STEP_SUMMARY"
+          gh run download "$BASELINE" -R "$GITHUB_REPOSITORY" -n e2e-logs -D coverage/main
       - name: XCUITest results from the macos job
         if: needs.changes.outputs.native_tests == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-native
           path: coverage/native
-      - run: python3 scripts/harness/e2e_coverage.py
+      - run: |
+          args=()
+          if [ -n "$BASELINE" ]; then args=(--baseline 'coverage/main/commands-*.json' --rerun-specs "$SPECS"); fi
+          if [ -n "$BASELINE" ] && [ "$CORE_RAN" = true ]; then args+=(--rerun-conformance); fi
+          python3 scripts/harness/e2e_coverage.py "${args[@]}" | tee coverage/e2e-report.md
+      # The two sides' numbers on the pull request: one comment, updated by every run.
+      - name: E2E coverage on the pull request
+        if: always() && github.event_name == 'pull_request' && hashFiles('coverage/e2e-report.md') != ''
+        continue-on-error: true # a fork's token cannot comment; the job summary has the same report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- noter-e2e-coverage -->'
+          body="$marker"$'\n'"$(cat coverage/e2e-report.md)"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            -q ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -n 1)
+          if [ -n "$id" ]; then gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
+          else gh pr comment "$PR" -R "$GITHUB_REPOSITORY" --body "$body"; fi
 
   visual:
     name: Screenshots (98% per pixel)
