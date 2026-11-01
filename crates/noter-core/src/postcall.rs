@@ -550,6 +550,16 @@ impl Core {
         })
     }
 
+    fn stored_section(
+        &self,
+        call: &CallId,
+        kind: SectionKind,
+    ) -> Result<Option<Stored>, CoreError> {
+        let id = call.as_str().to_owned();
+        let rows = self.store().read(move |c| stored(c, "call_id", &id))?;
+        Ok(rows.into_iter().find(|s| s.kind == kind))
+    }
+
     /// The rows one generated section commits: a new version, and the section pointing at it.
     fn section_rows(
         &self,
@@ -594,7 +604,8 @@ impl Core {
                 entity_type: "summary",
                 table: "summaries",
                 id: summary,
-                base_rev: None,
+                // A section written meanwhile fails the batch rather than being overwritten.
+                base_rev: existing.map(|s| Rev(s.rev)),
                 bump_rev: true,
                 values: section,
             },
@@ -623,14 +634,11 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-sections
         for (n, kind) in kinds.into_iter().enumerate() {
             ctx.checkpoint().await?;
-            let id = call.as_str().to_owned();
-            let existing = self
-                .store()
-                .read(move |c| stored(c, "call_id", &id))?
-                .into_iter()
-                .find(|s| s.kind == kind);
             // shortcut: an edited section is kept as it is; slice 2 merges a new generation in.
-            if existing.as_ref().is_some_and(|s| s.user_edited) {
+            if self
+                .stored_section(call, kind)?
+                .is_some_and(|s| s.user_edited)
+            {
                 committed += 1;
                 continue;
             }
@@ -651,8 +659,9 @@ impl Core {
                     self.postcall.set(call, kind, failed.clone());
                     self.progress(call, kind, failed);
                     first_failure.get_or_insert(code);
+                    // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-failed-section
                     continue;
-                } // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-failed-section
+                }
             };
             // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-commit
             // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-owner
@@ -661,6 +670,15 @@ impl Core {
             let Some(now) = self.current(call)? else {
                 return Ok(());
             };
+            // An edit that landed while the model ran stays the current version.
+            let existing = self.stored_section(call, kind)?;
+            if let Some(edited) = existing.as_ref().filter(|s| s.user_edited) {
+                let state = section(Some(edited), kind, None).state;
+                self.postcall.set(call, kind, state.clone());
+                self.progress(call, kind, state);
+                committed += 1;
+                continue;
+            }
             let mut rows = self.section_rows(call, kind, existing.as_ref(), &g);
             let first = committed == 0 && now.status == "processing";
             if first {

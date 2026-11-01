@@ -572,3 +572,73 @@ async fn regenerate_queues_a_regeneration_run_and_refuses_during_capture() {
         .unwrap_err();
     assert_eq!(blocked.code, ErrorCode::JobBlocked);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_second_run_adds_versions_and_keeps_an_edit_made_while_the_model_ran() {
+    let mut lines = vec![r#"{"on": "post-call"}"#; 7];
+    lines.push(r#"{"on": "post-call", "after_ms": 5000}"#);
+    let (core, _events, _dir) = open(&lines.join("\n")).await;
+    seed_call(&core, CALL, 3);
+    post_call(&core, CALL);
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    let summary = outputs(&core, CALL).await.sections[0]
+        .summary_id
+        .clone()
+        .unwrap();
+    // Continue Recording and a later stop queue a new generation; the summary is edited while
+    // the model writes it.
+    let run = post_call(&core, CALL);
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    edit(&core, CALL, summary.as_str(), 1, "Mine.")
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    assert_eq!(run_status(&core, &run).0, JobRunStatus::Succeeded);
+    let again = outputs(&core, CALL).await;
+    assert_eq!(again.sections[0].body_md.as_deref(), Some("Mine."));
+    assert_eq!(again.sections[0].state, SectionState::Ready);
+    assert_eq!(
+        again.sections[0].version_count, 2,
+        "the late generation is not kept over the edit"
+    );
+    assert_eq!(again.sections[1].version_count, 2);
+    assert_eq!(again.sections[1].rev, Some(Rev(2)));
+    assert_eq!(again.status, OutputsStatus::Ready);
+}
+
+#[tokio::test(start_paused = true)]
+async fn regenerate_refuses_a_section_the_call_type_does_not_have() {
+    let (core, _events, _dir) = open("").await;
+    core.store()
+        .insert_batch(vec![ins(
+            "calls",
+            vec![
+                ("id", json!("call_1on1")),
+                ("rev", json!(1)),
+                ("started_at", json!(NOW - 3_600_000)),
+                ("ended_at", json!(NOW - 60_000)),
+                ("title", json!("1:1")),
+                ("call_type", json!("one_on_one")),
+                ("status", json!("ready")),
+                ("mode_used", json!("cloud")),
+            ],
+        )])
+        .unwrap();
+    let args = |sections: Vec<SectionKind>| RegenerateArgs {
+        call_id: CallId::new("call_1on1"),
+        sections,
+        runtime: None,
+        model: None,
+        skill: None,
+        local: false,
+    };
+    let extras = core
+        .outputs_regenerate(&main_window(), args(vec![SectionKind::CallTypeExtras]))
+        .await
+        .unwrap_err();
+    assert_eq!(extras.code, ErrorCode::InvalidInput);
+    // No sections means all of them.
+    core.outputs_regenerate(&main_window(), args(vec![]))
+        .await
+        .unwrap();
+}
