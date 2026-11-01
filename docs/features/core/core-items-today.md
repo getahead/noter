@@ -246,7 +246,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Resolve and format share content
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-items-today-format`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-items-today-format`
 
 **Input**: Call ids, `ShareScope`, requested format and current committed outputs/items.
 
@@ -254,7 +254,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 **Steps**:
 1. [x] - `p1` - Treat empty section or item selectors as all content within their containing selection; reject item ids outside the selected call or sections - `inst-format-scope`
-2. [ ] - `p1` - Read only committed available sections; **IF** nothing requested is ready **RETURN** `outputs_not_ready` - `inst-format-ready`
+2. [x] - `p1` - Read only committed available sections; **IF** nothing requested is ready **RETURN** `outputs_not_ready` - `inst-format-ready`
 3. [x] - `p1` - Count suggested items in scope; **IF** present and `include_unreviewed` is false **RETURN** `unreviewed_in_scope`; otherwise include them visibly marked Not reviewed - `inst-format-review`
 4. [x] - `p1` - Omit rejected items; render Slack, Jira or Markdown with owners, dates and evidence links, escaping target markup and excluding raw HTML - `inst-format-render`
 5. [x] - `p1` - Keep explicit sensitive-call copies available, reporting sensitivity; this clipboard action is not an automatic cloud request - `inst-format-sensitive`
@@ -324,7 +324,7 @@ The system **MUST** assemble Today from permitted EventKit data and local record
 
 ### Sharing, export and tags
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-items-today-sharing`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-items-today-sharing`
 
 The system **MUST** format exactly the selected scope, guard unreviewed items, write rich clipboard formats and export only requested files through the native panel. Tag additions and removals across selected calls must be validated, case-normalized for uniqueness, serialized by the writer and undoable, with suggestions drawn only from current usage. The command has no caller-supplied revision.
 

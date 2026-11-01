@@ -360,8 +360,6 @@ fn html(blocks: &[Block]) -> String {
 /// What a share or export needs of the `calls` row.
 struct Facts {
     title: String,
-    sensitive: bool,
-    outputs_ready: bool,
     audio_kept: bool,
 }
 
@@ -447,16 +445,12 @@ impl Core {
         self.store()
             .read(|c| {
                 c.query_row(
-                    "SELECT title, privacy_class, outputs_status, audio_deleted, audio_not_stored
-                     FROM calls WHERE id = ?1",
+                    "SELECT title, audio_deleted, audio_not_stored FROM calls WHERE id = ?1",
                     [id],
                     |r| {
-                        let status: String = r.get(2)?;
                         Ok(Facts {
                             title: r.get(0)?,
-                            sensitive: r.get::<_, String>(1)? == "sensitive",
-                            outputs_ready: status == "ready" || status == "partially_failed",
-                            audio_kept: r.get::<_, i64>(3)? == 0 && r.get::<_, i64>(4)? == 0,
+                            audio_kept: r.get::<_, i64>(1)? == 0 && r.get::<_, i64>(2)? == 0,
                         })
                     },
                 )
@@ -465,55 +459,26 @@ impl Core {
             .ok_or_else(not_found)
     }
 
-    /// The call's committed output sections as share reads them.
-    // shortcut: only the item sections (decisions, action items, open questions, risks) are read,
-    // from `items`; the text sections live in 2.17's `summaries`: read them through its
-    // `outputs_now` once that is on main.
-    fn outputs_for_share(&self, id: &CallId, facts: &Facts) -> Result<CallOutputs, CoreError> {
+    /// The call's committed output sections as share reads them: post-call's sections, with the
+    /// item sections carrying their `items` rows (their Markdown stands in until there are any).
+    fn outputs_for_share(&self, id: &CallId) -> Result<CallOutputs, CoreError> {
+        let mut outputs = self.outputs_now(id)?;
         let items = self.items_of_call(id.as_str())?;
-        let state = if facts.outputs_ready {
-            SectionState::Ready
-        } else {
-            SectionState::Writing
-        };
-        let sections = [
-            (SectionKind::Decisions, ItemKind::Decision),
-            (SectionKind::ActionItems, ItemKind::ActionItem),
-            (SectionKind::OpenQuestions, ItemKind::OpenQuestion),
-            (SectionKind::Risks, ItemKind::Risk),
-        ]
-        .into_iter()
-        .map(|(kind, item_kind)| OutputSection {
-            kind,
-            state: state.clone(),
-            summary_id: None,
-            rev: None,
-            body_md: None,
-            items: items
-                .iter()
-                .filter(|i| i.kind == item_kind)
-                .cloned()
-                .collect(),
-            reviews: vec![],
-            writer: None,
-            user_edited: false,
-            regenerated_with_edits: false,
-            version_count: 1,
-        })
-        .collect();
-        Ok(CallOutputs {
-            call_id: id.clone(),
-            status: if facts.outputs_ready {
-                OutputsStatus::Ready
-            } else {
-                OutputsStatus::Writing
-            },
-            sections,
-            archive: ArchiveStatus::NotStarted,
-            review_waiting: 0,
-            sensitive: facts.sensitive,
-            written_locally: false,
-        })
+        for s in &mut outputs.sections {
+            let kind = match s.kind {
+                SectionKind::Decisions => ItemKind::Decision,
+                SectionKind::ActionItems => ItemKind::ActionItem,
+                SectionKind::OpenQuestions => ItemKind::OpenQuestion,
+                SectionKind::Risks => ItemKind::Risk,
+                _ => continue,
+            };
+            let mine: Vec<ItemView> = items.iter().filter(|i| i.kind == kind).cloned().collect();
+            if !mine.is_empty() {
+                s.items = mine;
+                s.body_md = None;
+            }
+        }
+        Ok(outputs)
     }
 
     // @cpt-flow:cpt-noter-flow-core-items-today-share:p1
@@ -521,8 +486,7 @@ impl Core {
     pub(crate) async fn copy_share(&self, args: ShareCopyArgs) -> Result<ShareResult, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-request
         self.ready()?;
-        let facts = self.call_facts(args.call_id.as_str())?;
-        let outputs = self.outputs_for_share(&args.call_id, &facts)?;
+        let outputs = self.outputs_for_share(&args.call_id)?;
         let shared = render(&outputs, &args.scope, args.format)?;
         // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-request
         // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-copy
@@ -544,7 +508,7 @@ impl Core {
             sections: shared.sections,
             items: shared.items,
             unreviewed_in_scope: shared.unreviewed,
-            sensitive: facts.sensitive,
+            sensitive: outputs.sensitive,
         })
         // @cpt-end:cpt-noter-algo-core-items-today-format:p1:inst-format-sensitive
         // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-copy
@@ -585,7 +549,7 @@ impl Core {
             // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-fail
             // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-export
             if want.summary_and_items {
-                let outputs = self.outputs_for_share(id, &facts)?;
+                let outputs = self.outputs_for_share(id)?;
                 let shared = render(&outputs, &scope, ShareFormat::Markdown)?;
                 files.push((format!("{base}.md"), Content::Text(shared.markdown)));
             }

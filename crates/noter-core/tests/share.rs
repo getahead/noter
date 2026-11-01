@@ -132,6 +132,39 @@ fn segment(id: &str, call_id: &str, t0: i64, t1: i64, text: &str) -> Insert {
     )
 }
 
+/// A committed section: its row and the one generated version it points at.
+fn section(call_id: &str, kind: &str, body: &str) -> Vec<Insert> {
+    let (id, version) = (
+        format!("sum_{call_id}_{kind}"),
+        format!("ver_{call_id}_{kind}"),
+    );
+    vec![
+        row(
+            "summaries",
+            &[
+                ("id", json!(id)),
+                ("rev", json!(1)),
+                ("call_id", json!(call_id)),
+                ("kind", json!(kind)),
+                ("current_version_id", json!(version)),
+            ],
+        ),
+        row(
+            "summary_versions",
+            &[
+                ("id", json!(version)),
+                ("summary_id", json!(id)),
+                ("n", json!(1)),
+                ("kind", json!("generated")),
+                ("body_md", json!(body)),
+                ("lang", json!("en")),
+                ("from_pass", json!("live")),
+                ("created_at", json!(1_792_000_700_000_i64)),
+            ],
+        ),
+    ]
+}
+
 fn world(core: &Core) {
     core.store()
         .insert_batch(vec![
@@ -148,6 +181,17 @@ fn world(core: &Core) {
             segment("seg_2", "call_a", 5_000, 7_000, "Ship it"),
         ])
         .unwrap();
+    let mut rows: Vec<Insert> = ["call_a", "call_sens", "call_gone"]
+        .into_iter()
+        .flat_map(|c| ["decisions", "action_items", "risks"].map(|k| (c, k)))
+        .flat_map(|(c, k)| section(c, k, &format!("- body of {k}")))
+        .collect();
+    rows.extend(section(
+        "call_a",
+        "summary",
+        "We **agreed** to ship <script>x</script>.",
+    ));
+    core.store().insert_batch(rows).unwrap();
 }
 
 fn args(call_id: &str, format: ShareFormat) -> ShareCopyArgs {
@@ -205,14 +249,19 @@ async fn share_copy_puts_plain_markdown_and_html_on_the_clipboard() {
         .unwrap();
     assert_eq!(
         (r.sections, r.items, r.unreviewed_in_scope, r.sensitive),
-        (2, 2, 0, false)
+        (3, 2, 0, false)
     );
     assert!(
         r.text.contains("*Action items*") && r.text.contains("Use Rust"),
         "{}",
         r.text
     );
-    assert!(!r.text.contains("Rejected risk"));
+    assert!(!r.text.contains("Rejected risk") && !r.text.contains("body of risks"));
+    assert!(
+        r.text.contains("*agreed*") && r.text.contains("&lt;script&gt;"),
+        "{}",
+        r.text
+    );
     let board = native.clipboard.lock().unwrap();
     assert_eq!(board.len(), 1);
     assert_eq!(board[0].plain, r.text);
@@ -222,6 +271,22 @@ async fn share_copy_puts_plain_markdown_and_html_on_the_clipboard() {
         .as_ref()
         .unwrap()
         .contains("<h2>Decisions</h2>"));
+}
+
+#[tokio::test]
+async fn share_copy_of_one_section_copies_that_section_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path(), None);
+    world(&core);
+    let mut one = args("call_a", ShareFormat::Markdown);
+    one.scope.sections = vec![SectionKind::Summary];
+    let r = core.share_copy(&ctx(), one).await.unwrap();
+    assert_eq!((r.sections, r.items), (1, 0));
+    assert!(
+        r.text.contains("agreed") && !r.text.contains("Use Rust"),
+        "{}",
+        r.text
+    );
 }
 
 #[tokio::test]
