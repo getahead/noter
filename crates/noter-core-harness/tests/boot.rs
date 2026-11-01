@@ -914,6 +914,73 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     r.finish().await;
 }
 
+// TL-13: with no `--llm-script` the scripted runtime answers the post-call skill with its
+// built-in valid output, so a real-core call goes from `capture_stop` to its outputs.
+#[tokio::test]
+async fn a_stopped_call_gets_its_outputs_from_the_scripted_runtime_without_a_script() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({ "source": "today", "sensitive": false }),
+        )
+        .await;
+    let call_id = started["call_id"].clone();
+    r.ok("main", "capture_stop", json!({ "call_id": call_id }))
+        .await;
+    let mut outputs = Value::Null;
+    for _ in 0..250 {
+        outputs = r
+            .ok("main", "outputs_get", json!({ "call_id": call_id }))
+            .await;
+        if outputs["status"] == "ready" {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(outputs["status"], "ready", "{outputs}");
+    assert_eq!(outputs["sections"][0]["kind"], "summary");
+    let call = r
+        .ok("main", "call_get", json!({ "call_id": call_id }))
+        .await;
+    assert_eq!(call["call"]["status"], "ready", "{call}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_fixture_outputs_are_seeded_as_summary_rows() {
+    let mut r = start().await;
+    let outputs = r
+        .ok("main", "outputs_get", json!({ "call_id": "call_backend" }))
+        .await;
+    let summary = &outputs["sections"][0];
+    assert_eq!(summary["kind"], "summary");
+    assert_eq!(summary["summary_id"], "sum_backend");
+    assert_eq!(summary["rev"], 2);
+    assert_eq!(summary["version_count"], 2);
+    assert_eq!(summary["writer"]["runtime"], "claude_api_key");
+    assert_eq!(summary["writer"]["model"], "claude-sonnet");
+    assert!(summary["body_md"]
+        .as_str()
+        .unwrap()
+        .starts_with("Backend and QA aligned"));
+    let versions = r
+        .ok(
+            "main",
+            "output_versions",
+            json!({ "summary_id": "sum_backend" }),
+        )
+        .await;
+    assert_eq!(versions["versions"].as_array().unwrap().len(), 2);
+    r.finish().await;
+}
+
 #[tokio::test]
 async fn a_capture_seeded_through_world_set_shows_the_call_window() {
     let mut r = start().await;

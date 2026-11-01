@@ -560,7 +560,9 @@ async fn an_engine_that_cannot_start_leaves_the_call_failed_not_refused() {
         .await
         .unwrap();
     assert_eq!(stopped.phase, CapturePhase::Stopped);
-    // The transcript file is written at the call's end: processing becomes ready.
+    // The post-call job writes the call's outputs (empty: nothing was heard): processing
+    // becomes ready.
+    tokio::time::sleep(Duration::from_secs(1)).await;
     assert_eq!(r.query::<String>("SELECT status FROM calls"), "ready");
 }
 
