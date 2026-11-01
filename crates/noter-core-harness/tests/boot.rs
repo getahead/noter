@@ -186,6 +186,26 @@ async fn fail_next_fails_the_next_call_once() {
     r.finish().await;
 }
 
+#[tokio::test]
+async fn the_record_prompt_fit_reaches_the_scripted_native_layer() {
+    let mut r = start().await;
+    r.ok(
+        "record-prompt",
+        "window_fit",
+        json!({ "width": 372, "height": 127 }),
+    )
+    .await;
+    let calls = r.ok("main", "harness.surfaces", json!({})).await["calls"].clone();
+    assert!(
+        calls
+            .as_array()
+            .unwrap()
+            .contains(&json!("fit_record_prompt 372x127")),
+        "{calls}"
+    );
+    r.finish().await;
+}
+
 // W13
 #[tokio::test]
 async fn world_get_then_set_changes_nothing() {

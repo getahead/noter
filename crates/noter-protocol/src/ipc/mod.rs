@@ -605,6 +605,8 @@ commands! {
     window_report_view(ViewReportArgs) -> Ack [Windows, Frozen, Main];
     /// Native announcement for a panel that is not key (D55).
     window_announce(AnnounceArgs) -> Ack [Windows, Frozen, CallScreen | RecordPrompt];
+    /// The record prompt reports its content size; the panel fits it, 360 to 440 pt wide.
+    window_fit(FitArgs) -> Ack [Windows, Frozen, RecordPrompt];
     /// Open a URL, a document citation, a System Settings pane or a Finder location.
     open_external(OpenExternalArgs) -> Ack [Windows, Frozen, Main | CallScreen | Settings | FirstRun];
 }

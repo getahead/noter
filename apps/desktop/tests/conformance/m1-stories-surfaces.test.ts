@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { exercised } from "../support/core";
-import { ok, until } from "../support/results";
+import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -163,7 +163,7 @@ describe("cpt-noter-seq-menu-bar-check-state", () => {
 });
 
 describe("the window commands", () => {
-  it("window_report_view, window_navigate, window_announce and open_external each succeed at least once", async () => {
+  it("window_report_view, window_navigate, window_announce, window_fit and open_external each succeed at least once", async () => {
     const main = s.core("main");
     const nav = await s.events("nav:request");
     ok(await main.windowReportView({ call_id: null }));
@@ -171,6 +171,9 @@ describe("the window commands", () => {
     await until(() => nav.latest()?.type === "call_page", "nav:request");
     ok(await main.windowReportView({ call_id: W.PAST_CALL }));
     ok(await s.core("call-screen").windowAnnounce({ text: "Recording paused", politeness: "polite" }));
+    ok(await s.core("record-prompt").windowFit({ width: 372, height: 127 }));
+    expect(refused(await s.core("record-prompt").windowFit({ width: 0, height: 127 })).code).toBe("invalid_input");
+    if (real()) expect(await asked()).toEqual(expect.arrayContaining(["fit_record_prompt 372x127"]));
     ok(await main.openExternal({ target: { type: "system_settings", permission: "system_audio" } }));
     if (real()) expect(await asked()).toEqual(expect.arrayContaining(["open_external system_settings"]));
     expect(ok(await s.core("call-screen").windowSetCallLayout({ preference: "auto" })).layout).toMatch(/^(dedicated|floating)$/);

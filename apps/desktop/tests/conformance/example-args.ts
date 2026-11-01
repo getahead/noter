@@ -179,5 +179,6 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   window_navigate: {},
   window_report_view: {},
   window_announce: {"text": "noter", "politeness": "polite"},
+  window_fit: {"width": 372, "height": 127},
   open_external: {"target": {"type": "url", "url": "https://example.com"}},
 };

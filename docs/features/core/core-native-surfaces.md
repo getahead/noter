@@ -64,7 +64,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Principles**: `cpt-noter-principle-core-degrade`
 
 **Delivers**:
-- Frozen commands (M1): `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_share_warning_seen`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `window_report_view`, `open_external`.
+- Frozen commands (M1): `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_share_warning_seen`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `window_report_view`, `open_external`, `window_fit`.
 - Events: `window:call`, `app:presenting`, `nav:request`.
 - DESIGN.md stories (M1): `cpt-noter-seq-call-screen-hide-for-presenting`, `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen`, `cpt-noter-seq-menu-bar-check-state`, `cpt-noter-seq-notifications-allow-notifications`; the menu bar half of `cpt-noter-seq-menu-bar-control-recording`.
 - The app's E2E command log for native callers (`NOTER_E2E_LOG_DIR`), so XCUITest runs count toward the E2E bar.
@@ -232,7 +232,10 @@ During a call Noter must never steal focus from the call app, never appear in a 
 1. [x] - `p1` - Convert the windows to NSPanel with the non-activating style through tauri-nspanel (pinned commit) - `inst-convert`
 2. [x] - `p1` - Set the sharing type so screen capture excludes them - `inst-content-protect`
 3. [x] - `p1` - Keep them above normal windows on every Space while a call runs - `inst-level`
-4. [x] - `p1` - **RETURN** - `inst-return-panels`
+4. [x] - `p1` - Draw the record prompt without a title bar on a transparent background, so the panel is its content - `inst-chrome`
+5. [x] - `p1` - Take the first click on a panel while another app is active: it acts at once instead of only making the panel key - `inst-first-click`
+6. [x] - `p1` - API: `window_fit { width, height }` from the record prompt: resize it to its content, 360 to 440 pt wide and at most 480 pt high, keeping its top-right corner; **IF** either is 0 **RETURN** `invalid_input` - `inst-fit`
+7. [x] - `p1` - **RETURN** - `inst-return-panels`
 
 ### Calendar facts for detection
 
@@ -287,7 +290,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-panels`
 
-The system **MUST** make the call window and the record prompt non-activating, content-protected panels, place the call window by display identity, switch layouts on display changes, and answer the window commands with a versioned `CallWindowState`.
+The system **MUST** make the call window and the record prompt non-activating, content-protected panels, fit the record prompt to its content, place the call window by display identity, switch layouts on display changes, and answer the window commands with a versioned `CallWindowState`.
 
 **Implements**:
 - `cpt-noter-flow-core-native-surfaces-call-window`
@@ -299,7 +302,7 @@ The system **MUST** make the call window and the record prompt non-activating, c
 **Constraints**: `cpt-noter-constraint-core-macos`
 
 **Touches**:
-- API: `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window:call`
+- API: `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_fit`, `window:call`
 - Entities: `CallWindowState`
 
 ### Every surface hides at once

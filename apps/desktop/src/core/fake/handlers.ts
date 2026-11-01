@@ -1745,6 +1745,11 @@ export const defaultHandlers: Handlers = {
     if (!a.text.trim()) throw coreError("invalid_input", "text", { type: "validation", field: "text", rule: "required" });
     return ack;
   },
+  window_fit: (a) => {
+    for (const field of ["width", "height"] as const)
+      if (a[field] === 0) throw coreError("invalid_input", field, { type: "validation", field, rule: "required" });
+    return ack;
+  },
   open_external: (a) => {
     if (a.target.type === "url" && !/^https?:\/\//.test(a.target.url)) throw coreError("invalid_input", "http(s) only", { type: "validation", field: "url", rule: "invalid_format" });
     return ack;

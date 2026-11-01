@@ -449,6 +449,22 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-navigate
     }
 
+    /// The record prompt fits its content: as wide as DESIGN allows (360 to 440 pt), at most
+    /// 480 pt high.
+    pub(crate) fn fit_record_prompt(&self, args: FitArgs) -> Result<(), CoreError> {
+        // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
+        for (field, value) in [("width", args.width), ("height", args.height)] {
+            if value == 0 {
+                return Err(invalid(field, ValidationRule::Required));
+            }
+        }
+        self.deps
+            .surfaces
+            .fit_record_prompt(args.width.clamp(360, 440), args.height.min(480));
+        // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
+        Ok(())
+    }
+
     pub(crate) fn announce(&self, args: AnnounceArgs) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-announce
         if args.text.trim().is_empty() {

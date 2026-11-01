@@ -47,6 +47,8 @@ pub trait Surfaces: Send + Sync {
     fn call_surface_visible(&self) -> bool;
     /// Delivers a notification now (`UNUserNotificationCenter`); when is the core's rule.
     fn post_notification(&self, notification: &Notification);
+    /// The record prompt takes this size (points), keeping its top-right corner.
+    fn fit_record_prompt(&self, _width: u32, _height: u32) {}
 }
 
 /// No native layer: nothing is shown.

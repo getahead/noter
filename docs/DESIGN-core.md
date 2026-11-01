@@ -1256,6 +1256,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `app_set_hidden_for_presenting` | Windows. Hide for Presenting (wanted state). `HiddenArgs → PresentingState`. Windows: CM. | frozen |
 | Command | `window_navigate` | Windows. Show Noter / Open in Noter at a place (main window or Settings window). `NavigateArgs → Ack`. Windows: MCRSF. | frozen |
 | Command | `window_announce` | Windows. Native announcement for a panel that is not key (D55). `AnnounceArgs → Ack`. Windows: CR. | frozen |
+| Command | `window_fit` | Windows. The record prompt reports its content size; the panel fits it, 360 to 440 pt wide. `FitArgs → Ack`. Windows: R. | frozen |
 | Command | `window_report_view` | Windows. The main window reports which call it shows (or none), so no notification is sent for that call while it is frontmost. `ViewReportArgs → Ack`. Windows: M. | frozen |
 | Command | `open_external` | Windows. Open a URL, a document citation, a System Settings pane or a Finder location. `OpenExternalArgs → Ack`. Windows: MCSF. | frozen |
 | Event | `capture:state` | The capture state machine, whole, on every change. Payload `CaptureState`. | frozen |

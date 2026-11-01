@@ -44,7 +44,8 @@ tauri_panel! {
     })
 }
 
-/// Floating call panel and its collapsed strip, record prompt (points).
+/// Floating call panel and its collapsed strip, record prompt until its content reports its size
+/// (points).
 const PANEL: (f64, f64) = (380.0, 600.0);
 const STRIP: (f64, f64) = (380.0, 56.0);
 const PROMPT: (f64, f64) = (360.0, 132.0);
@@ -638,6 +639,10 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
         builder
+            // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-first-click
+            // The first click on a panel of an inactive app acts, instead of only making it key.
+            .accept_first_mouse(true)
+            // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-first-click
             .content_protected(true)
             .always_on_top(true)
             .visible_on_all_workspaces(true)
@@ -648,6 +653,13 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
     } else {
         builder
     };
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-chrome
+    let builder = if matches!(label, WindowLabel::RecordPrompt) {
+        builder.decorations(false).transparent(true)
+    } else {
+        builder
+    };
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-chrome
     let window = builder.build().ok()?;
     if is_panel(label) {
         make_panel(&window);
@@ -675,6 +687,8 @@ pub struct TauriSurfaces<R: Runtime> {
     /// The display and layout the call window was last placed on, uncollapsed: where a move or
     /// resize by the user is saved.
     placed: Mutex<Option<(DisplayId, CallLayout)>>,
+    /// The record prompt's size: its content's, once reported (`window_fit`).
+    prompt_size: Mutex<(f64, f64)>,
     this: OnceLock<Weak<TauriSurfaces<R>>>,
 }
 
@@ -692,6 +706,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             hidden: Mutex::new(Vec::new()),
             frames,
             placed: Mutex::new(None),
+            prompt_size: Mutex::new(PROMPT),
             this: OnceLock::new(),
         });
         let _ = surfaces.this.set(Arc::downgrade(&surfaces));
@@ -788,6 +803,15 @@ impl<R: Runtime> TauriSurfaces<R> {
     fn frame(&self, chosen: Option<&DisplayId>) -> Option<(DisplayId, Frame)> {
         let displays = noter_native::environment(&self.storage).displays;
         frame_of(chosen, &displays, noter_native::display_frame)
+    }
+
+    /// The record prompt in the main display's top-right corner, at its size.
+    fn place_prompt(&self, prompt: &WebviewWindow<R>) {
+        let (w, h) = *self.prompt_size.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((_, screen)) = self.frame(None) {
+            let x = screen.x + screen.width - w - MARGIN;
+            Self::place(prompt, (x, screen.y + MENU_BAR + MARGIN, w, h));
+        }
     }
 
     fn place(window: &WebviewWindow<R>, (x, y, w, h): (f64, f64, f64, f64)) {
@@ -974,16 +998,23 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         let Some(prompt) = self.window(WindowLabel::RecordPrompt) else {
             return;
         };
-        if let Some((_, screen)) = self.frame(None) {
-            let x = screen.x + screen.width - PROMPT.0 - MARGIN;
-            Self::place(
-                &prompt,
-                (x, screen.y + MENU_BAR + MARGIN, PROMPT.0, PROMPT.1),
-            );
-        }
+        self.place_prompt(&prompt);
         show(&prompt, false);
     }
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
+
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
+    fn fit_record_prompt(&self, width: u32, height: u32) {
+        *self.prompt_size.lock().unwrap_or_else(|e| e.into_inner()) =
+            (f64::from(width), f64::from(height));
+        if let Some(prompt) = self
+            .app
+            .get_webview_window(WindowLabel::RecordPrompt.as_str())
+        {
+            self.place_prompt(&prompt);
+        }
+    }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
 
     fn close_record_prompt(&self) {
         if let Some(prompt) = self

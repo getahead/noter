@@ -1556,6 +1556,12 @@ export type FeatureFlags = {
 	behaviour_metrics: boolean,
 };
 
+/**  The record prompt's content size in points, measured by its webview: the panel fits it. */
+export type FitArgs = {
+	width: number,
+	height: number,
+};
+
 export type FixTermArgs = {
 	call_id: CallId,
 	segment_id: SegmentId,
@@ -3580,7 +3586,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.2";
+export const CONTRACT_VERSION = "2.3";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3758,6 +3764,7 @@ export const COMMANDS = {
   window_navigate: { group: "windows", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
   window_report_view: { group: "windows", stability: "frozen", windows: ["main"], channel: false },
   window_announce: { group: "windows", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
+  window_fit: { group: "windows", stability: "frozen", windows: ["record-prompt"], channel: false },
   open_external: { group: "windows", stability: "frozen", windows: ["main", "call-screen", "settings", "first-run"], channel: false },
 } as const satisfies Record<string, { group: CommandGroup; stability: Stability; windows: readonly WindowLabel[]; channel: boolean }>;
 
@@ -3936,6 +3943,7 @@ export interface CommandArgs {
   window_navigate: NavigateArgs;
   window_report_view: ViewReportArgs;
   window_announce: AnnounceArgs;
+  window_fit: FitArgs;
   open_external: OpenExternalArgs;
 }
 
@@ -4112,6 +4120,7 @@ export interface CommandResults {
   window_navigate: Ack;
   window_report_view: Ack;
   window_announce: Ack;
+  window_fit: Ack;
   open_external: Ack;
 }
 
@@ -4756,6 +4765,10 @@ export function createCore(transport: Transport) {
      * Native announcement for a panel that is not key (D55).
      */
     windowAnnounce: (args: AnnounceArgs) => call("window_announce", args),
+    /**
+     * The record prompt reports its content size; the panel fits it, 360 to 440 pt wide.
+     */
+    windowFit: (args: FitArgs) => call("window_fit", args),
     /**
      * Open a URL, a document citation, a System Settings pane or a Finder location.
      */

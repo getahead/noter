@@ -2169,6 +2169,18 @@
       ]
     },
     {
+      "args": "FitArgs",
+      "channel": null,
+      "doc": "The record prompt reports its content size; the panel fits it, 360 to 440 pt wide.",
+      "group": "windows",
+      "name": "window_fit",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "record-prompt"
+      ]
+    },
+    {
       "args": "OpenExternalArgs",
       "channel": null,
       "doc": "Open a URL, a document citation, a System Settings pane or a Finder location.",
@@ -2184,7 +2196,7 @@
       ]
     }
   ],
-  "contract_version": "2.2",
+  "contract_version": "2.3",
   "default_retryable": [
     "not_ready",
     "internal",
