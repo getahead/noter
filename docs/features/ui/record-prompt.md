@@ -33,11 +33,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-record-prompt`
+- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-record-prompt`
 
 ## 1. Feature Context
 
-- [x] `p2` - `cpt-noter-feature-ui-record-prompt`
+- [ ] `p2` - `cpt-noter-feature-ui-record-prompt`
 
 ### 1.1 Overview
 
@@ -206,7 +206,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 
 ### Record prompt panel and variants
 
-- [x] `p2` - **ID**: `cpt-noter-dod-ui-record-prompt-panel`
+- [ ] `p2` - **ID**: `cpt-noter-dod-ui-record-prompt-panel`
 
 The system **MUST** render the record prompt in its seven variants with the prototype's markup (`data-component="cpt-noter-component-ui-record-prompt"`, `data-variant`, `data-state` `default`, `disabled`, `not-a-call`, `countdown-running`, `countdown-paused`; regions RP-R1 and RP-R3), never take keyboard focus, pause the 15-second timer and the countdown on hover and focus, and post its native announcements.
 
@@ -226,7 +226,7 @@ The system **MUST** render the record prompt in its seven variants with the prot
 ## 6. Acceptance Criteria
 
 - [x] Every record-prompt state renders as its `RP_STATES` entry in the prototype
-- [x] Clicking **Record** leaves keyboard focus in the call app (XCUITest)
+- [ ] Clicking **Record** leaves keyboard focus in the call app (XCUITest)
 - [x] **Record** is disabled only in the Disk full and Speech model variants; with system audio off it starts capture
 - [x] **Don't Ask** confirms inline for every app and adds the app to Settings › General
 - [x] The countdown bar is absent under Reduce motion while the seconds still update; seconds are never announced

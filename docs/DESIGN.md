@@ -201,7 +201,7 @@ Every call surface shows whether Noter is recording and where text may go right 
 
 #### Never take focus from the call
 
-- [x] `p1` - **ID**: `cpt-noter-principle-never-steal-focus`
+- [ ] `p1` - **ID**: `cpt-noter-principle-never-steal-focus`
 
 The record prompt, the call window and its notices never make Noter the active app and never take keyboard focus from the call app. A click on them acts without moving focus, and every in-call action also has a global hotkey. ⌃⌥⌘N and **Open Call Screen** show the call window without taking focus. Only an explicit **Open in Noter**, typing into a field of the call window, or a second ⌃⌥⌘N while the call window is visible gives Noter focus (PM-40).
 
@@ -257,7 +257,7 @@ Reversible actions (tick, accept, reject, regenerate, propagate, pin, dismiss) a
 
 #### Quiet call surfaces
 
-- [x] `p1` - **ID**: `cpt-noter-principle-quiet-surface`
+- [ ] `p1` - **ID**: `cpt-noter-principle-quiet-surface`
 
 In-call surfaces show at most three cards, make no sound, and move only with a short slide that Reduce motion removes. Agent badges are monochrome, and the recording dot never pulses. A suggestion that would arrive after the topic has moved on is not shown at all.
 
@@ -295,7 +295,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### One call window with two layouts
 
-- [x] `p1` - **ID**: `cpt-noter-constraint-one-call-window`
+- [ ] `p1` - **ID**: `cpt-noter-constraint-one-call-window`
 
 **Type**: Technology. The call screen and the floating panel are one window and one React tree with two layouts; a display change switches the layout, never the window. PRD › Repository layout and PRD › Live copilot loop both describe one call window with two layouts.
 
@@ -303,7 +303,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Non-activating panels
 
-- [x] `p1` - **ID**: `cpt-noter-constraint-non-activating-panels`
+- [ ] `p1` - **ID**: `cpt-noter-constraint-non-activating-panels`
 
 **Type**: Platform. The call window and the record prompt are NSPanels: macOS panel windows that float above other windows without making Noter the active app. They become key (the window that receives keystrokes) only while the user types in them or after a second ⌃⌥⌘N (PM-40), so panel-local shortcuts work only then, and app-menu shortcuts never reach them.
 
@@ -311,7 +311,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Screen-share exclusion has limits
 
-- [x] `p1` - **ID**: `cpt-noter-constraint-share-exclusion-limits`
+- [ ] `p1` - **ID**: `cpt-noter-constraint-share-exclusion-limits`
 
 **Type**: Platform. Content protection hides the call window and the record prompt only from shares that honour it (Teams, Meet, Zoom with window filtering), never from a whole-display capture. The UI must state that limit where it matters, in the call screen header and in the floating panel (PM-49), and offer **Screen Share Test…** (D96) and **Hide for Presenting** (D84, PM-51).
 
@@ -375,7 +375,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Copilot behind a flag
 
-- [x] `p1` - **ID**: `cpt-noter-constraint-copilot-flag`
+- [ ] `p1` - **ID**: `cpt-noter-constraint-copilot-flag`
 
 **Type**: Scope. Full v1 is kept (owner decision, 17 Oct); the copilot ships behind a flag until the M4 latency gate. Every call surface therefore has a layout without the council column, and a single-agent variant for a council of one (PM-01, D9, PM-67).
 
@@ -846,7 +846,7 @@ The app menu is native and belongs to the main window and the Settings window wh
 
 #### Shell — Call window
 
-- [x] `p1` - **ID**: `cpt-noter-component-shell-call-window`
+- [ ] `p1` - **ID**: `cpt-noter-component-shell-call-window`
 
 ##### Why this component exists
 
@@ -1304,7 +1304,7 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 
 #### Screen — Record prompt
 
-- [x] `p1` - **ID**: `cpt-noter-component-screen-record-prompt`
+- [ ] `p1` - **ID**: `cpt-noter-component-screen-record-prompt`
 
 ##### Why this component exists
 
@@ -1573,7 +1573,7 @@ Today is the first screen after launch: what matters before today's and this wee
 
 #### Screen — Call screen
 
-- [x] `p1` - **ID**: `cpt-noter-component-screen-call-screen`
+- [ ] `p1` - **ID**: `cpt-noter-component-screen-call-screen`
 
 ##### Why this component exists
 
@@ -1770,7 +1770,7 @@ The call screen is the dedicated layout of the call window on a second display. 
 
 #### Screen — Floating panel
 
-- [x] `p1` - **ID**: `cpt-noter-component-screen-floating-panel`
+- [ ] `p1` - **ID**: `cpt-noter-component-screen-floating-panel`
 
 ##### Why this component exists
 
@@ -3964,7 +3964,7 @@ Every in-app shortcut also appears in a menu (D51). App-menu shortcuts never rea
 
 #### Component — Record prompt
 
-- [x] `p1` - **ID**: `cpt-noter-component-ui-record-prompt`
+- [ ] `p1` - **ID**: `cpt-noter-component-ui-record-prompt`
 
 ##### Why this component exists
 
@@ -4057,7 +4057,7 @@ The panel is 360 pt wide, grows up to 440 pt for longer strings, and its height 
 
 #### Component — Capture notice
 
-- [x] `p1` - **ID**: `cpt-noter-component-ui-capture-notice`
+- [ ] `p1` - **ID**: `cpt-noter-component-ui-capture-notice`
 
 ##### Why this component exists
 
@@ -4152,7 +4152,7 @@ The call-ended variant of `cpt-noter-component-ui-record-prompt` repeats this no
 
 #### Component — Recording indicator
 
-- [x] `p1` - **ID**: `cpt-noter-component-ui-recording-indicator`
+- [ ] `p1` - **ID**: `cpt-noter-component-ui-recording-indicator`
 
 ##### Why this component exists
 
@@ -4319,7 +4319,7 @@ The mode indicator shows where text may go right now: to the cloud, to the cloud
 
 #### Component — Call status strip
 
-- [x] `p1` - **ID**: `cpt-noter-component-ui-call-status-strip`
+- [ ] `p1` - **ID**: `cpt-noter-component-ui-call-status-strip`
 
 ##### Why this component exists
 
@@ -4415,7 +4415,7 @@ The call status strip puts the call's state and its controls in one line at the 
 
 #### Component — Collapsed call strip
 
-- [x] `p1` - **ID**: `cpt-noter-component-ui-collapsed-call-strip`
+- [ ] `p1` - **ID**: `cpt-noter-component-ui-collapsed-call-strip`
 
 ##### Why this component exists
 
@@ -6857,7 +6857,7 @@ Ask mode answers a question over all calls and documents with citations to speci
 
 #### Component — Person chip
 
-- [x] `p1` - **ID**: `cpt-noter-component-ui-person-chip`
+- [ ] `p1` - **ID**: `cpt-noter-component-ui-person-chip`
 
 ##### Why this component exists
 
