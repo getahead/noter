@@ -1055,6 +1055,7 @@ impl Core {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-postcall-outputs:p1
     /// The PostCall run: the chunks of the live transcript, then every section in order, each
     /// validated, committed and published before the next; a failed section is recorded and the
     /// next one runs; the run fails at the end with the first failed section's typed error.
@@ -1186,6 +1187,7 @@ impl Core {
     }
 
     // @cpt-algo:cpt-noter-algo-core-postcall-notify:p1
+    // @cpt-dod:cpt-noter-dod-core-postcall-notifications:p1
     /// The outcome goes to the session manager's hold rule: held while a call is live or Noter
     /// is hidden for presenting, not sent while the main window shows the call (its page has the
     /// sections as they arrive), else posted with the call's Summary as its target.

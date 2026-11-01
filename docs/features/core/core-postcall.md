@@ -247,7 +247,7 @@ Continue Recording invalidates the running generation and returns unfinished sec
 
 ### Ordered outputs and versions
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-postcall-outputs`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-postcall-outputs`
 
 The system **MUST** write validated sections in order, keep the transcript readable, expose complete section state and writer provenance, store every generated and edited version and accept edits only with the current revision. Failed sections must not hide ready sections, and local output must identify its writer.
 
@@ -280,9 +280,11 @@ The system **MUST** wait for capture before archive or regeneration, retain live
 
 ### Notifications and role policy
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-postcall-notifications`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-postcall-notifications`
 
 The system **MUST** hand output outcomes to the session manager for notification holds and native delivery, and log D4 role switch-off when sufficient actual card history exists. A notification click must open the correct call's Summary.
+
+Open: the D4 switch-off rule and its unit test are in, but no card history exists before M4 (cards and the `agents` table), so nothing is logged until then (`inst-notify-switch`); the native click-through E2E is the UI lane's XCUITest.
 
 **Implements**:
 - `cpt-noter-algo-core-postcall-notify`
@@ -294,9 +296,11 @@ The system **MUST** hand output outcomes to the session manager for notification
 
 ### Evaluations, tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-postcall-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-postcall-tests`
 
 The system **MUST** pass unit tests for section failure isolation, version guards, three-way overlap and concurrent edits, rejected-item suppression, archive relinking and cancelled generations; conformance for all five commands; skill evaluations for schema, citations and rubric on golden calls; and both real-core story E2E. Cover the M2 registry entry `post-call-outputs` with `core_post_call_scripted` and measure actual outputs after a 60-minute call against two minutes cloud and ten minutes local on the Mac runner, with reviews last. `just gate` passes.
+
+Open: the skill evaluations on `evals/golden`, the Mac-runner timing and the `core_post_call_scripted` perf scenario are the owner's items (TL-17; no performance tests in M2, owner 24 Oct); the unit tests are `crates/noter-core/tests/postcall.rs` and `postcall_archive.rs`, conformance and the output story `apps/desktop/tests/conformance/m2-outputs.test.ts` and `m2-stories-postcall.test.ts`.
 
 **Implements**:
 - `cpt-noter-flow-core-postcall-write`
