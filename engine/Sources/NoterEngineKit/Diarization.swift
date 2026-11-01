@@ -300,7 +300,7 @@ enum Diarization {
                 var sum = 0.0
                 for j in 0..<d {
                     let (l, a): (Double, Double) = (invL[k][j], alpha[k][j])
-                    sum += log(l) - l - a * a + 1
+                    sum = sum + log(l) - l - a * a + 1
                 }
                 bound += sum
             }
