@@ -196,6 +196,8 @@ Let the user review the night's changes in one list and reverse a wrong correcti
    1. [ ] - `p1` - DB: store supporting evidence without a closing flag and a proposed CloseItem change with its target base revision; leave item status and review unchanged - `inst-close-proposal-write`
 5. [ ] - `p1` - Treat commits, keyword matches, speech, unlinked or older completions as proposal-only; never promote a suggested item automatically or revive a rejected suggestion - `inst-close-weak`
 6. [ ] - `p1` - **RETURN** the committed outcome; rollback evidence and item/log changes together on transaction failure - `inst-close-return`
+7. [ ] - `p1` - **FROM** open **TO** answered_in_call **WHEN** an open question is answered with logged evidence; carried questions may also close during that call (moved from `core-items-today`, 2.18) - `inst-st-answered`
+8. [ ] - `p1` - **FROM** open **TO** closed_by_evidence **WHEN** a later evidence job supplies qualifying closure for an accepted item; handed_off may also close this way (moved from `core-items-today`, 2.18) - `inst-st-evidence`
 
 ### Apply a guarded decision
 

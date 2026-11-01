@@ -41,9 +41,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-items-today`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-items-today`
 
-- [ ] `p3` - `cpt-noter-feature-core-items-today`
+- [x] `p3` - `cpt-noter-feature-core-items-today`
 
 ## 1. Feature Context
 
@@ -229,7 +229,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Carry forward and rank relevant work
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-items-today-carry`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-items-today-carry`
 
 **Input**: Known attendees, upcoming or live call, Today settings and current item/call rows.
 
@@ -240,8 +240,8 @@ The user can review what a call produced, check the words behind an item, tick w
 2. [x] - `p1` - Select open accepted items and suggested items marked Not reviewed; exclude rejected or completed work and include awaiting handoffs in their separate collection - `inst-carry-select`
 3. [x] - `p1` - Deduplicate by item id, join owners, due dates and spans, and retain `carried_from` provenance - `inst-carry-join`
 4. [x] - `p1` - For default `owed_to_todays_people`, rank items owed to today's people first, then due date, then age; for `due_then_owed_to_you`, rank due date then owed to you, with stable identity tie-breaking - `inst-carry-rank`
-5. [ ] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status (open until M3 people: needs the live-call people hook) - `inst-carry-start`
-6. [ ] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity (open until M3 people: needs the live-call people hook) - `inst-carry-end`
+5. Logging offered open items as carried at call start: delivered by `core-people` (M3), which owns the live-call people hook; `inst-carry-start` is there.
+6. Returning carried items to open at call end: delivered by `core-people` (M3); `inst-carry-end` is there.
 7. [x] - `p1` - **RETURN** the same query result to Today and the later copilot's initial context - `inst-carry-return`
 
 ### Resolve and format share content
@@ -264,7 +264,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Item status and review
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-items-today-item`
+- [x] `p1` - **ID**: `cpt-noter-state-core-items-today-item`
 
 **States**: status open, done, handed_off, carried, closed_by_evidence, answered_in_call; review suggested, accepted, rejected
 
@@ -276,10 +276,10 @@ The user can review what a call produced, check the words behind an item, tick w
 3. [x] - `p1` - **FROM** open **TO** handed_off **WHEN** handoff successfully opens or copies; a suggestion becomes accepted - `inst-st-handoff`
 4. [x] - `p1` - **FROM** handed_off **TO** done **WHEN** landed or done_another_way is answered with the current revision - `inst-st-landed`
 5. [x] - `p1` - **FROM** handed_off **TO** handed_off **WHEN** keep_open or Esc leaves it awaiting the next matching call - `inst-st-keep-open`
-6. [ ] - `p1` - **FROM** open **TO** carried **WHEN** offered in a live call with the same people - `inst-st-carried`
-7. [ ] - `p1` - **FROM** carried **TO** open **WHEN** the call ends without closure - `inst-st-return-open`
-8. [ ] - `p1` - **FROM** open **TO** answered_in_call **WHEN** an open question is answered with logged evidence; carried questions may also close during that call - `inst-st-answered`
-9. [ ] - `p1` - **FROM** open **TO** closed_by_evidence **WHEN** a later evidence job supplies qualifying closure for an accepted item; handed_off may also close this way - `inst-st-evidence`
+6. The open to carried transition: delivered by `core-people` (M3); `inst-st-carried` is there.
+7. The carried to open transition: delivered by `core-people` (M3); `inst-st-return-open` is there.
+8. The open to answered_in_call transition: delivered by `core-evidence-proposals` (M5); `inst-st-answered` is there.
+9. The open to closed_by_evidence transition: delivered by `core-evidence-proposals` (M5); `inst-st-evidence` is there.
 10. [x] - `p1` - **FROM** done **TO** open **WHEN** `item_reopen` commits; the same applies from handed_off, closed_by_evidence or answered_in_call, review unchanged - `inst-st-reopen`
 11. [x] - `p1` - **FROM** suggested **TO** accepted **WHEN** review accept commits, with status unchanged - `inst-st-accept`
 12. [x] - `p1` - **FROM** suggested **TO** rejected **WHEN** review reject commits; its regeneration suppression remains recorded - `inst-st-reject`
