@@ -108,11 +108,11 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Provider rejection: `key_rejected`; locked Keychain: `keychain_locked`; offline verification: `offline`. A failed replacement does not destroy a previously working key.
 
 **Steps**:
-1. [ ] - `p1` - API: `accounts_get` from main, Settings or First run runs `cpt-noter-algo-core-credentials-privacy-availability` and returns versioned `AccountsView` (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-read`
-2. [ ] - `p1` - API: `api_key_set { provider, key }` only from Settings or First run; validate the provider and non-empty secret without logging or persisting the submitted arguments (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-request`
-3. [ ] - `p1` - Publish verifying status; verify the candidate using the router and egress gate, without replacing the saved key until verification succeeds (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-verify`
-4. [ ] - `p1` - Store the verified key in Keychain; store only status and verification time in settings through the change-log writer, never secret before/after values (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-store`
-5. [ ] - `p1` - Recompute availability and emit `accounts:changed` with a new version; **RETURN** `AccountsView` with status only (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-return`
+1. [x] - `p1` - API: `accounts_get` from main, Settings or First run runs `cpt-noter-algo-core-credentials-privacy-availability` and returns versioned `AccountsView` (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-read`
+2. [x] - `p1` - API: `api_key_set { provider, key }` only from Settings or First run; validate the provider and non-empty secret without logging or persisting the submitted arguments (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-request`
+3. [x] - `p1` - Publish verifying status; verify the candidate using the router and egress gate, without replacing the saved key until verification succeeds (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-verify`
+4. [x] - `p1` - Store the verified key in Keychain; store only status and verification time in settings through the change-log writer, never secret before/after values (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-store`
+5. [x] - `p1` - Recompute availability and emit `accounts:changed` with a new version; **RETURN** `AccountsView` with status only (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-return`
 6. [ ] - `p1` - API: `api_key_remove { provider }` only from Settings removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` (M3) - `inst-key-remove`
 
 ### Prepare and install an account runtime
@@ -231,12 +231,12 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 **Output**: `AccountsView` and router runtime availability.
 
 **Steps**:
-1. [ ] - `p1` - Query key presence and verification state without returning values; report not_set, configured, rejected or keychain_locked - `inst-availability-keys`
-2. [ ] - `p1` - Detect each CLI's installed path, tested version support and provider-reported identity; detect Ollama readiness and available local models - `inst-availability-clis`
+1. [x] - `p1` - Query key presence and verification state without returning values; report not_set, configured, rejected or keychain_locked - `inst-availability-keys`
+2. [x] - `p1` - Detect each CLI's installed path, tested version support and provider-reported identity; detect Ollama readiness and available local models - `inst-availability-clis`
 3. [ ] - `p1` - **IF** a connected account's provider has ended the session, mark signed_out_by_provider with time, pause its agents and publish the one-step sign-in fix - `inst-availability-ended`
 4. [ ] - `p1` - Join agents using each account and apply current runtime availability; account usage does not consume the per-call API budget share - `inst-availability-bindings`
-5. [ ] - `p1` - Stamp a monotonic version shared by the command result, snapshot slice and `accounts:changed`; coalesce unchanged observations - `inst-availability-version`
-6. [ ] - `p1` - **RETURN** public statuses only; transcript, document, key, CLI token and one-time code never enter diagnostics - `inst-availability-return`
+5. [x] - `p1` - Stamp a monotonic version shared by the command result, snapshot slice and `accounts:changed`; coalesce unchanged observations - `inst-availability-version`
+6. [x] - `p1` - **RETURN** public statuses only; transcript, document, key, CLI token and one-time code never enter diagnostics - `inst-availability-return`
 
 ### Check account eligibility and the runtime
 
@@ -263,11 +263,11 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 **Output**: Secret-free state, changes and diagnostics; secrets remain in the intended credential owner.
 
 **Steps**:
-1. [ ] - `p1` - Pass API key values only to candidate verification, Keychain storage and authorized runtime invocation; never serialize them into settings, changes or events - `inst-secret-key`
+1. [x] - `p1` - Pass API key values only to candidate verification, Keychain storage and authorized runtime invocation; never serialize them into settings, changes or events - `inst-secret-key`
 2. [ ] - `p1` - Let the unmodified CLI own account passwords and tokens; never read its credential files or copy its token into Noter's isolated run configuration - `inst-secret-account`
 3. [ ] - `p1` - Persist only identity, plan, connection state, references and revisioned agent preferences - `inst-secret-metadata`
-4. [ ] - `p1` - Scrub secret-bearing process output and command arguments; release candidate-key buffers after use - `inst-secret-scrub`
-5. [ ] - `p1` - **RETURN** status-only views; no masked key value is reconstructed by reading the saved secret for display - `inst-secret-return`
+4. [x] - `p1` - Scrub secret-bearing process output and command arguments; release candidate-key buffers after use - `inst-secret-scrub`
+5. [x] - `p1` - **RETURN** status-only views; no masked key value is reconstructed by reading the saved secret for display - `inst-secret-return`
 
 ## 4. States (CDSL)
 
@@ -298,12 +298,12 @@ Within signing_in, `SignInStep` progresses through waiting_for_browser, signed_i
 **Initial State**: not_set, or observed Keychain status on restart
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** not_set **TO** verifying **WHEN** a candidate is submitted; also from configured or rejected - `inst-key-state-verify`
-2. [ ] - `p1` - **FROM** verifying **TO** configured **WHEN** the provider accepts the candidate and Keychain storage succeeds - `inst-key-state-save`
-3. [ ] - `p1` - **FROM** verifying **TO** rejected **WHEN** a candidate is rejected and there is no working saved key; otherwise restore the prior saved-key status and return the candidate error - `inst-key-state-reject`
-4. [ ] - `p1` - **FROM** configured **TO** rejected **WHEN** the provider rejects the saved key - `inst-key-state-revoked`
-5. [ ] - `p1` - **FROM** configured **TO** keychain_locked **WHEN** Keychain access fails; also from verifying or not_set - `inst-key-state-locked`
-6. [ ] - `p1` - **FROM** keychain_locked **TO** configured **WHEN** access returns and the saved key is verified; otherwise recompute not_set or rejected - `inst-key-state-unlocked`
+1. [x] - `p1` - **FROM** not_set **TO** verifying **WHEN** a candidate is submitted; also from configured or rejected - `inst-key-state-verify`
+2. [x] - `p1` - **FROM** verifying **TO** configured **WHEN** the provider accepts the candidate and Keychain storage succeeds - `inst-key-state-save`
+3. [x] - `p1` - **FROM** verifying **TO** rejected **WHEN** a candidate is rejected and there is no working saved key; otherwise restore the prior saved-key status and return the candidate error - `inst-key-state-reject`
+4. [x] - `p1` - **FROM** configured **TO** rejected **WHEN** the provider rejects the saved key - `inst-key-state-revoked`
+5. [x] - `p1` - **FROM** configured **TO** keychain_locked **WHEN** Keychain access fails; also from verifying or not_set - `inst-key-state-locked`
+6. [x] - `p1` - **FROM** keychain_locked **TO** configured **WHEN** access returns and the saved key is verified; otherwise recompute not_set or rejected - `inst-key-state-unlocked`
 7. [ ] - `p1` - **FROM** configured **TO** not_set **WHEN** removal succeeds; also from rejected or keychain_locked after a successful Keychain delete (M3; the other transitions are M2 with `cpt-noter-feature-core-llm-gate`) - `inst-key-state-remove`
 
 ## 5. Definitions of Done

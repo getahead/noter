@@ -19,6 +19,7 @@ design: docs/DESIGN-core.md
   - [1.2 Purpose](#12-purpose)
   - [1.3 Actors](#13-actors)
   - [1.4 References](#14-references)
+  - [M2 decisions and follow-ups](#m2-decisions-and-follow-ups)
 - [2. Actor Flows (CDSL)](#2-actor-flows-cdsl)
   - [Run a skill through the router](#run-a-skill-through-the-router)
   - [Open, reuse and close a runtime session](#open-reuse-and-close-a-runtime-session)
@@ -83,6 +84,11 @@ Post-call and handoff can call a model without creating another path for user te
 - **Design**: [DESIGN-core.md](../../DESIGN-core.md): `cpt-noter-component-core-llm-router`, `cpt-noter-component-core-privacy`, `cpt-noter-interface-llm-runtime`, `cpt-noter-interface-skill-outputs`, `cpt-noter-dbtable-llm-runs`, `cpt-noter-dbtable-audit-log`
 - **Contract**: `crates/noter-protocol/src/skills.rs`, `common.rs`, `error.rs`; `contracts/skills/`, `contracts/egress-hosts.json`
 - **Dependencies**: `cpt-noter-feature-core-storage`, `cpt-noter-feature-core-settings`
+
+### M2 decisions and follow-ups
+
+- Keys: the `SecretStore` seam on `CoreDeps` (TL-13), the Keychain in the app, memory in `noter-core-harness`. The router reads a key on each call, and `CliConfig` holds none. Verification is one empty-packet `ask-answer` run on the key's own runtime, through the gate (its `llm_runs` and `audit_log` rows), with no failover. `settings` row `keys` keeps statuses only, written through the change log, not undoable.
+- Follow-ups from the #234 review, for 2.17 post-call and 2.13: send Ollama `think` only to thinking models; purge the CLI's own session history when a call is deleted or retention removes it; make the CLI `--version` probe async (it blocks a worker on first availability and on session open). Callers that route without `accounts_get` should call `Llm::refresh` first so Ollama's pulled models are known.
 
 ## 2. Actor Flows (CDSL)
 
