@@ -179,7 +179,7 @@ extern "C" {
 }
 
 /// Whether Noter may send Apple Events to the app `bundle_id` (`ask` shows the prompt).
-fn automation(bundle_id: &str, ask: bool) -> PermissionState {
+pub(crate) fn automation(bundle_id: &str, ask: bool) -> PermissionState {
     const TYPE_BUNDLE_ID: u32 = u32::from_be_bytes(*b"bund");
     const WILDCARD: u32 = u32::from_be_bytes(*b"****");
     let mut desc = AEDesc {

@@ -224,7 +224,6 @@ enum Archive {
 
     /// Decodes the call's stored channels into `result`, every segment's words beside it in
     /// `<result>.words/`; on failure neither is left. `progress` hears 0...1 between utterances.
-    // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
     static func run(
         _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints, decoder: ArchiveDecoder,
         progress: (Float) -> Void
