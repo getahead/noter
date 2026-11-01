@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-native-services`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-native-services`
 
-- [ ] `p3` - `cpt-noter-feature-core-native-services`
+- [x] `p3` - `cpt-noter-feature-core-native-services`
 
 ## 1. Feature Context
 

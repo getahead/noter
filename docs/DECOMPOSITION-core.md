@@ -1182,9 +1182,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.21 Native services: launch, clipboard, panels and share test - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-native-services`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-native-services`
 
-- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
+- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IMPLEMENTED (#243 #259 #267); open on the owner's Mac only: the `cwd`/`q` parameters of `claude://code/new` and `codex://new`, a real Screen Recording and Automation prompt, and a real launch pre-filled and unsent (manual macOS checklist). FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
 
 - **Purpose**: Give the M2 commands the macOS services they need from the core: Launch Services and Apple Events for handoff, rich clipboard formats, save panels for export, and the Screen Share Test.
 
@@ -1207,14 +1207,14 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Constraints Covered**:
 
-  - [ ] `p3` - `cpt-noter-constraint-core-macos`
+  - `cpt-noter-constraint-core-macos`
 
 - **Domain Model Entities**:
   - ShareTestResult
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-native`
+  - `cpt-noter-component-core-native`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `share_test_run`
