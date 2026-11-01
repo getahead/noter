@@ -390,7 +390,7 @@ impl Core {
             let mut stmt = c.prepare(&sql)?;
             let mut rows = stmt
                 .query_map(params_from_iter(page.params.iter()), |r| {
-                    Ok((stored(r)?, r.get::<_, Sql>(15)?))
+                    Ok((stored(r)?, r.get::<_, Sql>(16)?))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-select
