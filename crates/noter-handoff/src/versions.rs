@@ -3,7 +3,7 @@
 use noter_db::rusqlite::{params, OptionalExtension};
 use noter_db::{ChangeMeta, Logged, Store};
 use noter_protocol::model::{VersionKind, VersionMeta};
-use noter_protocol::{CoreError, ErrorCode, TimestampMs, VersionId};
+use noter_protocol::{CoreError, ErrorCode, ErrorDetail, Rev, TimestampMs, VersionId};
 use serde_json::Value;
 
 use crate::internal;
@@ -26,6 +26,8 @@ pub struct NewVersion<'a> {
     pub output: Option<&'a Value>,
     pub body_md: &'a str,
     pub now: TimestampMs,
+    /// The latest `n` the caller saw (an edit's `rev`); another one is `conflict`.
+    pub base_n: Option<u32>,
 }
 
 /// Where `handoff_open` writes the prompt, relative to the data folder.
@@ -104,6 +106,7 @@ pub fn append(
     let output = v.output.map(Value::to_string);
     let body = v.body_md.to_string();
     let path = file_path(v.item_id);
+    let base_n = v.base_n;
     let written = store.write_with(meta, move |tx| {
         let exists = tx
             .query_row("SELECT 1 FROM items WHERE id = ?1", [&item_id], |_| Ok(()))
@@ -124,6 +127,12 @@ pub fn append(
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .map_err(internal)?;
+        if base_n.is_some_and(|b| b != n) {
+            return Err(
+                CoreError::new(ErrorCode::Conflict, "the prompt changed since its rev")
+                    .with_detail(ErrorDetail::Conflict { current_rev: Rev(n) }),
+            );
+        }
         tx.execute(
             "INSERT INTO prompt_versions (id, item_id, n, kind, output_json, body_md, file_path)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",

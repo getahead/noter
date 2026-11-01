@@ -7,6 +7,7 @@ mod app;
 mod capture;
 mod first_run;
 mod glossary;
+mod handoff;
 mod history;
 mod hotkeys;
 mod hub;
@@ -48,7 +49,7 @@ pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 pub use models::PinnedModels;
-pub use native_ops::{NativeOps, SaveKind};
+pub use native_ops::{ClipboardText, LaunchRequest, NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
@@ -291,6 +292,8 @@ pub struct Core {
     transcript: transcript::Transcript,
     /// Post-call sections being written, or failed, that have no committed row yet.
     postcall: postcall::Sections,
+    /// Handoff prompts being written, and each item's wanted target.
+    handoffs: noter_handoff::Generations,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -348,7 +351,7 @@ impl Core {
         let log = log::Logger::open(data_dir).map_err(BootError::Io)?;
         let store = match Store::open(
             &data_dir.join("noter.db"),
-            &[noter_db::MIGRATIONS, MIGRATIONS],
+            &[noter_db::MIGRATIONS, MIGRATIONS, noter_handoff::MIGRATIONS],
         ) {
             Ok(store) => Arc::new(store),
             Err(e) => {
@@ -420,6 +423,7 @@ impl Core {
             playback: playback::Playback::new(),
             transcript: transcript::Transcript::new(data_dir.to_path_buf()),
             postcall: postcall::Sections::default(),
+            handoffs: noter_handoff::Generations::default(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
@@ -874,6 +878,78 @@ impl CoreApi for Core {
         args: HandoffLandedArgs,
     ) -> Result<ItemMutation, CoreError> {
         self.answer_handoff(ctx, args)
+    }
+
+    async fn handoff_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.handoff_view(args.item_id.as_str())
+    }
+
+    async fn handoff_generate(
+        &self,
+        _ctx: &CommandCtx,
+        args: HandoffGenerateArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.generate_handoff(args)
+    }
+
+    async fn handoff_cancel(
+        &self,
+        _ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.cancel_handoff(args)
+    }
+
+    async fn handoff_edit(
+        &self,
+        ctx: &CommandCtx,
+        args: HandoffEditArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.edit_handoff(ctx, args)
+    }
+
+    async fn handoff_set_target(
+        &self,
+        _ctx: &CommandCtx,
+        args: HandoffTargetArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.target_handoff(args)
+    }
+
+    async fn handoff_open(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffOpenResult, CoreError> {
+        self.open_handoff(ctx, args).await
+    }
+
+    async fn handoff_copy(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffCopyResult, CoreError> {
+        self.copy_handoff(ctx, args).await
+    }
+
+    async fn repos_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<RepoList, CoreError> {
+        self.list_repos()
+    }
+
+    async fn repo_upsert(
+        &self,
+        ctx: &CommandCtx,
+        args: RepoUpsertArgs,
+    ) -> Result<RepoList, CoreError> {
+        self.upsert_repo(ctx, args).await
+    }
+
+    async fn repo_remove(&self, ctx: &CommandCtx, args: RepoIdArgs) -> Result<RepoList, CoreError> {
+        self.remove_repo(ctx, args)
     }
 
     async fn window_show_call(

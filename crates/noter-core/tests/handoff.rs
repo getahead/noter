@@ -1,7 +1,6 @@
 //! FEATURE cpt-noter-feature-core-handoff: the ten handoff and repository commands over the
 //! scripted runtime and scripted native ops (TL-13, TL-15), on paused time.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -57,7 +56,7 @@ impl Clock for FixedClock {
 /// and copied.
 struct Ops {
     plan: Mutex<LaunchPlan>,
-    fail: Mutex<HashMap<LaunchPath, ErrorCode>>,
+    fail: Mutex<Vec<(LaunchPath, ErrorCode)>>,
     launched: Mutex<Vec<(LaunchPath, LaunchRequest)>>,
     copied: Mutex<Vec<ClipboardText>>,
     clipboard_fails: Mutex<bool>,
@@ -102,7 +101,7 @@ impl NativeOps for Ops {
         req: &'a LaunchRequest,
     ) -> noter_core::BoxFuture<'a, Result<(), ErrorCode>> {
         Box::pin(async move {
-            if let Some(code) = self.fail.lock().unwrap().get(&path) {
+            if let Some((_, code)) = self.fail.lock().unwrap().iter().find(|(p, _)| *p == path) {
                 return Err(*code);
             }
             self.launched.lock().unwrap().push((path, req.clone()));

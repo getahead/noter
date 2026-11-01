@@ -107,6 +107,7 @@ fn versions_number_up_and_keep_the_edit_beside_the_generated_body() {
             output: Some(&out),
             body_md: "generated",
             now: TimestampMs(1_000),
+            base_n: None,
         },
     )
     .unwrap();
@@ -119,10 +120,31 @@ fn versions_number_up_and_keep_the_edit_beside_the_generated_body() {
             output: None,
             body_md: "edited",
             now: TimestampMs(2_000),
+            base_n: Some(1),
         },
     )
     .unwrap();
     assert_eq!((v1.meta.n, v2.meta.n), (1, 2));
+    // An edit on a stale rev is refused inside the write.
+    let stale = append(
+        &store,
+        meta(),
+        NewVersion {
+            item_id: "itm_a",
+            kind: VersionKind::UserEdit,
+            output: None,
+            body_md: "late",
+            now: TimestampMs(2_500),
+            base_n: Some(1),
+        },
+    )
+    .unwrap_err();
+    assert_eq!(
+        stale.detail,
+        Some(ErrorDetail::Conflict {
+            current_rev: Rev(2)
+        })
+    );
     assert_eq!(v1.meta.created_at, TimestampMs(1_000));
     assert!(v1.meta.id.as_str().starts_with("ver_"));
     assert_eq!(v1.file_path, "handoffs/itm_a.md");
@@ -142,6 +164,7 @@ fn versions_number_up_and_keep_the_edit_beside_the_generated_body() {
             output: Some(&out),
             body_md: "b",
             now: TimestampMs(3_000),
+            base_n: None,
         },
     )
     .unwrap();
@@ -174,6 +197,7 @@ fn a_version_of_a_deleted_item_is_refused() {
             output: None,
             body_md: "x",
             now: TimestampMs(1),
+            base_n: None,
         },
     )
     .unwrap_err();
