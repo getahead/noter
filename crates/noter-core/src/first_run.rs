@@ -330,6 +330,7 @@ impl Core {
         self.start_capture();
         self.start_playback();
         self.start_transcript();
+        self.start_jobs();
     }
 
     fn apply_login_item(&self, on: bool) {
