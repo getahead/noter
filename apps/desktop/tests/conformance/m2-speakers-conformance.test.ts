@@ -1,6 +1,7 @@
 // M2 speakers conformance (2.13): transcript_rename_speaker, transcript_fix_term,
 // transcript_name_speakers, audio_delete and audio_delete_older answer the same on the fake and
 // the real core — result shapes, the call row after a delete and every typed error.
+// @cpt-dod:cpt-noter-dod-core-speakers-audio-tests:p1
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { Core } from "../../src/core/bindings";

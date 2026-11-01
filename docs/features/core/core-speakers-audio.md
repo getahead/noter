@@ -211,7 +211,7 @@ The system **MUST** delete stored audio explicitly or by age through a non-undoa
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-tests`
 
 The system **MUST** pass unit tests for line scope, call scope, Unicode term ranges, constraint persistence, undo, partial filesystem failure and idempotent deletion; conformance for all five commands; and real-core E2E for both naming stories. `just gate` passes.
 
