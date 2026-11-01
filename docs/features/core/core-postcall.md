@@ -49,7 +49,7 @@ design: docs/DESIGN-core.md
 
 The post-call pipeline writes sections from the live transcript as soon as each validates, then improves them after the archive pass. It keeps every generated version and user edit, extracts suggested items with evidence spans, chunks and embeds the transcript and serves output read, edit, version and regeneration commands. Search and Ask over those chunks remain M3.
 
-> **M2 decisions (Backend Teamlead, 1 Nov 2026).**  Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26). Two seams from 2.13 and the M4 gate (be-eng-2, 1 Nov 2026): the archive install reads `audio/<call>/constraints.json`, the file 2.13 writes for the offline pass, to keep the user's corrections across the upgrade; `TermCorrection[]` ranges are UTF-16 code-unit offsets (`TextRange`) into the segment's `text`, so a regeneration that merges text must carry them over. `inst-write-reviews` (role reviews), `inst-notify-switch` and `inst-notify-return` stay `[ ]` until M4 produces cards and role outcomes to act on.
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).**  Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26). Two seams from 2.13 and the M4 gate (be-eng-2, 1 Nov 2026): the archive install reads `audio/<call>/constraints.json`, the file 2.13 writes for the offline pass, to keep the user's corrections across the upgrade; `TermCorrection[]` ranges are UTF-16 code-unit offsets (`TextRange`) into the segment's `text`, so a regeneration that merges text must carry them over. `inst-write-reviews` (role reviews), `inst-notify-switch` and `inst-notify-return` moved to `core-agents` (M4), which produces the cards and role outcomes they act on.
 
 ### 1.2 Purpose
 
@@ -87,7 +87,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 ### Write outputs after a call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-postcall-write`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-postcall-write`
 
 **Actor**: Job scheduler, after the session manager stops a call
 
@@ -107,7 +107,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
    1. [x] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
    2. [x] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
    3. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
-5. [ ] - `p1` - Run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions (M4: no agent can be enabled before the `agents` table) - `inst-write-reviews`
+5. Role reviews run last: delivered by `core-agents` (M4), which owns the `agents` table; `inst-write-reviews` is there.
 6. [x] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
 7. [x] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
 8. [x] - `p1` - **RETURN** committed output state to the job; queue archive processing if audio is available - `inst-write-return`
@@ -207,7 +207,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 ### Release notifications and evaluate role switch-off
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-postcall-notify`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-postcall-notify`
 
 **Input**: Committed output outcome, current capture, presenting and main-window view state; role outcomes for completed calls.
 
@@ -217,9 +217,9 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 1. [x] - `p1` - Pass ready or failed outcome with its call target to the session manager's existing notification hold rule - `inst-notify-session`
 2. [x] - `p1` - Hold while a call is live or presenting is hidden; suppress the system notification when the foreground main window already shows that call and announce readiness on the page - `inst-notify-hold`
 3. [x] - `p1` - When released and authorization allows it, post Summary ready or the failed-summary notice with a thread per call and a `NavTarget` for Summary; clicking routes through `nav:request` - `inst-notify-release`
-4. [ ] - `p1` - For each agent with outcomes over the last ten calls of this type, calculate dismissal share; when at least 80 percent, log an undoable switch-off for that call type and its one-time Agents notice (M4: the rule arithmetic is in place; cards and the `agents` table arrive in M4) - `inst-notify-switch`
+4. The D4 role switch-off rule: delivered by `core-agents` (M4), with cards and the `agents` table; `inst-notify-switch` is there.
 5. [x] - `p1` - Do not infer dismissal history before M4 produces cards, and do not back-compute behaviour metrics for calls recorded before the setting was enabled - `inst-notify-no-backfill`
-6. [ ] - `p1` - **RETURN** notification disposition and committed changes (M4, with the switch-off changes) - `inst-notify-return`
+6. The returned notification disposition with the switch-off changes: delivered by `core-agents` (M4); `inst-notify-return` is there.
 
 ## 4. States (CDSL)
 
@@ -309,9 +309,9 @@ The system **MUST** pass unit tests for section failure isolation, version guard
 ## 6. Acceptance Criteria
 
 - [x] Real-core E2E `cpt-noter-seq-call-page-review-outputs` reads sections as they arrive, edits Summary, compares versions, retries a failed section locally and regenerates with edits preserved; all five commands succeed.
-- [ ] Real-app/native E2E `cpt-noter-seq-notifications-open-outputs` opens the correct call for ready and failed outcomes, suppresses a notice for the visible call and holds it through a subsequent recording. XCUITest uses `test_cpt_noter_seq_notifications_open_outputs` in its test name.
+- [ ] (waits on the UI M2 native XCUITest) Real-app/native E2E `cpt-noter-seq-notifications-open-outputs` opens the correct call for ready and failed outcomes, suppresses a notice for the visible call and holds it through a subsequent recording. XCUITest uses `test_cpt_noter_seq_notifications_open_outputs` in its test name.
 - [x] Accepted, pinned and edited items survive regeneration; rejected suggestions never return; missing or unknown citations cannot be persisted.
 - [x] Archive failure leaves live evidence usable; archive success resolves the same evidence spans to new text and labels while preserving corrections and edits.
 - [x] Concurrent user edits and Continue Recording cannot be overwritten by a late job result; unit tests prove both races.
-- [ ] Fake/real conformance and skill schema, citation and rubric evaluations pass; Mac timing evidence reports the stated cloud/local output targets.
+- [ ] (owner: skill evals on the golden set and Mac timing) Fake/real conformance and skill schema, citation and rubric evaluations pass; Mac timing evidence reports the stated cloud/local output targets.
 - [ ] `just gate` passes.
