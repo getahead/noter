@@ -1087,9 +1087,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.19 Handoff launcher and repositories - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-handoff`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-handoff`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#251 #255); three parts are open: acceptance criterion 6 (the `noter-native` query-cap test and the macOS launch evidence: 2.21 part B and the owner), the rubric evals (golden set, owner) and the `claude://code/new` / `codex://new` parameter check (owner's Mac). FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
 
 - **Purpose**: Generate handoff prompts on demand, keep their versions and edits, resolve the repository, detect the launch path and open the prompt in Claude Code or Codex pre-filled, never sent.
 
@@ -1119,7 +1119,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-handoff`
+  - `cpt-noter-component-core-handoff`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `handoff_get`, `handoff_generate`, `handoff_edit`, `handoff_set_target`, `handoff_open`, `handoff_copy`, `handoff_cancel`, `repos_list`, `repo_upsert`, `repo_remove`

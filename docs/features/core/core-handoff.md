@@ -36,9 +36,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-handoff`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-handoff`
 
-- [ ] `p3` - `cpt-noter-feature-core-handoff`
+- [x] `p3` - `cpt-noter-feature-core-handoff`
 
 ## 1. Feature Context
 
