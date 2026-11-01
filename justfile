@@ -158,8 +158,11 @@ native:
     # `-quiet` prints no test names: name every failure (an annotation in CI).
     if [ "$status" -ne 0 ]; then
       xcrun xcresulttool get test-results summary --path "$result" | python3 -I -c 'import json, os, sys
-    tag = "::error title=XCUITest::" if os.environ.get("GITHUB_ACTIONS") else ""
-    for f in json.load(sys.stdin).get("testFailures", []): print(tag + "native: FAILED " + f["testIdentifierString"] + ": " + f["failureText"], file=sys.stderr)' || true
+    ci = bool(os.environ.get("GITHUB_ACTIONS"))
+    for f in json.load(sys.stdin).get("testFailures", []):
+        line = "native: FAILED " + f["testIdentifierString"] + ": " + f["failureText"]
+        # A workflow command ends at a newline: escape it as GitHub documents.
+        print("::error title=XCUITest::" + line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A") if ci else line, file=sys.stderr)' || true
     fi
     exit $status
 
