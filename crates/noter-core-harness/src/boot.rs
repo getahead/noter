@@ -14,10 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock,
-    Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError, MemorySecrets, ModelSource,
-    NativeOps, NativeServices, Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel,
-    Updater,
+    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink,
+    ClipboardText, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError,
+    LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices, Placement, SaveKind,
+    Scripted, Surfaces, SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -280,6 +280,8 @@ impl Harness {
         let panel = Arc::new(ScriptedPanel {
             dir: dir.join("exports"),
             cancel_next: AtomicBool::new(false),
+            launch: Mutex::new(LaunchWorld::default()),
+            log: Mutex::new(json!({ "launches": [], "clipboard": [] })),
         });
         let deps = CoreDeps::new(
             clock.clone(),
@@ -1242,6 +1244,18 @@ impl Controls for Harness {
                     self.panel.cancel_next.store(true, Ordering::SeqCst);
                     Ok(json!({}))
                 }
+                // `{ plan: LaunchPlan, fail?: [{ path, code }] }`: what the Mac reports for the
+                // next handoff launches, and which paths fail with which code.
+                "launch_world" => {
+                    let world: LaunchWorld = parse(
+                        args,
+                        "harness.launch_world needs { plan: LaunchPlan, fail?: [{ path, code }] }",
+                    )?;
+                    *lock(&self.panel.launch) = world;
+                    Ok(json!({}))
+                }
+                // `{}`: the launches and clipboard writes so far, oldest first.
+                "native_log" => Ok(lock(&self.panel.log).clone()),
                 "set_output_route" => self.set_output_route(args),
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
@@ -1604,22 +1618,114 @@ fn hex(bytes: &[u8]) -> String {
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
 /// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
 /// the harness's.
-/// The save panel, scripted: answers `<data>/exports/<suggested name>`, or cancelled once after
-/// `harness.cancel_next_save_panel` (TL-15). More native asks join it as their commands land.
+/// The native asks, scripted (TL-15): the save panel answers `<data>/exports/<suggested name>`
+/// (a folder for `SaveKind::Folder`), or cancelled once after `harness.cancel_next_save_panel`;
+/// launches follow `harness.launch_world` and, like clipboard writes, are recorded for
+/// `harness.native_log`.
 struct ScriptedPanel {
     dir: PathBuf,
     cancel_next: AtomicBool,
+    launch: Mutex<LaunchWorld>,
+    log: Mutex<Value>,
+}
+
+/// What the Mac reports for launches: the plan, and the paths that fail with a code.
+#[derive(serde::Deserialize)]
+struct LaunchWorld {
+    plan: LaunchPlan,
+    #[serde(default)]
+    fail: Vec<FailedLaunch>,
+}
+
+#[derive(serde::Deserialize)]
+struct FailedLaunch {
+    path: LaunchPath,
+    code: ErrorCode,
+}
+
+impl Default for LaunchWorld {
+    /// Claude Code's `claude-cli://` handler and Codex's app are installed.
+    fn default() -> Self {
+        Self {
+            plan: LaunchPlan {
+                path: LaunchPath::ClaudeCliLink,
+                needs_automation: false,
+                automation_denied: false,
+            },
+            fail: vec![],
+        }
+    }
 }
 
 impl NativeOps for ScriptedPanel {
-    fn save_panel<'a>(&'a self, name: &'a str, _: SaveKind) -> CoreFuture<'a, Option<PathBuf>> {
+    fn save_panel<'a>(&'a self, name: &'a str, kind: SaveKind) -> CoreFuture<'a, Option<PathBuf>> {
         Box::pin(async move {
             if self.cancel_next.swap(false, Ordering::SeqCst) {
                 return None;
             }
-            std::fs::create_dir_all(&self.dir).ok()?;
-            Some(self.dir.join(name))
+            let path = self.dir.join(name);
+            let folder = if kind == SaveKind::Folder {
+                &path
+            } else {
+                &self.dir
+            };
+            std::fs::create_dir_all(folder).ok()?;
+            Some(path)
         })
+    }
+
+    fn launch_plan(&self, target: HandoffTarget) -> LaunchPlan {
+        let mut plan = lock(&self.launch).plan.clone();
+        // The scripted plan names Claude's link; Codex's own handler stands in for it.
+        if target == HandoffTarget::Codex
+            && matches!(
+                plan.path,
+                LaunchPath::ClaudeCliLink | LaunchPath::ClaudeDesktop
+            )
+        {
+            plan.path = LaunchPath::CodexApp;
+        }
+        plan
+    }
+
+    fn launch<'a>(
+        &'a self,
+        path: LaunchPath,
+        req: &'a LaunchRequest,
+    ) -> CoreFuture<'a, Result<(), ErrorCode>> {
+        Box::pin(async move {
+            let failed = lock(&self.launch)
+                .fail
+                .iter()
+                .find(|f| f.path == path)
+                .map(|f| f.code);
+            if let Some(code) = failed {
+                return Err(code);
+            }
+            let launch = json!({
+                "path": path,
+                "target": req.target,
+                "cwd": req.cwd,
+                "prompt_file": req.prompt_file,
+            });
+            push(&self.log, "launches", launch);
+            Ok(())
+        })
+    }
+
+    fn clipboard_write<'a>(
+        &'a self,
+        text: &'a ClipboardText,
+    ) -> CoreFuture<'a, Result<(), String>> {
+        let entry = json!({ "plain": text.plain, "markdown": text.markdown, "html": text.html });
+        push(&self.log, "clipboard", entry);
+        Box::pin(async { Ok(()) })
+    }
+}
+
+fn push(log: &Mutex<Value>, key: &str, entry: Value) {
+    if let Some(list) = lock(log)[key].as_array_mut() {
+        list.push(entry);
     }
 }
 
