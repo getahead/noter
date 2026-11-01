@@ -938,7 +938,11 @@ async fn a_live_call_pauses_the_download_job_and_it_goes_on_when_the_call_ends()
         Some(JobRunStatus::Running),
         "nothing downloads during a live call"
     );
-    assert!(!dir.path().join("models/whisper-turbo.partial").exists());
+    // The models folder holds nothing (it may not exist yet).
+    assert_eq!(
+        std::fs::read_dir(dir.path().join("models")).map_or(0, Iterator::count),
+        0
+    );
     s.core
         .capture_guard()
         .send(noter_jobs::CaptureGuardState::default())
