@@ -79,6 +79,7 @@ pub fn packet(f: &Facts) -> Packet {
         what: AuditWhat::HandoffPrompt,
         items,
         people,
+        context: Default::default(),
     }
 }
 // @cpt-end:cpt-noter-algo-core-handoff-build:p1:inst-build-packet
