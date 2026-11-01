@@ -121,7 +121,7 @@ A name or term corrected once stays corrected after offline transcription, and d
 
 ### Delete audio permanently
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-delete`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-delete`
 
 **Actor**: Primary user (main window)
 
@@ -132,13 +132,13 @@ A name or term corrected once stays corrected after offline transcription, and d
 - A selected call is live: `invalid_input`; filesystem failure must not report deleted bytes as freed.
 
 **Steps**:
-1. [ ] - `p1` - After the native permanent-delete alert for explicit calls, or the Delete Old Audio sheet, API: `audio_delete { call_ids }` or `audio_delete_older { older_than_days }`; cancelling confirmation sends no deletion - `inst-delete-request`
-2. [ ] - `p1` - Resolve and deduplicate explicit calls or the age selection; refuse an explicit live-call target and exclude active capture from age deletion - `inst-delete-select`
-3. [ ] - `p1` - Stop playback and prevent new replay or archive reads of the selected audio while deleting - `inst-delete-lock`
-4. [ ] - `p1` - Remove stored microphone and system files; keep transcript files, summaries, items, marks and gaps - `inst-delete-files`
-5. [ ] - `p1` - Through the writer, set audio-deleted availability for successfully removed files and append non-undoable changes without audio content; publish the calls - `inst-delete-log`
-6. [ ] - `p1` - **IF** removal fails, retain truthful availability, release the guard and return the typed I/O error; retry must tolerate files already removed - `inst-delete-failure`
-7. [ ] - `p1` - **RETURN** `DeleteAudioResult` with actual calls and freed megabytes; future replay returns `audio_deleted` - `inst-delete-return`
+1. [x] - `p1` - After the native permanent-delete alert for explicit calls, or the Delete Old Audio sheet, API: `audio_delete { call_ids }` or `audio_delete_older { older_than_days }`; cancelling confirmation sends no deletion - `inst-delete-request`
+2. [x] - `p1` - Resolve and deduplicate explicit calls or the age selection; refuse an explicit live-call target and exclude active capture from age deletion - `inst-delete-select`
+3. [x] - `p1` - Stop playback and prevent new replay or archive reads of the selected audio while deleting - `inst-delete-lock`
+4. [x] - `p1` - Remove stored microphone and system files; keep transcript files, summaries, items, marks and gaps - `inst-delete-files`
+5. [x] - `p1` - Through the writer, set audio-deleted availability for successfully removed files and append non-undoable changes without audio content; publish the calls - `inst-delete-log`
+6. [x] - `p1` - **IF** removal fails, retain truthful availability, release the guard and return the typed I/O error; retry must tolerate files already removed - `inst-delete-failure`
+7. [x] - `p1` - **RETURN** `DeleteAudioResult` with actual calls and freed megabytes; future replay returns `audio_deleted` - `inst-delete-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -163,16 +163,16 @@ A name or term corrected once stays corrected after offline transcription, and d
 
 ### Audio availability
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-speakers-audio-availability`
+- [x] `p1` - **ID**: `cpt-noter-state-core-speakers-audio-availability`
 
 **States**: kept, not_stored, deleted
 
 **Initial State**: kept if capture stores audio, otherwise not_stored
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** kept **TO** deleted **WHEN** explicit deletion or age deletion removes stored audio and its log entry commits - `inst-st-delete`
-2. [ ] - `p1` - **FROM** deleted **TO** deleted **WHEN** deletion is repeated; no bytes are counted twice - `inst-st-repeat`
-3. [ ] - `p1` - **FROM** not_stored **TO** not_stored **WHEN** deletion is requested for a call that never wrote audio - `inst-st-not-stored`
+1. [x] - `p1` - **FROM** kept **TO** deleted **WHEN** explicit deletion or age deletion removes stored audio and its log entry commits - `inst-st-delete`
+2. [x] - `p1` - **FROM** deleted **TO** deleted **WHEN** deletion is repeated; no bytes are counted twice - `inst-st-repeat`
+3. [x] - `p1` - **FROM** not_stored **TO** not_stored **WHEN** deletion is requested for a call that never wrote audio - `inst-st-not-stored`
 
 No reversal restores deleted audio. Nightly retention uses the same deletion path from M5. Naming remains allowed in every state.
 
@@ -196,7 +196,7 @@ The system **MUST** name speakers at call or line scope, accept batch naming wit
 
 ### Delete audio for good
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-deletion`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-deletion`
 
 The system **MUST** delete stored audio explicitly or by age through a non-undoable operation, keep text and evidence, report actual freed bytes and refuse to delete active capture. Archive jobs and playback must not keep using removed files.
 
