@@ -510,6 +510,16 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
             .message(message)
             .title(title)
             .buttons(MessageDialogButtons::OkCancelCustom(cancel, confirm));
+        // Without a parent rfd posts a system alert from another process instead of Noter's NSAlert:
+        // it goes on the main window when it shows, else on the call window.
+        let parent = [WindowLabel::Main, WindowLabel::CallScreen]
+            .into_iter()
+            .filter_map(|label| app.get_webview_window(label.as_str()))
+            .find(|w| w.is_visible().unwrap_or(false));
+        let dialog = match &parent {
+            Some(window) => dialog.parent(window),
+            None => dialog,
+        };
         // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-quit-alert
         dialog.show_with_result(move |answer| {
             // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-stop-quit

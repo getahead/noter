@@ -9,7 +9,8 @@ use noter_core::EventEmitter;
 use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::Controls;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx};
-use noter_protocol::model::WindowLabel;
+use noter_protocol::model::{CallLayout, DisplayInfo, WindowLabel};
+use noter_protocol::DisplayId;
 use serde_json::{json, Value};
 
 fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
@@ -155,4 +156,68 @@ async fn each_scenario_boots_the_fixture_in_its_state() {
         assert!(holds(&app), "scenario {name}");
         harness.shutdown().await;
     }
+}
+
+#[tokio::test]
+async fn on_the_macs_own_displays_the_live_call_window_floats_on_the_main_one() {
+    // The app draws its real windows on the Mac it runs on: a single display, without the
+    // fixture's Studio Display that the call screen is set to.
+    let builtin = DisplayInfo {
+        id: DisplayId::new("1".to_string()),
+        name: "Built-in Retina Display".into(),
+        is_main: true,
+        holds_call_app: false,
+        width_pt: 1512,
+        height_pt: 982,
+    };
+    let options = Options {
+        fixture: true,
+        displays: Some(vec![builtin.clone()]),
+        ..Options::default()
+    };
+    let harness = Harness::start_with(options, Arc::new(Seen::default()), |deps| deps)
+        .await
+        .expect("the hooks boot");
+    let app = snapshot(&harness).await;
+    assert_eq!(app["environment"]["displays"], json!([builtin]));
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let call = dispatch_json(
+        &*harness.core(),
+        &main,
+        "window_call_state",
+        json!({}),
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(call["layout"], json!(CallLayout::Floating));
+    harness.shutdown().await;
+}
+
+#[tokio::test]
+async fn first_call_leaves_one_saved_call_and_notifications_not_asked() {
+    let (harness, _) = boot(Some("first-call")).await;
+    let app = snapshot(&harness).await;
+    assert_eq!(app["capture"]["phase"], "idle");
+    let world = harness.control("world_get", json!({})).await.unwrap();
+    let titles: Vec<&str> = world["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|c| c["title"].as_str())
+        .collect();
+    assert_eq!(
+        titles,
+        ["Backend sync"],
+        "the library holds the first recorded call only"
+    );
+    assert_eq!(
+        world["app"]["environment"]["notifications"],
+        "not_determined"
+    );
+    harness.shutdown().await;
 }

@@ -24,7 +24,12 @@ pub fn boot<R: Runtime>(
     let started = match Options::from_env(|k| std::env::var(k).ok()) {
         Ok(options) => {
             let host = surfaces.clone();
-            tauri::async_runtime::block_on(Harness::start_with(options?, events, move |deps| {
+            // The windows are real, so the displays they are placed on are the Mac's own.
+            let options = Options {
+                displays: Some(noter_native::environment(&std::env::temp_dir()).displays),
+                ..options?
+            };
+            tauri::async_runtime::block_on(Harness::start_with(options, events, move |deps| {
                 deps.with_app_version(env!("CARGO_PKG_VERSION"))
                     .with_shortcuts(shortcuts)
                     .with_surfaces(host)
