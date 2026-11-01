@@ -468,3 +468,30 @@ async fn launch_tries_the_link_then_the_terminal_fallback() {
     let (r, tried) = run(plan(Iterm, false), |_| Err(ErrorCode::Internal)).await;
     assert_eq!((r, tried), (Err(ErrorCode::Internal), vec![Iterm]));
 }
+
+#[test]
+fn a_corrupt_mappings_row_is_never_overwritten() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store(&dir);
+    let repo = tempfile::tempdir().unwrap();
+    let path = repo.path().to_string_lossy().into_owned();
+    upsert_repo(&store, meta(), None, "VSTOR", &path, HandoffTarget::Codex).unwrap();
+    noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+        .unwrap()
+        .execute(
+            "UPDATE settings SET value = 'not json' WHERE key = 'repos'",
+            [],
+        )
+        .unwrap();
+    let err = upsert_repo(&store, meta(), None, "UI", &path, HandoffTarget::Codex).unwrap_err();
+    assert_eq!(err.code, ErrorCode::Internal);
+    assert!(repos(&store).is_err());
+    let kept: String = store
+        .read(|c| {
+            c.query_row("SELECT value FROM settings WHERE key = 'repos'", [], |r| {
+                r.get(0)
+            })
+        })
+        .unwrap();
+    assert_eq!(kept, "not json");
+}
