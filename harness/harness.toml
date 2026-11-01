@@ -156,6 +156,12 @@ tauri = ["apps/desktop/src-tauri/**"]
 native = ["apps/desktop/tests/native/**"]
 engine = ["engine/**"]
 stories = ["docs/DESIGN.md"]   # the E2E coverage gate counts its stories
+# The suites that also run against the real core, and the generated contract the fake world renders.
+e2e-suites = [
+  "apps/desktop/tests/conformance/**", "apps/desktop/tests/e2e/**", "apps/desktop/tests/support/**",
+  "apps/desktop/playwright.config.ts", "apps/desktop/vitest.conformance.config.ts",
+]
+contracts = ["contracts/**"]
 docs = ["docs/**", ".cf-studio/**", "**/*.md"]
 cargo = ["**/Cargo.toml", "**/Cargo.lock", "deny.toml"]
 manifests = [
@@ -179,10 +185,17 @@ lint-rust = ["rust"]
 lint-ui = ["ui"]
 contract = ["protocol"]
 arch = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
-unit = ["rust", "ui", "protocol"]
-e2e = ["rust", "ui", "protocol", "stories"]
+# Each side's unit coverage and E2E suites run only for that side; a skipped side is unchanged
+# from main (HARNESS.md › What a pull request runs). e2e-core runs the suites against the real core,
+# e2e-ui against the fake world; DESIGN.md alone is judged by e2e-coverage on main's real-core logs.
+unit-rust = ["rust", "protocol"]
+unit-ui = ["ui", "protocol"]
+e2e-core = ["rust", "protocol", "e2e-suites"]
+e2e-ui = ["ui", "protocol"]
 e2e-coverage = ["rust", "ui", "protocol", "stories"]
-visual = ["ui", "protocol"]
+# Screenshots render the UI over the fake world (contracts/fixtures): a noter-protocol change
+# reaches them only through the regenerated contracts/** and bindings.ts, which `contract` enforces.
+visual = ["ui", "contracts"]
 docs = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
 macos = ["rust", "tauri", "native", "engine"]
 

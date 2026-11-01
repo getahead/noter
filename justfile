@@ -70,14 +70,22 @@ test-unit:
     pnpm --dir apps/desktop test:unit
 
 # Unit tests with coverage, judged by the unit-coverage gate (80% per side and on changed lines)
-cov-unit:
-    rm -rf coverage/unit apps/desktop/coverage/unit && mkdir -p coverage/unit
+cov-unit: cov-unit-rust cov-unit-ui
+
+# Rust side of cov-unit (CI job unit-rust)
+cov-unit-rust:
+    rm -rf coverage/unit && mkdir -p coverage/unit
     cargo llvm-cov clean --workspace
     cargo llvm-cov --no-report --quiet run --locked -p noter-protocol --bin noter-contract-export -- --check
     cargo llvm-cov --no-report --quiet --workspace --locked
     cargo llvm-cov report --lcov --output-path coverage/unit/rust.lcov
+    python3 scripts/harness/coverage_gate.py --rust coverage/unit/rust.lcov --base {{base}}
+
+# UI side of cov-unit (CI job unit-ui)
+cov-unit-ui:
+    rm -rf apps/desktop/coverage/unit
     pnpm --dir apps/desktop test:unit:coverage
-    python3 scripts/harness/coverage_gate.py --rust coverage/unit/rust.lcov --ui apps/desktop/coverage/unit/lcov.info --base {{base}}
+    python3 scripts/harness/coverage_gate.py --ui apps/desktop/coverage/unit/lcov.info --base {{base}}
 
 # End-to-end: conformance suite (+ UI flows), then the E2E coverage gate (60% of what is delivered)
 e2e: (_locked "_e2e")
@@ -89,10 +97,22 @@ e2e-tests: (_locked "_e2e-tests")
 
 _e2e-tests:
     rm -rf coverage/e2e
+    just _e2e-ui
+    if [ -n "${NOTER_CORE_CMD:-}" ]; then just _e2e-core; fi
+
+# The suites against the fake world (CI job e2e-ui; not counted by the E2E coverage gate)
+e2e-ui: (_locked "_e2e-ui")
+
+_e2e-ui:
     pnpm --dir apps/desktop test:conformance
-    if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance; fi
     pnpm --dir apps/desktop test:e2e
-    if [ -n "${NOTER_CORE_CMD:-}" ]; then NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e; fi
+
+# The same suites against the real core over stdio (CI job e2e-core; needs NOTER_CORE_CMD, docs/HARNESS.md)
+e2e-core: (_locked "_e2e-core")
+
+_e2e-core:
+    NOTER_CORE=stdio pnpm --dir apps/desktop test:conformance
+    NOTER_CORE=stdio pnpm --dir apps/desktop test:e2e
 
 # The E2E coverage gate over coverage/e2e and coverage/native (60% of what is delivered)
 e2e-coverage:

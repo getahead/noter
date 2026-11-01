@@ -41,7 +41,7 @@ valgrind and the linters. It fails while anything `just gate` needs is missing; 
 | --- | --- |
 | `just gate-fast` | Continuously while working (lint, contract, architecture, trace, unit tests; about a minute). In Claude Code the Stop hook runs it and will not let an agent finish while it is red |
 | `just gate` | Before opening a PR, and what CI runs: adds unit coverage, native UI tests, E2E and E2E coverage, screenshots, `cfs validate` and the gate-config guard |
-| `just <gate>` | One gate: `lint`, `contract`, `arch`, `trace`, `test-unit`, `cov-unit`, `native`, `e2e`, `visual`, `docs`, `config-guard` |
+| `just <gate>` | One gate: `lint`, `contract`, `arch`, `trace`, `test-unit`, `cov-unit` (or one side: `cov-unit-rust`, `cov-unit-ui`), `native`, `e2e` (or one core: `e2e-core`, `e2e-ui`), `visual`, `docs`, `config-guard` |
 | `just fmt` | Format Rust (the pre-commit hook refuses unformatted staged Rust) |
 
 Several worktrees on one machine share port 5173: export `NOTER_E2E_LOCK=<path to a lock file>` (one file for the
