@@ -27,11 +27,21 @@ pub type LaunchFuture<'a> = Pin<Box<dyn Future<Output = io::Result<EngineIo>> + 
 /// Starts one engine process (or a scripted stand-in) and hands back its pipes.
 pub trait EngineLauncher: Send + Sync + 'static {
     fn launch(&self) -> LaunchFuture<'_>;
+
+    /// The App Group container its engines share with the core, where offline results and
+    /// embedding files are written; `None` refuses offline requests.
+    fn container(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 impl<T: EngineLauncher + ?Sized> EngineLauncher for Arc<T> {
     fn launch(&self) -> LaunchFuture<'_> {
         (**self).launch()
+    }
+
+    fn container(&self) -> Option<PathBuf> {
+        (**self).container()
     }
 }
 
@@ -96,6 +106,10 @@ impl EngineLauncher for ProcessLauncher {
         Box::pin(self.spawn())
     }
     // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-spawn
+
+    fn container(&self) -> Option<PathBuf> {
+        self.app_group.clone()
+    }
 }
 
 impl ProcessLauncher {

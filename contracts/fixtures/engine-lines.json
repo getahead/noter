@@ -1,4 +1,54 @@
 {
+  "archive_results": [
+    {
+      "backend": "whisper_large_v3",
+      "call_id": "call_1",
+      "segments": [
+        {
+          "avg_logprob": -0.25,
+          "call_id": "call_1",
+          "channel": "mic",
+          "corrections": [],
+          "crosstalk_labels": [],
+          "id": "aseg_1",
+          "lang": "en",
+          "lang_p": 0.875,
+          "no_speech_p": 0.125,
+          "speaker_label": "you",
+          "state": "confirmed",
+          "t0_ms": 1000,
+          "t1_ms": 2500,
+          "text": "hello",
+          "words_path": "audio/call_1/words/aseg_1.json"
+        },
+        {
+          "avg_logprob": -0.25,
+          "call_id": "call_1",
+          "channel": "sys",
+          "corrections": [
+            {
+              "from": "notter",
+              "to": "Noter"
+            }
+          ],
+          "crosstalk_labels": [
+            "spk_1",
+            "spk_2"
+          ],
+          "id": "aseg_2",
+          "lang": "en",
+          "lang_p": 0.875,
+          "no_speech_p": 0.125,
+          "speaker_label": "spk_1",
+          "state": "confirmed",
+          "t0_ms": 2000,
+          "t1_ms": 3500,
+          "text": "hello",
+          "words_path": "audio/call_1/words/aseg_2.json"
+        }
+      ]
+    }
+  ],
   "commands": [
     {
       "cmd": {
@@ -454,6 +504,14 @@
         "type": "pong"
       },
       "seq": 25
+    }
+  ],
+  "words": [
+    {
+      "p": 0.75,
+      "t0_ms": 1000,
+      "t1_ms": 1400,
+      "text": "hello"
     }
   ]
 }

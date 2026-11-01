@@ -4,8 +4,9 @@
 //! The only crate allowed to reach the network (`just arch`, decision C12). In M0 it holds
 //! what model downloads need: the allow-list check over `noter_protocol::egress`
 //! (`ALLOW_WITHOUT_AUDIT`, group `model_downloads`) and an HTTP range fetcher that never leaves it,
-//! not even through a redirect. The LLM runtimes and the audited provider path join it in M2.
-//! The caller (noter-core's download task) verifies each file's sha256.
+//! not even through a redirect; the caller (noter-core's download task) verifies each file's
+//! sha256. M2 adds the LLM runtimes behind the audited provider path: [`Llm`] implements
+//! [`LlmRuntime`] (routing, the egress gate, validation), with the scripted runtime for tests.
 
 use std::time::Duration;
 
@@ -14,8 +15,24 @@ use reqwest::header::{CONTENT_RANGE, RANGE};
 use reqwest::redirect::Policy;
 use reqwest::{StatusCode, Url};
 
+mod adapters;
+mod gate;
+mod route;
+mod runtime;
+mod validate;
+
+pub use adapters::scripted::{Received, Scripted};
+pub use gate::Adapters;
+pub use runtime::{
+    Availability, Budget, Cancel, Failure, Llm, LlmRuntime, Packet, PacketItem, Privacy,
+    Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind, TaskSettings,
+    Usage, Validated,
+};
+
 #[cfg(test)]
 mod fetch_tests;
+#[cfg(test)]
+mod runtime_tests;
 
 fn model_hosts() -> &'static [&'static str] {
     ALLOW_WITHOUT_AUDIT
