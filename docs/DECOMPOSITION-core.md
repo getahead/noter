@@ -975,7 +975,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [ ] `p3` - **ID**: `cpt-noter-feature-core-postcall`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-postcall.md](features/core/core-postcall.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: CODE COMPLETE (#247 #254 #257 #262); the box stays open: the DoDs `outputs`, `notifications` and `tests` carry no `@cpt-dod` marker in the code yet (cfs refuses a done DoD without one), the native XCUITest for `cpt-noter-seq-notifications-open-outputs` (UI M2) and the owner's skill evals and Mac timing evidence. The role-review and D4 switch-off steps moved to [core-agents](features/core/core-agents.md) (M4). FEATURE spec: [features/core/core-postcall.md](features/core/core-postcall.md)
 
 - **Purpose**: Write the outputs within two minutes from the live transcript, section by section, then improve them after the archive pass without losing an edit; serve and version the output sections.
 

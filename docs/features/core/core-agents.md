@@ -228,6 +228,9 @@ Visual layout and contrast are not applicable here because the UI owns the edito
 5. [ ] - `p1` - **IF** live privacy requires local, use the router's local two-agent policy (Teamlead and Architect), or off when no local model is ready; never send a sensitive skill packet to cloud - `inst-effective-local`
 6. [ ] - `p1` - **IF** fused, give the router the shared council instructions and ordered eligible skills for one model and effort; **ELSE IF** parallel, retain each agent's runtime, model, effort and permitted tools, with no lookup tools live - `inst-effective-mode`
 7. [ ] - `p1` - Build stats from stored feedback: seven-day card count, useful-or-used share over the last 20 calls, absent when there is no data; **RETURN** the effective configuration and `AgentsView` - `inst-effective-return`
+8. [ ] - `p1` - After a call's outputs are committed, run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions (moved from `core-postcall`, 2.17) - `inst-write-reviews`
+9. [ ] - `p1` - For each agent with outcomes over the last ten calls of this type, calculate dismissal share; when at least 80 percent, log an undoable switch-off for that call type and its one-time Agents notice (moved from `core-postcall`, 2.17) - `inst-notify-switch`
+10. [ ] - `p1` - **RETURN** the post-call notification disposition and committed changes, including the switch-off changes (moved from `core-postcall`, 2.17) - `inst-notify-return`
 
 ## 4. States (CDSL)
 
