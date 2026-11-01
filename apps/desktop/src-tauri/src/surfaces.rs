@@ -645,6 +645,8 @@ pub struct TauriSurfaces<R: Runtime> {
     tray: Mutex<Option<TrayIcon<R>>>,
     /// The menu on screen and the model it shows.
     menu: Mutex<Option<(TrayModel, Menu<R>)>>,
+    /// The model to show next, set from any thread.
+    wanted: Mutex<Option<TrayModel>>,
     /// **Use Floating Panel** is checked in the menu on screen.
     floating: AtomicBool,
     /// The windows hidden for presenting, shown again on restore.
@@ -665,6 +667,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             core: OnceLock::new(),
             tray: Mutex::new(None),
             menu: Mutex::new(None),
+            wanted: Mutex::new(None),
             floating: AtomicBool::new(false),
             hidden: Mutex::new(Vec::new()),
             frames,
@@ -688,6 +691,73 @@ impl<R: Runtime> TauriSurfaces<R> {
             core.refresh_tray();
         });
         // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
+    }
+
+    /// Shows the latest model `set_tray` was given; on the main thread only.
+    fn show_tray(&self) {
+        let Some(model) = self.wanted.lock().unwrap_or_else(|e| e.into_inner()).take() else {
+            return;
+        };
+        let model = &model;
+        let mut shown = self.menu.lock().unwrap_or_else(|e| e.into_inner());
+        let glyph = (model.glyph, model.hidden);
+        let new_glyph = shown.as_ref().map(|(m, _)| (m.glyph, m.hidden)) != Some(glyph);
+        let menu = match shown.take() {
+            Some((old, menu)) if same_shape(&old, model) => {
+                let _ = Self::update_menu(&menu, model);
+                Some(menu)
+            }
+            _ => None,
+        };
+        let rebuilt = menu.is_none();
+        let Some(menu) = menu.or_else(|| self.menu(model).ok()) else {
+            return;
+        };
+        let mut tray = self.tray.lock().unwrap_or_else(|e| e.into_inner());
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
+        if tray.is_none() {
+            let this = self.this.get().cloned().unwrap_or_default();
+            let builder = TrayIconBuilder::with_id("noter")
+                .icon(glyph_image(model.glyph, model.hidden))
+                .icon_as_template(true)
+                .on_menu_event(move |_, event| {
+                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
+                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
+                    let surfaces = this.upgrade();
+                    if let (Some(surfaces), Some(action)) =
+                        (surfaces, action_of(event.id().as_ref()))
+                    {
+                        surfaces.menu_clicked(action);
+                    }
+                    // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
+                    // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
+                });
+            *tray = builder.build(&self.app).ok();
+        }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
+        if let Some(tray) = tray.as_ref() {
+            if rebuilt {
+                let _ = tray.set_menu(Some(menu.clone()));
+            }
+            if new_glyph {
+                let _ = tray.set_icon_with_as_template(Some(glyph_image(glyph.0, glyph.1)), true);
+            }
+            let _ = tray.set_title(model.title.as_deref());
+            let _ = tray.set_tooltip(Some(model.label.as_str()));
+            Self::set_accessibility_label(tray, &model.label);
+        }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
+        let floating = model
+            .item(TrayAction::UseFloatingPanel)
+            .and_then(|i| i.checked);
+        self.floating
+            .store(floating == Some(true), Ordering::Relaxed);
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
+        *shown = Some((model.clone(), menu));
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
     }
 
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
@@ -957,65 +1027,14 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
 
     fn set_tray(&self, model: &TrayModel) {
-        let mut shown = self.menu.lock().unwrap_or_else(|e| e.into_inner());
-        let glyph = (model.glyph, model.hidden);
-        let new_glyph = shown.as_ref().map(|(m, _)| (m.glyph, m.hidden)) != Some(glyph);
-        let menu = match shown.take() {
-            Some((old, menu)) if same_shape(&old, model) => {
-                let _ = Self::update_menu(&menu, model);
-                Some(menu)
-            }
-            _ => None,
-        };
-        let rebuilt = menu.is_none();
-        let Some(menu) = menu.or_else(|| self.menu(model).ok()) else {
+        // Only the main thread touches the tray: Tauri's menu calls from another thread wait for
+        // it, a deadlock while it waits for `menu` (the launch hooks seed the core on it). It shows
+        // the latest model, never an older update queued behind a newer one.
+        *self.wanted.lock().unwrap_or_else(|e| e.into_inner()) = Some(model.clone());
+        let Some(this) = self.this.get().and_then(Weak::upgrade) else {
             return;
         };
-        let mut tray = self.tray.lock().unwrap_or_else(|e| e.into_inner());
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
-        if tray.is_none() {
-            let this = self.this.get().cloned().unwrap_or_default();
-            let builder = TrayIconBuilder::with_id("noter")
-                .icon(glyph_image(model.glyph, model.hidden))
-                .icon_as_template(true)
-                .on_menu_event(move |_, event| {
-                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
-                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
-                    let surfaces = this.upgrade();
-                    if let (Some(surfaces), Some(action)) =
-                        (surfaces, action_of(event.id().as_ref()))
-                    {
-                        surfaces.menu_clicked(action);
-                    }
-                    // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
-                    // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
-                });
-            *tray = builder.build(&self.app).ok();
-        }
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
-        if let Some(tray) = tray.as_ref() {
-            if rebuilt {
-                let _ = tray.set_menu(Some(menu.clone()));
-            }
-            if new_glyph {
-                let _ = tray.set_icon_with_as_template(Some(glyph_image(glyph.0, glyph.1)), true);
-            }
-            let _ = tray.set_title(model.title.as_deref());
-            let _ = tray.set_tooltip(Some(model.label.as_str()));
-            Self::set_accessibility_label(tray, &model.label);
-        }
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
-        let floating = model
-            .item(TrayAction::UseFloatingPanel)
-            .and_then(|i| i.checked);
-        self.floating
-            .store(floating == Some(true), Ordering::Relaxed);
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
-        *shown = Some((model.clone(), menu));
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
+        let _ = self.app.run_on_main_thread(move || this.show_tray());
     }
 
     // @cpt-dod:cpt-noter-dod-core-native-surfaces-navigation:p2
