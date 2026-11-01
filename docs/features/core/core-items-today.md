@@ -148,7 +148,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Read Today before the next call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-dashboard`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-dashboard`
 
 **Actor**: Primary user (main window)
 
@@ -160,13 +160,13 @@ The user can review what a call produced, check the words behind an item, tick w
 - Calendar not asked or denied: no automatic prompt and item sections remain available; failed permitted EventKit read returns `calendar_unavailable` for Try Again.
 
 **Steps**:
-1. [ ] - `p1` - API: `today_get {}`; read local date, Today settings, capture state and current calendar authorization - `inst-today-request`
-2. [ ] - `p1` - **IF** calendar is not asked or denied, return the corresponding `CalendarAccess` and no protected events; only `permission_request` may ask for access - `inst-today-no-access`
-3. [ ] - `p1` - **ELSE** read allowed calendars for the configured horizon through EventKit; **IF** it fails **RETURN** `calendar_unavailable` - `inst-today-calendar`
-4. [ ] - `p1` - For each event run `cpt-noter-algo-core-items-today-carry`, add known attendees, sensitivity, last-time summary and source call; group Today and This week by event time - `inst-today-carry`
-5. [ ] - `p1` - Include the live call even without a calendar match, due-without-call items, done-today items, suggested review count and existing waiting proposals; before M5 proposal production these may be empty - `inst-today-sections`
-6. [ ] - `p1` - Return self-test, audio-access and interrupted-recording banners from existing setup/capture facts; first use has no invented open items - `inst-today-banners`
-7. [ ] - `p1` - **RETURN** a complete `TodayView` with its effective ranking - `inst-today-return`
+1. [x] - `p1` - API: `today_get {}`; read local date, Today settings, capture state and current calendar authorization - `inst-today-request`
+2. [x] - `p1` - **IF** calendar is not asked or denied, return the corresponding `CalendarAccess` and no protected events; only `permission_request` may ask for access - `inst-today-no-access`
+3. [x] - `p1` - **ELSE** read allowed calendars for the configured horizon through EventKit; **IF** it fails **RETURN** `calendar_unavailable` - `inst-today-calendar`
+4. [x] - `p1` - For each event run `cpt-noter-algo-core-items-today-carry`, add known attendees, sensitivity, last-time summary and source call; group Today and This week by event time - `inst-today-carry`
+5. [x] - `p1` - Include the live call even without a calendar match, due-without-call items, done-today items, suggested review count and existing waiting proposals; before M5 proposal production these may be empty - `inst-today-sections`
+6. [x] - `p1` - Return self-test, audio-access and interrupted-recording banners from existing setup/capture facts; first use has no invented open items - `inst-today-banners`
+7. [x] - `p1` - **RETURN** a complete `TodayView` with its effective ranking - `inst-today-return`
 
 ### Share or export a scope
 
@@ -191,7 +191,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Set and list call tags
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-tags`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-tags`
 
 **Actor**: Primary user (main window)
 
@@ -202,11 +202,11 @@ The user can review what a call produced, check the words behind an item, tick w
 - A tag outside 1–32 characters is `invalid_input`; a deleted target call is `not_found`.
 
 **Steps**:
-1. [ ] - `p1` - API: `call_tags_set { call_ids, add, remove }`; validate calls and tags, normalize case for uniqueness and deduplicate - `inst-tags-set`
-2. [ ] - `p1` - DB: apply explicit tag additions and removals to every selected call under the writer, advance affected call revisions and append the logged change in one transaction; repeated additions or removals have no duplicate effect - `inst-tags-write`
-3. [ ] - `p1` - Publish whole changed calls and return `TagsSetResult` with the calls and undo handle - `inst-tags-publish`
-4. [ ] - `p1` - API: `tags_list {}` reads distinct currently used tags and their counts for `TagList`; do not generate model suggestions - `inst-tags-list`
-5. [ ] - `p1` - **RETURN** the tag result - `inst-tags-return`
+1. [x] - `p1` - API: `call_tags_set { call_ids, add, remove }`; validate calls and tags, normalize case for uniqueness and deduplicate - `inst-tags-set`
+2. [x] - `p1` - DB: apply explicit tag additions and removals to every selected call under the writer, advance affected call revisions and append the logged change in one transaction; repeated additions or removals have no duplicate effect - `inst-tags-write`
+3. [x] - `p1` - Publish whole changed calls and return `TagsSetResult` with the calls and undo handle - `inst-tags-publish`
+4. [x] - `p1` - API: `tags_list {}` reads distinct currently used tags and their counts for `TagList`; do not generate model suggestions - `inst-tags-list`
+5. [x] - `p1` - **RETURN** the tag result - `inst-tags-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -236,13 +236,13 @@ The user can review what a call produced, check the words behind an item, tick w
 **Output**: Ranked open work, questions and awaiting handoffs with source-call references.
 
 **Steps**:
-1. [ ] - `p1` - Resolve known participants and read the last two calls with the same people; unknown attendees alone do not imply a match - `inst-carry-match`
-2. [ ] - `p1` - Select open accepted items and suggested items marked Not reviewed; exclude rejected or completed work and include awaiting handoffs in their separate collection - `inst-carry-select`
-3. [ ] - `p1` - Deduplicate by item id, join owners, due dates and spans, and retain `carried_from` provenance - `inst-carry-join`
-4. [ ] - `p1` - For default `owed_to_todays_people`, rank items owed to today's people first, then due date, then age; for `due_then_owed_to_you`, rank due date then owed to you, with stable identity tie-breaking - `inst-carry-rank`
+1. [x] - `p1` - Resolve known participants and read the last two calls with the same people; unknown attendees alone do not imply a match - `inst-carry-match`
+2. [x] - `p1` - Select open accepted items and suggested items marked Not reviewed; exclude rejected or completed work and include awaiting handoffs in their separate collection - `inst-carry-select`
+3. [x] - `p1` - Deduplicate by item id, join owners, due dates and spans, and retain `carried_from` provenance - `inst-carry-join`
+4. [x] - `p1` - For default `owed_to_todays_people`, rank items owed to today's people first, then due date, then age; for `due_then_owed_to_you`, rank due date then owed to you, with stable identity tie-breaking - `inst-carry-rank`
 5. [ ] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status - `inst-carry-start`
 6. [ ] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity - `inst-carry-end`
-7. [ ] - `p1` - **RETURN** the same query result to Today and the later copilot's initial context - `inst-carry-return`
+7. [x] - `p1` - **RETURN** the same query result to Today and the later copilot's initial context - `inst-carry-return`
 
 ### Resolve and format share content
 
