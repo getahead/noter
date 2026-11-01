@@ -240,8 +240,8 @@ The user can review what a call produced, check the words behind an item, tick w
 2. [x] - `p1` - Select open accepted items and suggested items marked Not reviewed; exclude rejected or completed work and include awaiting handoffs in their separate collection - `inst-carry-select`
 3. [x] - `p1` - Deduplicate by item id, join owners, due dates and spans, and retain `carried_from` provenance - `inst-carry-join`
 4. [x] - `p1` - For default `owed_to_todays_people`, rank items owed to today's people first, then due date, then age; for `due_then_owed_to_you`, rank due date then owed to you, with stable identity tie-breaking - `inst-carry-rank`
-5. [ ] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status - `inst-carry-start`
-6. [ ] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity - `inst-carry-end`
+5. [ ] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status (open until M3 people: needs the live-call people hook) - `inst-carry-start`
+6. [ ] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity (open until M3 people: needs the live-call people hook) - `inst-carry-end`
 7. [x] - `p1` - **RETURN** the same query result to Today and the later copilot's initial context - `inst-carry-return`
 
 ### Resolve and format share content
