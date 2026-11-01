@@ -19,6 +19,7 @@ design: docs/DESIGN-core.md
   - [1.2 Purpose](#12-purpose)
   - [1.3 Actors](#13-actors)
   - [1.4 References](#14-references)
+  - [1.5 M2 decisions](#15-m2-decisions)
 - [2. Actor Flows (CDSL)](#2-actor-flows-cdsl)
   - [Read and export History](#read-and-export-history)
   - [Undo or redo a change or batch](#undo-or-redo-a-change-or-batch)

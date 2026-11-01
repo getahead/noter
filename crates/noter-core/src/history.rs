@@ -472,7 +472,6 @@ struct Selection {
 }
 
 impl Core {
-    // @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
     // @cpt-dod:cpt-noter-dod-core-history-undo-history:p1
     pub(crate) async fn export_history(
         &self,
