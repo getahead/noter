@@ -3,7 +3,8 @@ import XCTest
 
 final class DialogsTests: NoterTestCase {
     func test_cpt_noter_seq_dialogs_delete_call__error_return_pressed_by_habit() {
-        launch()
+        // Nothing recording: the live call's window would cover the library (its fixture display is not this Mac's).
+        launch("idle")
         openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Cancel"].waitForExistence(timeout: 5), "Delete Call… shows no alert")
@@ -13,7 +14,8 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__other_several_calls_selected() {
-        launch()
+        // Nothing recording: the live call's window would cover the library (its fixture display is not this Mac's).
+        launch("idle")
         openCall("Backend sync")
         app.typeKey("a", modifierFlags: .command)
         app.typeKey(.delete, modifierFlags: .command)
@@ -24,7 +26,8 @@ final class DialogsTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__alert_has_cancel_as_default() {
-        launch()
+        // Nothing recording: the live call's window would cover the library (its fixture display is not this Mac's).
+        launch("idle")
         openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
         let cancel = alert.buttons["Cancel"]
