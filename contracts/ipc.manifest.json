@@ -2184,7 +2184,7 @@
       ]
     }
   ],
-  "contract_version": "2.1",
+  "contract_version": "2.2",
   "default_retryable": [
     "not_ready",
     "internal",
@@ -2229,6 +2229,7 @@
     "budget_paused",
     "copilot_off",
     "outputs_not_ready",
+    "output_invalid",
     "unreviewed_in_scope",
     "repo_not_mapped",
     "repo_path_missing",

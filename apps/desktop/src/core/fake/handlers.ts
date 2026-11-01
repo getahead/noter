@@ -754,7 +754,7 @@ export const defaultHandlers: Handlers = {
     const c = call(world, a.call_id);
     return { call_id: c.id, status: "not_started", sections: [], archive: c.archive, review_waiting: c.review_waiting, sensitive: c.privacy === "sensitive", written_locally: false };
   },
-  output_edit: (a, { world }) => {
+  output_edit: (a, { world, emit }) => {
     const s = section(world, a.summary_id);
     if (s.rev !== null) checkRev(s.rev, a.rev);
     const before = s.body_md;
@@ -762,7 +762,9 @@ export const defaultHandlers: Handlers = {
     s.user_edited = true;
     s.rev = (s.rev ?? 0) + 1;
     s.version_count += 1;
-    return { section: s, change_id: logChange(world, { entity: { kind: "summary", id: a.summary_id, label: "Summary" }, field: "body", before, after: a.body_md, summary: "Edited the summary" }) };
+    const change_id = logChange(world, { entity: { kind: "summary", id: a.summary_id, label: "Summary" }, field: "body", before, after: a.body_md, summary: "Edited the summary" });
+    emit("entity:changed", { type: "section", call_id: a.call_id, section: s });
+    return { section: s, change_id };
   },
   // D2: post-call analysis may run during a live call; regeneration waits.
   outputs_regenerate: (a, { world, fake, emit }) => {
