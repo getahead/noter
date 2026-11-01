@@ -107,7 +107,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
    1. [x] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
    2. [x] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
    3. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
-5. [ ] - `p1` - Run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions - `inst-write-reviews` (M4: no agent can be enabled before the `agents` table)
+5. [ ] - `p1` - Run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions (M4: no agent can be enabled before the `agents` table) - `inst-write-reviews`
 6. [x] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
 7. [x] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
 8. [x] - `p1` - **RETURN** committed output state to the job; queue archive processing if audio is available - `inst-write-return`
@@ -217,9 +217,9 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 1. [x] - `p1` - Pass ready or failed outcome with its call target to the session manager's existing notification hold rule - `inst-notify-session`
 2. [x] - `p1` - Hold while a call is live or presenting is hidden; suppress the system notification when the foreground main window already shows that call and announce readiness on the page - `inst-notify-hold`
 3. [x] - `p1` - When released and authorization allows it, post Summary ready or the failed-summary notice with a thread per call and a `NavTarget` for Summary; clicking routes through `nav:request` - `inst-notify-release`
-4. [ ] - `p1` - For each agent with outcomes over the last ten calls of this type, calculate dismissal share; when at least 80 percent, log an undoable switch-off for that call type and its one-time Agents notice - `inst-notify-switch` (M4: the rule arithmetic is in place; cards and the `agents` table arrive in M4)
+4. [ ] - `p1` - For each agent with outcomes over the last ten calls of this type, calculate dismissal share; when at least 80 percent, log an undoable switch-off for that call type and its one-time Agents notice (M4: the rule arithmetic is in place; cards and the `agents` table arrive in M4) - `inst-notify-switch`
 5. [x] - `p1` - Do not infer dismissal history before M4 produces cards, and do not back-compute behaviour metrics for calls recorded before the setting was enabled - `inst-notify-no-backfill`
-6. [ ] - `p1` - **RETURN** notification disposition and committed changes - `inst-notify-return` (M4, with the switch-off changes)
+6. [ ] - `p1` - **RETURN** notification disposition and committed changes (M4, with the switch-off changes) - `inst-notify-return`
 
 ## 4. States (CDSL)
 
