@@ -182,12 +182,12 @@ The user can review what a call produced, check the words behind an item, tick w
 - Unwritten outputs: `outputs_not_ready`; suggested items excluded by the request's review guard: `unreviewed_in_scope`; cancelled panel: `cancelled`.
 
 **Steps**:
-1. [ ] - `p1` - API: `share_copy { call_id, scope, format }` or `calls_export { call_ids, include, scope }`; resolve the scope with `cpt-noter-algo-core-items-today-format` - `inst-share-request`
-2. [ ] - `p1` - For copy, write rich and plain clipboard representations through native services and return `ShareResult` with text, section count, item count, unreviewed count and sensitivity - `inst-share-copy`
-3. [ ] - `p1` - For export, show the native save panel; **IF** cancelled **RETURN** `cancelled` without writing a completed export - `inst-share-panel`
-4. [ ] - `p1` - Write selected summary/items as Markdown, transcript as SRT and JSON, and audio only while stored and requested; keep scope restrictions in every format - `inst-share-export`
-5. [ ] - `p1` - **IF** requested audio has been deleted, return `audio_deleted` rather than inventing files; an I/O failure returns the typed error and no success count for incomplete output - `inst-share-fail`
-6. [ ] - `p1` - **RETURN** `ExportResult` after completion; reveal-in-Finder uses the existing external-open command - `inst-share-return`
+1. [x] - `p1` - API: `share_copy { call_id, scope, format }` or `calls_export { call_ids, include, scope }`; resolve the scope with `cpt-noter-algo-core-items-today-format` - `inst-share-request`
+2. [x] - `p1` - For copy, write rich and plain clipboard representations through native services and return `ShareResult` with text, section count, item count, unreviewed count and sensitivity - `inst-share-copy`
+3. [x] - `p1` - For export, show the native save panel; **IF** cancelled **RETURN** `cancelled` without writing a completed export - `inst-share-panel`
+4. [x] - `p1` - Write selected summary/items as Markdown, transcript as SRT and JSON, and audio only while stored and requested; keep scope restrictions in every format - `inst-share-export`
+5. [x] - `p1` - **IF** requested audio has been deleted, return `audio_deleted` rather than inventing files; an I/O failure returns the typed error and no success count for incomplete output - `inst-share-fail`
+6. [x] - `p1` - **RETURN** `ExportResult` after completion; reveal-in-Finder uses the existing external-open command - `inst-share-return`
 
 ### Set and list call tags
 

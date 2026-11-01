@@ -464,6 +464,10 @@ impl Core {
     fn outputs_for_share(&self, id: &CallId) -> Result<CallOutputs, CoreError> {
         let mut outputs = self.outputs_now(id)?;
         let items = self.items_of_call(id.as_str())?;
+        let finished = matches!(
+            outputs.status,
+            OutputsStatus::Ready | OutputsStatus::PartiallyFailed
+        );
         for s in &mut outputs.sections {
             let kind = match s.kind {
                 SectionKind::Decisions => ItemKind::Decision,
@@ -476,6 +480,10 @@ impl Core {
             if !mine.is_empty() {
                 s.items = mine;
                 s.body_md = None;
+                // Items stand for the section's text: they are committed once the outputs are.
+                if finished && matches!(s.state, SectionState::Pending | SectionState::Empty) {
+                    s.state = SectionState::Ready;
+                }
             }
         }
         Ok(outputs)
