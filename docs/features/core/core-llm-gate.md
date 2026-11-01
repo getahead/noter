@@ -86,7 +86,7 @@ Post-call and handoff can call a model without creating another path for user te
 
 ### Run a skill through the router
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-llm-gate-run`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-llm-gate-run`
 
 **Actor**: Core model caller
 
@@ -103,7 +103,7 @@ Post-call and handoff can call a model without creating another path for user te
 2. [x] - `p1` - Read runtime availability, privacy mode, call sensitivity and source classes; select with `cpt-noter-algo-core-llm-gate-route` - `inst-run-route`
 3. [x] - `p1` - Allocate an `llm_run_id`, record runtime, task, skill version and prompt hash in `llm_runs`; never store the packet in operational logs - `inst-run-record`
 4. [x] - `p1` - Use `cpt-noter-algo-core-llm-gate-egress` for the selected attempt before invoking an adapter - `inst-run-gate`
-5. [ ] - `p1` - Start the locked-down adapter with the same app-owned schema, skill and allowed tools; apply effort, budget and task timeout - `inst-run-adapter`
+5. [x] - `p1` - Start the locked-down adapter with the same app-owned schema, skill and allowed tools; apply effort, budget and task timeout - `inst-run-adapter`
 6. [x] - `p1` - Validate results through `cpt-noter-algo-core-llm-gate-validate`; map pseudonyms back only after cloud output is inside the core - `inst-run-validate`
 7. [x] - `p1` - Record usage, duration, first token, validation, retry and session id; cost is present for API-key runs and absent for own-account runs - `inst-run-usage`
 8. [x] - `p1` - **IF** timeout or cancellation occurs, terminate the request and child process, invalidate late output and remove its temporary config - `inst-run-cancel`
@@ -111,7 +111,7 @@ Post-call and handoff can call a model without creating another path for user te
 
 ### Open, reuse and close a runtime session
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-llm-gate-session`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-llm-gate-session`
 
 **Actor**: Core model caller
 
@@ -122,7 +122,7 @@ Post-call and handoff can call a model without creating another path for user te
 - A failed session or changed privacy context cannot carry a cloud turn forward unchecked.
 
 **Steps**:
-1. [ ] - `p1` - On open or resume, check the tested CLI version range and the runtime's availability, then create the isolated run environment - `inst-session-open`
+1. [x] - `p1` - On open or resume, check the tested CLI version range and the runtime's availability, then create the isolated run environment - `inst-session-open`
 2. [x] - `p1` - Gate every new turn or resumed packet with its current privacy context and audit linkage before the adapter receives it - `inst-session-turn`
 3. [x] - `p1` - Count live ticks and reset the warm session after 15; keep only the caller's current permitted context - `inst-session-reset`
 4. [x] - `p1` - On close, cancellation, provider failure or privacy change, stop the child and release temporary files and per-run capabilities - `inst-session-close`
@@ -207,7 +207,7 @@ Only committed `llm_runs` metadata survives process exit; no cancelled result ma
 
 ### Runtime adapters and lockdown
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-llm-gate-adapters`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-llm-gate-adapters`
 
 The system **MUST** implement the runtime interface for Claude Code, Codex and Ollama with pinned tested versions. Claude runs in an empty Noter-owned directory with strict per-run MCP config, a tool allow-list excluding WebFetch, WebSearch and Bash, empty setting sources and nonessential traffic disabled. Own-account runs use the same restrictions without `--bare`. Codex uses an isolated `CODEX_HOME` without user config and a read-only sandbox; the pinned-version adapter test proves config and credential use without reading subscription tokens into Noter. Ollama uses localhost `/api/chat` with the schema in `format`. Temporary capabilities and configs are deleted after every outcome. M2 runs permit no unavailable MCP tools.
 
@@ -246,6 +246,8 @@ The system **MUST** reject audio egress, force sensitive processing local, redac
 
 The system **MUST** pass unit tests for routing, redaction, failed-audit refusal, cancellation, retry and unknown citations; adapter/schema conformance; CI lockdown tests with hostile user hooks, plugins and MCP config; and the macOS network-monitor test with real pinned CLIs and a recording proxy. Every provider connection must match a run's audit evidence by run id and time, other hosts must match `contracts/egress-hosts.json`, and the engine must make no connection. Consuming real-core E2E uses the scripted runtime and owns its story ids. `just gate` passes.
 
+Open: the macOS network-monitor run with real pinned CLIs is the owner's release test, [.plans/backend/m2-network-monitor-runbook.md](../../../.plans/backend/m2-network-monitor-runbook.md) (TL-14); the CI lockdown tests are `crates/noter-llm/tests/lockdown.rs`.
+
 **Implements**:
 - `cpt-noter-flow-core-llm-gate-run`
 - `cpt-noter-algo-core-llm-gate-egress`
@@ -257,10 +259,11 @@ The system **MUST** pass unit tests for routing, redaction, failed-audit refusal
 ## 6. Acceptance Criteria
 
 - [x] Audit-write failure prevents adapter receipt of cloud text; sensitive and local-only calls produce zero provider requests.
-- [ ] Unknown majors are refused; hostile user hooks, plugins, repo instructions and MCP servers never start in a runtime run.
+- [x] Unknown majors are refused; hostile user hooks, plugins, repo instructions and MCP servers never start in a runtime run.
 - [x] Redaction replaces PII and optional names consistently; reverse mapping restores attribution without logging originals.
 - [x] Invalid schema and missing or unknown evidence trigger one repair retry and then the simpler fallback; unvalidated output is never committed.
-- [ ] Unit tests cover cancellation, two consecutive failures, budget and timeout paths; adapter conformance covers all three runtimes and cleanup.
+- [x] Unit tests cover cancellation, two consecutive failures, budget and timeout paths; adapter conformance covers all three runtimes and cleanup.
 - [ ] M2 real-core output and handoff E2E passes with the scripted runtime; the network-monitor release test separately proves actual egress behavior.
+  Open: the network-monitor half is the owner's run of [.plans/backend/m2-network-monitor-runbook.md](../../../.plans/backend/m2-network-monitor-runbook.md).
 - [ ] `accounts_get` and `api_key_set` succeed in E2E against the real core with the scripted runtime. `noter-core-harness` provides a Keychain stand-in, a scripted secret store, as part of the Platform seam (Backend Teamlead decision D1, `.plans/core-harness.md`).
 - [ ] `just gate` passes.

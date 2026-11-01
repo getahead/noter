@@ -259,9 +259,38 @@ pub struct Availability {
     pub unavailable: Option<RuntimeUnavailableReason>,
     /// The installed CLI's version (CLI runtimes).
     pub version: Option<String>,
-    /// The CLI majors the adapter was tested with; any other is refused.
-    pub tested_majors: Vec<u64>,
+    /// The CLI versions the adapter was tested with; any other is refused.
+    pub tested: Option<Tested>,
     pub models: Vec<String>,
+}
+
+/// A tested CLI version range: from `min` up to, not including, `below`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Tested {
+    pub min: [u64; 3],
+    pub below: [u64; 3],
+}
+
+impl Tested {
+    /// `major.minor.patch`, ignoring a pre-release or build suffix.
+    pub(crate) fn parse(version: &str) -> Option<[u64; 3]> {
+        let core = version.split(['-', '+']).next()?;
+        let mut parts = core.split('.').map(|p| p.parse::<u64>().ok());
+        let v = [parts.next()??, parts.next()??, parts.next()??];
+        parts.next().is_none().then_some(v)
+    }
+
+    pub fn admits(&self, version: &str) -> bool {
+        Self::parse(version).is_some_and(|v| self.min <= v && v < self.below)
+    }
+}
+
+impl std::fmt::Display for Tested {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let [a, b, c] = self.min;
+        let [x, y, z] = self.below;
+        write!(f, ">={a}.{b}.{c}, <{x}.{y}.{z}")
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -677,9 +706,16 @@ impl Inner {
             self.enter(state, RequestState::Gated, run);
             // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-gate
             self.enter(state, RequestState::Running, run);
+            // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-adapter
+            let budget_usd = req
+                .budget
+                .max_cost_usd
+                .filter(|_| route::is_api_key(tally.choice.runtime))
+                .map(|cap| (cap - tally.spent_usd).max(0.0));
             let sent = self
                 .gate
-                .send(&approved, &tally.choice, tally.skill, session);
+                .send(&approved, &tally.choice, tally.skill, session, budget_usd);
+            // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-adapter
             // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-cancel
             let reply: Result<Reply, Failure> = tokio::select! {
                 r = tokio::time::timeout(tally.choice.timeout, sent) => match r {
@@ -826,6 +862,16 @@ impl Inner {
         self.store.write(mutation, meta).map(drop)
     }
 
+    /// The runtime a session opens or resumes on, with its CLI version read again: the CLI may
+    /// have been updated since startup. The caller then creates the isolated environment.
+    fn open_route(&self, req: &RunRequest) -> Result<Choice, Failure> {
+        // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-open
+        let first = self.route(req, 0.0, false)?;
+        self.gate.refresh(first.runtime);
+        self.route(req, 0.0, false)
+        // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-open
+    }
+
     // @cpt-flow:cpt-noter-flow-core-llm-gate-session:p1
     async fn turn(&self, id: &SessionId, req: RunRequest) -> RunOutcome {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-reset
@@ -894,7 +940,7 @@ impl LlmRuntime for Llm {
         req: &'a RunRequest,
     ) -> BoxFuture<'a, Result<SessionId, Failure>> {
         Box::pin(async move {
-            let choice = self.0.route(req, 0.0, false)?;
+            let choice = self.0.open_route(req)?;
             let cli_session = self
                 .0
                 .gate
@@ -925,7 +971,7 @@ impl LlmRuntime for Llm {
 
     fn resume<'a>(&'a self, cli_session: &'a str, req: RunRequest) -> BoxFuture<'a, RunOutcome> {
         Box::pin(async move {
-            let choice = self.0.route(&req, 0.0, false)?;
+            let choice = self.0.open_route(&req)?;
             let resumed = self
                 .0
                 .gate
