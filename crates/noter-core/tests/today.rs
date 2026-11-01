@@ -658,3 +658,38 @@ async fn reading_today_never_changes_an_item() {
     today(&core).await.unwrap();
     assert_eq!(count(&core, "changes"), 0);
 }
+
+#[tokio::test]
+async fn tags_across_calls_return_their_batch_and_one_undo_reverses_them_all() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    insert(
+        &core,
+        vec![
+            call("c1", NOW - DAY, "ready"),
+            call("c2", NOW - 2 * DAY, "ready"),
+        ],
+    );
+    let single = tags(&core, &["c1"], &["solo"], &[]).await.unwrap();
+    assert_eq!(single.batch_id, None, "one changed call has no batch");
+
+    let both = tags(&core, &["c1", "c2"], &["team"], &[]).await.unwrap();
+    let batch = both.batch_id.clone().expect("several calls share a batch");
+    let undone = core
+        .change_undo(
+            &ctx(),
+            UndoArgs {
+                target: UndoTarget::Batch { batch_id: batch },
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(undone.undone, 2);
+    assert_eq!(tag_list(&core).await, [("solo".to_string(), 1)]);
+
+    let nothing = tags(&core, &["c1", "c2"], &[], &["absent"]).await.unwrap();
+    assert_eq!(
+        nothing.batch_id, None,
+        "a request that changed nothing has no batch"
+    );
+}
