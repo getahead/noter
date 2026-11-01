@@ -458,6 +458,7 @@ impl Core {
     /// Writes what an intent wanted, or returns the item as it is with its latest change when
     /// the wanted state was already there.
     // @cpt-algo:cpt-noter-algo-core-items-today-mutate:p1
+    // @cpt-state:cpt-noter-state-core-items-today-item:p1
     fn apply(
         &self,
         ctx: &CommandCtx,

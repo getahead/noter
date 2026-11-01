@@ -104,6 +104,7 @@ impl Core {
 
     /// The one deletion path. A call whose files cannot all be removed stays "kept" and the
     /// error is returned; calls before it are done, and a retry skips what is already gone.
+    // @cpt-state:cpt-noter-state-core-speakers-audio-availability:p1
     fn remove_audio(
         &self,
         ctx: &CommandCtx,
