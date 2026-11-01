@@ -1323,6 +1323,7 @@ Every whole-state event payload has a `version`. `entity:changed`, `outputs:prog
 | `budget_paused` | "Budget near the cap, then reached" | copilot commands |
 | `copilot_off` | "Sensitive call", "Copilot muted" | copilot commands |
 | `outputs_not_ready` | "Nothing to share yet"; "Outputs being written" | `share_copy`, `calls_export` |
+| `output_invalid` | "Section couldn't be written" (the model's output stayed invalid; **Try Again** or **Rewrite Locally**) | `SectionState::Failed` of an output section |
 | `unreviewed_in_scope` | "Unreviewed items in the scope" | `share_copy` with `include_unreviewed: false` |
 | `repo_not_mapped` | "No repository mapped" (drawer offers **Add Mapping…**) | `handoff_open` |
 | `repo_path_missing` | "No repository mapped" with the missing path | `handoff_open` |

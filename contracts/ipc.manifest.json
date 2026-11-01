@@ -2229,6 +2229,7 @@
     "budget_paused",
     "copilot_off",
     "outputs_not_ready",
+    "output_invalid",
     "unreviewed_in_scope",
     "repo_not_mapped",
     "repo_path_missing",

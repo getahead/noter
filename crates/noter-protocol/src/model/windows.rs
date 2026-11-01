@@ -238,6 +238,11 @@ pub enum EntityChanged {
         call_id: CallId,
         speakers: Vec<SpeakerView>,
     },
+    /// An output section, whole: an edit, an undo or a regeneration that merged into it.
+    Section {
+        call_id: CallId,
+        section: OutputSection,
+    },
     Removed {
         kind: EntityKind,
         id: String,
