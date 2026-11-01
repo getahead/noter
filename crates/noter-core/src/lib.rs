@@ -24,6 +24,7 @@ mod postcall;
 mod recovery;
 mod self_test;
 mod settings;
+mod speakers;
 mod surfaces;
 #[cfg(feature = "harness")]
 pub mod testing;
@@ -341,6 +342,12 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 5,
         name: "summaries",
         sql: include_str!("../migrations/0005_summaries.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 6,
+        name: "speaker names and constraints",
+        sql: include_str!("../migrations/0006_speaker_constraints.sql"),
     },
 ];
 
@@ -698,6 +705,30 @@ impl CoreApi for Core {
         args: SpanArgs,
     ) -> Result<SpanPreview, CoreError> {
         self.span_preview(args)
+    }
+
+    async fn transcript_rename_speaker(
+        &self,
+        ctx: &CommandCtx,
+        args: RenameSpeakerArgs,
+    ) -> Result<SpeakerMutation, CoreError> {
+        self.rename_speaker(ctx, args)
+    }
+
+    async fn transcript_name_speakers(
+        &self,
+        ctx: &CommandCtx,
+        args: NameSpeakersArgs,
+    ) -> Result<SpeakerMutation, CoreError> {
+        self.name_speakers(ctx, args)
+    }
+
+    async fn transcript_fix_term(
+        &self,
+        ctx: &CommandCtx,
+        args: FixTermArgs,
+    ) -> Result<FixTermResult, CoreError> {
+        self.fix_term(ctx, args)
     }
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {

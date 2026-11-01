@@ -14,7 +14,7 @@ use crate::{internal, lock, Core};
 const COLUMNS: &str =
     "id, rev, term, variants_latin, variants_cyrillic, spoken_forms, lang, always_apply, added_from";
 
-fn read_terms(c: &Connection) -> noter_db::rusqlite::Result<Vec<GlossaryTerm>> {
+pub(crate) fn read_terms(c: &Connection) -> noter_db::rusqlite::Result<Vec<GlossaryTerm>> {
     let mut stmt = c.prepare(&format!("SELECT {COLUMNS} FROM glossary ORDER BY rowid"))?;
     let rows = stmt.query_map([], |r| {
         let json = |i: usize| -> noter_db::rusqlite::Result<Value> {
@@ -76,6 +76,16 @@ impl Core {
         ctx: &CommandCtx,
         args: GlossaryUpsertArgs,
     ) -> Result<GlossaryList, CoreError> {
+        self.upsert_term_in(ctx, args, None)
+    }
+
+    /// `upsert_term` whose change row joins `batch` (a term fix and its glossary entry undo together).
+    pub(crate) fn upsert_term_in(
+        &self,
+        ctx: &CommandCtx,
+        args: GlossaryUpsertArgs,
+        batch: Option<BatchId>,
+    ) -> Result<GlossaryList, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-settings-glossary:p2:inst-glossary-call
         let terms = self.glossary()?.terms;
         // @cpt-end:cpt-noter-flow-core-settings-glossary:p2:inst-glossary-call
@@ -118,7 +128,8 @@ impl Core {
                 ("always_apply", Value::Bool(args.always_apply)),
             ],
         };
-        let meta = self.change_meta(ctx, format!("Glossary term {term}"), "glossary_upsert");
+        let mut meta = self.change_meta(ctx, format!("Glossary term {term}"), "glossary_upsert");
+        meta.batch_id = batch;
         // Another window may add the same term between the check above and this write.
         self.store()
             .write(mutation, meta)
