@@ -1,0 +1,16 @@
+# be-eng-2 (Opus 5.5, senior, engine lane) — 2.21 Native services, part A: the noter-native half
+
+Worktree `~/orca/workspaces/noter/be-eng-2` (start from fresh `origin/main`; your #236 is merging). Read `spec-be-m2-common.md`, `PLAN-be-m2.md` (TL-15), `docs/features/core/core-native-services.md` (flows `-share-test` and `-operation`, algos `-visibility` and `-launch`, state `-probe`, DoDs, ACs), DESIGN-core `cpt-noter-component-core-native`, `cpt-noter-constraint-core-macos`, the M1 noter-native code (`crates/noter-native`: permissions, environment, notifications, EventKit, displays) and `handoff-be-eng-2.md`.
+
+**Target:** `feat(native): launch services, apple events, rich clipboard, save panels and the share visibility probe`, one PR on `lane/engine/native-services` (engine lane: `crates/noter-native`). The mechanisms only; the `NativeOps` trait on `CoreDeps` is being added by be-mid-2 in #238 (save panel first) and the src-tauri implementation of it over your functions is part B (a later dispatch, core lane) once #238 has merged. Code against a small, documented function surface so part B is glue.
+
+**Change:**
+1. Launch: detect installed URL handlers / apps for Claude Code and Codex (Launch Services), open a prompt pre-filled in the target (URL scheme or Apple Event per the feature spec's launch algorithm), Automation-denied detection (`TCC` result mapped to a typed error), terminal fallback (open Terminal/iTerm with the prompt file path; never sends anything). Return a typed `LaunchOutcome { used: Handler | AppleEvent | Terminal, detail }`.
+2. Clipboard: write plain + Markdown + HTML (and RTF if cheap) in one pasteboard write; read-back test on the pasteboard.
+3. Save panels: `NSSavePanel` with suggested name, allowed types and a directory-pick variant (export to a folder); cancelled → `None`; must run on the main thread (follow #233's lesson: never call AppKit from a tokio worker; use the existing main-thread dispatch helper in noter-native or src-tauri).
+4. Share visibility probe for the Screen Share Test (`-visibility`, state `-probe`): whether Noter's windows/panels are excluded from capture (`sharingType`), optional short capture probe with its own permission state, `ShareTestResult` per the contract (`crates/noter-protocol`), no permission prompt without the caller asking.
+5. Tests: unit tests for the pure parts (handler resolution order, fallback decision, result mapping, pasteboard round trip, panel cancelled path through an injected presenter) run under `just gate`; anything that needs a real app installed or a TCC prompt is behind an injected seam, never `#[ignore]`.
+
+**Constraints:** engine lane only (`crates/noter-native`, `Cargo.toml`/`Cargo.lock`; update `apps/desktop/src-tauri/Cargo.lock` if a dependency changes). No `NativeOps` trait edits (be-mid-2's), no src-tauri edits (part B), no new IPC command (`share_test_run` is wired in part B). No network.
+
+**Acceptance:** the CDSL items of 2.21 that live in noter-native `[x]` with markers (`-launch`, `-visibility`, state `-probe`, the native half of flow `-operation`; `share_test_run` and the src-tauri `NativeOps` impl stay `[ ]` for part B); `just gate` green; PR published with the self-review; `worker_done` names the PR and the function surface part B will call.

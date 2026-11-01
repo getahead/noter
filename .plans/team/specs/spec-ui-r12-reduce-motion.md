@@ -1,0 +1,11 @@
+# ui-mid-2 r12 — 2.9 record prompt: prove the Reduce-motion countdown AC (Sonnet). Read spec-ui-r12-common.md and spec-ui-r11-common.md first.
+
+Target: `docs/features/ui/record-prompt.md` §6 row "The countdown bar is absent under Reduce motion while the seconds still update; seconds are never announced" — the only non-XCUITest row left open in 2.9.
+
+Branch `lane/ui/record-prompt-reduce-motion` from fresh origin/main (UI lane: apps/desktop/** except src-tauri, src/core/fake, tests/conformance; docs/features/** allowed).
+
+Change (test only, no production code unless the test finds a real gap):
+- In `apps/desktop/tests/e2e/m1-record-prompt-ui.spec.ts`, next to the test at ~L222 ("the call-ended variant counts down, hover pauses it, …"), add one test on the fake world that: `page.emulateMedia({ reducedMotion: "reduce" })` before load; reaches `data-variant="call-ended"` / `data-state="countdown-running"` the same way; asserts the bar `.rp-countdown` is hidden (`toBeHidden`, the CSS `@media (prefers-reduced-motion: reduce) { .rp-countdown { display: none } }` in record-prompt.css:20); asserts the seconds text (`.rp-sub .np-tnum`, i18n key prompt.ended_stopping) changes between two reads (advance the clock the way the neighbouring test does); asserts seconds are never announced: no `window_announce` command sent whose text contains the seconds (use the file's `sent(page, …)` helper) and no `aria-live` region holds the seconds. Keep the test title in the file's convention (story id in the describe/title, as the neighbours).
+- Tick the §6 row, naming the test in the PR body. Nothing else in the spec changes (the XCUITest rows and `dod-record-prompt-panel` close with #203).
+
+Done: tests first; `just gate-fast`, then `just gate` exit 0 (`NOTER_CORE_CMD` set, lock held), `just docs`, `cfs validate`, `just trace`. Push, PR title `test(ui): record prompt countdown under Reduce motion (2.9)`, `/cf-sdlc-pr-review <N>` with `/ponytail-review` merged in, `just review-publish <N>`, `gh pr checks <N> --watch` (no sleep loops); known main flakes (m0-a11y-l10n-screens:244, models.rs:195) → `gh run rerun <id> --failed` once. One-line `send --type status` when the PR is open and when it merges; then `_team/handoff-ui-mid-2-r12.md` (≤ 10 lines) and worker_done, stop.

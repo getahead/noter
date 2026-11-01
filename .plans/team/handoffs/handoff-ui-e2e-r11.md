@@ -1,0 +1,11 @@
+# Handoff ui-e2e r11 (29 Oct): launch hooks merged, #203 draft (finish-only)
+- **Landed: #220** `feat(core)`: debug builds launched with `NOTER_TEST_FIXTURE=world|none` boot the core on noter-core-harness (scripted Mac, perms granted, scripted engine, tiny models, fixture seeded) behind the real windows/tray/notifications; `NOTER_TEST_SCENARIO=idle|low-disk|detected|new-meeting|call-seems-ended|switched-to-local`, `NOTER_TEST_CLOCK`, `NOTER_TEST_ENGINE_SCRIPT`. Release builds don't compile the hook (`cfg(debug_assertions)`); caveat: noter-core's `harness` feature is unified into release (unreferenced).
+- **#203** (lane/ui/native-tests, head 3668823, draft, rebased on main with #219+#220): tests call `launch(<scenario>)`; runner unsandboxed (`NoterNativeUITests.entitlements`).
+- **Root cause found:** a sandboxed XCUITest runner launches the app WITHOUT launchEnvironment → the app ran on the Mac's real `~/Library/Application Support/Noter` (also all r9 runs). NSWorkspace+environment fails the same way.
+- **Blockers (in the PR body):**
+  - owner TCC: local `just native` dies before any test ("Timed out while enabling automation mode"); run `sudo automationmodetool enable-automationmode-without-authentication` once at the Mac;
+  - #216 (CI native recipe) must merge for the macOS job to run the suite;
+  - `.cf-studio/config/artifacts.toml` "Native UI tests" entry is outside the ui lane, so the DoD marker `cpt-noter-dod-ui-menu-bar-native-tests` can't land yet.
+- **Per test at head:** full run not possible (TCC). Verified singly with hooks: `setup_incomplete` PASS; `paused_for_5_min` records, fails on the "Paused for 5 min" line (tray). The other 24 are unverified since the sandbox fix (r9 app gaps may be closed by #219).
+- **Rows left `[ ]`:** the menu-bar native-tests DoD, dialogs-host §6 (Return/quit), record-prompt §6 focus, call-window §6 focus, call-page-frame §6 ×2, notifications NT-3/allow, menu-bar §6. All wait on a green native run.
+- **Resume:** build `pnpm --dir apps/desktop exec tauri build --debug --bundles app`; `NOTER_APP_PATH=$PWD/apps/desktop/src-tauri/target/debug/bundle/macos/Noter.app just native`; move `engine/.build` out of the tree before `just gate` (arch); fix the test side; then tick, ready, self-review, review-publish.

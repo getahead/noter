@@ -1,0 +1,6 @@
+# ui-perf handoff (written by the UI Teamlead from ui-perf's worker_done, 18 Oct 17:50)
+- Plan: ~/projects/noter-wt/_team/ui/perf/plan.md — 6 due UI scenarios: M0 ui_stream_flush (file on main, NOT registered), ui_window_open (PR #82), ui_shell_render (after main-window-shell); M1 ui_transcript_replay, ui_transcript_scroll (live-transcript), ui_calls_list (library-calls).
+- PR #82 perf(ui): ui_window_open scenario — gate green, self-review APPROVE published, auto-merge on. ui-reviewer: COMMENT (nonblocking: dropped updates evade assertions — consider an assertion that counts delivered updates).
+- PR #76 docs(ui) D-1..D-3 — published, auto-merge on.
+- Findings: #36's / D-6 perf.toml snippet cannot serve scenarios importing zustand (output must sit under apps/desktop/node_modules/.perf); node --predictable makes counts repeat (±200 in 638M vs ±0.4%). Correct TOML: plan.md §4.
+- DevOps (ctx_0f81e84c9b80, may have changed — see ROSTER) has the §4 request: register ui-stream-flush + ui-window-open in harness/perf.toml and set node: "true" in the CI perf job; needs owner harness-change-approved; land after #82 merges. HoD D-6 follows plan.md §4. M0 perf gate needs >= 60% of due registry entries measured — on the M0 critical path.
