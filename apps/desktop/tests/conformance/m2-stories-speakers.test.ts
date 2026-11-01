@@ -63,9 +63,10 @@ describe("cpt-noter-seq-call-screen-name-speaker", () => {
 
   it("empty — no matching person: naming a new person creates them; a blank name is refused and nothing changes", async () => {
     open();
+    const logged = (await history()).length;
     const blank = refused(await main.transcriptRenameSpeaker({ call_id: LIVE_CALL, speaker_id: "spk_3", person: { type: "new", display_name: " " }, scope: { type: "whole_call" } }));
     expect(blank).toMatchObject({ code: "invalid_input", detail: { type: "validation", rule: "required" } });
-    expect((await history()).some((r) => r.summary.startsWith("Named"))).toBe(false);
+    expect((await history()).length).toBe(logged);
     const made = ok(await main.transcriptRenameSpeaker({ call_id: LIVE_CALL, speaker_id: "spk_3", person: { type: "new", display_name: "Lena" }, scope: { type: "whole_call" } }));
     expect(label(made.speakers, "spk_3")).toBe("Lena");
   });
