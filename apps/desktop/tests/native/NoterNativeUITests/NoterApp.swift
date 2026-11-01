@@ -36,7 +36,7 @@ class NoterTestCase: XCTestCase {
     }
 
     /// Launches the app on the fixture world (a live call recording, the call “Backend sync” in the library) in
-    /// `scenario` (`idle`, `low-disk`, `detected`, `new-meeting`, `call-seems-ended`, `switched-to-local`), or with
+    /// `scenario` (`idle`, `low-disk`, `detected`, `new-meeting`, `call-seems-ended`, `switched-to-local`, `first-call`), or with
     /// `fixture: "none"` as a fresh install.
     func launch(_ scenario: String? = nil, fixture: String = "world") {
         app.launchEnvironment["NOTER_TEST_FIXTURE"] = fixture
@@ -118,6 +118,8 @@ class NoterTestCase: XCTestCase {
 
     /// Opens Calls (⌘3) and selects the call with this title.
     func openCall(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
+        // The page takes keys once it has loaded: right after launch ⌘3 can reach an empty web view.
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load", file: file, line: line)
         app.typeKey("3", modifierFlags: .command)
         let row = app.staticTexts[title].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5), "no call “\(title)” in the library", file: file, line: line)
