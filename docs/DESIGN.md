@@ -193,7 +193,7 @@ The principles are listed in priority order: when two conflict, the one listed f
 
 #### Privacy and recording state stay visible
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-privacy-visible`
+- [x] `p1` - **ID**: `cpt-noter-principle-privacy-visible`
 
 Every call surface shows whether Noter is recording and where text may go right now (cloud, cloud with redaction, local only). When the state changes, the surface changes with it and says so in words, never in colour alone. What left the Mac is listed in plain words on the Privacy pane.
 
@@ -249,7 +249,7 @@ Every action can be reached and done with the keyboard. Lists use arrow keys, an
 
 #### Undo over confirmation
 
-- [ ] `p2` - **ID**: `cpt-noter-principle-undo-over-confirm`
+- [x] `p2` - **ID**: `cpt-noter-principle-undo-over-confirm`
 
 Reversible actions (tick, accept, reject, regenerate, propagate, pin, dismiss) apply at once and offer **Undo**; they never ask first. Only irreversible actions ask, in a native alert that says what is lost: deleting a call, a person, a voice profile or audio, removing a source or an agent, revoking a token, quitting while recording, and signing out of your Claude or ChatGPT account (PM-58).
 
@@ -319,7 +319,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Monochrome menu bar icons
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-menu-bar-template-icons`
+- [x] `p1` - **ID**: `cpt-noter-constraint-menu-bar-template-icons`
 
 **Type**: Platform. The menu bar extra shows four monochrome template glyphs (idle, recording, paused, copilot muted) and a native text menu; it cannot show red or custom views. Its optional title is capped at 24 characters and is off by default.
 
@@ -327,7 +327,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### No dialog after setup
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-no-dialog-after-setup`
+- [x] `p1` - **ID**: `cpt-noter-constraint-no-dialog-after-setup`
 
 **Type**: Product. Quick actions in the menu bar and on call surfaces take effect within a second and never open a dialog after first run. Permission prompts appear only in the first-run wizard, after a button the user pressed for that purpose, or, when macOS has never asked, at the first capture, which macOS itself triggers. No start control ever reads **Finish Setup…**: **Record** and **Start Recording** start capture whatever the setup state, and a missing permission shows as a degraded state during capture (PM-30, PM-60).
 
@@ -383,7 +383,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Notifications without buttons
 
-- [ ] `p2` - **ID**: `cpt-noter-constraint-notification-limits`
+- [x] `p2` - **ID**: `cpt-noter-constraint-notification-limits`
 
 **Type**: Platform. macOS notifications sent through the Tauri plugin carry no action buttons. Notifications therefore only inform and open a page; every decision happens inside Noter. While a call is being recorded they wait, and they arrive one per call when capture stops (PM-44).
 
@@ -1931,7 +1931,7 @@ Collapsed strip, 56 high:
 
 #### Screen — Menu bar extra
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-menu-bar`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-menu-bar`
 
 ##### Why this component exists
 
@@ -2068,7 +2068,7 @@ MB-R1  idle glyph, no title (None)                    MB-R1  recording glyph, no
 
 #### Screen — Call page
 
-- [ ] `p1` - **ID**: `cpt-noter-component-screen-call-page`
+- [x] `p1` - **ID**: `cpt-noter-component-screen-call-page`
 
 ##### Why this component exists
 
@@ -2278,7 +2278,7 @@ The Call page is where the user confirms and shares what came out of a call with
 | Audio deleted from Call info | PC-R4 Call info | After **Delete Audio** in the alert, **Audio deleted on 15 Nov · transcript kept** in **Audio** | PM-22 | `cpt-noter-seq-call-page-name-speakers` (Empty — Audio no longer kept) |
 #### Screen — Notifications
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-notifications`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-notifications`
 
 ##### Why this component exists
 
@@ -2362,7 +2362,7 @@ Notifications tell the user that outputs are ready or failed, or that capture ha
 
 #### Screen — Dialogs, sheets and popovers
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-dialogs`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-dialogs`
 
 ##### Why this component exists
 
@@ -4498,7 +4498,7 @@ The strip is 56 pt high, at least 300 pt wide, and as wide as the expanded panel
 
 #### Component — Status item
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-status-item`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-status-item`
 
 ##### Why this component exists
 

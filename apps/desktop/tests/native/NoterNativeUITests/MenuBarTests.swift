@@ -1,6 +1,7 @@
 // M1 menu bar extra (docs/features/ui/menu-bar.md): the menu per state and the controls on it.
 import XCTest
 
+// @cpt-dod:cpt-noter-dod-ui-menu-bar-native-tests:p2
 final class MenuBarTests: NoterTestCase {
     func test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue() {
         launch("idle")

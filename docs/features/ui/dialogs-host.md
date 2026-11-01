@@ -37,11 +37,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-dialogs-host`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-dialogs-host`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-dialogs-host`
+- [x] `p2` - `cpt-noter-feature-ui-dialogs-host`
 
 ### 1.1 Overview
 
@@ -262,7 +262,7 @@ The system **MUST** confirm discarding a recording inline in the capture notice,
 
 ## 6. Acceptance Criteria
 
-- [ ] Every irreversible action in M1 asks first, and Return never confirms a delete
+- [x] Every irreversible action in M1 asks first, and Return never confirms a delete
 - [x] No alert or sheet ever appears in the call window
 - [x] Deleting from a call's page lands on Library › **Calls** without the call
 - [x] Sheets keep focus inside until they close and return it to the opener

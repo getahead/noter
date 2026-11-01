@@ -35,11 +35,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-menu-bar`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-menu-bar`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-menu-bar`
+- [x] `p2` - `cpt-noter-feature-ui-menu-bar`
 
 ### 1.1 Overview
 
@@ -238,7 +238,7 @@ The system **MUST** provide the menu bar's content per state as listed in this f
 
 ### Native tests of every item
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-menu-bar-native-tests`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-menu-bar-native-tests`
 
 The system **MUST** have XCUITest cases for every menu item and every glyph, named after the stories they prove (`test_cpt_noter_seq_menu_bar_control_recording__pause_and_resume`, `test_cpt_noter_seq_menu_bar_check_state__setup_incomplete`), that check each action takes effect within a second and opens no window except **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Finish Setup…** and **Settings…**.
 
@@ -254,8 +254,8 @@ The system **MUST** have XCUITest cases for every menu item and every glyph, nam
 
 ## 6. Acceptance Criteria
 
-- [ ] Every `MB_STATES` entry of the prototype has a matching native menu, checked by XCUITest
-- [ ] No menu item opens a dialog after setup except the quit alert while recording
+- [x] Every `MB_STATES` entry of the prototype has a matching native menu, checked by XCUITest
+- [x] No menu item opens a dialog after setup except the quit alert while recording
 - [x] **Start Recording** never reads **Finish Setup…** and works in every setup state
 - [x] The glyphs are template images and change shape, never colour
 
