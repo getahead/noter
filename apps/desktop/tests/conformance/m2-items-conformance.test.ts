@@ -1,6 +1,5 @@
 // M2 items and Today conformance (2.18): the fourteen commands answer the same on the fake and
 // the real core — shapes, revisions (`conflict`), `invalid_input`, `not_found` and `cancelled`.
-// @cpt-dod:cpt-noter-dod-core-items-today-tests:p1
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { Core, ItemView } from "../../src/core/bindings";
