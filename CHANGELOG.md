@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/getahead/noter/compare/v0.14.0...v0.15.0) (2026-11-01)
+
+
+### Features
+
+* **core:** fit the record prompt to its content (window_fit) ([#285](https://github.com/getahead/noter/issues/285)) ([31b5895](https://github.com/getahead/noter/commit/31b589524c6fce844a079accc98d30a717cfa51d))
+* **engine:** the VBx speaker clustering of the archive pass on pinned pyannote and WeSpeaker models ([#279](https://github.com/getahead/noter/issues/279)) ([dddd5c4](https://github.com/getahead/noter/commit/dddd5c4067ad17695ec63b306d9597f5d6074a2e))
+
+
+### Bug fixes
+
+* **ui:** the record prompt fits its window so Record lies inside the panel ([#287](https://github.com/getahead/noter/issues/287)) ([2d3506a](https://github.com/getahead/noter/commit/2d3506a6ca731413bfe80fd8f865947954d2a177))
+
 ## [0.14.0](https://github.com/getahead/noter/compare/v0.13.0...v0.14.0) (2026-11-01)
 
 
