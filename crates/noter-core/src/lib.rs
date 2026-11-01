@@ -5,6 +5,7 @@
 mod accounts;
 mod app;
 mod archive;
+mod audio;
 mod capture;
 mod chunks;
 mod first_run;
@@ -360,6 +361,12 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 7,
         name: "chunks and crosstalk",
         sql: include_str!("../migrations/0007_chunks.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 8,
+        name: "audio deletion time",
+        sql: include_str!("../migrations/0008_audio_deleted_at.sql"),
     },
 ];
 
@@ -751,6 +758,22 @@ impl CoreApi for Core {
         args: FixTermArgs,
     ) -> Result<FixTermResult, CoreError> {
         self.fix_term(ctx, args)
+    }
+
+    async fn audio_delete(
+        &self,
+        ctx: &CommandCtx,
+        args: DeleteAudioArgs,
+    ) -> Result<DeleteAudioResult, CoreError> {
+        self.delete_audio(ctx, args)
+    }
+
+    async fn audio_delete_older(
+        &self,
+        ctx: &CommandCtx,
+        args: DeleteOldAudioArgs,
+    ) -> Result<DeleteAudioResult, CoreError> {
+        self.delete_audio_older(ctx, args)
     }
 
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {
