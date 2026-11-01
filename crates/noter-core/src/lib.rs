@@ -44,6 +44,7 @@ pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 pub use models::PinnedModels;
+pub use noter_jobs::{Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
 use noter_protocol::ipc::Sink;

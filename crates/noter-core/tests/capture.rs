@@ -2852,3 +2852,137 @@ async fn moves_that_are_not_transitions_are_refused() {
         );
     }
 }
+
+// --- Pipeline triggers and the capture guard (FEATURE core-jobs-scheduler) -----------------
+
+/// A pipeline worker that works in 100 ms steps, each at a safe boundary, for `steps` steps.
+struct Steady {
+    steps: u32,
+}
+
+impl noter_jobs::JobHandler for Steady {
+    fn run<'a>(
+        &'a self,
+        ctx: &'a mut noter_jobs::RunCtx,
+    ) -> noter_jobs::BoxFuture<'a, Result<(), noter_jobs::Stop>> {
+        Box::pin(async move {
+            for _ in 0..self.steps {
+                ctx.checkpoint().await?;
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            Ok(())
+        })
+    }
+}
+
+fn runs_of(r: &Rig, kind: JobKind) -> Vec<JobRunRow> {
+    r.core
+        .scheduler()
+        .runs()
+        .unwrap()
+        .into_iter()
+        .filter(|run| run.kind == kind)
+        .collect()
+}
+
+// @cpt-dod:cpt-noter-dod-core-jobs-scheduler-scheduling:p1
+#[tokio::test(start_paused = true)]
+async fn stop_queues_post_call_then_archive_and_the_guard_follows_the_call() {
+    let r = rig();
+    assert!(!r.core.capture_guard().borrow().live);
+    let call_id = r.recording().await;
+    assert!(r.core.capture_guard().borrow().live, "live from the start");
+    r.stop(&main_window(), &call_id).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(
+        !r.core.capture_guard().borrow().live,
+        "not live once stopped"
+    );
+    let post = runs_of(&r, JobKind::PostCall);
+    let archive = runs_of(&r, JobKind::ArchivePass);
+    assert_eq!((post.len(), archive.len()), (1, 1));
+    assert_eq!(post[0].status, JobRunStatus::Succeeded);
+    assert_eq!(archive[0].status, JobRunStatus::Succeeded);
+    assert!(
+        post[0].started_at <= archive[0].started_at,
+        "post-call first"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_second_call_leaves_the_previous_post_call_running_and_pauses_its_archive() {
+    let r = rig();
+    r.core
+        .scheduler()
+        .register(JobKind::PostCall, Arc::new(Steady { steps: 100 }));
+    r.core
+        .scheduler()
+        .register(JobKind::ArchivePass, Arc::new(Steady { steps: 100 }));
+    let first = r.recording().await;
+    r.stop(&main_window(), &first).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let second = r.recording().await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    assert_eq!(
+        runs_of(&r, JobKind::PostCall)[0].status,
+        JobRunStatus::Running,
+        "the previous call's post-call goes on during a live call"
+    );
+    assert_eq!(
+        runs_of(&r, JobKind::ArchivePass)[0].status,
+        JobRunStatus::Paused
+    );
+    r.stop(&main_window(), &second).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    assert_eq!(
+        runs_of(&r, JobKind::ArchivePass)[0].status,
+        JobRunStatus::Running,
+        "the archive goes on from its checkpoint once no call is live"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn continue_recording_cancels_the_calls_pipeline_and_the_next_stop_queues_a_fresh_one() {
+    let r = rig();
+    r.core
+        .scheduler()
+        .register(JobKind::PostCall, Arc::new(Steady { steps: 100 }));
+    let call_id = r.recording().await;
+    r.stop(&main_window(), &call_id).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let first = runs_of(&r, JobKind::PostCall)[0].clone();
+    assert_eq!(first.status, JobRunStatus::Running);
+    r.core
+        .capture_continue(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        r.core.capture_guard().borrow().resumed_call,
+        Some(call_id.clone())
+    );
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let runs = runs_of(&r, JobKind::PostCall);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].status, JobRunStatus::Cancelled);
+    assert_eq!(
+        runs_of(&r, JobKind::ArchivePass)
+            .iter()
+            .filter(|a| a.status == JobRunStatus::Succeeded)
+            .count(),
+        0,
+        "no archive result lands for the resumed call"
+    );
+    r.session_started(&call_id);
+    r.stop(&main_window(), &call_id).await;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    let runs = runs_of(&r, JobKind::PostCall);
+    assert_eq!(runs.len(), 2, "a fresh generation");
+    assert_ne!(runs[0].id, runs[1].id);
+    assert_eq!(runs[1].status, JobRunStatus::Running);
+    assert_eq!(r.core.capture_guard().borrow().resumed_call, None);
+}
