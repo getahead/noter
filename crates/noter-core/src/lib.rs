@@ -9,6 +9,7 @@ mod glossary;
 mod history;
 mod hotkeys;
 mod hub;
+mod items;
 mod jobs;
 mod library;
 mod log;
@@ -282,6 +283,14 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 3,
         name: "call tags",
         sql: include_str!("../migrations/0003_call_tags.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-items:p1
+    // @cpt-dbtable:cpt-noter-dbtable-item-spans:p1
+    Migration {
+        owner: "noter-core",
+        version: 4,
+        name: "items and item spans",
+        sql: include_str!("../migrations/0004_items.sql"),
     },
 ];
 
@@ -689,6 +698,74 @@ impl CoreApi for Core {
         args: RedoArgs,
     ) -> Result<UndoResult, CoreError> {
         self.reverse_change(Direction::Redo, args.target)
+    }
+
+    async fn items_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: ItemsListArgs,
+    ) -> Result<Page<ItemView>, CoreError> {
+        self.list_items(args)
+    }
+
+    async fn item_get(&self, _ctx: &CommandCtx, args: ItemIdArgs) -> Result<ItemDetail, CoreError> {
+        self.get_item(args)
+    }
+
+    async fn item_set_done(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemDoneArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.set_item_done(ctx, args)
+    }
+
+    async fn item_review(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemReviewArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.review_item(ctx, args)
+    }
+
+    async fn items_review_all(
+        &self,
+        ctx: &CommandCtx,
+        args: ReviewAllArgs,
+    ) -> Result<ItemsBatchResult, CoreError> {
+        self.review_all_items(ctx, args)
+    }
+
+    async fn item_edit(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemEditArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.edit_item(ctx, args)
+    }
+
+    async fn item_reopen(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemReopenArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.reopen_item(ctx, args)
+    }
+
+    async fn item_create(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemCreateArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.create_item(ctx, args)
+    }
+
+    async fn item_answer_handoff_landed(
+        &self,
+        ctx: &CommandCtx,
+        args: HandoffLandedArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.answer_handoff(ctx, args)
     }
 
     async fn window_show_call(

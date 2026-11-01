@@ -156,16 +156,21 @@ impl Core {
     ) -> Result<UndoResult, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-request
         self.ready()?;
+        let noted = target.clone();
         let handle = match target {
             UndoTarget::Change { change_id } => Handle::Change(change_id),
             UndoTarget::Batch { batch_id } => Handle::Batch(batch_id),
         };
         // @cpt-end:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-request
         // @cpt-begin:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-apply
+        // Items an undone creation removes cannot be found afterwards: note their calls first.
+        let item_calls = self
+            .store()
+            .read(move |c| crate::items::calls_of_target(c, &noted))?;
         let reversed = self.store().reverse(dir, handle, self.deps.clock.now().0)?;
         // @cpt-end:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-apply
         // @cpt-begin:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-publish
-        if let Err(e) = self.publish_reversed(&reversed.touched) {
+        if let Err(e) = self.publish_reversed(&reversed.touched, item_calls) {
             // The change is committed; a window that missed the event catches up on its next read.
             self.log(object(json!({
                 "level": "error", "module": "history", "code": "publish", "message_len": e.message.len()
@@ -182,7 +187,11 @@ impl Core {
 
     /// Whole changed entities through `entity:changed`, settings through `settings:changed`,
     /// the glossary through its live hooks, transcript files rewritten for transcript changes.
-    fn publish_reversed(&self, touched: &[(String, String)]) -> Result<(), CoreError> {
+    fn publish_reversed(
+        &self,
+        touched: &[(String, String)],
+        mut item_calls: BTreeSet<String>,
+    ) -> Result<(), CoreError> {
         let mut settings_keys = BTreeSet::new();
         let mut glossary = false;
         let mut transcripts = BTreeSet::new();
@@ -198,6 +207,14 @@ impl Core {
                     settings_keys.insert(id.clone());
                 }
                 "glossary" => glossary = true,
+                // @cpt-begin:cpt-noter-flow-core-items-today-tick:p1:inst-tick-undo
+                "item" => {
+                    if let Some(item) = self.item_view(id)? {
+                        item_calls.insert(item.call.id.as_str().to_string());
+                        self.emit_entity_changed(&EntityChanged::Item { item });
+                    }
+                }
+                // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-undo
                 "segment" | "speaker" => {
                     let table = if kind == "segment" {
                         "segments"
@@ -236,6 +253,7 @@ impl Core {
         if glossary {
             self.glossary_written()?;
         }
+        self.items_files(item_calls);
         for call_id in transcripts {
             self.write_transcript_file(&CallId::new(call_id))?;
         }

@@ -552,7 +552,7 @@ async fn a_tick_refuses_rejected_and_handed_off_items_and_unknown_ids() {
         "review"
     );
     assert_eq!(
-        refused(&done(&core, "itm_2", 1, false).await.unwrap_err()),
+        refused(&done(&core, "itm_hand", 1, false).await.unwrap_err()),
         "status"
     );
     assert_eq!(
