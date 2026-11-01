@@ -499,6 +499,21 @@ async fn a_deleted_item_is_not_found_and_its_late_result_is_dropped() {
         w.get("itm_nope").await.unwrap_err().code,
         ErrorCode::NotFound
     );
+    // Only an engineering item has a handoff (as the fake answers).
+    noter_db::rusqlite::Connection::open(w.dir.path().join("noter.db"))
+        .unwrap()
+        .execute(
+            "UPDATE items SET is_engineering = 0 WHERE id = 'itm_dec'",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        w.get("itm_dec").await.unwrap_err().detail,
+        Some(ErrorDetail::Validation {
+            field: "item_id".into(),
+            rule: noter_protocol::error::ValidationRule::InvalidFormat
+        })
+    );
     w.generate("itm_eng", false).await;
     noter_db::rusqlite::Connection::open(w.dir.path().join("noter.db"))
         .unwrap()

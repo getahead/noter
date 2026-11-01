@@ -240,6 +240,12 @@ fn repository_mappings_are_validated_saved_and_removed() {
     )
     .unwrap_err();
     assert_eq!(bad.code, ErrorCode::InvalidInput);
+    let slashes =
+        upsert_repo(&store, meta(), None, "A/b/c", &path, HandoffTarget::Codex).unwrap_err();
+    assert_eq!(slashes.code, ErrorCode::InvalidInput);
+    // Keys match whatever case the user typed: `vstor` is the VSTOR mapping again.
+    let same = upsert_repo(&store, meta(), None, "vstor", &path, HandoffTarget::Codex).unwrap_err();
+    assert_eq!(same.code, ErrorCode::InvalidInput);
     let empty = upsert_repo(&store, meta(), None, " ", &path, HandoffTarget::Codex).unwrap_err();
     assert_eq!(
         empty.detail,
@@ -333,6 +339,8 @@ fn resolve_matches_the_project_key_then_one_of_its_components() {
     assert_eq!(unmapped, None);
     let (repo, _) = resolve(&maps, Some("UI-7"));
     assert_eq!(repo.unwrap().key, "UI/web");
+    let (repo, _) = resolve(&[mapping("noter")], Some("NOTER-3"));
+    assert_eq!(repo.unwrap().key, "noter");
     let (repo, unmapped) = resolve(&maps, Some("CORE-1"));
     assert_eq!((repo, unmapped.as_deref()), (None, Some("CORE")));
     assert_eq!(resolve(&maps, None), (None, None));
