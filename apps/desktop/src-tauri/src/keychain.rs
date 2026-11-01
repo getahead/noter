@@ -24,8 +24,7 @@ impl SecretStore for Keychain {
     }
 
     fn set(&self, account: &str, secret: &Secret) -> Result<(), KeychainLocked> {
-        set_generic_password(SERVICE, account, secret.expose().as_bytes())
-            .map_err(|_| KeychainLocked)
+        set_generic_password(SERVICE, account, secret.expose().as_bytes()).map_err(|_| KeychainLocked)
     }
 
     fn remove(&self, account: &str) -> Result<(), KeychainLocked> {
