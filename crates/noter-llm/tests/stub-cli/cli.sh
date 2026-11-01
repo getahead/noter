@@ -18,7 +18,7 @@ line() { printf '%s\t%s\n' "$1" "$2" >>"$out"; }
 
 codex=no
 [ "$1" = "exec" ] && codex=yes
-bare=no strict=no ignore_user=no sources=unset resume=
+bare=no strict=no ignore_user=no docs=yes sources=unset resume=
 prev=
 for a in "$@"; do
     line argv "$a"
@@ -35,6 +35,7 @@ for a in "$@"; do
     --bare) bare=yes ;;
     --strict-mcp-config) strict=yes ;;
     --ignore-user-config) ignore_user=yes ;;
+    project_doc_max_bytes=0) docs=no ;;
     esac
     prev="$a"
 done
@@ -49,7 +50,7 @@ if [ $codex = yes ]; then
     [ $ignore_user = no ] && loads "$home/config.toml"
     loads "$home/AGENTS.md"
     loads "$HOME/.codex/config.toml"
-    loads "./AGENTS.md"
+    [ $docs = yes ] && loads "./AGENTS.md"
     if [ -L "$home/auth.json" ]; then line auth "$(readlink "$home/auth.json")"; fi
 else
     # Claude Code: --bare skips hooks, plugins, CLAUDE.md and MCP discovery; otherwise

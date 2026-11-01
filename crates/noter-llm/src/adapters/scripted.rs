@@ -15,7 +15,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{Invocation, Reply, RuntimeAdapter};
-use crate::runtime::{lock, Availability, BoxFuture, Skill};
+use crate::runtime::{lock, Availability, BoxFuture, Skill, Tested};
 
 const RUNTIMES: [RuntimeChoice; 5] = [
     RuntimeChoice::ClaudeApiKey,
@@ -116,7 +116,10 @@ impl RuntimeAdapter for Scripted {
             runtime,
             unavailable: None,
             version: cli.then(|| "1.0.0".to_owned()),
-            tested_majors: vec![1],
+            tested: Some(Tested {
+                min: [1, 0, 0],
+                below: [2, 0, 0],
+            }),
             models: vec!["scripted".into()],
         }
     }

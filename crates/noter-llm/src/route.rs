@@ -131,8 +131,7 @@ pub(crate) fn route(r: &Route) -> Result<Choice, Failure> {
         }
         // @cpt-begin:cpt-noter-algo-core-llm-gate-route:p1:inst-route-version
         if let Some(found) = &a.version {
-            let major = found.split('.').next().and_then(|m| m.parse::<u64>().ok());
-            if !major.is_some_and(|m| a.tested_majors.contains(&m)) {
+            if !a.tested.is_some_and(|t| t.admits(found)) {
                 refusal.get_or_insert_with(|| version_unsupported(runtime, found, a));
                 continue;
             }
@@ -175,12 +174,7 @@ pub(crate) fn route(r: &Route) -> Result<Choice, Failure> {
 }
 
 fn version_unsupported(runtime: RuntimeChoice, found: &str, a: &Availability) -> CoreError {
-    let supported = a
-        .tested_majors
-        .iter()
-        .map(|m| format!("{m}.x"))
-        .collect::<Vec<_>>()
-        .join(", ");
+    let supported = a.tested.map(|t| t.to_string()).unwrap_or_default();
     CoreError::new(
         ErrorCode::CliVersionUnsupported,
         format!(

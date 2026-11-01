@@ -13,6 +13,10 @@ use regex::Regex;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+use crate::adapters::claude_code::ClaudeCode;
+use crate::adapters::cli::CliConfig;
+use crate::adapters::codex::Codex;
+use crate::adapters::ollama::{Ollama, OllamaConfig};
 use crate::adapters::scripted::Scripted;
 use crate::adapters::{Invocation, Reply, RuntimeAdapter};
 use crate::route::{forced_local, is_cloud, unavailable, Choice};
@@ -35,6 +39,20 @@ impl Adapters {
             .into_iter()
             .map(|a| (a.runtime, adapter.clone()))
             .collect();
+        Self { registry }
+    }
+
+    /// The real runtimes: Claude Code and Codex locked down, Ollama on this Mac.
+    pub fn real(claude: CliConfig, codex: CliConfig, ollama: OllamaConfig) -> Self {
+        let claude: Arc<dyn RuntimeAdapter> = Arc::new(ClaudeCode::new(claude));
+        let codex: Arc<dyn RuntimeAdapter> = Arc::new(Codex::new(codex));
+        let registry = vec![
+            (RuntimeChoice::ClaudeApiKey, claude.clone()),
+            (RuntimeChoice::ClaudeAccount, claude),
+            (RuntimeChoice::CodexApiKey, codex.clone()),
+            (RuntimeChoice::ChatgptAccount, codex),
+            (RuntimeChoice::Local, Arc::new(Ollama::new(ollama)) as _),
+        ];
         Self { registry }
     }
 }
@@ -246,6 +264,7 @@ impl Gate {
         choice: &Choice,
         skill: Skill,
         session: Option<&str>,
+        budget_usd: Option<f64>,
     ) -> BoxFuture<'static, Result<Reply, String>> {
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-release
         let Some(adapter) = self.adapter(approved.runtime) else {
@@ -260,6 +279,7 @@ impl Gate {
             tools: choice.tools.clone(),
             packet: approved.bytes.clone(),
             session: session.map(String::from),
+            budget_usd,
         })
         // @cpt-end:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-release
     }
@@ -272,6 +292,13 @@ impl Gate {
     ) -> Result<String, String> {
         let adapter = self.adapter(runtime).ok_or("adapter_missing")?;
         adapter.open_session(runtime, resume)
+    }
+
+    /// Reads the runtime's CLI version again.
+    pub(crate) fn refresh(&self, runtime: RuntimeChoice) {
+        if let Some(adapter) = self.adapter(runtime) {
+            adapter.refresh();
+        }
     }
 
     pub(crate) fn close_session(&self, runtime: RuntimeChoice, session: &str) {

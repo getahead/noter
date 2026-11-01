@@ -398,7 +398,8 @@ async fn claude_api_key_runs_bare_with_every_restriction() {
     assert_eq!(env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"], "1");
     // An API-key run never sees the user's home.
     assert!(Path::new(&env["HOME"]).starts_with(&world.run_root));
-    assert_eq!(run.all("cwd"), [world.work().as_str()]);
+    let work = std::fs::canonicalize(world.work()).unwrap();
+    assert_eq!(run.all("cwd"), [work.display().to_string().as_str()]);
     assert_nothing_hostile_loaded(&run);
     // The child received exactly the bytes the gate audited.
     assert_eq!(sha(run.all("stdin")[0].as_bytes()), world.audited_hash());
