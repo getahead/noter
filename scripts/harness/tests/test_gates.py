@@ -114,6 +114,21 @@ class E2eCoverageTests(unittest.TestCase):
         errors, _ = e2e_coverage.evaluate(common.ROOT, cfg, self.milestones, set(frozen), set(m0["stories"]))
         self.assertEqual(errors, [])
 
+    def test_each_side_is_measured_and_enforced_where_harness_toml_sets_its_bar(self):
+        m0 = self.milestones["M0"]
+        everything, stories = set(m0["commands"]), set(m0["stories"])
+        sides = {"backend": (everything, set()), "frontend": (everything, stories)}
+        cfg = {**CFG, "milestone": {**CFG["milestone"], "current": "M0"}}
+        errors, report = e2e_coverage.evaluate(common.ROOT, cfg, self.milestones, everything, stories, sides=sides)
+        self.assertEqual(errors, [], "no per-side keys: reported only")
+        self.assertIn("| backend: stories | 0 | 3 | 0.0% | reported |", report)
+        strict = {**cfg, "gates": {**cfg["gates"], "e2e": {**cfg["gates"]["e2e"], "backend_stories_min": 60.0,
+                                                            "frontend_stories_min": 60.0}}}
+        errors, _ = e2e_coverage.evaluate(common.ROOT, strict, self.milestones, everything, stories, sides=sides)
+        self.assertEqual(errors, ["E2E backend: stories coverage 0.0% < 60%"])
+        self.assertEqual(e2e_coverage.side_of("conformance"), "backend")
+        self.assertEqual({e2e_coverage.side_of(s) for s in ("ui-e2e", "ui-e2e-flows", "native")}, {"frontend"})
+
     def test_fake_core_runs_do_not_count(self):
         with tempfile.TemporaryDirectory() as d:
             Path(d, "commands-a.json").write_text(json.dumps({"target": "fake", "commands": ["app_snapshot"], "stories": ["s1"]}))
@@ -122,6 +137,26 @@ class E2eCoverageTests(unittest.TestCase):
             self.assertEqual(e2e_coverage.invoked_commands([pattern]), {"log_ui"})
             self.assertEqual(e2e_coverage.read_logs([pattern]), ({"log_ui"}, {"s2"}))
             self.assertEqual(e2e_coverage.invoked_commands([pattern], include_fake=True), {"app_snapshot", "log_ui"})
+
+    def test_main_logs_count_for_what_a_pull_request_did_not_re_run(self):
+        with tempfile.TemporaryDirectory() as d:
+            def log(name, **data):
+                Path(d, f"commands-{name}.json").write_text(json.dumps(data))
+            log("conformance", suite="conformance", target="stdio", commands=["log_ui"], stories=["s-conf"])
+            log("flows", suite="ui-e2e-flows", target="stdio", commands=["a", "b"], stories=[], by_spec={
+                "tests/e2e/x.spec.ts": {"commands": ["a"], "stories": []}, "tests/e2e/y.spec.ts": {"commands": ["b"], "stories": []}})
+            log("ui-e2e", suite="ui-e2e", target="stdio", commands=[], stories=["sx", "sy"], by_spec={
+                "tests/e2e/x.spec.ts": {"commands": [], "stories": ["sx"]}, "tests/e2e/y.spec.ts": {"commands": [], "stories": ["sy"]}})
+            log("fake", suite="ui-e2e", target="fake", commands=["fake_only"], stories=["s-fake"], by_spec={})
+            main = [str(Path(d, "commands-*.json"))]
+            # x re-ran here: its fresh logs replace main's; y and the conformance suite come from main.
+            self.assertEqual(e2e_coverage.baseline_logs(main, "tests/e2e/x.spec.ts", False), ({"log_ui", "b"}, {"s-conf", "sy"}))
+            self.assertEqual(e2e_coverage.baseline_logs(main, "", True), ({"a", "b"}, {"sx", "sy"}))
+            self.assertEqual(e2e_coverage.baseline_logs(main, "all", True), (set(), set()))
+            log("old", suite="ui-e2e", target="stdio", commands=[], stories=["sz"])
+            with self.assertRaises(common.HarnessError):
+                e2e_coverage.baseline_logs(main, "tests/e2e/x.spec.ts", False)
+            self.assertEqual(e2e_coverage.baseline_logs(main, "all", False), ({"log_ui"}, {"s-conf"}))
 
     def test_xcuitest_runs_count_like_real_core_runs(self):
         results = {"testNodes": [{"nodeType": "Test Plan", "name": "NoterNativeUITests", "result": "Failed", "children": [
@@ -723,8 +758,8 @@ class CiChangesTests(unittest.TestCase):
         unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
         self.assertEqual(unknown, [])
 
-    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "visual", "docs"}
-    BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "docs", "macos"}
+    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "docs"}
+    BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "e2e-report", "docs", "macos"}
 
     def test_frontend_only_change_runs_the_ui_side(self):
         # The real-core run is skipped; e2e-coverage judges main's real-core logs (ci.yml).
@@ -764,7 +799,7 @@ class CiChangesTests(unittest.TestCase):
     def test_docs_change_runs_only_docs_and_trace(self):
         self.assertEqual(self.run_jobs(["docs/PRD.md"]), {"arch", "docs"})
         # Its stories set the bar; the suites and code are main's, so main's logs are judged again.
-        self.assertEqual(self.run_jobs(["docs/DESIGN.md"]), {"arch", "docs", "e2e-coverage"})
+        self.assertEqual(self.run_jobs(["docs/DESIGN.md"]), {"arch", "docs", "e2e-coverage", "e2e-report"})
 
     def test_tauri_host_is_not_ui(self):
         jobs = self.run_jobs(["apps/desktop/src-tauri/src/main.rs"])
@@ -826,6 +861,38 @@ class CiChangesTests(unittest.TestCase):
         self.assertEqual(ci_changes.verdict({**needs, "e2e-core": {"result": "failure"}}, json.dumps(p.jobs)),
                          ["e2e-core: failure"])
         self.assertEqual(ci_changes.verdict({**needs, "e2e-ui": skipped}, json.dumps(p.jobs)), ["e2e-ui: skipped"])
+
+    def specs(self, files):
+        return ci_changes.touched_specs(files, CFG["ci"])
+
+    def test_a_pull_request_re_runs_the_flows_of_the_features_it_touches(self):
+        self.assertEqual(self.specs(["crates/noter-core/src/tray.rs"]), "tests/e2e/m1-menu-bar.spec.ts")
+        self.assertEqual(self.specs(["apps/desktop/src/features/settings/HotkeysPane.tsx"]),
+                         "tests/e2e/m0-settings-hotkeys-ui.spec.ts tests/e2e/m0-settings-hotkeys.spec.ts "
+                         "tests/e2e/m0-settings-window-ui.spec.ts")
+        self.assertEqual(self.specs(["apps/desktop/tests/e2e/m1-floating-panel.spec.ts"]), "tests/e2e/m1-floating-panel.spec.ts")
+        for f in ["docs/PRD.md", "apps/desktop/tests/visual/primitives.spec.ts", "apps/desktop/tests/conformance/m0-core.test.ts"]:
+            self.assertEqual(self.specs([f]), "", f)
+
+    def test_shared_code_re_runs_every_flow(self):
+        for f in ["apps/desktop/src/core/bindings.ts", "apps/desktop/src/features/shell/MainWindow.tsx",
+                  "crates/noter-core/src/app.rs", "crates/noter-db/src/lib.rs", "apps/desktop/tests/support/scenario.ts",
+                  "apps/desktop/tests/e2e/support/fixtures.ts", "justfile"]:
+            self.assertEqual(self.specs([f]), "all", f)
+        self.assertEqual(self.specs(["crates/noter-core/src/tray.rs", "crates/noter-core/src/app.rs"]), "all")
+
+    def test_without_main_logs_everything_runs_against_the_real_core(self):
+        p = ci_changes.plan(["apps/desktop/src/features/library/CallsList.tsx"], CFG, "ci")
+        q, specs, base = ci_changes.e2e_selection(p, CFG["ci"], "123")
+        self.assertEqual((q.jobs["e2e-core"], specs.split()[0], base), (False, "tests/e2e/m1-library-calls-ui.spec.ts", "123"))
+        q, specs, base = ci_changes.e2e_selection(p, CFG["ci"], "")
+        self.assertEqual((q.jobs["e2e-core"], specs, base), (True, "all", ""))
+        full = ci_changes.plan(None, CFG, "ci", "a push run of main checks everything")
+        self.assertEqual(ci_changes.e2e_selection(full, CFG["ci"], "123")[1:], ("all", ""), "a full run needs no main logs")
+        none = ci_changes.plan(["docs/PRD.md"], CFG, "ci")
+        self.assertEqual(ci_changes.e2e_selection(none, CFG["ci"], "123")[1:], ("", ""))
+        design = ci_changes.plan(["docs/DESIGN.md"], CFG, "ci")
+        self.assertEqual(ci_changes.e2e_selection(design, CFG["ci"], "123")[1:], ("", "123"), "judged on main's logs")
 
     def test_verdict(self):
         ok, skipped, failed = {"result": "success"}, {"result": "skipped"}, {"result": "failure"}

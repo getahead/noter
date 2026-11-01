@@ -8,10 +8,12 @@
 // the flows that passed; this worker fixture records the frozen commands those passing flows
 // ran successfully, in the format scripts/harness/e2e_coverage.py reads:
 //   coverage/e2e/commands-ui-e2e-flows-<target>-<worker>-<pid>.json
-//   {"suite": "ui-e2e-flows", "target": "fake" | "stdio", "commands": [...], "stories": []}
-// Runs against the fake core are written for insight and not counted.
+//   {"suite": "ui-e2e-flows", "target": "fake" | "stdio", "commands": [...], "stories": [],
+//    "by_spec": {"tests/e2e/<spec>": {"commands": [...], "stories": []}}}
+// `by_spec` lets a pull request that re-runs only some specs be judged with main's logs for the
+// others. Runs against the fake core are written for insight and not counted.
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test as base } from "@playwright/test";
 
@@ -26,15 +28,18 @@ registerJsonModules();
 const target = process.env.NOTER_CORE === "stdio" ? "stdio" : "fake";
 
 const outDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "..", "coverage", "e2e");
+const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-export const test = base.extend<{ scenario: Scenario }, { commandLog: Set<CommandName> }>({
+export const test = base.extend<{ scenario: Scenario }, { commandLog: Map<string, Set<CommandName>> }>({
   commandLog: [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use, workerInfo) => {
-      const log = new Set<CommandName>();
+      const log = new Map<string, Set<CommandName>>(); // spec (relative to apps/desktop) -> commands
       await use(log);
       mkdirSync(outDir, { recursive: true });
-      const data = { suite: "ui-e2e-flows", target, commands: [...log].sort(), stories: [] };
+      const bySpec = Object.fromEntries([...log].sort().map(([spec, cmds]) => [spec, { commands: [...cmds].sort(), stories: [] }]));
+      const all = new Set([...log.values()].flatMap((cmds) => [...cmds]));
+      const data = { suite: "ui-e2e-flows", target, commands: [...all].sort(), stories: [], by_spec: bySpec };
       writeFileSync(join(outDir, `commands-ui-e2e-flows-${target}-${workerInfo.workerIndex}-${process.pid}.json`), JSON.stringify(data, null, 2) + "\n");
     },
     { scope: "worker", auto: true },
@@ -45,7 +50,12 @@ export const test = base.extend<{ scenario: Scenario }, { commandLog: Set<Comman
     await use(scenario);
     await scenario.dispose();
     // Only flows that passed count as exercising their commands.
-    if (testInfo.status === "passed") scenario.exercised.forEach((c) => commandLog.add(c));
+    if (testInfo.status === "passed") {
+      const spec = relative(appRoot, testInfo.file).split("\\").join("/");
+      const cmds = commandLog.get(spec) ?? new Set<CommandName>();
+      scenario.exercised.forEach((c) => cmds.add(c));
+      commandLog.set(spec, cmds);
+    }
   },
 });
 

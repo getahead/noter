@@ -89,7 +89,15 @@ def check_registry(milestones: dict, commands: set[str], stories: set[str]) -> l
     return errors
 
 
-def read_logs(patterns: list[str], include_fake: bool = False) -> tuple[set[str], set[str]]:
+BACKEND_SUITES = ("conformance",)  # the core's contract, driven without the UI
+
+
+def side_of(suite: str | None) -> str:
+    """Backend: the conformance suite against the core. Frontend: the UI flows and the native app runs."""
+    return "backend" if suite in BACKEND_SUITES else "frontend"
+
+
+def read_logs(patterns: list[str], include_fake: bool = False, side: str | None = None) -> tuple[set[str], set[str]]:
     """Commands that succeeded and stories whose tests passed in the E2E runs.
     Runs against the fake core do not count unless asked: E2E means the real core."""
     commands: set[str] = set()
@@ -99,8 +107,43 @@ def read_logs(patterns: list[str], include_fake: bool = False) -> tuple[set[str]
             data = json.loads(Path(path).read_text(encoding="utf-8"))
             if data.get("target") == "fake" and not include_fake:
                 continue
+            if side and side_of(data.get("suite")) != side:
+                continue
             commands.update(data.get("commands", []))
             stories.update(data.get("stories", []))
+    return commands, stories
+
+
+FLOW_SUITES = ("ui-e2e", "ui-e2e-flows")  # the Playwright UI flows, logged per spec
+
+
+def baseline_logs(patterns: list[str], rerun_specs: str, rerun_conformance: bool,
+                  side: str | None = None) -> tuple[set[str], set[str]]:
+    """What main's last full real-core run proved for the suites and specs this run did not re-run.
+    A pull request re-runs the specs of the features it touches (`rerun_specs`: "all" or the
+    space-separated specs relative to apps/desktop) and, when e2e-core runs, the conformance suite;
+    their fresh logs replace main's, and main's logs count for the rest."""
+    rerun = set(rerun_specs.split())
+    commands: set[str] = set()
+    stories: set[str] = set()
+    for pattern in patterns:
+        for path in glob.glob(pattern, recursive=True):
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+            if data.get("target") == "fake" or (side and side_of(data.get("suite")) != side):
+                continue
+            if data.get("suite") in FLOW_SUITES:
+                if rerun_specs == "all":
+                    continue
+                if "by_spec" not in data:
+                    raise HarnessError(f"main's log {Path(path).name} has no per-spec results; re-run this job "
+                                       "once a CI run on main with per-spec logs has passed")
+                for spec, got in data["by_spec"].items():
+                    if spec not in rerun:
+                        commands.update(got.get("commands", []))
+                        stories.update(got.get("stories", []))
+            elif data.get("suite") != "conformance" or not rerun_conformance:
+                commands.update(data.get("commands", []))
+                stories.update(data.get("stories", []))
     return commands, stories
 
 
@@ -140,8 +183,11 @@ def named_stories(root: Path, dirs: list[str]) -> set[str]:
 
 
 def evaluate(root: Path, cfg: dict, milestones: dict, invoked: set[str], named: set[str],
-             mentioned: set[str] | None = None) -> tuple[list[str], str]:
-    """`named`: stories proven by passing real-core E2E tests; `mentioned`: IDs merely found in test files."""
+             mentioned: set[str] | None = None,
+             sides: dict[str, tuple[set[str], set[str]]] | None = None) -> tuple[list[str], str]:
+    """`named`: stories proven by passing real-core E2E tests; `mentioned`: IDs merely found in test files;
+    `sides`: the (commands, stories) each side proved. A side's bar is enforced where harness.toml sets
+    gates.e2e.<side>_commands_min / <side>_stories_min, and reported otherwise."""
     manifest = manifest_commands(root)
     stories = design_stories(root)
     errors = check_registry(milestones, set(manifest), stories)
@@ -165,6 +211,17 @@ def evaluate(root: Path, cfg: dict, milestones: dict, invoked: set[str], named: 
         rows.append(f"| {label} | {hit} | {due} | {value:.1f}% | ≥ {need:.0f}% {'✅' if ok else '❌'} |")
         if not ok:
             errors.append(f"E2E {label} coverage {value:.1f}% < {need:.0f}%")
+    for side, (side_cmds, side_stories) in (sides or {}).items():
+        for kind, due, got in (("commands", due_cmds, side_cmds), ("stories", due_stories, side_stories)):
+            value, need = pct(len(due & got), len(due)), gates.get(f"{side}_{kind}_min")
+            label = f"{side}: {'frozen commands' if kind == 'commands' else 'stories'}"
+            if need is None:
+                rows.append(f"| {label} | {len(due & got)} | {len(due)} | {value:.1f}% | reported |")
+                continue
+            ok = value + 1e-9 >= float(need)
+            rows.append(f"| {label} | {len(due & got)} | {len(due)} | {value:.1f}% | ≥ {float(need):.0f}% {'✅' if ok else '❌'} |")
+            if not ok:
+                errors.append(f"E2E {label} coverage {value:.1f}% < {float(need):.0f}%")
     if due_cmds - invoked:
         rows.append("\nNot exercised: " + ", ".join(sorted(due_cmds - invoked)[:40]))
     if due_stories - named:
@@ -183,14 +240,28 @@ def main(argv: list[str] | None = None) -> int:
                     help="glob of `xcresulttool get test-results tests` JSON from the XCUITest run (repeatable)")
     ap.add_argument("--tests", action="append", default=None, help="directories scanned for story IDs (report only)")
     ap.add_argument("--include-fake", action="store_true", help="also count runs against the fake core (local insight only)")
+    ap.add_argument("--baseline", action="append", default=None,
+                    help="glob of main's last full-run logs, counted for what this run did not re-run (repeatable)")
+    ap.add_argument("--rerun-specs", default="all", help='UI flow specs this run re-ran: "all", "", or space-separated')
+    ap.add_argument("--rerun-conformance", action="store_true", help="this run re-ran the real-core conformance suite")
     args = ap.parse_args(argv)
     try:
         cfg = harness_config()
         milestones = load_toml(ROOT / "harness" / "milestones.toml")
         logs = args.commands_log or [str(ROOT / p) for p in DEFAULT_COMMAND_LOGS]
-        commands, stories = read_logs(logs, args.include_fake)
-        stories |= xcuitest_stories(args.xcuitest_results or [str(ROOT / p) for p in DEFAULT_XCUITEST_RESULTS])
-        errors, report = evaluate(ROOT, cfg, milestones, commands, stories, named_stories(ROOT, args.tests or DEFAULT_TEST_DIRS))
+        native = xcuitest_stories(args.xcuitest_results or [str(ROOT / p) for p in DEFAULT_XCUITEST_RESULTS])
+        sides: dict[str, tuple[set[str], set[str]]] = {}
+        for side in ("backend", "frontend"):
+            commands, stories = read_logs(logs, args.include_fake, side)
+            if side == "frontend":
+                stories |= native  # XCUITest drives the built app: UI and core together
+            if args.baseline:
+                base_commands, base_stories = baseline_logs(args.baseline, args.rerun_specs, args.rerun_conformance, side)
+                commands, stories = commands | base_commands, stories | base_stories
+            sides[side] = (commands, stories)
+        commands = sides["backend"][0] | sides["frontend"][0]
+        stories = sides["backend"][1] | sides["frontend"][1]
+        errors, report = evaluate(ROOT, cfg, milestones, commands, stories, named_stories(ROOT, args.tests or DEFAULT_TEST_DIRS), sides)
     except HarnessError as e:
         fail(str(e))
     write_summary(report)
