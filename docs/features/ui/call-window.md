@@ -44,11 +44,11 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-call-window`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-call-window`
 
 ## 1. Feature Context
 
-- [ ] `p2` - `cpt-noter-feature-ui-call-window`
+- [x] `p2` - `cpt-noter-feature-ui-call-window`
 
 ### 1.1 Overview
 
@@ -467,7 +467,7 @@ The system **MUST** show a person chip per participant in CS-R1 (with **You** an
 ## 6. Acceptance Criteria
 
 - [x] Every call-window state the prototype lists for M1 renders as its `surface('call')` state in the copilot-off layout: Copilot flag off, Call seems to have ended, New meeting started, Nothing heard yet, Closing after Stop Recording, Closing after automatic stop, System audio silent, Microphone off, Not recording · engine stopped, Transcription stalled, Disk nearly full, Second audio source, Scrolled up, Replaying on headphones, Recording on speakers, Output not identified, Paused, Hidden for presenting, Display unplugged, Floating collapsed strip
-- [ ] No click on the call window moves focus from the call app (XCUITest)
+- [x] No click on the call window moves focus from the call app (XCUITest)
 - [x] A layout switch, a hide and a WebView crash each keep the transcript position, marks and pins
 - [x] **Continue Recording** works for 5 minutes after any stop and appends a gap row
 - [x] Capture failures are announced once, assertively; transcript lines never
