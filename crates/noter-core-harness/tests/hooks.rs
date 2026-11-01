@@ -156,3 +156,29 @@ async fn each_scenario_boots_the_fixture_in_its_state() {
         harness.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn first_call_leaves_backend_sync_the_only_recorded_call() {
+    let (harness, _) = boot(Some("first-call")).await;
+    assert_eq!(snapshot(&harness).await["capture"]["phase"], "idle");
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let detail = dispatch_json(
+        &*harness.core(),
+        &main,
+        "call_get",
+        json!({ "call_id": "call_backend" }),
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(detail["call"]["title"], "Backend sync");
+    assert_eq!(
+        detail["first_recorded_call"], true,
+        "the call page offers notifications"
+    );
+    harness.shutdown().await;
+}

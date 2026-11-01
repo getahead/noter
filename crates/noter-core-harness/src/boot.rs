@@ -159,7 +159,15 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
                 retry_at: None,
             }]
         }
-        _ => return Err(format!("unknown scenario {name}; known: idle, low-disk, detected, new-meeting, call-seems-ended, switched-to-local")),
+        // The library holds one recorded call, “Backend sync”: its call page offers notifications.
+        "first-call" => {
+            w.app.capture = idle;
+            let keep = |id: &CallId| id.as_str() == "call_backend";
+            w.calls.retain(|c| keep(&c.id));
+            w.call_details.retain(|d| keep(&d.call.id));
+            w.transcripts.retain(|t| keep(&t.call_id));
+        }
+        _ => return Err(format!("unknown scenario {name}; known: idle, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
     }
     Ok(())
 }
