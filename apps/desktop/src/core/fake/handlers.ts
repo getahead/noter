@@ -871,15 +871,17 @@ export const defaultHandlers: Handlers = {
     emit("entity:changed", { type: "item", item });
     return { path_used: target === "codex" ? "codex_app" : "claude_cli_link", item, prompt_file: `handoffs/${item.id}.md` };
   },
+  // Copying hands the item off too (core-handoff.md §2): accepted, owner kept, not done.
   handoff_copy: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
     requireEngineering(item);
-    if (item.review === "suggested") {
-      item.review = "accepted";
-      bump(item);
-      emit("entity:changed", { type: "item", item });
-    }
-    return { chars: (handoffView(world, item).prompt_md ?? "").length, item };
+    const view = handoffView(world, item);
+    item.status = "handed_off";
+    item.review = "accepted";
+    item.handoff = { target: view.target, at: now(), cwd: view.repo?.local_path ?? "", awaiting: true };
+    bump(item);
+    emit("entity:changed", { type: "item", item });
+    return { chars: [...(view.prompt_md ?? "")].length, item };
   },
 
   // ── Library, search, ask, topics ─────────────────────────────────────
