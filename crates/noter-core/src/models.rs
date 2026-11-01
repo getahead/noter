@@ -399,6 +399,11 @@ impl Core {
                 }
             };
             if !live {
+                // A Resume that came as the task ended found it still running and only lifted the
+                // pause: go on with the paused bundles.
+                if self.resumed_while_stopping() {
+                    continue;
+                }
                 return self.download_outcome();
             }
             lock(&self.downloads).hold_for_call();
@@ -427,6 +432,30 @@ impl Core {
         drop(d);
         self.refresh_setup();
         true
+    }
+
+    fn resumed_while_stopping(&self) -> bool {
+        let mut d = lock(&self.downloads);
+        let stopped = d.error.is_none() && !d.live_paused && !d.pause.load(Ordering::SeqCst);
+        let mut any = false;
+        if stopped {
+            for b in d
+                .bundles
+                .iter_mut()
+                .filter(|b| b.state == BundleState::Paused)
+            {
+                b.state = BundleState::Downloading;
+                any = true;
+            }
+        }
+        if any {
+            d.running = true;
+        }
+        drop(d);
+        if any {
+            self.refresh_setup();
+        }
+        any
     }
 
     fn download_outcome(&self) -> Result<(), Stop> {
