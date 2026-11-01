@@ -4,6 +4,7 @@
 
 // @cpt-component:cpt-noter-component-core-ipc-host:p1
 
+mod alert_keys;
 pub mod e2e_log;
 mod native;
 pub mod surfaces;
@@ -88,6 +89,7 @@ pub fn run() {
         })
         .setup(move |app| {
             let _ = events.0.set(app.handle().clone());
+            alert_keys::return_chooses_cancel();
             // Once, before the event loop: noter-native runs the handler on the main thread.
             let clicked = app.handle().clone();
             noter_native::on_notification_click(Box::new(move |target| {
