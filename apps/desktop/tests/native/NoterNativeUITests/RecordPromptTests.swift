@@ -1,6 +1,7 @@
 // M1 record prompt (docs/features/ui/record-prompt.md): a non-activating panel that takes the hotkey, not the focus.
 import XCTest
 
+// @cpt-dod:cpt-noter-dod-ui-record-prompt-panel:p2
 final class RecordPromptTests: NoterTestCase {
     func test_cpt_noter_seq_record_prompt_start_recording__hotkey_keeps_focus() {
         launch("detected")

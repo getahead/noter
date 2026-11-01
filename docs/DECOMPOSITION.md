@@ -587,11 +587,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.9 [Record prompt](features/ui/record-prompt.md) — M1 · HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-ui-record-prompt`
+- [x] `p2` - **ID**: `cpt-noter-feature-ui-record-prompt`
 
 - **Purpose**: Let the user start recording a detected call with one click or ⌃⌥⌘R while the call app keeps focus, record it as sensitive, or stop being asked for an app, and carry the call-ended and new-meeting notices while the call window is hidden.
 
-- **Milestone**: M1. **Spec**: [`docs/features/ui/record-prompt.md`](features/ui/record-prompt.md). **Status**: NOT_STARTED.
+- **Milestone**: M1. **Spec**: [`docs/features/ui/record-prompt.md`](features/ui/record-prompt.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-call-window`
 
@@ -608,11 +608,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p2` - `cpt-noter-principle-never-steal-focus`
+  - [x] `p2` - `cpt-noter-principle-never-steal-focus`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p2` - `cpt-noter-constraint-non-activating-panels`
+  - [x] `p2` - `cpt-noter-constraint-non-activating-panels`
   - [x] `p2` - `cpt-noter-constraint-no-dialog-after-setup`
 
 - **Domain Model Entities**:
@@ -620,8 +620,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-screen-record-prompt`
-  - [ ] `p2` - `cpt-noter-component-ui-record-prompt`
+  - [x] `p2` - `cpt-noter-component-screen-record-prompt`
+  - [x] `p2` - `cpt-noter-component-ui-record-prompt`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `capture_start`
@@ -631,6 +631,7 @@ Every state in a screen's or component's States table must match a prototype sta
   - `capture_hold_notice`
   - `capture_answer_new_meeting`
   - `window_announce`
+  - `window_fit`
   - `window_navigate` (Delete Old Audio… in the main window)
   - `open_external` (Open System Settings…)
   - events `capture:detected`, `capture:state`, `env:changed`
@@ -648,11 +649,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.10 [Call window: call screen and floating panel](features/ui/call-window.md) — M1 · HIGH
 
-- [ ] `p2` - **ID**: `cpt-noter-feature-ui-call-window`
+- [x] `p2` - **ID**: `cpt-noter-feature-ui-call-window`
 
 - **Purpose**: Show the live call in one non-activating window with a dedicated layout on a second display and a floating layout beside the call app, with its recording state, capture decisions, degraded states and controls, without ever taking focus from the call app.
 
-- **Milestone**: M1. **Spec**: [`docs/features/ui/call-window.md`](features/ui/call-window.md). **Status**: NOT_STARTED.
+- **Milestone**: M1. **Spec**: [`docs/features/ui/call-window.md`](features/ui/call-window.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`, `cpt-noter-feature-ui-live-transcript`
 
@@ -672,29 +673,29 @@ Every state in a screen's or component's States table must match a prototype sta
 - **Design Principles Covered**:
 
   - [x] `p2` - `cpt-noter-principle-privacy-visible`
-  - [ ] `p2` - `cpt-noter-principle-never-steal-focus`
-  - [ ] `p2` - `cpt-noter-principle-quiet-surface`
+  - [x] `p2` - `cpt-noter-principle-never-steal-focus`
+  - [x] `p2` - `cpt-noter-principle-quiet-surface`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p2` - `cpt-noter-constraint-one-call-window`
-  - [ ] `p2` - `cpt-noter-constraint-non-activating-panels`
-  - [ ] `p2` - `cpt-noter-constraint-share-exclusion-limits`
-  - [ ] `p2` - `cpt-noter-constraint-copilot-flag`
+  - [x] `p2` - `cpt-noter-constraint-one-call-window`
+  - [x] `p2` - `cpt-noter-constraint-non-activating-panels`
+  - [x] `p2` - `cpt-noter-constraint-share-exclusion-limits`
+  - [x] `p2` - `cpt-noter-constraint-copilot-flag`
 
 - **Domain Model Entities**:
   - Capture state, capture notice, degraded set, call window state, presenting state, call
 
 - **Design Components**:
 
-  - [ ] `p2` - `cpt-noter-component-shell-call-window`
-  - [ ] `p2` - `cpt-noter-component-screen-call-screen`
-  - [ ] `p2` - `cpt-noter-component-screen-floating-panel`
-  - [ ] `p2` - `cpt-noter-component-ui-capture-notice`
-  - [ ] `p2` - `cpt-noter-component-ui-recording-indicator`
-  - [ ] `p2` - `cpt-noter-component-ui-call-status-strip`
-  - [ ] `p2` - `cpt-noter-component-ui-collapsed-call-strip`
-  - [ ] `p2` - `cpt-noter-component-ui-person-chip`
+  - [x] `p2` - `cpt-noter-component-shell-call-window`
+  - [x] `p2` - `cpt-noter-component-screen-call-screen`
+  - [x] `p2` - `cpt-noter-component-screen-floating-panel`
+  - [x] `p2` - `cpt-noter-component-ui-capture-notice`
+  - [x] `p2` - `cpt-noter-component-ui-recording-indicator`
+  - [x] `p2` - `cpt-noter-component-ui-call-status-strip`
+  - [x] `p2` - `cpt-noter-component-ui-collapsed-call-strip`
+  - [x] `p2` - `cpt-noter-component-ui-person-chip`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `capture_stop`
@@ -1651,11 +1652,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p5` - `cpt-noter-principle-quiet-surface`
+  - [x] `p5` - `cpt-noter-principle-quiet-surface`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p5` - `cpt-noter-constraint-copilot-flag`
+  - [x] `p5` - `cpt-noter-constraint-copilot-flag`
 
 - **Domain Model Entities**:
   - Card, agent
