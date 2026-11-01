@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-speakers-audio`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-speakers-audio`
 
-- [ ] `p3` - `cpt-noter-feature-core-speakers-audio`
+- [x] `p3` - `cpt-noter-feature-core-speakers-audio`
 
 ## 1. Feature Context
 

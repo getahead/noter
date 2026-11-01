@@ -771,9 +771,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.13 Speaker naming, term fixes and audio deletion - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-speakers-audio`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-speakers-audio`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-speakers-audio.md](features/core/core-speakers-audio.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#256 #261 #263 #273). FEATURE spec: [features/core/core-speakers-audio.md](features/core/core-speakers-audio.md)
 
 - **Purpose**: Let the user correct the transcript through logged changes (rename a speaker for the call or one line, fix a term and teach the glossary, name speakers after the call) and delete audio for good.
 
@@ -791,7 +791,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-single-writer`
+  - `cpt-noter-principle-core-single-writer`
 
 - **Design Constraints Covered**:
 
@@ -803,7 +803,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-transcript`
+  - `cpt-noter-component-core-transcript`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `transcript_rename_speaker`, `transcript_fix_term`, `transcript_name_speakers`, `audio_delete`, `audio_delete_older`
