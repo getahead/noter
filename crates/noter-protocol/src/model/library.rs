@@ -122,7 +122,11 @@ pub struct TagsSetArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct TagsSetResult {
     pub calls: Vec<CallRow>,
+    /// The first changed call's change; with `batch_id` set, undo the batch instead.
     pub change_id: ChangeId,
+    /// Set when several calls changed together: `change_undo` with this batch reverses them all.
+    #[serde(default)]
+    pub batch_id: Option<BatchId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

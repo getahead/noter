@@ -927,7 +927,8 @@ export const defaultHandlers: Handlers = {
       c.tags = [...new Set([...c.tags.filter((t) => !a.remove.includes(t)), ...a.add])];
       return c;
     });
-    return { calls, change_id: logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" }) };
+    const change_id = logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" });
+    return { calls, change_id, batch_id: a.call_ids.length > 1 ? `bat_${change_id}` : null };
   },
   tags_list: (_a, { world }) => {
     const counts = new Map<string, number>();

@@ -331,6 +331,7 @@ impl Core {
             return Ok(TagsSetResult {
                 calls: vec![],
                 change_id: ChangeId::new(""),
+                batch_id: None,
             });
         }
         // @cpt-end:cpt-noter-flow-core-items-today-tags:p1:inst-tags-set
@@ -343,9 +344,9 @@ impl Core {
             let wanted = wanted.clone();
             move |c| tags_differ(c, &wanted)
         })?;
-        let (changed, change_id) = match differs {
+        let (changed, change_id, batch_id) = match differs {
             Err(missing) => return Err(missing),
-            Ok(false) => (vec![], self.last_tags_change(&wanted.0[0])?),
+            Ok(false) => (vec![], self.last_tags_change(&wanted.0[0])?, None),
             Ok(true) => {
                 let written = self.store().write_with(meta, move |tx| {
                     let (calls, add, remove) = wanted;
@@ -385,9 +386,11 @@ impl Core {
                     }
                     Ok((changed, logged))
                 })?;
-                // shortcut: `TagsSetResult` has no batch id, so this handle undoes the first
-                // changed call only; a contract field would let several calls undo together.
-                (written.value, written.change_ids[0].clone())
+                (
+                    written.value,
+                    written.change_ids[0].clone(),
+                    written.batch_id,
+                )
             }
         };
         // @cpt-end:cpt-noter-flow-core-items-today-tags:p1:inst-tags-write
@@ -407,6 +410,7 @@ impl Core {
         Ok(TagsSetResult {
             calls: rows,
             change_id,
+            batch_id,
         })
         // @cpt-end:cpt-noter-flow-core-items-today-tags:p1:inst-tags-return
     }
