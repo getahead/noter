@@ -13,6 +13,7 @@ use noter_protocol::{Effort, RuntimeChoice};
 use serde_json::Value;
 
 use crate::runtime::{Availability, BoxFuture, Skill};
+use crate::secrets::Secret;
 
 /// One adapter call: the packet exactly as the gate released (and audited) it.
 pub(crate) struct Invocation {
@@ -27,6 +28,8 @@ pub(crate) struct Invocation {
     pub session: Option<String>,
     /// What an API-key run may still spend.
     pub budget_usd: Option<f64>,
+    /// The API key of an API-key run (the stored one, or the candidate a verification checks).
+    pub key: Option<Secret>,
 }
 
 /// What a runtime answered, before validation.
@@ -45,6 +48,10 @@ pub(crate) trait RuntimeAdapter: Send + Sync {
     fn availability(&self, runtime: RuntimeChoice) -> Availability;
     /// Reads the CLI version again (on open and resume).
     fn refresh(&self) {}
+    /// Asks the runtime what it has now (Ollama's pulled models); CLIs answer from `refresh`.
+    fn probe(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async {})
+    }
     /// Runs one call; dropping the future stops it (child process, temporary config).
     /// An error is the runtime's code (`rate_limited`, `signed_out`, …).
     fn invoke(&self, call: Invocation) -> BoxFuture<'static, Result<Reply, String>>;

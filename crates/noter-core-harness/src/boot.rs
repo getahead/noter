@@ -14,9 +14,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock, Core,
-    CoreDeps, EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Placement,
-    Surfaces, SystemClock, TrayModel, Updater,
+    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock,
+    Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError, MemorySecrets, ModelSource,
+    NativeServices, Placement, Scripted, Surfaces, SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -46,6 +46,9 @@ pub struct Options {
     pub engine_script: Option<Script>,
     /// A named state of the fixture world ([`scenario`]), applied with `world_set` once seeded.
     pub scenario: Option<String>,
+    /// `--llm-script <file>`: the scripted runtime answers these lines (TL-13); without it each
+    /// skill answers a built-in valid output.
+    pub llm_script: Option<Scripted>,
     /// The Mac's own displays, for the app's launch hooks: its real windows are drawn on them, so
     /// once seeded the scripted Mac has these displays (a display change, as when one unplugs).
     pub displays: Option<Vec<DisplayInfo>>,
@@ -54,8 +57,9 @@ pub struct Options {
 }
 
 impl Options {
-    /// The command line: `--fixture world` (the fixture world of noter-protocol), `--clock fixed` and
-    /// `--engine-script <file>` (the scripted engine's steps; a bad file is `Err` with its line).
+    /// The command line: `--fixture world` (the fixture world of noter-protocol), `--clock fixed`,
+    /// `--engine-script <file>` (the scripted engine's steps) and `--llm-script <file>` (the
+    /// scripted runtime's answers); a bad file is `Err` with its line.
     // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-start
     pub fn parse(args: &[String]) -> Result<Options, String> {
         let mut options = Options::default();
@@ -65,6 +69,13 @@ impl Options {
                 ("--fixture", Some("world")) => options.fixture = true,
                 ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
                 ("--clock", Some("fixed")) => options.fixed_clock = true,
+                ("--llm-script", Some(file)) => {
+                    let text = std::fs::read_to_string(file)
+                        .map_err(|e| format!("llm script {file}: {e}"))?;
+                    let script =
+                        Scripted::parse(&text).map_err(|e| format!("llm script {file}: {e}"))?;
+                    options.llm_script = Some(script);
+                }
                 ("--power", Some(source @ ("battery" | "ac"))) => {
                     options.battery = source == "battery";
                 }
@@ -75,7 +86,7 @@ impl Options {
                         Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
                     options.engine_script = Some(script);
                 }
-                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--engine-script <file>]")),
+                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--engine-script <file>] [--llm-script <file>]")),
             }
         }
         Ok(options)
@@ -197,6 +208,8 @@ pub struct Harness {
     models: Arc<TinyModels>,
     engine: ScriptedEngine,
     surfaces: Arc<ScriptedSurfaces>,
+    /// The Keychain stand-in (TL-13).
+    secrets: Arc<MemorySecrets>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -260,6 +273,8 @@ impl Harness {
         };
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
         let surfaces = Arc::new(ScriptedSurfaces::default());
+        let llm = Adapters::scripted(&options.llm_script.clone().unwrap_or_default());
+        let secrets = Arc::new(MemorySecrets::default());
         let deps = CoreDeps::new(
             clock.clone(),
             Arc::new(EventLines(events, seeding.clone(), engine.clone())),
@@ -268,7 +283,9 @@ impl Harness {
         .with_models(models.clone())
         .with_engine(Arc::new(engine.clone()))
         .with_updater(updater.clone())
-        .with_surfaces(surfaces.clone());
+        .with_surfaces(surfaces.clone())
+        .with_llm(llm)
+        .with_secrets(secrets.clone());
         let deps = if options.battery {
             deps.with_power(Arc::new(OnBattery))
         } else {
@@ -289,6 +306,7 @@ impl Harness {
             models,
             engine,
             surfaces,
+            secrets,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -1133,6 +1151,27 @@ impl Controls for Harness {
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
                 "engine_kill" => self.engine_kill(),
+                // `{ skill, items?: [{ id, text }] }` → `{ output, runtime, llm_run_id, audit }`: one
+                // skill run through the router and the egress gate (TL-13).
+                "llm_run" => {
+                    let skill = args["skill"].as_str().unwrap_or_default();
+                    let items = match args["items"].as_array() {
+                        Some(items) => items
+                            .iter()
+                            .map(|i| (i["id"].as_str(), i["text"].as_str()))
+                            .map(|(id, text)| (id.unwrap_or_default(), text.unwrap_or_default()))
+                            .map(|(id, text)| (id.to_owned(), text.to_owned()))
+                            .collect(),
+                        None => vec![("seg_1".into(), "Ann agreed to ship the importer.".into())],
+                    };
+                    noter_core::testing::llm_run(&self.core, skill, items).await
+                }
+                // `{ locked }`: the Keychain stand-in fails every access while locked.
+                "keychain" => {
+                    self.secrets
+                        .set_locked(args["locked"].as_bool() == Some(true));
+                    Ok(json!({}))
+                }
                 // `{}` → `{ path }`: the data folder of this core, for stories that read its rows and files.
                 "data_dir" => Ok(json!({ "path": self.dir.display().to_string() })),
                 _ => Err(CoreError::new(

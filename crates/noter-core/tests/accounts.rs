@@ -134,10 +134,7 @@ async fn a_fresh_core_reports_no_keys_and_the_runtimes_it_found() {
     let tools: Vec<CliTool> = view.accounts.iter().map(|a| a.cli.tool).collect();
     assert_eq!(tools, [CliTool::ClaudeCode, CliTool::Codex]);
     for account in &view.accounts {
-        assert!(
-            account.cli.installed && account.cli.supported,
-            "{account:?}"
-        );
+        assert!(account.cli.installed && account.cli.supported);
         assert_eq!(account.cli.version.as_deref(), Some("1.0.0"));
         assert_eq!(account.status, AccountStatus::NotSignedIn);
     }
@@ -298,14 +295,14 @@ async fn a_failed_replacement_keeps_the_working_key() {
             .map(|s| s.expose().to_owned()),
         Some(KEY.to_owned())
     );
+    assert_eq!(
+        w.events.statuses("anthropic"),
+        ["verifying", "configured", "verifying", "configured"]
+    );
     let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
     assert_eq!(
         status(&view, KeyProvider::Anthropic),
         KeyStatus::Configured { verified_at: NOW }
-    );
-    assert_eq!(
-        w.events.statuses("anthropic"),
-        ["verifying", "configured", "verifying", "configured"]
     );
 }
 

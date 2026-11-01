@@ -1586,6 +1586,7 @@ async fn power_battery_holds_the_jobs_that_need_mains_and_the_flag_parses() {
         assert_eq!(run.status, wanted, "battery = {battery}");
         r.finish().await;
     }
+}
 
 // TL-13: `--llm-script` feeds the scripted runtime and the harness keeps the Keychain stand-in;
 // a skill answer crosses the egress gate with its audit row (2.15 AC 7).
@@ -1605,16 +1606,16 @@ async fn keys_and_skill_runs_go_through_the_scripted_runtime_and_keychain() {
         "key_rejected"
     );
     let view = r.ok("settings", "api_key_set", key).await;
-    assert_eq!(view["keys"][0]["status"]["type"], "configured", "{view}");
+    assert_eq!(view["keys"][0]["status"]["type"], "configured");
     assert!(!view.to_string().contains("sk-ant-harness"));
 
     let ran = r
         .ok("main", "harness.llm_run", json!({"skill": "post-call"}))
         .await;
-    assert_eq!(ran["runtime"], "claude_api_key", "{ran}");
+    assert_eq!(ran["runtime"], "claude_api_key");
     assert_eq!(ran["output"]["summary_md"], "Scripted summary.");
     let audit = ran["audit"].as_array().unwrap();
-    assert_eq!(audit.len(), 1, "{ran}");
+    assert_eq!(audit.len(), 1);
     assert_eq!(audit[0]["llm_run_id"], ran["llm_run_id"]);
     assert_eq!(audit[0]["destination"], "api.anthropic.com");
     assert_eq!(audit[0]["kind"], "run");

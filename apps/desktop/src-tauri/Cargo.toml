@@ -28,6 +28,8 @@ noter-protocol = { path = "../../../crates/noter-protocol" }
 # The status item's VoiceOver label (tray-icon's NSStatusItem); both are in tray-icon's tree.
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString"] }
+# API keys in the Keychain (TL-13); already in the tree through rustls-platform-verifier.
+security-framework = "3"
 serde_json = "1"
 tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-dialog = "2"

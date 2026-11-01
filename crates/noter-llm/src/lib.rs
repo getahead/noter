@@ -20,6 +20,7 @@ mod adapters;
 mod gate;
 mod route;
 mod runtime;
+mod secrets;
 mod validate;
 
 pub use adapters::cli::CliConfig;
@@ -31,6 +32,7 @@ pub use runtime::{
     Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind, TaskSettings,
     Tested, Usage, Validated,
 };
+pub use secrets::{key_account, KeychainLocked, MemorySecrets, Secret, SecretStore};
 
 #[cfg(test)]
 mod fetch_tests;

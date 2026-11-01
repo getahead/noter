@@ -73,7 +73,7 @@ fn fixture(script: Option<&str>) -> Fixture {
     .with_secrets(secrets.clone())
     .on_log(move |v| l.lock().unwrap().push(v.clone()))
     .on_switch_to_local(move |call| s.lock().unwrap().push(call.clone()))
-    .on_key_rejected(move |runtime| r.lock().unwrap().push(runtime));
+    .on_key_rejected(move |runtime, _| r.lock().unwrap().push(runtime));
     let (privacy, _) = watch::channel(cloud());
     Fixture {
         _dir: dir,
@@ -915,7 +915,7 @@ async fn a_run_hands_its_adapter_the_stored_key_and_nothing_else_carries_it() {
     let run = f.row("SELECT * FROM llm_runs");
     let logs = serde_json::to_string(&*f.logs.lock().unwrap()).unwrap();
     for text in [audit.to_string(), run.to_string(), logs] {
-        assert!(!text.contains(ANTHROPIC_KEY), "{text}");
+        assert!(!text.contains(ANTHROPIC_KEY));
     }
 }
 

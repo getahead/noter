@@ -20,8 +20,9 @@ use tokio::process::Command;
 use super::{Invocation, Reply};
 use crate::runtime::{lock, Availability, BoxFuture, Tested};
 
-/// How Noter runs one CLI. A missing key or sign-in makes that runtime unavailable.
-#[derive(Clone)]
+/// How Noter runs one CLI. A missing sign-in makes the own-account runtime unavailable; the
+/// API-key runtime takes its key from the router's `SecretStore` on each call.
+#[derive(Debug, Clone)]
 pub struct CliConfig {
     /// The `claude` or `codex` binary.
     pub program: PathBuf,
@@ -29,26 +30,10 @@ pub struct CliConfig {
     pub home: PathBuf,
     /// A Noter-owned directory for run environments (layout above).
     pub run_root: PathBuf,
-    /// The API key for the API-key runtime (`ANTHROPIC_API_KEY` or `CODEX_API_KEY`).
-    pub api_key: Option<String>,
     /// The user signed in through the CLI itself (own-account runtime).
     pub signed_in: bool,
     /// The models offered, preferred first.
     pub models: Vec<String>,
-}
-
-/// Prints everything but the API key.
-impl std::fmt::Debug for CliConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CliConfig")
-            .field("program", &self.program)
-            .field("home", &self.home)
-            .field("run_root", &self.run_root)
-            .field("api_key", &self.api_key.as_ref().map(|_| "…"))
-            .field("signed_in", &self.signed_in)
-            .field("models", &self.models)
-            .finish()
-    }
 }
 
 /// Session handle → the CLI's own session id once its first turn answered.
@@ -84,16 +69,16 @@ impl Cli {
         let unavailable = if version.is_none() {
             Some(RuntimeUnavailableReason::CliMissing)
         } else if api_key {
-            self.config
-                .api_key
-                .is_none()
-                .then_some(RuntimeUnavailableReason::NoKey)
+            None
         } else {
             (!self.config.signed_in).then_some(RuntimeUnavailableReason::AccountSignedOut)
         };
         Availability {
             runtime,
             unavailable,
+            path: version
+                .as_ref()
+                .map(|_| self.config.program.display().to_string()),
             version,
             tested: Some(self.tested),
             models: self.config.models.clone(),

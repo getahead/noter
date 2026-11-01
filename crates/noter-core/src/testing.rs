@@ -79,3 +79,66 @@ pub fn capturing(core: &Core) -> Option<noter_protocol::CallId> {
     .then_some(capture.call_id)
     .flatten()
 }
+
+/// `harness.llm_run`: one `skill` run through the router and its egress gate on a packet of
+/// `items` (`(id, text)`), cloud allowed; answers the validated output, its runtime and
+/// `llm_runs` id, and the run's `audit_log` rows.
+pub async fn llm_run(
+    core: &Core,
+    skill: &str,
+    items: Vec<(String, String)>,
+) -> Result<serde_json::Value, CoreError> {
+    use noter_llm::{
+        Failure, LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
+    };
+    use noter_protocol::model::settings::AuditWhat;
+    use noter_protocol::{ErrorCode, PrivacyMode};
+    let skill = Skill::from_id(skill)
+        .ok_or_else(|| CoreError::new(ErrorCode::InvalidInput, format!("no skill {skill:?}")))?;
+    let items = items.into_iter().map(|(id, text)| PacketItem {
+        id,
+        source: SourceClass::Normal,
+        text,
+    });
+    let packet = Packet {
+        what: AuditWhat::FullTranscript,
+        items: items.collect(),
+        people: Vec::new(),
+    };
+    let (_privacy, rx) = tokio::sync::watch::channel(Privacy {
+        mode: PrivacyMode::CloudAllowed,
+        sensitive: false,
+        offline: false,
+    });
+    let req = RunRequest::new(skill, "harness", packet, TaskKind::PostCall, rx);
+    let done = core.llm().run_once(req).await.map_err(|f| match f {
+        Failure::Unavailable(e) | Failure::Storage(e) => e,
+        other => CoreError::new(ErrorCode::Internal, format!("{other:?}")),
+    })?;
+    let run = done.provenance.llm_run_id.as_str().to_owned();
+    let id = run.clone();
+    let audit = core.store().read(move |c| {
+        let mut stmt = c.prepare(
+            "SELECT id, kind, what, destination, runtime_choice, llm_run_id, bytes_out \
+             FROM audit_log WHERE llm_run_id = ?1 ORDER BY ts",
+        )?;
+        let rows = stmt.query_map([&id], |r| {
+            Ok(serde_json::json!({
+                "id": r.get::<_, String>(0)?,
+                "kind": r.get::<_, String>(1)?,
+                "what": r.get::<_, String>(2)?,
+                "destination": r.get::<_, String>(3)?,
+                "runtime_choice": r.get::<_, String>(4)?,
+                "llm_run_id": r.get::<_, String>(5)?,
+                "bytes_out": r.get::<_, i64>(6)?,
+            }))
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+    })?;
+    Ok(serde_json::json!({
+        "output": done.output,
+        "runtime": done.provenance.runtime,
+        "llm_run_id": run,
+        "audit": audit,
+    }))
+}

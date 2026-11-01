@@ -143,6 +143,29 @@ pub(crate) fn fresh_snapshot(app_version: &str) -> AppSnapshot {
     }
 }
 
+/// Stamps a whole-state payload with the next version of its kind and sends it.
+// @cpt-algo:cpt-noter-algo-core-ipc-host-version:p1
+pub(crate) fn publish<T: WholeState>(
+    events: &dyn crate::EventEmitter,
+    event: &'static str,
+    state: &mut T,
+) -> T {
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-increment
+    // The counter is the slice's own version: 1 at core start, kept in memory.
+    let next = StateVersion(state.version().0 + 1);
+    // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-increment
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-stamp
+    *state.version() = next;
+    let stamped = state.clone();
+    // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-stamp
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-emit-event
+    events.emit(event, crate::to_json(&stamped));
+    // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-emit-event
+    // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-return-version
+    stamped
+    // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-return-version
+}
+
 /// A whole-state payload: the full state of one kind and its `version`.
 pub(crate) trait WholeState: Serialize + Clone {
     fn version(&mut self) -> &mut StateVersion;

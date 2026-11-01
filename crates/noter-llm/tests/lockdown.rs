@@ -550,9 +550,10 @@ fn ollama_server(content: Value) -> (String, Seen) {
             let mut body = vec![0; length];
             reader.read_exact(&mut body).unwrap();
             let body = serde_json::from_slice(&body).unwrap_or_default();
+            let tags_asked = path == "/api/tags";
             log.lock().unwrap().push((path, body));
             let tags = json!({"models": [{"name": "llama3.2:3b"}, {"name": "qwen3:8b"}]});
-            let answer = if path == "/api/tags" {
+            let answer = if tags_asked {
                 tags.to_string()
             } else {
                 json!({
@@ -864,18 +865,11 @@ async fn all_three_runtimes_conform_on_one_request() {
     assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
 }
 
-// QA (#234): a config's Debug output never carries the API key.
+// QA (#234): the API key no longer lives in `CliConfig`; the `Secret` that carries it to a run
+// never prints it.
 #[test]
-fn a_cli_config_never_prints_its_api_key() {
-    let config = CliConfig {
-        program: "claude".into(),
-        home: "/home".into(),
-        run_root: "/run".into(),
-        api_key: Some("sk-ant-never-printed".into()),
-        signed_in: false,
-        models: Vec::new(),
-    };
-    let printed = format!("{config:?}");
+fn an_api_key_never_prints() {
+    let secret = Secret::new("sk-ant-never-printed".into());
+    let printed = format!("{secret:?} {:?}", World::new().cli(None, false));
     assert!(!printed.contains("sk-ant-never-printed"));
-    assert!(printed.contains("api_key: Some(\"…\")"));
 }

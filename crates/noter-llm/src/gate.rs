@@ -24,8 +24,10 @@ use crate::runtime::{
     hex, model_meta, runtime_name, Availability, BoxFuture, Failure, Now, Packet, Privacy, Skill,
     SourceClass,
 };
+use crate::secrets::Secret;
 
 /// The adapters, one per runtime choice. Only the gate can reach them.
+#[derive(Clone)]
 pub struct Adapters {
     registry: Vec<(RuntimeChoice, Arc<dyn RuntimeAdapter>)>,
 }
@@ -40,6 +42,13 @@ impl Adapters {
             .map(|a| (a.runtime, adapter.clone()))
             .collect();
         Self { registry }
+    }
+
+    /// No runtime at all: every choice is unavailable (a core whose host set none).
+    pub fn none() -> Self {
+        Self {
+            registry: Vec::new(),
+        }
     }
 
     /// The real runtimes: Claude Code and Codex locked down, Ollama on this Mac.
@@ -133,6 +142,17 @@ impl Gate {
     pub(crate) fn availability(&self) -> Vec<Availability> {
         let registry = &self.adapters.registry;
         registry.iter().map(|(r, a)| a.availability(*r)).collect()
+    }
+
+    /// Each adapter once (one serves several runtime choices).
+    pub(crate) fn adapters(&self) -> Vec<Arc<dyn RuntimeAdapter>> {
+        let mut all: Vec<Arc<dyn RuntimeAdapter>> = Vec::new();
+        for (_, a) in &self.adapters.registry {
+            if !all.iter().any(|b| Arc::ptr_eq(a, b)) {
+                all.push(a.clone());
+            }
+        }
+        all
     }
 
     pub(crate) fn adapter_name(&self, runtime: RuntimeChoice) -> &'static str {
@@ -265,6 +285,7 @@ impl Gate {
         skill: Skill,
         session: Option<&str>,
         budget_usd: Option<f64>,
+        key: Option<Secret>,
     ) -> BoxFuture<'static, Result<Reply, String>> {
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-release
         let Some(adapter) = self.adapter(approved.runtime) else {
@@ -280,6 +301,7 @@ impl Gate {
             packet: approved.bytes.clone(),
             session: session.map(String::from),
             budget_usd,
+            key,
         })
         // @cpt-end:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-release
     }
