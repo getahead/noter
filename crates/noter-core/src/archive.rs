@@ -460,9 +460,31 @@ impl Core {
         Some(rel)
     }
 
+    /// The archive pass of `call`. A run stopped after it started leaves the call as it found
+    /// it: cancelled (Continue Recording) back to pending for the next stop, failed as failed.
+    pub(crate) async fn archive_pass(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
+        let result = self.archive_run(ctx, call).await;
+        let status = match &result {
+            Err(Stop::Cancelled) => "pending",
+            Err(Stop::Failed(_)) => "failed",
+            Ok(()) => return result,
+        };
+        let id = call.as_str().to_owned();
+        let running = self
+            .store()
+            .read(move |c| audio(c, &id))
+            .ok()
+            .flatten()
+            .is_some_and(|h| h.archive_status == "running");
+        if running {
+            let _ = self.set_archive(ctx, call, status);
+        }
+        result
+    }
+
     // @cpt-flow:cpt-noter-flow-core-postcall-regenerate:p1
     // @cpt-dod:cpt-noter-dod-core-postcall-regeneration:p1
-    pub(crate) async fn archive_pass(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
+    async fn archive_run(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
         // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-archive
         // The scheduler holds this run while a call is live (TL-23); the checkpoint waits for it.
         ctx.checkpoint().await?;
