@@ -267,6 +267,7 @@ impl World {
                 text: TEXT.into(),
             }],
             people: Vec::new(),
+            context: Default::default(),
         };
         let privacy = self.privacy.subscribe();
         let mut req = RunRequest::new(

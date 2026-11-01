@@ -181,7 +181,7 @@ impl Gate {
                 .collect();
             return Ok(Approved {
                 runtime,
-                bytes: payload(r, &items),
+                bytes: payload(r, &items, context(packet, &packet.context.glossary)),
                 permitted: items.iter().map(|(id, _)| (*id).to_owned()).collect(),
                 names: Vec::new(),
                 audit_id: None,
@@ -204,6 +204,18 @@ impl Gate {
                 (i.id.as_str(), text)
             })
             .collect();
+        let mut glossary: Vec<String> = packet
+            .context
+            .glossary
+            .iter()
+            .map(|t| {
+                if redact {
+                    placeholders.redact(t)
+                } else {
+                    t.clone()
+                }
+            })
+            .collect();
         // @cpt-end:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-redact
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-pseudonyms
         let mut names = Vec::new();
@@ -213,7 +225,8 @@ impl Gate {
                 let pseudonym = format!("Person {}", n + 1);
                 let whole = Regex::new(&format!(r"\b{}\b", regex::escape(name)))
                     .expect("an escaped name is a valid pattern");
-                for (_, text) in items.iter_mut() {
+                let texts = items.iter_mut().map(|(_, t)| t).chain(glossary.iter_mut());
+                for text in texts {
                     *text = whole.replace_all(text, pseudonym.as_str()).into_owned();
                 }
                 names.push((pseudonym, name.clone()));
@@ -222,7 +235,7 @@ impl Gate {
             names.sort_by_key(|(p, _)| std::cmp::Reverse(p.len()));
         }
         // @cpt-end:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-pseudonyms
-        let bytes = payload(r, &items);
+        let bytes = payload(r, &items, context(packet, &glossary));
         let redaction_map_id = (redact || !names.is_empty()).then_some(r.map_id);
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-audit
         let audit_id = AuditId::new(format!("aud_{}", ulid::Ulid::generate()));
@@ -331,12 +344,26 @@ impl Gate {
 }
 
 /// The released bytes: the skill, the items and, on a repair, the failure explained.
-fn payload(r: &Release, items: &[(&str, String)]) -> Vec<u8> {
+/// The packet's context as it leaves, with the glossary as the gate rewrote it; `None` when empty.
+fn context(packet: &Packet, glossary: &[String]) -> Option<Value> {
+    (!packet.context.is_empty()).then(|| {
+        json!({
+            "call_type": packet.context.call_type,
+            "language": packet.context.language,
+            "glossary": glossary,
+        })
+    })
+}
+
+fn payload(r: &Release, items: &[(&str, String)], context: Option<Value>) -> Vec<u8> {
     let items: Vec<Value> = items
         .iter()
         .map(|(id, text)| json!({"id": id, "text": text}))
         .collect();
     let mut packet = json!({"skill": r.skill.id(), "items": items});
+    if let Some(context) = context {
+        packet["context"] = context;
+    }
     if let Some(repair) = r.repair {
         packet["repair"] = json!(repair);
     }

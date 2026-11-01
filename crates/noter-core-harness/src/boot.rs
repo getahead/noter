@@ -264,11 +264,15 @@ impl Harness {
         // result, so their events stay off the wire (`seeding` is cleared before `Ok`).
         let seeding = Arc::new(AtomicBool::new(true));
         // The self-test takes a moment, so a window can watch it and a scenario can push into it.
-        let engine = ScriptedEngine::new().with_default(Behaviour {
-            self_test_pace_ms: 300,
-            self_test_line: Some("Welcome to Noter".into()),
-            ..Behaviour::default()
-        });
+        // The data folder stands in for the App Group container: the offline pass and the
+        // embeddings write their built-in answers there.
+        let engine = ScriptedEngine::new()
+            .with_default(Behaviour {
+                self_test_pace_ms: 300,
+                self_test_line: Some("Welcome to Noter".into()),
+                ..Behaviour::default()
+            })
+            .with_container(dir.to_path_buf());
         let engine = match options.engine_script {
             Some(script) => engine.with_script(script),
             None => engine,

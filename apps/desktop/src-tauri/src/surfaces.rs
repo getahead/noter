@@ -360,7 +360,15 @@ pub fn posted(n: &Notification) -> PostedNotification {
             "Try Again on the call screen.",
             CallPageTab::Transcript,
         ),
+        // @cpt-begin:cpt-noter-algo-core-postcall-notify:p1:inst-notify-release
+        // One thread per call; the click opens the call's Summary through `nav:request`.
         NotificationKind::SummaryReady => ("Summary ready", "", CallPageTab::Summary),
+        NotificationKind::SummaryFailed => (
+            "Summary not written",
+            "Open the call to try again.",
+            CallPageTab::Summary,
+        ),
+        // @cpt-end:cpt-noter-algo-core-postcall-notify:p1:inst-notify-release
     };
     PostedNotification {
         id: format!("ntf_{}_{}", n.call_id, NEXT.fetch_add(1, Ordering::Relaxed)),

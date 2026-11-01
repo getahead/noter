@@ -41,8 +41,8 @@ impl PowerSource for AcPower {
     }
 }
 
-/// A job kind whose work lands later (archive and regeneration, 2.17 slice 2): its runs succeed
-/// at once.
+/// A job kind until its handler is registered at start (post-call, archive, regeneration and
+/// downloads register theirs in `start_jobs`): its runs succeed at once.
 struct NoOp;
 
 impl JobHandler for NoOp {

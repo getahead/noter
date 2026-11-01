@@ -28,9 +28,9 @@ pub use adapters::ollama::OllamaConfig;
 pub use adapters::scripted::{Received, Scripted};
 pub use gate::Adapters;
 pub use runtime::{
-    Availability, Budget, Cancel, Failure, Llm, LlmRuntime, Packet, PacketItem, Privacy,
-    Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind, TaskSettings,
-    Tested, Usage, Validated,
+    Availability, Budget, Cancel, Failure, Llm, LlmRuntime, Packet, PacketContext, PacketItem,
+    Privacy, Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind,
+    TaskSettings, Tested, Usage, Validated,
 };
 pub use secrets::{key_account, KeychainLocked, MemorySecrets, Secret, SecretStore};
 pub use validate::raw_html;

@@ -137,7 +137,8 @@ fn seed_call(core: &Core, id: &str, segments: i64) {
             vec![
                 ("id", json!(format!("{id}_spk"))),
                 ("call_id", json!(id)),
-                ("label", json!("Anna Lee")),
+                ("label", json!("spk_1")),
+                ("name", json!("Anna Lee")),
                 ("n", json!(1)),
                 ("channel", json!("sys")),
                 ("pass", json!("live")),
@@ -572,10 +573,7 @@ async fn a_failed_archive_keeps_the_live_transcript_and_sends_the_users_names() 
         &std::fs::read(r.dir.path().join(format!("audio/{CALL}/constraints.json"))).unwrap(),
     )
     .unwrap();
-    assert_eq!(
-        constraints["speaker_names"],
-        json!({"Anna Lee": "Anna Lee"})
-    );
+    assert_eq!(constraints["speaker_names"], json!({"spk_1": "Anna Lee"}));
     assert_eq!(constraints["must_link"], json!([]));
     // No audio: failed without asking the engine.
     seed_call(&r.core, "call_mute", 1);
