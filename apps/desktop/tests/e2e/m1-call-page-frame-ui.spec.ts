@@ -57,7 +57,11 @@ const quiet =
  * this feature, so Back lands on Library › Calls whatever it shows. Works on the fake core and the real one.
  */
 async function openCall(page: Page, title = TITLE) {
-  await page.keyboard.press("Meta+Digit3");
+  // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
+  await expect(async () => {
+    await page.keyboard.press("Meta+Digit3");
+    await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   const id = title === TITLE ? W.PAST_CALL : W.LIVE_CALL;
   await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
   await page.evaluate(async (callId) => {
