@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use noter_core::Core;
+use noter_core::Scripted;
 use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::{serve_with, Output};
 use noter_engine_client::scripted::Script;
@@ -1585,4 +1586,64 @@ async fn power_battery_holds_the_jobs_that_need_mains_and_the_flag_parses() {
         assert_eq!(run.status, wanted, "battery = {battery}");
         r.finish().await;
     }
+
+// TL-13: `--llm-script` feeds the scripted runtime and the harness keeps the Keychain stand-in;
+// a skill answer crosses the egress gate with its audit row (2.15 AC 7).
+#[tokio::test]
+async fn keys_and_skill_runs_go_through_the_scripted_runtime_and_keychain() {
+    let script = r#"{"on": "ask-answer", "fail": "key_rejected"}"#;
+    let mut r = start_with(Options {
+        fixture: true,
+        fixed_clock: true,
+        llm_script: Some(Scripted::parse(script).unwrap()),
+        ..Options::default()
+    })
+    .await;
+    let key = json!({"provider": "anthropic", "key": "sk-ant-harness"});
+    assert_eq!(
+        r.code("settings", "api_key_set", key.clone()).await,
+        "key_rejected"
+    );
+    let view = r.ok("settings", "api_key_set", key).await;
+    assert_eq!(view["keys"][0]["status"]["type"], "configured", "{view}");
+    assert!(!view.to_string().contains("sk-ant-harness"));
+
+    let ran = r
+        .ok("main", "harness.llm_run", json!({"skill": "post-call"}))
+        .await;
+    assert_eq!(ran["runtime"], "claude_api_key", "{ran}");
+    assert_eq!(ran["output"]["summary_md"], "Scripted summary.");
+    let audit = ran["audit"].as_array().unwrap();
+    assert_eq!(audit.len(), 1, "{ran}");
+    assert_eq!(audit[0]["llm_run_id"], ran["llm_run_id"]);
+    assert_eq!(audit[0]["destination"], "api.anthropic.com");
+    assert_eq!(audit[0]["kind"], "run");
+
+    r.ok("main", "harness.keychain", json!({"locked": true}))
+        .await;
+    let view = r.ok("main", "accounts_get", json!({})).await;
+    assert_eq!(view["keys"][0]["status"]["type"], "keychain_locked");
+    assert_eq!(
+        r.code("main", "harness.llm_run", json!({"skill": "nope"}))
+            .await,
+        "invalid_input"
+    );
+}
+
+#[test]
+fn llm_script_flag_reads_the_scripted_runtime_or_names_the_bad_line() {
+    let dir = std::env::temp_dir().join(format!("llm-script-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("llm.jsonl");
+    std::fs::write(
+        &file,
+        "{\"on\": \"post-call\", \"fail\": \"rate_limited\"}\n",
+    )
+    .unwrap();
+    let args = ["--llm-script".to_string(), file.display().to_string()];
+    assert!(Options::parse(&args).unwrap().llm_script.is_some());
+    std::fs::write(&file, "{\"on\": \"post-call\"}\nnot json\n").unwrap();
+    let err = Options::parse(&args).unwrap_err();
+    assert!(err.contains("line 2"), "{err}");
+    let _ = std::fs::remove_dir_all(dir);
 }

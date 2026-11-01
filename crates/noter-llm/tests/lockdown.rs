@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use noter_db::Store;
 use noter_llm::{
-    Adapters, CliConfig, Failure, Llm, LlmRuntime, OllamaConfig, Packet, PacketItem, Privacy,
-    RunRequest, Skill, SourceClass, TaskKind, Validated,
+    Adapters, CliConfig, Failure, Llm, LlmRuntime, MemorySecrets, OllamaConfig, Packet, PacketItem,
+    Privacy, RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind, Validated,
 };
 use noter_protocol::model::settings::AuditWhat;
 use noter_protocol::skills::{ExtractedItem, PostCallOutput};
@@ -158,6 +158,7 @@ struct World {
     home: PathBuf,
     run_root: PathBuf,
     store: Arc<Store>,
+    secrets: Arc<MemorySecrets>,
     privacy: watch::Sender<Privacy>,
 }
 
@@ -203,16 +204,25 @@ impl World {
             home,
             run_root,
             store,
+            secrets: Arc::default(),
             privacy,
         }
     }
 
-    fn cli(&self, stub: Option<&Stub>, api_key: Option<&str>, signed_in: bool) -> CliConfig {
+    /// A CLI's config; its API key, if any, goes to the Keychain stand-in under `account`.
+    fn cli_keyed(
+        &self,
+        stub: Option<&Stub>,
+        key: Option<(&str, &str)>,
+        signed_in: bool,
+    ) -> CliConfig {
+        if let Some((account, key)) = key {
+            self.secrets.set(account, &Secret::new(key.into())).unwrap();
+        }
         CliConfig {
             program: stub.map_or_else(|| self.run_root.join("missing-cli"), Stub::program),
             home: self.home.clone(),
             run_root: self.run_root.clone(),
-            api_key: api_key.map(String::from),
             signed_in,
             models: vec!["stub-model".into()],
         }
@@ -223,16 +233,29 @@ impl World {
         Llm::new(self.store.clone(), adapters, || {
             TimestampMs(1_792_000_000_000)
         })
+        .with_secrets(self.secrets.clone())
+    }
+
+    fn cli(&self, stub: Option<&Stub>, signed_in: bool) -> CliConfig {
+        self.cli_keyed(stub, None, signed_in)
+    }
+
+    fn claude_cli(&self, stub: Option<&Stub>, api_key: Option<&str>, signed_in: bool) -> CliConfig {
+        self.cli_keyed(stub, api_key.map(|k| ("anthropic", k)), signed_in)
+    }
+
+    fn codex_cli(&self, stub: Option<&Stub>, api_key: Option<&str>, signed_in: bool) -> CliConfig {
+        self.cli_keyed(stub, api_key.map(|k| ("codex", k)), signed_in)
     }
 
     fn claude_only(&self, stub: &Stub, api_key: Option<&str>, signed_in: bool) -> Llm {
-        let claude = self.cli(Some(stub), api_key, signed_in);
-        self.llm(claude, self.cli(None, None, false), no_ollama())
+        let claude = self.claude_cli(Some(stub), api_key, signed_in);
+        self.llm(claude, self.cli(None, false), no_ollama())
     }
 
     fn codex_only(&self, stub: &Stub, api_key: Option<&str>, signed_in: bool) -> Llm {
-        let codex = self.cli(Some(stub), api_key, signed_in);
-        self.llm(self.cli(None, None, false), codex, no_ollama())
+        let codex = self.codex_cli(Some(stub), api_key, signed_in);
+        self.llm(self.cli(None, false), codex, no_ollama())
     }
 
     fn request(&self, runtime: RuntimeChoice) -> RunRequest {
@@ -528,14 +551,19 @@ fn ollama_server(content: Value) -> (String, Seen) {
             reader.read_exact(&mut body).unwrap();
             let body = serde_json::from_slice(&body).unwrap_or_default();
             log.lock().unwrap().push((path, body));
-            let answer = json!({
+            let tags = json!({"models": [{"name": "llama3.2:3b"}, {"name": "qwen3:8b"}]});
+            let answer = if path == "/api/tags" {
+                tags.to_string()
+            } else {
+                json!({
                 "model": "qwen3:8b",
                 "message": {"role": "assistant", "content": content.to_string()},
                 "done": true,
                 "prompt_eval_count": 12,
                 "eval_count": 8,
-            })
-            .to_string();
+                })
+                .to_string()
+            };
             let mut out = stream;
             let _ = write!(
                 out,
@@ -555,11 +583,7 @@ async fn ollama_posts_to_localhost_with_the_schema_in_format() {
         url,
         models: vec!["qwen3:8b".into()],
     };
-    let llm = world.llm(
-        world.cli(None, None, false),
-        world.cli(None, None, false),
-        ollama,
-    );
+    let llm = world.llm(world.cli(None, false), world.cli(None, false), ollama);
     let done = ok(llm.run_once(world.request(RuntimeChoice::Local)).await);
     assert_eq!(done.provenance.adapter, "ollama");
     assert_eq!(done.provenance.usage.tokens_in, 12);
@@ -587,6 +611,49 @@ async fn ollama_posts_to_localhost_with_the_schema_in_format() {
     assert_eq!(audits, 0);
 }
 
+// algo -availability `inst-availability-clis`: what Ollama has pulled, from `/api/tags`
+#[tokio::test]
+async fn refreshing_reads_the_local_models_ollama_has_pulled() {
+    let world = World::new();
+    let (url, seen) = ollama_server(output());
+    let ollama = OllamaConfig {
+        url: url.clone(),
+        models: vec!["qwen3:8b".into()],
+    };
+    let llm = world.llm(world.cli(None, false), world.cli(None, false), ollama);
+    let all = llm.refresh().await;
+    let local = all
+        .iter()
+        .find(|a| a.runtime == RuntimeChoice::Local)
+        .unwrap();
+    assert_eq!(local.unavailable, None);
+    // The configured preference first, then the rest Ollama has.
+    assert_eq!(local.models, ["qwen3:8b", "llama3.2:3b"]);
+    assert_eq!(local.path.as_deref(), Some(url.as_str()));
+    let claude = all
+        .iter()
+        .find(|a| a.runtime == RuntimeChoice::ClaudeApiKey)
+        .unwrap();
+    assert_eq!(claude.path, None);
+    assert_eq!(seen.lock().unwrap()[0].0, "/api/tags");
+
+    let silent = OllamaConfig {
+        models: vec!["qwen3:8b".into()],
+        ..no_ollama()
+    };
+    let llm = world.llm(world.cli(None, false), world.cli(None, false), silent);
+    let all = llm.refresh().await;
+    let local = all
+        .iter()
+        .find(|a| a.runtime == RuntimeChoice::Local)
+        .unwrap();
+    assert_eq!(
+        local.unavailable,
+        Some(noter_protocol::error::RuntimeUnavailableReason::LocalModelNotReady)
+    );
+    assert_eq!(local.path, None);
+}
+
 #[tokio::test]
 async fn ollama_off_localhost_is_never_reached() {
     let world = World::new();
@@ -594,11 +661,7 @@ async fn ollama_off_localhost_is_never_reached() {
         url: "http://ollama.example.com:11434".into(),
         models: vec!["qwen3:8b".into()],
     };
-    let llm = world.llm(
-        world.cli(None, None, false),
-        world.cli(None, None, false),
-        ollama,
-    );
+    let llm = world.llm(world.cli(None, false), world.cli(None, false), ollama);
     let availability = llm.availability();
     let local = availability
         .iter()
@@ -618,8 +681,8 @@ async fn unknown_majors_and_versions_outside_the_tested_range_are_refused() {
         let claude_stub = Stub::new(claude);
         let codex_stub = Stub::new(codex);
         let llm = world.llm(
-            world.cli(Some(&claude_stub), Some("sk-ant-test"), false),
-            world.cli(Some(&codex_stub), Some("sk-codex-test"), false),
+            world.claude_cli(Some(&claude_stub), Some("sk-ant-test"), false),
+            world.codex_cli(Some(&codex_stub), Some("sk-codex-test"), false),
             no_ollama(),
         );
         let e = unavailable(
@@ -660,8 +723,8 @@ async fn session_turns_and_resume_continue_the_cli_session() {
     let claude = Stub::new(CLAUDE_OK);
     let codex = Stub::new(CODEX_OK);
     let llm = world.llm(
-        world.cli(Some(&claude), Some("sk-ant-test"), false),
-        world.cli(Some(&codex), Some("sk-codex-test"), false),
+        world.claude_cli(Some(&claude), Some("sk-ant-test"), false),
+        world.codex_cli(Some(&codex), Some("sk-codex-test"), false),
         no_ollama(),
     );
     let session = llm
@@ -770,8 +833,8 @@ async fn all_three_runtimes_conform_on_one_request() {
         models: vec!["qwen3:8b".into()],
     };
     let llm = world.llm(
-        world.cli(Some(&claude), Some("sk-ant-test"), false),
-        world.cli(Some(&codex), Some("sk-codex-test"), false),
+        world.claude_cli(Some(&claude), Some("sk-ant-test"), false),
+        world.codex_cli(Some(&codex), Some("sk-codex-test"), false),
         ollama,
     );
     for (runtime, adapter) in [

@@ -19,8 +19,8 @@ use crate::route::{route, timeout, Route};
 use crate::runtime::{tests_support, RequestState};
 use crate::validate::validate;
 use crate::{
-    Availability, Budget, Failure, Llm, LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill,
-    SourceClass, TaskKind, TaskSettings, Tested,
+    Availability, Budget, Failure, Llm, LlmRuntime, MemorySecrets, Packet, PacketItem, Privacy,
+    RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind, TaskSettings, Tested,
 };
 
 const NORMAL_TEXT: &str =
@@ -28,6 +28,7 @@ const NORMAL_TEXT: &str =
 const SENSITIVE_TEXT: &str = "SENSITIVE-SOURCE-TEXT";
 const AUDIO_TEXT: &str = "AUDIO-BYTES";
 const MODEL_TEXT: &str = "MODEL-ONLY-TEXT";
+const ANTHROPIC_KEY: &str = "sk-ant-stored-key";
 
 struct Fixture {
     _dir: tempfile::TempDir,
@@ -37,6 +38,8 @@ struct Fixture {
     llm: Llm,
     logs: Arc<Mutex<Vec<Value>>>,
     switched: Arc<Mutex<Vec<CallId>>>,
+    secrets: Arc<MemorySecrets>,
+    rejected: Arc<Mutex<Vec<RuntimeChoice>>>,
     privacy: watch::Sender<Privacy>,
 }
 
@@ -58,12 +61,19 @@ fn fixture(script: Option<&str>) -> Fixture {
     };
     let logs = Arc::new(Mutex::new(Vec::new()));
     let switched = Arc::new(Mutex::new(Vec::new()));
-    let (l, s) = (logs.clone(), switched.clone());
+    let secrets = Arc::new(MemorySecrets::default());
+    let key = |k: &str| Secret::new(k.into());
+    secrets.set("anthropic", &key(ANTHROPIC_KEY)).unwrap();
+    secrets.set("codex", &key("sk-codex-stored-key")).unwrap();
+    let rejected = Arc::new(Mutex::new(Vec::new()));
+    let (l, s, r) = (logs.clone(), switched.clone(), rejected.clone());
     let llm = Llm::new(store.clone(), Adapters::scripted(&scripted), || {
         TimestampMs(1_792_000_000_000)
     })
+    .with_secrets(secrets.clone())
     .on_log(move |v| l.lock().unwrap().push(v.clone()))
-    .on_switch_to_local(move |call| s.lock().unwrap().push(call.clone()));
+    .on_switch_to_local(move |call| s.lock().unwrap().push(call.clone()))
+    .on_key_rejected(move |runtime| r.lock().unwrap().push(runtime));
     let (privacy, _) = watch::channel(cloud());
     Fixture {
         _dir: dir,
@@ -73,6 +83,8 @@ fn fixture(script: Option<&str>) -> Fixture {
         llm,
         logs,
         switched,
+        secrets,
+        rejected,
         privacy,
     }
 }
@@ -846,4 +858,154 @@ fn a_script_line_names_a_skill_and_at_most_one_answer() {
     assert!(Scripted::parse(r#"{"on": "post-call", "output": {}, "fail": "x"}"#).is_err());
     assert!(Scripted::parse("not json").is_err());
     assert!(Scripted::parse("\n\n").is_ok());
+}
+
+// ── API keys (credentials-privacy: flow -keys, algo -secret-boundary, state -key) ──
+
+#[test]
+fn a_secret_never_prints_its_key() {
+    let secret = Secret::new("sk-ant-very-secret".into());
+    assert!(!format!("{secret:?}").contains("very-secret"));
+    assert_eq!(secret.expose(), "sk-ant-very-secret");
+}
+
+#[test]
+fn a_locked_keychain_fails_every_access_until_it_opens() {
+    let secrets = MemorySecrets::default();
+    secrets.set("anthropic", &Secret::new("k".into())).unwrap();
+    secrets.set_locked(true);
+    assert!(secrets.get("anthropic").is_err());
+    assert!(secrets.set("anthropic", &Secret::new("j".into())).is_err());
+    assert!(secrets.remove("anthropic").is_err());
+    secrets.set_locked(false);
+    assert_eq!(secrets.get("anthropic").unwrap().unwrap().expose(), "k");
+    secrets.remove("anthropic").unwrap();
+    assert_eq!(secrets.get("anthropic").unwrap(), None);
+}
+
+#[tokio::test]
+async fn an_api_key_runtime_without_a_readable_key_is_unavailable() {
+    let f = fixture(None);
+    let reason = |runtime| {
+        let all = f.llm.availability();
+        all.into_iter()
+            .find(|a| a.runtime == runtime)
+            .unwrap()
+            .unavailable
+    };
+    assert_eq!(reason(RuntimeChoice::ClaudeApiKey), None);
+    f.secrets.remove("anthropic").unwrap();
+    let no_key = Some(RuntimeUnavailableReason::NoKey);
+    assert_eq!(reason(RuntimeChoice::ClaudeApiKey), no_key);
+    assert_eq!(reason(RuntimeChoice::CodexApiKey), None);
+    f.secrets.set_locked(true);
+    assert_eq!(reason(RuntimeChoice::CodexApiKey), no_key);
+    // Own accounts and the local runtime never need a key.
+    assert_eq!(reason(RuntimeChoice::ClaudeAccount), None);
+    assert_eq!(reason(RuntimeChoice::Local), None);
+}
+
+#[tokio::test]
+async fn a_run_hands_its_adapter_the_stored_key_and_nothing_else_carries_it() {
+    let f = fixture(None);
+    f.llm.run_once(f.post_call()).await.unwrap();
+    let got = f.scripted.received();
+    assert_eq!(got[0].key.as_ref().map(Secret::expose), Some(ANTHROPIC_KEY));
+    let audit = f.row("SELECT * FROM audit_log");
+    let run = f.row("SELECT * FROM llm_runs");
+    let logs = serde_json::to_string(&*f.logs.lock().unwrap()).unwrap();
+    for text in [audit.to_string(), run.to_string(), logs] {
+        assert!(!text.contains(ANTHROPIC_KEY), "{text}");
+    }
+}
+
+#[tokio::test]
+async fn verifying_a_key_runs_once_on_its_runtime_with_the_candidate_through_the_gate() {
+    let f = fixture(None);
+    f.secrets.remove("anthropic").unwrap();
+    let candidate = Secret::new("sk-ant-candidate".into());
+    f.llm
+        .verify_key(RuntimeChoice::ClaudeApiKey, candidate, cloud())
+        .await
+        .unwrap();
+    let got = f.scripted.received();
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].runtime, RuntimeChoice::ClaudeApiKey);
+    assert_eq!(got[0].skill, "ask-answer");
+    assert_eq!(
+        got[0].key.as_ref().map(Secret::expose),
+        Some("sk-ant-candidate")
+    );
+    // Nothing of the user's leaves with a verification.
+    let sent: Value = serde_json::from_slice(&got[0].bytes).unwrap();
+    assert_eq!(sent["items"], json!([]));
+    assert_eq!(f.count("SELECT COUNT(*) FROM audit_log"), 1);
+    assert_eq!(f.count("SELECT COUNT(*) FROM llm_runs"), 1);
+    let audit = f.row("SELECT * FROM audit_log").to_string();
+    assert!(!audit.contains("sk-ant-candidate"));
+    // The router never stores a candidate: the caller does, once it is accepted.
+    assert_eq!(f.secrets.get("anthropic").unwrap(), None);
+}
+
+#[tokio::test]
+async fn a_rejected_candidate_fails_with_the_runtime_code_on_that_runtime_only() {
+    let f = fixture(Some(r#"{"on": "ask-answer", "fail": "key_rejected"}"#));
+    let candidate = Secret::new("sk-ant-bad".into());
+    let failure = f
+        .llm
+        .verify_key(RuntimeChoice::ClaudeApiKey, candidate, cloud())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        failure,
+        Failure::Runtime {
+            code: "key_rejected".into()
+        }
+    );
+    assert_eq!(f.scripted.received().len(), 1);
+    // A candidate's rejection says nothing about the stored key.
+    assert!(f.rejected.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn an_answer_that_fails_validation_still_means_the_key_was_accepted() {
+    let bad = r#"{"on": "ask-answer", "output": {"nope": 1}}"#;
+    let f = fixture(Some(&[bad, bad, bad].join("\n")));
+    let candidate = Secret::new("sk-ant-candidate".into());
+    f.llm
+        .verify_key(RuntimeChoice::CodexApiKey, candidate, cloud())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn verification_under_local_only_privacy_or_offline_sends_nothing() {
+    let f = fixture(None);
+    let local = Privacy {
+        mode: PrivacyMode::LocalOnly,
+        ..cloud()
+    };
+    let offline = Privacy {
+        offline: true,
+        ..cloud()
+    };
+    for privacy in [local, offline] {
+        let candidate = Secret::new("sk-ant-candidate".into());
+        let failure = f
+            .llm
+            .verify_key(RuntimeChoice::ClaudeApiKey, candidate, privacy)
+            .await
+            .unwrap_err();
+        assert!(matches!(failure, Failure::Unavailable(_)), "{failure:?}");
+    }
+    assert!(f.scripted.received().is_empty());
+    assert_eq!(f.count("SELECT COUNT(*) FROM audit_log"), 0);
+}
+
+#[tokio::test]
+async fn the_provider_rejecting_the_stored_key_is_reported_once_per_run() {
+    let f = fixture(Some(r#"{"on": "post-call", "fail": "key_rejected"}"#));
+    let failure = f.llm.run_once(f.post_call()).await.unwrap_err();
+    assert!(matches!(failure, Failure::Runtime { .. }));
+    assert_eq!(*f.rejected.lock().unwrap(), [RuntimeChoice::ClaudeApiKey]);
 }
