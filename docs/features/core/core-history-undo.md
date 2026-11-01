@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-history-undo`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-history-undo`
 
-- [ ] `p3` - `cpt-noter-feature-core-history-undo`
+- [x] `p3` - `cpt-noter-feature-core-history-undo`
 
 ## 1. Feature Context
 
@@ -220,4 +220,4 @@ The system **MUST** pass unit tests for reversal ordering, partial batches, stal
 - [x] Irreversible audio deletion returns `not_undoable`; proposed rows are not applied by these commands.
 - [x] Unit tests inject a commit failure and prove no partial restoration or orphan log row is visible.
 - [x] Conformance against fake and real cores checks window scope, typed errors, page shape and undo results; real-core E2E successfully calls each of the four commands, including an export via the native panel seam.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.

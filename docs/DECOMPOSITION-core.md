@@ -1136,9 +1136,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.20 History, undo and redo - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-history-undo`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-history-undo`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-history-undo.md](features/core/core-history-undo.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#232 #238 #249). FEATURE spec: [features/core/core-history-undo.md](features/core/core-history-undo.md)
 
 - **Purpose**: Make every logged change readable and reversible: undo and redo by change or batch at any time, skipping rows edited later, and the History read model and export.
 
@@ -1156,7 +1156,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-single-writer`
+  - `cpt-noter-principle-core-single-writer`
 
 - **Design Constraints Covered**:
 
@@ -1167,7 +1167,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-changelog`
+  - `cpt-noter-component-core-changelog`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `history_list`, `change_undo`, `change_redo`, `history_export`
