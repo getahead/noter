@@ -263,7 +263,6 @@ jobs:
     permissions:
       contents: read
       actions: read
-      pull-requests: write
     env:
       SPECS: ${{ needs.changes.outputs.e2e_specs }}
       BASELINE: ${{ needs.changes.outputs.e2e_baseline }}
@@ -301,16 +300,37 @@ jobs:
           if [ -n "$BASELINE" ]; then args=(--baseline 'coverage/main/commands-*.json' --rerun-specs "$SPECS"); fi
           if [ -n "$BASELINE" ] && [ "$CORE_RAN" = true ]; then args+=(--rerun-conformance); fi
           python3 scripts/harness/e2e_coverage.py "${args[@]}" | tee coverage/e2e-report.md
-      # The two sides' numbers on the pull request: one comment, updated by every run.
-      - name: E2E coverage on the pull request
-        if: always() && github.event_name == 'pull_request' && hashFiles('coverage/e2e-report.md') != ''
-        continue-on-error: true # a fork's token cannot comment; the job summary has the same report
+      - if: always() && hashFiles('coverage/e2e-report.md') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: coverage/e2e-report.md
+
+  # The two sides' numbers on the pull request: one comment, updated by every run. Its own job, so the
+  # write token never meets the pull request's code (nothing is checked out here).
+  e2e-report:
+    name: E2E coverage on the pull request
+    needs: [changes, e2e-coverage]
+    if: always() && needs.changes.result == 'success' && fromJSON(needs.changes.outputs.jobs)['e2e-report']
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - id: report
+        if: github.event_name == 'pull_request' && needs.e2e-coverage.result != 'skipped'
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: e2e-report
+          path: report
+      - if: steps.report.outcome == 'success'
+        continue-on-error: true # a fork's token cannot comment; the e2e-coverage summary has the same report
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
         run: |
           marker='<!-- noter-e2e-coverage -->'
-          body="$marker"$'\n'"$(cat coverage/e2e-report.md)"
+          body="$marker"$'\n'"$(cat report/e2e-report.md)"
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
             -q ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -n 1)
           if [ -n "$id" ]; then gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
@@ -397,7 +417,7 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, lint-rust, lint-ui, contract, arch, unit-rust, unit-ui, e2e-core, e2e-ui, e2e-coverage, visual, docs, macos]
+    needs: [changes, lint-rust, lint-ui, contract, arch, unit-rust, unit-ui, e2e-core, e2e-ui, e2e-coverage, e2e-report, visual, docs, macos]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -158,7 +158,7 @@ def touched_specs(files: list[str], ci: dict, root: Path = ROOT) -> str:
         if not any(a in PLAYWRIGHT for a in areas) or matches_any(f, NOT_FLOWS):
             continue
         if f.startswith(SPEC_DIR) and f.endswith(".spec.ts"):
-            specs.add(f)  # a deleted spec is passed too: Playwright then finds no test in it and fails loudly
+            specs.add(f)  # a deleted spec too: nothing runs (--pass-with-no-tests) and main's results for it are dropped
             continue
         owners = [feat for feat in features if matches_any(f, feat["code"])]
         if not owners:

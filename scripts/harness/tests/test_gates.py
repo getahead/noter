@@ -758,8 +758,8 @@ class CiChangesTests(unittest.TestCase):
         unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
         self.assertEqual(unknown, [])
 
-    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "visual", "docs"}
-    BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "docs", "macos"}
+    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "docs"}
+    BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "e2e-report", "docs", "macos"}
 
     def test_frontend_only_change_runs_the_ui_side(self):
         # The real-core run is skipped; e2e-coverage judges main's real-core logs (ci.yml).
@@ -799,7 +799,7 @@ class CiChangesTests(unittest.TestCase):
     def test_docs_change_runs_only_docs_and_trace(self):
         self.assertEqual(self.run_jobs(["docs/PRD.md"]), {"arch", "docs"})
         # Its stories set the bar; the suites and code are main's, so main's logs are judged again.
-        self.assertEqual(self.run_jobs(["docs/DESIGN.md"]), {"arch", "docs", "e2e-coverage"})
+        self.assertEqual(self.run_jobs(["docs/DESIGN.md"]), {"arch", "docs", "e2e-coverage", "e2e-report"})
 
     def test_tauri_host_is_not_ui(self):
         jobs = self.run_jobs(["apps/desktop/src-tauri/src/main.rs"])

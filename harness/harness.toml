@@ -246,6 +246,7 @@ unit-ui = ["ui", "protocol"]
 e2e-core = ["rust", "protocol", "e2e-suites"]
 e2e-ui = ["ui", "protocol"]
 e2e-coverage = ["rust", "ui", "protocol", "stories"]
+e2e-report = ["rust", "ui", "protocol", "stories"]   # posts e2e-coverage's report on the pull request
 # Screenshots render the UI over the fake world (contracts/fixtures): a noter-protocol change
 # reaches them only through the regenerated contracts/** and bindings.ts, which `contract` enforces.
 visual = ["ui", "contracts"]
