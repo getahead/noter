@@ -6,7 +6,8 @@
 //! (`ALLOW_WITHOUT_AUDIT`, group `model_downloads`) and an HTTP range fetcher that never leaves it,
 //! not even through a redirect; the caller (noter-core's download task) verifies each file's
 //! sha256. M2 adds the LLM runtimes behind the audited provider path: [`Llm`] implements
-//! [`LlmRuntime`] (routing, the egress gate, validation), with the scripted runtime for tests.
+//! [`LlmRuntime`] (routing, the egress gate, validation) over Claude Code and Codex run locked
+//! down, Ollama on localhost, and the scripted runtime for tests.
 
 use std::time::Duration;
 
@@ -21,12 +22,14 @@ mod route;
 mod runtime;
 mod validate;
 
+pub use adapters::cli::CliConfig;
+pub use adapters::ollama::OllamaConfig;
 pub use adapters::scripted::{Received, Scripted};
 pub use gate::Adapters;
 pub use runtime::{
     Availability, Budget, Cancel, Failure, Llm, LlmRuntime, Packet, PacketItem, Privacy,
     Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind, TaskSettings,
-    Usage, Validated,
+    Tested, Usage, Validated,
 };
 
 #[cfg(test)]

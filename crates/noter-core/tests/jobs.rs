@@ -126,3 +126,50 @@ async fn the_capture_guard_holds_archive_work_the_core_queued() {
         .unwrap();
     assert_eq!(last.status, JobRunStatus::Succeeded);
 }
+
+struct Battery(std::sync::atomic::AtomicBool);
+
+impl noter_jobs::PowerSource for Battery {
+    fn on_battery(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+// @cpt-dod:cpt-noter-dod-core-jobs-scheduler-scheduling:p1
+#[tokio::test(start_paused = true)]
+async fn the_cores_power_source_holds_archive_work_on_battery_until_mains_returns() {
+    use std::sync::atomic::Ordering;
+    let dir = tempfile::tempdir().unwrap();
+    let events = Arc::new(Events::default());
+    let power = Arc::new(Battery(std::sync::atomic::AtomicBool::new(true)));
+    let core = Arc::new(
+        Core::open(
+            dir.path(),
+            CoreDeps::new(Arc::new(FixedClock), events.clone()).with_power(power.clone()),
+        )
+        .unwrap(),
+    );
+    core.start_first_run();
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    let req = Request::for_call(
+        JobKind::ArchivePass,
+        Trigger::AfterCall,
+        &CallId::new("call_1"),
+    );
+    let id = core.scheduler().trigger(req).unwrap().expect("queued");
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    let status = |events: &Events| {
+        events
+            .progress()
+            .into_iter()
+            .map(|p| p.run)
+            .rfind(|r| r.id == id)
+            .unwrap()
+            .status
+    };
+    assert_eq!(status(&events), JobRunStatus::Queued);
+    power.0.store(false, Ordering::SeqCst);
+    core.scheduler().tick();
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    assert_eq!(status(&events), JobRunStatus::Succeeded);
+}

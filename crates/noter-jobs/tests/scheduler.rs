@@ -176,7 +176,7 @@ async fn rig() -> Rig {
     for kind in KINDS {
         r.sched.define(kind).unwrap();
     }
-    r.sched.start().await.unwrap();
+    r.sched.start().unwrap();
     r
 }
 
@@ -672,7 +672,7 @@ async fn restart_fails_unfinished_runs_and_queues_a_retry() {
     let dir = tempfile::tempdir().unwrap();
     let store = open_store(&dir);
     let mut r = rig_on(dir, store.clone(), 1_000);
-    r.sched.start().await.unwrap();
+    r.sched.start().unwrap();
     let running = r.go(r.post_call("call_1"));
     settle().await;
     r.live(true, None);
@@ -691,7 +691,7 @@ async fn restart_fails_unfinished_runs_and_queues_a_retry() {
     let dir = r.dir;
     drop(r.sched);
     let r2 = rig_on(dir, store, 9_000);
-    r2.sched.start().await.unwrap();
+    r2.sched.start().unwrap();
     settle().await;
     let runs = r2.sched.runs().unwrap();
     let old = runs.iter().find(|x| x.id == running).unwrap();

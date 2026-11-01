@@ -20,7 +20,7 @@ use crate::runtime::{tests_support, RequestState};
 use crate::validate::validate;
 use crate::{
     Availability, Budget, Failure, Llm, LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill,
-    SourceClass, TaskKind, TaskSettings,
+    SourceClass, TaskKind, TaskSettings, Tested,
 };
 
 const NORMAL_TEXT: &str =
@@ -555,6 +555,33 @@ fn an_unknown_cli_major_is_refused() {
     assert!(
         matches!(e.detail, Some(ErrorDetail::CliVersion { ref found, .. }) if found == "9.0.1")
     );
+}
+
+#[test]
+fn a_version_outside_the_tested_range_is_refused_within_a_tested_major() {
+    let mut available = without(&all_available(), &[RuntimeChoice::Local]);
+    for a in &mut available {
+        a.tested = Some(Tested {
+            min: [1, 2, 0],
+            below: [1, 3, 0],
+        });
+        a.version = Some("1.1.9".into());
+    }
+    let configured = Some(RuntimeChoice::ClaudeApiKey);
+    let chosen = choose(TaskKind::PostCall, configured, &available, cloud());
+    let Err(Failure::Unavailable(e)) = chosen else {
+        panic!("{chosen:?}")
+    };
+    assert_eq!(e.code, ErrorCode::CliVersionUnsupported);
+    let Some(ErrorDetail::CliVersion { supported, .. }) = e.detail else {
+        panic!("{:?}", e.detail)
+    };
+    assert_eq!(supported, ">=1.2.0, <1.3.0");
+    for a in &mut available {
+        a.version = Some("1.2.7".into());
+    }
+    let chosen = choose(TaskKind::PostCall, configured, &available, cloud());
+    assert_eq!(chosen.unwrap(), RuntimeChoice::ClaudeApiKey);
 }
 
 #[test]

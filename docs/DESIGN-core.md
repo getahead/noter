@@ -2613,7 +2613,7 @@ Maintenance jobs and their settings; runs in `job_runs`. Change from the PRD: `n
 | Column | Type | Description |
 |--------|------|-------------|
 | id | TEXT | `job_` id |
-| kind | TEXT | Job kind |
+| kind | TEXT UNIQUE | Job kind; one definition per kind (TL-24) |
 | trigger, schedule | TEXT | When it runs |
 | enabled, allow_on_battery | INTEGER | Settings |
 | last_run_at | INTEGER NULL | Epoch ms |
@@ -2622,7 +2622,7 @@ Maintenance jobs and their settings; runs in `job_runs`. Change from the PRD: `n
 
 **Constraints**: —
 
-**Additional info**: `job_runs` (id, job_id, started_at, finished_at, status, counts JSON, error_code, progress)
+**Additional info**: `job_runs` (id, job_id, subject, started_at, finished_at, status, counts JSON, error_code, progress); `subject` is the call or model id a run works on, NULL when none, and keys per-call dedup and cancel-on-continue (TL-24)
 
 **Example**:
 

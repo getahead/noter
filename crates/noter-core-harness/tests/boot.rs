@@ -1543,3 +1543,46 @@ async fn a_start_from_the_menu_uses_up_a_seeded_detection() {
     assert_eq!(snap["detection"]["detection"], Value::Null, "{snap}");
     r.finish().await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn power_battery_holds_the_jobs_that_need_mains_and_the_flag_parses() {
+    use noter_core::{Request, Trigger};
+    use noter_protocol::model::{JobKind, JobRunStatus};
+    let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert!(
+        Options::parse(&args(&["--power", "battery"]))
+            .unwrap()
+            .battery
+    );
+    assert!(!Options::parse(&args(&["--power", "ac"])).unwrap().battery);
+    assert!(Options::parse(&args(&["--power", "solar"])).is_err());
+    for (battery, wanted) in [
+        (true, JobRunStatus::Queued),
+        (false, JobRunStatus::Succeeded),
+    ] {
+        let r = start_with(Options {
+            fixture: false,
+            fixed_clock: true,
+            battery,
+            ..Options::default()
+        })
+        .await;
+        let req = Request::for_call(
+            JobKind::ArchivePass,
+            Trigger::AfterCall,
+            &noter_protocol::CallId::new("call_1"),
+        );
+        let id = r.core.scheduler().trigger(req).unwrap().expect("queued");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let run = r
+            .core
+            .scheduler()
+            .runs()
+            .unwrap()
+            .into_iter()
+            .find(|x| x.id == id)
+            .unwrap();
+        assert_eq!(run.status, wanted, "battery = {battery}");
+        r.finish().await;
+    }
+}

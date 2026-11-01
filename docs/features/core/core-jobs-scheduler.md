@@ -31,6 +31,7 @@ design: docs/DESIGN-core.md
   - [Scheduling and interruption](#scheduling-and-interruption)
   - [Bounded logged work and tests](#bounded-logged-work-and-tests)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [7. M2 decisions](#7-m2-decisions)
 
 <!-- /toc -->
 
@@ -43,6 +44,8 @@ design: docs/DESIGN-core.md
 ### 1.1 Overview
 
 `noter-jobs` gains durable job definitions and runs, trigger dispatch, priorities, battery guards and progress. M2 runs PostCall, ArchivePass, Regeneration and model download, and provides the CLI-install job handler for its M3 command. Maintenance, evidence, retention and the Jobs UI commands remain M5. The previous call's PostCall runs at low priority during another live call; archive, regeneration and all other jobs wait.
+
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** One migration per PR that first writes a table, named `000N_<tables>.sql` in merge order; `jobs` and `job_runs` are noter-db v3 and `models_download` moves onto the scheduler without changing its M0 contract (TL-22). The previous call's PostCall keeps running at low priority during a live call; everything else pauses at a checkpoint, and the session manager publishes capture state through one `CaptureGuard` watch channel that the scheduler never bypasses (TL-23). `job_runs.subject` (the call or model id a run works on, NULL when none) and `jobs.kind UNIQUE` stay, because per-call dedup and cancel-on-continue need them (TL-24; DESIGN-core `cpt-noter-dbtable-jobs`). Job definitions are created lazily on the first `define` or `trigger` (seeding at startup would add `job` change rows), the nightly window hours are UTC, and battery state comes through a `PowerSource` seam that defaults to mains until 2.21.
 
 ### 1.2 Purpose
 
@@ -177,7 +180,7 @@ Terminal runs are retained; retries create a new run linked to the same job defi
 
 ### Scheduling and interruption
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-jobs-scheduler-scheduling`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-jobs-scheduler-scheduling`
 
 The system **MUST** persist job definitions and run state, enforce trigger and battery settings, wait or pause during live calls except for the previous call's low-priority PostCall, and cancel obsolete work on Continue Recording. Pipeline handlers cover post-call, archive, regeneration, model download and CLI install without adding later-milestone commands to M2.
 
@@ -194,7 +197,7 @@ The system **MUST** persist job definitions and run state, enforce trigger and b
 
 ### Bounded logged work and tests
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-jobs-scheduler-batches`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-jobs-scheduler-batches`
 
 The system **MUST** use logged batches of at most 200 rows, yield between them and persist truthful progress and errors. Unit tests use a deterministic clock, power source and controllable worker to prove guard combinations, deduplication, pause, resume, cancellation, failure and restart. Event conformance and real-core post-call E2E prove the integration; no story is counted twice. `just gate` passes.
 
@@ -208,10 +211,18 @@ The system **MUST** use logged batches of at most 200 rows, yield between them a
 
 ## 6. Acceptance Criteria
 
-- [ ] A second capture leaves the previous call's PostCall running at low priority and its archive and regeneration waiting or paused; live ASR keeps priority.
-- [ ] Continue Recording cancels the same call's pipeline, rejects late results and queues a fresh generation at the next stop.
-- [ ] Battery, trigger and enabled settings are tested independently; no-battery jobs resume when power allows.
-- [ ] No transaction changes more than 200 target rows per batch; rollback leaves prior committed batches intact and progress truthful.
-- [ ] Startup reconciles interrupted runs; worker failure and cancellation produce terminal progress events with typed errors or counts.
+- [x] A second capture leaves the previous call's PostCall running at low priority and its archive and regeneration waiting or paused; live ASR keeps priority.
+- [x] Continue Recording cancels the same call's pipeline, rejects late results and queues a fresh generation at the next stop.
+- [x] Battery, trigger and enabled settings are tested independently; no-battery jobs resume when power allows.
+- [x] No transaction changes more than 200 target rows per batch; rollback leaves prior committed batches intact and progress truthful.
+- [x] Startup reconciles interrupted runs; worker failure and cancellation produce terminal progress events with typed errors or counts.
 - [ ] Event conformance and the post-call feature's real-core story E2E pass; setup model downloads still satisfy the M0 contract.
 - [ ] `just gate` passes.
+
+## 7. M2 decisions
+
+- `job_runs.subject` (TEXT, nullable) holds the work a run is for (a call id; a download generation), so one pending run per kind and subject is the deduplication key.
+- Job definitions are created lazily with their defaults the first time a kind is triggered; there is no seeding migration.
+- The nightly window is read in UTC hours (`"HH-HH"`, wrapping midnight); the user's time zone comes with the maintenance jobs (M5).
+- `models_download` queues one `ModelDownload` run per start (subject `download-N`); a live call holds the download (bundles show paused) and it goes on by itself when the call ends. Pausing it yourself during a call keeps it paused.
+- Power: the scheduler reads a `PowerSource` from `CoreDeps` (mains by default). The macOS battery reading arrives with 2.21 native-services; the harness answers `--power battery|ac`.
