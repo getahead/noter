@@ -82,17 +82,23 @@ fn links(target: HandoffTarget) -> &'static [LaunchPath] {
 
 // @cpt-begin:cpt-noter-flow-core-native-services-operation:p1:inst-op-plan
 /// The path a launch would take now: the target's first registered URL handler, else iTerm,
-/// else Terminal, with Automation as macOS reports it. Never opens anything or asks.
+/// else Terminal (one whose Automation is not denied first), with Automation as macOS reports
+/// it. Never opens anything or asks.
 pub fn plan_launch(sys: &impl LaunchSystem, target: HandoffTarget) -> LaunchPlan {
+    let installed: Vec<LaunchPath> = [LaunchPath::Iterm, LaunchPath::Terminal]
+        .into_iter()
+        .filter(|&p| terminal_app(p).is_some_and(|app| sys.has_app(app)))
+        .collect();
     let path = links(target)
         .iter()
         .copied()
         .find(|&p| scheme(p).is_some_and(|s| sys.has_handler(s)))
         .or_else(|| {
-            [LaunchPath::Iterm, LaunchPath::Terminal]
-                .into_iter()
-                .find(|&p| terminal_app(p).is_some_and(|app| sys.has_app(app)))
+            installed.iter().copied().find(|&p| {
+                terminal_app(p).is_some_and(|app| sys.automation(app) != PermissionState::Denied)
+            })
         })
+        .or_else(|| installed.first().copied())
         .unwrap_or(LaunchPath::None);
     let automation = terminal_app(path).map(|app| sys.automation(app));
     LaunchPlan {
