@@ -522,7 +522,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-copy
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-share:p1
     pub(crate) async fn export_calls(
         &self,
         args: ExportCallsArgs,
