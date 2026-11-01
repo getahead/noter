@@ -468,9 +468,15 @@ struct Column {
     required: bool,
 }
 
-/// The table an entity type is stored in: its own name or the plural.
+/// The table an entity type is stored in: its own name or the plural (`summary`: `summaries`).
 fn table_of(conn: &Connection, entity_type: &str) -> Result<String, CoreError> {
-    for name in [entity_type.to_string(), format!("{entity_type}s")] {
+    let ies = entity_type
+        .strip_suffix('y')
+        .map(|stem| format!("{stem}ies"));
+    for name in [entity_type.to_string(), format!("{entity_type}s")]
+        .into_iter()
+        .chain(ies)
+    {
         let found: Option<String> = conn
             .query_row(
                 "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1 AND name != 'changes'",
