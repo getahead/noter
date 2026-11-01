@@ -36,7 +36,7 @@ const label = (speakers: { id: string; label: { type: string; person?: { display
 const unnamedVoice = (w: World) => {
   const detail = w.call_details.find((d) => d.call.id === PAST_CALL)!;
   const snap = w.transcripts.find((t) => t.call_id === PAST_CALL)!;
-  const speaker = { ...structuredClone(detail.speakers[0]), id: "spk_b_3", label: { type: "unnamed", n: 3 }, named_by: null };
+  const speaker = { ...structuredClone(detail.speakers[0]), id: "spk_b_3", label: { type: "unnamed" as const, n: 3 }, named_by: null };
   const line = { ...structuredClone(snap.segments[1]), id: "seg_backend_003", text: "I think the kubernets rollout is fine", speaker: { speaker_id: "spk_b_3", label: speaker.label } };
   detail.speakers.push(speaker);
   snap.speakers.push(structuredClone(speaker));
