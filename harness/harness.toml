@@ -150,7 +150,7 @@ everything = [
 inert = [
   ".github/ISSUE_TEMPLATE/**", ".github/CODEOWNERS", ".github/dependabot.yml", ".github/rulesets/**",
   "**/.gitignore", ".idea/**", ".claude/**", ".githooks/**", ".plans/**", ".prs/**", "scripts/dev/**",
-  ".release-please-manifest.json", "release-please-config.json", "LICENSE*",
+  ".release-please-manifest.json", "release-please-config.json", "LICENSE*", "CHANGELOG.md",
 ]
 
 [ci.areas]
@@ -185,6 +185,7 @@ js-source = [
 # An area is excluded from a file that also matches one of these.
 [ci.except]
 ui = ["apps/desktop/src-tauri/**", "apps/desktop/tests/native/**"]
+docs = ["CHANGELOG.md"]   # written by release-please, checked by no job
 
 # The UI flows (Playwright, apps/desktop/tests/e2e) a pull request re-runs: the specs of the features
 # it touches. A changed spec runs itself; a code file in no feature below (shared UI, src/core, the

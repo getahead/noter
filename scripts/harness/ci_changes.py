@@ -11,7 +11,9 @@ Fails safe: a file in [ci].everything, or in no area and not in [ci].inert,
 runs every job, and so does any run that is not a pull request (a push to
 main, the nightly, a dispatch of main). A dispatched run on a PR branch (the
 Release PR, the screenshot bot) is filtered like the PR, against its merge
-base with main. If the changed files cannot be read, every job runs.
+base with main. If the changed files cannot be read, every job runs. A
+package.json whose only change is its own version (the Release PR's bump)
+counts as unchanged.
 
   ci_changes.py --workflow ci --event pull_request          # merge commit HEAD against HEAD^1
   ci_changes.py --workflow ci --event workflow_dispatch --ref lane/ui/x   # HEAD against its merge base with origin/main
@@ -34,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -202,7 +205,33 @@ def changed_files(event: str, ref: str, base_ref: str, root: Path = ROOT) -> tup
     else:
         return None, f"a {event or 'local'} run{' of ' + ref if ref else ''} checks everything"
     out = git("diff", "--name-only", "--no-renames", old, new, root=root)
-    return [line for line in out.splitlines() if line.strip()], ""
+    files = [line for line in out.splitlines() if line.strip()]
+    bumps = version_bumps(files, old, new, root)
+    return [f for f in files if f not in bumps], ""
+
+
+VERSION_LINE = re.compile(r'\s*"version":\s*"[^"]*",?\s*')
+
+
+def version_bumps(files: list[str], old: str, new: str, root: Path = ROOT) -> list[str]:
+    """The package.json files whose only change is their own top-level "version" (the Release PR's
+    bump): no job checks a version. Any other change, a dependency too, keeps the file in the plan."""
+    bumps = []
+    for f in files:
+        if Path(f).name != "package.json":
+            continue
+        diff = git("diff", "-U0", old, new, "--", f, root=root).splitlines()
+        lines = [line[1:] for line in diff if line[:1] in "+-" and not line.startswith(("+++", "---"))]
+        try:
+            before, after = (json.loads(git("show", f"{rev}:{f}", root=root)) for rev in (old, new))
+        except (HarnessError, ValueError):
+            continue  # added, deleted or not JSON
+        if not (isinstance(before, dict) and isinstance(after, dict)):
+            continue
+        same = {k: v for k, v in before.items() if k != "version"} == {k: v for k, v in after.items() if k != "version"}
+        if lines and same and all(VERSION_LINE.fullmatch(line) for line in lines):
+            bumps.append(f)
+    return bumps
 
 
 def verdict(needs: dict, expected_json: str) -> list[str]:
