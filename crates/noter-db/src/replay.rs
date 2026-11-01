@@ -357,12 +357,15 @@ fn ops(row: &Row) -> Result<Vec<Op>, CoreError> {
             .collect();
     }
     match &row.field {
-        Some(field) => Ok(vec![Op {
+        // A setting's field is a bound key; any other is spliced into SQL as a column name.
+        Some(field) if row.entity_type == "setting" || ident(field) => Ok(vec![Op {
             column: field.clone(),
             before: row.before.clone(),
             after: row.after.clone(),
         }]),
-        None => Err(unreadable("a change with neither a field nor a delta")),
+        _ => Err(unreadable(
+            "a change with neither a usable field nor a delta",
+        )),
     }
 }
 // @cpt-end:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-deltas

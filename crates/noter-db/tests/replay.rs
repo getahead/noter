@@ -598,3 +598,25 @@ fn a_row_the_log_cannot_describe_is_an_unreadable_log() {
         ErrorCode::ChangeLogUnreadable
     );
 }
+
+#[test]
+fn a_field_that_is_not_a_column_name_is_never_spliced_into_sql() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = path(&dir);
+    let store = open(&p);
+    store
+        .write(set("n1", "title", json!("a")), meta("seed"))
+        .unwrap();
+    raw(&p)
+        .execute(
+            "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, summary, reason, status)
+             VALUES ('chg_evil', 1, 'you', 'note', 'n1', 'title = 1; DROP TABLE notes; --', 'x', 'a', 's', 'r', 'applied')",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        code(undo(&store, change(&"chg_evil"))),
+        ErrorCode::ChangeLogUnreadable
+    );
+    assert_eq!(title(&store, "n1").as_deref(), Some("a"));
+}
