@@ -225,7 +225,7 @@ The system **MUST** pass Swift unit and file-mode golden-call tests, Rust superv
 **Touches**:
 - API: `cpt-noter-interface-engine-stdio`
 
-Open: the file-mode golden-call tests in English, Russian and German need `evals/golden`, and the archive quality run on the Mac runner needs the DER threshold the owner picks from #279's three options (absolute per language, relative to pyannote's pipeline, or product-facing); both are the owner's items (TL-17). The Swift unit tests (`engine/Tests/NoterEngineKitTests`: `OfflineTests`, `ArchiveTests`, `DiarizationTests`, `VectorTests`) drive the archive, VBx clustering and vector code on synthetic calls with scripted models; the Rust supervisor tests are `crates/noter-engine-client/tests/offline.rs`.
+Open: the file-mode golden-call tests in English, Russian and German need `evals/golden`, and the archive quality run on the Mac runner needs the DER threshold the owner picks from #279's three options (absolute per language, relative to pyannote's pipeline, or product-facing); both are the owner's items (TL-17). The Swift unit tests (`engine/Tests/NoterEngineKitTests`: `OfflineTests`, `ArchiveTests`, `DiarizationTests`, `VectorTests`) drive the archive, VBx clustering and vector code on synthetic calls with scripted models, and `RoundTripTests` checks the engine schema against `contracts/fixtures/engine-lines.json`; the Rust supervisor tests are `crates/noter-engine-client/tests/offline.rs`.
 
 ## 6. Acceptance Criteria
 
