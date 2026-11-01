@@ -374,7 +374,7 @@ impl Core {
     }
     // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-publish-gap-mark
 
-    fn publish_event(&self, call_id: &CallId, event: TranscriptEvent) {
+    pub(crate) fn publish_event(&self, call_id: &CallId, event: TranscriptEvent) {
         // Under the state lock like every publish, so a snapshot never falls between two.
         let _state = lock(&self.transcript.state);
         // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-deliver
@@ -432,6 +432,11 @@ impl Core {
         std::fs::rename(&tmp, dir.join("transcript.jsonl")).map_err(internal)
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
+    }
+
+    /// The call's folder under the data folder: its transcript, constraints and audio.
+    pub(crate) fn call_dir(&self, call_id: &CallId) -> PathBuf {
+        self.transcript.dir.join("audio").join(call_id.as_str())
     }
 
     fn log_error(&self, what: &str, e: &CoreError) {
@@ -654,7 +659,7 @@ pub(crate) fn segments_of(
 ) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
     let mut stmt = c.prepare(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, s.lang_p, s.avg_logprob,
-                p.id, p.label, p.n, p.named_by, s.pass, p.person_id
+                p.id, COALESCE(p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections
          FROM segments s LEFT JOIN speakers p ON p.id = s.speaker_id
          WHERE s.call_id = ?1 AND s.pass = (CASE WHEN EXISTS
                (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')
@@ -677,6 +682,7 @@ pub(crate) fn segments_of(
                     r.get(10)?,
                     named_by.as_deref(),
                     r.get::<_, Option<String>>(13)?,
+                    None,
                 ),
             },
             crosstalk_with: vec![],
@@ -692,7 +698,7 @@ pub(crate) fn segments_of(
             } else {
                 TranscriptPass::Live
             },
-            corrections: vec![],
+            corrections: serde_json::from_str(&r.get::<_, String>(14)?).unwrap_or_default(),
         })
     })?;
     let mut all = rows.collect::<Result<Vec<_>, _>>()?;
@@ -708,7 +714,7 @@ fn speakers_of(
     call_id: &CallId,
 ) -> noter_db::rusqlite::Result<Vec<(String, SpeakerView)>> {
     let mut stmt = c.prepare(
-        "SELECT id, label, n, channel, named_by, person_id FROM speakers
+        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers
          WHERE call_id = ?1 AND pass = (CASE WHEN EXISTS
                (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive')
                THEN 'archive' ELSE 'live' END)
@@ -726,6 +732,7 @@ fn speakers_of(
                 r.get(2)?,
                 named_by.as_deref(),
                 r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<String>>(6)?.as_deref(),
             ),
         };
         let mut view = speaker_view(call_id, &speaker, channel);
@@ -784,7 +791,7 @@ impl Live {
         });
         let speaker = SpeakerRef {
             speaker_id: SpeakerId::new(format!("spk_{}", ulid::Ulid::generate())),
-            label: speaker_label(channel, label, n.map(i64::from), None, None),
+            label: speaker_label(channel, label, n.map(i64::from), None, None, None),
         };
         // @cpt-begin:cpt-noter-algo-core-live-transcript-speakers:p1:inst-you
         let named_by = matches!(speaker.label, SpeakerLabel::You).then_some("you");
@@ -832,10 +839,11 @@ fn speaker_label(
     n: Option<i64>,
     named_by: Option<&str>,
     person_id: Option<String>,
+    name: Option<&str>,
 ) -> SpeakerLabel {
     if let Some(id) = person_id {
         return SpeakerLabel::Person {
-            person: chip(id, label),
+            person: chip(id, name.unwrap_or(label)),
         };
     }
     match channel {

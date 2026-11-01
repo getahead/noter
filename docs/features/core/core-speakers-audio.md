@@ -80,7 +80,7 @@ A name or term corrected once stays corrected after offline transcription, and d
 
 ### Name a speaker live or after the call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-name`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-name`
 
 **Actor**: Primary user (main window or call screen)
 
@@ -92,16 +92,16 @@ A name or term corrected once stays corrected after offline transcription, and d
 - Call, speaker or scoped segment is missing: `not_found`; a segment or speaker from another call is `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `transcript_rename_speaker { call_id, speaker_id, person, scope }` or `transcript_name_speakers { call_id, assignments }` - `inst-name-request`
-2. [ ] - `p1` - Validate every speaker and optional segment belongs to the call; resolve existing `PersonRef` values or create the named person as part of the same logged batch - `inst-name-validate`
-3. [ ] - `p1` - Leave null assignments unchanged; for each actual assignment run `cpt-noter-algo-core-speakers-audio-correct` - `inst-name-correct`
-4. [ ] - `p1` - Commit one logged batch, then publish changed speakers and segments and whole affected entities; return `SpeakerMutation` with its undo handle - `inst-name-publish`
-5. [ ] - `p1` - Keep text-only naming available when audio is gone; sample replay uses existing `audio_play` when available - `inst-name-no-audio`
-6. [ ] - `p1` - **RETURN** names and counts through the existing view models; undo uses `change_undo` - `inst-name-return`
+1. [x] - `p1` - API: `transcript_rename_speaker { call_id, speaker_id, person, scope }` or `transcript_name_speakers { call_id, assignments }` - `inst-name-request`
+2. [x] - `p1` - Validate every speaker and optional segment belongs to the call; resolve existing `PersonRef` values or create the named person as part of the same logged batch - `inst-name-validate`
+3. [x] - `p1` - Leave null assignments unchanged; for each actual assignment run `cpt-noter-algo-core-speakers-audio-correct` - `inst-name-correct`
+4. [x] - `p1` - Commit one logged batch, then publish changed speakers and segments and whole affected entities; return `SpeakerMutation` with its undo handle - `inst-name-publish`
+5. [x] - `p1` - Keep text-only naming available when audio is gone; sample replay uses existing `audio_play` when available - `inst-name-no-audio`
+6. [x] - `p1` - **RETURN** names and counts through the existing view models; undo uses `change_undo` - `inst-name-return`
 
 ### Correct a term and teach future decoding
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-term`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-term`
 
 **Actor**: Primary user (main window or call screen)
 
@@ -112,12 +112,12 @@ A name or term corrected once stays corrected after offline transcription, and d
 - A range no longer fits the segment or crosses invalid text boundaries: `invalid_input`; a deleted segment: `not_found`.
 
 **Steps**:
-1. [ ] - `p1` - API: `transcript_fix_term { call_id, segment_id, range, replacement, add_to_glossary }` - `inst-term-request`
-2. [ ] - `p1` - On the writer, validate call membership, range and replacement; apply the replacement and record its original text - `inst-term-validate`
-3. [ ] - `p1` - DB: UPDATE `segments` text, normalized shadow text and corrections; when requested, upsert the glossary term in the same logged operation - `inst-term-write`
-4. [ ] - `p1` - Commit, refresh the per-call transcript file and indexes, send `segments_updated` and `entity:changed`, and update the engine glossary for future decoding - `inst-term-publish`
-5. [ ] - `p1` - Record reconciliation intent for earlier calls without rewriting them; return `proposal_queued` truthfully for work queued, with processing and proposal controls deferred to M5 - `inst-term-reconcile`
-6. [ ] - `p1` - **RETURN** `FixTermResult` with segment, change id and optional glossary term id - `inst-term-return`
+1. [x] - `p1` - API: `transcript_fix_term { call_id, segment_id, range, replacement, add_to_glossary }` - `inst-term-request`
+2. [x] - `p1` - On the writer, validate call membership, range and replacement; apply the replacement and record its original text - `inst-term-validate`
+3. [x] - `p1` - DB: UPDATE `segments` text, normalized shadow text and corrections; when requested, upsert the glossary term in the same logged operation - `inst-term-write`
+4. [x] - `p1` - Commit, refresh the per-call transcript file and indexes, send `segments_updated` and `entity:changed`, and update the engine glossary for future decoding - `inst-term-publish`
+5. [x] - `p1` - Record reconciliation intent for earlier calls without rewriting them; return `proposal_queued` truthfully for work queued, with processing and proposal controls deferred to M5 - `inst-term-reconcile`
+6. [x] - `p1` - **RETURN** `FixTermResult` with segment, change id and optional glossary term id - `inst-term-return`
 
 ### Delete audio permanently
 
@@ -144,20 +144,20 @@ A name or term corrected once stays corrected after offline transcription, and d
 
 ### Apply a correction that survives archive clustering
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-speakers-audio-correct`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-speakers-audio-correct`
 
 **Input**: Validated person assignment, speaker, whole-call or one-segment scope, current transcript and dependent records.
 
 **Output**: A logged correction batch and persisted archive constraints.
 
 **Steps**:
-1. [ ] - `p1` - Load the selected speaker's segments and existing corrections on the writer - `inst-correct-load`
-2. [ ] - `p1` - **IF** scope is one segment, split its assignment from the original cluster without renaming other segments - `inst-correct-split`
-3. [ ] - `p1` - Store the user's mapping and must-link or cannot-link constraints in `speaker_constraints`, tied to channel and time spans so archive segment ids may change - `inst-correct-constraints`
-4. [ ] - `p1` - DB: UPDATE affected speaker mappings and segment references, call participants and derived owner attribution; refresh per-participant and generated name references without replacing user-written prose - `inst-correct-propagate`
-5. [ ] - `p1` - Keep the user's name ahead of calendar or voice suggestions; never enroll or update a voice profile implicitly - `inst-correct-no-enroll`
-6. [ ] - `p1` - Log the complete batch for reversal; refresh `transcript.jsonl` after commit and flag wording that can improve through explicit regeneration - `inst-correct-log`
-7. [ ] - `p1` - **RETURN** updated speaker views and the change handle - `inst-correct-return`
+1. [x] - `p1` - Load the selected speaker's segments and existing corrections on the writer - `inst-correct-load`
+2. [x] - `p1` - **IF** scope is one segment, split its assignment from the original cluster without renaming other segments - `inst-correct-split`
+3. [x] - `p1` - Store the user's mapping and must-link or cannot-link constraints in `speaker_constraints`, tied to channel and time spans so archive segment ids may change - `inst-correct-constraints`
+4. [x] - `p1` - DB: UPDATE affected speaker mappings and segment references, call participants and derived owner attribution; refresh per-participant and generated name references without replacing user-written prose - `inst-correct-propagate`
+5. [x] - `p1` - Keep the user's name ahead of calendar or voice suggestions; never enroll or update a voice profile implicitly - `inst-correct-no-enroll`
+6. [x] - `p1` - Log the complete batch for reversal; refresh `transcript.jsonl` after commit and flag wording that can improve through explicit regeneration - `inst-correct-log`
+7. [x] - `p1` - **RETURN** updated speaker views and the change handle - `inst-correct-return`
 
 ## 4. States (CDSL)
 
@@ -180,7 +180,7 @@ No reversal restores deleted audio. Nightly retention uses the same deletion pat
 
 ### Corrections and naming
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-corrections`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-corrections`
 
 The system **MUST** name speakers at call or line scope, accept batch naming with skips, create a person from `PersonRef` without the M3 person commands, and fix terms with optional glossary teaching. All affected records and correction constraints must be logged together, reflected in other windows and written to the per-call transcript after commit. A rename must not create a voice profile.
 

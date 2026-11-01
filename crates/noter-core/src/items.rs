@@ -115,7 +115,7 @@ fn sql_of(v: &Value) -> Sql {
 pub(crate) fn owner_chip(c: &Connection, person_id: &str) -> Db<PersonChip> {
     let label: Option<String> = c
         .query_row(
-            "SELECT label FROM speakers WHERE person_id = ?1 ORDER BY rowid DESC LIMIT 1",
+            "SELECT COALESCE(name, label) FROM speakers WHERE person_id = ?1 ORDER BY rowid DESC LIMIT 1",
             [person_id],
             |r| r.get(0),
         )
