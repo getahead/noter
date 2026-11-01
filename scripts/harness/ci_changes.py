@@ -127,10 +127,12 @@ class Repo:
 
 def apply_repo(p: Plan, repo: Repo) -> Plan:
     """ci.yml only: the macOS job needs something to build, and with XCUITests the E2E bar
-    is judged over the Linux and the macOS runs together, so they run as one."""
+    is judged over the Linux and the macOS runs together: the XCUITests drive the built app
+    (UI and core), so any E2E run brings the macOS run and the judgement with it. A skipped
+    real-core run is judged on main's logs (e2e-coverage in ci.yml)."""
     jobs = dict(p.jobs)
-    if repo.native_tests and (jobs.get("e2e") or jobs.get("e2e-coverage") or jobs.get("macos")):
-        jobs.update({"e2e": True, "e2e-coverage": True, "macos": True})
+    if repo.native_tests and any(jobs.get(j) for j in ("e2e-core", "e2e-ui", "e2e-coverage", "macos")):
+        jobs.update({"e2e-coverage": True, "macos": True})
     if not (repo.engine or repo.tauri):
         jobs["macos"] = False
     return Plan(p.workflow, jobs, p.reason, p.files, p.areas)

@@ -109,10 +109,12 @@ jobs:
       - name: Trace coverage (never lower than main)
         run: just trace
 
-  unit:
-    name: Unit tests and coverage (80%)
+  # Unit tests split by side: each judges its own side at 80% total and on its changed lines.
+  # A side no changed file belongs to is not run: its code and tests are main's, judged there.
+  unit-rust:
+    name: Rust unit tests and coverage (80%)
     needs: changes
-    if: fromJSON(needs.changes.outputs.jobs)['unit']
+    if: fromJSON(needs.changes.outputs.jobs)['unit-rust']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -121,21 +123,41 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
+          node: "false"
           tools: just,cargo-llvm-cov
-      - run: just cov-unit
+      - run: just cov-unit-rust
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: coverage-unit
-          path: |
-            coverage/unit
-            apps/desktop/coverage/unit
+          name: coverage-unit-rust
+          path: coverage/unit
           if-no-files-found: ignore
 
-  e2e:
-    name: End-to-end tests
+  unit-ui:
+    name: UI unit tests and coverage (80%)
     needs: changes
-    if: fromJSON(needs.changes.outputs.jobs)['e2e']
+    if: fromJSON(needs.changes.outputs.jobs)['unit-ui']
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          rust: "false"
+      - run: just cov-unit-ui
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-unit-ui
+          path: apps/desktop/coverage/unit
+          if-no-files-found: ignore
+
+  e2e-core:
+    name: End-to-end tests (real core)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['e2e-core']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -149,7 +171,8 @@ jobs:
           echo "NOTER_CORE_CMD=$PWD/target/debug/noter-core-harness --fixture world" >> "$GITHUB_ENV"
       - name: Browsers for the UI flows
         run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
-      - run: just e2e-tests
+      - run: just e2e-core
+      # The logs e2e-coverage judges; a PR that skips this job is judged on main's (same name).
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-logs
@@ -158,27 +181,66 @@ jobs:
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
+          name: playwright-report-core
           path: apps/desktop/playwright-report
           if-no-files-found: ignore
 
-  e2e-coverage:
-    name: E2E coverage (60%)
-    # Judged over the Linux run and the macos job's XCUITest run together (stories and commands
-    # proven against the built app count too, HARNESS.md); the two test jobs run in parallel.
-    needs: [changes, e2e, macos]
-    if: >-
-      !cancelled() && fromJSON(needs.changes.outputs.jobs)['e2e-coverage'] && needs.e2e.result == 'success' &&
-      (needs.macos.result == 'success' || needs.macos.result == 'skipped')
+  e2e-ui:
+    name: End-to-end tests (fake world)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.jobs)['e2e-ui']
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: ./.github/actions/setup
+        with:
+          rust: "false"
+      - name: Browsers for the UI flows
+        run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
+      - run: just e2e-ui
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-ui
+          path: apps/desktop/playwright-report
+          if-no-files-found: ignore
+
+  e2e-coverage:
+    name: E2E coverage (60%)
+    # Judged over the real-core logs and the macos job's XCUITest run together (stories and commands
+    # proven against the built app count too, HARNESS.md). Runs against the fake world never count,
+    # so e2e-ui is not waited for. When this change cannot reach the real core (e2e-core skipped),
+    # the real-core logs are those of the latest successful CI run on main.
+    needs: [changes, e2e-core, macos]
+    if: >-
+      !cancelled() && fromJSON(needs.changes.outputs.jobs)['e2e-coverage'] &&
+      (needs.e2e-core.result == 'success' || needs.e2e-core.result == 'skipped') &&
+      (needs.macos.result == 'success' || needs.macos.result == 'skipped')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: fromJSON(needs.changes.outputs.jobs)['e2e-core']
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: e2e-logs
           path: coverage/e2e
+      - name: Real-core logs of the latest successful run on main
+        if: "!fromJSON(needs.changes.outputs.jobs)['e2e-core']"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success \
+            -L 1 --json databaseId -q '.[0].databaseId')
+          [ -n "$run" ] || { echo "::error::no successful CI run on main to take the real-core logs from"; exit 1; }
+          echo "Real-core logs from main's run $run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run" | tee -a "$GITHUB_STEP_SUMMARY"
+          gh run download "$run" -R "$GITHUB_REPOSITORY" -n e2e-logs -D coverage/e2e
       - name: XCUITest results from the macos job
         if: needs.changes.outputs.native_tests == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -268,7 +330,7 @@ jobs:
   gate:
     name: gate
     if: always()
-    needs: [changes, lint-rust, lint-ui, contract, arch, unit, e2e, e2e-coverage, visual, docs, macos]
+    needs: [changes, lint-rust, lint-ui, contract, arch, unit-rust, unit-ui, e2e-core, e2e-ui, e2e-coverage, visual, docs, macos]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

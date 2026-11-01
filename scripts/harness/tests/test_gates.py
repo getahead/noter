@@ -723,13 +723,38 @@ class CiChangesTests(unittest.TestCase):
         unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
         self.assertEqual(unknown, [])
 
-    def test_ui_change_skips_rust_lints_contract_and_macos(self):
-        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"]),
-                         {"lint-ui", "arch", "unit", "e2e", "e2e-coverage", "visual", "docs"})
+    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "visual", "docs"}
+    BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "docs", "macos"}
 
-    def test_rust_change_skips_typecheck_and_screenshots(self):
-        self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs"]),
-                         {"lint-rust", "arch", "unit", "e2e", "e2e-coverage", "docs", "macos"})
+    def test_frontend_only_change_runs_the_ui_side(self):
+        # The real-core run is skipped; e2e-coverage judges main's real-core logs (ci.yml).
+        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"]), self.UI_ONLY)
+
+    def test_backend_only_change_runs_the_rust_side(self):
+        # The fake world is TypeScript and never counted: a Rust change cannot change its runs or the pixels.
+        self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs"]), self.BACKEND_ONLY)
+
+    def test_both_sides_run_both_halves(self):
+        self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs", "apps/desktop/src/App.tsx"]),
+                         self.UI_ONLY | self.BACKEND_ONLY)
+
+    def test_protocol_change_touches_both_sides(self):
+        both = {"unit-rust", "unit-ui", "e2e-core", "e2e-ui", "e2e-coverage", "contract"}
+        for f in ["crates/noter-protocol/src/lib.rs", "contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
+            self.assertLessEqual(both, self.run_jobs([f]), f)
+
+    def test_screenshots_follow_the_ui_and_the_generated_contract(self):
+        # noter-protocol reaches the pixels only through the regenerated contracts/** and bindings.ts.
+        self.assertNotIn("visual", self.run_jobs(["crates/noter-protocol/src/lib.rs"]))
+        self.assertNotIn("visual", self.run_jobs(["Cargo.lock"]))
+        for f in ["contracts/fixtures/world.json", "apps/desktop/src/core/bindings.ts", "pnpm-lock.yaml"]:
+            self.assertIn("visual", self.run_jobs([f]), f)
+
+    def test_suites_that_run_against_the_real_core_run_both_halves(self):
+        for f in ["apps/desktop/tests/e2e/m1-library-calls-ui.spec.ts", "apps/desktop/tests/conformance/a.test.ts",
+                  "apps/desktop/tests/support/stdio-transport.ts", "apps/desktop/playwright.config.ts"]:
+            self.assertLessEqual({"e2e-core", "e2e-ui", "e2e-coverage"}, self.run_jobs([f]), f)
+        self.assertNotIn("e2e-core", self.run_jobs(["apps/desktop/tests/visual/primitives.spec.ts"]))
 
     def test_contract_runs_for_the_protocol_and_the_generated_files(self):
         for f in ["crates/noter-protocol/src/lib.rs", "contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
@@ -738,7 +763,8 @@ class CiChangesTests(unittest.TestCase):
 
     def test_docs_change_runs_only_docs_and_trace(self):
         self.assertEqual(self.run_jobs(["docs/PRD.md"]), {"arch", "docs"})
-        self.assertIn("e2e-coverage", self.run_jobs(["docs/DESIGN.md"]), "DESIGN.md stories feed the E2E bar")
+        # Its stories set the bar; the suites and code are main's, so main's logs are judged again.
+        self.assertEqual(self.run_jobs(["docs/DESIGN.md"]), {"arch", "docs", "e2e-coverage"})
 
     def test_tauri_host_is_not_ui(self):
         jobs = self.run_jobs(["apps/desktop/src-tauri/src/main.rs"])
@@ -780,14 +806,26 @@ class CiChangesTests(unittest.TestCase):
             ci_changes.plan([], cfg, "ci")
 
     def test_native_tests_tie_e2e_and_macos_together(self):
-        p = ci_changes.plan(["apps/desktop/src/App.tsx"], CFG, "ci")
-        tied = ci_changes.apply_repo(p, ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True))
-        self.assertTrue(tied.jobs["macos"])
+        native = ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True)
+        tied = ci_changes.apply_repo(ci_changes.plan(["apps/desktop/src/App.tsx"], CFG, "ci"), native)
+        self.assertTrue(tied.jobs["macos"] and tied.jobs["e2e-coverage"])
+        self.assertFalse(tied.jobs["e2e-core"], "the real-core run is still judged on main's logs")
         p = ci_changes.plan(["apps/desktop/src-tauri/src/main.rs"], CFG, "ci")
-        tied = ci_changes.apply_repo(p, ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True))
-        self.assertTrue(tied.jobs["e2e"] and tied.jobs["e2e-coverage"])
+        tied = ci_changes.apply_repo(p, native)
+        self.assertTrue(tied.jobs["e2e-coverage"])
+        self.assertFalse(ci_changes.apply_repo(ci_changes.plan(["docs/PRD.md"], CFG, "ci"), native).jobs["macos"])
         loose = ci_changes.apply_repo(p, ci_changes.Repo(engine=False, tauri=False, core_harness=False, native_tests=False))
         self.assertFalse(loose.jobs["macos"], "nothing to build on macOS")
+
+    def test_verdict_over_partial_runs(self):
+        # A frontend-only plan: the skipped backend half passes, a backend half that ran and failed does not.
+        p = ci_changes.plan(["apps/desktop/src/App.tsx"], CFG, "ci")
+        ok, skipped = {"result": "success"}, {"result": "skipped"}
+        needs = {"changes": ok, **{j: ok if run else skipped for j, run in p.jobs.items()}}
+        self.assertEqual(ci_changes.verdict(needs, json.dumps(p.jobs)), [])
+        self.assertEqual(ci_changes.verdict({**needs, "e2e-core": {"result": "failure"}}, json.dumps(p.jobs)),
+                         ["e2e-core: failure"])
+        self.assertEqual(ci_changes.verdict({**needs, "e2e-ui": skipped}, json.dumps(p.jobs)), ["e2e-ui: skipped"])
 
     def test_verdict(self):
         ok, skipped, failed = {"result": "success"}, {"result": "skipped"}, {"result": "failure"}
