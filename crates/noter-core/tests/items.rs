@@ -338,6 +338,7 @@ fn ids(rows: &[ItemView]) -> Vec<&str> {
 
 // ── read ──────────────────────────────────────────────────────────────────────
 
+// @cpt-dod:cpt-noter-dod-core-items-today-tests:p1
 #[tokio::test]
 async fn items_list_filters_by_call_kind_status_review_and_due() {
     let dir = tempfile::tempdir().unwrap();

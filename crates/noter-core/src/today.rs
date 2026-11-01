@@ -450,6 +450,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-tags:p1:inst-tags-list
     }
 
+    // @cpt-dod:cpt-noter-dod-core-items-today-dashboard:p1
     // @cpt-flow:cpt-noter-flow-core-items-today-dashboard:p1
     pub(crate) fn today_view(&self) -> Result<TodayView, CoreError> {
         self.ready()?;

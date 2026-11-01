@@ -274,6 +274,7 @@ fn issue_key(key: &str) -> bool {
 type Wanted = Option<Vec<(&'static str, Value)>>;
 
 impl Core {
+    // @cpt-dod:cpt-noter-dod-core-items-today-items:p1
     // @cpt-flow:cpt-noter-flow-core-items-today-read:p1
     pub(crate) fn list_items(&self, args: ItemsListArgs) -> Result<Page<ItemView>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-items-today-read:p1:inst-read-list
@@ -860,6 +861,7 @@ impl Core {
             .store()
             .read(|c| select_item(c, id))?
             .ok_or_else(not_found)?;
+        // @cpt-begin:cpt-noter-state-core-items-today-item:p1:inst-st-handoff
         let mut values = vec![
             ("status", json!("handed_off")),
             ("handoff_target", json!(name(&target))),
@@ -869,6 +871,7 @@ impl Core {
         if s.review == "suggested" {
             values.push(("review_state", json!("accepted")));
         }
+        // @cpt-end:cpt-noter-state-core-items-today-item:p1:inst-st-handoff
         self.apply(ctx, s, Some(values), "Handed off", reason)
     }
 
