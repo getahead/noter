@@ -13,7 +13,7 @@ use noter_protocol::*;
 use serde_json::json;
 
 use crate::settings::{invalid, section_of};
-use crate::{lock, object, Core};
+use crate::{lock, object, Core, SaveKind};
 
 const DEFAULT_PAGE: u32 = 100;
 const MAX_PAGE: u32 = 500;
@@ -75,55 +75,13 @@ impl Core {
             ""
         };
         binds.push(Sql::Integer(i64::from(limit) + 1));
-        let sql = format!(
-            "SELECT c.rowid, c.id, c.batch_id,
-                    CASE WHEN c.batch_id IS NULL THEN 1
-                         ELSE (SELECT count(*) FROM changes b WHERE b.batch_id = c.batch_id AND b.redo_of IS NULL) END,
-                    c.ts, c.actor, c.entity_type, c.entity_id, c.field, c.before, c.after, c.delta IS NOT NULL,
-                    c.summary, c.reason, c.confidence, c.status, c.undoable,
-                    (EXISTS (SELECT 1 FROM changes d WHERE d.entity_type = c.entity_type AND d.entity_id = c.entity_id
-                                AND d.rowid > c.rowid AND d.undoable = 0 AND d.field IS NULL AND d.delta IS NULL)
-                     OR (c.entity_type = 'segment' AND NOT EXISTS (SELECT 1 FROM segments s WHERE s.id = c.entity_id))
-                     OR (c.entity_type = 'speaker' AND NOT EXISTS (SELECT 1 FROM speakers s WHERE s.id = c.entity_id)))
-             FROM changes c WHERE {filter}{cursor_clause} ORDER BY c.rowid DESC LIMIT ?"
+        let sql = select_sql(
+            &format!("{filter}{cursor_clause}"),
+            "ORDER BY c.rowid DESC LIMIT ?",
         );
         let mut found = self
             .store()
-            .read(move |c| {
-                let mut stmt = c.prepare(&sql)?;
-                let rows = stmt
-                    .query_map(params_from_iter(binds), |r| {
-                        let id: String = r.get(1)?;
-                        let status: String = r.get(15)?;
-                        let entity_type: String = r.get(6)?;
-                        let entity_id: String = r.get(7)?;
-                        let gone: bool = r.get(17)?;
-                        Ok(Raw {
-                            rowid: r.get(0)?,
-                            batch_id: r.get(2)?,
-                            batch_size: r.get(3)?,
-                            ts: r.get(4)?,
-                            actor: r.get(5)?,
-                            field: r.get(8)?,
-                            before: r.get(9)?,
-                            after: r.get(10)?,
-                            has_delta: r.get(11)?,
-                            summary: r.get(12)?,
-                            reason: r.get(13)?,
-                            confidence: r.get(14)?,
-                            undoable: r.get(16)?,
-                            redoable: status == "undone" && noter_db::redoable(c, &id),
-                            label: label_of(c, &entity_type, &entity_id, gone),
-                            id,
-                            status,
-                            entity_type,
-                            entity_id,
-                            gone,
-                        })
-                    })?
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(rows)
-            })
+            .read(move |c| raw_rows(c, &sql, binds))
             .map_err(|e| unreadable(e.message))?;
         // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-read-select
         // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-read-return
@@ -254,9 +212,67 @@ impl Core {
     }
 }
 
+/// The History select over `filter`, then `tail` (order, limit).
+fn select_sql(filter: &str, tail: &str) -> String {
+    format!(
+        "SELECT c.rowid, c.id, c.batch_id,
+                CASE WHEN c.batch_id IS NULL THEN 1
+                     ELSE (SELECT count(*) FROM changes b WHERE b.batch_id = c.batch_id AND b.redo_of IS NULL) END,
+                c.ts, c.actor, c.entity_type, c.entity_id, c.field, c.before, c.after, c.delta IS NOT NULL,
+                c.summary, c.reason, c.confidence, c.status, c.undoable,
+                (EXISTS (SELECT 1 FROM changes d WHERE d.entity_type = c.entity_type AND d.entity_id = c.entity_id
+                            AND d.rowid > c.rowid AND d.undoable = 0 AND d.field IS NULL AND d.delta IS NULL)
+                 OR (c.entity_type = 'segment' AND NOT EXISTS (SELECT 1 FROM segments s WHERE s.id = c.entity_id))
+                 OR (c.entity_type = 'speaker' AND NOT EXISTS (SELECT 1 FROM speakers s WHERE s.id = c.entity_id)))
+         FROM changes c WHERE {filter} {tail}"
+    )
+}
+
+fn raw_rows(
+    c: &noter_db::rusqlite::Connection,
+    sql: &str,
+    binds: Vec<Sql>,
+) -> noter_db::rusqlite::Result<Vec<Raw>> {
+    let mut stmt = c.prepare(sql)?;
+    let rows = stmt
+        .query_map(params_from_iter(binds), |r| {
+            let id: String = r.get(1)?;
+            let status: String = r.get(15)?;
+            let entity_type: String = r.get(6)?;
+            let entity_id: String = r.get(7)?;
+            let gone: bool = r.get(17)?;
+            Ok(Raw {
+                rowid: r.get(0)?,
+                batch_id: r.get(2)?,
+                batch_size: r.get(3)?,
+                ts: r.get(4)?,
+                actor: r.get(5)?,
+                field: r.get(8)?,
+                before: r.get(9)?,
+                after: r.get(10)?,
+                has_delta: r.get(11)?,
+                summary: r.get(12)?,
+                reason: r.get(13)?,
+                confidence: r.get(14)?,
+                undoable: r.get(16)?,
+                redoable: status == "undone" && noter_db::redoable(c, &id),
+                label: label_of(c, &entity_type, &entity_id, gone),
+                id,
+                status,
+                entity_type,
+                entity_id,
+                gone,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
 /// The WHERE clause and its binds for a target, actor, job and period.
 fn filter_of(args: &HistoryListArgs) -> (String, Vec<Sql>) {
-    let mut clauses = vec!["1 = 1".to_string()];
+    // The model's `llm_runs`/`audit_log` bookkeeping (2.15) is not a user-facing entity: no
+    // `EntityKind` names it, so it is out of History even under the model filter.
+    let mut clauses = vec!["c.entity_type NOT IN ('llm_run', 'audit_log')".to_string()];
     let mut binds: Vec<Sql> = Vec::new();
     let text = |s: &str| Sql::Text(s.to_string());
     match &args.target {
@@ -392,4 +408,217 @@ fn change_row(r: Raw) -> Result<ChangeRow, CoreError> {
         undoable: r.undoable && replayable && status == ChangeStatus::Applied,
         redoable: r.redoable,
     })
+}
+
+const DAY_MS: i64 = 86_400_000;
+
+/// Days since 1970-01-01 of a `YYYY-MM-DD` date; `None` for anything else.
+fn day_number(date: &LocalDate) -> Option<i64> {
+    let mut parts = date.0.split('-');
+    let (y, m, d) = (parts.next()?, parts.next()?, parts.next()?);
+    if parts.next().is_some() || y.len() != 4 || m.len() != 2 || d.len() != 2 {
+        return None;
+    }
+    let (y, m, d): (i64, i64, i64) = (y.parse().ok()?, m.parse().ok()?, d.parse().ok()?);
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let last = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return None,
+    };
+    if !(1..=last).contains(&d) {
+        return None;
+    }
+    Some(days_from_civil(y, m, d))
+}
+
+/// Howard Hinnant's days-from-civil.
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// `YYYY-MM-DD` of a day number (the inverse of [`days_from_civil`]).
+fn civil_from_days(z: i64) -> (i64, i64, i64) {
+    let z = z + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (yoe + era * 400 + i64::from(m <= 2), m, d)
+}
+
+fn date_of(ms: i64) -> String {
+    let (y, m, d) = civil_from_days(ms.div_euclid(DAY_MS));
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// What an export scope selects: a target and a closed period in ms.
+struct Selection {
+    target: HistoryTarget,
+    from: Option<i64>,
+    to: Option<i64>,
+    /// The part of the suggested file name that says which scope.
+    name: String,
+}
+
+impl Core {
+    // @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
+    // @cpt-dod:cpt-noter-dod-core-history-undo-history:p1
+    pub(crate) async fn export_history(
+        &self,
+        args: HistoryExportArgs,
+    ) -> Result<ExportResult, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-export-request
+        self.ready()?;
+        // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-request
+        // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-export-panel
+        let selection = self.selection_of(&args.scope)?;
+        let (ext, kind) = match args.format {
+            LogFormat::Markdown => ("md", SaveKind::Markdown),
+            LogFormat::Json => ("json", SaveKind::Json),
+        };
+        let name = format!("noter-history-{}.{ext}", selection.name);
+        let panel = self.deps.native_ops.save_panel(&name, kind).await;
+        // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-panel
+        // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-export-cancel
+        let Some(path) = panel else {
+            return Err(CoreError::new(ErrorCode::Cancelled, "export cancelled"));
+        };
+        // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-cancel
+        // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-export-write
+        let list = HistoryListArgs {
+            target: selection.target,
+            actor: ActorFilter::All,
+            job_id: None,
+            from: selection.from.map(TimestampMs),
+            to: selection.to.map(TimestampMs),
+            page: PageRequest {
+                cursor: None,
+                limit: None,
+            },
+        };
+        let (filter, binds) = filter_of(&list);
+        let sql = select_sql(&filter, "ORDER BY c.rowid ASC");
+        // One statement on a read connection: the rows are one snapshot.
+        let raw = self
+            .store()
+            .read(move |c| raw_rows(c, &sql, binds))
+            .map_err(|e| unreadable(e.message))?;
+        let rows = raw
+            .into_iter()
+            .map(change_row)
+            .collect::<Result<Vec<_>, _>>()?;
+        let text = match args.format {
+            LogFormat::Json => serde_json::to_string_pretty(&rows).map_err(crate::internal)?,
+            LogFormat::Markdown => markdown_of(&selection.name, &rows),
+        };
+        write_file(&path, &text)?;
+        // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-write
+        // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-export-result
+        Ok(ExportResult {
+            path: path.display().to_string(),
+            files: 1,
+        })
+        // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-result
+    }
+
+    /// shortcut: a day is a UTC day (as in the calls list); use the user's time zone when
+    /// settings carry one.
+    fn selection_of(&self, scope: &LogScope) -> Result<Selection, CoreError> {
+        let today = self.deps.clock.now().0.div_euclid(DAY_MS);
+        let period = |first: i64, last: i64, name: String| Selection {
+            target: HistoryTarget::All,
+            from: Some(first * DAY_MS),
+            to: Some((last + 1) * DAY_MS - 1),
+            name,
+        };
+        Ok(match scope {
+            LogScope::Call { call_id } => {
+                let id = call_id.as_str().to_string();
+                let known = self
+                    .store()
+                    .read(move |c| {
+                        c.query_row("SELECT 1 FROM calls WHERE id = ?1", [id], |_| Ok(()))
+                            .optional()
+                    })?
+                    .is_some();
+                if !known {
+                    return Err(CoreError::new(ErrorCode::NotFound, "no such call"));
+                }
+                Selection {
+                    target: HistoryTarget::Call {
+                        call_id: call_id.clone(),
+                    },
+                    from: None,
+                    to: None,
+                    name: format!("call-{call_id}"),
+                }
+            }
+            LogScope::Today => period(today, today, date_of(today * DAY_MS)),
+            LogScope::Last7Days => period(today - 6, today, "last-7-days".into()),
+            LogScope::Last30Days => period(today - 29, today, "last-30-days".into()),
+            LogScope::Period { from, to } => {
+                let day = |d: &LocalDate, field| {
+                    day_number(d).ok_or_else(|| invalid(field, ValidationRule::InvalidFormat))
+                };
+                let (a, b) = (day(from, "scope.from")?, day(to, "scope.to")?);
+                if a > b {
+                    return Err(invalid("scope.to", ValidationRule::OutOfRange));
+                }
+                period(a, b, format!("{}-to-{}", from.0, to.0))
+            }
+        })
+    }
+}
+
+/// One plain-language line per change, oldest first.
+fn markdown_of(scope: &str, rows: &[ChangeRow]) -> String {
+    let mut out = format!("# Noter history: {scope}\n\n");
+    for r in rows {
+        let ms = r.at.0;
+        let (h, m) = (
+            ms.rem_euclid(DAY_MS) / 3_600_000,
+            ms.rem_euclid(3_600_000) / 60_000,
+        );
+        let who = match &r.actor {
+            Actor::You => "You".to_string(),
+            Actor::Job { name, .. } => format!("Job {name}"),
+            Actor::Model { model, .. } => format!("Model {model}"),
+        };
+        out.push_str(&format!(
+            "- {} {h:02}:{m:02} · {who} · {}: {}",
+            date_of(ms),
+            r.summary,
+            r.entity.label
+        ));
+        if let (Some(before), Some(after)) = (&r.before, &r.after) {
+            out.push_str(&format!(" (“{before}” → “{after}”)"));
+        }
+        if r.status == ChangeStatus::Undone {
+            out.push_str(" [undone]");
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// Complete or absent: written beside the target, then renamed over it.
+fn write_file(path: &std::path::Path, text: &str) -> Result<(), CoreError> {
+    let tmp = path.with_extension("noter-tmp");
+    std::fs::write(&tmp, text)
+        .and_then(|()| std::fs::rename(&tmp, path))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            CoreError::new(ErrorCode::Internal, format!("cannot write the export: {e}"))
+        })
 }

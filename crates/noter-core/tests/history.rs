@@ -642,8 +642,12 @@ fn open_with_panel(dir: &Path, answer: Option<std::path::PathBuf>) -> (Core, Arc
         answer,
         asked: Mutex::default(),
     });
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
-        .with_native_ops(panel.clone());
+    // The change log stamps rows with the wall clock, so "today" must be the real one here.
+    let deps = CoreDeps::new(
+        Arc::new(noter_core::SystemClock),
+        Arc::new(Events::default()),
+    )
+    .with_native_ops(panel.clone());
     (Core::open(dir, deps).expect("core opens"), panel)
 }
 
@@ -682,7 +686,7 @@ async fn export_markdown_writes_one_plain_line_per_change_after_the_panel_answer
     let lines: Vec<_> = text.lines().filter(|l| l.starts_with("- ")).collect();
     assert_eq!(lines.len(), 1, "{text}");
     assert!(lines[0].contains("Changed call info") && lines[0].contains("Planning"));
-    assert!(lines[0].contains("2026-10-16") && lines[0].contains("You"));
+    assert!(lines[0].starts_with("- 20") && lines[0].contains(" · You · "));
     assert!(!text.contains("Other"));
     let asked = panel.asked.lock().unwrap();
     assert_eq!(asked.len(), 1);
@@ -698,8 +702,8 @@ async fn export_json_carries_every_field_of_every_matching_row() {
     let done = rename(&core, "call_a", 1, "Planning").await.unwrap();
 
     let period = LogScope::Period {
-        from: LocalDate("2026-10-16".into()),
-        to: LocalDate("2026-10-16".into()),
+        from: LocalDate("2020-01-01".into()),
+        to: LocalDate("2999-12-31".into()),
     };
     export(&core, period, LogFormat::Json).await.unwrap();
     let rows: Vec<ChangeRow> =
@@ -711,8 +715,8 @@ async fn export_json_carries_every_field_of_every_matching_row() {
 
     // A day with no change exports an empty list; Today is the clock's day.
     let before = LogScope::Period {
-        from: LocalDate("2026-10-14".into()),
-        to: LocalDate("2026-10-15".into()),
+        from: LocalDate("1970-01-01".into()),
+        to: LocalDate("1970-01-02".into()),
     };
     export(&core, before, LogFormat::Json).await.unwrap();
     assert_eq!(std::fs::read_to_string(&target).unwrap().trim(), "[]");

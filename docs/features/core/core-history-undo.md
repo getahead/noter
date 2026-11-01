@@ -74,11 +74,17 @@ The user can inspect and reverse a correction, review or job batch without losin
 - **Contract**: `model/history.rs`, `ipc/mod.rs` in `crates/noter-protocol/src`; `contracts/ipc.manifest.json`
 - **Dependencies**: `cpt-noter-feature-core-storage`
 
+### 1.5 M2 decisions
+
+- Hotkey and setup settings rows are not replayable: they live in memory beside their row, so `history_list` shows them with `undoable = false` and `change_undo` returns `not_undoable`.
+- The model's own bookkeeping rows (`llm_runs`, `audit_log`, written by the model actor, 2.15) are never listed or exported: no `EntityKind` names them, so not even the `models` actor filter shows them. Changes a model makes to user data are listed as usual.
+- Export scopes use UTC days until settings carry a time zone; a cancelled save panel returns `cancelled` and creates no file; the save panel is the `NativeOps` seam (TL-15).
+
 ## 2. Actor Flows (CDSL)
 
 ### Read and export History
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-history-undo-read`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-history-undo-read`
 
 **Actor**: Primary user (main window)
 
@@ -93,11 +99,11 @@ The user can inspect and reverse a correction, review or job batch without losin
 1. [x] - `p1` - API: `history_list { target, actor, job_id, from, to, page }`; validate the target and period - `inst-read-request`
 2. [x] - `p1` - DB: SELECT `changes` on a read-only connection with target, actor, job and date filters and stable page ordering - `inst-read-select`
 3. [x] - `p1` - Assemble `ChangeRow` values with actor labels, batch sizes, evidence, undoable and redoable state; return an empty page when no rows match - `inst-read-assemble`
-4. [ ] - `p1` - **IF** the user calls `history_export { scope, format }` - `inst-export-request`
-   1. [ ] - `p1` - Resolve whole-call or local-date period scope; show the native save panel - `inst-export-panel`
-   2. [ ] - `p1` - **IF** cancelled, **RETURN** `cancelled` without creating a file - `inst-export-cancel`
-   3. [ ] - `p1` - Read matching rows consistently and write one plain-language line per change for Markdown, or every export field for JSON - `inst-export-write`
-   4. [ ] - `p1` - **RETURN** `ExportResult` only after the file is complete - `inst-export-result`
+4. [x] - `p1` - **IF** the user calls `history_export { scope, format }` - `inst-export-request`
+   1. [x] - `p1` - Resolve whole-call or local-date period scope; show the native save panel - `inst-export-panel`
+   2. [x] - `p1` - **IF** cancelled, **RETURN** `cancelled` without creating a file - `inst-export-cancel`
+   3. [x] - `p1` - Read matching rows consistently and write one plain-language line per change for Markdown, or every export field for JSON - `inst-export-write`
+   4. [x] - `p1` - **RETURN** `ExportResult` only after the file is complete - `inst-export-result`
 5. [x] - `p1` - **RETURN** the page of changes and its next cursor - `inst-read-return`
 
 ### Undo or redo a change or batch
@@ -165,7 +171,7 @@ History derives `redoable` from current row history, including subsequent redo r
 
 ### History and export
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-history-undo-history`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-history-undo-history`
 
 The system **MUST** serve filtered, paged History with before/after text, reason, evidence and batch metadata, and export the chosen scope through a core-owned save panel. Exports and logs must not resurrect content removed by irreversible deletion.
 

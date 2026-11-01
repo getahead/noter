@@ -16,7 +16,8 @@ use std::sync::{Arc, Mutex};
 use noter_core::{
     Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock,
     Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError, MemorySecrets, ModelSource,
-    NativeServices, Placement, Scripted, Surfaces, SystemClock, TrayModel, Updater,
+    NativeOps, NativeServices, Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel,
+    Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -210,6 +211,7 @@ pub struct Harness {
     surfaces: Arc<ScriptedSurfaces>,
     /// The Keychain stand-in (TL-13).
     secrets: Arc<MemorySecrets>,
+    panel: Arc<ScriptedPanel>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -275,6 +277,10 @@ impl Harness {
         let surfaces = Arc::new(ScriptedSurfaces::default());
         let llm = Adapters::scripted(&options.llm_script.clone().unwrap_or_default());
         let secrets = Arc::new(MemorySecrets::default());
+        let panel = Arc::new(ScriptedPanel {
+            dir: dir.join("exports"),
+            cancel_next: AtomicBool::new(false),
+        });
         let deps = CoreDeps::new(
             clock.clone(),
             Arc::new(EventLines(events, seeding.clone(), engine.clone())),
@@ -285,7 +291,8 @@ impl Harness {
         .with_updater(updater.clone())
         .with_surfaces(surfaces.clone())
         .with_llm(llm)
-        .with_secrets(secrets.clone());
+        .with_secrets(secrets.clone())
+        .with_native_ops(panel.clone());
         let deps = if options.battery {
             deps.with_power(Arc::new(OnBattery))
         } else {
@@ -307,6 +314,7 @@ impl Harness {
             engine,
             surfaces,
             secrets,
+            panel,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -1147,6 +1155,11 @@ impl Controls for Harness {
                     self.models.released.store(true, Ordering::SeqCst);
                     Ok(json!({}))
                 }
+                // `{}`: the next save panel answers cancelled, once.
+                "cancel_next_save_panel" => {
+                    self.panel.cancel_next.store(true, Ordering::SeqCst);
+                    Ok(json!({}))
+                }
                 "set_output_route" => self.set_output_route(args),
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
@@ -1509,6 +1522,25 @@ fn hex(bytes: &[u8]) -> String {
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
 /// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
 /// the harness's.
+/// The save panel, scripted: answers `<data>/exports/<suggested name>`, or cancelled once after
+/// `harness.cancel_next_save_panel` (TL-15). More native asks join it as their commands land.
+struct ScriptedPanel {
+    dir: PathBuf,
+    cancel_next: AtomicBool,
+}
+
+impl NativeOps for ScriptedPanel {
+    fn save_panel<'a>(&'a self, name: &'a str, _: SaveKind) -> CoreFuture<'a, Option<PathBuf>> {
+        Box::pin(async move {
+            if self.cancel_next.swap(false, Ordering::SeqCst) {
+                return None;
+            }
+            std::fs::create_dir_all(&self.dir).ok()?;
+            Some(self.dir.join(name))
+        })
+    }
+}
+
 /// The native layer's windows, as the calls the core made (TL-2).
 #[derive(Default)]
 struct ScriptedSurfaces(Mutex<Vec<String>>, AtomicBool, AtomicBool);

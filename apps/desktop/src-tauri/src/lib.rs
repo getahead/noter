@@ -156,6 +156,7 @@ fn boot<R: Runtime>(
         .with_shortcuts(shortcuts)
         .with_engine(Arc::new(engine))
         .with_native(Arc::new(Mac::new(&group)))
+        .with_native_ops(Arc::new(native::MacOps))
         .with_models_dir(group.join("models"))
         .with_models(Arc::new(PinnedModels::new()))
         .with_updater(updater)

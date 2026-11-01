@@ -5,11 +5,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use noter_core::{BoxFuture, EnvironmentReading, NativeServices};
+use noter_core::{BoxFuture, EnvironmentReading, NativeOps, NativeServices, SaveKind};
 use noter_protocol::model::CalendarEventRef;
 use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs};
 
 /// The Mac; `storage` is the folder whose volume's free space counts.
+/// The save panel and the native asks to come (TL-15).
+pub struct MacOps;
+
+impl NativeOps for MacOps {
+    // shortcut: every export is cancelled until 2.21 native-services shows the real NSSavePanel.
+    fn save_panel<'a>(&'a self, _: &'a str, _: SaveKind) -> BoxFuture<'a, Option<PathBuf>> {
+        Box::pin(async { None })
+    }
+}
+
 pub struct Mac {
     storage: PathBuf,
     watch: Mutex<Option<noter_native::Watch>>,
