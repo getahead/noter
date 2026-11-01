@@ -3,8 +3,6 @@
 // harness's scripted Mac, engine and models (the launch hooks, NOTER_TEST_FIXTURE): no model, permission or call
 // of the machine it runs on is needed.
 // Story tests are named after the DESIGN story they prove (`cpt-noter-seq-…` with underscores, docs/HARNESS.md).
-import AppKit
-import ApplicationServices
 import XCTest
 
 class NoterTestCase: XCTestCase {
@@ -96,24 +94,24 @@ class NoterTestCase: XCTestCase {
                       "Start Recording did not start a capture", file: file, line: line)
     }
 
-    /// The key macOS draws next to a menu item of the open status menu (AXMenuItemCmdChar, which XCUITest
-    /// does not expose), or nil when the item shows none.
-    func keyOf(_ title: String) -> String? {
-        guard let pid = NSRunningApplication.runningApplications(withBundleIdentifier: "com.getahead.noter").first?.processIdentifier
-        else { return nil }
-        func attr(_ e: AXUIElement, _ name: String) -> AnyObject? {
-            var v: AnyObject?
-            return AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success ? v : nil
-        }
-        func children(_ e: AXUIElement) -> [AXUIElement] { attr(e, kAXChildrenAttribute) as? [AXUIElement] ?? [] }
-        guard let bar = attr(AXUIElementCreateApplication(pid), "AXExtrasMenuBar") else { return nil }
-        for menu in children(bar as! AXUIElement).flatMap(children) {
-            for item in children(menu) where attr(item, kAXTitleAttribute) as? String == title {
-                let key = attr(item, kAXMenuItemCmdCharAttribute) as? String
-                return key?.isEmpty == false ? key : nil
-            }
-        }
-        return nil
+    /// The key macOS draws next to a menu item of the open status menu (AXMenuItemCmdChar), or nil when the item
+    /// shows none. XCUITest does not expose the attribute, and the runner is not trusted for accessibility (a direct
+    /// AXUIElement read fails with kAXErrorAPIDisabled), so it is read through XCUITest's own accessibility interface.
+    // shortcut: private XCUIAutomation API (XCUIDevice.accessibilityInterface, XCElementSnapshot.accessibilityElement);
+    // switch to a public one if XCUITest ever exposes key equivalents.
+    func keyOf(_ title: String, file: StaticString = #filePath, line: UInt = #line) -> String? {
+        typealias Attributes = @convention(c) (AnyObject, Selector, AnyObject, NSArray, UnsafeMutablePointer<NSError?>?) -> NSDictionary?
+        let item = statusItem.menus.firstMatch.menuItems[title]
+        guard let snapshot = try? item.snapshot() as AnyObject, let element = snapshot.value(forKey: "accessibilityElement"),
+              let interface = (XCUIDevice.shared as NSObject).value(forKey: "accessibilityInterface") as? NSObject
+        else { XCTFail("menu item “\(title)” has no accessibility element", file: file, line: line); return nil }
+        let selector = NSSelectorFromString("attributesForElement:attributes:error:")
+        let read = unsafeBitCast(interface.method(for: selector), to: Attributes.self)
+        var error: NSError?
+        let attributes = read(interface, selector, element as AnyObject, ["AXMenuItemCmdChar"], &error)
+        XCTAssertNil(error, "could not read the key of “\(title)”", file: file, line: line)
+        let key = attributes?["AXMenuItemCmdChar"] as? String
+        return key?.isEmpty == false ? key : nil
     }
 
     /// Opens Calls (⌘3) and selects the call with this title.

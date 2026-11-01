@@ -76,7 +76,9 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_check_state__no_hotkey_shows_no_key() {
-        launch()
+        // Not recording: the fixture's call screen takes a whole display (its layout for a chosen second display),
+        // which on a one-display Mac covers Settings.
+        launch("idle")
         XCTAssertTrue(openMenu().exists)
         XCTAssertEqual(keyOf("Open Call Screen"), "N", "before: Open Call Screen shows ⌃⌥⌘N")
         closeMenu()
