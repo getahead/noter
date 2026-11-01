@@ -313,13 +313,17 @@ final class ArchiveTests: XCTestCase {
         let decoder = FakeDecoder()
         let e = EngineLoop(
             writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: container,
-            offline: LocalOfflineWork(decoder: { decoder })
+            offline: LocalOfflineWork(decoder: { decoder }, text: { FakeText() })
         ) { _ in FileAudioSource(mic: WAVAudio(sampleRate: 16_000, samples: []), sys: WAVAudio(sampleRate: 16_000, samples: []), realtime: true) }
         _ = e.handle(#"{"id":1,"cmd":{"type":"start_session","call_id":"call_2","session_dir":"audio/call_2","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}"#)
         XCTAssertNotNil(lines.waitFor("session_started"))
         _ = e.handle(command(2))
         Thread.sleep(forTimeInterval: 0.5)
         XCTAssertFalse(lines.types.contains("offline_done"), "capture goes first")
+        // A query's embedding is not held behind the waiting pass.
+        _ = e.handle(#"{"id":4,"cmd":{"type":"embed_texts","request_id":"r4","texts":["a"],"out_path":null}}"#)
+        XCTAssertNotNil(lines.waitFor("embeddings"))
+        XCTAssertFalse(lines.types.contains("offline_done"))
         _ = e.handle(#"{"id":3,"cmd":{"type":"stop","call_id":"call_2"}}"#)
         XCTAssertNotNil(lines.waitFor("offline_done"))
     }
