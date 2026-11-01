@@ -869,9 +869,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.15 LLM router, egress gate and audit - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-llm-gate`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-llm-gate`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-llm-gate.md](features/core/core-llm-gate.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#229 #234 #241 #246); two acceptance criteria are owner-gated: the network-monitor release test and the output and handoff E2E (waits on 2.17 and 2.19). FEATURE spec: [features/core/core-llm-gate.md](features/core/core-llm-gate.md)
 
 - **Purpose**: Route every model call through one runtime interface, validate output against the app-owned skill schemas, lock every CLI run down, and send nothing off the Mac without the egress gate's redaction and audit row.
 
@@ -894,11 +894,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-egress-gate`
+  - `cpt-noter-principle-core-egress-gate`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p3` - `cpt-noter-constraint-core-api-keys`
+  - `cpt-noter-constraint-core-api-keys`
 
 - **Domain Model Entities**:
   - LLM run
@@ -906,9 +906,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-llm-router`
-  - [ ] `p3` - `cpt-noter-component-core-privacy`
-  - [ ] `p3` - `cpt-noter-component-core-credentials` (shared with `cpt-noter-feature-core-credentials-privacy`; the M2 part is the Keychain code behind `api_key_set` and the availability behind `accounts_get`)
+  - `cpt-noter-component-core-llm-router`
+  - `cpt-noter-component-core-privacy`
+  - `cpt-noter-component-core-credentials` (shared with `cpt-noter-feature-core-credentials-privacy`; the M2 part is the Keychain code behind `api_key_set` and the availability behind `accounts_get`)
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `accounts_get`, `api_key_set`
