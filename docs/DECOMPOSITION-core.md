@@ -1030,9 +1030,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.18 Items, Today, sharing and export - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-items-today`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-items-today`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-items-today.md](features/core/core-items-today.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#245 #250 #258 #264 #268); the carry-forward start/end steps and their two transitions moved to [core-people](features/core/core-people.md) (M3), the answered and evidence transitions to [core-evidence-proposals](features/core/core-evidence-proposals.md) (M5). FEATURE spec: [features/core/core-items-today.md](features/core/core-items-today.md)
 
 - **Purpose**: Own the records the user acts on most: item lifecycle and review, evidence spans, the carry-forward query, the Today read model, call tags, share formats and export.
 
@@ -1052,7 +1052,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-intent-commands`
+  - `cpt-noter-principle-core-intent-commands`
 
 - **Design Constraints Covered**:
 
@@ -1065,7 +1065,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-items`
+  - `cpt-noter-component-core-items`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `items_list`, `item_get`, `item_set_done`, `item_review`, `items_review_all`, `item_edit`, `item_reopen`, `item_create`, `item_answer_handoff_landed`, `today_get`, `share_copy`, `calls_export`, `call_tags_set`, `tags_list`
