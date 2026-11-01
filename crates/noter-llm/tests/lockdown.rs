@@ -363,7 +363,7 @@ async fn claude_api_key_runs_bare_with_every_restriction() {
     let done = ok(llm.run_once(req).await);
     assert_eq!(done.provenance.adapter, "claude-code");
     let session = done.provenance.session_id.unwrap();
-    assert!(session.starts_with("session-"), "{session}");
+    assert!(session.starts_with("session-"));
 
     let run = stub.only();
     assert!(run.has("-p") && run.has("--bare"));
@@ -443,7 +443,7 @@ async fn codex_api_key_runs_in_an_isolated_codex_home() {
         .await);
     assert_eq!(done.provenance.adapter, "codex");
     let thread = done.provenance.session_id.unwrap();
-    assert!(thread.starts_with("thread-"), "{thread}");
+    assert!(thread.starts_with("thread-"));
     assert_eq!(done.output["summary_md"], "Importer ships Friday.");
 
     let run = stub.only();
@@ -799,4 +799,20 @@ async fn all_three_runtimes_conform_on_one_request() {
     );
     assert_eq!(seen.lock().unwrap()[0].1["format"], schema);
     assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
+}
+
+// QA (#234): a config's Debug output never carries the API key.
+#[test]
+fn a_cli_config_never_prints_its_api_key() {
+    let config = CliConfig {
+        program: "claude".into(),
+        home: "/home".into(),
+        run_root: "/run".into(),
+        api_key: Some("sk-ant-never-printed".into()),
+        signed_in: false,
+        models: Vec::new(),
+    };
+    let printed = format!("{config:?}");
+    assert!(!printed.contains("sk-ant-never-printed"));
+    assert!(printed.contains("api_key: Some(\"…\")"));
 }

@@ -21,7 +21,7 @@ use super::{Invocation, Reply};
 use crate::runtime::{lock, Availability, BoxFuture, Tested};
 
 /// How Noter runs one CLI. A missing key or sign-in makes that runtime unavailable.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CliConfig {
     /// The `claude` or `codex` binary.
     pub program: PathBuf,
@@ -35,6 +35,20 @@ pub struct CliConfig {
     pub signed_in: bool,
     /// The models offered, preferred first.
     pub models: Vec<String>,
+}
+
+/// Prints everything but the API key.
+impl std::fmt::Debug for CliConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CliConfig")
+            .field("program", &self.program)
+            .field("home", &self.home)
+            .field("run_root", &self.run_root)
+            .field("api_key", &self.api_key.as_ref().map(|_| "…"))
+            .field("signed_in", &self.signed_in)
+            .field("models", &self.models)
+            .finish()
+    }
 }
 
 /// Session handle → the CLI's own session id once its first turn answered.
