@@ -345,6 +345,9 @@ impl Core {
                 change_id: done.change_ids[0].clone(),
             });
         }
+        // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-no-audio
+        // Naming writes text rows only: it works the same once the audio is gone.
+        // @cpt-begin:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-log
         let meta = self.change_meta(ctx, summary.into(), "speaker_name");
         let written = self.store().write_batch(plan.mutations, meta)?;
         // @cpt-end:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-log
