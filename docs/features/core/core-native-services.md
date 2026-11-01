@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-native-services`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-native-services`
 
-- [ ] `p3` - `cpt-noter-feature-core-native-services`
+- [x] `p3` - `cpt-noter-feature-core-native-services`
 
 ## 1. Feature Context
 
@@ -81,7 +81,7 @@ M2 services can use macOS without granting a WebView shell access or putting OS 
 
 ### Run the Screen Share Test
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-services-share-test`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-services-share-test`
 
 **Actor**: Primary user (Settings window)
 
@@ -93,7 +93,7 @@ M2 services can use macOS without granting a WebView shell access or putting OS 
 - Screen Recording was denied or the capture API fails: the result reports the existing typed failure without recording a false pass or interrupting capture.
 
 **Steps**:
-1. [ ] - `p1` - API: `share_test_run { run_capture_test }` from Settings - `inst-test-request`
+1. [x] - `p1` - API: `share_test_run { run_capture_test }` from Settings - `inst-test-request`
 2. [x] - `p1` - Inspect actual core-owned window/panel protection and hidden-for-presenting state; assemble visibility rows with `cpt-noter-algo-core-native-services-visibility` - `inst-test-rows`
 3. [x] - `p1` - **IF** capture testing was not requested, set capture outcome not_run - `inst-test-not-run`
 4. [x] - `p1` - **ELSE IF** a call is live, set capture outcome blocked_by_call without a Screen Recording prompt or probe - `inst-test-blocked`
@@ -104,7 +104,7 @@ M2 services can use macOS without granting a WebView shell access or putting OS 
 
 ### Perform a native operation for an owning service
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-native-services-operation`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-native-services-operation`
 
 **Actor**: Core handoff, sharing, export or repository service
 
@@ -115,7 +115,7 @@ M2 services can use macOS without granting a WebView shell access or putting OS 
 - Panel cancelled: `cancelled`; unavailable handler: `no_link_handler`; denied terminal Automation: `automation_denied`; native or filesystem failure never becomes success.
 
 **Steps**:
-1. [ ] - `p1` - Receive a typed operation from the owning service after IPC scope validation; dispatch AppKit work on the appropriate app thread - `inst-op-dispatch`
+1. [x] - `p1` - Receive a typed operation from the owning service after IPC scope validation; dispatch AppKit work on the appropriate app thread - `inst-op-dispatch`
 2. [x] - `p1` - For clipboard, atomically publish the requested rich representation and matching plain text; return success only after the pasteboard write succeeds - `inst-op-clipboard`
 3. [x] - `p1` - For export or folder choice, show the native panel attached to the requesting window with the service's suggested name and allowed kind - `inst-op-panel`
 4. [x] - `p1` - **IF** cancelled, **RETURN** `cancelled` without invoking the owning service's file-writing step - `inst-op-cancel`
@@ -178,7 +178,7 @@ These are result states, not persistent database rows. A fresh request rechecks 
 
 ### Native clipboard, panels and launch
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-services-mechanisms`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-services-mechanisms`
 
 The system **MUST** expose native rich/plain clipboard writes, core-owned save and folder panels, Launch Services handler inspection and explicit Apple Events launch with typed results. Inspection must not prompt, panel cancellation must not write files, and launch must keep prompt/path data separate from executable syntax and leave the message unsent. Only the owning service records product state.
 
@@ -194,7 +194,7 @@ The system **MUST** expose native rich/plain clipboard writes, core-owned save a
 
 ### Share visibility and capture test
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-services-share-test`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-services-share-test`
 
 The system **MUST** answer `share_test_run` from Settings with actual per-surface visibility and an optional core-process probe. It must block the probe during capture, ask Screen Recording only for explicit testing, dispose of buffers and report failure without false success.
 
@@ -211,7 +211,7 @@ The system **MUST** answer `share_test_run` from Settings with actual per-surfac
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-services-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-services-tests`
 
 The system **MUST** pass unit tests for visibility mapping, call guards, permission failures, argument encoding and cancellation; conformance for the command's Settings-only scope and result shapes; and macOS native tests for clipboard formats, panels and launch. `share_test_run` must succeed in real-app E2E and contribute to the command count; owning stories remain counted under items and handoff. System TCC prompt appearance remains on the existing manual macOS checklist. `just gate` passes.
 
@@ -224,10 +224,12 @@ The system **MUST** pass unit tests for visibility mapping, call guards, permiss
 
 ## 6. Acceptance Criteria
 
-- [ ] A real-app E2E call to `share_test_run` from Settings succeeds with per-surface rows; another window receives `window_not_allowed`.
-- [ ] Optional capture testing during a call returns blocked_by_call without prompting, writing frames or changing capture state; outside a call it records passed or a typed failed result.
-- [ ] Native tests verify protected-panel and whole-display behavior, including Hide for Presenting; uncertain app-sharing results remain depends_on_app.
-- [ ] Native clipboard tests inspect both rich and plain representations; native-panel cancellation creates no export, with the caller receiving `cancelled`.
-- [ ] Native launch tests cover handler disappearance, Automation denial, Unicode and shell-like paths, and prove the prompt remains pre-filled and unsent.
-- [ ] Unit, conformance and native tests pass; XCUITest names use underscore story IDs when exercising the owning handoff or sharing stories.
-- [ ] `just gate` passes.
+- [x] A real-app E2E call to `share_test_run` from Settings succeeds with per-surface rows; another window receives `window_not_allowed`.
+- [x] Optional capture testing during a call returns blocked_by_call without prompting, writing frames or changing capture state; outside a call it records passed or a typed failed result.
+- [x] Native tests verify protected-panel and whole-display behavior, including Hide for Presenting; uncertain app-sharing results remain depends_on_app.
+- [x] Native clipboard tests inspect both rich and plain representations; native-panel cancellation creates no export, with the caller receiving `cancelled`.
+- [x] Native launch tests cover handler disappearance, Automation denial, Unicode and shell-like paths, and prove the prompt remains pre-filled and unsent.
+- [x] Unit, conformance and native tests pass; XCUITest names use underscore story IDs when exercising the owning handoff or sharing stories.
+- [x] `just gate` passes.
+
+The native tests above are noter-native's (#243) and the host's (`apps/desktop/src-tauri/tests/native.rs`: the panel off the async runtime, a private-pasteboard round trip, the Screen Share Test through `MacOps`). Only the owner's Mac proves the `cwd`/`q` parameters of `claude://code/new` and `codex://new`, a real Screen Recording and Automation prompt (the manual macOS checklist), and a real launch pre-filled and unsent. `apps/desktop/tests/conformance/m2-share-test.test.ts` runs `share_test_run` against the fake and the real core.

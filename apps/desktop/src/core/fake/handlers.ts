@@ -44,16 +44,19 @@ function checkRev(current: Rev, sent: Rev): void {
   if (current !== sent) throw coreError("conflict", "rev is stale", { type: "conflict", current_rev: current });
 }
 
-type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason">>;
+type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable">>;
 
 function logChange(world: World, row: ChangeInput): ChangeId {
   const id = newId("chg");
+  // A later edit of the same field blocks the redo of an undone change (`edited_later`).
+  world.changes.forEach((c) => c.status === "undone" && c.entity.id === row.entity.id && c.field === (row.field ?? null) && (c.redoable = false));
   world.changes.unshift({
     actor: { type: "you" },
     field: null,
     before: null,
     after: null,
     reason: null,
+    undoable: true,
     ...row,
     id,
     at: now(),
@@ -62,7 +65,6 @@ function logChange(world: World, row: ChangeInput): ChangeId {
     evidence: [],
     confidence: null,
     status: "applied",
-    undoable: true,
     redoable: false,
   });
   return id;
@@ -157,6 +159,14 @@ function section(world: World, summaryId: string): OutputSection {
   const s = world.outputs.flatMap((o) => o.sections).find((x) => x.summary_id === summaryId);
   if (!s) throw coreError("not_found", `summary ${summaryId}`);
   return s;
+}
+
+/** A section's versions, oldest first: the seeded ones carry its written text, as in the real core. */
+const sectionVersions = new WeakMap<OutputSection, { body_md: string; kind: "generated" | "user_edit" }[]>();
+function versionsOf(s: OutputSection): { body_md: string; kind: "generated" | "user_edit" }[] {
+  let v = sectionVersions.get(s);
+  if (!v) sectionVersions.set(s, (v = Array.from({ length: Math.max(1, s.version_count) }, () => ({ body_md: s.body_md ?? "", kind: "generated" as const }))));
+  return v;
 }
 
 function topic(world: World, id: string): TopicRow {
@@ -331,7 +341,7 @@ export const defaultHandlers: Handlers = {
     // Like the real core: the new call has its row and an empty live transcript at once (D-37).
     const template = world.calls.find((c) => c.id === cap.call_id) ?? world.calls[0];
     if (template) {
-      const row = { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], audio_kept_until: null, audio_deleted: false, open_items: 0, review_waiting: 0 };
+      const row = { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 };
       world.calls = [row, ...world.calls];
     }
     world.transcripts.push({ subscription_id: null, call_id: id, live: true, pass: "live", archive: "not_started", segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true });
@@ -503,10 +513,15 @@ export const defaultHandlers: Handlers = {
     return fake.playback;
   },
   audio_delete: (a, { world, emit }) => {
-    const calls = a.call_ids.map((id) => call(world, id)).filter((c) => !c.audio_deleted);
+    const found = a.call_ids.map((id) => call(world, id));
+    // A capturing call keeps its audio, like the real core: nothing is removed when one is named.
+    if (found.some((c) => c.status === "recording" || c.status === "paused")) throw coreError("invalid_input", "call_ids", { type: "validation", field: "call_ids", rule: "invalid_format" });
+    const calls = [...new Set(found)].filter((c) => !c.audio_deleted);
     calls.forEach((c) => {
       c.audio_deleted = true;
+      c.audio_deleted_at = Date.now();
       c.audio_kept_until = null;
+      logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, summary: "Deleted the audio of a call", undoable: false });
       emit("entity:changed", { type: "call", call: c });
     });
     return { calls: calls.length, freed_mb: calls.length * 58 };
@@ -514,8 +529,8 @@ export const defaultHandlers: Handlers = {
   audio_delete_older: (a, { world }) => {
     if (a.older_than_days < 1) throw coreError("invalid_input", "days", { type: "validation", field: "older_than_days", rule: "out_of_range" });
     const cutoff = world.now - a.older_than_days * 86_400_000;
-    const calls = world.calls.filter((c) => !c.audio_deleted && c.started_at < cutoff);
-    calls.forEach((c) => (c.audio_deleted = true));
+    const calls = world.calls.filter((c) => !c.audio_deleted && c.status !== "recording" && c.status !== "paused" && c.started_at < cutoff);
+    calls.forEach((c) => Object.assign(c, { audio_deleted: true, audio_deleted_at: Date.now(), audio_kept_until: null }));
     return { calls: calls.length, freed_mb: calls.length * 58 };
   },
 
@@ -752,23 +767,27 @@ export const defaultHandlers: Handlers = {
     const c = call(world, a.call_id);
     return { call_id: c.id, status: "not_started", sections: [], archive: c.archive, review_waiting: c.review_waiting, sensitive: c.privacy === "sensitive", written_locally: false };
   },
-  output_edit: (a, { world }) => {
+  output_edit: (a, { world, emit }) => {
     const s = section(world, a.summary_id);
     if (s.rev !== null) checkRev(s.rev, a.rev);
     const before = s.body_md;
+    versionsOf(s).push({ body_md: a.body_md, kind: "user_edit" });
     s.body_md = a.body_md;
     s.user_edited = true;
     s.rev = (s.rev ?? 0) + 1;
     s.version_count += 1;
-    return { section: s, change_id: logChange(world, { entity: { kind: "summary", id: a.summary_id, label: "Summary" }, field: "body", before, after: a.body_md, summary: "Edited the summary" }) };
+    const change_id = logChange(world, { entity: { kind: "summary", id: a.summary_id, label: "Summary" }, field: "body", before, after: a.body_md, summary: "Edited the summary" });
+    emit("entity:changed", { type: "section", call_id: a.call_id, section: s });
+    return { section: s, change_id };
   },
   // D2: post-call analysis may run during a live call; regeneration waits.
   outputs_regenerate: (a, { world, fake, emit }) => {
     call(world, a.call_id);
     if (live(world.app.capture)) throw coreError("job_blocked", "regeneration waits for the live call to end");
-    if (!a.sections.length) throw coreError("invalid_input", "sections", { type: "validation", field: "sections", rule: "required" });
     const run = newId("run");
-    a.sections.forEach((kind, i) => {
+    // No sections means all of them, as in the real core.
+    const sections = a.sections.length ? a.sections : (world.outputs.find((o) => o.call_id === a.call_id)?.sections.map((x) => x.kind) ?? []);
+    sections.forEach((kind, i) => {
       fake.later(300 * (i + 1), () => emit("outputs:progress", { call_id: a.call_id, status: "writing", section: kind, state: { type: "writing" } }));
       fake.later(300 * (i + 2), () => emit("outputs:progress", { call_id: a.call_id, status: "ready", section: kind, state: { type: "ready" } }));
     });
@@ -776,22 +795,24 @@ export const defaultHandlers: Handlers = {
   },
   output_versions: (a, { world }) => {
     const s = section(world, a.summary_id);
-    const versions = Array.from({ length: Math.max(1, s.version_count) }, (_, i) => ({
+    const versions = versionsOf(s).map((v, i) => ({
       id: `ver_${a.summary_id}_${i + 1}`,
       n: i + 1,
-      kind: i === 0 || !s.user_edited ? ("generated" as const) : ("user_edit" as const),
-      writer: s.writer,
+      kind: v.kind,
+      writer: v.kind === "generated" ? s.writer : null,
       created_at: (s.writer?.generated_at ?? world.now) + i * MIN,
     }));
-    return { versions: versions.reverse() };
+    return { versions };
   },
   output_version_get: (a, { world }) => {
     const s = section(world, a.summary_id);
     const n = Number(a.version_id.split("_").at(-1));
-    if (!n || n > Math.max(1, s.version_count)) throw coreError("not_found", `version ${a.version_id}`);
-    return { meta: { id: a.version_id, n, kind: n === 1 ? "generated" : s.user_edited ? "user_edit" : "generated", writer: s.writer, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: n === s.version_count ? (s.body_md ?? "") : `${s.body_md ?? ""}\n\n(Version ${n}.)` };
+    const v = versionsOf(s)[n - 1];
+    if (!n || !v) throw coreError("not_found", `version ${a.version_id}`);
+    return { meta: { id: a.version_id, n, kind: v.kind, writer: v.kind === "generated" ? s.writer : null, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: v.body_md };
   },
   share_copy: (a, { world }) => {
+    call(world, a.call_id);
     const out = world.outputs.find((o) => o.call_id === a.call_id);
     if (!out || out.status === "writing" || out.status === "not_started") throw coreError("outputs_not_ready");
     const sections = out.sections.filter((s) => !a.scope.sections.length || a.scope.sections.includes(s.kind));
@@ -867,15 +888,17 @@ export const defaultHandlers: Handlers = {
     emit("entity:changed", { type: "item", item });
     return { path_used: target === "codex" ? "codex_app" : "claude_cli_link", item, prompt_file: `handoffs/${item.id}.md` };
   },
+  // Copying hands the item off too (core-handoff.md §2): accepted, owner kept, not done.
   handoff_copy: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
     requireEngineering(item);
-    if (item.review === "suggested") {
-      item.review = "accepted";
-      bump(item);
-      emit("entity:changed", { type: "item", item });
-    }
-    return { chars: (handoffView(world, item).prompt_md ?? "").length, item };
+    const view = handoffView(world, item);
+    item.status = "handed_off";
+    item.review = "accepted";
+    item.handoff = { target: view.target, at: now(), cwd: view.repo?.local_path ?? "", awaiting: true };
+    bump(item);
+    emit("entity:changed", { type: "item", item });
+    return { chars: [...(view.prompt_md ?? "")].length, item };
   },
 
   // ── Library, search, ask, topics ─────────────────────────────────────
@@ -921,7 +944,8 @@ export const defaultHandlers: Handlers = {
       c.tags = [...new Set([...c.tags.filter((t) => !a.remove.includes(t)), ...a.add])];
       return c;
     });
-    return { calls, change_id: logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" }) };
+    const change_id = logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" });
+    return { calls, change_id, batch_id: a.call_ids.length > 1 ? `bat_${change_id}` : null };
   },
   tags_list: (_a, { world }) => {
     const counts = new Map<string, number>();
@@ -935,6 +959,8 @@ export const defaultHandlers: Handlers = {
     world.call_details = world.call_details.filter((d) => !ids.has(d.call.id));
     world.transcripts = world.transcripts.filter((t) => !ids.has(t.call_id));
     ids.forEach((id) => emit("entity:changed", { type: "removed", kind: "call", id }));
+    // Irreversible and content-free, as the core logs it.
+    ids.forEach((id) => logChange(world, { entity: { kind: "call", id, label: id }, summary: "Deleted a call", undoable: false }));
     return { deleted: ids.size };
   },
   call_types_list: (_a, { world }) => world.call_types,
@@ -1109,7 +1135,19 @@ export const defaultHandlers: Handlers = {
     term.rev += 1;
     return term;
   },
-  history_export: (a) => ({ path: `~/Downloads/Noter log ${a.scope.type}.${a.format === "json" ? "json" : "md"}`, files: 1 }),
+  // The scope is checked before the (absent) save panel, as the core does; a cancelled panel is `failNext(…, "cancelled")`.
+  history_export: (a, { world }) => {
+    const s = a.scope;
+    if (s.type === "call") call(world, s.call_id);
+    if (s.type === "period") {
+      const day = (d: string, field: string) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d))) throw coreError("invalid_input", field, { type: "validation", field, rule: "invalid_format" });
+        return d;
+      };
+      if (day(s.from, "scope.from") > day(s.to, "scope.to")) throw coreError("invalid_input", "scope.to", { type: "validation", field: "scope.to", rule: "out_of_range" });
+    }
+    return { path: `~/Downloads/Noter log ${s.type}.${a.format === "json" ? "json" : "md"}`, files: 1 };
+  },
   activity_get: (a, { world }) => ({
     day: a.day ?? new Date(world.now).toISOString().slice(0, 10),
     needs_attention: world.jobs.jobs.flatMap((j) => (j.last_run?.status === "failed" ? [j.last_run] : [])),

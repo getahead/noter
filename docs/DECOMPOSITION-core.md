@@ -771,9 +771,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.13 Speaker naming, term fixes and audio deletion - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-speakers-audio`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-speakers-audio`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-speakers-audio.md](features/core/core-speakers-audio.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#256 #261 #263 #273). FEATURE spec: [features/core/core-speakers-audio.md](features/core/core-speakers-audio.md)
 
 - **Purpose**: Let the user correct the transcript through logged changes (rename a speaker for the call or one line, fix a term and teach the glossary, name speakers after the call) and delete audio for good.
 
@@ -791,7 +791,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-single-writer`
+  - `cpt-noter-principle-core-single-writer`
 
 - **Design Constraints Covered**:
 
@@ -803,7 +803,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-transcript`
+  - `cpt-noter-component-core-transcript`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `transcript_rename_speaker`, `transcript_fix_term`, `transcript_name_speakers`, `audio_delete`, `audio_delete_older`
@@ -869,9 +869,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.15 LLM router, egress gate and audit - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-llm-gate`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-llm-gate`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-llm-gate.md](features/core/core-llm-gate.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#229 #234 #241 #246); two acceptance criteria are owner-gated: the network-monitor release test and the output and handoff E2E (waits on 2.17 and 2.19). FEATURE spec: [features/core/core-llm-gate.md](features/core/core-llm-gate.md)
 
 - **Purpose**: Route every model call through one runtime interface, validate output against the app-owned skill schemas, lock every CLI run down, and send nothing off the Mac without the egress gate's redaction and audit row.
 
@@ -894,11 +894,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-egress-gate`
+  - `cpt-noter-principle-core-egress-gate`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p3` - `cpt-noter-constraint-core-api-keys`
+  - `cpt-noter-constraint-core-api-keys`
 
 - **Domain Model Entities**:
   - LLM run
@@ -906,9 +906,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-llm-router`
-  - [ ] `p3` - `cpt-noter-component-core-privacy`
-  - [ ] `p3` - `cpt-noter-component-core-credentials` (shared with `cpt-noter-feature-core-credentials-privacy`; the M2 part is the Keychain code behind `api_key_set` and the availability behind `accounts_get`)
+  - `cpt-noter-component-core-llm-router`
+  - `cpt-noter-component-core-privacy`
+  - `cpt-noter-component-core-credentials` (shared with `cpt-noter-feature-core-credentials-privacy`; the M2 part is the Keychain code behind `api_key_set` and the availability behind `accounts_get`)
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `accounts_get`, `api_key_set`
@@ -973,9 +973,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.17 Post-call pipeline and outputs - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-postcall`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-postcall`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-postcall.md](features/core/core-postcall.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#247 #254 #257 #262 #266); open: the native XCUITest for `cpt-noter-seq-notifications-open-outputs` (UI M2) and the owner's skill evals and Mac timing evidence. The role-review and D4 switch-off steps moved to [core-agents](features/core/core-agents.md) (M4). FEATURE spec: [features/core/core-postcall.md](features/core/core-postcall.md)
 
 - **Purpose**: Write the outputs within two minutes from the live transcript, section by section, then improve them after the archive pass without losing an edit; serve and version the output sections.
 
@@ -1009,7 +1009,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-postcall`
+  - `cpt-noter-component-core-postcall`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `outputs_get`, `output_edit`, `outputs_regenerate`, `output_versions`, `output_version_get`
@@ -1030,9 +1030,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.18 Items, Today, sharing and export - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-items-today`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-items-today`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-items-today.md](features/core/core-items-today.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#245 #250 #258 #264 #268); the carry-forward start/end steps and their two transitions moved to [core-people](features/core/core-people.md) (M3), the answered and evidence transitions to [core-evidence-proposals](features/core/core-evidence-proposals.md) (M5). FEATURE spec: [features/core/core-items-today.md](features/core/core-items-today.md)
 
 - **Purpose**: Own the records the user acts on most: item lifecycle and review, evidence spans, the carry-forward query, the Today read model, call tags, share formats and export.
 
@@ -1052,7 +1052,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-intent-commands`
+  - `cpt-noter-principle-core-intent-commands`
 
 - **Design Constraints Covered**:
 
@@ -1065,7 +1065,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-items`
+  - `cpt-noter-component-core-items`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `items_list`, `item_get`, `item_set_done`, `item_review`, `items_review_all`, `item_edit`, `item_reopen`, `item_create`, `item_answer_handoff_landed`, `today_get`, `share_copy`, `calls_export`, `call_tags_set`, `tags_list`
@@ -1087,9 +1087,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.19 Handoff launcher and repositories - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-handoff`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-handoff`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#251 #255); three parts are open: acceptance criterion 6 (the `noter-native` query-cap test and the macOS launch evidence: 2.21 part B and the owner), the rubric evals (golden set, owner) and the `claude://code/new` / `codex://new` parameter check (owner's Mac). FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
 
 - **Purpose**: Generate handoff prompts on demand, keep their versions and edits, resolve the repository, detect the launch path and open the prompt in Claude Code or Codex pre-filled, never sent.
 
@@ -1119,7 +1119,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-handoff`
+  - `cpt-noter-component-core-handoff`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `handoff_get`, `handoff_generate`, `handoff_edit`, `handoff_set_target`, `handoff_open`, `handoff_copy`, `handoff_cancel`, `repos_list`, `repo_upsert`, `repo_remove`
@@ -1136,9 +1136,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.20 History, undo and redo - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-history-undo`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-history-undo`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-history-undo.md](features/core/core-history-undo.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#232 #238 #249). FEATURE spec: [features/core/core-history-undo.md](features/core/core-history-undo.md)
 
 - **Purpose**: Make every logged change readable and reversible: undo and redo by change or batch at any time, skipping rows edited later, and the History read model and export.
 
@@ -1156,7 +1156,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-core-single-writer`
+  - `cpt-noter-principle-core-single-writer`
 
 - **Design Constraints Covered**:
 
@@ -1167,7 +1167,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-changelog`
+  - `cpt-noter-component-core-changelog`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `history_list`, `change_undo`, `change_redo`, `history_export`
@@ -1182,9 +1182,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.21 Native services: launch, clipboard, panels and share test - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-native-services`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-native-services`
 
-- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
+- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IMPLEMENTED (#243 #259 #267); open on the owner's Mac only: the `cwd`/`q` parameters of `claude://code/new` and `codex://new`, a real Screen Recording and Automation prompt, and a real launch pre-filled and unsent (manual macOS checklist). FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
 
 - **Purpose**: Give the M2 commands the macOS services they need from the core: Launch Services and Apple Events for handoff, rich clipboard formats, save panels for export, and the Screen Share Test.
 
@@ -1207,14 +1207,14 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Constraints Covered**:
 
-  - [ ] `p3` - `cpt-noter-constraint-core-macos`
+  - `cpt-noter-constraint-core-macos`
 
 - **Domain Model Entities**:
   - ShareTestResult
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-core-native`
+  - `cpt-noter-component-core-native`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `share_test_run`

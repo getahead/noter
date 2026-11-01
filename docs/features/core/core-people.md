@@ -24,6 +24,7 @@ design: docs/DESIGN-core.md
   - [Create or edit a person and name a speaker](#create-or-edit-a-person-and-name-a-speaker)
   - [Merge or delete an identity](#merge-or-delete-an-identity)
   - [Opt into or delete a voice profile](#opt-into-or-delete-a-voice-profile)
+  - [Carry open items into a live call](#carry-open-items-into-a-live-call)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Assemble pages and the unnamed queue](#assemble-pages-and-the-unnamed-queue)
   - [Merge all identity references](#merge-all-identity-references)
@@ -165,6 +166,24 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 4. [ ] - `p1` - **RETURN** `VoiceProfileView` containing enabled state and centroid count, never embeddings; emit `entity:changed` after commit - `inst-profile-created`
 5. [ ] - `p1` - API: `voice_profile_delete { person_id }` after the delete alert; atomically clear opt-in and remove every centroid, with a non-undoable change that contains no biometric blobs - `inst-profile-delete`
 6. [ ] - `p1` - Invalidate matching caches and pending writes for the profile; **RETURN** disabled `VoiceProfileView` and emit the person change without renaming any speaker - `inst-profile-deleted`
+
+### Carry open items into a live call
+
+- [ ] `p4` - **ID**: `cpt-noter-flow-core-people-carry`
+
+**Actor**: Job scheduler and session manager, on a live call with known people (moved from `core-items-today`, 2.18)
+
+**Success Scenarios**:
+- Open items offered for the call's people are logged as carried at call start and return to open at call end unless closed or answered meanwhile.
+
+**Error Scenarios**:
+- Unknown attendees alone never imply a match; reading Today alone never changes item status.
+
+**Steps**:
+1. [ ] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status (moved from `core-items-today`, 2.18) - `inst-carry-start`
+2. [ ] - `p1` - **FROM** open **TO** carried **WHEN** offered in a live call with the same people (moved from `core-items-today`, 2.18) - `inst-st-carried`
+3. [ ] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity (moved from `core-items-today`, 2.18) - `inst-carry-end`
+4. [ ] - `p1` - **FROM** carried **TO** open **WHEN** the call ends without closure (moved from `core-items-today`, 2.18) - `inst-st-return-open`
 
 ## 3. Processes / Business Logic (CDSL)
 

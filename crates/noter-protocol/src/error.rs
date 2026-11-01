@@ -181,6 +181,9 @@ pub enum ErrorCode {
     // ── items, outputs, handoff ───────────────────────────────
     /// Outputs or a section are still being written.
     OutputsNotReady,
+    /// The model's output stayed invalid (schema, raw HTML or citations) after the retry and
+    /// the simpler fallback; the section offers retry or a local rewrite.
+    OutputInvalid,
     /// Sharing a scope that contains suggested items not yet reviewed.
     UnreviewedInScope,
     /// No repository mapped for the item's project key.
@@ -319,6 +322,7 @@ impl ErrorCode {
         ErrorCode::BudgetPaused,
         ErrorCode::CopilotOff,
         ErrorCode::OutputsNotReady,
+        ErrorCode::OutputInvalid,
         ErrorCode::UnreviewedInScope,
         ErrorCode::RepoNotMapped,
         ErrorCode::RepoPathMissing,

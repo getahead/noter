@@ -19,8 +19,9 @@ use crate::route::{route, timeout, Route};
 use crate::runtime::{tests_support, RequestState};
 use crate::validate::validate;
 use crate::{
-    Availability, Budget, Failure, Llm, LlmRuntime, MemorySecrets, Packet, PacketItem, Privacy,
-    RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind, TaskSettings, Tested,
+    Availability, Budget, Failure, Llm, LlmRuntime, MemorySecrets, Packet, PacketContext,
+    PacketItem, Privacy, RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind,
+    TaskSettings, Tested,
 };
 
 const NORMAL_TEXT: &str =
@@ -108,6 +109,7 @@ fn packet() -> Packet {
             ),
         ],
         people: vec!["Ann Lee".into()],
+        context: PacketContext::default(),
     }
 }
 
@@ -325,6 +327,37 @@ async fn redaction_and_pseudonyms_are_consistent_and_names_come_back_inside_the_
     let map_id = audit["redaction_map_id"].as_str().unwrap();
     assert!(map_id.starts_with("rmap_"));
     assert!(!f.log_text().contains("Ann Lee"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_call_context_goes_out_with_the_lines_through_the_same_redaction() {
+    let f = fixture(None);
+    f.privacy.send_replace(Privacy {
+        mode: PrivacyMode::CloudRedacted,
+        ..cloud()
+    });
+    let mut req = f.request(Skill::PostCall, TaskKind::PostCall);
+    req.settings.pseudonyms = true;
+    req.packet.context = PacketContext {
+        call_type: Some("planning".into()),
+        language: Some(noter_protocol::Lang::De),
+        glossary: vec![
+            "Kubernetes".into(),
+            "Ann Lee".into(),
+            "ann@example.com".into(),
+        ],
+    };
+    f.llm.run_once(req).await.unwrap();
+    let sent: Value = serde_json::from_slice(&f.scripted.received()[0].bytes).unwrap();
+    assert_eq!(
+        sent["context"],
+        json!({"call_type": "planning", "language": "de", "glossary": ["Kubernetes", "Person 1", "[EMAIL_1]"]})
+    );
+    // No context, no key: the packets of the other skills stay as they were.
+    let req = f.request(Skill::RoleReview, TaskKind::PostCall);
+    let _ = f.llm.run_once(req).await;
+    let sent: Value = serde_json::from_slice(&f.scripted.received()[1].bytes).unwrap();
+    assert!(sent.get("context").is_none(), "{sent}");
 }
 
 // ── validation, the repair retry and the simpler fallback ────────

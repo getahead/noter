@@ -651,6 +651,13 @@ export type CallRow = {
 	archive: ArchiveStatus,
 	audio_kept_until: TimestampMs | null,
 	audio_deleted: boolean,
+	/**
+	 *  When the audio was deleted (by hand or by age); `null` while it is kept or never stored.
+	 *  The call page reads "Audio deleted on <date> (kept N days)" from it (D-36).
+	 */
+	audio_deleted_at: TimestampMs | null,
+	/**  Days the audio is kept under the current retention; 0 for forever and never store. */
+	audio_retention_days: number,
 	open_items: number,
 	review_waiting: number,
 };
@@ -1233,7 +1240,9 @@ export type Effort = "low" | "medium" | "high" | "max";
  *  Event `entity:changed`: a record changed for any reason (a job, another
  *  window, a model run). Windows that show it replace it by id.
  */
-export type EntityChanged = { type: "call"; call: CallRow } | { type: "item"; item: ItemView } | { type: "person"; person: PersonRow } | { type: "topic"; topic: TopicRow } | { type: "agent"; agent: AgentView } | { type: "source"; source: SourceRow } | { type: "handoff"; handoff: HandoffView } | { type: "speakers"; call_id: CallId; speakers: SpeakerView[] } | { type: "removed"; kind: EntityKind; id: string };
+export type EntityChanged = { type: "call"; call: CallRow } | { type: "item"; item: ItemView } | { type: "person"; person: PersonRow } | { type: "topic"; topic: TopicRow } | { type: "agent"; agent: AgentView } | { type: "source"; source: SourceRow } | { type: "handoff"; handoff: HandoffView } | { type: "speakers"; call_id: CallId; speakers: SpeakerView[] } | 
+/**  An output section, whole: an edit, an undo or a regeneration that merged into it. */
+{ type: "section"; call_id: CallId; section: OutputSection } | { type: "removed"; kind: EntityKind; id: string };
 
 export type EntityKind = "call" | "segment" | "speaker" | "person" | "item" | "summary" | "topic" | "agent" | "source" | "glossary" | "setting" | "handoff";
 
@@ -1339,6 +1348,11 @@ export type ErrorCode =
 "copilot_off" | 
 /**  Outputs or a section are still being written. */
 "outputs_not_ready" | 
+/**
+ *  The model's output stayed invalid (schema, raw HTML or citations) after the retry and
+ *  the simpler fallback; the section offers retry or a local rewrite.
+ */
+"output_invalid" | 
 /**  Sharing a scope that contains suggested items not yet reviewed. */
 "unreviewed_in_scope" | 
 /**  No repository mapped for the item's project key. */
@@ -3211,7 +3225,10 @@ export type TagsSetArgs = {
 
 export type TagsSetResult = {
 	calls: CallRow[],
+	/**  The first changed call's change; with `batch_id` set, undo the batch instead. */
 	change_id: ChangeId,
+	/**  Set when several calls changed together: `change_undo` with this batch reverses them all. */
+	batch_id?: BatchId | null,
 };
 
 /**  A term the hallucination/term filter corrected; the original shows in the help tag. */
@@ -3563,7 +3580,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.1";
+export const CONTRACT_VERSION = "2.2";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -4191,7 +4208,7 @@ export const EVENTS = {
   "nav:request": { stability: "frozen" },
 } as const satisfies Record<EventName, { stability: Stability }>;
 
-export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "permission_missing", "permission_denied", "disk_full", "offline", "checksum_failed", "model_missing", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "calendar_unavailable", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "already_undone", "not_undone", "not_undoable", "edited_later", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "tracker_unreachable", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
+export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "permission_missing", "permission_denied", "disk_full", "offline", "checksum_failed", "model_missing", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "output_invalid", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "calendar_unavailable", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "already_undone", "not_undone", "not_undoable", "edited_later", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "tracker_unreachable", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
 
 /** Codes for which **Try Again** makes sense by default (`ErrorCode::default_retryable`). */
 export const DEFAULT_RETRYABLE: readonly ErrorCode[] = ["not_ready", "internal", "offline", "engine_unavailable", "calendar_unavailable", "search_failed", "change_log_unreadable", "tracker_unreachable", "keychain_locked", "source_sync_failed"];

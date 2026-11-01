@@ -14,11 +14,11 @@ use noter_core::{
     Core, Notification, NotificationKind, Placement, Surfaces, TrayAction, TrayEntry, TrayGlyph,
     TrayModel,
 };
-use noter_native::{Frame, PostedNotification};
+use noter_native::{Frame, ParentWindow, PostedNotification};
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
     AppSnapshot, CallLayout, CallPageTab, CapturePhase, CaptureState, DegradedState, DisplayInfo,
-    ExternalTarget, NavTarget, Politeness, SettingsPane, WindowLabel,
+    ExternalTarget, NavTarget, NoterSurface, Politeness, SettingsPane, WindowLabel,
 };
 use noter_protocol::{CallId, DisplayId, NoArgs, PermissionKind};
 use serde_json::{json, Value};
@@ -30,6 +30,8 @@ use tauri::{
 };
 use tauri_nspanel::{tauri_panel, ManagerExt, StyleMask, WebviewPanelManager, WebviewWindowExt};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
+
+use crate::native::{on_main, Windows};
 
 tauri_panel! {
     panel!(CallPanel {
@@ -360,7 +362,15 @@ pub fn posted(n: &Notification) -> PostedNotification {
             "Try Again on the call screen.",
             CallPageTab::Transcript,
         ),
+        // @cpt-begin:cpt-noter-algo-core-postcall-notify:p1:inst-notify-release
+        // One thread per call; the click opens the call's Summary through `nav:request`.
         NotificationKind::SummaryReady => ("Summary ready", "", CallPageTab::Summary),
+        NotificationKind::SummaryFailed => (
+            "Summary not written",
+            "Open the call to try again.",
+            CallPageTab::Summary,
+        ),
+        // @cpt-end:cpt-noter-algo-core-postcall-notify:p1:inst-notify-release
     };
     PostedNotification {
         id: format!("ntf_{}_{}", n.call_id, NEXT.fetch_add(1, Ordering::Relaxed)),
@@ -1087,5 +1097,47 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
         // Delivery is fire-and-forget: a click comes back through `notification_clicked`.
         // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
+    }
+}
+
+/// The windows the Screen Share Test reports, with the surface each one is.
+const SHARED: [(WindowLabel, NoterSurface); 4] = [
+    (WindowLabel::CallScreen, NoterSurface::CallWindow),
+    (WindowLabel::RecordPrompt, NoterSurface::RecordPrompt),
+    (WindowLabel::Main, NoterSurface::MainWindow),
+    (WindowLabel::Settings, NoterSurface::SettingsWindow),
+];
+
+// The windows' AppKit side on the main thread; `MacOps` calls these from a blocking thread.
+impl<R: Runtime> Windows for TauriSurfaces<R> {
+    fn ids(&self) -> Vec<(NoterSurface, u32)> {
+        let app = self.app.clone();
+        on_main(&self.app, move || {
+            SHARED
+                .iter()
+                .filter_map(|&(label, surface)| {
+                    // Only windows that exist: `window()` would open a closed one.
+                    let ns = app.get_webview_window(label.as_str())?.ns_window().ok()?;
+                    // SAFETY: Tauri's live NSWindow, read on the main thread.
+                    let number = unsafe { &*(ns as *const objc2_app_kit::NSWindow) }.windowNumber();
+                    // No window device yet (never shown): nothing a share could see.
+                    Some((surface, u32::try_from(number).ok().filter(|&n| n > 0)?))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+    }
+
+    fn focused(&self) -> Option<ParentWindow> {
+        let app = self.app.clone();
+        on_main(&self.app, move || {
+            let window = app
+                .webview_windows()
+                .into_values()
+                .find(|w| w.is_focused().unwrap_or(false))?;
+            // SAFETY: a live NSWindow; AppKit ends a sheet with the window it is attached to.
+            unsafe { ParentWindow::from_raw(window.ns_window().ok()?) }
+        })
+        .flatten()
     }
 }

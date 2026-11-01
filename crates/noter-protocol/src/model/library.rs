@@ -39,6 +39,11 @@ pub struct CallRow {
     pub archive: ArchiveStatus,
     pub audio_kept_until: Option<TimestampMs>,
     pub audio_deleted: bool,
+    /// When the audio was deleted (by hand or by age); `null` while it is kept or never stored.
+    /// The call page reads "Audio deleted on <date> (kept N days)" from it (D-36).
+    pub audio_deleted_at: Option<TimestampMs>,
+    /// Days the audio is kept under the current retention; 0 for forever and never store.
+    pub audio_retention_days: u32,
     pub open_items: u32,
     pub review_waiting: u32,
 }
@@ -122,7 +127,11 @@ pub struct TagsSetArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct TagsSetResult {
     pub calls: Vec<CallRow>,
+    /// The first changed call's change; with `batch_id` set, undo the batch instead.
     pub change_id: ChangeId,
+    /// Set when several calls changed together: `change_undo` with this batch reverses them all.
+    #[serde(default)]
+    pub batch_id: Option<BatchId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

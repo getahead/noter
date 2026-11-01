@@ -29,7 +29,7 @@ use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, Webview, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-pub use native::Mac;
+pub use native::{Mac, MacOps, Windows};
 
 const WINDOWS: [WindowLabel; 5] = [
     WindowLabel::Main,
@@ -156,7 +156,7 @@ fn boot<R: Runtime>(
         .with_shortcuts(shortcuts)
         .with_engine(Arc::new(engine))
         .with_native(Arc::new(Mac::new(&group)))
-        .with_native_ops(Arc::new(native::MacOps))
+        .with_native_ops(Arc::new(MacOps::new(surfaces.clone())))
         .with_models_dir(group.join("models"))
         .with_models(Arc::new(PinnedModels::new()))
         .with_updater(updater)

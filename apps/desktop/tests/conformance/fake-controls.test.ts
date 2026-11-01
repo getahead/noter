@@ -38,6 +38,17 @@ describe.skipIf(!isFake)("fake core controls", () => {
     expect(fake.world.app.setup.models.error).toBeNull();
   });
 
+  it("output_edit sends the whole section as entity:changed", async () => {
+    const fake = fakeFor("main");
+    const core = createCore(fake);
+    const seen: unknown[] = [];
+    await fake.listen("entity:changed", (p) => seen.push(p));
+    const edited = await core.outputEdit({ call_id: "call_backend", summary_id: "sum_backend", rev: 2, body_md: "Edited." });
+    expect(edited.status).toBe("ok");
+    if (edited.status !== "ok") return;
+    expect(seen).toContainEqual({ type: "section", call_id: "call_backend", section: edited.data.section });
+  });
+
   it("returns copies, so the UI never holds references into core state", async () => {
     const fake = fakeFor("main");
     const core = createCore(fake);

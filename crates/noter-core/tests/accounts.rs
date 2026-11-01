@@ -357,6 +357,7 @@ async fn a_stored_key_the_provider_rejects_becomes_rejected() {
             text: "Ann agreed.".into(),
         }],
         people: vec![],
+        context: Default::default(),
     };
     let privacy = tokio::sync::watch::channel(Privacy {
         mode: PrivacyMode::CloudAllowed,

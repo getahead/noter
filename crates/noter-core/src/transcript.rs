@@ -18,7 +18,7 @@ use std::time::Duration;
 use noter_db::rusqlite::{Connection, OptionalExtension};
 use noter_db::Insert;
 use noter_protocol::engine::{EngineEvent, EngineEventLine, EngineSegment, EngineSegmentState};
-use noter_protocol::ipc::{Caller, CommandCtx, Sink};
+use noter_protocol::ipc::{CommandCtx, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
@@ -374,7 +374,7 @@ impl Core {
     }
     // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-publish-gap-mark
 
-    fn publish_event(&self, call_id: &CallId, event: TranscriptEvent) {
+    pub(crate) fn publish_event(&self, call_id: &CallId, event: TranscriptEvent) {
         // Under the state lock like every publish, so a snapshot never falls between two.
         let _state = lock(&self.transcript.state);
         // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-deliver
@@ -398,49 +398,15 @@ impl Core {
             // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
             self.flush(call_id);
             // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
-            match self.write_transcript_file(call_id) {
-                Ok(()) => self.mark_ready(call_id),
-                Err(e) => self.log_error("file", &e),
+            // The post-call job moves the call on from processing once its outputs are written.
+            if let Err(e) = self.write_transcript_file(call_id) {
+                self.log_error("file", &e);
             }
         }
         lock(&self.transcript.state).calls.remove(call_id);
         self.transcript_hub().end_stream(call_id.as_str(), reason);
     }
     // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-end-stream
-
-    /// processing -> ready once the transcript file is there. Only a call still processing moves:
-    /// the engine's `session_stopped` and the session's own stop both end up here, and a call
-    /// that was continued meanwhile is recording again. From M2 the post-call job writes the
-    /// outputs and moves the call to ready again after its own processing.
-    fn mark_ready(&self, call_id: &CallId) {
-        let processing = self
-            .store
-            .read(|c| {
-                c.query_row(
-                    "SELECT status = 'processing' FROM calls WHERE id = ?1",
-                    [call_id.as_str()],
-                    |r| r.get::<_, bool>(0),
-                )
-                .optional()
-            })
-            .ok()
-            .flatten()
-            .unwrap_or(false);
-        if !processing {
-            return;
-        }
-        let ctx = CommandCtx {
-            caller: Caller::Window {
-                label: WindowLabel::Main,
-            },
-        };
-        // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-ready
-        let values = vec![("status", json!("ready"))];
-        if let Err(e) = self.write_call(&ctx, call_id, "Call ready", false, values) {
-            self.log_error("status", &e);
-        }
-        // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-ready
-    }
 
     /// `audio/<call_id>/transcript.jsonl`, 0600: a temporary file renamed into place.
     // @cpt-dod:cpt-noter-dod-core-live-transcript-span-file:p2
@@ -466,6 +432,11 @@ impl Core {
         std::fs::rename(&tmp, dir.join("transcript.jsonl")).map_err(internal)
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
+    }
+
+    /// The call's folder under the data folder: its transcript, constraints and audio.
+    pub(crate) fn call_dir(&self, call_id: &CallId) -> PathBuf {
+        self.transcript.dir.join("audio").join(call_id.as_str())
     }
 
     fn log_error(&self, what: &str, e: &CoreError) {
@@ -688,17 +659,20 @@ pub(crate) fn segments_of(
 ) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
     let mut stmt = c.prepare(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, s.lang_p, s.avg_logprob,
-                p.id, p.label, p.n, p.named_by, s.pass, p.person_id
+                p.id, COALESCE(p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections,
+                s.crosstalk_with
          FROM segments s LEFT JOIN speakers p ON p.id = s.speaker_id
          WHERE s.call_id = ?1 AND s.pass = (CASE WHEN EXISTS
                (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')
                THEN 'archive' ELSE 'live' END)
          ORDER BY s.t0_ms, s.rowid",
     )?;
+    let mut crosstalk: Vec<Vec<String>> = vec![];
     let rows = stmt.query_map([call_id.as_str()], |r| {
         let channel: AudioChannel = word(&r.get::<_, String>(1)?).unwrap_or(AudioChannel::Mic);
         let label: Option<String> = r.get(9)?;
         let named_by: Option<String> = r.get(11)?;
+        crosstalk.push(serde_json::from_str(&r.get::<_, String>(15)?).unwrap_or_default());
         Ok(SegmentView {
             id: SegmentId::new(r.get::<_, String>(0)?),
             call_id: call_id.clone(),
@@ -711,6 +685,7 @@ pub(crate) fn segments_of(
                     r.get(10)?,
                     named_by.as_deref(),
                     r.get::<_, Option<String>>(13)?,
+                    None,
                 ),
             },
             crosstalk_with: vec![],
@@ -726,14 +701,68 @@ pub(crate) fn segments_of(
             } else {
                 TranscriptPass::Live
             },
-            corrections: vec![],
+            corrections: serde_json::from_str(&r.get::<_, String>(14)?).unwrap_or_default(),
         })
     })?;
     let mut all = rows.collect::<Result<Vec<_>, _>>()?;
+    // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-rechunk
+    // Both candidates of an archive overlap (D-40), labelled as their speakers are.
+    if crosstalk.iter().any(|c| !c.is_empty()) {
+        let speakers = speaker_refs(c, call_id)?;
+        for (segment, ids) in all.iter_mut().zip(crosstalk) {
+            segment.crosstalk_with = ids
+                .iter()
+                .filter_map(|id| speakers.get(id).cloned())
+                .collect();
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-rechunk
     if let Some((channel, t0, t1)) = span {
         all.retain(|s| channel.map_or(true, |c| c == s.channel) && s.t1_ms > t0 && s.t0_ms < t1);
     }
     Ok(all)
+}
+
+/// The call's speakers of its current pass, as `entity:changed` sends them.
+pub(crate) fn speaker_views(
+    c: &Connection,
+    call_id: &CallId,
+) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
+    Ok(speakers_of(c, call_id)?
+        .into_iter()
+        .map(|(_, v)| v)
+        .collect())
+}
+
+/// Every speaker of the call, of both passes, by id.
+fn speaker_refs(
+    c: &Connection,
+    call_id: &CallId,
+) -> noter_db::rusqlite::Result<HashMap<String, SpeakerRef>> {
+    let mut stmt = c.prepare(
+        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers WHERE call_id = ?1",
+    )?;
+    let rows = stmt.query_map([call_id.as_str()], |r| {
+        let id: String = r.get(0)?;
+        let channel: AudioChannel = word(&r.get::<_, String>(3)?).unwrap_or(AudioChannel::Sys);
+        let named_by: Option<String> = r.get(4)?;
+        let label = speaker_label(
+            channel,
+            &r.get::<_, String>(1)?,
+            r.get(2)?,
+            named_by.as_deref(),
+            r.get(5)?,
+            r.get::<_, Option<String>>(6)?.as_deref(),
+        );
+        Ok((
+            id.clone(),
+            SpeakerRef {
+                speaker_id: SpeakerId::new(id),
+                label,
+            },
+        ))
+    })?;
+    rows.collect()
 }
 
 /// The call's live speakers with the engine label each was created for.
@@ -742,7 +771,7 @@ fn speakers_of(
     call_id: &CallId,
 ) -> noter_db::rusqlite::Result<Vec<(String, SpeakerView)>> {
     let mut stmt = c.prepare(
-        "SELECT id, label, n, channel, named_by, person_id FROM speakers
+        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers
          WHERE call_id = ?1 AND pass = (CASE WHEN EXISTS
                (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive')
                THEN 'archive' ELSE 'live' END)
@@ -760,6 +789,7 @@ fn speakers_of(
                 r.get(2)?,
                 named_by.as_deref(),
                 r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<String>>(6)?.as_deref(),
             ),
         };
         let mut view = speaker_view(call_id, &speaker, channel);
@@ -818,7 +848,7 @@ impl Live {
         });
         let speaker = SpeakerRef {
             speaker_id: SpeakerId::new(format!("spk_{}", ulid::Ulid::generate())),
-            label: speaker_label(channel, label, n.map(i64::from), None, None),
+            label: speaker_label(channel, label, n.map(i64::from), None, None, None),
         };
         // @cpt-begin:cpt-noter-algo-core-live-transcript-speakers:p1:inst-you
         let named_by = matches!(speaker.label, SpeakerLabel::You).then_some("you");
@@ -866,10 +896,11 @@ fn speaker_label(
     n: Option<i64>,
     named_by: Option<&str>,
     person_id: Option<String>,
+    name: Option<&str>,
 ) -> SpeakerLabel {
     if let Some(id) = person_id {
         return SpeakerLabel::Person {
-            person: chip(id, label),
+            person: chip(id, name.unwrap_or(label)),
         };
     }
     match channel {
@@ -930,7 +961,7 @@ fn segment_row(seg: &EngineSegment, view: &SegmentView) -> Insert {
 /// The shadow text for the keyword index: lower-cased, ё folded to е, ß to ss.
 // shortcut: no NFKC and no stemming (PRD › Retrieval function); retrieval adds both when it
 // rebuilds the shadow column from `text`.
-fn shadow(text: &str) -> String {
+pub(crate) fn shadow(text: &str) -> String {
     text.to_lowercase().replace('ё', "е").replace('ß', "ss")
 }
 
@@ -939,7 +970,7 @@ fn confidence(avg_logprob: f32) -> f32 {
     avg_logprob.exp().clamp(0.0, 1.0)
 }
 
-fn lang_word(lang: &Lang) -> String {
+pub(crate) fn lang_word(lang: &Lang) -> String {
     match lang {
         Lang::En => "en".into(),
         Lang::Ru => "ru".into(),

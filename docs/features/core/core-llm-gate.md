@@ -37,9 +37,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-llm-gate`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-llm-gate`
 
-- [ ] `p3` - `cpt-noter-feature-core-llm-gate`
+- [x] `p3` - `cpt-noter-feature-core-llm-gate`
 
 ## 1. Feature Context
 
@@ -275,4 +275,4 @@ Open: the macOS network-monitor run with real pinned CLIs is the owner's release
   Open: the network-monitor half is the owner's run of [.plans/backend/m2-network-monitor-runbook.md](../../../.plans/backend/m2-network-monitor-runbook.md).
 - [x] `accounts_get` and `api_key_set` succeed in E2E against the real core with the scripted runtime. `noter-core-harness` provides a Keychain stand-in, a scripted secret store, as part of the Platform seam (Backend Teamlead decision D1, `.plans/core-harness.md`).
   Proven by `apps/desktop/tests/conformance/m2-llm-gate.test.ts` (real core: `--llm-script`, `harness.llm_run`, `harness.keychain`).
-- [ ] `just gate` passes.
+- [x] `just gate` passes.

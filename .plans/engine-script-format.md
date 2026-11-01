@@ -14,6 +14,7 @@ Proposal by be-e2e for be-eng-2, 2026-10-18. The engine-lane half (timed scripts
 - **`on`**: the `type` tag of an `EngineCommand` (`start_session`, `pause`, `stop`, `self_test`, …; not `ping` or `shutdown`, which a step can never follow). The step runs after the engine has `ack`ed that command. Each time the command arrives, its steps run again, in file order.
 - **`after_ms`**: milliseconds after that `ack`, on the scripted engine's clock (tokio time, so a test can pause and advance it, decision NB5).
 - **`event`**: one `EngineEvent` exactly as the protocol serialises it (`contracts/engine.schema.json`). The engine adds `seq` and `at`; a script never writes them.
+- An `offline_done` step whose `result_path` is absolute names a recorded `ArchiveResult` file: the scripted engine copies it into the result file the core asked for, with the asked call id, and sends `offline_done` with that path (a file it cannot read sends `offline_failed`). A relative path is sent as written.
 - **`kill`**: `true` ends the current engine as `kill_current()` does (its stdout closes). The supervisor then sees a dead engine and runs its restart rules. A step has either `event` or `kill`, never both.
 - Blank lines and lines starting with `//` are ignored. Any other line that does not parse fails the whole script, naming the line number.
 

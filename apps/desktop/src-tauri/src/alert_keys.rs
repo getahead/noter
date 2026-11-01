@@ -2,7 +2,7 @@
 //!
 //! The dialog plugin's NSAlert gets Cancel as its first button, and AppKit then gives that button
 //! Escape (it is titled Cancel) and no button Return: Return did nothing. One local key monitor
-//! makes Return in a modal window with no default button click the button that holds Escape,
+//! makes Return in a modal window or sheet with no default button click the button that holds Escape,
 //! AppKit's Cancel; a window whose own default button takes Return (a save panel) is left alone.
 
 use std::ptr::NonNull;
@@ -41,13 +41,14 @@ pub fn return_chooses_cancel() {
         // SAFETY: AppKit hands the monitor a live event, on the main thread.
         let e = unsafe { event.as_ref() };
         let modal = NSApplication::sharedApplication(mtm).modalWindow();
-        let cancel = modal
-            .filter(|m| {
-                RETURN_KEYS.contains(&e.keyCode()) && e.window(mtm).as_deref() == Some(&**m)
-            })
+        let cancel = e
+            .window(mtm)
+            .filter(|_| RETURN_KEYS.contains(&e.keyCode()))
+            // An alert with a parent (the dialog plugin's) is a sheet, never the app's modal window.
+            .filter(|w| w.isSheet() || modal.as_deref() == Some(&**w))
             // While the window is shown AppKit keeps Return on its default button cell, not a key equivalent.
-            .filter(|m| m.defaultButtonCell().is_none())
-            .and_then(|m| m.contentView())
+            .filter(|w| w.defaultButtonCell().is_none())
+            .and_then(|w| w.contentView())
             .and_then(|v| button_for(&v, ESCAPE));
         match cancel {
             Some(button) => {

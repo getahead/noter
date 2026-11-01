@@ -157,6 +157,13 @@ describe("window store", () => {
         payload: { type: "removed", kind: "glossary", id: "g" },
       }),
     ).toBe(s);
+    // A whole output section is the call page's to read (UI M2); the store keeps nothing of it.
+    expect(
+      applyEvent(s, {
+        event: "entity:changed",
+        payload: { type: "section", call_id: "c", section: { kind: "summary" } as never },
+      }),
+    ).toBe(s);
   });
 
   it("writes a command's returned record by identity, keeping the higher rev", () => {

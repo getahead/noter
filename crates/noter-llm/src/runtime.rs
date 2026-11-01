@@ -184,6 +184,23 @@ pub struct Packet {
     pub items: Vec<PacketItem>,
     /// Names to pseudonymize when the task asks for it.
     pub people: Vec<String>,
+    /// What the call is, beside its lines; empty for skills that need none.
+    pub context: PacketContext,
+}
+
+/// The call's context a skill reads with the lines: its type, the language outputs are written
+/// in and the glossary's terms. Leaves with the items, redacted and pseudonymized like them.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PacketContext {
+    pub call_type: Option<String>,
+    pub language: Option<noter_protocol::Lang>,
+    pub glossary: Vec<String>,
+}
+
+impl PacketContext {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.call_type.is_none() && self.language.is_none() && self.glossary.is_empty()
+    }
 }
 
 /// The caller's cancellation handle; cloning shares it.
@@ -519,6 +536,7 @@ impl Llm {
             what: AuditWhat::Outputs,
             items: Vec::new(),
             people: Vec::new(),
+            context: PacketContext::default(),
         };
         let (_privacy, rx) = watch::channel(privacy);
         let mut req = RunRequest::new(Skill::AskAnswer, "key-check", packet, TaskKind::Ask, rx);

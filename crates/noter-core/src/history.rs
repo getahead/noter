@@ -116,7 +116,11 @@ impl Core {
         self.ready()?;
         let noted = target.clone();
         let handle = match target {
-            UndoTarget::Change { change_id } => Handle::Change(change_id),
+            // A naming or term fix is several rows: its handle takes them all.
+            UndoTarget::Change { change_id } => match self.action_batch(&change_id)? {
+                Some(batch) => Handle::Batch(batch),
+                None => Handle::Change(change_id),
+            },
             UndoTarget::Batch { batch_id } => Handle::Batch(batch_id),
         };
         // @cpt-end:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-request
@@ -173,6 +177,7 @@ impl Core {
                     }
                 }
                 // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-undo
+                "summary" => self.publish_section(id)?,
                 "segment" | "speaker" => {
                     let table = if kind == "segment" {
                         "segments"
@@ -189,11 +194,11 @@ impl Core {
                         .optional()
                     })?;
                     if let Some(call_id) = call_id {
+                        // A line moved to a speaker the undo removes: both views change.
                         if kind == "segment" {
-                            transcripts.insert(call_id);
-                        } else {
-                            speakers.insert(call_id);
+                            transcripts.insert(call_id.clone());
                         }
+                        speakers.insert(call_id);
                     }
                 }
                 _ => {}
@@ -216,6 +221,7 @@ impl Core {
             self.write_transcript_file(&CallId::new(call_id))?;
         }
         for call_id in speakers {
+            self.write_constraints_file(&CallId::new(call_id.clone()))?;
             let views = {
                 let call_id = call_id.clone();
                 self.store()

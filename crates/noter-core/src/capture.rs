@@ -997,6 +997,8 @@ impl Core {
             }
             _ => {}
         }
+        // A seeded end of capture sends what was held, as a stop does.
+        self.release_held();
         // A seeded live call is a state to show, not a capture running: it holds no pipeline
         // work or download back (the scripted world keeps running them).
         self.capture_guard

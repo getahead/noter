@@ -41,7 +41,8 @@ impl PowerSource for AcPower {
     }
 }
 
-/// A job kind whose work lands later (2.17 fills post-call and archive): its runs succeed at once.
+/// A job kind until its handler is registered at start (post-call, archive, regeneration and
+/// downloads register theirs in `start_jobs`): its runs succeed at once.
 struct NoOp;
 
 impl JobHandler for NoOp {
@@ -97,6 +98,7 @@ impl Core {
             JobKind::ModelDownload,
             Arc::new(crate::models::DownloadJob(Arc::downgrade(self))),
         );
+        crate::postcall::register(self);
         if let Err(e) = self.jobs.start() {
             self.log(object(json!({
                 "level": "error", "module": "jobs", "message": e.message

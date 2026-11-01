@@ -112,10 +112,10 @@ fn sql_of(v: &Value) -> Sql {
 
 /// A named speaker's chip: shortcut, no `people` table before library-people, so the name is
 /// the label the person's speaker row carries and nobody is the user yet.
-fn owner_chip(c: &Connection, person_id: &str) -> Db<PersonChip> {
+pub(crate) fn owner_chip(c: &Connection, person_id: &str) -> Db<PersonChip> {
     let label: Option<String> = c
         .query_row(
-            "SELECT label FROM speakers WHERE person_id = ?1 ORDER BY rowid DESC LIMIT 1",
+            "SELECT COALESCE(name, label) FROM speakers WHERE person_id = ?1 ORDER BY rowid DESC LIMIT 1",
             [person_id],
             |r| r.get(0),
         )
@@ -220,6 +220,19 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
     })
 }
 
+/// Complete items matching a `WHERE` clause over `i` (items) and `c` (their calls), oldest
+/// first: the shared read behind Today's carry-forward, due and done sections.
+pub(crate) fn items_where(c: &Connection, clause: &str, args: Vec<Sql>) -> Db<Vec<ItemView>> {
+    let rows = c
+        .prepare(&format!(
+            "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
+             WHERE {clause} ORDER BY i.rowid"
+        ))?
+        .query_map(params_from_iter(args), stored)?
+        .collect::<Result<Vec<_>, _>>()?;
+    rows.into_iter().map(|s| assemble(c, s)).collect()
+}
+
 fn clock(ms: u32) -> String {
     format!("{}:{:02}", ms / 60_000, ms / 1000 % 60)
 }
@@ -261,6 +274,7 @@ fn issue_key(key: &str) -> bool {
 type Wanted = Option<Vec<(&'static str, Value)>>;
 
 impl Core {
+    // @cpt-dod:cpt-noter-dod-core-items-today-items:p1
     // @cpt-flow:cpt-noter-flow-core-items-today-read:p1
     pub(crate) fn list_items(&self, args: ItemsListArgs) -> Result<Page<ItemView>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-items-today-read:p1:inst-read-list
@@ -498,7 +512,7 @@ impl Core {
     /// After a commit: the whole changed items through `entity:changed` and each call's
     /// `items.json` refreshed. A failure is logged: the change is committed.
     // @cpt-begin:cpt-noter-algo-core-items-today-mutate:p1:inst-mutate-publish
-    fn items_published(&self, items: &[ItemView]) {
+    pub(crate) fn items_published(&self, items: &[ItemView]) {
         for item in items {
             self.emit_entity_changed(&EntityChanged::Item { item: item.clone() });
         }
@@ -516,8 +530,9 @@ impl Core {
         }
     }
 
-    fn write_items_file(&self, call_id: &str) -> Result<(), CoreError> {
-        let items = self.store().read(|c| {
+    /// Every item of the call, by id: one snapshot on a read connection.
+    pub(crate) fn items_of_call(&self, call_id: &str) -> Result<Vec<ItemView>, CoreError> {
+        self.store().read(|c| {
             c.prepare(&format!(
                 "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
                  WHERE i.call_id = ?1 ORDER BY i.id"
@@ -525,7 +540,11 @@ impl Core {
             .query_map([call_id], stored)?
             .map(|s| assemble(c, s?))
             .collect::<Db<Vec<_>>>()
-        })?;
+        })
+    }
+
+    fn write_items_file(&self, call_id: &str) -> Result<(), CoreError> {
+        let items = self.items_of_call(call_id)?;
         let dir = self.data_dir.join("audio").join(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
         let tmp = dir.join("items.json.tmp");
@@ -824,6 +843,36 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-items-today-item:p1:inst-st-landed
         self.apply(ctx, s, values, "Answered handoff", reason)
         // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-answer
+    }
+
+    /// A used handoff (`handoff_open`, `handoff_copy`): handed off with its target, folder and
+    /// time, and accepted if it was suggested; the owner stays and it is not done. `reason`
+    /// names the prompt version used and whether it was edited (the Handoff metric).
+    pub(crate) fn hand_off(
+        &self,
+        ctx: &CommandCtx,
+        id: &str,
+        target: HandoffTarget,
+        cwd: Option<&str>,
+        reason: &str,
+    ) -> Result<ItemMutation, CoreError> {
+        self.ready()?;
+        let s = self
+            .store()
+            .read(|c| select_item(c, id))?
+            .ok_or_else(not_found)?;
+        // @cpt-begin:cpt-noter-state-core-items-today-item:p1:inst-st-handoff
+        let mut values = vec![
+            ("status", json!("handed_off")),
+            ("handoff_target", json!(name(&target))),
+            ("handoff_cwd", json!(cwd)),
+            ("handed_off_at", json!(self.deps.clock.now().0)),
+        ];
+        if s.review == "suggested" {
+            values.push(("review_state", json!("accepted")));
+        }
+        // @cpt-end:cpt-noter-state-core-items-today-item:p1:inst-st-handoff
+        self.apply(ctx, s, Some(values), "Handed off", reason)
     }
 
     pub(crate) fn create_item(

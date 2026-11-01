@@ -56,11 +56,12 @@ struct Stored {
     audio_deleted: bool,
     audio_not_stored: bool,
     mode_used: String,
+    audio_deleted_at: Option<i64>,
 }
 
 const STORED: &str = "c.id, c.rev, c.started_at, c.ended_at, c.title, c.call_type, c.platform, \
     c.privacy_class, c.status, c.outputs_status, c.archive_status, c.audio_retention_until, \
-    c.audio_deleted, c.audio_not_stored, c.mode_used";
+    c.audio_deleted, c.audio_not_stored, c.mode_used, c.audio_deleted_at";
 
 fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
     Ok(Stored {
@@ -79,6 +80,7 @@ fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
         audio_deleted: r.get(12)?,
         audio_not_stored: r.get(13)?,
         mode_used: r.get(14)?,
+        audio_deleted_at: r.get(15)?,
     })
 }
 
@@ -112,11 +114,30 @@ pub(crate) fn lang_code(lang: &Lang) -> String {
 }
 
 /// The speakers a call shows: the archive pass once it exists, the live one until then.
-const SHOWN_PASS: &str =
+pub(crate) const SHOWN_PASS: &str =
     "(CASE WHEN EXISTS (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive') \
     THEN 'archive' ELSE 'live' END)";
 
 // @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
+/// Days the audio is kept under the stored retention setting (30 until one is saved); 0 for
+/// forever and never store.
+fn retention_days(c: &Connection) -> noter_db::rusqlite::Result<u32> {
+    let stored: Option<String> = c
+        .query_row("SELECT value FROM settings WHERE key = 'audio'", [], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    let word = stored
+        .and_then(|v| serde_json::from_str::<serde_json::Value>(&v).ok())
+        .and_then(|v| v["retention"].as_str().map(String::from));
+    Ok(match word.as_deref() {
+        Some("days7") => 7,
+        Some("days90") => 90,
+        Some("forever" | "never_store") => 0,
+        _ => 30,
+    })
+}
+
 fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<CallRow> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     let mut languages = c.prepare(
@@ -162,6 +183,8 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         archive: word(s.archive_status)?,
         audio_kept_until: s.audio_retention_until.map(TimestampMs),
         audio_deleted: s.audio_deleted,
+        audio_deleted_at: s.audio_deleted_at.map(TimestampMs),
+        audio_retention_days: retention_days(c)?,
         open_items: 0,
         review_waiting: 0,
     };
@@ -367,7 +390,7 @@ impl Core {
             let mut stmt = c.prepare(&sql)?;
             let mut rows = stmt
                 .query_map(params_from_iter(page.params.iter()), |r| {
-                    Ok((stored(r)?, r.get::<_, Sql>(15)?))
+                    Ok((stored(r)?, r.get::<_, Sql>(16)?))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-select
@@ -733,7 +756,7 @@ pub(crate) fn speakers_of(
     call_id: &str,
 ) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
     let mut stmt = c.prepare(&format!(
-        "SELECT s.id, s.label, s.n, s.channel, s.person_id, s.named_by,
+        "SELECT s.id, COALESCE(s.name, s.label), s.n, s.channel, s.person_id, s.named_by,
                 (SELECT count(*) FROM segments g WHERE g.speaker_id = s.id)
          FROM speakers s WHERE s.call_id = ?1 AND s.pass = {SHOWN_PASS} ORDER BY s.rowid"
     ))?;

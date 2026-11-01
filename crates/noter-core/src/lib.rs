@@ -4,9 +4,13 @@
 
 mod accounts;
 mod app;
+mod archive;
+mod audio;
 mod capture;
+mod chunks;
 mod first_run;
 mod glossary;
+mod handoff;
 mod history;
 mod hotkeys;
 mod hub;
@@ -14,17 +18,22 @@ mod items;
 mod jobs;
 mod library;
 mod log;
+mod merge;
 mod models;
 mod native_ops;
 mod notices;
 mod notify;
 mod playback;
+mod postcall;
 mod recovery;
 mod self_test;
 mod settings;
+mod share;
+mod speakers;
 mod surfaces;
 #[cfg(feature = "harness")]
 pub mod testing;
+mod today;
 mod transcript;
 mod tray;
 
@@ -40,14 +49,14 @@ use serde_json::{json, Map, Value};
 use app::WholeState;
 pub use capture::{CaptureEvent, Surfaces};
 pub use first_run::{
-    detection, BoxFuture, BundleFile, BundleSpec, ChunkSink, EnvironmentReading, FetchError,
-    ModelSource, NativeServices, Updater,
+    detection, BoxFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent, ChunkSink,
+    EnvironmentReading, FetchError, ModelSource, NativeServices, Updater,
 };
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 pub use models::PinnedModels;
-pub use native_ops::{NativeOps, SaveKind};
+pub use native_ops::{ClipboardText, LaunchRequest, NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
@@ -288,6 +297,10 @@ pub struct Core {
     playback: playback::Playback,
     /// The live transcript: batching, streams, speakers.
     transcript: transcript::Transcript,
+    /// Post-call sections being written, or failed, that have no committed row yet.
+    postcall: postcall::Sections,
+    /// Handoff prompts being written, and each item's wanted target.
+    handoffs: noter_handoff::Generations,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -328,6 +341,33 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "items and item spans",
         sql: include_str!("../migrations/0004_items.sql"),
     },
+    // @cpt-dbtable:cpt-noter-dbtable-summaries:p1
+    // @cpt-dbtable:cpt-noter-dbtable-summary-versions:p1
+    Migration {
+        owner: "noter-core",
+        version: 5,
+        name: "summaries",
+        sql: include_str!("../migrations/0005_summaries.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 6,
+        name: "speaker names and constraints",
+        sql: include_str!("../migrations/0006_speaker_constraints.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-chunks:p1
+    Migration {
+        owner: "noter-core",
+        version: 7,
+        name: "chunks and crosstalk",
+        sql: include_str!("../migrations/0007_chunks.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 8,
+        name: "audio deletion time",
+        sql: include_str!("../migrations/0008_audio_deleted_at.sql"),
+    },
 ];
 
 impl Core {
@@ -337,7 +377,7 @@ impl Core {
         let log = log::Logger::open(data_dir).map_err(BootError::Io)?;
         let store = match Store::open(
             &data_dir.join("noter.db"),
-            &[noter_db::MIGRATIONS, MIGRATIONS],
+            &[noter_db::MIGRATIONS, MIGRATIONS, noter_handoff::MIGRATIONS],
         ) {
             Ok(store) => Arc::new(store),
             Err(e) => {
@@ -408,6 +448,8 @@ impl Core {
             audio_dir,
             playback: playback::Playback::new(),
             transcript: transcript::Transcript::new(data_dir.to_path_buf()),
+            postcall: postcall::Sections::default(),
+            handoffs: noter_handoff::Generations::default(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
@@ -626,6 +668,16 @@ impl CoreApi for Core {
         self.start_self_test(ctx, args, channel)
     }
 
+    async fn share_test_run(
+        &self,
+        _ctx: &CommandCtx,
+        args: ShareTestArgs,
+    ) -> Result<ShareTestResult, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-services-share-test:p1:inst-test-request
+        self.share_test(args).await
+        // @cpt-end:cpt-noter-flow-core-native-services-share-test:p1:inst-test-request
+    }
+
     async fn models_download(
         &self,
         _ctx: &CommandCtx,
@@ -684,6 +736,46 @@ impl CoreApi for Core {
         self.span_preview(args)
     }
 
+    async fn transcript_rename_speaker(
+        &self,
+        ctx: &CommandCtx,
+        args: RenameSpeakerArgs,
+    ) -> Result<SpeakerMutation, CoreError> {
+        self.rename_speaker(ctx, args)
+    }
+
+    async fn transcript_name_speakers(
+        &self,
+        ctx: &CommandCtx,
+        args: NameSpeakersArgs,
+    ) -> Result<SpeakerMutation, CoreError> {
+        self.name_speakers(ctx, args)
+    }
+
+    async fn transcript_fix_term(
+        &self,
+        ctx: &CommandCtx,
+        args: FixTermArgs,
+    ) -> Result<FixTermResult, CoreError> {
+        self.fix_term(ctx, args)
+    }
+
+    async fn audio_delete(
+        &self,
+        ctx: &CommandCtx,
+        args: DeleteAudioArgs,
+    ) -> Result<DeleteAudioResult, CoreError> {
+        self.delete_audio(ctx, args)
+    }
+
+    async fn audio_delete_older(
+        &self,
+        ctx: &CommandCtx,
+        args: DeleteOldAudioArgs,
+    ) -> Result<DeleteAudioResult, CoreError> {
+        self.delete_audio_older(ctx, args)
+    }
+
     async fn update_install(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<Ack, CoreError> {
         self.install_update().await
     }
@@ -724,6 +816,46 @@ impl CoreApi for Core {
         self.delete_calls(ctx, args)
     }
 
+    async fn outputs_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CallOutputs, CoreError> {
+        self.outputs_now(&args.call_id)
+    }
+
+    async fn output_edit(
+        &self,
+        ctx: &CommandCtx,
+        args: OutputEditArgs,
+    ) -> Result<OutputMutation, CoreError> {
+        self.edit_output(ctx, args)
+    }
+
+    async fn outputs_regenerate(
+        &self,
+        _ctx: &CommandCtx,
+        args: RegenerateArgs,
+    ) -> Result<JobAccepted, CoreError> {
+        self.queue_regeneration(&args)
+    }
+
+    async fn output_versions(
+        &self,
+        _ctx: &CommandCtx,
+        args: SummaryIdArgs,
+    ) -> Result<VersionList, CoreError> {
+        self.output_version_list(&args.summary_id)
+    }
+
+    async fn output_version_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: VersionGetArgs,
+    ) -> Result<VersionBody, CoreError> {
+        self.output_version(&args)
+    }
+
     async fn history_list(
         &self,
         _ctx: &CommandCtx,
@@ -762,6 +894,38 @@ impl CoreApi for Core {
         args: ItemsListArgs,
     ) -> Result<Page<ItemView>, CoreError> {
         self.list_items(args)
+    }
+
+    async fn today_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TodayView, CoreError> {
+        self.today_view()
+    }
+
+    async fn call_tags_set(
+        &self,
+        ctx: &CommandCtx,
+        args: TagsSetArgs,
+    ) -> Result<TagsSetResult, CoreError> {
+        self.set_call_tags(ctx, args)
+    }
+
+    async fn share_copy(
+        &self,
+        _ctx: &CommandCtx,
+        args: ShareCopyArgs,
+    ) -> Result<ShareResult, CoreError> {
+        self.copy_share(args).await
+    }
+
+    async fn calls_export(
+        &self,
+        _ctx: &CommandCtx,
+        args: ExportCallsArgs,
+    ) -> Result<ExportResult, CoreError> {
+        self.export_calls(args).await
+    }
+
+    async fn tags_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TagList, CoreError> {
+        self.list_tags()
     }
 
     async fn item_get(&self, _ctx: &CommandCtx, args: ItemIdArgs) -> Result<ItemDetail, CoreError> {
@@ -822,6 +986,78 @@ impl CoreApi for Core {
         args: HandoffLandedArgs,
     ) -> Result<ItemMutation, CoreError> {
         self.answer_handoff(ctx, args)
+    }
+
+    async fn handoff_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.handoff_view(args.item_id.as_str())
+    }
+
+    async fn handoff_generate(
+        &self,
+        _ctx: &CommandCtx,
+        args: HandoffGenerateArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.generate_handoff(args)
+    }
+
+    async fn handoff_cancel(
+        &self,
+        _ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.cancel_handoff(args)
+    }
+
+    async fn handoff_edit(
+        &self,
+        ctx: &CommandCtx,
+        args: HandoffEditArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.edit_handoff(ctx, args)
+    }
+
+    async fn handoff_set_target(
+        &self,
+        _ctx: &CommandCtx,
+        args: HandoffTargetArgs,
+    ) -> Result<HandoffView, CoreError> {
+        self.target_handoff(args)
+    }
+
+    async fn handoff_open(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffOpenResult, CoreError> {
+        self.open_handoff(ctx, args).await
+    }
+
+    async fn handoff_copy(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemIdArgs,
+    ) -> Result<HandoffCopyResult, CoreError> {
+        self.copy_handoff(ctx, args).await
+    }
+
+    async fn repos_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<RepoList, CoreError> {
+        self.list_repos()
+    }
+
+    async fn repo_upsert(
+        &self,
+        ctx: &CommandCtx,
+        args: RepoUpsertArgs,
+    ) -> Result<RepoList, CoreError> {
+        self.upsert_repo(ctx, args).await
+    }
+
+    async fn repo_remove(&self, ctx: &CommandCtx, args: RepoIdArgs) -> Result<RepoList, CoreError> {
+        self.remove_repo(ctx, args)
     }
 
     async fn window_show_call(

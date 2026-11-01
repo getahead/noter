@@ -2238,6 +2238,7 @@ version = "0.1.0"
 dependencies = [
  "noter-db",
  "noter-engine-client",
+ "noter-handoff",
  "noter-jobs",
  "noter-llm",
  "noter-protocol",
@@ -2255,6 +2256,7 @@ dependencies = [
  "noter-core",
  "noter-db",
  "noter-engine-client",
+ "noter-native",
  "noter-protocol",
  "serde",
  "serde_json",
@@ -2306,6 +2308,18 @@ dependencies = [
  "noter-protocol",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "noter-handoff"
+version = "0.1.0"
+dependencies = [
+ "noter-db",
+ "noter-llm",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "ulid",
 ]
 
 [[package]]

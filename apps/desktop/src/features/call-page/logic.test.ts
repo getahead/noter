@@ -14,7 +14,7 @@ const row = (o: Partial<CallRow> = {}): CallRow =>
       { id: "p2", display_name: "You", short_name: "You", initials: "Y", is_you: true },
     ],
     unnamed_speakers: 0, languages: ["en", "ru"], tags: [], privacy: "normal", status: "ready", outputs: "none", archive: "none",
-    audio_kept_until: Date.UTC(2026, 10, 15), audio_deleted: false, open_items: 0, review_waiting: 0, ...o,
+    audio_kept_until: Date.UTC(2026, 10, 15), audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0, ...o,
   }) as unknown as CallRow;
 
 describe("route key", () => {

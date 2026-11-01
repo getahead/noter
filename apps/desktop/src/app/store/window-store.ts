@@ -285,6 +285,8 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
             (acc, sp) => setEntity(acc, "speaker", sp.id, sp),
             s,
           );
+        case "section":
+          return s;
         case "removed": {
           const slice = (
             s.entities as unknown as Record<string, Record<string, unknown>>

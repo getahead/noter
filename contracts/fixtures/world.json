@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.1",
+    "contract_version": "2.2",
     "copilot": {
       "agents": [
         {
@@ -658,7 +658,9 @@
       "call": {
         "archive": "not_started",
         "audio_deleted": false,
+        "audio_deleted_at": null,
         "audio_kept_until": 1794729600000,
+        "audio_retention_days": 30,
         "call_type": "planning",
         "duration_ms": 1380000,
         "id": "call_live",
@@ -852,7 +854,9 @@
       "call": {
         "archive": "done",
         "audio_deleted": false,
+        "audio_deleted_at": null,
         "audio_kept_until": 1793520000000,
+        "audio_retention_days": 30,
         "call_type": "cross_team",
         "duration_ms": 3120000,
         "id": "call_backend",
@@ -1009,7 +1013,9 @@
     {
       "archive": "not_started",
       "audio_deleted": false,
+      "audio_deleted_at": null,
       "audio_kept_until": 1794729600000,
+      "audio_retention_days": 30,
       "call_type": "planning",
       "duration_ms": 1380000,
       "id": "call_live",
@@ -1065,7 +1071,9 @@
     {
       "archive": "done",
       "audio_deleted": false,
+      "audio_deleted_at": null,
       "audio_kept_until": 1793520000000,
+      "audio_retention_days": 30,
       "call_type": "cross_team",
       "duration_ms": 3120000,
       "id": "call_backend",
@@ -2572,7 +2580,9 @@
     "live_call": {
       "archive": "not_started",
       "audio_deleted": false,
+      "audio_deleted_at": null,
       "audio_kept_until": 1794729600000,
+      "audio_retention_days": 30,
       "call_type": "planning",
       "duration_ms": 1380000,
       "id": "call_live",

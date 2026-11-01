@@ -24,6 +24,8 @@ const call = (id: string, o: Partial<CallRow> = {}) =>
     archive: "done",
     audio_kept_until: null,
     audio_deleted: false,
+    audio_deleted_at: null,
+    audio_retention_days: 30,
     open_items: 0,
     review_waiting: 0,
     ...o,

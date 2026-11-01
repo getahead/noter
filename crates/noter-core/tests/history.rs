@@ -642,14 +642,27 @@ fn open_with_panel(dir: &Path, answer: Option<std::path::PathBuf>) -> (Core, Arc
         answer,
         asked: Mutex::default(),
     });
-    // The change log stamps rows with the wall clock, so "today" must be the real one here.
-    let deps = CoreDeps::new(
-        Arc::new(noter_core::SystemClock),
-        Arc::new(Events::default()),
-    )
-    .with_native_ops(panel.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        .with_native_ops(panel.clone());
     (Core::open(dir, deps).expect("core opens"), panel)
 }
+
+/// The change log stamps rows with the wall clock, and `changes` is append-only, so the export
+/// tests append their rows at known moments of the fixed clock's day (NOW is 2026-10-16 08:00 UTC)
+/// and assert dates exactly.
+fn log_title(dir: &Path, id: &str, call: &str, (before, after): (&str, &str), at: i64) {
+    let db = noter_db::rusqlite::Connection::open(dir.join("noter.db")).unwrap();
+    db.execute(
+        "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, summary, reason, status, undoable)
+         VALUES (?1, ?2, 'you', 'call', ?3, 'title', ?4, ?5, 'Changed call info', 'test', 'applied', 1)",
+        noter_db::rusqlite::params![id, at, call, before, after],
+    )
+    .unwrap();
+}
+
+const MIDNIGHT: i64 = NOW - 8 * 3_600_000; // 2026-10-16 00:00 UTC
+const AFTERNOON: i64 = MIDNIGHT + 14 * 3_600_000 + 5 * 60_000; // 2026-10-16 14:05 UTC
+const LATE_YESTERDAY: i64 = MIDNIGHT - 60_000; // 2026-10-15 23:59 UTC
 
 async fn export(
     core: &Core,
@@ -672,8 +685,20 @@ async fn export_markdown_writes_one_plain_line_per_change_after_the_panel_answer
     let target = dir.path().join("out.md");
     let (core, panel) = open_with_panel(dir.path(), Some(target.clone()));
     seed(&core, &["call_a", "call_b"]);
-    rename(&core, "call_a", 1, "Planning").await.unwrap();
-    rename(&core, "call_b", 1, "Other").await.unwrap();
+    log_title(
+        dir.path(),
+        "chg_a",
+        "call_a",
+        ("Call call_a", "Planning"),
+        AFTERNOON,
+    );
+    log_title(
+        dir.path(),
+        "chg_b",
+        "call_b",
+        ("Call call_b", "Other"),
+        AFTERNOON,
+    );
 
     let done = export(&core, call_scope("call_a"), LogFormat::Markdown)
         .await
@@ -682,50 +707,79 @@ async fn export_markdown_writes_one_plain_line_per_change_after_the_panel_answer
         (done.path.as_str(), done.files),
         (target.to_str().unwrap(), 1)
     );
-    let text = std::fs::read_to_string(&target).unwrap();
-    let lines: Vec<_> = text.lines().filter(|l| l.starts_with("- ")).collect();
-    assert_eq!(lines.len(), 1, "{text}");
-    assert!(lines[0].contains("Changed call info") && lines[0].contains("Planning"));
-    assert!(lines[0].starts_with("- 20") && lines[0].contains(" · You · "));
-    assert!(!text.contains("Other"));
+    assert_eq!(
+        std::fs::read_to_string(&target).unwrap(),
+        "# Noter history: call-call_a\n\n- 2026-10-16 14:05 · You · Changed call info: Call call_a (“Call call_a” → “Planning”)\n"
+    );
     let asked = panel.asked.lock().unwrap();
     assert_eq!(asked.len(), 1);
-    assert!(asked[0].0.ends_with(".md") && asked[0].1 == noter_core::SaveKind::Markdown);
+    assert!(
+        asked[0].0 == "noter-history-call-call_a.md"
+            && asked[0].1 == noter_core::SaveKind::Markdown
+    );
 }
 
 #[tokio::test]
-async fn export_json_carries_every_field_of_every_matching_row() {
+async fn export_json_carries_every_field_of_the_rows_in_the_period() {
     let dir = tempfile::tempdir().unwrap();
     let target = dir.path().join("out.json");
     let (core, panel) = open_with_panel(dir.path(), Some(target.clone()));
     seed(&core, &["call_a"]);
-    let done = rename(&core, "call_a", 1, "Planning").await.unwrap();
+    log_title(
+        dir.path(),
+        "chg_early",
+        "call_a",
+        ("Call call_a", "Early"),
+        LATE_YESTERDAY,
+    );
+    log_title(
+        dir.path(),
+        "chg_noon",
+        "call_a",
+        ("Early", "Planning"),
+        AFTERNOON,
+    );
 
-    let period = LogScope::Period {
-        from: LocalDate("2020-01-01".into()),
-        to: LocalDate("2999-12-31".into()),
+    let page = history(&core, list_args(HistoryTarget::All)).await.rows;
+    let row = |id: &str| page.iter().find(|r| r.id.as_str() == id).unwrap().clone();
+    let (early, noon) = (row("chg_early"), row("chg_noon"));
+    assert_eq!(
+        (early.at, noon.at),
+        (TimestampMs(LATE_YESTERDAY), TimestampMs(AFTERNOON))
+    );
+    let day = |from: &str, to: &str| LogScope::Period {
+        from: LocalDate(from.into()),
+        to: LocalDate(to.into()),
     };
-    export(&core, period, LogFormat::Json).await.unwrap();
-    let rows: Vec<ChangeRow> =
-        serde_json::from_str(&std::fs::read_to_string(&target).unwrap()).unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].id, done.change_id);
-    assert_eq!(rows[0].after.as_deref(), Some("Planning"));
-    assert!(panel.asked.lock().unwrap()[0].0.ends_with(".json"));
-
-    // A day with no change exports an empty list; Today is the clock's day.
-    let before = LogScope::Period {
-        from: LocalDate("1970-01-01".into()),
-        to: LocalDate("1970-01-02".into()),
+    // The export is the History rows, oldest first, every field verbatim.
+    let exported = |scope| async {
+        export(&core, scope, LogFormat::Json).await.unwrap();
+        serde_json::from_str::<Vec<ChangeRow>>(&std::fs::read_to_string(&target).unwrap()).unwrap()
     };
-    export(&core, before, LogFormat::Json).await.unwrap();
-    assert_eq!(std::fs::read_to_string(&target).unwrap().trim(), "[]");
-    export(&core, LogScope::Today, LogFormat::Json)
-        .await
-        .unwrap();
-    assert!(std::fs::read_to_string(&target)
+    assert_eq!(
+        exported(day("2026-10-16", "2026-10-16")).await,
+        vec![noon.clone()]
+    );
+    assert_eq!(
+        exported(day("2026-10-15", "2026-10-15")).await,
+        vec![early.clone()]
+    );
+    assert_eq!(exported(day("2026-10-14", "2026-10-14")).await, vec![]);
+    assert_eq!(exported(day("2026-10-17", "2026-10-18")).await, vec![]);
+    assert_eq!(exported(LogScope::Today).await, vec![noon.clone()]);
+    for scope in [LogScope::Last7Days, LogScope::Last30Days] {
+        assert_eq!(exported(scope).await, vec![early.clone(), noon.clone()]);
+    }
+    let names: Vec<_> = panel
+        .asked
+        .lock()
         .unwrap()
-        .contains("Planning"));
+        .iter()
+        .map(|a| a.0.clone())
+        .collect();
+    assert_eq!(names[0], "noter-history-2026-10-16-to-2026-10-16.json");
+    assert!(names.contains(&"noter-history-2026-10-16.json".to_string()));
+    assert!(names.contains(&"noter-history-last-7-days.json".to_string()));
 }
 
 #[tokio::test]

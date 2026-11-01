@@ -14,10 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock,
-    Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError, MemorySecrets, ModelSource,
-    NativeOps, NativeServices, Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel,
-    Updater,
+    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent,
+    CaptureEvent, ChunkSink, ClipboardText, Clock, Core, CoreDeps, EnvironmentReading,
+    EventEmitter, FetchError, LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices,
+    Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -264,11 +264,15 @@ impl Harness {
         // result, so their events stay off the wire (`seeding` is cleared before `Ok`).
         let seeding = Arc::new(AtomicBool::new(true));
         // The self-test takes a moment, so a window can watch it and a scenario can push into it.
-        let engine = ScriptedEngine::new().with_default(Behaviour {
-            self_test_pace_ms: 300,
-            self_test_line: Some("Welcome to Noter".into()),
-            ..Behaviour::default()
-        });
+        // The data folder stands in for the App Group container: the offline pass and the
+        // embeddings write their built-in answers there.
+        let engine = ScriptedEngine::new()
+            .with_default(Behaviour {
+                self_test_pace_ms: 300,
+                self_test_line: Some("Welcome to Noter".into()),
+                ..Behaviour::default()
+            })
+            .with_container(dir.to_path_buf());
         let engine = match options.engine_script {
             Some(script) => engine.with_script(script),
             None => engine,
@@ -280,6 +284,9 @@ impl Harness {
         let panel = Arc::new(ScriptedPanel {
             dir: dir.join("exports"),
             cancel_next: AtomicBool::new(false),
+            launch: Mutex::new(LaunchWorld::default()),
+            log: Mutex::new(json!({ "launches": [], "clipboard": [] })),
+            probe_fails: Mutex::new(None),
         });
         let deps = CoreDeps::new(
             clock.clone(),
@@ -408,6 +415,7 @@ impl Harness {
         }
         self.write_setup(&wanted["app"]["setup"]).await?;
         self.seed_calls(&wanted)?;
+        self.native.set_calendar(&w.today);
         if !w.app.banners.banners.is_empty() {
             self.core.set_banners(w.app.banners.banners.clone());
         }
@@ -486,6 +494,7 @@ impl Harness {
                     ("archive_status", call["archive"].clone()),
                     ("audio_retention_until", call["audio_kept_until"].clone()),
                     ("audio_deleted", call["audio_deleted"].clone()),
+                    ("audio_deleted_at", call["audio_deleted_at"].clone()),
                     (
                         "audio_not_stored",
                         detail.map_or(json!(false), |d| d["audio_not_stored"].clone()),
@@ -665,6 +674,7 @@ impl Harness {
             }
         }
         // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
+        rows.extend(summary_rows(wanted));
         self.core.store().insert_batch(rows)
     }
 
@@ -1241,6 +1251,32 @@ impl Controls for Harness {
                     self.panel.cancel_next.store(true, Ordering::SeqCst);
                     Ok(json!({}))
                 }
+                // `{ plan: LaunchPlan, fail?: [{ path, code }] }`: what the Mac reports for the
+                // next handoff launches, and which paths fail with which code.
+                "launch_world" => {
+                    let world: LaunchWorld = parse(
+                        args,
+                        "harness.launch_world needs { plan: LaunchPlan, fail?: [{ path, code }] }",
+                    )?;
+                    *lock(&self.panel.launch) = world;
+                    Ok(json!({}))
+                }
+                // `{ fail: ErrorCode | null }`: the Screen Share Test's probe fails with `fail`
+                // from now on, or passes again.
+                "share_test_probe" => {
+                    #[derive(serde::Deserialize)]
+                    struct Probe {
+                        fail: Option<ErrorCode>,
+                    }
+                    let probe: Probe = parse(
+                        args,
+                        "harness.share_test_probe needs { fail: ErrorCode | null }",
+                    )?;
+                    *lock(&self.panel.probe_fails) = probe.fail;
+                    Ok(json!({}))
+                }
+                // `{}`: the launches and clipboard writes so far, oldest first.
+                "native_log" => Ok(lock(&self.panel.log).clone()),
                 "set_output_route" => self.set_output_route(args),
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
@@ -1385,6 +1421,8 @@ type OnChange = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
 struct ScriptedNative(
     Mutex<(HashMap<PermissionKind, PermissionState>, EnvironmentReading)>,
     Mutex<Option<OnChange>>,
+    /// The calendar's events: the cards the world's Today shows, as EventKit would list them.
+    Mutex<Vec<CalendarEvent>>,
 );
 
 impl ScriptedNative {
@@ -1396,9 +1434,35 @@ impl ScriptedNative {
         let native = ScriptedNative(
             Mutex::new((HashMap::new(), EnvironmentReading::default())),
             Mutex::new(None),
+            Mutex::new(vec![]),
         );
         native.set(env, &env.permissions);
         native
+    }
+
+    fn set_calendar(&self, today: &TodayView) {
+        *lock(&self.2) = today
+            .today
+            .iter()
+            .chain(&today.this_week)
+            .map(|c| CalendarEvent {
+                event: CalendarEventRef {
+                    id: c.event_id.clone(),
+                    title: c.title.clone(),
+                    starts_at: c.starts_at,
+                    ends_at: c.ends_at,
+                },
+                platform: c.platform.clone(),
+                attendees: c
+                    .attendees
+                    .iter()
+                    .map(|a| CalendarAttendee {
+                        name: a.name.clone(),
+                        email: a.email.clone(),
+                    })
+                    .collect(),
+            })
+            .collect();
     }
 
     /// Calls the core's listener with the current reading, as the Mac's change notices do.
@@ -1466,6 +1530,18 @@ impl NativeServices for ScriptedNative {
 
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
+    }
+
+    fn calendar_events(
+        &self,
+        from: TimestampMs,
+        to: TimestampMs,
+    ) -> Result<Vec<CalendarEvent>, CoreError> {
+        let events = lock(&self.2).clone();
+        Ok(events
+            .into_iter()
+            .filter(|e| (from.0..to.0).contains(&e.event.starts_at.0))
+            .collect())
     }
 }
 
@@ -1603,22 +1679,155 @@ fn hex(bytes: &[u8]) -> String {
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
 /// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
 /// the harness's.
-/// The save panel, scripted: answers `<data>/exports/<suggested name>`, or cancelled once after
-/// `harness.cancel_next_save_panel` (TL-15). More native asks join it as their commands land.
+/// The native asks, scripted (TL-15): the save panel answers `<data>/exports/<suggested name>`
+/// (a folder for `SaveKind::Folder`), or cancelled once after `harness.cancel_next_save_panel`;
+/// launches follow `harness.launch_world` and, like clipboard writes, are recorded for
+/// `harness.native_log`; the Screen Share Test answers fixed rows (the fake core's) and its
+/// probe passes unless `harness.share_test_probe` says it fails.
 struct ScriptedPanel {
     dir: PathBuf,
     cancel_next: AtomicBool,
+    launch: Mutex<LaunchWorld>,
+    log: Mutex<Value>,
+    probe_fails: Mutex<Option<ErrorCode>>,
+}
+
+/// What the Mac reports for launches: the plan, and the paths that fail with a code.
+#[derive(serde::Deserialize)]
+struct LaunchWorld {
+    plan: LaunchPlan,
+    #[serde(default)]
+    fail: Vec<FailedLaunch>,
+}
+
+#[derive(serde::Deserialize)]
+struct FailedLaunch {
+    path: LaunchPath,
+    code: ErrorCode,
+}
+
+impl Default for LaunchWorld {
+    /// Claude Code's `claude-cli://` handler and Codex's app are installed.
+    fn default() -> Self {
+        Self {
+            plan: LaunchPlan {
+                path: LaunchPath::ClaudeCliLink,
+                needs_automation: false,
+                automation_denied: false,
+            },
+            fail: vec![],
+        }
+    }
 }
 
 impl NativeOps for ScriptedPanel {
-    fn save_panel<'a>(&'a self, name: &'a str, _: SaveKind) -> CoreFuture<'a, Option<PathBuf>> {
+    fn save_panel<'a>(&'a self, name: &'a str, kind: SaveKind) -> CoreFuture<'a, Option<PathBuf>> {
         Box::pin(async move {
             if self.cancel_next.swap(false, Ordering::SeqCst) {
                 return None;
             }
-            std::fs::create_dir_all(&self.dir).ok()?;
-            Some(self.dir.join(name))
+            let path = self.dir.join(name);
+            let folder = if kind == SaveKind::Folder {
+                &path
+            } else {
+                &self.dir
+            };
+            std::fs::create_dir_all(folder).ok()?;
+            Some(path)
         })
+    }
+
+    fn launch_plan(&self, target: HandoffTarget) -> LaunchPlan {
+        let mut plan = lock(&self.launch).plan.clone();
+        // The scripted plan names Claude's link; Codex's own handler stands in for it.
+        if target == HandoffTarget::Codex
+            && matches!(
+                plan.path,
+                LaunchPath::ClaudeCliLink | LaunchPath::ClaudeDesktop
+            )
+        {
+            plan.path = LaunchPath::CodexApp;
+        }
+        plan
+    }
+
+    fn launch<'a>(
+        &'a self,
+        path: LaunchPath,
+        req: &'a LaunchRequest,
+    ) -> CoreFuture<'a, Result<(), ErrorCode>> {
+        Box::pin(async move {
+            let failed = lock(&self.launch)
+                .fail
+                .iter()
+                .find(|f| f.path == path)
+                .map(|f| f.code);
+            if let Some(code) = failed {
+                return Err(code);
+            }
+            let launch = json!({
+                "path": path,
+                "target": req.target,
+                "cwd": req.cwd,
+                "prompt_file": req.prompt_file,
+            });
+            push(&self.log, "launches", launch);
+            Ok(())
+        })
+    }
+
+    fn clipboard_write<'a>(
+        &'a self,
+        text: &'a ClipboardText,
+    ) -> CoreFuture<'a, Result<(), String>> {
+        let entry = json!({ "plain": text.plain, "markdown": text.markdown, "html": text.html });
+        push(&self.log, "clipboard", entry);
+        Box::pin(async { Ok(()) })
+    }
+
+    fn share_test<'a>(
+        &'a self,
+        args: &'a ShareTestArgs,
+        call_live: bool,
+        _menu_bar_title_shown: bool,
+        now: TimestampMs,
+    ) -> CoreFuture<'a, Result<ShareTestResult, ErrorCode>> {
+        use ShareVisibility::*;
+        let rows = [
+            NoterSurface::CallWindow,
+            NoterSurface::RecordPrompt,
+            NoterSurface::MainWindow,
+            NoterSurface::SettingsWindow,
+            NoterSurface::MenuBarTitle,
+        ]
+        .map(|surface| ShareTestRow {
+            surface,
+            window_share: Hidden,
+            app_share: Hidden,
+            display_share: if surface == NoterSurface::MenuBarTitle {
+                Visible
+            } else {
+                DependsOnApp
+            },
+        });
+        let fails = *lock(&self.probe_fails);
+        // The probe's states are noter-native's: not run, blocked by the call, passed or failed.
+        let capture_test =
+            noter_native::capture_outcome(args.run_capture_test, call_live, now, || {
+                fails.map_or(Ok(()), Err)
+            });
+        Box::pin(async move {
+            Ok(ShareTestResult {
+                rows: rows.to_vec(),
+                capture_test,
+            })
+        })
+    }
+}
+
+fn push(log: &Mutex<Value>, key: &str, entry: Value) {
+    if let Some(list) = lock(log)[key].as_array_mut() {
+        list.push(entry);
     }
 }
 
@@ -1688,8 +1897,13 @@ impl Surfaces for ScriptedSurfaces {
     fn call_surface_visible(&self) -> bool {
         self.1.load(Ordering::SeqCst)
     }
-    fn post_notification(&self, _: &noter_core::Notification) {
-        self.note("post_notification");
+    fn post_notification(&self, n: &noter_core::Notification) {
+        let kind = match n.kind {
+            noter_core::NotificationKind::CaptureProblem(_) => "capture_problem",
+            noter_core::NotificationKind::SummaryReady => "summary_ready",
+            noter_core::NotificationKind::SummaryFailed => "summary_failed",
+        };
+        self.note(format!("post_notification {kind} {}", n.call_id.as_str()));
     }
 }
 
@@ -1712,4 +1926,97 @@ fn system_audio(rows: &[PermissionRow]) -> PermissionState {
         Some(r) if r.state == PermissionState::Denied => PermissionState::Denied,
         _ => PermissionState::Granted,
     }
+}
+
+/// The world's text sections of the calls it seeds as `summaries` rows, each with its versions
+/// (all generated, the current one last) and the `llm_runs` row their writer comes from.
+fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
+    let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
+        table,
+        values,
+    };
+    // `llm_runs` outlives a world_set's call deletion: each seed writes its own run ids.
+    let seeded = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let mut rows = vec![];
+    let calls = wanted["calls"].as_array().cloned().unwrap_or_default();
+    let seeded_call = |o: &&Value| calls.iter().any(|c| c["id"] == o["call_id"]);
+    for outputs in wanted["outputs"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(seeded_call)
+    {
+        for s in outputs["sections"].as_array().into_iter().flatten() {
+            let (Some(id), Some(body)) = (s["summary_id"].as_str(), s["body_md"].as_str()) else {
+                continue;
+            };
+            let w = &s["writer"];
+            let run = format!("llm_seed_{id}_{seeded}");
+            if w.is_object() {
+                rows.push(ins(
+                    "llm_runs",
+                    vec![
+                        ("id", json!(run)),
+                        ("adapter", json!("fixture")),
+                        ("runtime_choice", w["runtime"].clone()),
+                        ("model", w["model"].clone()),
+                        ("skill", json!("post-call")),
+                        ("skill_version", w["skill_version"].clone()),
+                        ("call_id", outputs["call_id"].clone()),
+                        ("prompt_hash", json!("fixture")),
+                        ("schema_ok", json!(1)),
+                    ],
+                ));
+            }
+            let count = s["version_count"].as_u64().unwrap_or(1).max(1);
+            rows.push(ins(
+                "summaries",
+                vec![
+                    ("id", json!(id)),
+                    ("rev", s["rev"].clone()),
+                    ("call_id", outputs["call_id"].clone()),
+                    ("kind", s["kind"].clone()),
+                    ("current_version_id", json!(format!("ver_{id}_{count}"))),
+                    ("user_edited", s["user_edited"].clone()),
+                    (
+                        "regenerated_with_edits",
+                        s["regenerated_with_edits"].clone(),
+                    ),
+                ],
+            ));
+            for n in 1..=count {
+                rows.push(ins(
+                    "summary_versions",
+                    vec![
+                        ("id", json!(format!("ver_{id}_{n}"))),
+                        ("summary_id", json!(id)),
+                        ("n", json!(n)),
+                        ("kind", json!("generated")),
+                        ("body_md", json!(body)),
+                        ("lang", json!("en")),
+                        ("skill_version", w["skill_version"].clone()),
+                        (
+                            "llm_run_id",
+                            if w.is_object() {
+                                json!(run)
+                            } else {
+                                Value::Null
+                            },
+                        ),
+                        (
+                            "from_pass",
+                            w["from_pass"].as_str().map_or(json!("live"), |p| json!(p)),
+                        ),
+                        (
+                            "created_at",
+                            w["generated_at"].as_i64().map_or(json!(0), |t| json!(t)),
+                        ),
+                    ],
+                ));
+            }
+        }
+    }
+    rows
 }

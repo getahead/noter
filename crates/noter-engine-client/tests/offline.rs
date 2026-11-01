@@ -320,6 +320,42 @@ async fn a_result_behind_a_symlink_out_of_the_container_fails() {
     assert!(matches!(r, Err(OfflineError::BadResult(_))), "{r:?}");
 }
 
+#[tokio::test(start_paused = true)]
+async fn a_scripted_done_naming_an_absolute_file_installs_that_fixture_for_the_asked_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let fixtures = tempfile::tempdir().unwrap();
+    // A result recorded for another call, without word timings.
+    let mut recorded = noter_protocol::fixtures::engine_lines::archive_results().remove(0);
+    recorded.call_id = CallId::new("call_recorded");
+    for s in &mut recorded.segments {
+        s.call_id = recorded.call_id.clone();
+        s.words_path = None;
+    }
+    let fixture = fixtures.path().join("archive.json");
+    std::fs::write(&fixture, serde_json::to_vec(&recorded).unwrap()).unwrap();
+    let step = serde_json::json!({"on": "offline_pass", "after_ms": 10, "event": {
+        "type": "offline_done", "call_id": "call_recorded", "result_path": fixture}});
+    let engine = scripted(dir.path(), &step.to_string());
+    // The core names a fresh result file per pass; the fixture lands there, for this call.
+    let c = client(&engine);
+    let within = |f| tokio::time::timeout(Duration::from_secs(60), f);
+    let path = within(pass(&c, "audio/call_1/archive-01.json"))
+        .await
+        .expect("answered")
+        .unwrap();
+    assert_eq!(path, dir.path().join("audio/call_1/archive-01.json"));
+    let got: ArchiveResult = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(got.call_id, call());
+    assert!(got.segments.iter().all(|s| s.call_id == call()));
+    assert_eq!(got.segments.len(), recorded.segments.len());
+    // A fixture that cannot be read fails the pass instead of leaving it waiting.
+    std::fs::remove_file(&fixture).unwrap();
+    let r = within(pass(&c, "audio/call_1/archive-02.json"))
+        .await
+        .expect("answered");
+    assert!(matches!(r, Err(OfflineError::Engine { .. })), "{r:?}");
+}
+
 /// Progress only: the pass runs until the test answers it.
 const RUNS: &str = r#"{"on": "offline_pass", "after_ms": 10, "event": {"type": "offline_progress", "call_id": "call_1", "progress": 0.5}}"#;
 

@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
-use noter_db::{Mutation, Store};
+use noter_db::{ChangeMeta, Mutation, Store};
 use noter_protocol::model::{CountEntry, JobKind, JobRunRow, JobRunStatus};
 use noter_protocol::{CallId, CoreError, ErrorCode, JobRunId, TimestampMs};
 use serde_json::json;
@@ -636,6 +636,14 @@ impl RunCtx {
 
     pub fn subject(&self) -> Option<&str> {
         self.subject.as_deref()
+    }
+
+    /// The change metadata of this run, for a write the batch shape does not fit (blobs, rows
+    /// without an id); `None` once the run is gone.
+    pub fn change_meta(&self, summary: &str) -> Option<ChangeMeta> {
+        lock(&self.inner.open)
+            .get(&self.id)
+            .map(|e| rows::meta(&e.row, summary))
     }
 
     /// A safe boundary: returns when the run may go on, holding it paused while a guard blocks

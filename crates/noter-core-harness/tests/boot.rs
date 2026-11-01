@@ -914,6 +914,73 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     r.finish().await;
 }
 
+// TL-13: with no `--llm-script` the scripted runtime answers the post-call skill with its
+// built-in valid output, so a real-core call goes from `capture_stop` to its outputs.
+#[tokio::test]
+async fn a_stopped_call_gets_its_outputs_from_the_scripted_runtime_without_a_script() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({ "source": "today", "sensitive": false }),
+        )
+        .await;
+    let call_id = started["call_id"].clone();
+    r.ok("main", "capture_stop", json!({ "call_id": call_id }))
+        .await;
+    let mut outputs = Value::Null;
+    for _ in 0..250 {
+        outputs = r
+            .ok("main", "outputs_get", json!({ "call_id": call_id }))
+            .await;
+        if outputs["status"] == "ready" {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(outputs["status"], "ready", "{outputs}");
+    assert_eq!(outputs["sections"][0]["kind"], "summary");
+    let call = r
+        .ok("main", "call_get", json!({ "call_id": call_id }))
+        .await;
+    assert_eq!(call["call"]["status"], "ready", "{call}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_fixture_outputs_are_seeded_as_summary_rows() {
+    let mut r = start().await;
+    let outputs = r
+        .ok("main", "outputs_get", json!({ "call_id": "call_backend" }))
+        .await;
+    let summary = &outputs["sections"][0];
+    assert_eq!(summary["kind"], "summary");
+    assert_eq!(summary["summary_id"], "sum_backend");
+    assert_eq!(summary["rev"], 2);
+    assert_eq!(summary["version_count"], 2);
+    assert_eq!(summary["writer"]["runtime"], "claude_api_key");
+    assert_eq!(summary["writer"]["model"], "claude-sonnet");
+    assert!(summary["body_md"]
+        .as_str()
+        .unwrap()
+        .starts_with("Backend and QA aligned"));
+    let versions = r
+        .ok(
+            "main",
+            "output_versions",
+            json!({ "summary_id": "sum_backend" }),
+        )
+        .await;
+    assert_eq!(versions["versions"].as_array().unwrap().len(), 2);
+    r.finish().await;
+}
+
 #[tokio::test]
 async fn a_capture_seeded_through_world_set_shows_the_call_window() {
     let mut r = start().await;
@@ -1650,4 +1717,163 @@ fn llm_script_flag_reads_the_scripted_runtime_or_names_the_bad_line() {
     let err = Options::parse(&args).unwrap_err();
     assert!(err.contains("line 2"), "{err}");
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// Polls `handoff_get` until the prompt is ready (the scripted runtime answers at once).
+async fn handoff_ready(r: &mut Runner, item: &str) -> Value {
+    for _ in 0..250 {
+        let view = r
+            .ok("main", "handoff_get", json!({ "item_id": item }))
+            .await;
+        if view["state"]["type"] == "ready" {
+            return view;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("the {item} prompt never became ready");
+}
+
+#[tokio::test]
+async fn scripted_native_ops_record_launches_and_clipboard_writes_and_follow_the_launch_world() {
+    let mut r = start().await;
+    let args = json!({ "item_id": "itm_replay" });
+    let generating = r
+        .ok(
+            "main",
+            "handoff_generate",
+            json!({ "item_id": "itm_replay", "regenerate": false }),
+        )
+        .await;
+    assert_eq!(generating["state"]["type"], "generating");
+    let ready = handoff_ready(&mut r, "itm_replay").await;
+    assert_eq!(ready["launch"]["path"], "claude_cli_link");
+    assert_eq!(ready["unmapped_key"], "VSTOR");
+
+    // No folder given: the scripted folder panel answers one under the data folder.
+    let repos = r
+        .ok(
+            "main",
+            "repo_upsert",
+            json!({ "key": "VSTOR", "local_path": null, "default_tool": "claude_code" }),
+        )
+        .await;
+    assert_eq!(repos["mappings"][0]["path_exists"], true);
+    r.ok("main", "harness.cancel_next_save_panel", json!({}))
+        .await;
+    assert_eq!(
+        r.code(
+            "main",
+            "repo_upsert",
+            json!({ "key": "UI", "default_tool": "codex" })
+        )
+        .await,
+        "cancelled"
+    );
+
+    // Automation denied for the planned terminal: the typed error, nothing launched.
+    let denied = json!({ "plan": { "path": "terminal", "needs_automation": false, "automation_denied": true } });
+    r.ok("main", "harness.launch_world", denied).await;
+    assert_eq!(
+        r.code("main", "handoff_open", args.clone()).await,
+        "automation_denied"
+    );
+    let log = r.ok("main", "harness.native_log", json!({})).await;
+    assert_eq!(log["launches"], json!([]));
+
+    // The link fails and Terminal opens.
+    let fallback = json!({
+        "plan": { "path": "claude_cli_link", "needs_automation": false, "automation_denied": false },
+        "fail": [{ "path": "claude_cli_link", "code": "no_link_handler" }, { "path": "iterm", "code": "no_link_handler" }],
+    });
+    r.ok("main", "harness.launch_world", fallback).await;
+    let opened = r.ok("main", "handoff_open", args.clone()).await;
+    assert_eq!(opened["path_used"], "terminal");
+    assert_eq!(opened["item"]["status"], "handed_off");
+    let copied = r.ok("main", "handoff_copy", args).await;
+    assert!(copied["chars"].as_u64().unwrap() > 0);
+
+    let log = r.ok("main", "harness.native_log", json!({})).await;
+    let launch = &log["launches"][0];
+    assert_eq!(launch["path"], "terminal");
+    assert_eq!(launch["target"], "claude_code");
+    assert!(launch["prompt_file"]
+        .as_str()
+        .unwrap()
+        .ends_with("handoffs/itm_replay.md"));
+    assert_eq!(log["clipboard"][0]["markdown"], ready["prompt_md"]);
+    assert_eq!(
+        r.code("main", "harness.launch_world", json!({ "plan": "nope" }))
+            .await,
+        "invalid_input"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_scripted_folder_panel_answers_a_folder_under_the_data_dir_and_the_clipboard_log_starts_empty(
+) {
+    let mut r = start().await;
+    assert_eq!(
+        r.ok("main", "harness.native_log", json!({})).await,
+        json!({ "launches": [], "clipboard": [] })
+    );
+    let data = r.ok("main", "harness.data_dir", json!({})).await;
+    let shown = r
+        .ok(
+            "main",
+            "calls_export",
+            json!({
+                "call_ids": ["call_backend"],
+                "include": { "summary_and_items": false, "transcript": true, "audio": false }
+            }),
+        )
+        .await;
+    let path = std::path::PathBuf::from(shown["path"].as_str().unwrap());
+    assert!(
+        path.starts_with(data["path"].as_str().unwrap()) && path.is_dir(),
+        "{path:?}"
+    );
+    assert_eq!(shown["files"], 2);
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn the_scripted_share_test_answers_fixed_rows_and_the_probe_states() {
+    let mut r = start().await;
+    let ask = |capture: bool| json!({ "run_capture_test": capture });
+    // The fixture's live call blocks the probe.
+    let live = r.ok("settings", "share_test_run", ask(true)).await;
+    assert_eq!(live["capture_test"], json!({ "type": "blocked_by_call" }));
+    assert_eq!(live["rows"].as_array().unwrap().len(), 5);
+    assert_eq!(live["rows"][4]["surface"], "menu_bar_title");
+    assert_eq!(
+        r.ok("settings", "share_test_run", ask(false)).await["capture_test"],
+        json!({ "type": "not_run" })
+    );
+    r.ok("main", "capture_stop", json!({ "call_id": "call_live" }))
+        .await;
+    let passed = r.ok("settings", "share_test_run", ask(true)).await;
+    assert_eq!(passed["capture_test"]["type"], "passed");
+    assert!(passed["capture_test"]["at"].as_i64().unwrap() > 0);
+    r.ok(
+        "main",
+        "harness.share_test_probe",
+        json!({ "fail": "permission_denied" }),
+    )
+    .await;
+    let failed = r.ok("settings", "share_test_run", ask(true)).await;
+    assert_eq!(
+        failed["capture_test"],
+        json!({ "type": "failed", "code": "permission_denied" })
+    );
+    assert_eq!(
+        r.code("main", "share_test_run", ask(false)).await,
+        "window_not_allowed"
+    );
+    assert_eq!(
+        r.code("main", "harness.share_test_probe", json!({ "fail": 3 }))
+            .await,
+        "invalid_input"
+    );
+    r.finish().await;
 }
