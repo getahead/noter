@@ -2234,6 +2234,33 @@ pub mod engine_lines {
         }]
     }
 
+    /// An example constraints file (`constraints_path`).
+    pub fn constraints() -> Vec<OfflineConstraints> {
+        let span = |t0: u32, t1: u32| EngineSpan {
+            t0_ms: OffsetMs(t0),
+            t1_ms: OffsetMs(t1),
+        };
+        vec![OfflineConstraints {
+            languages: vec![Lang::En, Lang::Other { code: "fr".into() }],
+            glossary: vec![glossary()],
+            speaker_priors: vec![SpeakerPrior {
+                label: "spk_1".into(),
+                en: 0.75,
+                ru: 0.25,
+                de: 0.0,
+            }],
+            must_link: vec![SpanLink {
+                a: span(1_000, 2_000),
+                b: span(5_000, 6_500),
+            }],
+            cannot_link: vec![SpanLink {
+                a: span(1_000, 2_000),
+                b: span(9_000, 9_800),
+            }],
+            speaker_names: [("spk_1".to_string(), "Anna K.".to_string())].into(),
+        }]
+    }
+
     /// An example word-timings file (`words_path`).
     pub fn words() -> Vec<EngineWord> {
         vec![EngineWord {
