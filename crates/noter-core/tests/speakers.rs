@@ -569,3 +569,32 @@ async fn a_term_fix_refuses_bad_ranges_and_foreign_segments() {
     assert_eq!(code(r), ErrorCode::InvalidInput);
     assert_eq!(text_of(&core, "seg_u").0, "Привет kubernets 😀 ok");
 }
+
+#[tokio::test]
+async fn naming_nobody_changes_nothing_and_cannot_be_undone() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let done = core
+        .transcript_name_speakers(
+            &ctx(),
+            NameSpeakersArgs {
+                call_id: CallId::new("call_a"),
+                assignments: vec![],
+            },
+        )
+        .await
+        .unwrap();
+    assert!(done.speakers.iter().all(|s| named(s).is_none()));
+    let undone = core
+        .change_undo(
+            &ctx(),
+            UndoArgs {
+                target: UndoTarget::Change {
+                    change_id: done.change_id,
+                },
+            },
+        )
+        .await;
+    assert_eq!(undone.unwrap_err().code, ErrorCode::NotUndoable);
+}

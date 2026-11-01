@@ -322,13 +322,29 @@ impl Core {
         })??;
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-validate
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-correct
-        // Every speaker skipped (or already that person): nothing to log, so no handle to return.
+        // Every speaker skipped (or already that person): nothing changes, but the answer still
+        // carries a handle, so one content-free row is logged that cannot be undone.
         if plan.mutations.is_empty() {
-            return Err(invalid("assignments", ValidationRule::Required));
+            let mut meta = self.change_meta(ctx, "Named no speakers".into(), "speaker_name");
+            meta.undoable = false;
+            let call = call_id.as_str().to_string();
+            let done = self.store().write_with(meta, move |_| {
+                let logged = noter_db::Logged {
+                    entity_type: "call",
+                    entity_id: call,
+                    field: Some("speakers".into()),
+                    before: None,
+                    after: None,
+                    delta: None,
+                };
+                Ok(((), vec![logged]))
+            })?;
+            let speakers = self.publish_corrected(call_id, &[])?;
+            return Ok(SpeakerMutation {
+                speakers,
+                change_id: done.change_ids[0].clone(),
+            });
         }
-        // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-no-audio
-        // Naming writes text rows only: it works the same once the audio is gone.
-        // @cpt-begin:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-log
         let meta = self.change_meta(ctx, summary.into(), "speaker_name");
         let written = self.store().write_batch(plan.mutations, meta)?;
         // @cpt-end:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-log
