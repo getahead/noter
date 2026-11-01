@@ -1263,6 +1263,23 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-merge
         // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-publish
+        // The call's aggregate follows its sections: Try Again on the failed one makes it ready.
+        let states: Vec<SectionState> = self
+            .outputs_now(call)?
+            .sections
+            .into_iter()
+            .filter(|s| s.kind != SectionKind::RoleReviews)
+            .map(|s| s.state)
+            .collect();
+        let status = aggregate(&states);
+        if let Some(now) = self.current(call)? {
+            if status != OutputsStatus::Writing && now.outputs_status != text_of(&status) {
+                let values = vec![("outputs_status", to_json(&status))];
+                ctx.commit_batch(vec![call_mutation(call, values)], vec![], Some(1.0))
+                    .await?;
+                self.publish_call_row(call);
+            }
+        }
         self.write_files(call);
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-publish
         match first_failure {

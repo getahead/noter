@@ -308,7 +308,7 @@ The system **MUST** pass unit tests for section failure isolation, version guard
 
 ## 6. Acceptance Criteria
 
-- [ ] Real-core E2E `cpt-noter-seq-call-page-review-outputs` reads sections as they arrive, edits Summary, compares versions, retries a failed section locally and regenerates with edits preserved; all five commands succeed.
+- [x] Real-core E2E `cpt-noter-seq-call-page-review-outputs` reads sections as they arrive, edits Summary, compares versions, retries a failed section locally and regenerates with edits preserved; all five commands succeed.
 - [ ] Real-app/native E2E `cpt-noter-seq-notifications-open-outputs` opens the correct call for ready and failed outcomes, suppresses a notice for the visible call and holds it through a subsequent recording. XCUITest uses `test_cpt_noter_seq_notifications_open_outputs` in its test name.
 - [x] Accepted, pinned and edited items survive regeneration; rejected suggestions never return; missing or unknown citations cannot be persisted.
 - [x] Archive failure leaves live evidence usable; archive success resolves the same evidence spans to new text and labels while preserving corrections and edits.
