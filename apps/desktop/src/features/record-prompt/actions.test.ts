@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CallDetection } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
-import { announce, answerCallEnd, answerNewMeeting, dismiss, holdNotice, ignoreApp, openDeleteOldAudio, openSystemSettings, startRecording } from "./actions";
+import { announce, answerCallEnd, answerNewMeeting, dismiss, fitPanel, holdNotice, ignoreApp, openDeleteOldAudio, openSystemSettings, startRecording } from "./actions";
 
 let bridge: Bridge;
 let fake: FakeCore;
@@ -69,5 +69,40 @@ describe("record prompt commands", () => {
     expect(seen).toContainEqual(["open_external", { target: { type: "system_settings", permission: "system_audio" } }]);
     expect(seen).toContainEqual(["window_navigate", { target: { type: "delete_old_audio" } }]);
     expect(seen).toContainEqual(["window_announce", { text: "x", politeness: "assertive" }]);
+  });
+});
+
+describe("the panel window fits the panel", () => {
+  it("sends window_fit with the panel's size in whole points each time it changes, and stops on cleanup", async () => {
+    await ready();
+    const seen = sent();
+    let changed = () => {};
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(cb: () => void) { changed = cb; }
+      observe() {}
+      disconnect = disconnect;
+    });
+    let size = { width: 371.4, height: 126.2 };
+    const panel = { getBoundingClientRect: () => size } as unknown as Element;
+    const stop = fitPanel(bridge, panel);
+    changed();
+    size = { width: 0, height: 0 }; // hidden: nothing to fit
+    changed();
+    size = { width: 400, height: 180 };
+    changed();
+    await new Promise((r) => setTimeout(r));
+    expect(seen.filter(([cmd]) => cmd === "window_fit").map(([, a]) => a)).toEqual([{ width: 372, height: 127 }, { width: 400, height: 180 }]);
+    stop?.();
+    expect(disconnect).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("does nothing without a panel or a ResizeObserver", async () => {
+    await ready();
+    expect(fitPanel(bridge, null)).toBeUndefined();
+    vi.stubGlobal("ResizeObserver", undefined);
+    expect(fitPanel(bridge, {} as Element)).toBeUndefined();
+    vi.unstubAllGlobals();
   });
 });

@@ -11,6 +11,15 @@ final class CallWindowTests: NoterTestCase {
         XCTAssertEqual(other.state, .runningForeground, "it shows without taking focus")
     }
 
+    func test_cpt_noter_seq_floating_panel_hide_and_reopen__click_keeps_focus() {
+        launch()
+        other.activate()
+        hotkey("n")
+        XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "⌃⌥⌘N shows the call window")
+        clickKeepingFocus(callWindow)
+        XCTAssertEqual(other.state, .runningForeground, "no click on the call window moves focus from the call app")
+    }
+
     func test_cpt_noter_seq_call_screen_hide_for_presenting__hotkey_hides_and_restores_every_surface() {
         launch()
         hotkey("n")

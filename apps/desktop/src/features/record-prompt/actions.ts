@@ -7,6 +7,19 @@ import { t } from "../../i18n/format";
 export const announce = (bridge: Bridge, text: string, politeness: Politeness) => bridge.core.windowAnnounce({ text, politeness });
 // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-api-announce
 
+// @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-api-fit
+/** The panel window fits the panel: `window_fit` with its size in whole points each time it changes (not while hidden). */
+export function fitPanel(bridge: Bridge, panel: Element | null): (() => void) | undefined {
+  if (!panel || typeof ResizeObserver === "undefined") return undefined;
+  const fit = new ResizeObserver(() => {
+    const { width, height } = panel.getBoundingClientRect();
+    if (width > 0 && height > 0) void bridge.core.windowFit({ width: Math.ceil(width), height: Math.ceil(height) });
+  });
+  fit.observe(panel);
+  return () => fit.disconnect();
+}
+// @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-api-fit
+
 export type StartResult = { ok: true } | { ok: false; reason: "disk_full" | "model_missing" | "already_recording" | "other"; freeMb?: number };
 
 const REFUSALS = { disk_full: "disk_full", model_missing: "model_missing", already_recording: "already_recording" } as const;

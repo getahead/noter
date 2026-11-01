@@ -55,6 +55,12 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
     await expect(button(page, "Record as Sensitive")).toBeEnabled();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true); // never takes focus; the hotkey and click-in-place are NATIVE: test_cpt_noter_seq_record_prompt_start_recording__hotkey_keeps_focus
     expect(await sent(page, "window_announce")).toContainEqual({ text: "Noter: Record this call? Press Control-Option-Command-R to record.", politeness: "polite" });
+    // the core fits the panel window to the panel (window_fit), 360 to 440 pt wide, so Record lies inside it
+    await expect.poll(async () => (await sent(page, "window_fit")).length).toBeGreaterThan(0);
+    const box = (await panel(page).boundingBox())!;
+    expect((await sent(page, "window_fit")).at(-1)).toEqual({ width: Math.ceil(box.width), height: Math.ceil(box.height) });
+    expect(box.width).toBeGreaterThanOrEqual(360);
+    expect(box.width).toBeLessThanOrEqual(440);
 
     await button(page, "Record").click();
     expect(await sent(page, "capture_start")).toEqual([{ source: "record_prompt", sensitive: false, detection_id: TEAMS }]);
