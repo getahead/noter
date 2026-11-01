@@ -614,3 +614,228 @@ async fn a_transcript_change_refreshes_the_call_file_and_the_speakers() {
         .unwrap()
         .contains("Kubernetes"));
 }
+
+// ---- slice 2: history_export over the NativeOps save panel ----
+
+/// A save panel that answers `answer` (None = the user cancelled) and remembers what it was asked.
+struct Panel {
+    answer: Option<std::path::PathBuf>,
+    asked: Mutex<Vec<(String, noter_core::SaveKind)>>,
+}
+
+impl noter_core::NativeOps for Panel {
+    fn save_panel<'a>(
+        &'a self,
+        suggested_name: &'a str,
+        kind: noter_core::SaveKind,
+    ) -> noter_core::BoxFuture<'a, Option<std::path::PathBuf>> {
+        self.asked
+            .lock()
+            .unwrap()
+            .push((suggested_name.into(), kind));
+        Box::pin(async move { self.answer.clone() })
+    }
+}
+
+fn open_with_panel(dir: &Path, answer: Option<std::path::PathBuf>) -> (Core, Arc<Panel>) {
+    let panel = Arc::new(Panel {
+        answer,
+        asked: Mutex::default(),
+    });
+    // The change log stamps rows with the wall clock, so "today" must be the real one here.
+    let deps = CoreDeps::new(
+        Arc::new(noter_core::SystemClock),
+        Arc::new(Events::default()),
+    )
+    .with_native_ops(panel.clone());
+    (Core::open(dir, deps).expect("core opens"), panel)
+}
+
+async fn export(
+    core: &Core,
+    scope: LogScope,
+    format: LogFormat,
+) -> Result<ExportResult, CoreError> {
+    core.history_export(&main_window(), HistoryExportArgs { scope, format })
+        .await
+}
+
+fn call_scope(id: &str) -> LogScope {
+    LogScope::Call {
+        call_id: CallId::new(id),
+    }
+}
+
+#[tokio::test]
+async fn export_markdown_writes_one_plain_line_per_change_after_the_panel_answers() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("out.md");
+    let (core, panel) = open_with_panel(dir.path(), Some(target.clone()));
+    seed(&core, &["call_a", "call_b"]);
+    rename(&core, "call_a", 1, "Planning").await.unwrap();
+    rename(&core, "call_b", 1, "Other").await.unwrap();
+
+    let done = export(&core, call_scope("call_a"), LogFormat::Markdown)
+        .await
+        .unwrap();
+    assert_eq!(
+        (done.path.as_str(), done.files),
+        (target.to_str().unwrap(), 1)
+    );
+    let text = std::fs::read_to_string(&target).unwrap();
+    let lines: Vec<_> = text.lines().filter(|l| l.starts_with("- ")).collect();
+    assert_eq!(lines.len(), 1, "{text}");
+    assert!(lines[0].contains("Changed call info") && lines[0].contains("Planning"));
+    assert!(lines[0].starts_with("- 20") && lines[0].contains(" · You · "));
+    assert!(!text.contains("Other"));
+    let asked = panel.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1);
+    assert!(asked[0].0.ends_with(".md") && asked[0].1 == noter_core::SaveKind::Markdown);
+}
+
+#[tokio::test]
+async fn export_json_carries_every_field_of_every_matching_row() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("out.json");
+    let (core, panel) = open_with_panel(dir.path(), Some(target.clone()));
+    seed(&core, &["call_a"]);
+    let done = rename(&core, "call_a", 1, "Planning").await.unwrap();
+
+    let period = LogScope::Period {
+        from: LocalDate("2020-01-01".into()),
+        to: LocalDate("2999-12-31".into()),
+    };
+    export(&core, period, LogFormat::Json).await.unwrap();
+    let rows: Vec<ChangeRow> =
+        serde_json::from_str(&std::fs::read_to_string(&target).unwrap()).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].id, done.change_id);
+    assert_eq!(rows[0].after.as_deref(), Some("Planning"));
+    assert!(panel.asked.lock().unwrap()[0].0.ends_with(".json"));
+
+    // A day with no change exports an empty list; Today is the clock's day.
+    let before = LogScope::Period {
+        from: LocalDate("1970-01-01".into()),
+        to: LocalDate("1970-01-02".into()),
+    };
+    export(&core, before, LogFormat::Json).await.unwrap();
+    assert_eq!(std::fs::read_to_string(&target).unwrap().trim(), "[]");
+    export(&core, LogScope::Today, LogFormat::Json)
+        .await
+        .unwrap();
+    assert!(std::fs::read_to_string(&target)
+        .unwrap()
+        .contains("Planning"));
+}
+
+#[tokio::test]
+async fn a_cancelled_panel_is_cancelled_and_leaves_no_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open_with_panel(dir.path(), None);
+    seed(&core, &["call_a"]);
+    let err = export(&core, LogScope::Last7Days, LogFormat::Markdown)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::Cancelled);
+    assert!(!dir.path().join("out.md").exists());
+}
+
+#[tokio::test]
+async fn a_bad_scope_is_invalid_input_before_the_panel_opens() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, panel) = open_with_panel(dir.path(), Some(dir.path().join("out.md")));
+    let bad = |from: &str, to: &str| LogScope::Period {
+        from: LocalDate(from.into()),
+        to: LocalDate(to.into()),
+    };
+    for scope in [
+        bad("2026-10-17", "2026-10-16"),
+        bad("2026-13-01", "2026-13-02"),
+        bad("yesterday", "today"),
+    ] {
+        let err = export(&core, scope, LogFormat::Markdown).await.unwrap_err();
+        assert_eq!(err.code, ErrorCode::InvalidInput);
+    }
+    let missing = export(&core, call_scope("call_nope"), LogFormat::Markdown)
+        .await
+        .unwrap_err();
+    assert_eq!(missing.code, ErrorCode::NotFound);
+    assert!(panel.asked.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn an_export_never_brings_back_what_an_irreversible_delete_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("out.json");
+    let (core, _) = open_with_panel(dir.path(), Some(target.clone()));
+    seed(&core, &["call_a"]);
+    rename(&core, "call_a", 1, "Secret title").await.unwrap();
+    core.calls_delete(
+        &main_window(),
+        CallsDeleteArgs {
+            call_ids: vec![CallId::new("call_a")],
+        },
+    )
+    .await
+    .unwrap();
+    for format in [LogFormat::Json, LogFormat::Markdown] {
+        export(&core, LogScope::Today, format).await.unwrap();
+        let text = std::fs::read_to_string(&target).unwrap();
+        assert!(!text.contains("Secret title"), "{text}");
+        assert!(!text.contains("Call call_a"), "{text}");
+    }
+}
+
+#[tokio::test]
+async fn model_bookkeeping_rows_stay_out_of_history_and_export() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("out.md");
+    let (core, _) = open_with_panel(dir.path(), Some(target.clone()));
+    seed(&core, &["call_a"]);
+    rename(&core, "call_a", 1, "Planning").await.unwrap();
+    let run = LlmRunId::new("llm_one");
+    let values = [
+        ("adapter", "scripted"),
+        ("runtime_choice", "local"),
+        ("model", "m"),
+        ("skill", "post-call"),
+        ("skill_version", "1.0.0"),
+        ("prompt_hash", "h"),
+    ]
+    .map(|(k, v)| (k, json!(v)))
+    .to_vec();
+    core.store()
+        .write(
+            Mutation {
+                entity_type: "llm_run",
+                table: "llm_runs",
+                id: run.as_str().into(),
+                base_rev: None,
+                bump_rev: false,
+                values,
+            },
+            ChangeMeta {
+                actor: Actor::Model {
+                    llm_run_id: run,
+                    runtime: RuntimeChoice::Local,
+                    model: "m".into(),
+                },
+                summary: "Model run started".into(),
+                ..meta("")
+            },
+        )
+        .unwrap();
+
+    for actor in [ActorFilter::All, ActorFilter::Models] {
+        let mut args = list_args(HistoryTarget::All);
+        args.actor = actor;
+        let page = history(&core, args).await;
+        assert!(page.rows.iter().all(|r| r.summary != "Model run started"));
+    }
+    export(&core, LogScope::Today, LogFormat::Markdown)
+        .await
+        .unwrap();
+    assert!(!std::fs::read_to_string(&target)
+        .unwrap()
+        .contains("Model run"));
+}

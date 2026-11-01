@@ -14,6 +14,7 @@ mod jobs;
 mod library;
 mod log;
 mod models;
+mod native_ops;
 mod notices;
 mod notify;
 mod playback;
@@ -45,6 +46,7 @@ pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 pub use models::PinnedModels;
+pub use native_ops::{NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
@@ -116,6 +118,8 @@ pub struct CoreDeps {
     pub secrets: Arc<dyn SecretStore>,
     /// Whether the Mac is on battery, for the jobs that do not run on it (mains power if unset).
     pub power: Arc<dyn noter_jobs::PowerSource>,
+    /// Save panel and the native asks to come (`NativeOps`); every panel cancels until set.
+    pub native_ops: Arc<dyn NativeOps>,
 }
 
 impl CoreDeps {
@@ -136,6 +140,7 @@ impl CoreDeps {
             llm: Adapters::none(),
             secrets: Arc::new(MemorySecrets::default()),
             power: Arc::new(jobs::AcPower),
+            native_ops: Arc::new(native_ops::NoNativeOps),
         }
     }
 
@@ -151,6 +156,11 @@ impl CoreDeps {
 
     pub fn with_secrets(mut self, secrets: Arc<dyn SecretStore>) -> Self {
         self.secrets = secrets;
+        self
+    }
+
+    pub fn with_native_ops(mut self, ops: Arc<dyn NativeOps>) -> Self {
+        self.native_ops = ops;
         self
     }
 
@@ -711,6 +721,14 @@ impl CoreApi for Core {
         args: HistoryListArgs,
     ) -> Result<Page<ChangeRow>, CoreError> {
         self.history_page(args)
+    }
+
+    async fn history_export(
+        &self,
+        _ctx: &CommandCtx,
+        args: HistoryExportArgs,
+    ) -> Result<ExportResult, CoreError> {
+        self.export_history(args).await
     }
 
     async fn change_undo(
