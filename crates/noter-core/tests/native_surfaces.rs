@@ -96,6 +96,9 @@ impl Surfaces for Rec {
     fn show_window(&self, window: WindowLabel) {
         self.note(format!("show_window {}", window.as_str()));
     }
+    fn fit_record_prompt(&self, width: u32, height: u32) {
+        self.note(format!("fit_record_prompt {width}x{height}"));
+    }
 }
 
 fn open(dir: &Path) -> (Core, Arc<Events>, Arc<Rec>) {
@@ -393,6 +396,41 @@ async fn the_tray_follows_capture_privacy_and_presenting() {
     let hidden = rec.tray.lock().unwrap().clone().unwrap();
     assert_eq!(item(&hidden, TrayAction::ShowAfterPresenting), Some(true));
     assert_eq!(item(&hidden, TrayAction::HideForPresenting), None);
+}
+
+#[tokio::test]
+async fn the_record_prompt_fits_its_content_within_the_designed_width() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _events, rec) = open(dir.path());
+    rec.take();
+    let prompt = window(WindowLabel::RecordPrompt);
+    let fit = |width, height| FitArgs { width, height };
+    let empty = core.window_fit(&prompt, fit(0, 120)).await.unwrap_err();
+    assert_eq!(empty.code, ErrorCode::InvalidInput);
+    core.window_fit(&prompt, fit(372, 127)).await.unwrap();
+    core.window_fit(&prompt, fit(300, 2000)).await.unwrap();
+    core.window_fit(&prompt, fit(900, 140)).await.unwrap();
+    assert_eq!(
+        rec.take(),
+        [
+            "fit_record_prompt 372x127",
+            "fit_record_prompt 360x480",
+            "fit_record_prompt 440x140"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn without_a_native_layer_the_fit_is_accepted_and_shows_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let core = Core::open(dir.path(), deps).expect("core opens");
+    let prompt = window(WindowLabel::RecordPrompt);
+    let fit = FitArgs {
+        width: 372,
+        height: 127,
+    };
+    core.window_fit(&prompt, fit).await.unwrap();
 }
 
 #[tokio::test]

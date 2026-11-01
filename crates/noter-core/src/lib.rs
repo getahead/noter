@@ -1157,6 +1157,11 @@ impl CoreApi for Core {
         Ok(Ack {})
     }
 
+    async fn window_fit(&self, _ctx: &CommandCtx, args: FitArgs) -> Result<Ack, CoreError> {
+        self.fit_record_prompt(args)?;
+        Ok(Ack {})
+    }
+
     async fn open_external(
         &self,
         _ctx: &CommandCtx,

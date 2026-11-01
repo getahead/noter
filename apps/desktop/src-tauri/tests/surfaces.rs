@@ -424,7 +424,9 @@ fn the_host_creates_the_core_windows_on_first_use() {
         );
     }
     surfaces.close_record_prompt(); // never shown: nothing to close
+    surfaces.fit_record_prompt(400, 150); // kept for the prompt's first show
     surfaces.show_record_prompt();
+    surfaces.fit_record_prompt(372, 127);
     assert!(app
         .get_webview_window(WindowLabel::RecordPrompt.as_str())
         .is_some());

@@ -1894,6 +1894,9 @@ impl Surfaces for ScriptedSurfaces {
     fn show_window(&self, window: WindowLabel) {
         self.note(format!("show_window {}", window.as_str()));
     }
+    fn fit_record_prompt(&self, width: u32, height: u32) {
+        self.note(format!("fit_record_prompt {width}x{height}"));
+    }
     fn call_surface_visible(&self) -> bool {
         self.1.load(Ordering::SeqCst)
     }

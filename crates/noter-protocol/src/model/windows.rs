@@ -164,6 +164,13 @@ pub struct AnnounceArgs {
     pub politeness: Politeness,
 }
 
+/// The record prompt's content size in points, measured by its webview: the panel fits it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct FitArgs {
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExternalTarget {

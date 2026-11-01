@@ -21,6 +21,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
     const snap = ok(await prompt.appSnapshot({}));
     expect(snap.detection.detection).toMatchObject({ app_name: "Microsoft Teams", blocked: null }); // Microsoft Teams is using the microphone
     ahead(await prompt.windowAnnounce({ text: "Record this call?", politeness: "polite" })); // M1 command
+    ahead(await prompt.windowFit({ width: 372, height: 127 })); // the panel fits its content, Record inside it (M1 command)
 
     const started = ahead(await prompt.captureStart({ source: "record_prompt", sensitive: false, detection_id: detection.id }));
     if (!started) return; // capture_start (M1)
