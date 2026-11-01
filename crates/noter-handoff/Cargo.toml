@@ -1,0 +1,20 @@
+[package]
+name = "noter-handoff"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The handoff launcher: prompt rendering and versions (prompt_versions), repository mappings, the generation registry and the launch order. Never touches SQLite or the network directly."
+publish = false
+
+[dependencies]
+noter-db = { path = "../noter-db" }
+noter-llm = { path = "../noter-llm" }
+noter-protocol = { path = "../noter-protocol" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ulid = "3"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt"] }

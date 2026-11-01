@@ -774,6 +774,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "noter-handoff"
+version = "0.1.0"
+dependencies = [
+ "noter-db",
+ "noter-llm",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "ulid",
+]
+
+[[package]]
 name = "noter-jobs"
 version = "0.1.0"
 dependencies = [
