@@ -112,7 +112,7 @@ fn sql_of(v: &Value) -> Sql {
 
 /// A named speaker's chip: shortcut, no `people` table before library-people, so the name is
 /// the label the person's speaker row carries and nobody is the user yet.
-fn owner_chip(c: &Connection, person_id: &str) -> Db<PersonChip> {
+pub(crate) fn owner_chip(c: &Connection, person_id: &str) -> Db<PersonChip> {
     let label: Option<String> = c
         .query_row(
             "SELECT label FROM speakers WHERE person_id = ?1 ORDER BY rowid DESC LIMIT 1",
@@ -218,6 +218,19 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
         owed,
         carried_from,
     })
+}
+
+/// Complete items matching a `WHERE` clause over `i` (items) and `c` (their calls), oldest
+/// first: the shared read behind Today's carry-forward, due and done sections.
+pub(crate) fn items_where(c: &Connection, clause: &str, args: Vec<Sql>) -> Db<Vec<ItemView>> {
+    let rows = c
+        .prepare(&format!(
+            "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
+             WHERE {clause} ORDER BY i.rowid"
+        ))?
+        .query_map(params_from_iter(args), stored)?
+        .collect::<Result<Vec<_>, _>>()?;
+    rows.into_iter().map(|s| assemble(c, s)).collect()
 }
 
 fn clock(ms: u32) -> String {

@@ -27,6 +27,7 @@ mod settings;
 mod surfaces;
 #[cfg(feature = "harness")]
 pub mod testing;
+mod today;
 mod transcript;
 mod tray;
 
@@ -42,8 +43,8 @@ use serde_json::{json, Map, Value};
 use app::WholeState;
 pub use capture::{CaptureEvent, Surfaces};
 pub use first_run::{
-    detection, BoxFuture, BundleFile, BundleSpec, ChunkSink, EnvironmentReading, FetchError,
-    ModelSource, NativeServices, Updater,
+    detection, BoxFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent, ChunkSink,
+    EnvironmentReading, FetchError, ModelSource, NativeServices, Updater,
 };
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
@@ -818,6 +819,22 @@ impl CoreApi for Core {
         args: ItemsListArgs,
     ) -> Result<Page<ItemView>, CoreError> {
         self.list_items(args)
+    }
+
+    async fn today_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TodayView, CoreError> {
+        self.today_view()
+    }
+
+    async fn call_tags_set(
+        &self,
+        ctx: &CommandCtx,
+        args: TagsSetArgs,
+    ) -> Result<TagsSetResult, CoreError> {
+        self.set_call_tags(ctx, args)
+    }
+
+    async fn tags_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TagList, CoreError> {
+        self.list_tags()
     }
 
     async fn item_get(&self, _ctx: &CommandCtx, args: ItemIdArgs) -> Result<ItemDetail, CoreError> {

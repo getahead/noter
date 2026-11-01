@@ -14,10 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink,
-    ClipboardText, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError,
-    LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices, Placement, SaveKind,
-    Scripted, Surfaces, SystemClock, TrayModel, Updater,
+    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent,
+    CaptureEvent, ChunkSink, ClipboardText, Clock, Core, CoreDeps, EnvironmentReading,
+    EventEmitter, FetchError, LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices,
+    Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -410,6 +410,7 @@ impl Harness {
         }
         self.write_setup(&wanted["app"]["setup"]).await?;
         self.seed_calls(&wanted)?;
+        self.native.set_calendar(&w.today);
         if !w.app.banners.banners.is_empty() {
             self.core.set_banners(w.app.banners.banners.clone());
         }
@@ -1400,6 +1401,8 @@ type OnChange = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
 struct ScriptedNative(
     Mutex<(HashMap<PermissionKind, PermissionState>, EnvironmentReading)>,
     Mutex<Option<OnChange>>,
+    /// The calendar's events: the cards the world's Today shows, as EventKit would list them.
+    Mutex<Vec<CalendarEvent>>,
 );
 
 impl ScriptedNative {
@@ -1411,9 +1414,35 @@ impl ScriptedNative {
         let native = ScriptedNative(
             Mutex::new((HashMap::new(), EnvironmentReading::default())),
             Mutex::new(None),
+            Mutex::new(vec![]),
         );
         native.set(env, &env.permissions);
         native
+    }
+
+    fn set_calendar(&self, today: &TodayView) {
+        *lock(&self.2) = today
+            .today
+            .iter()
+            .chain(&today.this_week)
+            .map(|c| CalendarEvent {
+                event: CalendarEventRef {
+                    id: c.event_id.clone(),
+                    title: c.title.clone(),
+                    starts_at: c.starts_at,
+                    ends_at: c.ends_at,
+                },
+                platform: c.platform.clone(),
+                attendees: c
+                    .attendees
+                    .iter()
+                    .map(|a| CalendarAttendee {
+                        name: a.name.clone(),
+                        email: a.email.clone(),
+                    })
+                    .collect(),
+            })
+            .collect();
     }
 
     /// Calls the core's listener with the current reading, as the Mac's change notices do.
@@ -1481,6 +1510,18 @@ impl NativeServices for ScriptedNative {
 
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
+    }
+
+    fn calendar_events(
+        &self,
+        from: TimestampMs,
+        to: TimestampMs,
+    ) -> Result<Vec<CalendarEvent>, CoreError> {
+        let events = lock(&self.2).clone();
+        Ok(events
+            .into_iter()
+            .filter(|e| (from.0..to.0).contains(&e.event.starts_at.0))
+            .collect())
     }
 }
 

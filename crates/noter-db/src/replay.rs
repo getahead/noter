@@ -44,6 +44,16 @@ pub fn replayable(entity_type: &str, field: Option<&str>) -> bool {
     !(entity_type == "setting" && matches!(field, Some("hotkeys" | "setup")))
 }
 
+/// A call's tags as logged: a JSON array of the tags as written, ordered by their normalized
+/// form. The `tags` field of a `call` change holds this text before and after.
+pub fn call_tags_text(conn: &Connection, call_id: &str) -> rusqlite::Result<String> {
+    let tags = conn
+        .prepare("SELECT tag FROM call_tags WHERE call_id = ?1 ORDER BY tag_norm")?
+        .query_map([call_id], |r| r.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(serde_json::to_string(&tags).unwrap_or_default())
+}
+
 /// Undone and not edited later, so redo would apply it (the `redoable` of a History row).
 pub fn redoable(conn: &Connection, change_id: &str) -> bool {
     let Ok(root) = root_of(conn, change_id) else {
@@ -393,6 +403,11 @@ enum Act {
         table: String,
         id: String,
     },
+    /// A call's tags, replaced whole (`call_tags` has no row ids of its own).
+    Tags {
+        call_id: String,
+        tags: String,
+    },
 }
 
 impl Act {
@@ -411,6 +426,19 @@ impl Act {
             }
             Act::Delete { table, id } => {
                 tx.execute(&format!("DELETE FROM {table} WHERE id = ?1"), [id])
+            }
+            Act::Tags { call_id, tags } => {
+                let tags: Vec<String> = serde_json::from_str(tags).map_err(unreadable)?;
+                tx.execute("DELETE FROM call_tags WHERE call_id = ?1", [call_id])
+                    .map_err(restore_error)?;
+                for tag in &tags {
+                    tx.execute(
+                        "INSERT INTO call_tags (call_id, tag, tag_norm) VALUES (?1, ?2, ?3)",
+                        [call_id, tag, &tag.to_lowercase()],
+                    )
+                    .map_err(restore_error)?;
+                }
+                tx.execute("UPDATE calls SET rev = rev + 1 WHERE id = ?1", [call_id])
             }
             Act::Update {
                 table,
@@ -557,6 +585,18 @@ fn plan(conn: &Connection, row: &Row, dir: Direction) -> Result<Option<Act>, Cor
             .map_err(internal)?;
         let value = target.into_iter().next().and_then(|(_, v)| v);
         return Ok((held == expected[0].1).then_some(Act::Setting { key, value }));
+    }
+    if row.entity_type == "call" && row.field.as_deref() == Some("tags") {
+        let call_id = row.entity_id.clone();
+        let held = call_tags_text(conn, &call_id).map_err(internal)?;
+        let gone = current_row(conn, "calls", &call_id)?.is_none();
+        let tags = target.into_iter().next().and_then(|(_, v)| v);
+        return Ok(match (gone, tags) {
+            (false, Some(tags)) if expected[0].1.as_deref() == Some(&held) => {
+                Some(Act::Tags { call_id, tags })
+            }
+            _ => None,
+        });
     }
     let table = table_of(conn, &row.entity_type)?;
     let columns = columns_of(conn, &table)?;

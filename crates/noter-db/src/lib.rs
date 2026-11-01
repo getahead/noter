@@ -26,7 +26,7 @@ use rusqlite::{Connection, ErrorCode as SqliteCode, OpenFlags};
 
 pub use change::{ChangeMeta, Custom, Insert, Logged, Mutation, Written};
 pub use migrate::{Migration, MIGRATIONS};
-pub use replay::{redoable, replayable, Direction, Handle, Reversed};
+pub use replay::{call_tags_text, redoable, replayable, Direction, Handle, Reversed};
 pub use rusqlite;
 
 /// Read-only connections opened with the store; more are opened when all are busy.

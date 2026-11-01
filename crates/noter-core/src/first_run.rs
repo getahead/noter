@@ -46,6 +46,20 @@ impl Default for EnvironmentReading {
     }
 }
 
+/// A calendar event Today shows, as EventKit reports it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalendarEvent {
+    pub event: CalendarEventRef,
+    pub platform: Option<String>,
+    pub attendees: Vec<CalendarAttendee>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalendarAttendee {
+    pub name: String,
+    pub email: Option<String>,
+}
+
 /// macOS services (`noter-native` in the app, a scripted Mac in the harness).
 pub trait NativeServices: Send + Sync {
     /// The permission's state, without prompting. System audio is never asked here.
@@ -63,6 +77,16 @@ pub trait NativeServices: Send + Sync {
     fn calendar_event_near(&self, at: TimestampMs) -> Option<CalendarEventRef> {
         let _ = at;
         None
+    }
+    /// The events starting in `from..to` of the visible calendars, without prompting; an error
+    /// is a failed read of a permitted calendar (none until noter-native reads ranges).
+    fn calendar_events(
+        &self,
+        from: TimestampMs,
+        to: TimestampMs,
+    ) -> Result<Vec<CalendarEvent>, CoreError> {
+        let _ = (from, to);
+        Ok(vec![])
     }
 }
 

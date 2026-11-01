@@ -112,7 +112,7 @@ pub(crate) fn lang_code(lang: &Lang) -> String {
 }
 
 /// The speakers a call shows: the archive pass once it exists, the live one until then.
-const SHOWN_PASS: &str =
+pub(crate) const SHOWN_PASS: &str =
     "(CASE WHEN EXISTS (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive') \
     THEN 'archive' ELSE 'live' END)";
 
