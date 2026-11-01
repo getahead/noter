@@ -2278,6 +2278,7 @@ name = "noter-desktop"
 version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
+ "block2",
  "minisign",
  "noter-core",
  "noter-core-harness",
@@ -2285,6 +2286,7 @@ dependencies = [
  "noter-native",
  "noter-protocol",
  "objc2",
+ "objc2-app-kit",
  "objc2-foundation",
  "serde_json",
  "tauri",
