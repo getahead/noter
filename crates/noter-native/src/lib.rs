@@ -15,6 +15,12 @@
 //!   [`display_frame`], [`post_notification`] and [`on_notification_click`], [`announce`],
 //!   [`calendar_event_near`]. They work from any thread (the macOS half hops to the main thread
 //!   where AppKit needs it) and do nothing elsewhere.
+//! * Native services (`docs/features/core/core-native-services.md`), for the core's
+//!   `NativeOps`: [`launch_plan`] and [`launch`] (Launch Services links, Terminal or iTerm
+//!   through Apple Events), [`clipboard_write`], [`save_panel`], and [`share_test`] for the
+//!   Screen Share Test. Each decision is a plain function over an injected seam
+//!   ([`plan_launch`], [`launch_with`], [`save_panel_with`], [`share_rows`],
+//!   [`capture_outcome`]); the panel, launch and probe block until macOS answers.
 //!
 //! The request functions block until macOS answers: call them off the async runtime. On other
 //! systems nothing is granted and the environment is empty, so the workspace builds and tests
@@ -22,6 +28,11 @@
 
 #[cfg(target_os = "macos")]
 mod mac;
+#[cfg(target_os = "macos")]
+mod mac_services;
+mod services;
+
+pub use services::*;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};

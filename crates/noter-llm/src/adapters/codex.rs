@@ -44,8 +44,8 @@ impl Codex {
             .env("HOME", self.0.dir("home")?)
             .env("CODEX_HOME", &codex_home);
         if api_key {
-            let key = self.0.config.api_key.as_deref().ok_or("no_key")?;
-            command.env("CODEX_API_KEY", key);
+            let key = call.key.as_ref().ok_or("no_key")?;
+            command.env("CODEX_API_KEY", key.expose());
         } else {
             // shortcut: the sign-in at `~/.codex`; a user who moved CODEX_HOME signs in again.
             let link = codex_home.join("auth.json");

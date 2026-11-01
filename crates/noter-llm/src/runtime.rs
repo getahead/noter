@@ -30,6 +30,7 @@ use tokio::time::Instant;
 use crate::adapters::Reply;
 use crate::gate::{Adapters, Gate, Release};
 use crate::route::{self, Choice, Route};
+use crate::secrets::{key_account, MemorySecrets, Secret, SecretStore};
 use crate::validate;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -259,6 +260,9 @@ pub struct Availability {
     pub unavailable: Option<RuntimeUnavailableReason>,
     /// The installed CLI's version (CLI runtimes).
     pub version: Option<String>,
+    /// Where the runtime was found: the CLI that answered `--version`, or the Ollama URL that
+    /// answered `/api/tags`; `None` when it was not found.
+    pub path: Option<String>,
     /// The CLI versions the adapter was tested with; any other is refused.
     pub tested: Option<Tested>,
     pub models: Vec<String>,
@@ -425,6 +429,9 @@ impl RequestState {
 
 type Log = Box<dyn Fn(&Value) + Send + Sync>;
 type OnSwitch = Box<dyn Fn(&CallId) + Send + Sync>;
+type OnKeyRejected = Box<dyn Fn(RuntimeChoice, &LlmRunId) + Send + Sync>;
+/// A verification's runtime and the candidate key it runs with.
+type Candidate = Option<(RuntimeChoice, Secret)>;
 pub(crate) type Now = Arc<dyn Fn() -> TimestampMs + Send + Sync>;
 
 struct Session {
@@ -438,6 +445,9 @@ struct Inner {
     store: Arc<Store>,
     log: Option<Log>,
     on_switch: Option<OnSwitch>,
+    /// The API keys of the API-key runtimes (the Keychain in the app).
+    secrets: Arc<dyn SecretStore>,
+    on_key_rejected: Option<OnKeyRejected>,
     /// Consecutive runtime failures per call, and the calls switched to local.
     failures: Mutex<HashMap<CallId, u32>>,
     switched: Mutex<HashSet<CallId>>,
@@ -459,6 +469,8 @@ impl Llm {
             store,
             log: None,
             on_switch: None,
+            secrets: Arc::new(MemorySecrets::default()),
+            on_key_rejected: None,
             failures: Mutex::default(),
             switched: Mutex::default(),
             sessions: Mutex::default(),
@@ -474,6 +486,66 @@ impl Llm {
     /// `privacy:changed` with `EffectiveMode::SwitchedToLocal`.
     pub fn on_switch_to_local(self, f: impl Fn(&CallId) + Send + Sync + 'static) -> Self {
         self.configure(|i| i.on_switch = Some(Box::new(f)))
+    }
+
+    /// Where the API keys are; without one, no API-key runtime has a key.
+    pub fn with_secrets(self, secrets: Arc<dyn SecretStore>) -> Self {
+        self.configure(|i| i.secrets = secrets)
+    }
+
+    /// Called when the provider rejects a stored API key during a run (`key_rejected`): the
+    /// core marks the key rejected (`inst-key-state-revoked`).
+    pub fn on_key_rejected(
+        self,
+        f: impl Fn(RuntimeChoice, &LlmRunId) + Send + Sync + 'static,
+    ) -> Self {
+        self.configure(|i| i.on_key_rejected = Some(Box::new(f)))
+    }
+
+    // @cpt-begin:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-verify
+    /// Verifies a candidate API key with one minimal run on its own runtime, never another,
+    /// through the gate (an `llm_runs` row and, for the cloud, its audit row): an empty packet,
+    /// so nothing of the user's leaves. Any answer means the provider took the key; the
+    /// candidate is not stored here.
+    pub async fn verify_key(
+        &self,
+        runtime: RuntimeChoice,
+        candidate: Secret,
+        privacy: Privacy,
+    ) -> Result<(), Failure> {
+        let packet = Packet {
+            // shortcut: the closest category for a call that carries no user text; a `key_check`
+            // value needs a contract change (M3 audit pane).
+            what: AuditWhat::Outputs,
+            items: Vec::new(),
+            people: Vec::new(),
+        };
+        let (_privacy, rx) = watch::channel(privacy);
+        let mut req = RunRequest::new(Skill::AskAnswer, "key-check", packet, TaskKind::Ask, rx);
+        req.settings.configured = Some(runtime);
+        req.settings.effort = Effort::Low;
+        match self.0.run(req, None, Some((runtime, candidate))).await {
+            Ok(_) | Err(Failure::Invalid { .. }) => Ok(()),
+            Err(failure) => Err(failure),
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-verify
+
+    /// Asks every runtime again what it has (CLI versions, Ollama's pulled models) and answers
+    /// the availability that follows. The CLI probes block, so they run off the async workers.
+    pub async fn refresh(&self) -> Vec<Availability> {
+        let adapters = self.0.gate.adapters();
+        for adapter in &adapters {
+            adapter.probe().await;
+        }
+        let llm = self.clone();
+        let refreshed = tokio::task::spawn_blocking(move || {
+            adapters.iter().for_each(|a| a.refresh());
+            llm.0.availability(None)
+        });
+        refreshed
+            .await
+            .unwrap_or_else(|_| self.0.availability(None))
     }
 
     fn configure(self, f: impl FnOnce(&mut Inner)) -> Self {
@@ -520,13 +592,41 @@ impl Inner {
         );
     }
 
+    /// The adapters' availability, with an API-key runtime unavailable while its key cannot be
+    /// read. A verification sees only its own runtime, with the candidate standing for the key.
+    fn availability(&self, verifying: Option<RuntimeChoice>) -> Vec<Availability> {
+        let mut all = self.gate.availability();
+        for a in all.iter_mut().filter(|a| a.unavailable.is_none()) {
+            let Some(account) = key_account(a.runtime) else {
+                continue;
+            };
+            if verifying != Some(a.runtime) && !matches!(self.secrets.get(account), Ok(Some(_))) {
+                a.unavailable = Some(RuntimeUnavailableReason::NoKey);
+            }
+        }
+        if let Some(runtime) = verifying {
+            all.retain(|a| a.runtime == runtime);
+        }
+        all
+    }
+
+    /// The key an attempt on `runtime` runs with: the candidate, or the stored one.
+    fn key(&self, runtime: RuntimeChoice, candidate: &Candidate) -> Option<Secret> {
+        if let Some((_, key)) = candidate {
+            return Some(key.clone());
+        }
+        let account = key_account(runtime)?;
+        self.secrets.get(account).ok().flatten()
+    }
+
     fn route(
         &self,
         req: &RunRequest,
         spent_usd: f64,
         prefer_local: bool,
+        verifying: Option<RuntimeChoice>,
     ) -> Result<Choice, Failure> {
-        let available = self.gate.availability();
+        let available = self.availability(verifying);
         let switched = req
             .call_id
             .as_ref()
@@ -566,7 +666,12 @@ impl Inner {
     }
 
     // @cpt-flow:cpt-noter-flow-core-llm-gate-run:p1
-    async fn run(&self, req: RunRequest, session: Option<(RuntimeChoice, String)>) -> RunOutcome {
+    async fn run(
+        &self,
+        req: RunRequest,
+        session: Option<(RuntimeChoice, String)>,
+        candidate: Candidate,
+    ) -> RunOutcome {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-input
         let started = Instant::now();
         let mut state = RequestState::Preparing;
@@ -577,8 +682,9 @@ impl Inner {
             return Err(Failure::Cancelled);
         }
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-route
+        let verifying = candidate.as_ref().map(|(runtime, _)| *runtime);
         let routed = self
-            .route(&req, 0.0, false)
+            .route(&req, 0.0, false, verifying)
             .and_then(|choice| match &session {
                 // A session never carries a turn to another runtime (privacy changed, say).
                 Some((runtime, _)) if *runtime != choice.runtime => Err(Failure::Unavailable(
@@ -617,13 +723,21 @@ impl Inner {
         };
         let cli_session = session.as_ref().map(|(_, s)| s.as_str());
         let outcome = self
-            .attempts(&req, cli_session, &mut tally, &mut state)
+            .attempts(&req, cli_session, &candidate, &mut tally, &mut state)
             .await;
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-usage
         let ended = self.record_end(&tally);
         // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-usage
         let runtime_failed = matches!(outcome, Err(Failure::Runtime { .. } | Failure::Timeout));
         self.note_outcome(req.call_id.as_ref(), runtime_failed);
+        // @cpt-begin:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-revoked
+        let rejected = matches!(&outcome, Err(Failure::Runtime { code }) if code == "key_rejected");
+        if rejected && candidate.is_none() && route::is_api_key(tally.choice.runtime) {
+            if let Some(on_key_rejected) = &self.on_key_rejected {
+                on_key_rejected(tally.choice.runtime, &tally.run_id);
+            }
+        }
+        // @cpt-end:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-revoked
         let code = outcome.as_ref().map_or_else(failure_code, |_| "succeeded");
         self.log(
             json!({"module": "llm", "event": "run_end", "llm_run_id": tally.run_id.as_str(),
@@ -649,9 +763,11 @@ impl Inner {
         &self,
         req: &RunRequest,
         session: Option<&str>,
+        candidate: &Candidate,
         tally: &mut Tally,
         state: &mut RequestState,
     ) -> Result<Value, Failure> {
+        let verifying = candidate.as_ref().map(|(runtime, _)| *runtime);
         let map_id = format!("rmap_{}", ulid::Ulid::generate());
         let mut repair: Option<String> = None;
         let run_id = tally.run_id.clone();
@@ -663,8 +779,8 @@ impl Inner {
                 return Err(Failure::Cancelled);
             }
             if attempt > 0 {
-                let rerouted = self.route(req, tally.spent_usd, tally.fallback).and_then(
-                    |choice| match session {
+                let rerouted = (self.route(req, tally.spent_usd, tally.fallback, verifying))
+                    .and_then(|choice| match session {
                         Some(_) if choice.runtime != tally.choice.runtime => {
                             Err(Failure::Unavailable(route::unavailable(
                                 tally.choice.runtime,
@@ -672,8 +788,7 @@ impl Inner {
                             )))
                         }
                         _ => Ok(choice),
-                    },
-                );
+                    });
                 match rerouted {
                     Ok(choice) => tally.choice = choice,
                     Err(failure) => {
@@ -712,9 +827,15 @@ impl Inner {
                 .max_cost_usd
                 .filter(|_| route::is_api_key(tally.choice.runtime))
                 .map(|cap| (cap - tally.spent_usd).max(0.0));
-            let sent = self
-                .gate
-                .send(&approved, &tally.choice, tally.skill, session, budget_usd);
+            let key = self.key(tally.choice.runtime, candidate);
+            let sent = (self.gate).send(
+                &approved,
+                &tally.choice,
+                tally.skill,
+                session,
+                budget_usd,
+                key,
+            );
             // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-adapter
             // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-cancel
             let reply: Result<Reply, Failure> = tokio::select! {
@@ -866,9 +987,9 @@ impl Inner {
     /// have been updated since startup. The caller then creates the isolated environment.
     fn open_route(&self, req: &RunRequest) -> Result<Choice, Failure> {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-open
-        let first = self.route(req, 0.0, false)?;
+        let first = self.route(req, 0.0, false, None)?;
         self.gate.refresh(first.runtime);
-        self.route(req, 0.0, false)
+        self.route(req, 0.0, false, None)
         // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-open
     }
 
@@ -900,7 +1021,7 @@ impl Inner {
         };
         // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-reset
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-turn
-        let outcome = self.run(req, Some((runtime, cli_session))).await;
+        let outcome = self.run(req, Some((runtime, cli_session)), None).await;
         // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-turn
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-close
         if matches!(
@@ -928,11 +1049,11 @@ impl Inner {
 
 impl LlmRuntime for Llm {
     fn availability(&self) -> Vec<Availability> {
-        self.0.gate.availability()
+        self.0.availability(None)
     }
 
     fn run_once(&self, req: RunRequest) -> BoxFuture<'_, RunOutcome> {
-        Box::pin(self.0.run(req, None))
+        Box::pin(self.0.run(req, None, None))
     }
 
     fn open_session<'a>(
@@ -979,7 +1100,7 @@ impl LlmRuntime for Llm {
                 .map_err(|code| Failure::Runtime { code })?;
             let outcome = self
                 .0
-                .run(req, Some((choice.runtime, resumed.clone())))
+                .run(req, Some((choice.runtime, resumed.clone())), None)
                 .await;
             self.0.gate.close_session(choice.runtime, &resumed);
             outcome

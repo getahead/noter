@@ -88,7 +88,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Read items and their evidence
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-read`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-read`
 
 **Actor**: Primary user (main window; call screen for inspector)
 
@@ -99,15 +99,15 @@ The user can review what a call produced, check the words behind an item, tick w
 - Deleted item or source call: `not_found`; unavailable audio leaves text evidence usable and replay returns `audio_deleted`.
 
 **Steps**:
-1. [ ] - `p1` - API: `items_list { filter, page }`; validate filters and read a stable page from `items`, joining owners, calls, topics and spans in the core - `inst-read-list`
-2. [ ] - `p1` - API: `item_get { item_id }`; read the item, supporting and closing evidence, and its changes into `ItemDetail` - `inst-read-detail`
-3. [ ] - `p1` - Resolve `item_spans` by call, channel and time against the active transcript pass rather than storing archive-fragile segment ids - `inst-read-span`
-4. [ ] - `p1` - Serve evidence through existing `transcript_span`; report audio availability and `upgraded_by_archive` so the UI can show changed wording or live evidence while archive is pending - `inst-read-preview`
-5. [ ] - `p1` - **RETURN** complete view models; replay and navigation use the M1 commands, with their existing route guards - `inst-read-return`
+1. [x] - `p1` - API: `items_list { filter, page }`; validate filters and read a stable page from `items`, joining owners, calls, topics and spans in the core - `inst-read-list`
+2. [x] - `p1` - API: `item_get { item_id }`; read the item, supporting and closing evidence, and its changes into `ItemDetail` - `inst-read-detail`
+3. [x] - `p1` - Resolve `item_spans` by call, channel and time against the active transcript pass rather than storing archive-fragile segment ids - `inst-read-span`
+4. [x] - `p1` - Serve evidence through existing `transcript_span`; report audio availability and `upgraded_by_archive` so the UI can show changed wording or live evidence while archive is pending - `inst-read-preview`
+5. [x] - `p1` - **RETURN** complete view models; replay and navigation use the M1 commands, with their existing route guards - `inst-read-return`
 
 ### Review, edit, create and reopen items
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-review`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-review`
 
 **Actor**: Primary user (main window; call screen only for allowed item mutations)
 
@@ -118,17 +118,17 @@ The user can review what a call produced, check the words behind an item, tick w
 - Stale revision returns `conflict` with `current_rev`; invalid owner, date, text or source span returns `invalid_input`; nothing is written on failure.
 
 **Steps**:
-1. [ ] - `p1` - API: `item_review { item_id, rev, decision }` applies accept, reject or restore without changing item status - `inst-review-single`
-2. [ ] - `p1` - API: `items_review_all { call_id, kinds }` selects current suggested rows of those kinds, or all kinds when empty; accept eligible rows under one batch id and report skipped rows - `inst-review-batch`
-3. [ ] - `p1` - API: `item_edit { item_id, rev, patch }` validates wanted fields, treating omitted fields as unchanged and explicit set-or-clear values as the nullable-field operation - `inst-review-edit`
-4. [ ] - `p1` - Preserve the generated text for edit comparison; saving in the review row can then accept through `item_review` with the returned revision; inspector save alone need not accept - `inst-review-accept-edit`
-5. [ ] - `p1` - API: `item_create { call_id, kind, text, owner, due, span }` creates a user-authored, accepted item and validates any optional evidence span - `inst-review-create`
-6. [ ] - `p1` - API: `item_reopen { item_id, rev }` returns a closed or handed-off item to open without changing review, retaining its history and evidence - `inst-review-reopen`
-7. [ ] - `p1` - Apply every operation through `cpt-noter-algo-core-items-today-mutate`; return the record and change id, or `ItemsBatchResult` for bulk review - `inst-review-return`
+1. [x] - `p1` - API: `item_review { item_id, rev, decision }` applies accept, reject or restore without changing item status - `inst-review-single`
+2. [x] - `p1` - API: `items_review_all { call_id, kinds }` selects current suggested rows of those kinds, or all kinds when empty; accept eligible rows under one batch id and report skipped rows - `inst-review-batch`
+3. [x] - `p1` - API: `item_edit { item_id, rev, patch }` validates wanted fields, treating omitted fields as unchanged and explicit set-or-clear values as the nullable-field operation - `inst-review-edit`
+4. [x] - `p1` - Preserve the generated text for edit comparison; saving in the review row can then accept through `item_review` with the returned revision; inspector save alone need not accept - `inst-review-accept-edit`
+5. [x] - `p1` - API: `item_create { call_id, kind, text, owner, due, span }` creates a user-authored, accepted item and validates any optional evidence span - `inst-review-create`
+6. [x] - `p1` - API: `item_reopen { item_id, rev }` returns a closed or handed-off item to open without changing review, retaining its history and evidence - `inst-review-reopen`
+7. [x] - `p1` - Apply every operation through `cpt-noter-algo-core-items-today-mutate`; return the record and change id, or `ItemsBatchResult` for bulk review - `inst-review-return`
 
 ### Tick an item or answer a handoff
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-tick`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-tick`
 
 **Actor**: Primary user (main window or call screen)
 
@@ -139,12 +139,12 @@ The user can review what a call produced, check the words behind an item, tick w
 - An item changed elsewhere returns `conflict` rather than closing a stale version.
 
 **Steps**:
-1. [ ] - `p1` - For an ordinary item, API: `item_set_done { item_id, rev, done }` sets wanted done/open state; repeating the current wanted state creates no duplicate effect - `inst-tick-wanted`
-2. [ ] - `p1` - **IF** the user ticks a handed-off row, ask Did the handoff land in the UI before sending its answer; do not infer the answer from a generic tick - `inst-tick-handoff`
-3. [ ] - `p1` - API: `item_answer_handoff_landed { item_id, rev, answer }`; landed or done_another_way marks done with the stated reason, keep_open leaves handed_off and asks again next matching call - `inst-tick-answer`
-4. [ ] - `p1` - Log status, review and completion time atomically, publish the changed item, and recompute Today counts from committed data - `inst-tick-commit`
-5. [ ] - `p1` - A UI Undo uses `change_undo` with the returned handle; the ten-second strip is presentation only and History reversal remains available later - `inst-tick-undo`
-6. [ ] - `p1` - **RETURN** `ItemMutation` - `inst-tick-return`
+1. [x] - `p1` - For an ordinary item, API: `item_set_done { item_id, rev, done }` sets wanted done/open state; repeating the current wanted state creates no duplicate effect - `inst-tick-wanted`
+2. [x] - `p1` - **IF** the user ticks a handed-off row, ask Did the handoff land in the UI before sending its answer; do not infer the answer from a generic tick - `inst-tick-handoff`
+3. [x] - `p1` - API: `item_answer_handoff_landed { item_id, rev, answer }`; landed or done_another_way marks done with the stated reason, keep_open leaves handed_off and asks again next matching call - `inst-tick-answer`
+4. [x] - `p1` - Log status, review and completion time atomically, publish the changed item, and recompute Today counts from committed data - `inst-tick-commit`
+5. [x] - `p1` - A UI Undo uses `change_undo` with the returned handle; the ten-second strip is presentation only and History reversal remains available later - `inst-tick-undo`
+6. [x] - `p1` - **RETURN** `ItemMutation` - `inst-tick-return`
 
 ### Read Today before the next call
 
@@ -212,20 +212,20 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Apply an item intent atomically
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-items-today-mutate`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-items-today-mutate`
 
 **Input**: Validated intent, current revision where supplied, actor and target item or selected batch.
 
 **Output**: Changed complete item and undo handle, batch result, or a typed error.
 
 **Steps**:
-1. [ ] - `p1` - On the writer, load the target and compare the supplied revision; **IF** stale **RETURN** `conflict` with `current_rev` - `inst-mutate-rev`
-2. [ ] - `p1` - Validate status × review transition and all referenced people, call, topic and evidence spans - `inst-mutate-validate`
-3. [ ] - `p1` - Compute wanted status and review independently; done on suggested means accepted and done, restore rejection means suggested without losing provenance - `inst-mutate-state`
-4. [ ] - `p1` - Write item fields, spans, normalized indexes and change rows in the same transaction; keep rejection identity for regeneration suppression - `inst-mutate-write`
-5. [ ] - `p1` - For bulk review, re-check selected rows on the writer, skip rows no longer suggested and use one batch handle with bounded logged writes - `inst-mutate-bulk`
-6. [ ] - `p1` - After commit refresh per-call `items.json`, publish whole changed entities and return the updated revision and handles - `inst-mutate-publish`
-7. [ ] - `p1` - **RETURN** without running a model or network request inside the writer transaction - `inst-mutate-return`
+1. [x] - `p1` - On the writer, load the target and compare the supplied revision; **IF** stale **RETURN** `conflict` with `current_rev` - `inst-mutate-rev`
+2. [x] - `p1` - Validate status × review transition and all referenced people, call, topic and evidence spans - `inst-mutate-validate`
+3. [x] - `p1` - Compute wanted status and review independently; done on suggested means accepted and done, restore rejection means suggested without losing provenance - `inst-mutate-state`
+4. [x] - `p1` - Write item fields, spans, normalized indexes and change rows in the same transaction; keep rejection identity for regeneration suppression - `inst-mutate-write`
+5. [x] - `p1` - For bulk review, re-check selected rows on the writer, skip rows no longer suggested and use one batch handle with bounded logged writes - `inst-mutate-bulk`
+6. [x] - `p1` - After commit refresh per-call `items.json`, publish whole changed entities and return the updated revision and handles - `inst-mutate-publish`
+7. [x] - `p1` - **RETURN** without running a model or network request inside the writer transaction - `inst-mutate-return`
 
 ### Carry forward and rank relevant work
 
@@ -271,19 +271,19 @@ The user can review what a call produced, check the words behind an item, tick w
 **Initial State**: open and suggested for extraction; open and accepted for manual creation or pins
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** open **TO** done **WHEN** `item_set_done(true)` commits; suggested review becomes accepted - `inst-st-done`
-2. [ ] - `p1` - **FROM** done **TO** open **WHEN** `item_set_done(false)` commits, with review unchanged - `inst-st-untick`
+1. [x] - `p1` - **FROM** open **TO** done **WHEN** `item_set_done(true)` commits; suggested review becomes accepted - `inst-st-done`
+2. [x] - `p1` - **FROM** done **TO** open **WHEN** `item_set_done(false)` commits, with review unchanged - `inst-st-untick`
 3. [ ] - `p1` - **FROM** open **TO** handed_off **WHEN** handoff successfully opens or copies; a suggestion becomes accepted - `inst-st-handoff`
-4. [ ] - `p1` - **FROM** handed_off **TO** done **WHEN** landed or done_another_way is answered with the current revision - `inst-st-landed`
-5. [ ] - `p1` - **FROM** handed_off **TO** handed_off **WHEN** keep_open or Esc leaves it awaiting the next matching call - `inst-st-keep-open`
+4. [x] - `p1` - **FROM** handed_off **TO** done **WHEN** landed or done_another_way is answered with the current revision - `inst-st-landed`
+5. [x] - `p1` - **FROM** handed_off **TO** handed_off **WHEN** keep_open or Esc leaves it awaiting the next matching call - `inst-st-keep-open`
 6. [ ] - `p1` - **FROM** open **TO** carried **WHEN** offered in a live call with the same people - `inst-st-carried`
 7. [ ] - `p1` - **FROM** carried **TO** open **WHEN** the call ends without closure - `inst-st-return-open`
 8. [ ] - `p1` - **FROM** open **TO** answered_in_call **WHEN** an open question is answered with logged evidence; carried questions may also close during that call - `inst-st-answered`
 9. [ ] - `p1` - **FROM** open **TO** closed_by_evidence **WHEN** a later evidence job supplies qualifying closure for an accepted item; handed_off may also close this way - `inst-st-evidence`
-10. [ ] - `p1` - **FROM** done **TO** open **WHEN** `item_reopen` commits; the same applies from handed_off, closed_by_evidence or answered_in_call, review unchanged - `inst-st-reopen`
-11. [ ] - `p1` - **FROM** suggested **TO** accepted **WHEN** review accept commits, with status unchanged - `inst-st-accept`
-12. [ ] - `p1` - **FROM** suggested **TO** rejected **WHEN** review reject commits; its regeneration suppression remains recorded - `inst-st-reject`
-13. [ ] - `p1` - **FROM** rejected **TO** suggested **WHEN** explicit restore commits - `inst-st-restore`
+10. [x] - `p1` - **FROM** done **TO** open **WHEN** `item_reopen` commits; the same applies from handed_off, closed_by_evidence or answered_in_call, review unchanged - `inst-st-reopen`
+11. [x] - `p1` - **FROM** suggested **TO** accepted **WHEN** review accept commits, with status unchanged - `inst-st-accept`
+12. [x] - `p1` - **FROM** suggested **TO** rejected **WHEN** review reject commits; its regeneration suppression remains recorded - `inst-st-reject`
+13. [x] - `p1` - **FROM** rejected **TO** suggested **WHEN** explicit restore commits - `inst-st-restore`
 
 Every transition is persisted with a change row and revision. Invalid input leaves both axes unchanged. The stale `ItemStatus` doc comment suggesting keep_open returns open is superseded by `HandoffLandedAnswer`, DESIGN-core 3.1 and the PRD: it stays handed_off. Evidence production is M5; M2 renders existing evidence and implements the lifecycle boundary.
 

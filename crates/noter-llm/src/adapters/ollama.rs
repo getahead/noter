@@ -10,9 +10,10 @@ use reqwest::header::CONTENT_TYPE;
 use reqwest::redirect::Policy;
 use reqwest::Url;
 use serde_json::{json, Value};
+use std::sync::Mutex;
 
 use super::{instructions, Invocation, Reply, RuntimeAdapter};
-use crate::runtime::{Availability, BoxFuture};
+use crate::runtime::{lock, Availability, BoxFuture};
 
 #[derive(Debug, Clone)]
 pub struct OllamaConfig {
@@ -26,6 +27,9 @@ pub(crate) struct Ollama {
     /// `None` when the configured URL is off this Mac: then nothing is ever sent.
     url: Option<Url>,
     models: Vec<String>,
+    /// What `/api/tags` last answered: `None` before the first probe, `Some(None)` when Ollama
+    /// did not answer, else the names of its pulled models.
+    tags: Mutex<Option<Option<Vec<String>>>>,
     client: reqwest::Client,
 }
 
@@ -40,6 +44,7 @@ impl Ollama {
         Self {
             url,
             models: config.models,
+            tags: Mutex::default(),
             client,
         }
     }
@@ -60,18 +65,49 @@ impl RuntimeAdapter for Ollama {
         "ollama"
     }
 
-    // shortcut: the configured models stand for what Ollama has pulled; asking `/api/tags` is
-    // the availability algorithm of slice 3 (accounts_get).
+    /// Until the first probe the configured models stand for what Ollama has pulled; after it,
+    /// what `/api/tags` answered, the configured preference first.
     fn availability(&self, runtime: RuntimeChoice) -> Availability {
-        let ready = self.url.is_some() && !self.models.is_empty();
+        let (models, path) = match lock(&self.tags).clone() {
+            None => (self.models.clone(), None),
+            Some(None) => (Vec::new(), None),
+            Some(Some(tags)) => {
+                let mut models: Vec<String> = (self.models.iter())
+                    .filter(|m| tags.contains(m))
+                    .cloned()
+                    .collect();
+                models.extend(tags.into_iter().filter(|t| !self.models.contains(t)));
+                (
+                    models,
+                    self.url
+                        .as_ref()
+                        .map(|u| u.as_str().trim_end_matches('/').to_owned()),
+                )
+            }
+        };
+        let ready = self.url.is_some() && !models.is_empty();
         Availability {
             runtime,
             unavailable: (!ready).then_some(RuntimeUnavailableReason::LocalModelNotReady),
             version: None,
+            path,
             tested: None,
-            models: self.models.clone(),
+            models,
         }
     }
+
+    // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+    fn probe(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            let url = self.url.as_ref().and_then(|u| u.join("api/tags").ok());
+            let tags = match url {
+                Some(url) => self.tags(url).await,
+                None => None,
+            };
+            *lock(&self.tags) = Some(tags);
+        })
+    }
+    // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
 
     fn invoke(&self, call: Invocation) -> BoxFuture<'static, Result<Reply, String>> {
         let Some(url) = self.url.as_ref().and_then(|u| u.join("api/chat").ok()) else {
@@ -123,4 +159,26 @@ impl RuntimeAdapter for Ollama {
     }
 
     fn close_session(&self, _: RuntimeChoice, _: &str) {}
+}
+
+impl Ollama {
+    /// The models `/api/tags` lists, or `None` when Ollama does not answer.
+    async fn tags(&self, url: Url) -> Option<Vec<String>> {
+        let asked = async {
+            let response = self.client.get(url).send().await.ok()?;
+            response.error_for_status().ok()?.bytes().await.ok()
+        };
+        // Ollama on this Mac answers at once; a hung one is not running.
+        let bytes = tokio::time::timeout(std::time::Duration::from_secs(2), asked)
+            .await
+            .ok()??;
+        let body: Value = serde_json::from_slice(&bytes).ok()?;
+        let models = body["models"].as_array()?;
+        Some(
+            models
+                .iter()
+                .filter_map(|m| m["name"].as_str().map(String::from))
+                .collect(),
+        )
+    }
 }

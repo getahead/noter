@@ -52,8 +52,8 @@ impl ClaudeCode {
             .env("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
             .arg("-p");
         if api_key {
-            let key = self.0.config.api_key.as_deref().ok_or("no_key")?;
-            command.env("ANTHROPIC_API_KEY", key).arg("--bare");
+            let key = call.key.as_ref().ok_or("no_key")?;
+            command.env("ANTHROPIC_API_KEY", key.expose()).arg("--bare");
         }
         command
             .args(["--output-format", "json"])

@@ -16,6 +16,7 @@ use serde_json::Value;
 
 use super::{Invocation, Reply, RuntimeAdapter};
 use crate::runtime::{lock, Availability, BoxFuture, Skill, Tested};
+use crate::secrets::Secret;
 
 const RUNTIMES: [RuntimeChoice; 5] = [
     RuntimeChoice::ClaudeApiKey,
@@ -38,6 +39,8 @@ struct Line {
 /// One packet the scripted runtime received, as the gate released it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Received {
+    /// The API key the call carried (redacted when printed).
+    pub key: Option<Secret>,
     pub runtime: RuntimeChoice,
     pub skill: String,
     pub bytes: Vec<u8>,
@@ -49,7 +52,7 @@ pub struct Received {
     pub tools: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct State {
     lines: Vec<Option<Line>>,
     received: Vec<Received>,
@@ -58,7 +61,7 @@ struct State {
 }
 
 /// Every runtime choice, available, answered from the script. Cloning shares it.
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Scripted(Arc<Mutex<State>>);
 
 impl Scripted {
@@ -116,6 +119,7 @@ impl RuntimeAdapter for Scripted {
             runtime,
             unavailable: None,
             version: cli.then(|| "1.0.0".to_owned()),
+            path: Some("scripted".into()),
             tested: Some(Tested {
                 min: [1, 0, 0],
                 below: [2, 0, 0],
@@ -128,6 +132,7 @@ impl RuntimeAdapter for Scripted {
         let line = {
             let mut state = lock(&self.0);
             state.received.push(Received {
+                key: call.key.clone(),
                 runtime: call.runtime,
                 skill: call.skill.id().into(),
                 bytes: call.packet.clone(),

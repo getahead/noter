@@ -2,6 +2,7 @@
 //! (`apps/desktop/src-tauri`) and `noter-core-harness`; neither depends on Tauri here.
 //! Every later feature plugs its service in through [`CoreDeps`] and this crate.
 
+mod accounts;
 mod app;
 mod capture;
 mod first_run;
@@ -9,10 +10,12 @@ mod glossary;
 mod history;
 mod hotkeys;
 mod hub;
+mod items;
 mod jobs;
 mod library;
 mod log;
 mod models;
+mod native_ops;
 mod notices;
 mod notify;
 mod playback;
@@ -44,9 +47,14 @@ pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 pub use models::PinnedModels;
+pub use native_ops::{NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
+pub use noter_llm::{
+    Adapters, CliConfig, KeychainLocked, Llm, MemorySecrets, OllamaConfig, Scripted, Secret,
+    SecretStore,
+};
 use noter_protocol::ipc::Sink;
 pub use notify::{Notification, NotificationKind};
 pub use settings::default_settings;
@@ -104,8 +112,15 @@ pub struct CoreDeps {
     pub engine_config: noter_engine_client::Config,
     /// Record prompt and call window (AppKit in the app, recorded calls in the harness, TL-2).
     pub surfaces: Arc<dyn Surfaces>,
+    /// The LLM runtimes (the locked-down CLIs and Ollama in the app, the scripted runtime in
+    /// the harness and tests, TL-13); none until the host sets them.
+    pub llm: Adapters,
+    /// API keys (the Keychain in the app, memory in the harness and tests).
+    pub secrets: Arc<dyn SecretStore>,
     /// Whether the Mac is on battery, for the jobs that do not run on it (mains power if unset).
     pub power: Arc<dyn noter_jobs::PowerSource>,
+    /// Save panel and the native asks to come (`NativeOps`); every panel cancels until set.
+    pub native_ops: Arc<dyn NativeOps>,
 }
 
 impl CoreDeps {
@@ -123,12 +138,30 @@ impl CoreDeps {
             engine: Arc::new(self_test::NoEngine),
             engine_config: noter_engine_client::Config::default(),
             surfaces: Arc::new(capture::NoSurfaces),
+            llm: Adapters::none(),
+            secrets: Arc::new(MemorySecrets::default()),
             power: Arc::new(jobs::AcPower),
+            native_ops: Arc::new(native_ops::NoNativeOps),
         }
     }
 
     pub fn with_power(mut self, power: Arc<dyn noter_jobs::PowerSource>) -> Self {
         self.power = power;
+        self
+    }
+
+    pub fn with_llm(mut self, adapters: Adapters) -> Self {
+        self.llm = adapters;
+        self
+    }
+
+    pub fn with_secrets(mut self, secrets: Arc<dyn SecretStore>) -> Self {
+        self.secrets = secrets;
+        self
+    }
+
+    pub fn with_native_ops(mut self, ops: Arc<dyn NativeOps>) -> Self {
+        self.native_ops = ops;
         self
     }
 
@@ -205,6 +238,10 @@ impl std::error::Error for BootError {}
 pub struct Core {
     deps: CoreDeps,
     store: Arc<Store>,
+    /// The LLM router and its egress gate (`noter-llm`).
+    llm: Llm,
+    /// API keys and runtime availability (`accounts_get`, `api_key_set`).
+    accounts: Arc<accounts::Accounts>,
     /// Pipeline jobs; `capture_guard` is the session manager's input to it.
     jobs: noter_jobs::Scheduler,
     capture_guard: tokio::sync::watch::Sender<noter_jobs::CaptureGuardState>,
@@ -283,6 +320,14 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "call tags",
         sql: include_str!("../migrations/0003_call_tags.sql"),
     },
+    // @cpt-dbtable:cpt-noter-dbtable-items:p1
+    // @cpt-dbtable:cpt-noter-dbtable-item-spans:p1
+    Migration {
+        owner: "noter-core",
+        version: 4,
+        name: "items and item spans",
+        sql: include_str!("../migrations/0004_items.sql"),
+    },
 ];
 
 impl Core {
@@ -313,10 +358,31 @@ impl Core {
         let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
         let engine =
             noter_engine_client::EngineClient::new(deps.engine.clone(), deps.engine_config.clone());
+        let accounts = Arc::new(
+            accounts::Accounts::load(
+                store.clone(),
+                deps.secrets.clone(),
+                deps.events.clone(),
+                deps.clock.clone(),
+                snapshot.accounts.clone(),
+            )
+            .map_err(BootError::Load)?,
+        );
+        let clock = deps.clock.clone();
+        let revoked = Arc::downgrade(&accounts);
+        let llm = Llm::new(store.clone(), deps.llm.clone(), move || clock.now())
+            .with_secrets(deps.secrets.clone())
+            .on_key_rejected(move |runtime, run| {
+                if let Some(accounts) = revoked.upgrade() {
+                    accounts.revoked(runtime, run);
+                }
+            });
         let (jobs, capture_guard) = jobs::build(store.clone(), &deps);
         let core = Core {
             deps,
             store,
+            llm,
+            accounts,
             jobs,
             capture_guard,
             data_dir: data_dir.to_path_buf(),
@@ -363,6 +429,11 @@ impl Core {
     /// The store, for the services the core composes.
     pub fn store(&self) -> &Store {
         &self.store
+    }
+
+    /// The LLM router: every model call goes through it and its egress gate.
+    pub fn llm(&self) -> &Llm {
+        &self.llm
     }
 
     /// A stream hub for one Channel message type; the core routes `stream_ack`,
@@ -471,22 +542,8 @@ impl Core {
     }
 
     /// Stamps a whole-state payload with the next version of its kind and sends it.
-    // @cpt-algo:cpt-noter-algo-core-ipc-host-version:p1
     fn publish<T: WholeState>(&self, event: &'static str, state: &mut T) -> T {
-        // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-increment
-        // The counter is the slice's own version: 1 at core start, kept in memory.
-        let next = StateVersion(state.version().0 + 1);
-        // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-increment
-        // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-stamp
-        *state.version() = next;
-        let stamped = state.clone();
-        // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-stamp
-        // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-emit-event
-        self.deps.events.emit(event, to_json(&stamped));
-        // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-emit-event
-        // @cpt-begin:cpt-noter-algo-core-ipc-host-version:p1:inst-return-version
-        stamped
-        // @cpt-end:cpt-noter-algo-core-ipc-host-version:p1:inst-return-version
+        app::publish(&*self.deps.events, event, state)
     }
 }
 
@@ -675,6 +732,14 @@ impl CoreApi for Core {
         self.history_page(args)
     }
 
+    async fn history_export(
+        &self,
+        _ctx: &CommandCtx,
+        args: HistoryExportArgs,
+    ) -> Result<ExportResult, CoreError> {
+        self.export_history(args).await
+    }
+
     async fn change_undo(
         &self,
         _ctx: &CommandCtx,
@@ -689,6 +754,74 @@ impl CoreApi for Core {
         args: RedoArgs,
     ) -> Result<UndoResult, CoreError> {
         self.reverse_change(Direction::Redo, args.target)
+    }
+
+    async fn items_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: ItemsListArgs,
+    ) -> Result<Page<ItemView>, CoreError> {
+        self.list_items(args)
+    }
+
+    async fn item_get(&self, _ctx: &CommandCtx, args: ItemIdArgs) -> Result<ItemDetail, CoreError> {
+        self.get_item(args)
+    }
+
+    async fn item_set_done(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemDoneArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.set_item_done(ctx, args)
+    }
+
+    async fn item_review(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemReviewArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.review_item(ctx, args)
+    }
+
+    async fn items_review_all(
+        &self,
+        ctx: &CommandCtx,
+        args: ReviewAllArgs,
+    ) -> Result<ItemsBatchResult, CoreError> {
+        self.review_all_items(ctx, args)
+    }
+
+    async fn item_edit(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemEditArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.edit_item(ctx, args)
+    }
+
+    async fn item_reopen(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemReopenArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.reopen_item(ctx, args)
+    }
+
+    async fn item_create(
+        &self,
+        ctx: &CommandCtx,
+        args: ItemCreateArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.create_item(ctx, args)
+    }
+
+    async fn item_answer_handoff_landed(
+        &self,
+        ctx: &CommandCtx,
+        args: HandoffLandedArgs,
+    ) -> Result<ItemMutation, CoreError> {
+        self.answer_handoff(ctx, args)
     }
 
     async fn window_show_call(
@@ -993,6 +1126,45 @@ impl CoreApi for Core {
         self.set_call_sensitive(ctx, args).await
     }
 
+    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-keys:p1
+    async fn accounts_get(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<AccountsView, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-read
+        let availability = self.llm.refresh().await;
+        Ok(self.accounts.observe(Some(availability)))
+        // @cpt-end:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-read
+    }
+
+    async fn api_key_set(
+        &self,
+        ctx: &CommandCtx,
+        args: ApiKeySetArgs,
+    ) -> Result<AccountsView, CoreError> {
+        let (provider, candidate) = accounts::candidate(args)?;
+        // @cpt-begin:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-verify
+        self.accounts.verifying(provider, true);
+        // @cpt-end:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-verify
+        let privacy = noter_llm::Privacy {
+            mode: lock(&self.settings).privacy.mode,
+            sensitive: false,
+            offline: !self.app().environment.online,
+        };
+        let runtime = accounts::runtime_of(provider);
+        let verified = self
+            .llm
+            .verify_key(runtime, candidate.clone(), privacy)
+            .await;
+        let meta = self.change_meta(
+            ctx,
+            format!("Verified the {provider:?} API key"),
+            "api_key_set",
+        );
+        self.accounts.settle(meta, provider, &candidate, verified)
+    }
+
     // @cpt-dod:cpt-noter-dod-core-ipc-host-snapshot:p1
     async fn app_snapshot(
         &self,
@@ -1001,6 +1173,7 @@ impl CoreApi for Core {
     ) -> Result<AppSnapshot, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
         let mut snapshot = self.app().clone();
+        snapshot.accounts = self.accounts.view();
         snapshot.window = match ctx.caller {
             Caller::Window { label } => label,
             Caller::Native { .. } => WindowLabel::Main,
@@ -1106,7 +1279,7 @@ fn open_error_kind(e: &OpenError) -> &'static str {
     }
 }
 
-fn to_json<T: serde::Serialize>(v: &T) -> Value {
+pub(crate) fn to_json<T: serde::Serialize>(v: &T) -> Value {
     serde_json::to_value(v).unwrap_or(Value::Null)
 }
 

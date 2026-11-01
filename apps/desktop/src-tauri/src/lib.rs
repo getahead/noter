@@ -6,6 +6,7 @@
 
 mod alert_keys;
 pub mod e2e_log;
+mod keychain;
 mod native;
 pub mod surfaces;
 #[cfg(debug_assertions)]
@@ -15,7 +16,8 @@ pub mod updater;
 use std::sync::{Arc, OnceLock};
 
 use noter_core::{
-    Core, CoreDeps, EventEmitter, PinnedModels, ShortcutRegistrar, ShortcutTaken, SystemClock,
+    Adapters, CliConfig, Core, CoreDeps, EventEmitter, OllamaConfig, PinnedModels,
+    ShortcutRegistrar, ShortcutTaken, SystemClock,
 };
 use noter_engine_client::ProcessLauncher;
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
@@ -154,10 +156,13 @@ fn boot<R: Runtime>(
         .with_shortcuts(shortcuts)
         .with_engine(Arc::new(engine))
         .with_native(Arc::new(Mac::new(&group)))
+        .with_native_ops(Arc::new(native::MacOps))
         .with_models_dir(group.join("models"))
         .with_models(Arc::new(PinnedModels::new()))
         .with_updater(updater)
-        .with_surfaces(surfaces.clone());
+        .with_surfaces(surfaces.clone())
+        .with_llm(runtimes(&dir))
+        .with_secrets(Arc::new(keychain::Keychain));
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
@@ -171,6 +176,39 @@ fn boot<R: Runtime>(
             Booted(Err(e.to_string()))
         }
     }
+}
+
+/// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
+/// this Mac. Own-account sign-in is M3, so only the API-key and local runtimes run in M2.
+fn runtimes(data: &std::path::Path) -> Adapters {
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    let cli = |name: &str| CliConfig {
+        program: find_cli(&home, name),
+        home: home.clone(),
+        run_root: data.join("runtimes"),
+        signed_in: false,
+        models: Vec::new(),
+    };
+    let ollama = OllamaConfig {
+        url: "http://127.0.0.1:11434".into(),
+        models: Vec::new(),
+    };
+    Adapters::real(cli("claude"), cli("codex"), ollama)
+}
+
+/// shortcut: an app started from Finder has no shell PATH, so the usual install folders are
+/// tried first; a CLI elsewhere is found by name on PATH (CLI install, M3, records its path).
+fn find_cli(home: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let dirs = [
+        home.join(".local/bin"),
+        home.join(".claude/local"),
+        "/opt/homebrew/bin".into(),
+        "/usr/local/bin".into(),
+    ];
+    dirs.iter()
+        .map(|d| d.join(name))
+        .find(|p| p.is_file())
+        .unwrap_or_else(|| name.into())
 }
 
 /// Tauri's invoke handler: a name in `COMMANDS` is answered (one handler per command, with

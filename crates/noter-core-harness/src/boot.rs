@@ -14,9 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock, Core,
-    CoreDeps, EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Placement,
-    Surfaces, SystemClock, TrayModel, Updater,
+    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock,
+    Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError, MemorySecrets, ModelSource,
+    NativeOps, NativeServices, Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel,
+    Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -46,6 +47,9 @@ pub struct Options {
     pub engine_script: Option<Script>,
     /// A named state of the fixture world ([`scenario`]), applied with `world_set` once seeded.
     pub scenario: Option<String>,
+    /// `--llm-script <file>`: the scripted runtime answers these lines (TL-13); without it each
+    /// skill answers a built-in valid output.
+    pub llm_script: Option<Scripted>,
     /// The Mac's own displays, for the app's launch hooks: its real windows are drawn on them, so
     /// once seeded the scripted Mac has these displays (a display change, as when one unplugs).
     pub displays: Option<Vec<DisplayInfo>>,
@@ -54,8 +58,9 @@ pub struct Options {
 }
 
 impl Options {
-    /// The command line: `--fixture world` (the fixture world of noter-protocol), `--clock fixed` and
-    /// `--engine-script <file>` (the scripted engine's steps; a bad file is `Err` with its line).
+    /// The command line: `--fixture world` (the fixture world of noter-protocol), `--clock fixed`,
+    /// `--engine-script <file>` (the scripted engine's steps) and `--llm-script <file>` (the
+    /// scripted runtime's answers); a bad file is `Err` with its line.
     // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-start
     pub fn parse(args: &[String]) -> Result<Options, String> {
         let mut options = Options::default();
@@ -65,6 +70,13 @@ impl Options {
                 ("--fixture", Some("world")) => options.fixture = true,
                 ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
                 ("--clock", Some("fixed")) => options.fixed_clock = true,
+                ("--llm-script", Some(file)) => {
+                    let text = std::fs::read_to_string(file)
+                        .map_err(|e| format!("llm script {file}: {e}"))?;
+                    let script =
+                        Scripted::parse(&text).map_err(|e| format!("llm script {file}: {e}"))?;
+                    options.llm_script = Some(script);
+                }
                 ("--power", Some(source @ ("battery" | "ac"))) => {
                     options.battery = source == "battery";
                 }
@@ -75,7 +87,7 @@ impl Options {
                         Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
                     options.engine_script = Some(script);
                 }
-                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--engine-script <file>]")),
+                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--engine-script <file>] [--llm-script <file>]")),
             }
         }
         Ok(options)
@@ -197,6 +209,9 @@ pub struct Harness {
     models: Arc<TinyModels>,
     engine: ScriptedEngine,
     surfaces: Arc<ScriptedSurfaces>,
+    /// The Keychain stand-in (TL-13).
+    secrets: Arc<MemorySecrets>,
+    panel: Arc<ScriptedPanel>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
@@ -260,6 +275,12 @@ impl Harness {
         };
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
         let surfaces = Arc::new(ScriptedSurfaces::default());
+        let llm = Adapters::scripted(&options.llm_script.clone().unwrap_or_default());
+        let secrets = Arc::new(MemorySecrets::default());
+        let panel = Arc::new(ScriptedPanel {
+            dir: dir.join("exports"),
+            cancel_next: AtomicBool::new(false),
+        });
         let deps = CoreDeps::new(
             clock.clone(),
             Arc::new(EventLines(events, seeding.clone(), engine.clone())),
@@ -268,7 +289,10 @@ impl Harness {
         .with_models(models.clone())
         .with_engine(Arc::new(engine.clone()))
         .with_updater(updater.clone())
-        .with_surfaces(surfaces.clone());
+        .with_surfaces(surfaces.clone())
+        .with_llm(llm)
+        .with_secrets(secrets.clone())
+        .with_native_ops(panel.clone());
         let deps = if options.battery {
             deps.with_power(Arc::new(OnBattery))
         } else {
@@ -289,6 +313,8 @@ impl Harness {
             models,
             engine,
             surfaces,
+            secrets,
+            panel,
             world: Mutex::new(w.clone()),
             dir,
         });
@@ -570,6 +596,74 @@ impl Harness {
                 ));
             }
         }
+        // The items follow their calls (they reference them), each with its evidence spans.
+        let calls = wanted["calls"].as_array().unwrap_or(&empty);
+        let has_call = |id: &Value| calls.iter().any(|c| c["id"] == *id);
+        // A scenario may drop calls and leave their items in the fixture: those are left out.
+        for item in wanted["items"]
+            .as_array()
+            .unwrap_or(&empty)
+            .iter()
+            .filter(|i| has_call(&i["call"]["id"]))
+        {
+            let lang = match &item["lang"] {
+                Value::String(code) => json!(code),
+                other => other["code"].clone(),
+            };
+            let text = &item["text"];
+            rows.push(ins(
+                "items",
+                vec![
+                    ("id", item["id"].clone()),
+                    ("rev", item["rev"].clone()),
+                    ("call_id", item["call"]["id"].clone()),
+                    ("kind", item["kind"].clone()),
+                    ("text", text.clone()),
+                    ("lang", lang),
+                    // The view says only that the text was edited: any other wording will do.
+                    (
+                        "generated_text",
+                        if item["edited"] == json!(true) {
+                            json!(format!("{} (generated)", text.as_str().unwrap_or_default()))
+                        } else {
+                            Value::Null
+                        },
+                    ),
+                    ("owner_person_id", item["owner"]["id"].clone()),
+                    ("due_date", item["due"].clone()),
+                    ("status", item["status"].clone()),
+                    ("review_state", item["review"].clone()),
+                    ("created_by", item["created_by"].clone()),
+                    ("topic_id", item["topic"]["id"].clone()),
+                    ("is_engineering", item["is_engineering"].clone()),
+                    ("linked_issue_key", item["linked_issue"].clone()),
+                    ("handoff_target", item["handoff"]["target"].clone()),
+                    ("handoff_cwd", item["handoff"]["cwd"].clone()),
+                    ("handed_off_at", item["handoff"]["at"].clone()),
+                    ("done_at", item["done_at"].clone()),
+                    (
+                        "carried_from_call_id",
+                        if has_call(&item["carried_from"]["id"]) {
+                            item["carried_from"]["id"].clone()
+                        } else {
+                            Value::Null
+                        },
+                    ),
+                ],
+            ));
+            for span in item["spans"].as_array().unwrap_or(&empty) {
+                rows.push(ins(
+                    "item_spans",
+                    vec![
+                        ("item_id", item["id"].clone()),
+                        ("call_id", span["call_id"].clone()),
+                        ("channel", span["channel"].clone()),
+                        ("t0_ms", span["t0_ms"].clone()),
+                        ("t1_ms", span["t1_ms"].clone()),
+                    ],
+                ));
+            }
+        }
         // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         self.core.store().insert_batch(rows)
     }
@@ -818,6 +912,19 @@ impl Harness {
         }
         w["calls"] = page["rows"].clone();
         w["call_details"] = Value::Array(details);
+        // The items service's read model, every page of it.
+        let mut items = vec![];
+        let mut cursor = Value::Null;
+        loop {
+            let args = json!({ "filter": {}, "page": { "limit": 500, "cursor": cursor } });
+            let page = self.call(WindowLabel::Main, "items_list", args).await?;
+            items.extend(page["rows"].as_array().cloned().unwrap_or_default());
+            cursor = page["next_cursor"].clone();
+            if cursor.is_null() {
+                break;
+            }
+        }
+        w["items"] = Value::Array(items);
         w["call_types"] = self
             .call(WindowLabel::Main, "call_types_list", json!({}))
             .await?;
@@ -843,7 +950,7 @@ impl Harness {
             if current.get(key) == Some(value)
                 || matches!(
                     key.as_str(),
-                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts"
+                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts" | "items"
                 )
             {
                 continue;
@@ -877,7 +984,7 @@ impl Harness {
             }
             v
         };
-        if ["calls", "transcripts"]
+        if ["calls", "transcripts", "items"]
             .iter()
             .any(|k| accepted[k] != wanted[k])
             || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"])
@@ -1129,10 +1236,36 @@ impl Controls for Harness {
                     self.models.released.store(true, Ordering::SeqCst);
                     Ok(json!({}))
                 }
+                // `{}`: the next save panel answers cancelled, once.
+                "cancel_next_save_panel" => {
+                    self.panel.cancel_next.store(true, Ordering::SeqCst);
+                    Ok(json!({}))
+                }
                 "set_output_route" => self.set_output_route(args),
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
                 "engine_kill" => self.engine_kill(),
+                // `{ skill, items?: [{ id, text }] }` → `{ output, runtime, llm_run_id, audit }`: one
+                // skill run through the router and the egress gate (TL-13).
+                "llm_run" => {
+                    let skill = args["skill"].as_str().unwrap_or_default();
+                    let items = match args["items"].as_array() {
+                        Some(items) => items
+                            .iter()
+                            .map(|i| (i["id"].as_str(), i["text"].as_str()))
+                            .map(|(id, text)| (id.unwrap_or_default(), text.unwrap_or_default()))
+                            .map(|(id, text)| (id.to_owned(), text.to_owned()))
+                            .collect(),
+                        None => vec![("seg_1".into(), "Ann agreed to ship the importer.".into())],
+                    };
+                    noter_core::testing::llm_run(&self.core, skill, items).await
+                }
+                // `{ locked }`: the Keychain stand-in fails every access while locked.
+                "keychain" => {
+                    self.secrets
+                        .set_locked(args["locked"].as_bool() == Some(true));
+                    Ok(json!({}))
+                }
                 // `{}` → `{ path }`: the data folder of this core, for stories that read its rows and files.
                 "data_dir" => Ok(json!({ "path": self.dir.display().to_string() })),
                 _ => Err(CoreError::new(
@@ -1470,6 +1603,25 @@ fn hex(bytes: &[u8]) -> String {
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its
 /// streams end with `shutdown`), but the process keeps serving: relaunching is the app's job, not
 /// the harness's.
+/// The save panel, scripted: answers `<data>/exports/<suggested name>`, or cancelled once after
+/// `harness.cancel_next_save_panel` (TL-15). More native asks join it as their commands land.
+struct ScriptedPanel {
+    dir: PathBuf,
+    cancel_next: AtomicBool,
+}
+
+impl NativeOps for ScriptedPanel {
+    fn save_panel<'a>(&'a self, name: &'a str, _: SaveKind) -> CoreFuture<'a, Option<PathBuf>> {
+        Box::pin(async move {
+            if self.cancel_next.swap(false, Ordering::SeqCst) {
+                return None;
+            }
+            std::fs::create_dir_all(&self.dir).ok()?;
+            Some(self.dir.join(name))
+        })
+    }
+}
+
 /// The native layer's windows, as the calls the core made (TL-2).
 #[derive(Default)]
 struct ScriptedSurfaces(Mutex<Vec<String>>, AtomicBool, AtomicBool);

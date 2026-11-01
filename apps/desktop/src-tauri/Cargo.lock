@@ -2288,6 +2288,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
+ "security-framework",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -2332,6 +2333,7 @@ dependencies = [
  "sha2 0.11.1",
  "tokio",
  "ulid",
+ "zeroize",
 ]
 
 [[package]]
