@@ -21,10 +21,6 @@ type NativeLog = { launches: Launch[]; clipboard: { plain: string; markdown: str
 
 let s: Scenario;
 let repo: string;
-afterEach(async () => {
-  await s.dispose();
-  rmSync(repo, { recursive: true, force: true });
-});
 
 /** The scenario's harness: controls are requests on the same wire. */
 const harness = () => (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<unknown> } }).process;
@@ -61,6 +57,11 @@ async function generate(item: string, regenerate = false): Promise<HandoffView> 
 }
 
 describe.skipIf(isFake)("handoff stories on the real core (2.19)", () => {
+  afterEach(async () => {
+    await s.dispose();
+    rmSync(repo, { recursive: true, force: true });
+  });
+
   it("cpt-noter-seq-call-page-hand-off-item: the prompt is written, edited and opened pre-filled in Claude Code in the mapped repository; the item is handed off", async () => {
     await open(false);
     // The drawer opens: nothing written yet; no mapping yet, so Add Mapping… is prefilled.
