@@ -211,7 +211,7 @@ The system **MUST** answer `share_test_run` from Settings with actual per-surfac
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-native-services-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-native-services-tests`
 
 The system **MUST** pass unit tests for visibility mapping, call guards, permission failures, argument encoding and cancellation; conformance for the command's Settings-only scope and result shapes; and macOS native tests for clipboard formats, panels and launch. `share_test_run` must succeed in real-app E2E and contribute to the command count; owning stories remain counted under items and handoff. System TCC prompt appearance remains on the existing manual macOS checklist. `just gate` passes.
 
@@ -224,12 +224,12 @@ The system **MUST** pass unit tests for visibility mapping, call guards, permiss
 
 ## 6. Acceptance Criteria
 
-- [ ] A real-app E2E call to `share_test_run` from Settings succeeds with per-surface rows; another window receives `window_not_allowed`.
-- [ ] Optional capture testing during a call returns blocked_by_call without prompting, writing frames or changing capture state; outside a call it records passed or a typed failed result.
+- [x] A real-app E2E call to `share_test_run` from Settings succeeds with per-surface rows; another window receives `window_not_allowed`.
+- [x] Optional capture testing during a call returns blocked_by_call without prompting, writing frames or changing capture state; outside a call it records passed or a typed failed result.
 - [x] Native tests verify protected-panel and whole-display behavior, including Hide for Presenting; uncertain app-sharing results remain depends_on_app.
 - [x] Native clipboard tests inspect both rich and plain representations; native-panel cancellation creates no export, with the caller receiving `cancelled`.
 - [x] Native launch tests cover handler disappearance, Automation denial, Unicode and shell-like paths, and prove the prompt remains pre-filled and unsent.
-- [ ] Unit, conformance and native tests pass; XCUITest names use underscore story IDs when exercising the owning handoff or sharing stories.
-- [ ] `just gate` passes.
+- [x] Unit, conformance and native tests pass; XCUITest names use underscore story IDs when exercising the owning handoff or sharing stories.
+- [x] `just gate` passes.
 
-The native tests above are noter-native's (#243) and the host's (`apps/desktop/src-tauri/tests/native.rs`: the panel off the async runtime, a private-pasteboard round trip, the Screen Share Test through `MacOps`). Only the owner's Mac proves the `cwd`/`q` parameters of `claude://code/new` and `codex://new`, a real Screen Recording and Automation prompt (the manual macOS checklist), and a real launch pre-filled and unsent. The real-app E2E and conformance for `share_test_run` come with the contract PR.
+The native tests above are noter-native's (#243) and the host's (`apps/desktop/src-tauri/tests/native.rs`: the panel off the async runtime, a private-pasteboard round trip, the Screen Share Test through `MacOps`). Only the owner's Mac proves the `cwd`/`q` parameters of `claude://code/new` and `codex://new`, a real Screen Recording and Automation prompt (the manual macOS checklist), and a real launch pre-filled and unsent. `apps/desktop/tests/conformance/m2-share-test.test.ts` runs `share_test_run` against the fake and the real core.
