@@ -233,7 +233,8 @@ impl noter_desktop::Windows for NoWindows {
 fn the_share_test_runs_through_the_mac_from_settings_only() {
     let dir = tempfile::tempdir().unwrap();
     let ops = noter_desktop::MacOps::new(Arc::new(NoWindows));
-    let deps = CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)).with_native_ops(Arc::new(ops));
+    let deps =
+        CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)).with_native_ops(Arc::new(ops));
     let core = Core::open(dir.path(), deps).unwrap();
     let app = builder(mock_builder())
         .manage(Booted(Ok(Arc::new(core))))

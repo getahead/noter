@@ -265,7 +265,7 @@ The system **MUST** pass unit tests for caching, cancel/result races, retained e
 - [x] Automation denial returns the typed error without claiming a successful handoff; Copy succeeds and records the used version and acceptance.
 - [x] Forced regeneration keeps user edits; cancelled or superseded work cannot publish ready or overwrite the current prompt.
 - [x] All ten commands succeed against the real core; fake/real conformance verifies command scopes, revisions, async generation events and errors.
-- [ ] Native tests prove paths and prompt text cannot execute shell syntax, and long prompts use a short file instruction below the query cap.
+- [x] Native tests prove paths and prompt text cannot execute shell syntax, and long prompts use a short file instruction below the query cap.
 
-The native AC stays open: noter-native's own tests (#243) prove the quoting and URL encoding; a query-cap test and the macOS launch evidence belong to 2.21 and the owner's Mac check. The handoff skill's rubric evaluations need the golden set (an owner item, as for 2.8 and 2.14).
+The native AC: noter-native's own tests (#243) prove the quoting and URL encoding; the query-cap test is the host's (`apps/desktop/src-tauri/tests/native.rs`, 2.21); the macOS launch evidence is the owner's Mac check. The handoff skill's rubric evaluations need the golden set (an owner item, as for 2.8 and 2.14).
 - [x] `just gate` passes.

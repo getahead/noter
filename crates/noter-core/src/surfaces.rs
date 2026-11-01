@@ -332,6 +332,32 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-return-presenting
     }
 
+    /// `share_test_run`: the native layer measures the surfaces and runs the probe; the core
+    /// tells it whether a call is live, whether the menu bar shows a title, and the time.
+    // @cpt-flow:cpt-noter-flow-core-native-services-share-test:p1
+    // @cpt-dod:cpt-noter-dod-core-native-services-share-test:p1
+    pub(crate) async fn share_test(
+        &self,
+        args: ShareTestArgs,
+    ) -> Result<ShareTestResult, CoreError> {
+        let call_live = matches!(
+            self.capture_now().phase,
+            CapturePhase::Starting | CapturePhase::Recording | CapturePhase::Paused
+        );
+        // The tray as it is now: the title follows the setting, the call and presenting.
+        self.refresh_tray();
+        let title_shown = lock(&self.windows)
+            .tray
+            .as_ref()
+            .is_some_and(|t| t.title.is_some());
+        let now = self.deps.clock.now();
+        self.deps
+            .native_ops
+            .share_test(&args, call_live, title_shown, now)
+            .await
+            .map_err(|code| CoreError::new(code, "the Screen Share Test could not run"))
+    }
+
     /// Builds the tray model and hands it to the native layer when it changed; the app calls it
     /// every second for the clock, the countdowns and the states that change without an event.
     /// It takes the app, settings, hotkeys and downloads locks: no caller may hold one.

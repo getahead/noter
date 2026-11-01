@@ -2,31 +2,119 @@
 //! item (DESIGN-core › Native surfaces).
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
     BoxFuture, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps, NativeServices,
     SaveKind,
 };
-use noter_protocol::model::{CalendarEventRef, HandoffTarget, LaunchPath, LaunchPlan};
+use noter_native::{PanelRequest, ParentWindow};
+use noter_protocol::model::{
+    CalendarEventRef, HandoffTarget, LaunchPath, LaunchPlan, NoterSurface, ShareTestArgs,
+    ShareTestResult,
+};
 use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs};
+use tauri::{AppHandle, Runtime};
 
-/// The Mac; `storage` is the folder whose volume's free space counts.
-/// The native asks of the commands (TL-15): launches and the clipboard over noter-native.
-pub struct MacOps;
+/// What `MacOps` needs of the app's windows, read on the main thread: each surface's
+/// `CGWindowID` for the Screen Share Test, and the focused window a panel attaches to.
+pub trait Windows: Send + Sync {
+    fn ids(&self) -> Vec<(NoterSurface, u32)>;
+    fn focused(&self) -> Option<ParentWindow>;
+}
+
+/// Runs `f` on the main thread and waits for its answer. From a blocking thread only: on a tokio
+/// worker the main thread may be waiting on the runtime (#233). None once the event loop is gone.
+pub(crate) fn on_main<R: Runtime, T: Send + 'static>(
+    app: &AppHandle<R>,
+    f: impl FnOnce() -> T + Send + 'static,
+) -> Option<T> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(f());
+    })
+    .ok()?;
+    rx.recv().ok()
+}
+
+/// Runs `f` on a blocking thread, off the async runtime: panels and the Automation and Screen
+/// Recording prompts wait on the user, and AppKit work reaches the main thread from there.
+async fn off_runtime<T: Send + 'static>(
+    f: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, ErrorCode> {
+    // @cpt-begin:cpt-noter-flow-core-native-services-operation:p1:inst-op-dispatch
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|_| ErrorCode::Internal)
+    // @cpt-end:cpt-noter-flow-core-native-services-operation:p1:inst-op-dispatch
+}
+
+/// The native asks of the commands (TL-15) over noter-native: panels, the clipboard, launches
+/// and the Screen Share Test. The panel and the pasteboard are seams a test stands in for.
+// @cpt-flow:cpt-noter-flow-core-native-services-operation:p1
+// @cpt-dod:cpt-noter-dod-core-native-services-mechanisms:p1
+pub struct MacOps {
+    windows: Arc<dyn Windows>,
+    panel: fn(&PanelRequest) -> Option<PathBuf>,
+    pasteboard: fn(&noter_native::ClipboardText) -> Result<(), String>,
+}
+
+impl MacOps {
+    pub fn new(windows: Arc<dyn Windows>) -> Self {
+        Self::with(
+            windows,
+            noter_native::save_panel,
+            noter_native::clipboard_write,
+        )
+    }
+
+    /// With the panel and the pasteboard given (tests).
+    pub fn with(
+        windows: Arc<dyn Windows>,
+        panel: fn(&PanelRequest) -> Option<PathBuf>,
+        pasteboard: fn(&noter_native::ClipboardText) -> Result<(), String>,
+    ) -> Self {
+        Self {
+            windows,
+            panel,
+            pasteboard,
+        }
+    }
+}
 
 impl NativeOps for MacOps {
-    // shortcut: every export is cancelled until 2.21 native-services shows the real NSSavePanel.
-    fn save_panel<'a>(&'a self, _: &'a str, _: SaveKind) -> BoxFuture<'a, Option<PathBuf>> {
-        Box::pin(async { None })
+    /// A sheet on the focused window (the one that asked), else a free panel.
+    fn save_panel<'a>(&'a self, name: &'a str, kind: SaveKind) -> BoxFuture<'a, Option<PathBuf>> {
+        let windows = self.windows.clone();
+        let panel = self.panel;
+        let extensions = match kind {
+            SaveKind::Markdown => vec!["md".to_string()],
+            SaveKind::Json => vec!["json".to_string()],
+            SaveKind::Folder => vec![],
+        };
+        let req = PanelRequest {
+            suggested_name: name.to_string(),
+            extensions,
+            folder: kind == SaveKind::Folder,
+            parent: None,
+        };
+        Box::pin(async move {
+            off_runtime(move || {
+                let parent = windows.focused();
+                panel(&PanelRequest { parent, ..req })
+            })
+            .await
+            .ok()
+            .flatten()
+        })
     }
 
     fn launch_plan(&self, target: HandoffTarget) -> LaunchPlan {
         noter_native::launch_plan(target)
     }
 
-    /// On a blocking thread: macOS may wait on the user's Automation answer.
+    /// May wait on the user's Automation answer.
     fn launch<'a>(
         &'a self,
         path: LaunchPath,
@@ -38,9 +126,8 @@ impl NativeOps for MacOps {
             prompt_file: req.prompt_file.clone(),
         };
         Box::pin(async move {
-            tauri::async_runtime::spawn_blocking(move || noter_native::launch(path, &req))
-                .await
-                .map_err(|_| ErrorCode::Internal)?
+            off_runtime(move || noter_native::launch(path, &req))
+                .await?
                 .map(drop)
         })
     }
@@ -51,10 +138,38 @@ impl NativeOps for MacOps {
             markdown: text.markdown.clone(),
             html: text.html.clone(),
         };
-        Box::pin(async move { noter_native::clipboard_write(&text) })
+        // NSPasteboard takes writes from any thread.
+        let written = (self.pasteboard)(&text);
+        Box::pin(async move { written })
+    }
+
+    /// The window server's view of the windows, then the probe; may wait on the Screen
+    /// Recording prompt.
+    fn share_test<'a>(
+        &'a self,
+        args: &'a ShareTestArgs,
+        call_live: bool,
+        menu_bar_title_shown: bool,
+        now: TimestampMs,
+    ) -> BoxFuture<'a, Result<ShareTestResult, ErrorCode>> {
+        let windows = self.windows.clone();
+        let args = args.clone();
+        Box::pin(async move {
+            off_runtime(move || {
+                noter_native::share_test(
+                    &args,
+                    call_live,
+                    &windows.ids(),
+                    menu_bar_title_shown,
+                    now,
+                )
+            })
+            .await
+        })
     }
 }
 
+/// The Mac; `storage` is the folder whose volume's free space counts.
 pub struct Mac {
     storage: PathBuf,
     watch: Mutex<Option<noter_native::Watch>>,

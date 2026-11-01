@@ -661,6 +661,16 @@ impl CoreApi for Core {
         self.start_self_test(ctx, args, channel)
     }
 
+    async fn share_test_run(
+        &self,
+        _ctx: &CommandCtx,
+        args: ShareTestArgs,
+    ) -> Result<ShareTestResult, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-native-services-share-test:p1:inst-test-request
+        self.share_test(args).await
+        // @cpt-end:cpt-noter-flow-core-native-services-share-test:p1:inst-test-request
+    }
+
     async fn models_download(
         &self,
         _ctx: &CommandCtx,

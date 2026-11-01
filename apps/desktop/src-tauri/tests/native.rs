@@ -50,7 +50,7 @@ use std::thread::ThreadId;
 
 use noter_core::{ClipboardText, NativeOps, SaveKind};
 use noter_desktop::{MacOps, Windows};
-use noter_native::{ParentWindow, PanelRequest};
+use noter_native::{PanelRequest, ParentWindow};
 use noter_protocol::model::*;
 use noter_protocol::{ErrorCode, TimestampMs};
 
@@ -93,8 +93,12 @@ fn no_pasteboard(_: &noter_native::ClipboardText) -> Result<(), String> {
 fn the_save_panel_is_shown_off_the_async_runtime_with_the_kind_asked() {
     let ops = MacOps::with(no_windows(), chooses, no_pasteboard);
     let me = std::thread::current().id();
-    let chosen = tauri::async_runtime::block_on(ops.save_panel("Week 44: notes", SaveKind::Markdown));
-    assert_eq!(chosen, Some(PathBuf::from("/Users/me/Exports/Week 44- notes")));
+    let chosen =
+        tauri::async_runtime::block_on(ops.save_panel("Week 44: notes", SaveKind::Markdown));
+    assert_eq!(
+        chosen,
+        Some(PathBuf::from("/Users/me/Exports/Week 44: notes"))
+    );
     let folder = tauri::async_runtime::block_on(ops.save_panel("noter", SaveKind::Folder));
     assert_eq!(folder, Some(PathBuf::from("/Users/me/Exports/noter")));
     let shown = std::mem::take(&mut *PANELS.lock().unwrap());
@@ -133,8 +137,14 @@ fn the_clipboard_carries_the_rich_forms_and_the_plain_text() {
     };
     tauri::async_runtime::block_on(ops.clipboard_write(&text)).unwrap();
     let read = |uti| noter_native::clipboard_read("dev.noter.tests.macops", uti);
-    assert_eq!(read("public.utf8-plain-text").as_deref(), Some("Ship the fix"));
-    assert_eq!(read("net.daringfireball.markdown").as_deref(), Some("**Ship** the fix"));
+    assert_eq!(
+        read("public.utf8-plain-text").as_deref(),
+        Some("Ship the fix")
+    );
+    assert_eq!(
+        read("net.daringfireball.markdown").as_deref(),
+        Some("**Ship** the fix")
+    );
     assert_eq!(read("public.html").as_deref(), Some("<b>Ship</b> the fix"));
     noter_native::clipboard_release("dev.noter.tests.macops");
 }
@@ -160,7 +170,8 @@ fn the_share_test_reports_every_surface_and_never_probes_during_a_call() {
     );
     let at = TimestampMs(1_792_137_600_000);
     let args = |run_capture_test| ShareTestArgs { run_capture_test };
-    let quiet = tauri::async_runtime::block_on(ops.share_test(&args(false), false, true, at)).unwrap();
+    let quiet =
+        tauri::async_runtime::block_on(ops.share_test(&args(false), false, true, at)).unwrap();
     let surfaces: Vec<_> = quiet.rows.iter().map(|r| r.surface).collect();
     assert_eq!(
         surfaces,
@@ -177,7 +188,8 @@ fn the_share_test_reports_every_surface_and_never_probes_during_a_call() {
     assert_eq!(quiet.rows[4].window_share, ShareVisibility::Hidden);
     assert_eq!(quiet.rows[4].display_share, ShareVisibility::Visible);
     assert_eq!(quiet.capture_test, CaptureTestOutcome::NotRun);
-    let live = tauri::async_runtime::block_on(ops.share_test(&args(true), true, false, at)).unwrap();
+    let live =
+        tauri::async_runtime::block_on(ops.share_test(&args(true), true, false, at)).unwrap();
     assert_eq!(live.capture_test, CaptureTestOutcome::BlockedByCall);
     assert_eq!(live.rows[4].display_share, ShareVisibility::Hidden);
 }
@@ -193,4 +205,37 @@ fn a_launch_without_its_handler_fails_typed() {
     };
     let got = tauri::async_runtime::block_on(ops.launch(LaunchPath::None, &req));
     assert_eq!(got, Err(ErrorCode::NoLinkHandler));
+}
+
+// FEATURE cpt-noter-feature-core-handoff, AC "long prompts use a short file instruction below
+// the query cap": `q` carries only the instruction to read the prompt file, never the prompt.
+#[test]
+fn a_long_prompt_travels_as_a_short_file_instruction_below_the_query_cap() {
+    // claude-cli://open caps `q` at 5,000 characters (PRD › Handoff).
+    const Q_CAP: usize = 5_000;
+    let dir = tempfile::tempdir().unwrap();
+    let prompt_file = dir
+        .path()
+        .join("Application Support/Noter/handoffs/itm_ünïcode $(whoami) 'quote'.md");
+    std::fs::create_dir_all(prompt_file.parent().unwrap()).unwrap();
+    let prompt = "Ship the fix; `touch pwned` && echo $HOME\n".repeat(2_000);
+    std::fs::write(&prompt_file, &prompt).unwrap();
+    let instruction = noter_native::read_instruction(&prompt_file);
+    let cwd = dir.path().join("vhi frontend");
+    for path in [
+        LaunchPath::ClaudeCliLink,
+        LaunchPath::ClaudeDesktop,
+        LaunchPath::CodexApp,
+    ] {
+        let url = noter_native::link_url(path, &cwd, &instruction).unwrap();
+        let q = url.split("&q=").nth(1).unwrap();
+        assert!(q.len() < Q_CAP, "{path:?}: q is {} characters", q.len());
+        assert!(!url.contains("touch"), "{path:?} carries the prompt's text");
+        // Percent-encoded: no shell or URL syntax survives as itself.
+        assert!(
+            !q.contains(['$', '\'', ' ', '&', '(', '`']),
+            "{path:?}: {q}"
+        );
+    }
+    assert!(instruction.contains(&*prompt_file.to_string_lossy()));
 }

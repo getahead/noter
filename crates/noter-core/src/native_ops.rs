@@ -4,8 +4,10 @@
 
 use std::path::PathBuf;
 
-use noter_protocol::model::{HandoffTarget, LaunchPath, LaunchPlan};
-use noter_protocol::ErrorCode;
+use noter_protocol::model::{
+    HandoffTarget, LaunchPath, LaunchPlan, ShareTestArgs, ShareTestResult,
+};
+use noter_protocol::{ErrorCode, TimestampMs};
 
 use crate::BoxFuture;
 
@@ -35,8 +37,7 @@ pub struct ClipboardText {
     pub html: Option<String>,
 }
 
-/// Native asks of the commands. Still to come, added by the command that needs it:
-/// `share_test(..)` (`share_test_run`).
+/// Native asks of the commands.
 pub trait NativeOps: Send + Sync {
     /// Shows the save panel named `suggested_name`; `None` when the user cancels.
     fn save_panel<'a>(
@@ -71,6 +72,19 @@ pub trait NativeOps: Send + Sync {
         _text: &'a ClipboardText,
     ) -> BoxFuture<'a, Result<(), String>> {
         Box::pin(async { Err("no clipboard".into()) })
+    }
+
+    /// The Screen Share Test: a row per Noter surface as the window server reports it, and the
+    /// optional capture probe, refused while `call_live`. May wait on the Screen Recording
+    /// prompt. Without a Mac there is nothing to measure: an error, never a false pass.
+    fn share_test<'a>(
+        &'a self,
+        _args: &'a ShareTestArgs,
+        _call_live: bool,
+        _menu_bar_title_shown: bool,
+        _now: TimestampMs,
+    ) -> BoxFuture<'a, Result<ShareTestResult, ErrorCode>> {
+        Box::pin(async { Err(ErrorCode::Internal) })
     }
 }
 

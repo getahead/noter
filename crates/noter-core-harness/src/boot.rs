@@ -286,6 +286,7 @@ impl Harness {
             cancel_next: AtomicBool::new(false),
             launch: Mutex::new(LaunchWorld::default()),
             log: Mutex::new(json!({ "launches": [], "clipboard": [] })),
+            probe_fails: Mutex::new(None),
         });
         let deps = CoreDeps::new(
             clock.clone(),
@@ -1259,6 +1260,20 @@ impl Controls for Harness {
                     *lock(&self.panel.launch) = world;
                     Ok(json!({}))
                 }
+                // `{ fail: ErrorCode | null }`: the Screen Share Test's probe fails with `fail`
+                // from now on, or passes again.
+                "share_test_probe" => {
+                    #[derive(serde::Deserialize)]
+                    struct Probe {
+                        fail: Option<ErrorCode>,
+                    }
+                    let probe: Probe = parse(
+                        args,
+                        "harness.share_test_probe needs { fail: ErrorCode | null }",
+                    )?;
+                    *lock(&self.panel.probe_fails) = probe.fail;
+                    Ok(json!({}))
+                }
                 // `{}`: the launches and clipboard writes so far, oldest first.
                 "native_log" => Ok(lock(&self.panel.log).clone()),
                 "set_output_route" => self.set_output_route(args),
@@ -1666,12 +1681,14 @@ fn hex(bytes: &[u8]) -> String {
 /// The native asks, scripted (TL-15): the save panel answers `<data>/exports/<suggested name>`
 /// (a folder for `SaveKind::Folder`), or cancelled once after `harness.cancel_next_save_panel`;
 /// launches follow `harness.launch_world` and, like clipboard writes, are recorded for
-/// `harness.native_log`.
+/// `harness.native_log`; the Screen Share Test answers fixed rows (the fake core's) and its
+/// probe passes unless `harness.share_test_probe` says it fails.
 struct ScriptedPanel {
     dir: PathBuf,
     cancel_next: AtomicBool,
     launch: Mutex<LaunchWorld>,
     log: Mutex<Value>,
+    probe_fails: Mutex<Option<ErrorCode>>,
 }
 
 /// What the Mac reports for launches: the plan, and the paths that fail with a code.
@@ -1765,6 +1782,45 @@ impl NativeOps for ScriptedPanel {
         let entry = json!({ "plain": text.plain, "markdown": text.markdown, "html": text.html });
         push(&self.log, "clipboard", entry);
         Box::pin(async { Ok(()) })
+    }
+
+    fn share_test<'a>(
+        &'a self,
+        args: &'a ShareTestArgs,
+        call_live: bool,
+        _menu_bar_title_shown: bool,
+        now: TimestampMs,
+    ) -> CoreFuture<'a, Result<ShareTestResult, ErrorCode>> {
+        use ShareVisibility::*;
+        let rows = [
+            NoterSurface::CallWindow,
+            NoterSurface::RecordPrompt,
+            NoterSurface::MainWindow,
+            NoterSurface::SettingsWindow,
+            NoterSurface::MenuBarTitle,
+        ]
+        .map(|surface| ShareTestRow {
+            surface,
+            window_share: Hidden,
+            app_share: Hidden,
+            display_share: if surface == NoterSurface::MenuBarTitle {
+                Visible
+            } else {
+                DependsOnApp
+            },
+        });
+        let fails = *lock(&self.probe_fails);
+        // The probe's states are noter-native's: not run, blocked by the call, passed or failed.
+        let capture_test =
+            noter_native::capture_outcome(args.run_capture_test, call_live, now, || {
+                fails.map_or(Ok(()), Err)
+            });
+        Box::pin(async move {
+            Ok(ShareTestResult {
+                rows: rows.to_vec(),
+                capture_test,
+            })
+        })
     }
 }
 
