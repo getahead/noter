@@ -3225,7 +3225,10 @@ export type TagsSetArgs = {
 
 export type TagsSetResult = {
 	calls: CallRow[],
+	/**  The first changed call's change; with `batch_id` set, undo the batch instead. */
 	change_id: ChangeId,
+	/**  Set when several calls changed together: `change_undo` with this batch reverses them all. */
+	batch_id?: BatchId | null,
 };
 
 /**  A term the hallucination/term filter corrected; the original shows in the help tag. */

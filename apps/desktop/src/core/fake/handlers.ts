@@ -808,6 +808,7 @@ export const defaultHandlers: Handlers = {
     return { meta: { id: a.version_id, n, kind: v.kind, writer: v.kind === "generated" ? s.writer : null, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: v.body_md };
   },
   share_copy: (a, { world }) => {
+    call(world, a.call_id);
     const out = world.outputs.find((o) => o.call_id === a.call_id);
     if (!out || out.status === "writing" || out.status === "not_started") throw coreError("outputs_not_ready");
     const sections = out.sections.filter((s) => !a.scope.sections.length || a.scope.sections.includes(s.kind));
@@ -939,7 +940,8 @@ export const defaultHandlers: Handlers = {
       c.tags = [...new Set([...c.tags.filter((t) => !a.remove.includes(t)), ...a.add])];
       return c;
     });
-    return { calls, change_id: logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" }) };
+    const change_id = logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" });
+    return { calls, change_id, batch_id: a.call_ids.length > 1 ? `bat_${change_id}` : null };
   },
   tags_list: (_a, { world }) => {
     const counts = new Map<string, number>();
