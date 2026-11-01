@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-engine-offline`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-engine-offline`
 
-- [ ] `p3` - `cpt-noter-feature-core-engine-offline`
+- [x] `p3` - `cpt-noter-feature-core-engine-offline`
 
 ## 1. Feature Context
 
@@ -45,7 +45,7 @@ design: docs/DESIGN-core.md
 
 The Swift engine and Rust supervisor gain the offline Large v3 pass with VBx clustering, 256-dimensional speaker embeddings and 1024-dimensional bge-m3 text embeddings. Large results travel by file inside the App Group container. The engine returns facts and files; installing archive results, identifying people and querying vectors belong to their consuming features.
 
-> **M2 decisions (Backend Teamlead, 1 Nov 2026).** The constraints file is `OfflineConstraints` (`contracts/engine.schema.json#offline_constraints`): `{languages, glossary, speaker_priors, must_link: [{a: {t0_ms, t1_ms}, b: {...}}], cannot_link, speaker_names: {live_label: name}}`, every key required, spans in call milliseconds on the system channel; 2.13 writes it (TL-16). Large v3 runs on WhisperKit, which has no beam search, so the decode is greedy with a temperature fallback over the top five tokens, not beam 5; a voice with under 3 s of speech gets the label `''` (TL-16). Clustering follows the owner's D-32 answer (1 Nov): pinned pyannote community-1 segmentation and WeSpeaker CoreML models with VBx in the engine, no FluidAudio binary (licences: `.plans/backend/m2-diarization-licences.md`); the golden set is the owner's item (TL-17). Crosstalk: the engine only reports overlap; `segments.crosstalk_with` storage and both transcript readers land with the archive install in 2.17 and are cross-referenced from the crosstalk acceptance criterion below (TL-21, D-40).
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** The constraints file is `OfflineConstraints` (`contracts/engine.schema.json#offline_constraints`): `{languages, glossary, speaker_priors, must_link: [{a: {t0_ms, t1_ms}, b: {...}}], cannot_link, speaker_names: {live_label: name}}`, every key required, spans in call milliseconds on the system channel; 2.13 writes it (TL-16). Large v3 runs on WhisperKit, which has no beam search, so the decode is greedy with a temperature fallback over the top five tokens, not beam 5; a voice with under 3 s of speech gets the label `''` (TL-16). Clustering implements the owner's D-32 answer, option 2 (1 Nov, #279): pinned pyannote community-1 segmentation and WeSpeaker CoreML models with VBx and the user's constraints in the engine, no FluidAudio binary; every pinned file is CC-BY-4.0 and needs attribution (`.plans/backend/m2-diarization-licences.md`); the golden set is the owner's item (TL-17). Crosstalk: the engine only reports overlap; `segments.crosstalk_with` storage and both transcript readers land with the archive install in 2.17 and are cross-referenced from the crosstalk acceptance criterion below (TL-21, D-40).
 
 ### 1.2 Purpose
 
