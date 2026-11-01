@@ -1897,3 +1897,13 @@ async fn the_scripted_share_test_answers_fixed_rows_and_the_probe_states() {
     );
     r.finish().await;
 }
+
+// D-33: the scripted plan names Claude's link; Codex has none that carries the prompt.
+#[tokio::test]
+async fn a_codex_handoff_plans_the_terminal() {
+    let mut r = start().await;
+    let args = json!({ "item_id": "itm_virt", "target": "codex" });
+    let view = r.ok("main", "handoff_set_target", args).await;
+    assert_eq!(view["launch"]["path"], "terminal", "{view}");
+    r.finish().await;
+}
