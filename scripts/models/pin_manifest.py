@@ -65,14 +65,18 @@ BUNDLES = [
         "only": ["tokenizer.json", "tokenizer_config.json"],
         "required_for_capture": False,
     },
-    # Speaker vectors: WeSpeaker ResNet34 as pyannote community-1's FBank and Embedding CoreML
-    # conversions (CC-BY-4.0, attribution in NOTICE.md).
+    # Speaker vectors and the archive's clustering: pyannote community-1's segmentation, WeSpeaker
+    # ResNet34 as its FBank and Embedding CoreML conversions, and VBx's PLDA (CC-BY-4.0,
+    # attribution in NOTICE.md; .plans/backend/m2-diarization-licences.md).
     {
         "bundle": "wespeaker",
         "repo": "FluidInference/speaker-diarization-coreml",
         "commit": "7eab74f3463c736418d0eb10296261ae581146c9",
         "folder": "",
-        "only": ["FBank.mlmodelc/", "Embedding.mlmodelc/", "NOTICE.md"],
+        "only": [
+            "Segmentation.mlmodelc/", "FBank.mlmodelc/", "Embedding.mlmodelc/", "plda-parameters.json",
+            "xvector-transform.json", "NOTICE.md",
+        ],
         "required_for_capture": False,
     },
     # Text vectors: bge-m3 as a CoreML conversion (MIT), with bge-m3's own tokenizer.

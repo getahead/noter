@@ -45,7 +45,7 @@ design: docs/DESIGN-core.md
 
 The Swift engine and Rust supervisor gain the offline Large v3 pass with VBx clustering, 256-dimensional speaker embeddings and 1024-dimensional bge-m3 text embeddings. Large results travel by file inside the App Group container. The engine returns facts and files; installing archive results, identifying people and querying vectors belong to their consuming features.
 
-> **M2 decisions (Backend Teamlead, 1 Nov 2026).** The constraints file is `OfflineConstraints` (`contracts/engine.schema.json#offline_constraints`): `{languages, glossary, speaker_priors, must_link: [{a: {t0_ms, t1_ms}, b: {...}}], cannot_link, speaker_names: {live_label: name}}`, every key required, spans in call milliseconds on the system channel; 2.13 writes it (TL-16). Large v3 runs on WhisperKit, which has no beam search, so the decode is greedy with a temperature fallback over the top five tokens, not beam 5; a voice with under 3 s of speech gets the label `''` (TL-16). Clustering (`inst-decode-cluster`) is owner-gated (D-32) and the golden set is the owner's item (TL-17). Crosstalk: the engine only reports overlap; `segments.crosstalk_with` storage and both transcript readers land with the archive install in 2.17 and are cross-referenced from the crosstalk acceptance criterion below (TL-21, D-40).
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** The constraints file is `OfflineConstraints` (`contracts/engine.schema.json#offline_constraints`): `{languages, glossary, speaker_priors, must_link: [{a: {t0_ms, t1_ms}, b: {...}}], cannot_link, speaker_names: {live_label: name}}`, every key required, spans in call milliseconds on the system channel; 2.13 writes it (TL-16). Large v3 runs on WhisperKit, which has no beam search, so the decode is greedy with a temperature fallback over the top five tokens, not beam 5; a voice with under 3 s of speech gets the label `''` (TL-16). Clustering follows the owner's D-32 answer (1 Nov): pinned pyannote community-1 segmentation and WeSpeaker CoreML models with VBx in the engine, no FluidAudio binary (licences: `.plans/backend/m2-diarization-licences.md`); the golden set is the owner's item (TL-17). Crosstalk: the engine only reports overlap; `segments.crosstalk_with` storage and both transcript readers land with the archive install in 2.17 and are cross-referenced from the crosstalk acceptance criterion below (TL-21, D-40).
 
 ### 1.2 Purpose
 
@@ -125,7 +125,7 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Decode and cluster with corrections
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-decode`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-decode`
 
 **Input**: Stopped-call mic and system audio, timeline, glossary and persisted must-link and cannot-link constraints.
 
@@ -136,12 +136,12 @@ The live transcript can improve after the call without losing the user's speaker
 2. [x] - `p1` - Split speech with VAD and identify language per utterance using the configured languages and speaker priors - `inst-decode-language`
 3. [x] - `p1` - Run full Large v3 with beam size 5 and temperature fallback, then apply glossary and hallucination filters - `inst-decode-asr`
 4. [x] - `p1` - Re-decode low-probability mixed-language utterances with the alternative language and keep the better-scoring result - `inst-decode-alternative`
-5. [ ] - `p1` - Run offline FluidAudio diarization and VBx across the system channel, enforcing must-link and cannot-link time-span constraints from user corrections - `inst-decode-cluster`
+5. [x] - `p1` - Run offline pyannote segmentation, WeSpeaker embeddings and VBx across the system channel, enforcing must-link and cannot-link time-span constraints from user corrections - `inst-decode-cluster`
 6. [x] - `p1` - Mark overlapping spans with both candidate labels and low ASR confidence; leave voices with under three seconds of speech unnamed - `inst-decode-overlap`
 7. [x] - `p1` - Preserve the microphone channel's user or guest attribution and the two-channel split; do not infer cross-call person identity here - `inst-decode-channel`
 8. [x] - `p1` - **RETURN** the complete result; the core maps archive clusters to live labels by time overlap and applies corrections when installing it - `inst-decode-return`
 
-> **Clustering is owner-gated (TL-16, D-32, 1 Nov 2026).** `inst-decode-cluster` waits on the owner's choice of backend (FluidAudio prebuilt binary or pinned pyannote/WeSpeaker models). Until then a system-channel voice is the live per-side label (`spk_1`), split by cannot-link spans, joined by must-link spans and shared names unless a cannot-link stands between them; a voice with under three seconds of speech gets the empty label. Large v3 runs on WhisperKit, which has no beam search: a failed greedy decode falls back through temperatures sampling the top five tokens.
+> **Clustering (D-32 option 2, 1 Nov 2026).** As pyannote community-1 runs it: segmentation finds each 10 s window's speakers on the system channel, WeSpeaker embeds each over the window with the frames they speak alone, VBx (agglomerative start 0.6, PLDA, Fa 0.07, Fb 0.8) learns the voices from speakers with 2 s of such speech, and each speaker joins its closest voice that no cannot-link forbids (two speakers of one window are two people). Must-links and shared names then join voices unless a cannot-link stands between them; a voice with under three seconds of speech gets the empty label. Without the segmentation model (a bundle installed before it was pinned) the system channel keeps its live label (`spk_1`). Large v3 runs on WhisperKit, which has no beam search: a failed greedy decode falls back through temperatures sampling the top five tokens.
 
 ### Produce local vectors
 
@@ -181,7 +181,7 @@ Abandoning a request invalidates its completion at the supervisor; it adds no en
 
 ### Constrained archive results
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-archive`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-archive`
 
 The system **MUST** implement the offline pass through the existing stdio protocol, decode both channels with full Large v3 and constrained VBx, preserve timing and gaps, and publish progress and complete result files without replacing the core's live rows itself.
 
@@ -195,8 +195,6 @@ The system **MUST** implement the offline pass through the existing stdio protoc
 **Touches**:
 - API: `offline_pass`, `offline_progress`, `offline_done`, `offline_failed`
 - Entities: `EngineSegment`, archive result files and correction constraints
-
-> **Open (TL-16).** Everything but constrained VBx clustering is delivered: both channels in call time with gaps, Large v3, the filters, progress and complete result files. The box waits on `inst-decode-cluster`.
 
 ### Embedding requests
 
@@ -227,15 +225,15 @@ The system **MUST** pass Swift unit and file-mode golden-call tests, Rust superv
 **Touches**:
 - API: `cpt-noter-interface-engine-stdio`
 
-> **Open (TL-17).** The Swift unit tests drive the archive and vector code on synthetic calls with scripted models, and the Rust supervisor and schema tests are in; the file-mode golden-call tests need `evals/golden`, the owner's item.
+> **Open (TL-17).** The Swift unit tests drive the archive, clustering and vector code on synthetic calls with scripted models, and the Rust supervisor and schema tests are in; the file-mode golden-call tests need `evals/golden`, the owner's item.
 
 ## 6. Acceptance Criteria
 
 - [ ] File-mode golden calls in English, Russian and German produce a complete archive with word timings, channel separation, crosstalk and enforced user constraints.
 - [x] Speaker vectors have 256 finite dimensions; text vectors have 1024; batch order and count match the request, including an empty batch.
 - [x] Unsafe paths and missing audio or models fail through the existing protocol without publishing partial files.
-- [ ] Engine exit and abandoned requests do not leave unresolved callers or install stale results; capture still restarts before archive work.
+- [x] Engine exit and abandoned requests do not leave unresolved callers or install stale results; capture still restarts before archive work.
 - [ ] Engine-schema conformance and the consuming post-call story E2E pass; archive quality is measured on the golden set on the Mac runner.
-- [ ] `just gate` passes.
+- [x] `just gate` passes.
 
-> **Open (TL-17).** The first and fifth criteria are measured on `evals/golden` on the Mac runner, the owner's item; the conformance half of the fifth is in.
+> **Open (TL-17).** The first and fifth criteria are measured on `evals/golden` on the Mac runner, the owner's item (diarization DER thresholds proposed to the owner, none set); the conformance half of the fifth is in.
