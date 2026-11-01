@@ -262,7 +262,6 @@ type Wanted = Option<Vec<(&'static str, Value)>>;
 
 impl Core {
     // @cpt-flow:cpt-noter-flow-core-items-today-read:p1
-    // @cpt-dod:cpt-noter-dod-core-items-today-items:p1
     pub(crate) fn list_items(&self, args: ItemsListArgs) -> Result<Page<ItemView>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-items-today-read:p1:inst-read-list
         self.ready()?;
@@ -353,7 +352,6 @@ impl Core {
             .read(|c| select_item(c, id)?.map(|s| assemble(c, s)).transpose())
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-read:p1
     pub(crate) fn get_item(&self, args: ItemIdArgs) -> Result<ItemDetail, CoreError> {
         self.ready()?;
         let id = args.item_id.as_str().to_string();
@@ -620,7 +618,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-review:p1:inst-review-single
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-review:p1
     pub(crate) fn review_all_items(
         &self,
         ctx: &CommandCtx,
@@ -696,7 +693,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-review:p1:inst-review-batch
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-review:p1
     pub(crate) fn edit_item(
         &self,
         ctx: &CommandCtx,
@@ -778,7 +774,6 @@ impl Core {
             .ok_or_else(|| invalid("owner", ValidationRule::OutOfRange))
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-review:p1
     pub(crate) fn reopen_item(
         &self,
         ctx: &CommandCtx,
@@ -804,7 +799,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-review:p1:inst-review-reopen
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-tick:p1
     pub(crate) fn answer_handoff(
         &self,
         ctx: &CommandCtx,
@@ -832,7 +826,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-answer
     }
 
-    // @cpt-flow:cpt-noter-flow-core-items-today-review:p1
     pub(crate) fn create_item(
         &self,
         ctx: &CommandCtx,
