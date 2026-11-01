@@ -259,7 +259,7 @@ enum Archive {
                     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
                     let (allowed, order) = languages(c, label: label, last: last)
                     let probabilities = try decoder.languages(audio)
-                    let (lang, langP) = LiveASR.language(probabilities, among: allowed.isEmpty ? [] : order)
+                    let (lang, langP) = LiveASR.language(probabilities, among: allowed)
                     // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
                     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
                     var (best, bestLang, bestP) = (try decoder.decode(audio, language: lang), lang, langP)

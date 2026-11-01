@@ -130,8 +130,8 @@ extension EngineLoop {
         // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
         writer.emit(.ack(cmdId: id))
         let writer = self.writer
-        // On the `.utility` queue: below capture and the live transcript.
-        offlineQueue.async {
+        // On a `.utility` queue: below capture and the live transcript.
+        archiveQueue.async {
             // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
             do {
                 var reported: Float = -1
