@@ -1,6 +1,6 @@
-//! What the core's commands ask of macOS beyond `NativeServices` (TL-15): one trait that grows as
-//! its consumers land, so every native ask is in one place. The real implementation is 2.21
-//! native-services; the harness answers scripted.
+//! What the core's commands ask of macOS beyond `NativeServices` (TL-15), every native ask in
+//! one place. The real implementation is the host's `MacOps` over noter-native (2.21); the
+//! harness answers scripted.
 
 use std::path::PathBuf;
 
