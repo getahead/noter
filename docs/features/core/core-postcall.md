@@ -39,9 +39,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-postcall`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-postcall`
 
-- [ ] `p3` - `cpt-noter-feature-core-postcall`
+- [x] `p3` - `cpt-noter-feature-core-postcall`
 
 ## 1. Feature Context
 
