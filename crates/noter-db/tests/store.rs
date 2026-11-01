@@ -78,7 +78,7 @@ fn fresh_start_creates_private_file_at_newest_schema() {
     let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode(&path), 0o600);
     assert_eq!(mode(path.parent().unwrap()), 0o700);
-    assert_eq!(count(&store, "SELECT count(*) FROM schema_migrations"), 2);
+    assert_eq!(count(&store, "SELECT count(*) FROM schema_migrations"), 3);
     let pragmas = store
         .read_snapshot(|c| {
             let wal: String = c.query_row("PRAGMA journal_mode", [], |r| r.get(0))?;
@@ -100,7 +100,7 @@ fn second_start_runs_no_migration() {
     let path = db_path(&dir);
     open(&path).close();
     let store = open(&path); // NOTES would fail if it ran again
-    assert_eq!(count(&store, "SELECT count(*) FROM schema_migrations"), 2);
+    assert_eq!(count(&store, "SELECT count(*) FROM schema_migrations"), 3);
 }
 
 #[test]
@@ -1071,4 +1071,27 @@ fn a_failed_delete_leaves_everything() {
     );
     assert_eq!(count(&store, "SELECT count(*) FROM calls"), 1);
     assert_eq!(count(&store, "SELECT count(*) FROM changes"), 1);
+}
+
+#[test]
+fn the_audit_log_is_append_only_and_names_its_kind() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = db_path(&dir);
+    open(&path).close();
+    let conn = raw(&path);
+    conn.execute_batch(
+        "INSERT INTO llm_runs (id, adapter, runtime_choice, model, skill, skill_version, prompt_hash)
+         VALUES ('llm_1', 'scripted', 'local', 'm', 'post-call', '1.0.0', 'h');
+         INSERT INTO audit_log (id, ts, kind, what, destination, llm_run_id, bytes_out, payload_hash)
+         VALUES ('aud_1', 1, 'run', 'outputs', 'api.anthropic.com', 'llm_1', 10, 'h');",
+    )
+    .unwrap();
+    assert!(conn
+        .execute("UPDATE audit_log SET bytes_out = 1", [])
+        .is_err());
+    assert!(conn.execute("DELETE FROM audit_log", []).is_err());
+    let other_kind =
+        "INSERT INTO audit_log (id, ts, kind, what, destination, bytes_out, payload_hash)
+                      VALUES ('aud_2', 1, 'other', 'outputs', 'x', 1, 'h')";
+    assert!(conn.execute(other_kind, []).is_err());
 }

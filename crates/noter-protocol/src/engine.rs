@@ -204,6 +204,29 @@ pub struct EngineSegment {
     pub crosstalk_labels: Vec<String>,
 }
 
+/// One word and its time in the call: a word-timings file (`words_path`) holds a list of them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct EngineWord {
+    pub t0_ms: OffsetMs,
+    pub t1_ms: OffsetMs,
+    pub text: String,
+    /// Word probability 0..1.
+    pub p: f32,
+}
+
+/// The archive result file `offline_done` names (`result_path`): the whole call after the
+/// offline pass, written completely before the event. Segments are `confirmed`, in call time,
+/// on both channels; `speaker_label` is the final cluster label (the `mic` channel keeps the
+/// user or guest attribution), `lang`/`lang_p`/`avg_logprob` are language and confidence,
+/// `corrections` the glossary and filter metadata, `crosstalk_labels` both candidates of an
+/// overlap, and `words_path` the segment's word timings. The core maps clusters to live labels.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ArchiveResult {
+    pub call_id: CallId,
+    pub backend: AsrBackend,
+    pub segments: Vec<EngineSegment>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EngineErrorCode {

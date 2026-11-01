@@ -89,14 +89,14 @@ The live transcript can improve after the call without losing the user's speaker
 - Missing audio or model, malformed constraints, failed decode or disk failure returns the protocol's correlated error or `offline_failed`; the live transcript remains usable.
 
 **Steps**:
-1. [ ] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }` - `inst-archive-request`
-2. [ ] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the App Group - `inst-archive-paths`
+1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }` - `inst-archive-request`
+2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the App Group - `inst-archive-paths`
 3. [ ] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
-4. [ ] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; capture work takes priority if it starts - `inst-archive-progress`
+4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; capture work takes priority if it starts - `inst-archive-progress`
 5. [ ] - `p1` - Write the completed archive result and referenced word timings before emitting `offline_done { call_id, result_path }` - `inst-archive-complete`
-6. [ ] - `p1` - **IF** asynchronous processing fails, emit `offline_failed { call_id, code }`; never report an incomplete file as done - `inst-archive-fail`
-7. [ ] - `p1` - Supervisor correlates the result with the current call job, discards stale completions from cancelled or superseded work and returns it to the pipeline - `inst-archive-correlate`
-8. [ ] - `p1` - **RETURN** the result path or failure; no database writes occur in the engine - `inst-archive-return`
+6. [x] - `p1` - **IF** asynchronous processing fails, emit `offline_failed { call_id, code }`; never report an incomplete file as done - `inst-archive-fail`
+7. [x] - `p1` - Supervisor correlates the result with the current call job, discards stale completions from cancelled or superseded work and returns it to the pipeline - `inst-archive-correlate`
+8. [x] - `p1` - **RETURN** the result path or failure; no database writes occur in the engine - `inst-archive-return`
 
 ### Request speaker or text embeddings
 
@@ -111,13 +111,13 @@ The live transcript can improve after the call without losing the user's speaker
 - Unknown call, invalid spans or paths, unavailable model and engine exit complete the pending request with an error rather than waiting forever.
 
 **Steps**:
-1. [ ] - `p1` - Send `speaker_embedding { request_id, call_id, channel, spans, out_path }` or `embed_texts { request_id, texts, out_path }` with a unique request id - `inst-embed-request`
-2. [ ] - `p1` - Validate span bounds and file paths; acknowledge the command or return a correlated `error` - `inst-embed-validate`
+1. [x] - `p1` - Send `speaker_embedding { request_id, call_id, channel, spans, out_path }` or `embed_texts { request_id, texts, out_path }` with a unique request id - `inst-embed-request`
+2. [x] - `p1` - Validate span bounds and file paths; acknowledge the command or return a correlated `error` - `inst-embed-validate`
 3. [ ] - `p1` - Run `cpt-noter-algo-core-engine-offline-vectors` and finish every output file before announcing it - `inst-embed-run`
-4. [ ] - `p1` - Emit `speaker_embedding_done` with the output path or `embeddings` with inline data or a batch path and count, preserving `request_id` - `inst-embed-event`
-5. [ ] - `p1` - Supervisor validates vector dimensions, finite values and count, then resolves the pending request; process exit or an error rejects it - `inst-embed-resolve`
-6. [ ] - `p1` - Release scratch files after consumption; the core encrypts retained speaker embeddings, and this feature never enrolls a person - `inst-embed-clean`
-7. [ ] - `p1` - **RETURN** the vectors to the caller - `inst-embed-return`
+4. [x] - `p1` - Emit `speaker_embedding_done` with the output path or `embeddings` with inline data or a batch path and count, preserving `request_id` - `inst-embed-event`
+5. [x] - `p1` - Supervisor validates vector dimensions, finite values and count, then resolves the pending request; process exit or an error rejects it - `inst-embed-resolve`
+6. [x] - `p1` - Release scratch files after consumption; the core encrypts retained speaker embeddings, and this feature never enrolls a person - `inst-embed-clean`
+7. [x] - `p1` - **RETURN** the vectors to the caller - `inst-embed-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -158,18 +158,18 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Offline request
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-engine-offline-request`
+- [x] `p1` - **ID**: `cpt-noter-state-core-engine-offline-request`
 
 **States**: pending, running, complete, failed, abandoned
 
 **Initial State**: pending when the supervisor registers the request
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** pending **TO** running **WHEN** the engine acknowledges a valid request - `inst-st-running`
-2. [ ] - `p1` - **FROM** pending **TO** failed **WHEN** validation or model loading is refused - `inst-st-refused`
-3. [ ] - `p1` - **FROM** running **TO** complete **WHEN** the matching result file or inline vector is complete and validated - `inst-st-complete`
-4. [ ] - `p1` - **FROM** running **TO** failed **WHEN** offline failure, a correlated error or engine exit arrives - `inst-st-failed`
-5. [ ] - `p1` - **FROM** pending **TO** abandoned **WHEN** the caller cancels before completion; the same applies while running - `inst-st-abandoned`
+1. [x] - `p1` - **FROM** pending **TO** running **WHEN** the engine acknowledges a valid request - `inst-st-running`
+2. [x] - `p1` - **FROM** pending **TO** failed **WHEN** validation or model loading is refused - `inst-st-refused`
+3. [x] - `p1` - **FROM** running **TO** complete **WHEN** the matching result file or inline vector is complete and validated - `inst-st-complete`
+4. [x] - `p1` - **FROM** running **TO** failed **WHEN** offline failure, a correlated error or engine exit arrives - `inst-st-failed`
+5. [x] - `p1` - **FROM** pending **TO** abandoned **WHEN** the caller cancels before completion; the same applies while running - `inst-st-abandoned`
 
 Abandoning a request invalidates its completion at the supervisor; it adds no engine cancel command. Scheduler pause and restart use the existing protocol and job checkpoint boundaries, preserving capture-first restart. Pending requests are process-local; the job record owns durable retries.
 

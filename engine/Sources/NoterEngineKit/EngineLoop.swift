@@ -3,13 +3,13 @@
 import Foundation
 
 public final class EngineLoop: @unchecked Sendable {
-    private let writer: EventWriter
+    let writer: EventWriter
     private let engineVersion: String
     private let models: [String]
     private let sandboxed: Bool
     private let source: (StartSession?) -> AudioSource?
     private let play: @Sendable ([Float]) -> Void
-    private let container: URL?
+    let container: URL?
     private let now: () -> Int64
     private let encoder: (URL) throws -> AudioEncoder
     private let selfTests = DispatchQueue(label: "ai.noter.engine.self-test")
@@ -21,6 +21,10 @@ public final class EngineLoop: @unchecked Sendable {
     private let asrQueue = DispatchQueue(label: "ai.noter.engine.asr", qos: .userInitiated)
     private let stops = DispatchQueue(label: "ai.noter.engine.stop")
     private let processes: @Sendable () -> [ProcessAudio]
+    /// The offline models (archive decode, embeddings); nil refuses offline commands.
+    let offline: OfflineWork?
+    /// Below the live transcript and capture: archive work never delays a session.
+    let offlineQueue = DispatchQueue(label: "ai.noter.engine.offline", qos: .utility)
     /// The call being captured and its audio; commands arrive on one thread.
     private var session: (capture: CaptureSession, audio: AudioSource)?
     private var replaying = false
@@ -34,7 +38,8 @@ public final class EngineLoop: @unchecked Sendable {
     /// nil, a self-test (the live taps, or WAV files in file mode and tests); `container` is the
     /// App Group container sessions write into; `now` gives epoch milliseconds; `play` plays the
     /// self-test's clip; `player` replays stored audio; `processes` lists the processes playing or
-    /// recording now (`ProcessWatcher.snapshot` live); `transcriber` loads the live speech model.
+    /// recording now (`ProcessWatcher.snapshot` live); `transcriber` loads the live speech model;
+    /// `offline` runs the archive pass and the embeddings.
     public init(
         writer: EventWriter, engineVersion: String, models: [String], sandboxed: Bool,
         container: URL? = nil, now: @escaping () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
@@ -43,6 +48,7 @@ public final class EngineLoop: @unchecked Sendable {
         player: Player = FilePlayer(),
         processes: @escaping @Sendable () -> [ProcessAudio] = { [] },
         transcriber: (() throws -> Transcriber)? = nil,
+        offline: OfflineWork? = nil,
         source: @escaping (StartSession?) -> AudioSource?
     ) {
         self.writer = writer
@@ -57,6 +63,7 @@ public final class EngineLoop: @unchecked Sendable {
         self.player = player
         self.processes = processes
         model = transcriber.map(ModelCache.init)
+        self.offline = offline
     }
 
     /// Checks the processes every `interval` for detection facts, new sound sources and whether
@@ -127,6 +134,12 @@ public final class EngineLoop: @unchecked Sendable {
         case let .setLanguages(languages):
             session?.capture.asr.setLanguages(languages)
             writer.emit(.ack(cmdId: command.id))
+        case let .offlinePass(pass):
+            offlinePass(command.id, pass)
+        case let .speakerEmbedding(request):
+            speakerEmbedding(command.id, request)
+        case let .embedTexts(requestId, texts, outPath):
+            embedTexts(command.id, requestId, texts, outPath)
         case let .other(type):
             writer.emit(.error(cmdId: command.id, code: .badCommand, message: "\(type) is not supported by this engine yet"))
         }

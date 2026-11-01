@@ -39,6 +39,7 @@ extension EngineCommand: Encodable {
         case type, enabled, known_bundle_ids, play_clip, timeout_ms, call_id, bundle_id, entries, languages
         case session_dir, store_audio, mic_device_uid, exclude_bundle_ids, backend, glossary, speaker_priors
         case enrolled_embeddings_path, resume_from_ms, from_ms, to_ms, channel
+        case result_path, constraints_path, request_id, spans, out_path, texts
     }
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: Keys.self)
@@ -87,13 +88,32 @@ extension EngineCommand: Encodable {
             try c.encode(toMs, forKey: .to_ms)
             try c.encode(channel, forKey: .channel)
         case .stopPlayback: try c.encode("stop_playback", forKey: .type)
+        case let .offlinePass(p):
+            try c.encode("offline_pass", forKey: .type)
+            try c.encode(p.callId, forKey: .call_id)
+            try c.encode(p.sessionDir, forKey: .session_dir)
+            try c.encode(p.resultPath, forKey: .result_path)
+            try c.encode(p.constraintsPath, forKey: .constraints_path)
+            try c.encode(p.backend, forKey: .backend)
+        case let .speakerEmbedding(r):
+            try c.encode("speaker_embedding", forKey: .type)
+            try c.encode(r.requestId, forKey: .request_id)
+            try c.encode(r.callId, forKey: .call_id)
+            try c.encode(r.channel, forKey: .channel)
+            try c.encode(r.spans, forKey: .spans)
+            try c.encode(r.outPath, forKey: .out_path)
+        case let .embedTexts(requestId, texts, outPath):
+            try c.encode("embed_texts", forKey: .type)
+            try c.encode(requestId, forKey: .request_id)
+            try c.encode(texts, forKey: .texts)
+            try c.encode(outPath, forKey: .out_path)
         case let .other(type):
             throw EncodingError.invalidValue(type, .init(codingPath: [], debugDescription: "a command the engine does not answer"))
         }
     }
 }
 
-/// An event type the engine does not write yet (capture, offline, embeddings: M1 and later).
+/// An event type the engine does not write (speaker turns: live diarization, later).
 private struct NotWritten: Error {}
 
 extension EngineEvent: Decodable {
@@ -101,6 +121,7 @@ extension EngineEvent: Decodable {
         case type, protocol_version, engine_version, models, sandboxed, cmd_id, code, message, call_id, mic_db, sys_db
         case channel, passed, failure, own_sounds_leak, timeline_path, mic_path, sys_path, mic_device, output_device
         case device_name, gap_from_ms, gap_to_ms, bundle_id, app_name, pid, since_ms, confidence, at_ms, playing, segment, text
+        case progress, result_path, request_id, out_path, inline, count
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
@@ -161,6 +182,19 @@ extension EngineEvent: Decodable {
             self = .silence(callId: try c.decode(String.self, forKey: .call_id), sinceMs: try c.decode(Int.self, forKey: .since_ms))
         case "self_test_line":
             self = .selfTestLine(channel: try c.decode(Channel.self, forKey: .channel), text: try c.decode(String.self, forKey: .text))
+        case "offline_progress":
+            self = .offlineProgress(callId: try c.decode(String.self, forKey: .call_id), progress: try c.decode(Float.self, forKey: .progress))
+        case "offline_done":
+            self = .offlineDone(callId: try c.decode(String.self, forKey: .call_id), resultPath: try c.decode(String.self, forKey: .result_path))
+        case "offline_failed":
+            self = .offlineFailed(callId: try c.decode(String.self, forKey: .call_id), code: try c.decode(EngineErrorCode.self, forKey: .code))
+        case "speaker_embedding_done":
+            self = .speakerEmbeddingDone(
+                requestId: try c.decode(String.self, forKey: .request_id), outPath: try c.decode(String.self, forKey: .out_path))
+        case "embeddings":
+            self = .embeddings(
+                requestId: try c.decode(String.self, forKey: .request_id), inline: try c.decode([Float]?.self, forKey: .inline),
+                outPath: try c.decode(String?.self, forKey: .out_path), count: try c.decode(UInt32.self, forKey: .count))
         default: throw NotWritten()
         }
     }
@@ -189,8 +223,9 @@ final class RoundTripTests: XCTestCase {
         XCTAssertEqual(
             answered.sorted(),
             [
-                "exclude_process", "pause", "ping", "play", "resume", "self_test", "set_detection", "set_glossary",
-                "set_languages", "shutdown", "start_session", "stop", "stop_playback",
+                "embed_texts", "exclude_process", "offline_pass", "pause", "ping", "play", "resume", "self_test",
+                "set_detection", "set_glossary", "set_languages", "shutdown", "speaker_embedding", "start_session", "stop",
+                "stop_playback",
             ])
     }
 
@@ -213,9 +248,10 @@ final class RoundTripTests: XCTestCase {
         XCTAssertEqual(
             written.sorted(),
             [
-                "ack", "audio_source_added", "call_audio_released", "call_detected", "device_changed", "error", "levels",
-                "no_segments", "playback_position", "pong", "ready", "segment", "self_test_line", "self_test_result",
-                "self_test_stream", "session_started", "session_stopped", "silence", "system_audio_silent",
+                "ack", "audio_source_added", "call_audio_released", "call_detected", "device_changed", "embeddings", "error",
+                "levels", "no_segments", "offline_done", "offline_failed", "offline_progress", "playback_position", "pong",
+                "ready", "segment", "self_test_line", "self_test_result", "self_test_stream", "session_started",
+                "session_stopped", "silence", "speaker_embedding_done", "system_audio_silent",
             ])
     }
 

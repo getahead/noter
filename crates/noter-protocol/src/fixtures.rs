@@ -2195,4 +2195,52 @@ pub mod engine_lines {
             })
             .collect()
     }
+
+    fn archive_segment(id: &str, channel: AudioChannel, t0: u32, label: &str) -> EngineSegment {
+        EngineSegment {
+            id: id.into(),
+            call_id: call(),
+            channel,
+            t0_ms: OffsetMs(t0),
+            t1_ms: OffsetMs(t0 + 1_500),
+            state: EngineSegmentState::Confirmed,
+            lang: Lang::En,
+            lang_p: 0.875,
+            speaker_label: label.into(),
+            text: "hello".into(),
+            words_path: Some(format!("audio/call_1/words/{id}.json")),
+            avg_logprob: -0.25,
+            no_speech_p: 0.125,
+            corrections: Vec::new(),
+            crosstalk_labels: Vec::new(),
+        }
+    }
+
+    /// Examples of the archive result file `offline_done` names.
+    pub fn archive_results() -> Vec<ArchiveResult> {
+        let mut overlap = archive_segment("aseg_2", AudioChannel::Sys, 2_000, "spk_1");
+        overlap.crosstalk_labels = vec!["spk_1".into(), "spk_2".into()];
+        overlap.corrections = vec![EngineCorrection {
+            from: "notter".into(),
+            to: "Noter".into(),
+        }];
+        vec![ArchiveResult {
+            call_id: call(),
+            backend: AsrBackend::WhisperLargeV3,
+            segments: vec![
+                archive_segment("aseg_1", AudioChannel::Mic, 1_000, "you"),
+                overlap,
+            ],
+        }]
+    }
+
+    /// An example word-timings file (`words_path`).
+    pub fn words() -> Vec<EngineWord> {
+        vec![EngineWord {
+            t0_ms: OffsetMs(1_000),
+            t1_ms: OffsetMs(1_400),
+            text: "hello".into(),
+            p: 0.75,
+        }]
+    }
 }

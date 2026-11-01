@@ -1,15 +1,18 @@
 //! A scripted engine over an in-memory pipe, for the supervisor's tests and for
 //! `noter-core-harness` (decision D3: in M0 it answers `ready`, `ack`, `pong` and the
 //! self-test; replaying recordings comes with the engine's file mode in M1). A [`Script`]
-//! adds timed steps bound to commands (`.plans/engine-script-format.md`, TL-3).
+//! adds timed steps bound to commands (`.plans/engine-script-format.md`, TL-3). With a container,
+//! `offline_pass`, `speaker_embedding` and `embed_texts` that no script step names get a built-in
+//! answer: an empty archive result, or deterministic finite vectors, written there first.
 
 use std::collections::VecDeque;
 use std::fmt;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use noter_protocol::engine::{
-    EngineCommand, EngineCommandLine, EngineErrorCode, EngineEvent, EngineEventLine,
+    ArchiveResult, EngineCommand, EngineCommandLine, EngineErrorCode, EngineEvent, EngineEventLine,
     ENGINE_PROTOCOL_VERSION,
 };
 use noter_protocol::{AudioChannel, PermissionState, TimestampMs};
@@ -19,6 +22,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::time::Instant;
 
 use crate::launch::{EngineIo, EngineLauncher, LaunchFuture};
+use crate::offline::{SPEAKER_DIMS, TEXT_DIMS};
 
 /// The engine sends levels at most this often.
 const LEVELS_EVERY: std::time::Duration = std::time::Duration::from_millis(100);
@@ -127,6 +131,10 @@ impl Script {
     pub fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
+
+    fn names(&self, tag: &str) -> bool {
+        self.steps.iter().any(|s| s.on == tag)
+    }
 }
 
 /// How one launched engine behaves.
@@ -174,6 +182,8 @@ struct State {
     default: Behaviour,
     launches: usize,
     commands: Vec<EngineCommand>,
+    last_id: Option<u64>,
+    container: Option<PathBuf>,
     kill: Option<oneshot::Sender<()>>,
     inject: Option<mpsc::UnboundedSender<EngineEvent>>,
     system_audio: PermissionState,
@@ -187,6 +197,8 @@ impl Default for State {
             default: Behaviour::default(),
             launches: 0,
             commands: Vec::new(),
+            last_id: None,
+            container: None,
             kill: None,
             inject: None,
             system_audio: PermissionState::Granted,
@@ -223,6 +235,17 @@ impl ScriptedEngine {
     pub fn with_script(self, script: Script) -> Self {
         self.lock().script = Arc::new(script);
         self
+    }
+
+    /// The App Group container its engines write offline results and vectors into.
+    pub fn with_container(self, dir: impl Into<PathBuf>) -> Self {
+        self.lock().container = Some(dir.into());
+        self
+    }
+
+    /// The id of the last command any engine of this script received.
+    pub fn last_command_id(&self) -> Option<u64> {
+        self.lock().last_id
     }
 
     pub fn launches(&self) -> usize {
@@ -264,6 +287,10 @@ impl ScriptedEngine {
 impl EngineLauncher for ScriptedEngine {
     fn launch(&self) -> LaunchFuture<'_> {
         Box::pin(self.start())
+    }
+
+    fn container(&self) -> Option<PathBuf> {
+        self.lock().container.clone()
     }
 }
 
@@ -314,6 +341,114 @@ impl<W: AsyncWrite + Unpin> Out<W> {
 
     async fn raw(&mut self, line: &str) {
         let _ = self.w.write_all(format!("{line}\n").as_bytes()).await;
+    }
+}
+
+/// The wire name of a command (`offline_pass`).
+fn tag(cmd: &EngineCommand) -> &'static str {
+    match cmd {
+        EngineCommand::OfflinePass { .. } => "offline_pass",
+        EngineCommand::SpeakerEmbedding { .. } => "speaker_embedding",
+        EngineCommand::EmbedTexts { .. } => "embed_texts",
+        _ => "",
+    }
+}
+
+/// A deterministic vector of finite values in 0..1, its own for each text.
+fn vector_of(text: &str, dims: usize) -> Vec<f32> {
+    let seed = text
+        .bytes()
+        .fold(17u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)));
+    (0..dims as u32)
+        .map(|i| (seed.wrapping_add(i.wrapping_mul(2_654_435_761)) >> 8) % 1000)
+        .map(|v| v as f32 / 1000.0)
+        .collect()
+}
+
+fn write_file(root: &Path, rel: &str, bytes: &[u8]) -> io::Result<()> {
+    let path = root.join(rel);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(path, bytes)
+}
+
+fn f32_bytes(values: &[f32]) -> Vec<u8> {
+    values.iter().flat_map(|v| v.to_le_bytes()).collect()
+}
+
+/// The built-in answer to an offline command: its file first, then its events.
+fn answer_offline(root: &Path, cmd: EngineCommand) -> Vec<EngineEvent> {
+    match cmd {
+        EngineCommand::OfflinePass {
+            call_id,
+            result_path,
+            backend,
+            ..
+        } => {
+            let result = ArchiveResult {
+                call_id: call_id.clone(),
+                backend,
+                segments: Vec::new(),
+            };
+            let bytes = serde_json::to_vec(&result).unwrap_or_default();
+            let progress = |progress| EngineEvent::OfflineProgress {
+                call_id: call_id.clone(),
+                progress,
+            };
+            match write_file(root, &result_path, &bytes) {
+                Ok(()) => vec![
+                    progress(0.5),
+                    progress(1.0),
+                    EngineEvent::OfflineDone {
+                        call_id,
+                        result_path,
+                    },
+                ],
+                Err(_) => vec![EngineEvent::OfflineFailed {
+                    call_id,
+                    code: EngineErrorCode::DiskFull,
+                }],
+            }
+        }
+        EngineCommand::SpeakerEmbedding {
+            request_id,
+            call_id,
+            out_path,
+            ..
+        } => {
+            let _ = write_file(
+                root,
+                &out_path,
+                &f32_bytes(&vector_of(call_id.as_str(), SPEAKER_DIMS)),
+            );
+            vec![EngineEvent::SpeakerEmbeddingDone {
+                request_id,
+                out_path,
+            }]
+        }
+        EngineCommand::EmbedTexts {
+            request_id,
+            texts,
+            out_path,
+        } => {
+            let rows: Vec<f32> = texts.iter().flat_map(|t| vector_of(t, TEXT_DIMS)).collect();
+            let count = texts.len() as u32;
+            let inline = match &out_path {
+                Some(p) => {
+                    let _ = write_file(root, p, &f32_bytes(&rows));
+                    None
+                }
+                None => Some(rows),
+            };
+            vec![EngineEvent::Embeddings {
+                request_id,
+                inline,
+                out_path,
+                count,
+            }]
+        }
+        _ => Vec::new(),
     }
 }
 
@@ -398,7 +533,12 @@ async fn run(
         let Ok(EngineCommandLine { id, cmd }) = serde_json::from_str(&line) else {
             continue;
         };
-        engine.lock().commands.push(cmd.clone());
+        let container = {
+            let mut s = engine.lock();
+            s.commands.push(cmd.clone());
+            s.last_id = Some(id);
+            s.container.clone()
+        };
         if b.hang {
             continue;
         }
@@ -483,6 +623,25 @@ async fn run(
                     due.extend(timed.into_iter().map(|(t, e)| (now + t, e)));
                 }
                 // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
+            }
+            EngineCommand::OfflinePass { .. }
+            | EngineCommand::SpeakerEmbedding { .. }
+            | EngineCommand::EmbedTexts { .. }
+                if !script.names(tag(&cmd)) =>
+            {
+                let Some(root) = container else {
+                    out.emit(EngineEvent::Error {
+                        cmd_id: Some(id),
+                        code: EngineErrorCode::BadCommand,
+                        message: "no App Group container".into(),
+                    })
+                    .await;
+                    continue;
+                };
+                out.emit(ack).await;
+                for event in answer_offline(&root, cmd) {
+                    out.emit(event).await;
+                }
             }
             _ => {
                 out.emit(ack).await;
