@@ -193,7 +193,7 @@ The principles are listed in priority order: when two conflict, the one listed f
 
 #### Privacy and recording state stay visible
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-privacy-visible`
+- [x] `p1` - **ID**: `cpt-noter-principle-privacy-visible`
 
 Every call surface shows whether Noter is recording and where text may go right now (cloud, cloud with redaction, local only). When the state changes, the surface changes with it and says so in words, never in colour alone. What left the Mac is listed in plain words on the Privacy pane.
 
@@ -201,7 +201,7 @@ Every call surface shows whether Noter is recording and where text may go right 
 
 #### Never take focus from the call
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-never-steal-focus`
+- [x] `p1` - **ID**: `cpt-noter-principle-never-steal-focus`
 
 The record prompt, the call window and its notices never make Noter the active app and never take keyboard focus from the call app. A click on them acts without moving focus, and every in-call action also has a global hotkey. ⌃⌥⌘N and **Open Call Screen** show the call window without taking focus. Only an explicit **Open in Noter**, typing into a field of the call window, or a second ⌃⌥⌘N while the call window is visible gives Noter focus (PM-40).
 
@@ -249,7 +249,7 @@ Every action can be reached and done with the keyboard. Lists use arrow keys, an
 
 #### Undo over confirmation
 
-- [ ] `p2` - **ID**: `cpt-noter-principle-undo-over-confirm`
+- [x] `p2` - **ID**: `cpt-noter-principle-undo-over-confirm`
 
 Reversible actions (tick, accept, reject, regenerate, propagate, pin, dismiss) apply at once and offer **Undo**; they never ask first. Only irreversible actions ask, in a native alert that says what is lost: deleting a call, a person, a voice profile or audio, removing a source or an agent, revoking a token, quitting while recording, and signing out of your Claude or ChatGPT account (PM-58).
 
@@ -257,7 +257,7 @@ Reversible actions (tick, accept, reject, regenerate, propagate, pin, dismiss) a
 
 #### Quiet call surfaces
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-quiet-surface`
+- [x] `p1` - **ID**: `cpt-noter-principle-quiet-surface`
 
 In-call surfaces show at most three cards, make no sound, and move only with a short slide that Reduce motion removes. Agent badges are monochrome, and the recording dot never pulses. A suggestion that would arrive after the topic has moved on is not shown at all.
 
@@ -295,7 +295,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### One call window with two layouts
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-one-call-window`
+- [x] `p1` - **ID**: `cpt-noter-constraint-one-call-window`
 
 **Type**: Technology. The call screen and the floating panel are one window and one React tree with two layouts; a display change switches the layout, never the window. PRD › Repository layout and PRD › Live copilot loop both describe one call window with two layouts.
 
@@ -303,7 +303,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Non-activating panels
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-non-activating-panels`
+- [x] `p1` - **ID**: `cpt-noter-constraint-non-activating-panels`
 
 **Type**: Platform. The call window and the record prompt are NSPanels: macOS panel windows that float above other windows without making Noter the active app. They become key (the window that receives keystrokes) only while the user types in them or after a second ⌃⌥⌘N (PM-40), so panel-local shortcuts work only then, and app-menu shortcuts never reach them.
 
@@ -311,7 +311,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Screen-share exclusion has limits
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-share-exclusion-limits`
+- [x] `p1` - **ID**: `cpt-noter-constraint-share-exclusion-limits`
 
 **Type**: Platform. Content protection hides the call window and the record prompt only from shares that honour it (Teams, Meet, Zoom with window filtering), never from a whole-display capture. The UI must state that limit where it matters, in the call screen header and in the floating panel (PM-49), and offer **Screen Share Test…** (D96) and **Hide for Presenting** (D84, PM-51).
 
@@ -319,7 +319,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Monochrome menu bar icons
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-menu-bar-template-icons`
+- [x] `p1` - **ID**: `cpt-noter-constraint-menu-bar-template-icons`
 
 **Type**: Platform. The menu bar extra shows four monochrome template glyphs (idle, recording, paused, copilot muted) and a native text menu; it cannot show red or custom views. Its optional title is capped at 24 characters and is off by default.
 
@@ -327,7 +327,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### No dialog after setup
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-no-dialog-after-setup`
+- [x] `p1` - **ID**: `cpt-noter-constraint-no-dialog-after-setup`
 
 **Type**: Product. Quick actions in the menu bar and on call surfaces take effect within a second and never open a dialog after first run. Permission prompts appear only in the first-run wizard, after a button the user pressed for that purpose, or, when macOS has never asked, at the first capture, which macOS itself triggers. No start control ever reads **Finish Setup…**: **Record** and **Start Recording** start capture whatever the setup state, and a missing permission shows as a degraded state during capture (PM-30, PM-60).
 
@@ -375,7 +375,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Copilot behind a flag
 
-- [ ] `p1` - **ID**: `cpt-noter-constraint-copilot-flag`
+- [x] `p1` - **ID**: `cpt-noter-constraint-copilot-flag`
 
 **Type**: Scope. Full v1 is kept (owner decision, 17 Oct); the copilot ships behind a flag until the M4 latency gate. Every call surface therefore has a layout without the council column, and a single-agent variant for a council of one (PM-01, D9, PM-67).
 
@@ -383,7 +383,7 @@ Each constraint names its type and source. Legacy integration constraints are no
 
 #### Notifications without buttons
 
-- [ ] `p2` - **ID**: `cpt-noter-constraint-notification-limits`
+- [x] `p2` - **ID**: `cpt-noter-constraint-notification-limits`
 
 **Type**: Platform. macOS notifications sent through the Tauri plugin carry no action buttons. Notifications therefore only inform and open a page; every decision happens inside Noter. While a call is being recorded they wait, and they arrive one per call when capture stops (PM-44).
 
