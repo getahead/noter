@@ -120,6 +120,7 @@ fn spawn<T: Send + 'static>(
 
 // --- the archive pass ---------------------------------------------------------------------------
 
+// @cpt-dod:cpt-noter-dod-core-engine-offline-tests:p1
 #[tokio::test(start_paused = true)]
 async fn an_archive_pass_returns_the_complete_result_file_after_its_progress() {
     let dir = tempfile::tempdir().unwrap();
