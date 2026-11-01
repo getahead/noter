@@ -14,14 +14,25 @@ pub struct Migration {
     pub sql: &'static str,
 }
 
-/// noter-db's own migrations: the change log.
+/// noter-db's own migrations: the change log, then the model-run and egress audit tables
+/// (written by noter-llm, which may not touch SQLite itself).
 // @cpt-dbtable:cpt-noter-dbtable-changes:p1
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    owner: "noter-db",
-    version: 1,
-    name: "changes",
-    sql: include_str!("../migrations/0001_changes.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        owner: "noter-db",
+        version: 1,
+        name: "changes",
+        sql: include_str!("../migrations/0001_changes.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-llm-runs:p1
+    // @cpt-dbtable:cpt-noter-dbtable-audit-log:p1
+    Migration {
+        owner: "noter-db",
+        version: 2,
+        name: "llm runs and audit log",
+        sql: include_str!("../migrations/0002_llm_runs_audit_log.sql"),
+    },
+];
 
 const HISTORY: &str = "CREATE TABLE IF NOT EXISTS schema_migrations (
     owner TEXT NOT NULL, version INTEGER NOT NULL, name TEXT NOT NULL, applied_at INTEGER NOT NULL,
