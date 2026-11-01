@@ -438,6 +438,7 @@ export const en = {
   "settings.share.permission": "Screen Recording · needed for this test only",
   "settings.share.continue": "Continue",
   "settings.share.open_system_settings": "Open System Settings…",
+  "settings.share.not_asked": "macOS won’t ask again. Turn Noter on in Screen & System Audio Recording (add it with + if it isn’t listed), then quit and reopen Noter.",
   "settings.share.running": "Showing test windows on {display}…",
   "settings.share.on_screen": "On your screen",
   "settings.share.what_sees": "What the share sees",

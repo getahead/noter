@@ -203,6 +203,14 @@ describe("share test commands", () => {
     fake.failNext("permission_request", "offline");
     expect(await askScreenRecording(bridge)).toBe(false);
   });
+
+  it("counts Screen Recording as refused when macOS answered without granting it (no prompt, or a relaunch first)", async () => {
+    await ready();
+    for (const state of ["needs_relaunch", "not_asked"] as const) {
+      vi.spyOn(bridge.core, "permissionRequest").mockResolvedValueOnce({ status: "ok", data: { kind: "screen_recording", state } });
+      expect(await askScreenRecording(bridge)).toBe(false);
+    }
+  });
 });
 
 import { vi } from "vitest";

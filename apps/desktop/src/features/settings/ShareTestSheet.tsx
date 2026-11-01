@@ -86,6 +86,7 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
             <PushButton label={t("settings.share.open_system_settings")} size="small" onAction={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "screen_recording" } })} />
           </div>
         )}
+        {state === "NEEDS_PERMISSION" && <p className="np-dim">{t("settings.share.not_asked")}</p>}
         {running && (
           <div className="dlg-perm" role="status">
             <Progress variant="spinner" label={t("settings.share.running", { display })} />

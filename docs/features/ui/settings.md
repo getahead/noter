@@ -151,7 +151,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 
 **Error Scenarios**:
 - During a call: **Run Capture Test** disabled with **Run the test when no call is being recorded.**; the table still answers
-- Screen Recording refused: **Screen Recording · needed for this test only** then **Open System Settings…**; the table and the limits line stay
+- Screen Recording refused: **Screen Recording · needed for this test only** then **Open System Settings…**, which opens the Screen Recording pane, and the line **macOS won’t ask again. Turn Noter on in Screen & System Audio Recording (add it with + if it isn’t listed), then quit and reopen Noter.**; any answer but granted counts as refused (macOS may not prompt at all, or wants a relaunch); the table and the limits line stay
 - Capture failed: **Couldn't capture the display.** · **Try Again**
 
 **Steps**:
