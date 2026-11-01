@@ -2,7 +2,8 @@
 //!
 //! The dialog plugin's NSAlert gets Cancel as its first button, and AppKit then gives that button
 //! Escape (it is titled Cancel) and no button Return: Return did nothing. One local key monitor
-//! makes Return in a modal alert click the button that holds Escape, AppKit's Cancel.
+//! makes Return in a modal window with no default button click the button that holds Escape,
+//! AppKit's Cancel; a window whose own default button takes Return (a save panel) is left alone.
 
 use std::ptr::NonNull;
 
@@ -15,15 +16,15 @@ use objc2_app_kit::{NSApplication, NSButton, NSEvent, NSEventMask, NSView};
 const RETURN_KEYS: [u16; 2] = [36, 76];
 const ESCAPE: &str = "\u{1b}";
 
-/// The button among `view`'s descendants that holds Escape.
-fn escape_button(view: &NSView) -> Option<Retained<NSButton>> {
+/// The button among `view`'s descendants whose key equivalent is `key`.
+fn button_for(view: &NSView, key: &str) -> Option<Retained<NSButton>> {
     for sub in view.subviews().iter() {
         if let Some(button) = sub.downcast_ref::<NSButton>() {
-            if button.keyEquivalent().to_string() == ESCAPE {
+            if button.keyEquivalent().to_string() == key {
                 return Some(button.retain());
             }
         }
-        if let Some(found) = escape_button(&sub) {
+        if let Some(found) = button_for(&sub, key) {
             return Some(found);
         }
     }
@@ -44,8 +45,10 @@ pub fn return_chooses_cancel() {
             .filter(|m| {
                 RETURN_KEYS.contains(&e.keyCode()) && e.window(mtm).as_deref() == Some(&**m)
             })
+            // While the window is shown AppKit keeps Return on its default button cell, not a key equivalent.
+            .filter(|m| m.defaultButtonCell().is_none())
             .and_then(|m| m.contentView())
-            .and_then(|v| escape_button(&v));
+            .and_then(|v| button_for(&v, ESCAPE));
         match cancel {
             Some(button) => {
                 // SAFETY: a click on an alert button, on the main thread, with no sender.
