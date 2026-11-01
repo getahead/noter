@@ -682,16 +682,20 @@ async fn operational_logs_never_hold_packet_model_text_or_credentials() {
         .unwrap();
     let logs = f.log_text();
     assert!(logs.contains("\"event\":\"run_end\""), "{logs}");
-    for secret in [
-        NORMAL_TEXT,
-        SENSITIVE_TEXT,
-        AUDIO_TEXT,
-        MODEL_TEXT,
-        "ann@example.com",
-        "sk-abcdefghijklmnop",
-        "Ann Lee",
+    // The failure names what leaked, never the value itself.
+    for (what, text) in [
+        ("normal text", NORMAL_TEXT),
+        ("sensitive text", SENSITIVE_TEXT),
+        ("audio text", AUDIO_TEXT),
+        ("model text", MODEL_TEXT),
+        ("e-mail", "ann@example.com"),
+        ("API key", "sk-abcdefghijklmnop"),
+        ("person name", "Ann Lee"),
     ] {
-        assert!(!logs.contains(secret), "{secret} in {logs}");
+        assert!(
+            !logs.contains(text),
+            "{what} leaked into the operational logs"
+        );
     }
 }
 
