@@ -44,16 +44,19 @@ function checkRev(current: Rev, sent: Rev): void {
   if (current !== sent) throw coreError("conflict", "rev is stale", { type: "conflict", current_rev: current });
 }
 
-type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason">>;
+type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable">>;
 
 function logChange(world: World, row: ChangeInput): ChangeId {
   const id = newId("chg");
+  // A later edit of the same field blocks the redo of an undone change (`edited_later`).
+  world.changes.forEach((c) => c.status === "undone" && c.entity.id === row.entity.id && c.field === (row.field ?? null) && (c.redoable = false));
   world.changes.unshift({
     actor: { type: "you" },
     field: null,
     before: null,
     after: null,
     reason: null,
+    undoable: true,
     ...row,
     id,
     at: now(),
@@ -62,7 +65,6 @@ function logChange(world: World, row: ChangeInput): ChangeId {
     evidence: [],
     confidence: null,
     status: "applied",
-    undoable: true,
     redoable: false,
   });
   return id;
@@ -935,6 +937,8 @@ export const defaultHandlers: Handlers = {
     world.call_details = world.call_details.filter((d) => !ids.has(d.call.id));
     world.transcripts = world.transcripts.filter((t) => !ids.has(t.call_id));
     ids.forEach((id) => emit("entity:changed", { type: "removed", kind: "call", id }));
+    // Irreversible and content-free, as the core logs it.
+    ids.forEach((id) => logChange(world, { entity: { kind: "call", id, label: id }, summary: "Deleted a call", undoable: false }));
     return { deleted: ids.size };
   },
   call_types_list: (_a, { world }) => world.call_types,
@@ -1109,7 +1113,19 @@ export const defaultHandlers: Handlers = {
     term.rev += 1;
     return term;
   },
-  history_export: (a) => ({ path: `~/Downloads/Noter log ${a.scope.type}.${a.format === "json" ? "json" : "md"}`, files: 1 }),
+  // The scope is checked before the (absent) save panel, as the core does; a cancelled panel is `failNext(…, "cancelled")`.
+  history_export: (a, { world }) => {
+    const s = a.scope;
+    if (s.type === "call") call(world, s.call_id);
+    if (s.type === "period") {
+      const day = (d: string, field: string) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d))) throw coreError("invalid_input", field, { type: "validation", field, rule: "invalid_format" });
+        return d;
+      };
+      if (day(s.from, "scope.from") > day(s.to, "scope.to")) throw coreError("invalid_input", "scope.to", { type: "validation", field: "scope.to", rule: "out_of_range" });
+    }
+    return { path: `~/Downloads/Noter log ${s.type}.${a.format === "json" ? "json" : "md"}`, files: 1 };
+  },
   activity_get: (a, { world }) => ({
     day: a.day ?? new Date(world.now).toISOString().slice(0, 10),
     needs_attention: world.jobs.jobs.flatMap((j) => (j.last_run?.status === "failed" ? [j.last_run] : [])),
