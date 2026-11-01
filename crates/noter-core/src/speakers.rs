@@ -610,10 +610,21 @@ impl Core {
                 t1_ms: OffsetMs(v[3]),
             },
         };
+        // A line the user moved out of its cluster wins over the whole-call links made earlier:
+        // the pass gets no must-link that touches a span of a cannot-link.
+        let split: Vec<[u32; 2]> = links
+            .iter()
+            .filter(|(k, _)| k == "cannot_link")
+            .flat_map(|(_, v)| [[v[0], v[1]], [v[2], v[3]]])
+            .collect();
         let of = |kind: &str| -> Vec<SpanLink> {
             links
                 .iter()
-                .filter(|(k, _)| k == kind)
+                .filter(|(k, v)| {
+                    k == kind
+                        && (kind == "cannot_link"
+                            || !(split.contains(&[v[0], v[1]]) || split.contains(&[v[2], v[3]])))
+                })
                 .map(|(_, v)| link(v))
                 .collect()
         };

@@ -598,3 +598,30 @@ async fn naming_nobody_changes_nothing_and_cannot_be_undone() {
         .await;
     assert_eq!(undone.unwrap_err().code, ErrorCode::NotUndoable);
 }
+
+#[tokio::test]
+async fn a_line_moved_after_a_whole_call_naming_drops_the_must_links_that_touch_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    core.transcript_rename_speaker(&ctx(), rename_args("spk_1", "Dana", RenameScope::WholeCall))
+        .await
+        .unwrap();
+    let one = RenameScope::OneSegment {
+        segment_id: SegmentId::new("seg_2"),
+    };
+    core.transcript_rename_speaker(&ctx(), rename_args("spk_2", "Omar", RenameScope::WholeCall))
+        .await
+        .unwrap();
+    core.transcript_rename_speaker(&ctx(), rename_args("spk_1", "Omar", one))
+        .await
+        .unwrap();
+
+    let file = constraints(dir.path());
+    assert!(file["must_link"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|l| l["a"]["t0_ms"] != 2_000 && l["b"]["t0_ms"] != 2_000));
+    assert_eq!(file["cannot_link"].as_array().unwrap().len(), 1);
+}
