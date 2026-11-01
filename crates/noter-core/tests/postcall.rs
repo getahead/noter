@@ -187,7 +187,7 @@ const ORDER: [SectionKind; 7] = [
 async fn sections_land_in_order_within_two_minutes_and_the_call_is_ready_after_the_first() {
     // Every section answers after 10 s: seven sections in order are well inside two minutes.
     let line = r#"{"on": "post-call", "after_ms": 10000}"#;
-    let script = vec![line; 7].join("\n");
+    let script = [line; 7].join("\n");
     let (core, events, _dir) = open(&script).await;
     seed_call(&core, CALL, 3);
     let started = tokio::time::Instant::now();
@@ -287,7 +287,7 @@ async fn a_failed_section_keeps_the_earlier_ones_and_the_later_ones_still_run() 
 #[tokio::test(start_paused = true)]
 async fn when_no_section_is_written_the_call_fails_with_the_typed_reason() {
     let fail = r#"{"on": "post-call", "fail": "rate_limited"}"#;
-    let (core, events, _dir) = open(&vec![fail; 7].join("\n")).await;
+    let (core, events, _dir) = open(&[fail; 7].join("\n")).await;
     seed_call(&core, CALL, 3);
     let run = post_call(&core, CALL);
     tokio::time::sleep(Duration::from_secs(30)).await;
