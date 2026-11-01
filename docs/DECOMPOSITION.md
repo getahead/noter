@@ -557,7 +557,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [x] `p2` - `cpt-noter-principle-undo-over-confirm`
+  - [ ] `p2` - `cpt-noter-principle-undo-over-confirm`
 
 - **Design Constraints Covered**:
 
@@ -608,12 +608,12 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [x] `p2` - `cpt-noter-principle-never-steal-focus`
+  - [ ] `p2` - `cpt-noter-principle-never-steal-focus`
 
 - **Design Constraints Covered**:
 
-  - [x] `p2` - `cpt-noter-constraint-non-activating-panels`
-  - [x] `p2` - `cpt-noter-constraint-no-dialog-after-setup`
+  - [ ] `p2` - `cpt-noter-constraint-non-activating-panels`
+  - [ ] `p2` - `cpt-noter-constraint-no-dialog-after-setup`
 
 - **Domain Model Entities**:
   - Detection, capture state, calendar event
@@ -671,16 +671,16 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [x] `p2` - `cpt-noter-principle-privacy-visible`
-  - [x] `p2` - `cpt-noter-principle-never-steal-focus`
-  - [x] `p2` - `cpt-noter-principle-quiet-surface`
+  - [ ] `p2` - `cpt-noter-principle-privacy-visible`
+  - [ ] `p2` - `cpt-noter-principle-never-steal-focus`
+  - [ ] `p2` - `cpt-noter-principle-quiet-surface`
 
 - **Design Constraints Covered**:
 
-  - [x] `p2` - `cpt-noter-constraint-one-call-window`
-  - [x] `p2` - `cpt-noter-constraint-non-activating-panels`
-  - [x] `p2` - `cpt-noter-constraint-share-exclusion-limits`
-  - [x] `p2` - `cpt-noter-constraint-copilot-flag`
+  - [ ] `p2` - `cpt-noter-constraint-one-call-window`
+  - [ ] `p2` - `cpt-noter-constraint-non-activating-panels`
+  - [ ] `p2` - `cpt-noter-constraint-share-exclusion-limits`
+  - [ ] `p2` - `cpt-noter-constraint-copilot-flag`
 
 - **Domain Model Entities**:
   - Capture state, capture notice, degraded set, call window state, presenting state, call
@@ -817,12 +817,12 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [x] `p2` - `cpt-noter-principle-privacy-visible`
+  - [ ] `p2` - `cpt-noter-principle-privacy-visible`
 
 - **Design Constraints Covered**:
 
-  - [x] `p2` - `cpt-noter-constraint-menu-bar-template-icons`
-  - [x] `p2` - `cpt-noter-constraint-no-dialog-after-setup`
+  - [ ] `p2` - `cpt-noter-constraint-menu-bar-template-icons`
+  - [ ] `p2` - `cpt-noter-constraint-no-dialog-after-setup`
 
 - **Domain Model Entities**:
   - Capture state, detection, setup status, presenting state, degraded set; the next calendar event (MB-R6) comes with Today in M2 (owner decision A, 28 Oct 2026)
@@ -985,7 +985,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [x] `p2` - `cpt-noter-constraint-notification-limits`
+  - [ ] `p2` - `cpt-noter-constraint-notification-limits`
 
 - **Domain Model Entities**:
   - Call (title and counts only)
