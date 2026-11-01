@@ -202,7 +202,7 @@ The system **MUST** reverse changes or whole batches through the single writer, 
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-history-undo-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-history-undo-tests`
 
 The system **MUST** pass unit tests for reversal ordering, partial batches, stale records, every wrong-state error and transaction rollback; conformance tests for scopes and typed results; and real-core E2E for all four commands. E2E review and Today tick tests exercise this service under their owning story IDs. `just gate` passes.
 
@@ -219,5 +219,5 @@ The system **MUST** pass unit tests for reversal ordering, partial batches, stal
 - [x] Undo and redo a three-row batch after one row is edited elsewhere: two reverse, one is counted as skipped; an all-skipped batch returns `edited_later`.
 - [x] Irreversible audio deletion returns `not_undoable`; proposed rows are not applied by these commands.
 - [x] Unit tests inject a commit failure and prove no partial restoration or orphan log row is visible.
-- [ ] Conformance against fake and real cores checks window scope, typed errors, page shape and undo results; real-core E2E successfully calls each of the four commands, including an export via the native panel seam.
+- [x] Conformance against fake and real cores checks window scope, typed errors, page shape and undo results; real-core E2E successfully calls each of the four commands, including an export via the native panel seam.
 - [ ] `just gate` passes.
