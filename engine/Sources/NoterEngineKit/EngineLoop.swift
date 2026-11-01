@@ -25,6 +25,8 @@ public final class EngineLoop: @unchecked Sendable {
     let offline: OfflineWork?
     /// Below the live transcript and capture: archive work never delays a session.
     let offlineQueue = DispatchQueue(label: "ai.noter.engine.offline", qos: .utility)
+    /// The archive pass on its own: it waits out a captured call, embeddings do not wait for it.
+    let archiveQueue = DispatchQueue(label: "ai.noter.engine.archive", qos: .utility)
     /// The call being captured and its audio; commands arrive on one thread.
     private var session: (capture: CaptureSession, audio: AudioSource)?
     private var replaying = false
@@ -32,6 +34,8 @@ public final class EngineLoop: @unchecked Sendable {
     private let facts = NSLock()
     private var detector = Detector()
     private var capturing: CaptureSession?
+    /// Whether a call is being captured now (offline work waits for it).
+    var isCapturing: Bool { facts.withLock { capturing != nil } }
     private var watcher: DispatchSourceTimer?
 
     /// `models` are the installed model folders; `source` opens the audio for a session or, given

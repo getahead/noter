@@ -604,3 +604,22 @@ fn archive_result_examples_round_trip() {
     let v = serde_json::to_value(&words[0]).unwrap();
     assert_eq!(v["t0_ms"], 1_000);
 }
+
+/// The constraints file the core writes for the offline pass: the example Swift's tests read
+/// survives serde, with `speaker_names` as a JSON object and spans in call ms.
+#[test]
+fn offline_constraints_examples_round_trip() {
+    use noter_protocol::engine::*;
+    use noter_protocol::fixtures::engine_lines;
+    let examples = engine_lines::constraints();
+    assert!(!examples.is_empty());
+    for c in &examples {
+        let back: OfflineConstraints =
+            serde_json::from_str(&serde_json::to_string(c).unwrap()).unwrap();
+        assert_eq!(&back, c);
+    }
+    let v = serde_json::to_value(&examples[0]).unwrap();
+    assert_eq!(v["speaker_names"]["spk_1"], "Anna K.");
+    assert_eq!(v["must_link"][0]["b"]["t0_ms"], 5_000);
+    assert_eq!(v["languages"][1]["code"], "fr");
+}

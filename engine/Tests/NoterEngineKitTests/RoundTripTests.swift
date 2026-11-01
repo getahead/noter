@@ -255,6 +255,27 @@ final class RoundTripTests: XCTestCase {
             ])
     }
 
+    /// The offline pass's files: the archive result and word timings it writes, the constraints it reads.
+    func testTheOfflineFilesOfTheFixtureDecodeAndReencodeEqual() throws {
+        for result in try XCTUnwrap(fixture["archive_results"]) {
+            let data = try JSONSerialization.data(withJSONObject: result)
+            XCTAssertEqual(try object(JSONEncoder().encode(JSONDecoder().decode(ArchiveResult.self, from: data))), try object(data))
+        }
+        let words = try JSONSerialization.data(withJSONObject: try XCTUnwrap(fixture["words"]))
+        XCTAssertEqual(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(JSONDecoder().decode([Word].self, from: words))) as? NSArray,
+            try JSONSerialization.jsonObject(with: words) as? NSArray)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        for example in try XCTUnwrap(fixture["constraints"]) {
+            try JSONSerialization.data(withJSONObject: example).write(to: url)
+            let constraints = try XCTUnwrap(OfflineConstraints.read(url))
+            XCTAssertEqual(constraints.mustLink.first?.b, Span(t0Ms: 5_000, t1Ms: 6_500))
+            XCTAssertEqual(constraints.speakerNames["spk_1"], "Anna K.")
+            XCTAssertEqual(LiveASR.codes(constraints.languages), ["en", "fr"])
+        }
+    }
+
     func testEventWriterWritesTheLineShapeOfTheFixture() throws {
         let lines = Lines()
         EventWriter(clock: { 1_790_000_000_000 }, out: lines.write).emit(.pong)

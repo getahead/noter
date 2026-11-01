@@ -2,8 +2,8 @@
 // path is checked against the App Group container and every request before a file opens; an
 // invalid one gets the correlated `error`, a valid one its `ack`, then the work runs below capture
 // priority and its progress, result or failure is reported with the call or request id. The work
-// itself (Large v3 decode, clustering, bge-m3 and WeSpeaker) is `OfflineWork`; without it the
-// engine refuses with `model_missing`.
+// itself (Large v3 decode, bge-m3 and WeSpeaker) is `OfflineWork`; without its model the engine
+// refuses with `model_missing`.
 
 import Foundation
 
@@ -42,15 +42,28 @@ public struct OfflineFailure: Error, Equatable {
     public init(code: EngineErrorCode) { self.code = code }
 }
 
+/// The models an offline command needs.
+public enum OfflineModel: Sendable {
+    case archive, speaker, text
+}
+
 /// The models behind the offline commands. Each call finishes its files before it returns.
 public protocol OfflineWork: Sendable {
+    /// The models installed: a command whose model is missing is refused.
+    var available: Set<OfflineModel> { get }
     /// Decodes the call into `result` and the word timings it references, reporting progress 0...1.
-    func archive(_ pass: OfflinePass, session: URL, result: URL, constraints: URL?, progress: (Float) -> Void) throws
+    func archive(
+        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints, progress: (Float) -> Void
+    ) throws
     /// Writes the speaker's 256 float32 values to `out`.
     func speaker(_ request: SpeakerEmbedding, session: URL, out: URL) throws
     /// One 1024-value row per text, in order: written to `out` as float32 rows (nil returned), or
     /// returned inline for one text without `out`.
     func texts(_ texts: [String], out: URL?) throws -> [Float]?
+}
+
+extension OfflineWork {
+    public var available: Set<OfflineModel> { [.archive, .speaker, .text] }
 }
 
 /// Paths the core sends are relative to the App Group container and must stay inside it.
@@ -99,31 +112,45 @@ extension EngineLoop {
         // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-paths
         guard let container,
             let session = ContainerPath.resolve(pass.sessionDir, in: container), Self.isDirectory(session),
-            let result = ContainerPath.resolve(pass.resultPath, in: container)
+            SessionAudio.stored(in: session), let result = ContainerPath.resolve(pass.resultPath, in: container)
         else {
             return refuse(id, "offline_pass: an unsafe path or no stored audio")
         }
-        var constraints: URL?
+        var constraints = OfflineConstraints.none
         if let path = pass.constraintsPath {
-            guard let url = ContainerPath.resolve(path, in: container), FileManager.default.fileExists(atPath: url.path)
-            else {
-                return refuse(id, "offline_pass: unsafe or missing constraints")
+            guard let url = ContainerPath.resolve(path, in: container), let read = OfflineConstraints.read(url) else {
+                return refuse(id, "offline_pass: unsafe, missing or malformed constraints")
             }
-            constraints = url
+            constraints = read
         }
         // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-paths
-        guard let work = offline else { return refuse(id, "offline_pass: no archive model", .modelMissing) }
+        guard let work = offline, work.available.contains(.archive) else {
+            return refuse(id, "offline_pass: no archive model", .modelMissing)
+        }
+        // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
         writer.emit(.ack(cmdId: id))
         let writer = self.writer
-        offlineQueue.async {
+        // On a `.utility` queue: below capture and the live transcript.
+        archiveQueue.async {
+            // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
             do {
+                var reported: Float = -1
                 // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-progress
                 try work.archive(pass, session: session, result: result, constraints: constraints) { progress in
-                    writer.emit(.offlineProgress(callId: pass.callId, progress: min(max(progress, 0), 1)))
+                    // Capture goes first: the pass waits at its next step while a call is captured.
+                    while self.isCapturing { Thread.sleep(forTimeInterval: 0.2) }
+                    let p = min(max(progress, 0), 1)
+                    if p >= reported + 0.01 || (p == 1 && reported < 1) {
+                        reported = p
+                        writer.emit(.offlineProgress(callId: pass.callId, progress: p))
+                    }
                 }
                 // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-progress
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-complete
+                // The pass wrote the words, then the result, each to a temporary name renamed in place.
                 guard FileManager.default.fileExists(atPath: result.path) else { throw OfflineFailure(code: .internal) }
                 writer.emit(.offlineDone(callId: pass.callId, resultPath: pass.resultPath))
+                // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-complete
             } catch {
                 // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-fail
                 // Never a partial file where the core could take it for a result.
@@ -145,12 +172,16 @@ extension EngineLoop {
             return refuse(id, "speaker_embedding: invalid spans, an unknown call or an unsafe path")
         }
         // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-validate
-        guard let work = offline else { return refuse(id, "speaker_embedding: no speaker model", .modelMissing) }
+        guard let work = offline, work.available.contains(.speaker) else {
+            return refuse(id, "speaker_embedding: no speaker model", .modelMissing)
+        }
         writer.emit(.ack(cmdId: id))
         let writer = self.writer
         offlineQueue.async {
             do {
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-run
                 try work.speaker(request, session: session, out: out)
+                // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-run
                 // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-event
                 writer.emit(.speakerEmbeddingDone(requestId: request.requestId, outPath: request.outPath))
                 // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-event
@@ -173,12 +204,16 @@ extension EngineLoop {
             return refuse(id, "embed_texts: a batch needs out_path")
         }
         // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-validate
-        guard let work = offline else { return refuse(id, "embed_texts: no text model", .modelMissing) }
+        guard let work = offline, work.available.contains(.text) else {
+            return refuse(id, "embed_texts: no text model", .modelMissing)
+        }
         writer.emit(.ack(cmdId: id))
         let writer = self.writer
         offlineQueue.async {
             do {
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-run
                 let inline = try work.texts(texts, out: out)
+                // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-run
                 // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-event
                 if let outPath {
                     writer.emit(.embeddings(requestId: requestId, inline: nil, outPath: outPath, count: UInt32(texts.count)))

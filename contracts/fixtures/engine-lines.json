@@ -238,6 +238,65 @@
       "id": 16
     }
   ],
+  "constraints": [
+    {
+      "cannot_link": [
+        {
+          "a": {
+            "t0_ms": 1000,
+            "t1_ms": 2000
+          },
+          "b": {
+            "t0_ms": 9000,
+            "t1_ms": 9800
+          }
+        }
+      ],
+      "glossary": [
+        {
+          "spoken_forms": [
+            "no-ter"
+          ],
+          "term": "Noter",
+          "variants_cyrillic": [
+            "Ноутер"
+          ],
+          "variants_latin": [
+            "Notter"
+          ]
+        }
+      ],
+      "languages": [
+        "en",
+        {
+          "code": "fr"
+        }
+      ],
+      "must_link": [
+        {
+          "a": {
+            "t0_ms": 1000,
+            "t1_ms": 2000
+          },
+          "b": {
+            "t0_ms": 5000,
+            "t1_ms": 6500
+          }
+        }
+      ],
+      "speaker_names": {
+        "spk_1": "Anna K."
+      },
+      "speaker_priors": [
+        {
+          "de": 0.0,
+          "en": 0.75,
+          "label": "spk_1",
+          "ru": 0.25
+        }
+      ]
+    }
+  ],
   "events": [
     {
       "at": 1790000000000,

@@ -25,6 +25,8 @@
 //! * The engine also plays replay audio (D6): it owns the files and is excluded
 //!   from the tap; the tap also excludes the app's own process.
 
+use std::collections::BTreeMap;
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -217,7 +219,8 @@ pub struct EngineWord {
 /// The archive result file `offline_done` names (`result_path`): the whole call after the
 /// offline pass, written completely before the event. Segments are `confirmed`, in call time,
 /// on both channels; `speaker_label` is the final cluster label (the `mic` channel keeps the
-/// user or guest attribution), `lang`/`lang_p`/`avg_logprob` are language and confidence,
+/// user or guest attribution; empty for a voice with under three seconds of speech in the
+/// call, which stays unlabelled), `lang`/`lang_p`/`avg_logprob` are language and confidence,
 /// `corrections` the glossary and filter metadata, `crosstalk_labels` both candidates of an
 /// overlap, and `words_path` the segment's word timings. The core maps clusters to live labels.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -225,6 +228,29 @@ pub struct ArchiveResult {
     pub call_id: CallId,
     pub backend: AsrBackend,
     pub segments: Vec<EngineSegment>,
+}
+
+/// Two spans of call time on the system channel, from one user correction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct SpanLink {
+    pub a: EngineSpan,
+    pub b: EngineSpan,
+}
+
+/// The constraints file `offline_pass` names (`constraints_path`), written by the core before
+/// the pass: what the user corrected and what the call was configured with. Spans are call ms on
+/// the system channel; `must_link` spans are one voice, `cannot_link` spans two different ones;
+/// `speaker_names` maps live labels to the names the user gave them (labels sharing a name are
+/// one voice). A malformed file refuses the command with a correlated `error`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct OfflineConstraints {
+    /// The call's languages: language ID picks among them (empty: any).
+    pub languages: Vec<Lang>,
+    pub glossary: Vec<GlossaryEntry>,
+    pub speaker_priors: Vec<SpeakerPrior>,
+    pub must_link: Vec<SpanLink>,
+    pub cannot_link: Vec<SpanLink>,
+    pub speaker_names: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
