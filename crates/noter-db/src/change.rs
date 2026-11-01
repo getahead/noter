@@ -439,7 +439,7 @@ fn what_changed(
 }
 
 /// A column value as `before`/`after` text: strings as they are, `NULL` stays `NULL`.
-fn as_text(v: &Value) -> Option<String> {
+pub(crate) fn as_text(v: &Value) -> Option<String> {
     match v {
         Value::Null => None,
         Value::String(s) => Some(s.clone()),
@@ -490,7 +490,7 @@ fn rev_of(row: &Value) -> Option<Rev> {
 }
 
 /// Table and column names are spliced into SQL, so they must be plain identifiers.
-fn ident(s: &str) -> bool {
+pub(crate) fn ident(s: &str) -> bool {
     s.starts_with(|c: char| c.is_ascii_lowercase())
         && s.bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
@@ -550,7 +550,7 @@ fn write_row(
     tx.execute(&sql, params_from_iter(args))
 }
 
-fn to_sql(v: &Value) -> Sql {
+pub(crate) fn to_sql(v: &Value) -> Sql {
     match v {
         Value::Null => Sql::Null,
         Value::Bool(b) => Sql::Integer((*b).into()),
@@ -562,7 +562,7 @@ fn to_sql(v: &Value) -> Sql {
     }
 }
 
-fn from_sql(v: ValueRef) -> Value {
+pub(crate) fn from_sql(v: ValueRef) -> Value {
     match v {
         ValueRef::Null => Value::Null,
         ValueRef::Integer(i) => i.into(),

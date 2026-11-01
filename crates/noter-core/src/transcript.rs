@@ -445,7 +445,7 @@ impl Core {
     /// `audio/<call_id>/transcript.jsonl`, 0600: a temporary file renamed into place.
     // @cpt-dod:cpt-noter-dod-core-live-transcript-span-file:p2
     // @cpt-algo:cpt-noter-algo-core-live-transcript-file:p2
-    fn write_transcript_file(&self, call_id: &CallId) -> Result<(), CoreError> {
+    pub(crate) fn write_transcript_file(&self, call_id: &CallId) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
         let segments = self.store.read(|c| segments_of(c, call_id, None))?;
         let dir = self.transcript.dir.join("audio").join(call_id.as_str());

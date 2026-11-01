@@ -6,6 +6,7 @@ mod app;
 mod capture;
 mod first_run;
 mod glossary;
+mod history;
 mod hotkeys;
 mod hub;
 mod library;
@@ -26,7 +27,7 @@ mod tray;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use noter_db::{ChangeMeta, Migration, OpenError, Store};
+use noter_db::{ChangeMeta, Direction, Migration, OpenError, Store};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -638,6 +639,30 @@ impl CoreApi for Core {
         args: CallsDeleteArgs,
     ) -> Result<DeleteResult, CoreError> {
         self.delete_calls(ctx, args)
+    }
+
+    async fn history_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: HistoryListArgs,
+    ) -> Result<Page<ChangeRow>, CoreError> {
+        self.history_page(args)
+    }
+
+    async fn change_undo(
+        &self,
+        _ctx: &CommandCtx,
+        args: UndoArgs,
+    ) -> Result<UndoResult, CoreError> {
+        self.reverse_change(Direction::Undo, args.target)
+    }
+
+    async fn change_redo(
+        &self,
+        _ctx: &CommandCtx,
+        args: RedoArgs,
+    ) -> Result<UndoResult, CoreError> {
+        self.reverse_change(Direction::Redo, args.target)
     }
 
     async fn window_show_call(
