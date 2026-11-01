@@ -596,6 +596,74 @@ impl Harness {
                 ));
             }
         }
+        // The items follow their calls (they reference them), each with its evidence spans.
+        let calls = wanted["calls"].as_array().unwrap_or(&empty);
+        let has_call = |id: &Value| calls.iter().any(|c| c["id"] == *id);
+        // A scenario may drop calls and leave their items in the fixture: those are left out.
+        for item in wanted["items"]
+            .as_array()
+            .unwrap_or(&empty)
+            .iter()
+            .filter(|i| has_call(&i["call"]["id"]))
+        {
+            let lang = match &item["lang"] {
+                Value::String(code) => json!(code),
+                other => other["code"].clone(),
+            };
+            let text = &item["text"];
+            rows.push(ins(
+                "items",
+                vec![
+                    ("id", item["id"].clone()),
+                    ("rev", item["rev"].clone()),
+                    ("call_id", item["call"]["id"].clone()),
+                    ("kind", item["kind"].clone()),
+                    ("text", text.clone()),
+                    ("lang", lang),
+                    // The view says only that the text was edited: any other wording will do.
+                    (
+                        "generated_text",
+                        if item["edited"] == json!(true) {
+                            json!(format!("{} (generated)", text.as_str().unwrap_or_default()))
+                        } else {
+                            Value::Null
+                        },
+                    ),
+                    ("owner_person_id", item["owner"]["id"].clone()),
+                    ("due_date", item["due"].clone()),
+                    ("status", item["status"].clone()),
+                    ("review_state", item["review"].clone()),
+                    ("created_by", item["created_by"].clone()),
+                    ("topic_id", item["topic"]["id"].clone()),
+                    ("is_engineering", item["is_engineering"].clone()),
+                    ("linked_issue_key", item["linked_issue"].clone()),
+                    ("handoff_target", item["handoff"]["target"].clone()),
+                    ("handoff_cwd", item["handoff"]["cwd"].clone()),
+                    ("handed_off_at", item["handoff"]["at"].clone()),
+                    ("done_at", item["done_at"].clone()),
+                    (
+                        "carried_from_call_id",
+                        if has_call(&item["carried_from"]["id"]) {
+                            item["carried_from"]["id"].clone()
+                        } else {
+                            Value::Null
+                        },
+                    ),
+                ],
+            ));
+            for span in item["spans"].as_array().unwrap_or(&empty) {
+                rows.push(ins(
+                    "item_spans",
+                    vec![
+                        ("item_id", item["id"].clone()),
+                        ("call_id", span["call_id"].clone()),
+                        ("channel", span["channel"].clone()),
+                        ("t0_ms", span["t0_ms"].clone()),
+                        ("t1_ms", span["t1_ms"].clone()),
+                    ],
+                ));
+            }
+        }
         // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         self.core.store().insert_batch(rows)
     }
@@ -844,6 +912,19 @@ impl Harness {
         }
         w["calls"] = page["rows"].clone();
         w["call_details"] = Value::Array(details);
+        // The items service's read model, every page of it.
+        let mut items = vec![];
+        let mut cursor = Value::Null;
+        loop {
+            let args = json!({ "filter": {}, "page": { "limit": 500, "cursor": cursor } });
+            let page = self.call(WindowLabel::Main, "items_list", args).await?;
+            items.extend(page["rows"].as_array().cloned().unwrap_or_default());
+            cursor = page["next_cursor"].clone();
+            if cursor.is_null() {
+                break;
+            }
+        }
+        w["items"] = Value::Array(items);
         w["call_types"] = self
             .call(WindowLabel::Main, "call_types_list", json!({}))
             .await?;
@@ -869,7 +950,7 @@ impl Harness {
             if current.get(key) == Some(value)
                 || matches!(
                     key.as_str(),
-                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts"
+                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts" | "items"
                 )
             {
                 continue;
@@ -903,7 +984,7 @@ impl Harness {
             }
             v
         };
-        if ["calls", "transcripts"]
+        if ["calls", "transcripts", "items"]
             .iter()
             .any(|k| accepted[k] != wanted[k])
             || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"])

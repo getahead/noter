@@ -233,13 +233,16 @@ async fn world_set_writes_owned_slices_through_the_core() {
 async fn world_set_refuses_a_slice_no_service_owns_yet() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
-    world["items"] = json!([]);
+    world["outputs"] = json!([]);
     let (set, events) = r
         .call("main", "harness.world_set", json!({ "world": world }))
         .await;
     assert_eq!(set["error"]["code"], "not_implemented");
     assert!(
-        set["error"]["message"].as_str().unwrap().contains("items"),
+        set["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("outputs"),
         "{set}"
     );
     assert!(

@@ -83,7 +83,7 @@ fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
 }
 
 /// A stored snake_case word as its protocol enum.
-fn word<T: serde::de::DeserializeOwned>(text: String) -> noter_db::rusqlite::Result<T> {
+pub(crate) fn word<T: serde::de::DeserializeOwned>(text: String) -> noter_db::rusqlite::Result<T> {
     serde_json::from_value(Value::String(text)).map_err(|e| {
         noter_db::rusqlite::Error::FromSqlConversionFailure(
             0,
@@ -93,7 +93,7 @@ fn word<T: serde::de::DeserializeOwned>(text: String) -> noter_db::rusqlite::Res
     })
 }
 
-fn lang_of(code: String) -> Lang {
+pub(crate) fn lang_of(code: String) -> Lang {
     match code.as_str() {
         "en" => Lang::En,
         "ru" => Lang::Ru,
@@ -102,7 +102,7 @@ fn lang_of(code: String) -> Lang {
     }
 }
 
-fn lang_code(lang: &Lang) -> String {
+pub(crate) fn lang_code(lang: &Lang) -> String {
     match lang {
         Lang::En => "en".into(),
         Lang::Ru => "ru".into(),
@@ -182,7 +182,7 @@ fn select_call(c: &Connection, id: &str) -> noter_db::rusqlite::Result<Option<St
 }
 
 /// Days since 1970-01-01 of a `YYYY-MM-DD` date; `None` for anything else.
-fn day_number(date: &LocalDate) -> Option<i64> {
+pub(crate) fn day_number(date: &LocalDate) -> Option<i64> {
     let mut parts = date.0.split('-');
     let (y, m, d) = (parts.next()?, parts.next()?, parts.next()?);
     if parts.next().is_some() || y.len() != 4 || m.len() != 2 || d.len() != 2 {
@@ -210,18 +210,18 @@ fn day_number(date: &LocalDate) -> Option<i64> {
 }
 
 /// What the list's `WHERE` clause needs, with its bound values (`?1` is the clock's now).
-struct Where {
-    sql: String,
-    params: Vec<Sql>,
+pub(crate) struct Where {
+    pub(crate) sql: String,
+    pub(crate) params: Vec<Sql>,
 }
 
 impl Where {
-    fn bind(&mut self, v: impl Into<Sql>) -> String {
+    pub(crate) fn bind(&mut self, v: impl Into<Sql>) -> String {
         self.params.push(v.into());
         format!("?{}", self.params.len())
     }
 
-    fn bind_all<T: Into<Sql>>(&mut self, values: impl IntoIterator<Item = T>) -> String {
+    pub(crate) fn bind_all<T: Into<Sql>>(&mut self, values: impl IntoIterator<Item = T>) -> String {
         let marks: Vec<String> = values.into_iter().map(|v| self.bind(v)).collect();
         marks.join(", ")
     }
@@ -238,11 +238,11 @@ fn order_of(sort: CallSort) -> (&'static str, bool) {
 }
 
 /// A page cursor: the last row's sort key and id.
-fn cursor_of(key: Value, id: &str) -> Cursor {
+pub(crate) fn cursor_of(key: Value, id: &str) -> Cursor {
     Cursor(json!([key, id]).to_string())
 }
 
-fn parse_cursor(c: &Cursor) -> Result<(Sql, String), CoreError> {
+pub(crate) fn parse_cursor(c: &Cursor) -> Result<(Sql, String), CoreError> {
     let bad = || invalid("page.cursor", ValidationRule::InvalidFormat);
     let Ok(Value::Array(parts)) = serde_json::from_str::<Value>(&c.0) else {
         return Err(bad());

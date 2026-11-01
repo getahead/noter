@@ -681,7 +681,7 @@ fn call_ref(c: &Connection, id: &CallId) -> noter_db::rusqlite::Result<Option<Ca
 }
 
 /// The call's current-pass segments (archive once it exists, else live) in time order; `span` keeps those that overlap it.
-fn segments_of(
+pub(crate) fn segments_of(
     c: &Connection,
     call_id: &CallId,
     span: Option<(Option<AudioChannel>, OffsetMs, OffsetMs)>,
