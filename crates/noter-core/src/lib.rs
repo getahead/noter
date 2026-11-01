@@ -6,8 +6,10 @@ mod app;
 mod capture;
 mod first_run;
 mod glossary;
+mod history;
 mod hotkeys;
 mod hub;
+mod jobs;
 mod library;
 mod log;
 mod models;
@@ -26,7 +28,7 @@ mod tray;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use noter_db::{ChangeMeta, Migration, OpenError, Store};
+use noter_db::{ChangeMeta, Direction, Migration, OpenError, Store};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -101,6 +103,8 @@ pub struct CoreDeps {
     pub engine_config: noter_engine_client::Config,
     /// Record prompt and call window (AppKit in the app, recorded calls in the harness, TL-2).
     pub surfaces: Arc<dyn Surfaces>,
+    /// Whether the Mac is on battery, for the jobs that do not run on it (mains power if unset).
+    pub power: Arc<dyn noter_jobs::PowerSource>,
 }
 
 impl CoreDeps {
@@ -118,7 +122,13 @@ impl CoreDeps {
             engine: Arc::new(self_test::NoEngine),
             engine_config: noter_engine_client::Config::default(),
             surfaces: Arc::new(capture::NoSurfaces),
+            power: Arc::new(jobs::AcPower),
         }
+    }
+
+    pub fn with_power(mut self, power: Arc<dyn noter_jobs::PowerSource>) -> Self {
+        self.power = power;
+        self
     }
 
     pub fn with_surfaces(mut self, surfaces: Arc<dyn Surfaces>) -> Self {
@@ -193,7 +203,10 @@ impl std::error::Error for BootError {}
 /// The core: one per process, shared by every window and native surface.
 pub struct Core {
     deps: CoreDeps,
-    store: Store,
+    store: Arc<Store>,
+    /// Pipeline jobs; `capture_guard` is the session manager's input to it.
+    jobs: noter_jobs::Scheduler,
+    capture_guard: tokio::sync::watch::Sender<noter_jobs::CaptureGuardState>,
     /// `noter.db`, `logs/`, `audio/` and the user's `skills/` live here.
     data_dir: std::path::PathBuf,
     log: log::Logger,
@@ -280,7 +293,7 @@ impl Core {
             &data_dir.join("noter.db"),
             &[noter_db::MIGRATIONS, MIGRATIONS],
         ) {
-            Ok(store) => store,
+            Ok(store) => Arc::new(store),
             Err(e) => {
                 let record =
                     json!({ "level": "error", "module": "storage", "code": open_error_kind(&e) });
@@ -299,9 +312,12 @@ impl Core {
         let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
         let engine =
             noter_engine_client::EngineClient::new(deps.engine.clone(), deps.engine_config.clone());
+        let (jobs, capture_guard) = jobs::build(store.clone(), &deps);
         let core = Core {
             deps,
             store,
+            jobs,
+            capture_guard,
             data_dir: data_dir.to_path_buf(),
             log,
             app: Mutex::new(snapshot),
@@ -638,6 +654,30 @@ impl CoreApi for Core {
         args: CallsDeleteArgs,
     ) -> Result<DeleteResult, CoreError> {
         self.delete_calls(ctx, args)
+    }
+
+    async fn history_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: HistoryListArgs,
+    ) -> Result<Page<ChangeRow>, CoreError> {
+        self.history_page(args)
+    }
+
+    async fn change_undo(
+        &self,
+        _ctx: &CommandCtx,
+        args: UndoArgs,
+    ) -> Result<UndoResult, CoreError> {
+        self.reverse_change(Direction::Undo, args.target)
+    }
+
+    async fn change_redo(
+        &self,
+        _ctx: &CommandCtx,
+        args: RedoArgs,
+    ) -> Result<UndoResult, CoreError> {
+        self.reverse_change(Direction::Redo, args.target)
     }
 
     async fn window_show_call(

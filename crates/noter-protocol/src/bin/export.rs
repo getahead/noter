@@ -7,7 +7,7 @@
 //! * `contracts/ipc.manifest.json`         commands, events, error codes as data
 //! * `contracts/engine.schema.json`        engine stdio protocol (→ Swift Codable)
 //! * `contracts/fixtures/engine-lines.json` one example line per engine command and event, an archive
-//!   result file and a word-timings file (Swift round-trip tests)
+//!   result file, a word-timings file and a constraints file (Swift round-trip tests)
 //! * `contracts/mcp-tools.schema.json`     noter-mcp tool input/output schemas
 //! * `contracts/skills/*.schema.json`      LLM skill output schemas
 //! * `contracts/fixtures/world.json`       typed fixtures for the fake core
@@ -442,6 +442,7 @@ fn main() {
         "event_line": schema_for!(engine::EngineEventLine),
         "archive_result": schema_for!(engine::ArchiveResult),
         "words_file": schema_for!(Vec<engine::EngineWord>),
+        "offline_constraints": schema_for!(engine::OfflineConstraints),
     });
     write(
         &root,
@@ -455,6 +456,7 @@ fn main() {
         "events": noter_protocol::fixtures::engine_lines::events(),
         "archive_results": noter_protocol::fixtures::engine_lines::archive_results(),
         "words": noter_protocol::fixtures::engine_lines::words(),
+        "constraints": noter_protocol::fixtures::engine_lines::constraints(),
     });
     write(
         &root,

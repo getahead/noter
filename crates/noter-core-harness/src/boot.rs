@@ -46,6 +46,9 @@ pub struct Options {
     pub engine_script: Option<Script>,
     /// A named state of the fixture world ([`scenario`]), applied with `world_set` once seeded.
     pub scenario: Option<String>,
+    /// The Mac's own displays, for the app's launch hooks: its real windows are drawn on them, so
+    /// once seeded the scripted Mac has these displays (a display change, as when one unplugs).
+    pub displays: Option<Vec<DisplayInfo>>,
 }
 
 impl Options {
@@ -159,7 +162,15 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
                 retry_at: None,
             }]
         }
-        _ => return Err(format!("unknown scenario {name}; known: idle, low-disk, detected, new-meeting, call-seems-ended, switched-to-local")),
+        "first-call" => {
+            // After the first recorded call: the library holds only “Backend sync”, nothing records.
+            w.app.capture = idle;
+            let first = |id: &CallId| id.as_str() == "call_backend";
+            w.calls.retain(|c| first(&c.id));
+            w.call_details.retain(|d| first(&d.call.id));
+            w.transcripts.retain(|t| first(&t.call_id));
+        }
+        _ => return Err(format!("unknown scenario {name}; known: idle, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
     }
     Ok(())
 }
@@ -282,6 +293,10 @@ impl Harness {
                 .world_set(json!({ "world": w }))
                 .await
                 .map_err(failed)?;
+        }
+        if let Some(displays) = options.displays {
+            harness.native.update(|r| r.displays = displays);
+            harness.native.changed();
         }
         if options.fixture {
             harness.feed_engine();

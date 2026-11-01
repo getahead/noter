@@ -177,7 +177,7 @@ impl Core {
         self.glossary_written()
     }
 
-    fn glossary_written(&self) -> Result<GlossaryList, CoreError> {
+    pub(crate) fn glossary_written(&self) -> Result<GlossaryList, CoreError> {
         let list = self.glossary()?;
         // @cpt-begin:cpt-noter-flow-core-settings-glossary:p2:inst-glossary-live
         for hook in lock(&self.glossary_hooks).iter() {

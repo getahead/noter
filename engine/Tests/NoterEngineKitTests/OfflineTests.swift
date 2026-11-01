@@ -13,7 +13,9 @@ private final class FakeWork: OfflineWork, @unchecked Sendable {
     var fail: EngineErrorCode?
     var leavesPartialFile = false
 
-    func archive(_ pass: OfflinePass, session: URL, result: URL, constraints: URL?, progress: (Float) -> Void) throws {
+    func archive(
+        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints, progress: (Float) -> Void
+    ) throws {
         progress(0.25)
         progress(1.5)  // clamped
         if let fail {
@@ -50,6 +52,7 @@ final class OfflineTests: XCTestCase {
             try FileManager.default.createDirectory(
                 at: container.appendingPathComponent(dir), withIntermediateDirectories: true)
         }
+        try storeCall(in: container.appendingPathComponent("audio/call_1"), seconds: 1, mic: [], sys: [])
     }
 
     override func tearDownWithError() throws {
@@ -143,7 +146,7 @@ final class OfflineTests: XCTestCase {
 
     func testAnArchivePassIsAcknowledgedThenReportsProgressAndItsCompleteFile() throws {
         let lines = Lines()
-        try Data("[]".utf8).write(to: container.appendingPathComponent("audio/call_1/constraints.json"))
+        try Data(ArchiveTests.languages(["en"]).utf8).write(to: container.appendingPathComponent("audio/call_1/constraints.json"))
         _ = engine(lines, work: FakeWork()).handle(offlinePass(7, constraints: #""audio/call_1/constraints.json""#))
         let done = try XCTUnwrap(lines.waitFor("offline_done"))
         XCTAssertEqual(done["call_id"] as? String, "call_1")

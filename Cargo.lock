@@ -726,6 +726,7 @@ dependencies = [
  "noter-core",
  "noter-db",
  "noter-engine-client",
+ "noter-jobs",
  "noter-llm",
  "noter-protocol",
  "serde",
@@ -770,6 +771,19 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+]
+
+[[package]]
+name = "noter-jobs"
+version = "0.1.0"
+dependencies = [
+ "noter-db",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "ulid",
 ]
 
 [[package]]

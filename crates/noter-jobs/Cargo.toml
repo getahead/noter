@@ -1,0 +1,20 @@
+[package]
+name = "noter-jobs"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "The job scheduler: durable pipeline jobs, trigger dispatch, call and battery guards, bounded logged batches and progress. Never touches SQLite directly."
+publish = false
+
+[dependencies]
+noter-db = { path = "../noter-db" }
+noter-protocol = { path = "../noter-protocol" }
+serde = "1"
+serde_json = "1"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+ulid = "3"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "sync", "test-util", "time"] }

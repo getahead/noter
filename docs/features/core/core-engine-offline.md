@@ -78,7 +78,7 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Run an archive pass
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-archive`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-archive`
 
 **Actor**: Engine supervisor, for the archive job
 
@@ -91,16 +91,16 @@ The live transcript can improve after the call without losing the user's speaker
 **Steps**:
 1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }` - `inst-archive-request`
 2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the App Group - `inst-archive-paths`
-3. [ ] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
+3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
 4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; capture work takes priority if it starts - `inst-archive-progress`
-5. [ ] - `p1` - Write the completed archive result and referenced word timings before emitting `offline_done { call_id, result_path }` - `inst-archive-complete`
+5. [x] - `p1` - Write the completed archive result and referenced word timings before emitting `offline_done { call_id, result_path }` - `inst-archive-complete`
 6. [x] - `p1` - **IF** asynchronous processing fails, emit `offline_failed { call_id, code }`; never report an incomplete file as done - `inst-archive-fail`
 7. [x] - `p1` - Supervisor correlates the result with the current call job, discards stale completions from cancelled or superseded work and returns it to the pipeline - `inst-archive-correlate`
 8. [x] - `p1` - **RETURN** the result path or failure; no database writes occur in the engine - `inst-archive-return`
 
 ### Request speaker or text embeddings
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-embeddings`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-embeddings`
 
 **Actor**: Engine supervisor, for a core service
 
@@ -113,7 +113,7 @@ The live transcript can improve after the call without losing the user's speaker
 **Steps**:
 1. [x] - `p1` - Send `speaker_embedding { request_id, call_id, channel, spans, out_path }` or `embed_texts { request_id, texts, out_path }` with a unique request id - `inst-embed-request`
 2. [x] - `p1` - Validate span bounds and file paths; acknowledge the command or return a correlated `error` - `inst-embed-validate`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-engine-offline-vectors` and finish every output file before announcing it - `inst-embed-run`
+3. [x] - `p1` - Run `cpt-noter-algo-core-engine-offline-vectors` and finish every output file before announcing it - `inst-embed-run`
 4. [x] - `p1` - Emit `speaker_embedding_done` with the output path or `embeddings` with inline data or a batch path and count, preserving `request_id` - `inst-embed-event`
 5. [x] - `p1` - Supervisor validates vector dimensions, finite values and count, then resolves the pending request; process exit or an error rejects it - `inst-embed-resolve`
 6. [x] - `p1` - Release scratch files after consumption; the core encrypts retained speaker embeddings, and this feature never enrolls a person - `inst-embed-clean`
@@ -130,29 +130,31 @@ The live transcript can improve after the call without losing the user's speaker
 **Output**: Archive segments with channels, times, words, language, confidence, correction metadata and final cluster labels.
 
 **Steps**:
-1. [ ] - `p1` - Read both stored channels against the timeline, keeping pauses and gaps in call-relative time - `inst-decode-timeline`
-2. [ ] - `p1` - Split speech with VAD and identify language per utterance using the configured languages and speaker priors - `inst-decode-language`
-3. [ ] - `p1` - Run full Large v3 with beam size 5 and temperature fallback, then apply glossary and hallucination filters - `inst-decode-asr`
-4. [ ] - `p1` - Re-decode low-probability mixed-language utterances with the alternative language and keep the better-scoring result - `inst-decode-alternative`
+1. [x] - `p1` - Read both stored channels against the timeline, keeping pauses and gaps in call-relative time - `inst-decode-timeline`
+2. [x] - `p1` - Split speech with VAD and identify language per utterance using the configured languages and speaker priors - `inst-decode-language`
+3. [x] - `p1` - Run full Large v3 with beam size 5 and temperature fallback, then apply glossary and hallucination filters - `inst-decode-asr`
+4. [x] - `p1` - Re-decode low-probability mixed-language utterances with the alternative language and keep the better-scoring result - `inst-decode-alternative`
 5. [ ] - `p1` - Run offline FluidAudio diarization and VBx across the system channel, enforcing must-link and cannot-link time-span constraints from user corrections - `inst-decode-cluster`
-6. [ ] - `p1` - Mark overlapping spans with both candidate labels and low ASR confidence; leave voices with under three seconds of speech unnamed - `inst-decode-overlap`
-7. [ ] - `p1` - Preserve the microphone channel's user or guest attribution and the two-channel split; do not infer cross-call person identity here - `inst-decode-channel`
-8. [ ] - `p1` - **RETURN** the complete result; the core maps archive clusters to live labels by time overlap and applies corrections when installing it - `inst-decode-return`
+6. [x] - `p1` - Mark overlapping spans with both candidate labels and low ASR confidence; leave voices with under three seconds of speech unnamed - `inst-decode-overlap`
+7. [x] - `p1` - Preserve the microphone channel's user or guest attribution and the two-channel split; do not infer cross-call person identity here - `inst-decode-channel`
+8. [x] - `p1` - **RETURN** the complete result; the core maps archive clusters to live labels by time overlap and applies corrections when installing it - `inst-decode-return`
+
+> **Clustering is owner-gated (TL-16, D-32, 1 Nov 2026).** `inst-decode-cluster` waits on the owner's choice of backend (FluidAudio prebuilt binary or pinned pyannote/WeSpeaker models). Until then a system-channel voice is the live per-side label (`spk_1`), split by cannot-link spans, joined by must-link spans and shared names unless a cannot-link stands between them; a voice with under three seconds of speech gets the empty label. Large v3 runs on WhisperKit, which has no beam search: a failed greedy decode falls back through temperatures sampling the top five tokens.
 
 ### Produce local vectors
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-vectors`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-vectors`
 
 **Input**: Audio spans for one speaker request, or an ordered list of texts with an optional output path.
 
 **Output**: 256-dimensional WeSpeaker embedding or 1024-dimensional bge-m3 rows.
 
 **Steps**:
-1. [ ] - `p1` - **IF** the request is for a speaker, load only the requested channel and spans and extract the WeSpeaker vector - `inst-vector-speaker`
-2. [ ] - `p1` - **ELSE** embed each text locally with bge-m3, preserving input order; an empty list produces zero rows - `inst-vector-text`
-3. [ ] - `p1` - Validate dimensions and finite numbers before writing or returning any vector - `inst-vector-check`
-4. [ ] - `p1` - Use an inline vector for a single query without `out_path`; write batches as float32 little-endian rows at the requested path - `inst-vector-file`
-5. [ ] - `p1` - **RETURN** vector or path and count; never access the network or the database - `inst-vector-return`
+1. [x] - `p1` - **IF** the request is for a speaker, load only the requested channel and spans and extract the WeSpeaker vector - `inst-vector-speaker`
+2. [x] - `p1` - **ELSE** embed each text locally with bge-m3, preserving input order; an empty list produces zero rows - `inst-vector-text`
+3. [x] - `p1` - Validate dimensions and finite numbers before writing or returning any vector - `inst-vector-check`
+4. [x] - `p1` - Use an inline vector for a single query without `out_path`; write batches as float32 little-endian rows at the requested path - `inst-vector-file`
+5. [x] - `p1` - **RETURN** vector or path and count; never access the network or the database - `inst-vector-return`
 
 ## 4. States (CDSL)
 
@@ -192,9 +194,11 @@ The system **MUST** implement the offline pass through the existing stdio protoc
 - API: `offline_pass`, `offline_progress`, `offline_done`, `offline_failed`
 - Entities: `EngineSegment`, archive result files and correction constraints
 
+> **Open (TL-16).** Everything but constrained VBx clustering is delivered: both channels in call time with gaps, Large v3, the filters, progress and complete result files. The box waits on `inst-decode-cluster`.
+
 ### Embedding requests
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-embeddings`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-embeddings`
 
 The system **MUST** correlate speaker and text embeddings, validate their dimensions and counts, reject unsafe paths, use files for bulk results and keep extraction local. The core encrypts speaker embeddings before retaining them; person matching is M3.
 
@@ -221,11 +225,15 @@ The system **MUST** pass Swift unit and file-mode golden-call tests, Rust superv
 **Touches**:
 - API: `cpt-noter-interface-engine-stdio`
 
+> **Open (TL-17).** The Swift unit tests drive the archive and vector code on synthetic calls with scripted models, and the Rust supervisor and schema tests are in; the file-mode golden-call tests need `evals/golden`, the owner's item.
+
 ## 6. Acceptance Criteria
 
 - [ ] File-mode golden calls in English, Russian and German produce a complete archive with word timings, channel separation, crosstalk and enforced user constraints.
-- [ ] Speaker vectors have 256 finite dimensions; text vectors have 1024; batch order and count match the request, including an empty batch.
-- [ ] Unsafe paths and missing audio or models fail through the existing protocol without publishing partial files.
+- [x] Speaker vectors have 256 finite dimensions; text vectors have 1024; batch order and count match the request, including an empty batch.
+- [x] Unsafe paths and missing audio or models fail through the existing protocol without publishing partial files.
 - [ ] Engine exit and abandoned requests do not leave unresolved callers or install stale results; capture still restarts before archive work.
 - [ ] Engine-schema conformance and the consuming post-call story E2E pass; archive quality is measured on the golden set on the Mac runner.
 - [ ] `just gate` passes.
+
+> **Open (TL-17).** The first and fifth criteria are measured on `evals/golden` on the Mac runner, the owner's item; the conformance half of the fifth is in.
