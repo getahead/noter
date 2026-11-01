@@ -207,6 +207,302 @@
    "size_bytes": 282843,
    "sha256": "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
    "required_for_capture": true
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "AudioEncoder.mlmodelc/analytics/coremldata.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/AudioEncoder.mlmodelc/analytics/coremldata.bin",
+   "size_bytes": 243,
+   "sha256": "195e35e9fbaa218cd59eca69988a2165245e5bfccc4a5d9776847e8955d1625a",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "AudioEncoder.mlmodelc/coremldata.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/AudioEncoder.mlmodelc/coremldata.bin",
+   "size_bytes": 348,
+   "sha256": "273d6cd004f95763e9d03e5d36622f11038819a81b9eafed64b1d95444e04f62",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "AudioEncoder.mlmodelc/metadata.json",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/AudioEncoder.mlmodelc/metadata.json",
+   "size_bytes": 1826,
+   "sha256": "db0d80a1046e03e211928cd2918d5e5924947f4ecbcee5232b125f0f59757fbc",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "AudioEncoder.mlmodelc/model.mil",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/AudioEncoder.mlmodelc/model.mil",
+   "size_bytes": 581035,
+   "sha256": "3e7737df445ef8fc13238970e3e518c0c6455bcadb6371df2ede1f22dcb8a8e0",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "AudioEncoder.mlmodelc/model.mlmodel",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/AudioEncoder.mlmodelc/model.mlmodel",
+   "size_bytes": 408667,
+   "sha256": "bf0987c0d8c3fe180877b12ba5b4ac1d890e011f2103926e53186089feced575",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "AudioEncoder.mlmodelc/weights/weight.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/AudioEncoder.mlmodelc/weights/weight.bin",
+   "size_bytes": 1273974400,
+   "sha256": "eb07bab32dcd62ce653b5b288bd6c27bdc5a538be309f242e33ed05e1cb53457",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "MelSpectrogram.mlmodelc/analytics/coremldata.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/MelSpectrogram.mlmodelc/analytics/coremldata.bin",
+   "size_bytes": 243,
+   "sha256": "091a361134891f94e613562771beea0d93a9aefbc6984ba86c60f856e07a508f",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "MelSpectrogram.mlmodelc/coremldata.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/MelSpectrogram.mlmodelc/coremldata.bin",
+   "size_bytes": 329,
+   "sha256": "f3c5778c86d6fbc6a9817a56dbcac05a946a4d95c77f6db8355572f3be9e9a68",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "MelSpectrogram.mlmodelc/metadata.json",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/MelSpectrogram.mlmodelc/metadata.json",
+   "size_bytes": 1850,
+   "sha256": "1a94f4dfaec25549cbb386fe59b68c67a7a5af4a1c672a5998e5a84b9111135b",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "MelSpectrogram.mlmodelc/model.mil",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/MelSpectrogram.mlmodelc/model.mil",
+   "size_bytes": 10187,
+   "sha256": "17977ed2332430c6cc4c1da2516f2cd4deb662d65ae38d72725ab157f32d4949",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "MelSpectrogram.mlmodelc/weights/weight.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/MelSpectrogram.mlmodelc/weights/weight.bin",
+   "size_bytes": 373376,
+   "sha256": "97a66b915cd3fc97dcba6806d92381e1a56024b8f68c1a1cd370d4c92505fe87",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "TextDecoder.mlmodelc/analytics/coremldata.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/TextDecoder.mlmodelc/analytics/coremldata.bin",
+   "size_bytes": 243,
+   "sha256": "7c151c6259c279aa7922d60e82c7851bbad1df10018b1cebc566aa6c2aee5e0f",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "TextDecoder.mlmodelc/coremldata.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/TextDecoder.mlmodelc/coremldata.bin",
+   "size_bytes": 637,
+   "sha256": "f41a7939b47f7cf127aa69dfd8c552a141dc773b936bf8621aeffcd201fb9e30",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "TextDecoder.mlmodelc/metadata.json",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/TextDecoder.mlmodelc/metadata.json",
+   "size_bytes": 4770,
+   "sha256": "de900a968f7640e9775c28268e348a0bc6559a4a92defae07d91e7effa838246",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "TextDecoder.mlmodelc/model.mil",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/TextDecoder.mlmodelc/model.mil",
+   "size_bytes": 1010477,
+   "sha256": "f8273cbf61aac4a43118a9090fc4d580678ea04abda473b4cb9dda2647d25c27",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "TextDecoder.mlmodelc/model.mlmodel",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/TextDecoder.mlmodelc/model.mlmodel",
+   "size_bytes": 745579,
+   "sha256": "680d8dfb7c7d8f1f852071ac7bdc96e55c696d0b822e70861045efb426b0a27b",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "TextDecoder.mlmodelc/weights/weight.bin",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/TextDecoder.mlmodelc/weights/weight.bin",
+   "size_bytes": 1813201716,
+   "sha256": "680f398925225a313c62da0221aa0a58c9f1bffac5c36f20c449a70a7c9b1e55",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "config.json",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/config.json",
+   "size_bytes": 1163,
+   "sha256": "798b69c08cf93b2b03d94bea6eb3eb25fd4712259712d8a62ed2483fdf818a9e",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "generation_config.json",
+   "url": "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/0f63a7800b00dd0226abd051b906c246e1907482/openai_whisper-large-v3/generation_config.json",
+   "size_bytes": 2810,
+   "sha256": "d24f9cca0f448609a71ae044b736023706382f45e9700e0dffb2559d10cf1fea",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "tokenizer.json",
+   "url": "https://huggingface.co/openai/whisper-large-v3/resolve/06f233fe06e710322aca913c1bc4249a0d71fce1/tokenizer.json",
+   "size_bytes": 2480617,
+   "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "whisper-large-v3",
+   "path": "tokenizer_config.json",
+   "url": "https://huggingface.co/openai/whisper-large-v3/resolve/06f233fe06e710322aca913c1bc4249a0d71fce1/tokenizer_config.json",
+   "size_bytes": 282843,
+   "sha256": "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "Embedding.mlmodelc/analytics/coremldata.bin",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/Embedding.mlmodelc/analytics/coremldata.bin",
+   "size_bytes": 243,
+   "sha256": "8d6706436639b53830b4dbe8aaf9c9a843f7f582d63e16f3cb8bb7c6ccd58682",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "Embedding.mlmodelc/coremldata.bin",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/Embedding.mlmodelc/coremldata.bin",
+   "size_bytes": 704,
+   "sha256": "4a705bac27d151d9642f37609296042a15602a42253039e0921dc9e75da7e004",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "Embedding.mlmodelc/metadata.json",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/Embedding.mlmodelc/metadata.json",
+   "size_bytes": 2818,
+   "sha256": "1854371eb6b438fb8aeac96afb45c999af7902581c06afdfcd7ff3cb1ce66be5",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "Embedding.mlmodelc/model.mil",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/Embedding.mlmodelc/model.mil",
+   "size_bytes": 78432,
+   "sha256": "22fa958aef72a561c21f874a07cbdcd30fdf40ee961c0bc2fb67c119273b46d3",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "Embedding.mlmodelc/weights/weight.bin",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/Embedding.mlmodelc/weights/weight.bin",
+   "size_bytes": 13412288,
+   "sha256": "99356b2985b8d43880a657024d941d450b38820451ccff903f76ed4e52d1868b",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "FBank.mlmodelc/analytics/coremldata.bin",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/FBank.mlmodelc/analytics/coremldata.bin",
+   "size_bytes": 243,
+   "sha256": "0e8bd3a8b82ac123580989f490e4d9245127c535857630b543311268accc3f0a",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "FBank.mlmodelc/coremldata.bin",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/FBank.mlmodelc/coremldata.bin",
+   "size_bytes": 853,
+   "sha256": "57ac436bb0671cbb5527a339134d695f752eb77f7a18966b93c6835335595759",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "FBank.mlmodelc/metadata.json",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/FBank.mlmodelc/metadata.json",
+   "size_bytes": 3409,
+   "sha256": "2623785f5d186893b82d01e84aa33a7704ef763c3309e02055f22dc9d871ce9a",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "FBank.mlmodelc/model.mil",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/FBank.mlmodelc/model.mil",
+   "size_bytes": 15667,
+   "sha256": "27aaeb21569e81bdbe2eef87789f50a37cfea800039bd134448a9417de2f30ed",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "FBank.mlmodelc/weights/weight.bin",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/FBank.mlmodelc/weights/weight.bin",
+   "size_bytes": 1776896,
+   "sha256": "9e83fdd3ea78064b078069e4d9141603c61c47a27fd19e7e3142ff7476f8db36",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "wespeaker",
+   "path": "NOTICE.md",
+   "url": "https://huggingface.co/FluidInference/speaker-diarization-coreml/resolve/7eab74f3463c736418d0eb10296261ae581146c9/NOTICE.md",
+   "size_bytes": 4247,
+   "sha256": "d8e53d399c5345cabc4763732ba096e7e18ff42c861d57b73edb73b0c9ce9356",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "bge-m3",
+   "path": "bge-m3.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+   "url": "https://huggingface.co/JGKarlin/ohia-bge-m3-coreml/resolve/cb67d6bcbdb0c68efc2448752717cbbf925034c6/bge-m3.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+   "size_bytes": 241760,
+   "sha256": "b89816b8fd7002fe98f538dafe45aeaa657c7831afad2d8d554ef06b34d46b1f",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "bge-m3",
+   "path": "bge-m3.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+   "url": "https://huggingface.co/JGKarlin/ohia-bge-m3-coreml/resolve/cb67d6bcbdb0c68efc2448752717cbbf925034c6/bge-m3.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+   "size_bytes": 2268938624,
+   "sha256": "06c53798f7797e108e9bbd68885f78d799267a156e1898d4b4fa970041152d54",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "bge-m3",
+   "path": "bge-m3.mlpackage/Manifest.json",
+   "url": "https://huggingface.co/JGKarlin/ohia-bge-m3-coreml/resolve/cb67d6bcbdb0c68efc2448752717cbbf925034c6/bge-m3.mlpackage/Manifest.json",
+   "size_bytes": 617,
+   "sha256": "8aa91348c2d37c00bd1a2e841ef931e6a70ff98a19fd9c37ea8c52b89fea6ba4",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "bge-m3",
+   "path": "tokenizer.json",
+   "url": "https://huggingface.co/BAAI/bge-m3/resolve/5617a9f61b028005a4858fdac845db406aefb181/tokenizer.json",
+   "size_bytes": 17098108,
+   "sha256": "21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08",
+   "required_for_capture": false
+  },
+  {
+   "bundle": "bge-m3",
+   "path": "tokenizer_config.json",
+   "url": "https://huggingface.co/BAAI/bge-m3/resolve/5617a9f61b028005a4858fdac845db406aefb181/tokenizer_config.json",
+   "size_bytes": 444,
+   "sha256": "a62b2b6784f990259fddef5f16388693a8043be4f69179e6a5257eeb3f9abac4",
+   "required_for_capture": false
   }
  ]
 }
