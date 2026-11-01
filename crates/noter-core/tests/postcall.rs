@@ -285,6 +285,46 @@ async fn a_failed_section_keeps_the_earlier_ones_and_the_later_ones_still_run() 
 }
 
 #[tokio::test(start_paused = true)]
+async fn try_again_on_the_failed_section_makes_the_call_ready() {
+    let script = [
+        r#"{"on": "post-call"}"#,
+        r#"{"on": "post-call", "fail": "rate_limited"}"#,
+    ]
+    .join("\n");
+    let (core, _events, _dir) = open(&script).await;
+    seed_call(&core, CALL, 3);
+    post_call(&core, CALL);
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    assert_eq!(
+        outputs(&core, CALL).await.status,
+        OutputsStatus::PartiallyFailed
+    );
+    let again = core
+        .outputs_regenerate(
+            &main_window(),
+            RegenerateArgs {
+                call_id: CallId::new(CALL),
+                sections: vec![SectionKind::Decisions],
+                runtime: None,
+                model: None,
+                skill: None,
+                local: false,
+            },
+        )
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    assert_eq!(
+        run_status(&core, &again.job_run_id),
+        (JobRunStatus::Succeeded, None)
+    );
+    let o = outputs(&core, CALL).await;
+    assert_eq!(o.sections[1].state, SectionState::Ready);
+    assert_eq!(o.status, OutputsStatus::Ready);
+    assert_eq!(call_status(&core, CALL), ("ready".into(), "ready".into()));
+}
+
+#[tokio::test(start_paused = true)]
 async fn when_no_section_is_written_the_call_fails_with_the_typed_reason() {
     let fail = r#"{"on": "post-call", "fail": "rate_limited"}"#;
     let (core, events, _dir) = open(&[fail; 7].join("\n")).await;
