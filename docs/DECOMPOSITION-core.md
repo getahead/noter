@@ -1089,7 +1089,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p3` - **ID**: `cpt-noter-feature-core-handoff`
 
-- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#251 #255); three parts are open: acceptance criterion 6 (the `noter-native` query-cap test and the macOS launch evidence: 2.21 part B and the owner), the rubric evals (golden set, owner) and the `claude://code/new` / `codex://new` parameter check (owner's Mac). FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
+- **Milestone**: M2 · **Lane**: core · **Status**: IMPLEMENTED (#251 #255); two parts are open: acceptance criterion 6 (the `noter-native` query-cap test and the macOS launch evidence: 2.21 part B and the owner) and the rubric evals (golden set, owner). The `claude://code/new` / `codex://new` parameter check is closed: they ignore `cwd` and `q` (D-33) and are no longer launch paths. FEATURE spec: [features/core/core-handoff.md](features/core/core-handoff.md)
 
 - **Purpose**: Generate handoff prompts on demand, keep their versions and edits, resolve the repository, detect the launch path and open the prompt in Claude Code or Codex pre-filled, never sent.
 
@@ -1184,7 +1184,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - [x] `p3` - **ID**: `cpt-noter-feature-core-native-services`
 
-- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IMPLEMENTED (#243 #259 #267); open on the owner's Mac only: the `cwd`/`q` parameters of `claude://code/new` and `codex://new`, a real Screen Recording and Automation prompt, and a real launch pre-filled and unsent (manual macOS checklist). FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
+- **Milestone**: M2 · **Lane**: core (src-tauri) and engine (noter-native) · **Status**: IMPLEMENTED (#243 #259 #267); open on the owner's Mac only: a real Screen Recording and Automation prompt, and a real launch pre-filled and unsent (manual macOS checklist). FEATURE spec: [features/core/core-native-services.md](features/core/core-native-services.md)
 
 - **Purpose**: Give the M2 commands the macOS services they need from the core: Launch Services and Apple Events for handoff, rich clipboard formats, save panels for export, and the Screen Share Test.
 

@@ -177,7 +177,7 @@ The story's other-owner path says the item stays open after Copy; the frozen `Ha
 **Output**: Actual `LaunchPath` used or the existing typed launch error.
 
 **Steps**:
-1. [x] - `p1` - Ask Launch Services which handlers exist; for Claude prefer `claude-cli://open`, then `claude://code/new`; for Codex prefer `codex://new` - `inst-launch-handlers`
+1. [x] - `p1` - Ask Launch Services which handlers exist; for Claude use `claude-cli://open`; never `claude://code/new` or `codex://new`, so Codex always takes the terminal fallback - `inst-launch-handlers`
 2. [x] - `p1` - Put only the encoded cwd and short instruction to read the saved file in the link; keep Claude's query under 5000 characters regardless of prompt length - `inst-launch-short`
 3. [x] - `p1` - **IF** the supported handler opens, **RETURN** its path without submitting the prompt - `inst-launch-link`
 4. [x] - `p1` - Otherwise choose the available Terminal or iTerm fallback and report whether Automation is needed or already denied in `LaunchPlan` - `inst-launch-terminal`
@@ -185,7 +185,7 @@ The story's other-owner path says the item stays open after Copy; the frozen `Ha
 6. [x] - `p1` - Launch the tool with the intended cwd and short read-file instruction using native argument-safe transport; prompt and path text cannot become shell syntax - `inst-launch-safe`
 7. [x] - `p1` - **RETURN** terminal path used, pre-filled and never sent; no command is run in the repository by Noter - `inst-launch-return`
 
-The `cwd` and `q` parameters of `claude://code/new` and `codex://new` are unverified until the owner checks them on a Mac (#243); `claude-cli://open` and the terminal fallback do not depend on them.
+The owner checked on a Mac (D-33, 1 Nov) that `claude://code/new` ignores `cwd` and `codex://new` ignores `q`: Claude Desktop would open outside the repository and the Codex app without the prompt. So neither is a launch path. Claude opens through `claude-cli://open`, else the terminal fallback; Codex always takes the terminal fallback, which changes to the repository folder and pre-fills the command with the read-file instruction, unsent. `LaunchPath` keeps `claude_desktop` and `codex_app` (frozen contract); the plan never returns them, and a stale plan naming one goes straight to the terminals.
 
 ## 4. States (CDSL)
 

@@ -46,7 +46,7 @@ pub struct LaunchRequest {
     pub prompt_file: PathBuf,
 }
 
-/// The path actually used: a URL handler (`claude_cli_link`, `claude_desktop`, `codex_app`)
+/// The path actually used: a URL handler (`claude_cli_link`)
 /// or a terminal driven by Apple Events (`terminal`, `iterm`). `detail` is the URL opened or
 /// the line typed into the terminal.
 #[derive(Debug, Clone, PartialEq)]
@@ -58,8 +58,6 @@ pub struct LaunchOutcome {
 fn scheme(path: LaunchPath) -> Option<&'static str> {
     match path {
         LaunchPath::ClaudeCliLink => Some("claude-cli"),
-        LaunchPath::ClaudeDesktop => Some("claude"),
-        LaunchPath::CodexApp => Some("codex"),
         _ => None,
     }
 }
@@ -72,11 +70,13 @@ fn terminal_app(path: LaunchPath) -> Option<&'static str> {
     }
 }
 
-/// The URL handlers that serve `target`, most preferred first.
+/// The URL handlers that serve `target`, most preferred first. Never the desktop apps:
+/// `claude://code/new` ignores `cwd` and `codex://new` ignores `q` (owner's Mac, D-33), so
+/// they would open outside the repository or without the prompt; a terminal does both.
 fn links(target: HandoffTarget) -> &'static [LaunchPath] {
     match target {
-        HandoffTarget::ClaudeCode => &[LaunchPath::ClaudeCliLink, LaunchPath::ClaudeDesktop],
-        HandoffTarget::Codex => &[LaunchPath::CodexApp],
+        HandoffTarget::ClaudeCode => &[LaunchPath::ClaudeCliLink],
+        HandoffTarget::Codex => &[],
     }
 }
 
@@ -134,17 +134,13 @@ pub fn percent_encode(s: &str) -> String {
         .collect()
 }
 
-/// The URL for a link path. The design names `claude-cli://open?cwd=…&q=…`; the desktop apps
-/// get the same two parameters.
+/// The URL for a link path: `claude-cli://open?cwd=…&q=…` is the only one.
 pub fn link_url(path: LaunchPath, cwd: &Path, instruction: &str) -> Option<String> {
-    let base = match path {
-        LaunchPath::ClaudeCliLink => "claude-cli://open",
-        LaunchPath::ClaudeDesktop => "claude://code/new",
-        LaunchPath::CodexApp => "codex://new",
-        _ => return None,
-    };
+    if path != LaunchPath::ClaudeCliLink {
+        return None;
+    }
     Some(format!(
-        "{base}?cwd={}&q={}",
+        "claude-cli://open?cwd={}&q={}",
         percent_encode(&cwd.to_string_lossy()),
         percent_encode(instruction)
     ))

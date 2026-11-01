@@ -1739,14 +1739,15 @@ impl NativeOps for ScriptedPanel {
 
     fn launch_plan(&self, target: HandoffTarget) -> LaunchPlan {
         let mut plan = lock(&self.launch).plan.clone();
-        // The scripted plan names Claude's link; Codex's own handler stands in for it.
+        // The scripted plan names Claude's link; Codex has none that carries the prompt
+        // (D-33), so it opens in a terminal.
         if target == HandoffTarget::Codex
             && matches!(
                 plan.path,
                 LaunchPath::ClaudeCliLink | LaunchPath::ClaudeDesktop
             )
         {
-            plan.path = LaunchPath::CodexApp;
+            plan.path = LaunchPath::Terminal;
         }
         plan
     }

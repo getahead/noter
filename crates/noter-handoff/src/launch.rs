@@ -24,8 +24,9 @@ where
         Iterm => &[Iterm],
         // @cpt-begin:cpt-noter-algo-core-handoff-launch:p1:inst-launch-terminal
         ClaudeCliLink => &[ClaudeCliLink, Iterm, Terminal],
-        ClaudeDesktop => &[ClaudeDesktop, Iterm, Terminal],
-        CodexApp => &[CodexApp, Iterm, Terminal],
+        // `claude://code/new` ignores `cwd`, `codex://new` ignores `q` (D-33): the native
+        // plan never picks them.
+        ClaudeDesktop | CodexApp => &[Iterm, Terminal],
         // @cpt-end:cpt-noter-algo-core-handoff-launch:p1:inst-launch-terminal
     };
     // @cpt-end:cpt-noter-algo-core-handoff-launch:p1:inst-launch-refused

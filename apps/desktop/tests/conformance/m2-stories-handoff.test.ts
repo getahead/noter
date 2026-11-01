@@ -79,7 +79,7 @@ describe.skipIf(isFake)("handoff stories on the real core (2.19)", () => {
     expect(ok(await s.core("main").handoffGet({ item_id: "itm_virt" })).repo).toMatchObject({ key: "VSTOR", local_path: repo, path_exists: true });
     // Switching the target changes the launch line only; switching back restores it.
     const codex = ok(await s.core("main").handoffSetTarget({ item_id: "itm_virt", target: "codex" }));
-    expect([codex.target, codex.launch.path, codex.versions.length]).toEqual(["codex", "codex_app", 1]);
+    expect([codex.target, codex.launch.path, codex.versions.length]).toEqual(["codex", "terminal", 1]);
     ok(await s.core("main").handoffSetTarget({ item_id: "itm_virt", target: "claude_code" }));
     // The user types a change: Edited, and Your Edit in the version menu; the generated prompt stays for the diff.
     const typed = `${written.prompt_md}\nKeep the row height.\n`;

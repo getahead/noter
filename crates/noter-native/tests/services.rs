@@ -64,7 +64,7 @@ fn plan(path: LaunchPath, needs_automation: bool, automation_denied: bool) -> La
 }
 
 #[test]
-fn claude_prefers_the_cli_link_then_the_desktop_app_then_a_terminal() {
+fn claude_prefers_the_cli_link_then_a_terminal_never_the_desktop_app() {
     let all = FakeMac {
         schemes: vec!["claude-cli", "claude", "codex"],
         apps: vec![TERMINAL_APP],
@@ -74,6 +74,7 @@ fn claude_prefers_the_cli_link_then_the_desktop_app_then_a_terminal() {
         plan_launch(&all, HandoffTarget::ClaudeCode),
         plan(LaunchPath::ClaudeCliLink, false, false)
     );
+    // `claude://code/new` ignores `cwd` (D-33): only a terminal opens the repository folder.
     let desktop = FakeMac {
         schemes: vec!["claude"],
         apps: vec![TERMINAL_APP],
@@ -81,7 +82,7 @@ fn claude_prefers_the_cli_link_then_the_desktop_app_then_a_terminal() {
     };
     assert_eq!(
         plan_launch(&desktop, HandoffTarget::ClaudeCode),
-        plan(LaunchPath::ClaudeDesktop, false, false)
+        plan(LaunchPath::Terminal, true, false)
     );
     let terminal = FakeMac {
         apps: vec![TERMINAL_APP],
@@ -96,7 +97,8 @@ fn claude_prefers_the_cli_link_then_the_desktop_app_then_a_terminal() {
 }
 
 #[test]
-fn codex_prefers_its_app_and_iterm_wins_over_terminal() {
+fn codex_opens_in_a_terminal_and_iterm_wins_over_terminal() {
+    // `codex://new` ignores `q` (D-33): only a terminal pre-fills the prompt in the folder.
     let codex = FakeMac {
         schemes: vec!["claude-cli", "codex"],
         apps: vec![TERMINAL_APP],
@@ -104,7 +106,7 @@ fn codex_prefers_its_app_and_iterm_wins_over_terminal() {
     };
     assert_eq!(
         plan_launch(&codex, HandoffTarget::Codex),
-        plan(LaunchPath::CodexApp, false, false)
+        plan(LaunchPath::Terminal, true, false)
     );
     // The Claude links never serve Codex.
     let iterm = FakeMac {
@@ -198,9 +200,19 @@ fn a_handler_that_disappeared_or_does_not_match_the_target_opens_nothing() {
     let gone = FakeMac::default();
     let claude = request(HandoffTarget::ClaudeCode, "/repo");
     assert_eq!(
-        launch_with(&gone, LaunchPath::ClaudeDesktop, &claude).unwrap_err(),
+        launch_with(&gone, LaunchPath::ClaudeCliLink, &claude).unwrap_err(),
         ErrorCode::NoLinkHandler
     );
+    // Claude Desktop is never a launch path: it would open outside the repository (D-33).
+    let desktop = FakeMac {
+        schemes: vec!["claude"],
+        ..FakeMac::default()
+    };
+    assert_eq!(
+        launch_with(&desktop, LaunchPath::ClaudeDesktop, &claude).unwrap_err(),
+        ErrorCode::NoLinkHandler
+    );
+    assert!(desktop.opened.borrow().is_empty());
     let codex_only = FakeMac {
         schemes: vec!["codex", "claude-cli"],
         ..FakeMac::default()
@@ -212,6 +224,10 @@ fn a_handler_that_disappeared_or_does_not_match_the_target_opens_nothing() {
     );
     assert_eq!(
         launch_with(&codex_only, LaunchPath::None, &codex).unwrap_err(),
+        ErrorCode::NoLinkHandler
+    );
+    assert_eq!(
+        launch_with(&codex_only, LaunchPath::CodexApp, &codex).unwrap_err(),
         ErrorCode::NoLinkHandler
     );
     assert!(gone.opened.borrow().is_empty() && codex_only.opened.borrow().is_empty());
