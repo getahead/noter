@@ -905,6 +905,64 @@ class CiChangesTests(unittest.TestCase):
         self.assertTrue(ci_changes.verdict({"changes": ok, "a": ok, "b": skipped, "c": ok}, expected), "unlisted job")
         self.assertTrue(ci_changes.verdict({"changes": ok, "a": ok, "b": skipped}, "not json"))
 
+    def test_a_release_bump_runs_only_the_title_and_approvals(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+
+        def g(*args):
+            return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=root,
+                                  capture_output=True, text=True, check=True).stdout.strip()
+
+        def write(version, deps):
+            for f in ("package.json", "apps/desktop/package.json"):
+                (root / f).parent.mkdir(parents=True, exist_ok=True)
+                body = {"name": "noter", "version": version, "private": True, "dependencies": deps}
+                (root / f).write_text(json.dumps(body, indent=2) + "\n")
+            (root / ".release-please-manifest.json").write_text(json.dumps({".": version}))
+            (root / "CHANGELOG.md").write_text(f"# Changelog\n\n## {version}\n")
+
+        g("init", "-q", "-b", "main")
+        write("0.14.0", {"react": "19.0.0"})
+        g("add", "-A"); g("commit", "-qm", "base")
+        g("update-ref", "refs/remotes/origin/main", "main")
+        g("checkout", "-qb", "release-please--branches--main")
+        write("0.15.0", {"react": "19.0.0"})
+        g("commit", "-qam", "chore(main): release 0.15.0")
+        files, _ = ci_changes.changed_files("workflow_dispatch", "release-please--branches--main", "origin/main", root)
+        self.assertEqual(files, [".release-please-manifest.json", "CHANGELOG.md"], "a version-only package.json is unchanged")
+        self.assertEqual(self.run_jobs(files), set())
+        self.assertEqual(self.run_jobs(files, "hygiene"), {"title", "approvals"})
+        self.assertEqual(self.run_jobs(files, "codeql"), set())
+
+        write("0.15.0", {"react": "19.1.0"})
+        g("commit", "-qam", "a dependency rides along")
+        files, _ = ci_changes.changed_files("workflow_dispatch", "release-please--branches--main", "origin/main", root)
+        self.assertIn("apps/desktop/package.json", files, "a dependency change is never a version bump")
+        self.assertIn("package.json", files)
+        self.assertTrue({"unit-ui", "e2e-ui", "visual"} <= self.run_jobs(files))
+        self.assertIn("dependencies", self.run_jobs(files, "hygiene"))
+
+    def test_only_the_own_version_line_is_a_bump(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+
+        def g(*args):
+            return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=root,
+                                  capture_output=True, text=True, check=True).stdout.strip()
+        g("init", "-q", "-b", "main")
+        (root / "package.json").write_text('{\n  "version": "1.0.0",\n  "x": {"version": "1"}\n}\n')
+        (root / "a/package.json").parent.mkdir()
+        (root / "a/package.json").write_text('{\n  "version": "1.0.0"\n}\n')
+        g("add", "-A"); g("commit", "-qm", "base")
+        (root / "package.json").write_text('{\n  "version": "1.0.0",\n  "x": {\n    "version": "2"}\n}\n')
+        (root / "a/package.json").write_text('{\n  "version": "1.0.1"\n}\n')
+        (root / "b/package.json").parent.mkdir()
+        (root / "b/package.json").write_text('{\n  "version": "1.0.0"\n}\n')
+        g("add", "-A"); g("commit", "-qm", "change")
+        files = ["a/package.json", "b/package.json", "package.json"]
+        self.assertEqual(ci_changes.version_bumps(files, "HEAD^", "HEAD", root), ["a/package.json"],
+                         "a nested version and an added file are changes")
+
     def test_changed_files_from_git(self):
         root = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, root, True)

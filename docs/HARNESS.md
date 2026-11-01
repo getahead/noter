@@ -143,6 +143,7 @@ On a pull request each job runs only if the change can affect what it checks (ow
 | the Tauri host or the engine | `arch`, `docs`, `macos` |
 | documentation (`docs/`, `.cf-studio/`, Markdown) | `arch` (trace coverage) and `docs` (`cfs validate`); `docs/DESIGN.md` also `e2e-coverage`, since its stories set the E2E bar (judged on `main`'s real-core logs) |
 | another workflow file, `deny.toml`, Dependabot config, plans | nothing in `ci.yml` (`hygiene` checks them) |
+| the Release PR's bump: `CHANGELOG.md`, `.release-please-manifest.json` and a `package.json` whose only change is its own `"version"` | nothing but the title and the approvals; a `package.json` change to anything else, a dependency too, runs what that file runs |
 | CI itself, `justfile`, `harness/`, the gate scripts, the toolchain, or a file no rule knows | everything |
 
 CodeQL follows the same rules per language, and carries `main`'s result forward for a language the PR does not touch (DELIVERY.md). Once the XCUITest suite exists, any E2E job brings `e2e-coverage` and `macos` with it, because the E2E bar is judged over both platforms and the XCUITests drive the built app.
