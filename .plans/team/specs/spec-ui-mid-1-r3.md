@@ -1,0 +1,7 @@
+# ui-mid-1 r3 — #197 library calls: make CI green, then ready (read spec-ui-r3-common.md first)
+
+Worktree ~/orca/workspaces/noter/ui-mid-1, branch lane/ui/library-calls @6c2eae4 (clean, pushed). Your self-review for 6c2eae4 is in .prs/197/review.md (COMMENT).
+CI at 6c2eae4 is red on ONE test only, stdio pass: `tests/e2e/m1-library-calls-ui.spec.ts:110` "empty path: No calls yet…" — the empty state never renders on the real core. The steer sets `w.calls = []` only; the real core keeps calls and call_details together (crates/noter-core/src/library.rs), so empty BOTH `w.calls` and `w.call_details` (and anything else the core derives the list from — check `world_set` in the harness). Verify on stdio, then the fake.
+Also QA 197-r2 m-1: during the stdio run vite logged `Maximum update depth exceeded` once — check the empty-state/self-test effect for a setState loop; fix if real, else note it in the handoff.
+Then: spec fake+stdio under the lock, `just gate-fast`, push, `gh pr checks 197 --watch`; red → fix and repeat; green → `/cf-sdlc-pr-review 197` + `/ponytail-review` (new head needs a new review), send `ready #197 @<sha>`, handoff, worker_done. Do not publish: QA runs next, then I tell you (or you publish per the r2 self-serve rule once QA PASS lands as a PR comment and you are still live).
+2.13 ticks stay as they are (edit flow/markers missing); list the missing items in the handoff.

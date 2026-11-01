@@ -1,0 +1,2 @@
+# ui-mid-1 r4 — 2.13 library-calls tick pass (read spec-ui-tick-pass-r4.md)
+Worktree ~/orca/workspaces/noter/ui-mid-1 (#197 merged as 3e3de43; `git fetch && git checkout -B lane/ui/tick-library-calls origin/main`). 28 open boxes in docs/features/ui/library-calls.md incl. the edit flow `cpt-noter-flow-ui-library-calls-edit` (p2): implement it only if it fits rule 2; else list it. QA's two minors from 197-r3.md (library-calls.md:155 old deleted-audio copy; tests-first) go in too.

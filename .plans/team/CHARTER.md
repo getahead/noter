@@ -78,3 +78,33 @@ Goal: every M0 FEATURE box ticked in `docs/DECOMPOSITION.md` (UI: core-bridge, t
 ## PAUSED (owner, 18 Oct, late evening)
 
 Usage limits reached. Everyone wraps up at a safe point (push WIP, write handoff-<role>.md) and waits for the owner's next command through the coordinator. No new work. Resume point: M0 to 100% (above); open owner item: harness-change-approved on DevOps's perf.toml PR.
+
+## BACKEND M1 (owner, 21 Oct; replaces PAUSED, the freeze and stand-by for the backend)
+
+M0 is delivered (`harness.toml [milestone].current = "M0"`). Goal: every backend M1 FEATURE box ticked in `docs/DECOMPOSITION-core.md` (5 features: engine-capture, capture-session, live-transcript, native-surfaces, library-calls; 36 commands, 13 stories per the milestone table), then the M1 gate (E2E >= 60% of M1 commands and stories against the real core, perf >= 60% of due M1 scenarios incl. `call-memory-footprint`); the owner advances the milestone. Backend only: the UI team is not part of this run; contract-lane PRs still get the UI review rule. The Q4 latency measurement and the Q7 engine-kill drill (week one of M1) come first; physical MacBook actions go to the coordinator, batched.
+- Open PRs <= 10 across the unit. Tests first, gate, self-review, `review-publish`; never merge by hand. Rules above (lanes, generated files, baselines, thresholds, no pkill by pattern) apply in full.
+- Team (Teamlead spawns and owns the six below; Unblocker and Delivery Reporter are started by the coordinator): Technical writer (Sonnet 5.5, ticks/docs/spec fit, replaces be-pm), 2 Backend engineers (Sonnet 5.5), 2 Senior backend developers (Opus 5.5), QA (Sonnet 5.5). The Teamlead assigns features by lane (engine vs core) and pairs seniors on the hardest (capture, session manager).
+
+## FINISH-ONLY (owner, 21 Oct, out of tokens; replaces BACKEND M1 start-up)
+Complete the open PRs (#131 #127 #126 #93); no new PRs or features (package-build branches stay pushed, unopened). When all are merged the coordinator stops every agent and watcher. Write handoff-<role>.md before that. Resume later from PLAN-be-m1.md.
+
+## BACKEND M1 RESUMED (owner, 23 Oct; lifts FINISH-ONLY)
+All FINISH-ONLY PRs merged (#127 #131 #132, D-28 A/B, #134 allowance). Continue backend M1 features per PLAN-be-m1.md and the handoff-*.md files: remaining M1 FEATURE boxes (engine-capture, capture-session, live-transcript, native-surfaces, library-calls) in dependency order. PR cap <= 10 open. Owner is low on tokens: keep messages and heartbeats short, batch owner items, escalate only owner-only things. #129 (release) is the owner's.
+
+## NO PERFORMANCE TESTS (owner, 24 Oct)
+Performance scenarios are out of active development: out of `just gate` and CI (PR ci/drop-perf-gate), no tasks to write them, backend or UI. Existing tests and files stay. Resume only on the owner's word.
+
+## UI M1 (owner, 24 Oct)
+Start UI M1: every UI M1 FEATURE box in `docs/DECOMPOSITION.md` (2.8 dialogs-host, 2.9 record-prompt, 2.10 call-window, 2.11 live-transcript, 2.12 menu-bar, 2.13 library-calls, 2.14 call-page-frame, 2.15 notifications) ticked with markers, `just gate` green, UI stories/commands covered against the real core (backend M1 is on main except 2.11 NSPanel conversion, NB10 resolved). No performance work (see NO PERFORMANCE TESTS). Open PRs <= 10 across the unit. Token cost matters: lean team, short messages, clear context between tasks, stop idle workers.
+
+## LOW-COST MODE (owner, 24 Oct)
+Session spend is high. Every worker: finish the task in hand, then worker_done and stop (no idle waiting or polling); /clear between tasks (state in handoff files); one-line messages; one test job at a time. Opus workers stop as soon as their PR is published. Leads restart workers with a fresh spec only when there is queued work. The Reporter runs one pass per owner request, never loops.
+
+## FOCUS: NO NEW FEATURES UNTIL CURRENT ARE RESOLVED (owner, 25 Oct; low-cost mode stays)
+Do not start or open any new feature work (no new feature branches, no new feature PRs, no menu-bar host PRs, no M2) until every currently open PR is merged or closed. Allowed: fixing, rebasing on conflict, QA, review, publish and ticking boxes for the open PRs; the 2.8 tick PR; releases (owner's). Leads stay up while a PR is open and wait on CI with `gh pr checks --watch` (no polling loops, no token use while waiting); workers stop when their task is done. Low-cost rules as above.
+
+## FINISH-ONLY (owner, 29 Oct, out of tokens; replaces the UI M1 completion push)
+Complete the open PRs (#224 #223 #216 #203; #221 release is the owner's); no new PRs, branches or features. Drop work that is not already in an open PR (note it in handoff-ui-lead.md). When the PRs are merged, or #203 cannot be finished without the owner, the lead writes handoff-ui-lead.md and sends COMPLETE; the coordinator then stops everything. Resume later from the handoff and ui/PLAN.md.
+
+## BACKEND M2 (owner, 31 Oct)
+Start backend M2: every backend M2 FEATURE box in `docs/DECOMPOSITION-core.md` (core-speakers-audio, engine-offline, llm-gate, jobs-scheduler, postcall, items-today, handoff, history-undo, native-services) ticked with markers and green gates; E2E >= 60% of M2 commands and stories against the real core. Backend M1 is 5/5 ticked on main (UI M1 finishing separately via #203). No performance tests (see NO PERFORMANCE TESTS). Open PRs <= 10 across the unit. Low-cost: fresh contexts, lean team, short messages, workers stop when done. Owner-only items batched to the coordinator.

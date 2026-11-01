@@ -1,0 +1,8 @@
+# ui-mid-2 r3 — #191 record prompt: make CI green, baselines, then ready (read spec-ui-r3-common.md first)
+
+Worktree ~/orca/workspaces/noter/ui-mid-2, branch lane/ui/record-prompt @5cca50d (clean, pushed; label `update-screenshots` is on but its run failed, see 1).
+CI at 5cca50d:
+1. Screenshots job + the update-screenshots run: `tests/visual/record-prompt.spec.ts` `call-ended` and `new-meeting` fail — `panel()` (`[data-component="cpt-noter-component-ui-record-prompt"]`) is never visible on the fake when the world has `detection = null`, `capture.phase = "recording"` and a `W.notice(...)`. Make the panel render for the notice states (or seed what the panel actually keys on); the other 8 visual failures are only missing baselines.
+2. E2E job: only the m0 self-test flake (not yours).
+3. stdio `m1-record-prompt-ui.spec.ts:162` model percent: the real core replaces `size_mb` with the tiny bundle's real size (models.rs:198), so 62 % cannot hold on stdio: assert `/\(\d+ %\)/` when `NOTER_CORE=stdio`; clamp `modelPercent` to 0–100 in `record-prompt/logic.ts:62` (QA m-1). (:143 already_recording: re-check on stdio after a harness rebuild; if it still fails, write the exact refusal in the handoff and move on.)
+Then: spec fake+stdio under the lock, `just gate-fast`, push, `gh pr checks 191 --watch`; green except Screenshots → remove and re-add the `update-screenshots` label (`gh pr edit 191 --remove-label update-screenshots` then `--add-label`), watch again until the bot's baseline commit and its checks are green; then `/cf-sdlc-pr-review 191` + `/ponytail-review` on the final head, send `design #191 @<sha>` and `ready #191 @<sha>`, handoff, worker_done. Do not publish; QA + designer run next.

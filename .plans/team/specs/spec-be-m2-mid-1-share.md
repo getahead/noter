@@ -1,0 +1,19 @@
+# be-mid-1 (Sonnet 5.5, engineer) — 2.18 Items and Today, slice 3: share, export, the story tests
+
+Worktree `~/orca/workspaces/noter/be-mid-1` (start from fresh `origin/main` once your #250 has merged; else branch and rebase when it lands). Read `spec-be-m2-common.md`, `PLAN-be-m2.md` (TL-15, TL-18, the Status log), `docs/features/core/core-items-today.md` (flow "Share or export a scope", algorithm "Resolve and format share content", DoD "Sharing, export and tags", DoD "Tests and gate", the remaining `[ ]` steps you named on #250, the ACs), the `NativeOps` trait on main (#238: `save_panel`; be-eng-1's handoff PR #251 adds `clipboard_write`: if it is on main, use it; else add `clipboard_write(ClipboardText)` yourself in the same shape and tell the Teamlead), `noter_native::clipboard_write/save_panel` from #243 (src-tauri impl may already exist from #238/#251; add what is missing), the M1 story tests `apps/desktop/tests/conformance/m1-stories-*.test.ts` and the M2 ones from #246/#249 (D-26 shape), DESIGN.md stories `cpt-noter-seq-today-review-before-call`, `-today-tick-item`, `-call-page-review-suggested-items`, `-call-page-share-outputs`, `-call-page-check-evidence`.
+
+**Target:** two PRs, ≤ 2 open: (1) `feat(core): share_copy and calls_export over NativeOps` on `lane/core/items-share` (core lane); (2) `test(contract): items and Today conformance, TagsSetResult batch id and the five real-core stories` on `lane/contract/items-e2e` (contract lane; the `TagsSetResult.batch_id` field is a wire change: `just contract-regen`, UI review by the UI Teamlead, `milestones.toml` untouched). Closes 2.18 except steps that need a live-call people hook (name them; they wait for M3 people or 2.17's participants).
+
+**Change (PR 1):**
+1. `share_copy { scope, format }`: whole call, one section or selected items; omit rejected items; render Slack, Jira or Markdown with owners, dates, review labels and evidence links, escaping target markup and excluding raw HTML; `NativeOps::clipboard_write` with plain + markdown + html; `ShareResult` per the contract.
+2. `calls_export { calls, sections, format }`: `NativeOps::save_panel` (folder variant) → `cancelled` without files; writes a folder with the requested content (one file per call/section as the spec says), `ExportResult` only when complete.
+3. Harness: scripted clipboard (recorded, readable through a harness control) and the folder panel answering a path under the harness data dir; src-tauri impls over `noter_native` if not already there.
+4. Unit tests per AC: each format's rendering (escaping, rejected omitted, links), cancelled export, complete-only result.
+
+**Change (PR 2):**
+5. Contract: `TagsSetResult.batch_id` (the change batch of a multi-call tag set, for undo), fake core updated, conformance for the 14 commands of 2.18 against fake + real cores (shapes, `conflict`, `invalid_input`, `cancelled`).
+6. Story tests `m2-stories-items.test.ts`, one per story ID with the core-visible steps: today-review-before-call (seeded calendar + items → `today_get` ranking), today-tick-item (`item_set_done` → `entity:changed`, undo through `change_undo`), call-page-review-suggested-items (seeded suggested items → review/review_all → states), call-page-share-outputs (`share_copy` → scripted clipboard content), call-page-check-evidence (`item_get` spans resolved to words). Every 2.18 command succeeds at least once there. Run with `NOTER_CORE=stdio NOTER_CORE_CMD="$PWD/target/debug/noter-core-harness --fixture world"`.
+
+**Constraints:** PR 1 core lane (incl. src-tauri), PR 2 contract lane. No new IPC command. Coordinate with be-eng-1's #251 on the `NativeOps` trait (same file): rebase, keep both. New deps → `apps/desktop/src-tauri/Cargo.lock`.
+
+**Acceptance:** every 2.18 item `[x]` with markers except the ones you name; `just gate` green on both; both published with self-reviews; `worker_done` lists the PRs, the remaining `[ ]` items and why.
