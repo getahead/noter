@@ -513,11 +513,15 @@ export const defaultHandlers: Handlers = {
     return fake.playback;
   },
   audio_delete: (a, { world, emit }) => {
-    const calls = a.call_ids.map((id) => call(world, id)).filter((c) => !c.audio_deleted);
+    const found = a.call_ids.map((id) => call(world, id));
+    // A capturing call keeps its audio, like the real core: nothing is removed when one is named.
+    if (found.some((c) => c.status === "recording" || c.status === "paused")) throw coreError("invalid_input", "call_ids", { type: "validation", field: "call_ids", rule: "invalid_format" });
+    const calls = [...new Set(found)].filter((c) => !c.audio_deleted);
     calls.forEach((c) => {
       c.audio_deleted = true;
       c.audio_deleted_at = Date.now();
       c.audio_kept_until = null;
+      logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, summary: "Deleted the audio of a call", undoable: false });
       emit("entity:changed", { type: "call", call: c });
     });
     return { calls: calls.length, freed_mb: calls.length * 58 };
@@ -525,8 +529,8 @@ export const defaultHandlers: Handlers = {
   audio_delete_older: (a, { world }) => {
     if (a.older_than_days < 1) throw coreError("invalid_input", "days", { type: "validation", field: "older_than_days", rule: "out_of_range" });
     const cutoff = world.now - a.older_than_days * 86_400_000;
-    const calls = world.calls.filter((c) => !c.audio_deleted && c.started_at < cutoff);
-    calls.forEach((c) => (c.audio_deleted = true));
+    const calls = world.calls.filter((c) => !c.audio_deleted && c.status !== "recording" && c.status !== "paused" && c.started_at < cutoff);
+    calls.forEach((c) => Object.assign(c, { audio_deleted: true, audio_deleted_at: Date.now(), audio_kept_until: null }));
     return { calls: calls.length, freed_mb: calls.length * 58 };
   },
 
