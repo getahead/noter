@@ -246,7 +246,7 @@ The system **MUST** resolve mappings, expose missing paths and the actual launch
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-handoff-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-handoff-tests`
 
 The system **MUST** pass unit tests for caching, cancel/result races, retained edits, missing repos, handler ordering, query length and safe transport of Unicode, quotes and shell-like strings; conformance for all ten commands; handoff skill schema/citation/rubric evaluations; and real-core E2E for the handoff story, with native launch and clipboard assertions on macOS. `just gate` passes.
 
@@ -260,10 +260,12 @@ The system **MUST** pass unit tests for caching, cancel/result races, retained e
 
 ## 6. Acceptance Criteria
 
-- [ ] Real-core E2E `cpt-noter-seq-call-page-hand-off-item` generates, edits, compares, switches target, opens and copies; prompt text is pre-filled and no message is sent.
-- [ ] Both tools follow their link/fallback order; missing mapping disables open without disabling copy, and a newly added mapping enables it.
-- [ ] Automation denial returns the typed error without claiming a successful handoff; Copy succeeds and records the used version and acceptance.
-- [ ] Forced regeneration keeps user edits; cancelled or superseded work cannot publish ready or overwrite the current prompt.
-- [ ] All ten commands succeed against the real core; fake/real conformance verifies command scopes, revisions, async generation events and errors.
+- [x] Real-core E2E `cpt-noter-seq-call-page-hand-off-item` generates, edits, compares, switches target, opens and copies; prompt text is pre-filled and no message is sent.
+- [x] Both tools follow their link/fallback order; missing mapping disables open without disabling copy, and a newly added mapping enables it.
+- [x] Automation denial returns the typed error without claiming a successful handoff; Copy succeeds and records the used version and acceptance.
+- [x] Forced regeneration keeps user edits; cancelled or superseded work cannot publish ready or overwrite the current prompt.
+- [x] All ten commands succeed against the real core; fake/real conformance verifies command scopes, revisions, async generation events and errors.
 - [ ] Native tests prove paths and prompt text cannot execute shell syntax, and long prompts use a short file instruction below the query cap.
-- [ ] `just gate` passes.
+
+The native AC stays open: noter-native's own tests (#243) prove the quoting and URL encoding; a query-cap test and the macOS launch evidence belong to 2.21 and the owner's Mac check. The handoff skill's rubric evaluations need the golden set (an owner item, as for 2.8 and 2.14).
+- [x] `just gate` passes.
