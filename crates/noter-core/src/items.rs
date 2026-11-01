@@ -749,10 +749,9 @@ impl Core {
         if p.topic_id.is_some() {
             return Err(invalid("topic_id", ValidationRule::OutOfRange));
         }
-        if values.is_empty() {
-            return Err(invalid("patch", ValidationRule::Required));
-        }
-        self.apply(ctx, s, Some(values), "Edited item", "item_edit")
+        // An empty patch changes nothing: omitted fields stay as they are.
+        let wanted = (!values.is_empty()).then_some(values);
+        self.apply(ctx, s, wanted, "Edited item", "item_edit")
         // @cpt-end:cpt-noter-flow-core-items-today-review:p1:inst-review-accept-edit
         // @cpt-end:cpt-noter-flow-core-items-today-review:p1:inst-review-edit
     }

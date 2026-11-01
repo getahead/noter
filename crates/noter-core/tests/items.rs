@@ -757,7 +757,6 @@ async fn an_invalid_edit_names_its_field_and_writes_nothing() {
         ..Default::default()
     };
     let cases: Vec<(ItemPatch, &str)> = vec![
-        (ItemPatch::default(), "patch"),
         (
             ItemPatch {
                 text: Some("   ".into()),
@@ -825,6 +824,17 @@ async fn an_invalid_edit_names_its_field_and_writes_nothing() {
     );
     assert_eq!(view(&core, "itm_1").await.rev, Rev(1));
     assert!(history(&core, "itm_1").await.is_empty());
+}
+
+#[tokio::test]
+async fn an_empty_patch_changes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    world(&core);
+    let same = edit(&core, "itm_1", 1, ItemPatch::default()).await.unwrap();
+    assert_eq!(same.item.rev, Rev(1));
+    assert!(history(&core, "itm_1").await.is_empty());
+    assert!(events.named(event_names::ENTITY_CHANGED).is_empty());
 }
 
 // ── reopen ────────────────────────────────────────────────────────────────────
