@@ -193,6 +193,8 @@ impl Core {
         let facts = self.handoff_facts(&view)?;
         // @cpt-begin:cpt-noter-algo-core-handoff-build:p1:inst-build-route
         let mode = lock(&self.settings).privacy.mode;
+        // shortcut: `offline` stays false until the core reads reachability for the router; the
+        // route still falls back to local when the target's runtime is unavailable.
         let (_privacy, rx) = tokio::sync::watch::channel(Privacy {
             mode,
             sensitive: facts.sensitive,

@@ -32,9 +32,12 @@ impl Stored {
     }
 }
 
-fn parse(text: Option<String>) -> Vec<Stored> {
-    text.and_then(|t| serde_json::from_str(&t).ok())
-        .unwrap_or_default()
+/// The stored list; a row that does not parse fails rather than reading as empty, so the next
+/// write cannot drop every mapping.
+fn parse(text: Option<String>) -> Result<Vec<Stored>, CoreError> {
+    text.map_or(Ok(Vec::new()), |t| {
+        serde_json::from_str(&t).map_err(internal)
+    })
 }
 
 fn invalid(field: &str, rule: ValidationRule) -> CoreError {
@@ -66,7 +69,7 @@ pub fn repos(store: &Store) -> Result<Vec<RepoMapping>, CoreError> {
         })
         .optional()
     })?;
-    Ok(parse(text).into_iter().map(Stored::view).collect())
+    Ok(parse(text)?.into_iter().map(Stored::view).collect())
 }
 // @cpt-end:cpt-noter-flow-core-handoff-repositories:p1:inst-repo-list
 
@@ -85,7 +88,7 @@ fn write(
             })
             .optional()
             .map_err(internal)?;
-        let mut list = parse(before.clone());
+        let mut list = parse(before.clone())?;
         edit(&mut list)?;
         let after = serde_json::to_string(&list).map_err(internal)?;
         tx.execute(
