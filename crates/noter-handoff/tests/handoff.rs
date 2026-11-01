@@ -446,19 +446,28 @@ async fn launch_tries_the_link_then_the_terminal_fallback() {
     let (r, tried) = run(plan(ClaudeCliLink, false), |_| Ok(())).await;
     assert_eq!((r, tried), (Ok(ClaudeCliLink), vec![ClaudeCliLink]));
     // The link fails: iTerm, then Terminal.
-    let (r, tried) = run(plan(CodexApp, false), |p| match p {
+    let (r, tried) = run(plan(ClaudeCliLink, false), |p| match p {
         Terminal => Ok(()),
         _ => Err(ErrorCode::NoLinkHandler),
     })
     .await;
-    assert_eq!((r, tried), (Ok(Terminal), vec![CodexApp, Iterm, Terminal]));
+    assert_eq!(
+        (r, tried),
+        (Ok(Terminal), vec![ClaudeCliLink, Iterm, Terminal])
+    );
     // Nothing opens; a denied terminal is the error the user can fix.
-    let (r, _) = run(plan(ClaudeDesktop, false), |p| match p {
+    let (r, _) = run(plan(ClaudeCliLink, false), |p| match p {
         Iterm => Err(ErrorCode::AutomationDenied),
         _ => Err(ErrorCode::NoLinkHandler),
     })
     .await;
     assert_eq!(r, Err(ErrorCode::AutomationDenied));
+    // Claude Desktop ignores `cwd` and the Codex app `q` (D-33): only a terminal opens the
+    // repository folder with the prompt pre-filled.
+    for app in [ClaudeDesktop, CodexApp] {
+        let (r, tried) = run(plan(app, false), |_| Ok(())).await;
+        assert_eq!((r, tried), (Ok(Iterm), vec![Iterm]));
+    }
     // The plan already says: no path, or the terminal's Automation is denied.
     let (r, tried) = run(plan(None, false), |_| Ok(())).await;
     assert_eq!((r, tried), (Err(ErrorCode::NoLinkHandler), vec![]));

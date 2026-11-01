@@ -129,6 +129,7 @@ function handoffView(world: World, item: ItemView, state: HandoffView["state"] =
   const repo = world.repos.mappings.find((m) => item.linked_issue?.startsWith(m.key)) ?? null;
   const own = item.owner?.is_you ?? false;
   const edited = handoffEdits.get(item.id);
+  const target = handoffTargets.get(item.id) ?? repo?.default_tool ?? "claude_code";
   const generated = `## Goal\n${item.text}\n\n## Context\nSaid in “${item.call.title}”.\n\nAsk before touching anything outside this scope.`;
   return {
     item,
@@ -138,10 +139,10 @@ function handoffView(world: World, item: ItemView, state: HandoffView["state"] =
     generated_md: state.type === "ready" ? generated : null,
     edited: edited !== undefined,
     versions: [],
-    target: handoffTargets.get(item.id) ?? repo?.default_tool ?? "claude_code",
+    target,
     repo,
     unmapped_key: repo ? null : (item.linked_issue?.split("-")[0] ?? null),
-    launch: { path: repo ? "claude_cli_link" : "none", needs_automation: false, automation_denied: false },
+    launch: { path: !repo ? "none" : target === "codex" ? "terminal" : "claude_cli_link", needs_automation: false, automation_denied: false },
     default_action: own ? "open" : "copy_prompt",
     last: item.handoff,
   };
@@ -886,7 +887,8 @@ export const defaultHandlers: Handlers = {
     item.handoff = { target, at: now(), cwd: repo.local_path, awaiting: true };
     bump(item);
     emit("entity:changed", { type: "item", item });
-    return { path_used: target === "codex" ? "codex_app" : "claude_cli_link", item, prompt_file: `handoffs/${item.id}.md` };
+    // Codex has no link that carries the prompt (D-33): it opens in a terminal.
+    return { path_used: target === "codex" ? "terminal" : "claude_cli_link", item, prompt_file: `handoffs/${item.id}.md` };
   },
   // Copying hands the item off too (core-handoff.md §2): accepted, owner kept, not done.
   handoff_copy: (a, { world, emit }) => {
@@ -1610,7 +1612,7 @@ export const defaultHandlers: Handlers = {
       tokens_out: 3_100,
     };
   },
-  perf_brief: (a) => ({ path: `~/Downloads/Noter improvement brief (${a.period}).md`, opened_with: a.action.type === "open_in" ? (a.action.target === "codex" ? "codex_app" : "claude_cli_link") : null }),
+  perf_brief: (a) => ({ path: `~/Downloads/Noter improvement brief (${a.period}).md`, opened_with: a.action.type === "open_in" ? (a.action.target === "codex" ? "terminal" : "claude_cli_link") : null }),
 
   // ── First run and permissions ────────────────────────────────────────
   setup_status: (_a, { world }) => world.app.setup,

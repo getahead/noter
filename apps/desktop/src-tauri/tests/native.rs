@@ -222,20 +222,15 @@ fn a_long_prompt_travels_as_a_short_file_instruction_below_the_query_cap() {
     std::fs::write(&prompt_file, &prompt).unwrap();
     let instruction = noter_native::read_instruction(&prompt_file);
     let cwd = dir.path().join("vhi frontend");
-    for path in [
-        LaunchPath::ClaudeCliLink,
-        LaunchPath::ClaudeDesktop,
-        LaunchPath::CodexApp,
-    ] {
-        let url = noter_native::link_url(path, &cwd, &instruction).unwrap();
-        let q = url.split("&q=").nth(1).unwrap();
-        assert!(q.len() < Q_CAP, "{path:?}: q is {} characters", q.len());
-        assert!(!url.contains("touch"), "{path:?} carries the prompt's text");
-        // Percent-encoded: no shell or URL syntax survives as itself.
-        assert!(
-            !q.contains(['$', '\'', ' ', '&', '(', '`']),
-            "{path:?}: {q}"
-        );
+    let url = noter_native::link_url(LaunchPath::ClaudeCliLink, &cwd, &instruction).unwrap();
+    let q = url.split("&q=").nth(1).unwrap();
+    assert!(q.len() < Q_CAP, "q is {} characters", q.len());
+    assert!(!url.contains("touch"), "the link carries the prompt's text");
+    // Percent-encoded: no shell or URL syntax survives as itself.
+    assert!(!q.contains(['$', '\'', ' ', '&', '(', '`']), "{q}");
+    // Only claude-cli://open carries the prompt; the desktop apps drop `cwd` or `q` (D-33).
+    for path in [LaunchPath::ClaudeDesktop, LaunchPath::CodexApp] {
+        assert_eq!(noter_native::link_url(path, &cwd, &instruction), None);
     }
     assert!(instruction.contains(&*prompt_file.to_string_lossy()));
 }

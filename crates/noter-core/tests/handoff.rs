@@ -89,8 +89,9 @@ impl NativeOps for Ops {
 
     fn launch_plan(&self, target: HandoffTarget) -> LaunchPlan {
         let mut plan = self.plan.lock().unwrap().clone();
+        // Codex has no link that carries the prompt (D-33): it opens in a terminal.
         if target == HandoffTarget::Codex && plan.path == LaunchPath::ClaudeCliLink {
-            plan.path = LaunchPath::CodexApp;
+            plan.path = LaunchPath::Terminal;
         }
         plan
     }
@@ -547,7 +548,7 @@ async fn set_target_recomputes_the_launch_line_without_generating() {
         .await
         .unwrap();
     assert_eq!(view.target, HandoffTarget::Codex);
-    assert_eq!(view.launch.path, LaunchPath::CodexApp);
+    assert_eq!(view.launch.path, LaunchPath::Terminal);
     assert_eq!(view.state, PromptState::NotGenerated);
     assert_eq!(w.get("itm_eng").await.unwrap().target, HandoffTarget::Codex);
     w.settle().await;
