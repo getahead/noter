@@ -35,9 +35,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-jobs-scheduler`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-core-jobs-scheduler`
 
-- [ ] `p3` - `cpt-noter-feature-core-jobs-scheduler`
+- [x] `p3` - `cpt-noter-feature-core-jobs-scheduler`
 
 ## 1. Feature Context
 
@@ -214,8 +214,8 @@ The system **MUST** use logged batches of at most 200 rows, yield between them a
 - [x] Battery, trigger and enabled settings are tested independently; no-battery jobs resume when power allows.
 - [x] No transaction changes more than 200 target rows per batch; rollback leaves prior committed batches intact and progress truthful.
 - [x] Startup reconciles interrupted runs; worker failure and cancellation produce terminal progress events with typed errors or counts.
-- [ ] Event conformance and the post-call feature's real-core story E2E pass; setup model downloads still satisfy the M0 contract.
-- [ ] `just gate` passes.
+- [ ] Event conformance and the post-call feature's real-core story E2E pass; setup model downloads still satisfy the M0 contract. Open: the post-call story E2E needs the 2.17 handlers; the M0 download E2E and conformance pass on the scheduler.
+- [x] `just gate` passes.
 
 ## 7. M2 decisions
 
