@@ -24,6 +24,7 @@ mod postcall;
 mod recovery;
 mod self_test;
 mod settings;
+mod share;
 mod speakers;
 mod surfaces;
 #[cfg(feature = "harness")]
