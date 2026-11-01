@@ -1806,6 +1806,9 @@ async fn scripted_native_ops_record_launches_and_clipboard_writes_and_follow_the
             .await,
         "invalid_input"
     );
+    r.finish().await;
+}
+
 #[tokio::test]
 async fn the_scripted_folder_panel_answers_a_folder_under_the_data_dir_and_the_clipboard_log_starts_empty(
 ) {
