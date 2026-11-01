@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.14.0](https://github.com/getahead/noter/compare/v0.13.0...v0.14.0) (2026-11-01)
+
+
+### Features
+
+* **contract:** audio_deleted_at and audio_retention_days on call rows ([#261](https://github.com/getahead/noter/issues/261)) ([1e98db4](https://github.com/getahead/noter/commit/1e98db43f65c5ce9da4caad47469c11a0e55c65a))
+* **contract:** summary entity change, output_invalid error and the archive result fields ([#254](https://github.com/getahead/noter/issues/254)) ([6866273](https://github.com/getahead/noter/commit/6866273ad56533e0f682411fd1cbb7ea7af92b43))
+* **core:** accounts_get and api_key_set over a SecretStore ([#241](https://github.com/getahead/noter/issues/241)) ([4390bf9](https://github.com/getahead/noter/commit/4390bf94e078999c246b5d06813c47b0ccf86e51))
+* **core:** archive install, chunks, regeneration merge and the summary-ready notification ([#257](https://github.com/getahead/noter/issues/257)) ([30bd517](https://github.com/getahead/noter/commit/30bd517f7cd5218cc991c7e4fb7b89a395bad8dc))
+* **core:** audio_delete and audio_delete_older ([#263](https://github.com/getahead/noter/issues/263)) ([a21edbe](https://github.com/getahead/noter/commit/a21edbec211f712a59314b98a0dad360d40f753d))
+* **core:** capture triggers, power source and model download on the scheduler ([#240](https://github.com/getahead/noter/issues/240)) ([ffd1898](https://github.com/getahead/noter/commit/ffd1898eb6b2450205f2cc15f6a689247b5bad22))
+* **core:** carry-forward, Today and call tags ([#250](https://github.com/getahead/noter/issues/250)) ([e20a3bd](https://github.com/getahead/noter/commit/e20a3bdda5bd9aa920f8914b22ed510f57be3fc7))
+* **core:** history_export over the NativeOps save panel ([#238](https://github.com/getahead/noter/issues/238)) ([43539f3](https://github.com/getahead/noter/commit/43539f3162135982d74c7734f465d228885914c6))
+* **core:** history_list and the undo/redo replay ([#232](https://github.com/getahead/noter/issues/232)) ([63a429a](https://github.com/getahead/noter/commit/63a429ab0c1ed4bfbaed4ce553f94469e6658b58))
+* **core:** items service, intents and evidence spans ([#245](https://github.com/getahead/noter/issues/245)) ([5b4ee9c](https://github.com/getahead/noter/commit/5b4ee9c97d682309d89193cb753b09d6394d5df6))
+* **core:** post-call outputs from the live transcript ([#247](https://github.com/getahead/noter/issues/247)) ([9e0a32a](https://github.com/getahead/noter/commit/9e0a32aa572e84a9079addbedc6e651a75f75611))
+* **core:** share_copy and calls_export over NativeOps ([#258](https://github.com/getahead/noter/issues/258)) ([5a3a9eb](https://github.com/getahead/noter/commit/5a3a9eb1d3440e6e02539577f75ebca924cc5010))
+* **core:** speaker renames, term fixes and post-call naming ([#256](https://github.com/getahead/noter/issues/256)) ([41f143c](https://github.com/getahead/noter/commit/41f143cf907a543f5222a015232209591ef798b6))
+* **core:** the MacOps host over noter-native and share_test_run ([#259](https://github.com/getahead/noter/issues/259)) ([7786005](https://github.com/getahead/noter/commit/778600553ce482ac290fadc1bda0562aaba12fb0))
+* **engine:** offline Large v3 decode and local embeddings ([#236](https://github.com/getahead/noter/issues/236)) ([c9a4822](https://github.com/getahead/noter/commit/c9a4822fb28e284b51820adf54b31745ff1a255a))
+* **engine:** offline_pass and embeddings over engine stdio ([#228](https://github.com/getahead/noter/issues/228)) ([4ad5466](https://github.com/getahead/noter/commit/4ad5466da183977ec15bc93c505718ed5436ca23))
+* **handoff:** prompt generation, versions, repositories and the launch plan ([#251](https://github.com/getahead/noter/issues/251)) ([74646eb](https://github.com/getahead/noter/commit/74646ebead0612602667cc54812198a5e8cf16c6))
+* **jobs:** noter-jobs scheduler, job_runs and jobs:progress ([#230](https://github.com/getahead/noter/issues/230)) ([b491513](https://github.com/getahead/noter/commit/b491513a6a4de8fcf5f27a500d9d9d74464560ab))
+* **llm:** locked-down Claude Code, Codex and Ollama adapters ([#234](https://github.com/getahead/noter/issues/234)) ([ef8b58b](https://github.com/getahead/noter/commit/ef8b58b77709d240f4cd445d1f3e924739aed849))
+* **llm:** the LlmRuntime router, egress gate and audit ([#229](https://github.com/getahead/noter/issues/229)) ([ccd520a](https://github.com/getahead/noter/commit/ccd520acaa17d98494e0f5888bb4caf3c81bb7d9))
+* **native:** launch services, apple events, rich clipboard, save panels and the share visibility probe ([#243](https://github.com/getahead/noter/issues/243)) ([bc19a7a](https://github.com/getahead/noter/commit/bc19a7aabf344401e9b93dd67dacef5eca439938))
+
+
+### Bug fixes
+
+* **core:** make Return choose Cancel in the alerts shown as sheets ([#275](https://github.com/getahead/noter/issues/275)) ([649cb37](https://github.com/getahead/noter/commit/649cb37a332e60f5b5760b81f57b8a7e83fb210e))
+* **core:** make Return choose Cancel in the native alerts ([#239](https://github.com/getahead/noter/issues/239)) ([57e72d9](https://github.com/getahead/noter/commit/57e72d997126f26f12184f858ed2bbfda34cda1f))
+* **core:** show the tray only from the main thread so a launch cannot deadlock ([#233](https://github.com/getahead/noter/issues/233)) ([7b6360c](https://github.com/getahead/noter/commit/7b6360c7194728c2864153d779e5996ba52d9bdd))
+* **core:** the launch hooks place windows on the Mac's own displays, and the quit alert is Noter's own ([#235](https://github.com/getahead/noter/issues/235)) ([90530b7](https://github.com/getahead/noter/commit/90530b78c250abba1529b49483bec11a5c23a472))
+
 ## [0.13.0](https://github.com/getahead/noter/compare/v0.12.0...v0.13.0) (2026-10-29)
 
 
