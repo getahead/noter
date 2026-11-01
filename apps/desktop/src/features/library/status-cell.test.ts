@@ -8,6 +8,8 @@ const call = (o: Partial<CallRow> = {}) =>
     unnamed_speakers: 0,
     archive: "done",
     audio_deleted: false,
+    audio_deleted_at: null,
+    audio_retention_days: 30,
     audio_kept_until: null,
     privacy: "normal",
     ...o,

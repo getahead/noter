@@ -681,3 +681,42 @@ async fn files_that_could_not_be_removed_are_retried_at_the_next_start() {
     let (_again, _) = open(dir.path());
     assert!(!dir.path().join("audio/call_b").exists());
 }
+
+#[tokio::test]
+async fn a_call_row_carries_the_audio_retention_days_and_no_deletion_time_while_audio_is_kept() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let days = || async {
+        let detail = core
+            .call_get(
+                &main_window(),
+                CallIdArgs {
+                    call_id: CallId::new("call_a"),
+                },
+            )
+            .await
+            .unwrap();
+        (
+            detail.call.audio_retention_days,
+            detail.call.audio_deleted_at,
+        )
+    };
+    assert_eq!(days().await, (30, None), "the default retention");
+
+    let db = Connection::open(dir.path().join("noter.db")).unwrap();
+    for (word, expected) in [
+        ("days7", 7),
+        ("days90", 90),
+        ("forever", 0),
+        ("never_store", 0),
+    ] {
+        let value = json!({ "retention": word }).to_string();
+        db.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('audio', ?1)",
+            [value],
+        )
+        .unwrap();
+        assert_eq!(days().await.0, expected, "{word}");
+    }
+}

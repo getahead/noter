@@ -117,6 +117,25 @@ pub(crate) const SHOWN_PASS: &str =
     THEN 'archive' ELSE 'live' END)";
 
 // @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
+/// Days the audio is kept under the stored retention setting (30 until one is saved); 0 for
+/// forever and never store.
+fn retention_days(c: &Connection) -> noter_db::rusqlite::Result<u32> {
+    let stored: Option<String> = c
+        .query_row("SELECT value FROM settings WHERE key = 'audio'", [], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    let word = stored
+        .and_then(|v| serde_json::from_str::<serde_json::Value>(&v).ok())
+        .and_then(|v| v["retention"].as_str().map(String::from));
+    Ok(match word.as_deref() {
+        Some("days7") => 7,
+        Some("days90") => 90,
+        Some("forever" | "never_store") => 0,
+        _ => 30,
+    })
+}
+
 fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<CallRow> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     let mut languages = c.prepare(
@@ -162,6 +181,9 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         archive: word(s.archive_status)?,
         audio_kept_until: s.audio_retention_until.map(TimestampMs),
         audio_deleted: s.audio_deleted,
+        // The deletion time is recorded with audio deletion (2.13 slice 3).
+        audio_deleted_at: None,
+        audio_retention_days: retention_days(c)?,
         open_items: 0,
         review_waiting: 0,
     };
