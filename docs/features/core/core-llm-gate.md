@@ -99,15 +99,15 @@ Post-call and handoff can call a model without creating another path for user te
 - Audit persistence fails: no cloud packet is released.
 
 **Steps**:
-1. [ ] - `p1` - Receive the skill, version, input packet, output schema, task settings, budget and cancellation handle through `LlmRuntime` - `inst-run-input`
-2. [ ] - `p1` - Read runtime availability, privacy mode, call sensitivity and source classes; select with `cpt-noter-algo-core-llm-gate-route` - `inst-run-route`
-3. [ ] - `p1` - Allocate an `llm_run_id`, record runtime, task, skill version and prompt hash in `llm_runs`; never store the packet in operational logs - `inst-run-record`
-4. [ ] - `p1` - Use `cpt-noter-algo-core-llm-gate-egress` for the selected attempt before invoking an adapter - `inst-run-gate`
+1. [x] - `p1` - Receive the skill, version, input packet, output schema, task settings, budget and cancellation handle through `LlmRuntime` - `inst-run-input`
+2. [x] - `p1` - Read runtime availability, privacy mode, call sensitivity and source classes; select with `cpt-noter-algo-core-llm-gate-route` - `inst-run-route`
+3. [x] - `p1` - Allocate an `llm_run_id`, record runtime, task, skill version and prompt hash in `llm_runs`; never store the packet in operational logs - `inst-run-record`
+4. [x] - `p1` - Use `cpt-noter-algo-core-llm-gate-egress` for the selected attempt before invoking an adapter - `inst-run-gate`
 5. [ ] - `p1` - Start the locked-down adapter with the same app-owned schema, skill and allowed tools; apply effort, budget and task timeout - `inst-run-adapter`
-6. [ ] - `p1` - Validate results through `cpt-noter-algo-core-llm-gate-validate`; map pseudonyms back only after cloud output is inside the core - `inst-run-validate`
-7. [ ] - `p1` - Record usage, duration, first token, validation, retry and session id; cost is present for API-key runs and absent for own-account runs - `inst-run-usage`
-8. [ ] - `p1` - **IF** timeout or cancellation occurs, terminate the request and child process, invalidate late output and remove its temporary config - `inst-run-cancel`
-9. [ ] - `p1` - **RETURN** validated output and provenance or the typed failure; capture remains independent - `inst-run-return`
+6. [x] - `p1` - Validate results through `cpt-noter-algo-core-llm-gate-validate`; map pseudonyms back only after cloud output is inside the core - `inst-run-validate`
+7. [x] - `p1` - Record usage, duration, first token, validation, retry and session id; cost is present for API-key runs and absent for own-account runs - `inst-run-usage`
+8. [x] - `p1` - **IF** timeout or cancellation occurs, terminate the request and child process, invalidate late output and remove its temporary config - `inst-run-cancel`
+9. [x] - `p1` - **RETURN** validated output and provenance or the typed failure; capture remains independent - `inst-run-return`
 
 ### Open, reuse and close a runtime session
 
@@ -123,83 +123,83 @@ Post-call and handoff can call a model without creating another path for user te
 
 **Steps**:
 1. [ ] - `p1` - On open or resume, check the tested CLI version range and the runtime's availability, then create the isolated run environment - `inst-session-open`
-2. [ ] - `p1` - Gate every new turn or resumed packet with its current privacy context and audit linkage before the adapter receives it - `inst-session-turn`
-3. [ ] - `p1` - Count live ticks and reset the warm session after 15; keep only the caller's current permitted context - `inst-session-reset`
-4. [ ] - `p1` - On close, cancellation, provider failure or privacy change, stop the child and release temporary files and per-run capabilities - `inst-session-close`
-5. [ ] - `p1` - **RETURN** session state or typed availability error; no M4 IPC surface is delivered here - `inst-session-return`
+2. [x] - `p1` - Gate every new turn or resumed packet with its current privacy context and audit linkage before the adapter receives it - `inst-session-turn`
+3. [x] - `p1` - Count live ticks and reset the warm session after 15; keep only the caller's current permitted context - `inst-session-reset`
+4. [x] - `p1` - On close, cancellation, provider failure or privacy change, stop the child and release temporary files and per-run capabilities - `inst-session-close`
+5. [x] - `p1` - **RETURN** session state or typed availability error; no M4 IPC surface is delivered here - `inst-session-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Route by task and privacy
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-llm-gate-route`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-llm-gate-route`
 
 **Input**: Task, chosen runtime and model, available runtimes, call privacy, source classes, failure history and budget.
 
 **Output**: An allowed runtime choice or `runtime_unavailable` with its reason and fix.
 
 **Steps**:
-1. [ ] - `p1` - Force local for local-only mode, sensitive calls or offline execution; sensitive sources are never admitted to a cloud packet - `inst-route-local`
-2. [ ] - `p1` - For post-call, prefer the configured available runtime, then the PRD fallback order Claude Code, Codex, local; handoff prefers its target runtime then local - `inst-route-order`
-3. [ ] - `p1` - Keep embeddings and redaction local; if the local redaction model is unavailable, retain regex redaction - `inst-route-redaction`
-4. [ ] - `p1` - Refuse unknown CLI majors or versions outside the tested range with `cli_version_unsupported`; never assume a new CLI honors lockdown flags - `inst-route-version`
-5. [ ] - `p1` - Apply API-key cost caps and allowed tools; two consecutive runtime failures within a call switch it to local, with effective state published through `privacy:changed` - `inst-route-failover`
-6. [ ] - `p1` - **IF** no policy-compliant runtime is available, **RETURN** `runtime_unavailable` with the existing runtime reason; never relax privacy - `inst-route-none`
-7. [ ] - `p1` - **RETURN** the choice, model, effort, tools and timeout: post-call 10 minutes, Ask 60 seconds and live agent 8 seconds where those callers later use the interface - `inst-route-return`
+1. [x] - `p1` - Force local for local-only mode, sensitive calls or offline execution; sensitive sources are never admitted to a cloud packet - `inst-route-local`
+2. [x] - `p1` - For post-call, prefer the configured available runtime, then the PRD fallback order Claude Code, Codex, local; handoff prefers its target runtime then local - `inst-route-order`
+3. [x] - `p1` - Keep embeddings and redaction local; if the local redaction model is unavailable, retain regex redaction - `inst-route-redaction`
+4. [x] - `p1` - Refuse unknown CLI majors or versions outside the tested range with `cli_version_unsupported`; never assume a new CLI honors lockdown flags - `inst-route-version`
+5. [x] - `p1` - Apply API-key cost caps and allowed tools; two consecutive runtime failures within a call switch it to local, with effective state published through `privacy:changed` - `inst-route-failover`
+6. [x] - `p1` - **IF** no policy-compliant runtime is available, **RETURN** `runtime_unavailable` with the existing runtime reason; never relax privacy - `inst-route-none`
+7. [x] - `p1` - **RETURN** the choice, model, effort, tools and timeout: post-call 10 minutes, Ask 60 seconds and live agent 8 seconds where those callers later use the interface - `inst-route-return`
 
 ### Redact and audit before release
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-llm-gate-egress`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-llm-gate-egress`
 
 **Input**: Run context, packet, destination and effective privacy mode.
 
 **Output**: Permitted packet with a committed audit row, local execution, or refusal.
 
 **Steps**:
-1. [ ] - `p1` - Re-check call sensitivity, mode and source scope at release time; reject cloud release if they changed to local-only - `inst-egress-recheck`
-2. [ ] - `p1` - **IF** local, return the local packet without cloud egress; no cloud audit row is claimed - `inst-egress-local`
-3. [ ] - `p1` - Remove sensitive sources and all audio; in cloud-with-redaction mode replace PII and credential-like strings with local-model plus regex placeholders - `inst-egress-redact`
-4. [ ] - `p1` - Apply optional stable person pseudonyms with a run-local reverse map; audit records identify placeholders, never originals - `inst-egress-pseudonyms`
-5. [ ] - `p1` - DB: INSERT `audit_log` with kind run, timestamp, destination, runtime, call id, run id, exact outgoing bytes, payload hash and redaction-map id; commit before releasing text - `inst-egress-audit`
-6. [ ] - `p1` - **IF** commit fails, refuse release and return a typed storage failure - `inst-egress-no-audit`
-7. [ ] - `p1` - Release only the approved packet to the selected adapter; every retry or new cloud payload must cross this boundary and retain attributable audit evidence - `inst-egress-release`
-8. [ ] - `p1` - Reserve the same boundary for future tool-result and lookup callers; M3 implements the socket handler and tool-result rows, not an M2 bypass - `inst-egress-future-tools`
-9. [ ] - `p1` - **RETURN** the permitted packet and audit linkage - `inst-egress-return`
+1. [x] - `p1` - Re-check call sensitivity, mode and source scope at release time; reject cloud release if they changed to local-only - `inst-egress-recheck`
+2. [x] - `p1` - **IF** local, return the local packet without cloud egress; no cloud audit row is claimed - `inst-egress-local`
+3. [x] - `p1` - Remove sensitive sources and all audio; in cloud-with-redaction mode replace PII and credential-like strings with local-model plus regex placeholders - `inst-egress-redact`
+4. [x] - `p1` - Apply optional stable person pseudonyms with a run-local reverse map; audit records identify placeholders, never originals - `inst-egress-pseudonyms`
+5. [x] - `p1` - DB: INSERT `audit_log` with kind run, timestamp, destination, runtime, call id, run id, exact outgoing bytes, payload hash and redaction-map id; commit before releasing text - `inst-egress-audit`
+6. [x] - `p1` - **IF** commit fails, refuse release and return a typed storage failure - `inst-egress-no-audit`
+7. [x] - `p1` - Release only the approved packet to the selected adapter; every retry or new cloud payload must cross this boundary and retain attributable audit evidence - `inst-egress-release`
+8. [x] - `p1` - Reserve the same boundary for future tool-result and lookup callers; M3 implements the socket handler and tool-result rows, not an M2 bypass - `inst-egress-future-tools`
+9. [x] - `p1` - **RETURN** the permitted packet and audit linkage - `inst-egress-return`
 
 ### Validate output and retry once
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-llm-gate-validate`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-llm-gate-validate`
 
 **Input**: Runtime output, the app-owned schema, supplied evidence ids and run context.
 
 **Output**: Validated output or a typed failure for the owning section.
 
 **Steps**:
-1. [ ] - `p1` - Parse structured output and validate against the supplied schema; reject raw HTML in Markdown fields - `inst-validate-schema`
-2. [ ] - `p1` - Check every required item or quote cites evidence, and every cited segment or chunk id belongs to the permitted packet - `inst-validate-citations`
-3. [ ] - `p1` - **IF** invalid, retry once with the validation failure explained, through the same egress and budget checks - `inst-validate-retry`
-4. [ ] - `p1` - **IF** still invalid, use the existing simpler skill/schema path and local fallback where available, applying the same evidence checks; never save unvalidated claims - `inst-validate-simple`
-5. [ ] - `p1` - **IF** fallback also fails, record schema failure and return the typed failure to the caller without replacing a ready section - `inst-validate-fail`
-6. [ ] - `p1` - **RETURN** validated content with usage and retry provenance - `inst-validate-return`
+1. [x] - `p1` - Parse structured output and validate against the supplied schema; reject raw HTML in Markdown fields - `inst-validate-schema`
+2. [x] - `p1` - Check every required item or quote cites evidence, and every cited segment or chunk id belongs to the permitted packet - `inst-validate-citations`
+3. [x] - `p1` - **IF** invalid, retry once with the validation failure explained, through the same egress and budget checks - `inst-validate-retry`
+4. [x] - `p1` - **IF** still invalid, use the existing simpler skill/schema path and local fallback where available, applying the same evidence checks; never save unvalidated claims - `inst-validate-simple`
+5. [x] - `p1` - **IF** fallback also fails, record schema failure and return the typed failure to the caller without replacing a ready section - `inst-validate-fail`
+6. [x] - `p1` - **RETURN** validated content with usage and retry provenance - `inst-validate-return`
 
 ## 4. States (CDSL)
 
 ### Runtime request
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-llm-gate-request`
+- [x] `p1` - **ID**: `cpt-noter-state-core-llm-gate-request`
 
 **States**: preparing, gated, running, validating, succeeded, failed, cancelled
 
 **Initial State**: preparing
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** preparing **TO** gated **WHEN** policy and, for cloud, audit commit succeed - `inst-st-gated`
-2. [ ] - `p1` - **FROM** gated **TO** running **WHEN** the isolated adapter starts - `inst-st-running`
-3. [ ] - `p1` - **FROM** running **TO** validating **WHEN** structured output arrives - `inst-st-validating`
-4. [ ] - `p1` - **FROM** validating **TO** preparing **WHEN** the single repair attempt or validated fallback is required; it is gated again - `inst-st-retry`
-5. [ ] - `p1` - **FROM** validating **TO** succeeded **WHEN** schema and evidence checks pass - `inst-st-success`
-6. [ ] - `p1` - **FROM** preparing **TO** failed **WHEN** policy, audit or availability fails; running or validating also fails on terminal runtime or validation failure - `inst-st-failure`
-7. [ ] - `p1` - **FROM** running **TO** cancelled **WHEN** the caller cancels; cancellation is also accepted during preparation or validation - `inst-st-cancel`
+1. [x] - `p1` - **FROM** preparing **TO** gated **WHEN** policy and, for cloud, audit commit succeed - `inst-st-gated`
+2. [x] - `p1` - **FROM** gated **TO** running **WHEN** the isolated adapter starts - `inst-st-running`
+3. [x] - `p1` - **FROM** running **TO** validating **WHEN** structured output arrives - `inst-st-validating`
+4. [x] - `p1` - **FROM** validating **TO** preparing **WHEN** the single repair attempt or validated fallback is required; it is gated again - `inst-st-retry`
+5. [x] - `p1` - **FROM** validating **TO** succeeded **WHEN** schema and evidence checks pass - `inst-st-success`
+6. [x] - `p1` - **FROM** preparing **TO** failed **WHEN** policy, audit or availability fails; running or validating also fails on terminal runtime or validation failure - `inst-st-failure`
+7. [x] - `p1` - **FROM** running **TO** cancelled **WHEN** the caller cancels; cancellation is also accepted during preparation or validation - `inst-st-cancel`
 
 Only committed `llm_runs` metadata survives process exit; no cancelled result may mutate the caller's records.
 
@@ -226,7 +226,7 @@ The system **MUST** implement the runtime interface for Claude Code, Codex and O
 
 ### One gate and validated results
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-llm-gate-policy`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-llm-gate-policy`
 
 The system **MUST** reject audio egress, force sensitive processing local, redact where configured, commit audit metadata before each permitted cloud release and validate schema and evidence before accepting output. No caller can reach an adapter around the gate, and no operational log contains transcript, document, model text or credentials.
 
@@ -256,10 +256,10 @@ The system **MUST** pass unit tests for routing, redaction, failed-audit refusal
 
 ## 6. Acceptance Criteria
 
-- [ ] Audit-write failure prevents adapter receipt of cloud text; sensitive and local-only calls produce zero provider requests.
+- [x] Audit-write failure prevents adapter receipt of cloud text; sensitive and local-only calls produce zero provider requests.
 - [ ] Unknown majors are refused; hostile user hooks, plugins, repo instructions and MCP servers never start in a runtime run.
-- [ ] Redaction replaces PII and optional names consistently; reverse mapping restores attribution without logging originals.
-- [ ] Invalid schema and missing or unknown evidence trigger one repair retry and then the simpler fallback; unvalidated output is never committed.
+- [x] Redaction replaces PII and optional names consistently; reverse mapping restores attribution without logging originals.
+- [x] Invalid schema and missing or unknown evidence trigger one repair retry and then the simpler fallback; unvalidated output is never committed.
 - [ ] Unit tests cover cancellation, two consecutive failures, budget and timeout paths; adapter conformance covers all three runtimes and cleanup.
 - [ ] M2 real-core output and handoff E2E passes with the scripted runtime; the network-monitor release test separately proves actual egress behavior.
 - [ ] `accounts_get` and `api_key_set` succeed in E2E against the real core with the scripted runtime. `noter-core-harness` provides a Keychain stand-in, a scripted secret store, as part of the Platform seam (Backend Teamlead decision D1, `.plans/core-harness.md`).

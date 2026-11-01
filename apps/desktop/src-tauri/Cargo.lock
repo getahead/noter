@@ -2308,10 +2308,15 @@ dependencies = [
 name = "noter-llm"
 version = "0.1.0"
 dependencies = [
+ "noter-db",
  "noter-protocol",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
+ "tokio",
+ "ulid",
 ]
 
 [[package]]
