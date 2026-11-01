@@ -216,3 +216,36 @@ fn a_pressed_hotkey_reaches_the_core_as_a_native_caller() {
             .unwrap();
     assert_eq!(unbound.unwrap_err().code, ErrorCode::NotFound);
 }
+
+/// No window the window server knows, and none focused.
+struct NoWindows;
+
+impl noter_desktop::Windows for NoWindows {
+    fn ids(&self) -> Vec<(noter_protocol::model::NoterSurface, u32)> {
+        vec![]
+    }
+    fn focused(&self) -> Option<noter_native::ParentWindow> {
+        None
+    }
+}
+
+#[test]
+fn the_share_test_runs_through_the_mac_from_settings_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let ops = noter_desktop::MacOps::new(Arc::new(NoWindows));
+    let deps = CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)).with_native_ops(Arc::new(ops));
+    let core = Core::open(dir.path(), deps).unwrap();
+    let app = builder(mock_builder())
+        .manage(Booted(Ok(Arc::new(core))))
+        .build(mock_context(noop_assets()))
+        .unwrap();
+    let args = json!({ "args": { "run_capture_test": false } });
+    let result = call(&window(&app, "settings"), "share_test_run", args.clone()).unwrap();
+    assert_eq!(result["rows"].as_array().unwrap().len(), 5);
+    assert_eq!(result["capture_test"], json!({ "type": "not_run" }));
+    let refused = call(&window(&app, "main"), "share_test_run", args).unwrap_err();
+    assert_eq!(
+        serde_json::from_value::<CoreError>(refused).unwrap().code,
+        ErrorCode::WindowNotAllowed
+    );
+}

@@ -1836,3 +1836,44 @@ async fn the_scripted_folder_panel_answers_a_folder_under_the_data_dir_and_the_c
     assert_eq!(shown["files"], 2);
     r.finish().await;
 }
+
+#[tokio::test]
+async fn the_scripted_share_test_answers_fixed_rows_and_the_probe_states() {
+    let mut r = start().await;
+    let ask = |capture: bool| json!({ "run_capture_test": capture });
+    // The fixture's live call blocks the probe.
+    let live = r.ok("settings", "share_test_run", ask(true)).await;
+    assert_eq!(live["capture_test"], json!({ "type": "blocked_by_call" }));
+    assert_eq!(live["rows"].as_array().unwrap().len(), 5);
+    assert_eq!(live["rows"][4]["surface"], "menu_bar_title");
+    assert_eq!(
+        r.ok("settings", "share_test_run", ask(false)).await["capture_test"],
+        json!({ "type": "not_run" })
+    );
+    r.ok("main", "capture_stop", json!({ "call_id": "call_live" }))
+        .await;
+    let passed = r.ok("settings", "share_test_run", ask(true)).await;
+    assert_eq!(passed["capture_test"]["type"], "passed");
+    assert!(passed["capture_test"]["at"].as_i64().unwrap() > 0);
+    r.ok(
+        "main",
+        "harness.share_test_probe",
+        json!({ "fail": "permission_denied" }),
+    )
+    .await;
+    let failed = r.ok("settings", "share_test_run", ask(true)).await;
+    assert_eq!(
+        failed["capture_test"],
+        json!({ "type": "failed", "code": "permission_denied" })
+    );
+    assert_eq!(
+        r.code("main", "share_test_run", ask(false)).await,
+        "window_not_allowed"
+    );
+    assert_eq!(
+        r.code("main", "harness.share_test_probe", json!({ "fail": 3 }))
+            .await,
+        "invalid_input"
+    );
+    r.finish().await;
+}
