@@ -66,7 +66,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 - **Design**: [DESIGN.md](../../DESIGN.md) › 3.2 Screen — Record prompt; Component — Record prompt; 3.8 Deployment Topology (record prompt row)
 - **Design elements**: `cpt-noter-component-screen-record-prompt`, `cpt-noter-component-ui-record-prompt`
 - **Stories**: `cpt-noter-seq-record-prompt-start-recording`, `cpt-noter-seq-record-prompt-record-after-missed-prompt` (M1); it also shows the variants of `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Call window hidden; Error — Next meeting starts straight away), owned by `cpt-noter-feature-ui-call-window`
-- **Frozen commands it calls**: `capture_start` (with `sensitive`), `capture_dismiss_detection`, `capture_ignore_app`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `window_announce`, `window_navigate` (the **Delete Old Audio…** sheet in the main window), `open_external` (**Open System Settings…**)
+- **Frozen commands it calls**: `capture_start` (with `sensitive`), `capture_dismiss_detection`, `capture_ignore_app`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `window_announce`, `window_fit`, `window_navigate` (the **Delete Old Audio…** sheet in the main window), `open_external` (**Open System Settings…**)
 - **Events**: `capture:detected`, `capture:state`, `env:changed` (disk), `setup:changed` (speech model)
 - **Prototype modules**: `src/js/10-a-components.js` (`C.recordPrompt`), `src/js/10-a-surfaces.js` (`surface('record')`, `RP_STATES`, the `rp.*` actions), `src/css/10-a.css` (`.rp-*`), `src/css/01-macos27.css` (panel material)
 - **Dependencies**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-call-window`
@@ -94,6 +94,7 @@ Success criteria: a detected call is recorded with one click or one key while th
    The 72 pt offset under a meeting toolbar is not part of the core placement algorithm (`cpt-noter-algo-core-native-surfaces-placement`); recorded as a DESIGN discrepancy for the HoD (28 Oct), not held here.
 2. [x] - `p1` - Algorithm: choose the variant with `cpt-noter-algo-ui-record-prompt-variant` - `inst-choose-variant`
 3. [x] - `p1` - UI: render RP-R1 (app icon, **Record this call?**, the source line, ×) and RP-R3 for the variant; the panel never takes focus - `inst-render`
+   1. [x] - `p1` - API: `window_fit` with the panel's size in whole points each time it changes: the core fits the panel window to it (360 to 440 pt wide), so every button lies inside the panel - `inst-api-fit`
 4. [x] - `p1` - API: `window_announce` "Noter: Record this call? Press Control-Option-Command-R to record." (polite) - `inst-api-announce`
 5. [x] - `p1` - User clicks **Record** or **Record as Sensitive**, or presses ⌃⌥⌘R (the core receives the hotkey) - `inst-user-record`
 6. [x] - `p1` - API: `capture_start` (detection, `sensitive` true for **Record as Sensitive**); the button shows loading - `inst-api-start`
@@ -220,7 +221,7 @@ The system **MUST** render the record prompt in its seven variants with the prot
 **Constraints**: `cpt-noter-constraint-non-activating-panels`, `cpt-noter-constraint-no-dialog-after-setup`
 
 **Touches**:
-- Commands: `capture_start`, `capture_dismiss_detection`, `capture_ignore_app`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `window_announce`, `window_navigate`, `open_external`
+- Commands: `capture_start`, `capture_dismiss_detection`, `capture_ignore_app`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `window_announce`, `window_fit`, `window_navigate`, `open_external`
 - Tests: E2E `cpt-noter-seq-record-prompt-start-recording` and `cpt-noter-seq-record-prompt-record-after-missed-prompt` (every path) against `noter-core-harness`; XCUITest `test_cpt_noter_seq_record_prompt_start_recording__hotkey_keeps_focus` (the panel takes clicks and ⌃⌥⌘R without stealing focus); screenshot specs for each `RP_STATES` entry
 
 ## 6. Acceptance Criteria

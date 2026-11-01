@@ -13,7 +13,7 @@ import { Popover } from "../../ui/primitives/popover";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { leaveTimer, tickWhile } from "../shell/shell-effects";
-import { announce, answerCallEnd, answerNewMeeting, dismiss, holdNotice, ignoreApp, openDeleteOldAudio, openSystemSettings, startRecording } from "./actions";
+import { announce, answerCallEnd, answerNewMeeting, dismiss, fitPanel, holdNotice, ignoreApp, openDeleteOldAudio, openSystemSettings, startRecording } from "./actions";
 import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptTimer } from "./logic";
 import "./record-prompt.css";
 
@@ -67,6 +67,8 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
   const shown = view !== null && key !== null && local.gone !== key;
   // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-return-dismiss
 
+  // the core sizes the panel window to the panel, so every button lies inside it
+  useEffect(() => (shown ? fitPanel(bridge, panel.current) : undefined), [shown, bridge]);
   // a prompt that is over (the core cleared it) is forgotten, so the next one is drawn
   useEffect(() => void (key === null && dispatch({ type: "reset" })), [key]);
   // the fade lasts 200 ms, then the prompt is gone until the core's next one
