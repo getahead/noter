@@ -20,7 +20,10 @@ function install(): void {
       if (!cmd.startsWith("plugin:dialog|")) return (base.invoke as (...a: unknown[]) => unknown)?.(cmd, payload, options);
       (g.__noterAlerts as unknown[]).push({ cmd, payload });
       const confirm = g.__noterAlertAnswer === "confirm";
-      // ask/confirm answer a boolean; message answers the chosen button's label.
+      // ask/confirm answer a boolean; message answers the chosen button's label. With two custom buttons the
+      // first is the default (Cancel), so "cancel" chooses it and "confirm" the other one.
+      const custom = (payload.buttons as { OkCancelCustom?: [string, string] } | undefined)?.OkCancelCustom;
+      if (cmd.endsWith("|message") && custom) return Promise.resolve(confirm ? custom[1] : custom[0]);
       return Promise.resolve(cmd.endsWith("|message") ? (confirm ? (payload.okLabel ?? "Ok") : (payload.cancelLabel ?? "Cancel")) : confirm);
     },
   });
