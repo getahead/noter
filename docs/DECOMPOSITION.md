@@ -1030,7 +1030,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-undo-over-confirm`
+  - [x] `p3` - `cpt-noter-principle-undo-over-confirm`
 
 - **Design Constraints Covered**:
 
@@ -1651,11 +1651,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p5` - `cpt-noter-principle-quiet-surface`
+  - [x] `p5` - `cpt-noter-principle-quiet-surface`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p5` - `cpt-noter-constraint-copilot-flag`
+  - [x] `p5` - `cpt-noter-constraint-copilot-flag`
 
 - **Domain Model Entities**:
   - Card, agent
