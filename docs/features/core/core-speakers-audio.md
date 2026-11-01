@@ -45,6 +45,8 @@ design: docs/DESIGN-core.md
 
 The transcript service gains whole-call and single-line speaker naming, term fixes with glossary teaching, post-call naming and permanent audio deletion by call or age. Corrections become constraints for the archive pass. Voice-profile creation and person-page commands remain M3; a new name can still be created through the existing `PersonRef` in a naming command.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** `CallRow` and `CallDetail` gain `audio_deleted_at: Option<TimestampMs>` and `audio_retention_days`, delivered with `audio_delete_older` in a contract-lane PR (wire change, UI review by the UI Teamlead; `milestones.toml` untouched); the dated "Audio deleted on <date> (kept N days)" copy returns with it (TL-20, D-36). Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26).
+
 ### 1.2 Purpose
 
 A name or term corrected once stays corrected after offline transcription, and deleting audio leaves the transcript and its evidence readable.

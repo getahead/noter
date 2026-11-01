@@ -45,6 +45,8 @@ design: docs/DESIGN-core.md
 
 The native bridge in `apps/desktop/src-tauri` and `noter-native` supplies M2 launch, rich clipboard, folder/save panels and the Screen Share Test. Owning services decide which prompt to launch or which content to export. The capture test runs in the core process so it measures the actual Noter surfaces. Core and engine lane work lands separately at this boundary.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** `NativeOps` is a trait on `CoreDeps` (save panel, rich clipboard, launch, share test); the harness answers it scripted (a path under its data dir, a recorded clipboard, recorded launches, a fixed `ShareTestResult`), and the real implementations come with 2.21 native-services (TL-15). The `share_test_run` consumer codes against the trait first; this feature delivers the macOS half last.
+
 ### 1.2 Purpose
 
 M2 services can use macOS without granting a WebView shell access or putting OS rules into UI code. The user can check how each Noter surface appears in a share before presenting.

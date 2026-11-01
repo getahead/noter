@@ -44,6 +44,8 @@ design: docs/DESIGN-core.md
 
 The change-log service gains History, undo and redo over the write path built in M0. A change or batch can be reversed at any time while its target rows have not been edited later. Capture data (confirmed segments, live speakers, gaps and marks, including user-pressed marks and pause gaps) is written without change rows (`cpt-noter-principle-core-single-writer`, Backend Teamlead M1 decision, 18 Oct 2026), so it is outside History and undo; PRD › 11 "undo any change" covers logged changes only, and the user's later edits to capture data are logged and undoable. Partial reversal keeps later edits and reports them. History lists the actor, reason, evidence and before/after values, and exports Markdown or JSON. Proposals and Activity remain M5.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** `NativeOps` is a trait on `CoreDeps` (save panel, rich clipboard, launch, share test); the harness answers it scripted (a path under its data dir, a recorded clipboard, recorded launches, a fixed `ShareTestResult`), and the real implementations come with 2.21 native-services (TL-15). `history_export` writes through its save panel. Hotkey and setup rows are not replayable. Model-actor rows are filtered from History.
+
 ### 1.2 Purpose
 
 The user can inspect and reverse a correction, review or job batch without losing work done since it.

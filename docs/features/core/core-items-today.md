@@ -51,6 +51,8 @@ design: docs/DESIGN-core.md
 
 The items service owns item status and review, revision-guarded edits, evidence views, the shared carry-forward query and Today. It formats scoped sharing for Slack, Jira and Markdown, exports selected calls or sections through native services and stores call tags. Evidence collection and proposal decisions remain M5; prompt generation belongs to handoff.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** `NativeOps` is a trait on `CoreDeps` (save panel, rich clipboard, launch, share test); the harness answers it scripted (a path under its data dir, a recorded clipboard, recorded launches, a fixed `ShareTestResult`), and the real implementations come with 2.21 native-services (TL-15). `share_copy` and `calls_export` code against it from day one. Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26).
+
 ### 1.2 Purpose
 
 The user can review what a call produced, check the words behind an item, tick work done and see what to raise before the next call. Sharing reflects the chosen scope and never silently treats a suggestion as reviewed.
