@@ -2,6 +2,7 @@
 import XCTest
 
 final class NotificationsTests: NoterTestCase {
+    // @cpt-dod:cpt-noter-dod-ui-notifications-permission:p2
     func test_cpt_noter_seq_notifications_allow_notifications__happy_path() {
         // The banner follows the first recorded call: the library holds only “Backend sync”.
         launch("first-call")

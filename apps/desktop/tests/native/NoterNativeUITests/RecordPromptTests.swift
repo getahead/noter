@@ -2,6 +2,7 @@
 import XCTest
 
 final class RecordPromptTests: NoterTestCase {
+    // @cpt-dod:cpt-noter-dod-ui-record-prompt-panel:p2
     func test_cpt_noter_seq_record_prompt_start_recording__hotkey_keeps_focus() {
         launch("detected")
         other.activate()
