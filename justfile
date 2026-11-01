@@ -147,11 +147,20 @@ native:
     [ -d "$app" ] || { echo "GATE FAILED: native: no app bundle at $app (set NOTER_APP_PATH)" >&2; exit 1; }
     mkdir -p coverage/native
     status=0
+    result=coverage/native/NoterNativeUITests.xcresult
+    # A hung test fails after 3 minutes (a longer one sets executionTimeAllowance) instead of burning the job.
     TEST_RUNNER_NOTER_APP_PATH="$app" TEST_RUNNER_NOTER_E2E_LOG_DIR="$PWD/coverage/native" \
       xcodebuild test -project "$project" -scheme NoterNativeUITests -destination 'platform=macOS' \
-      -resultBundlePath coverage/native/NoterNativeUITests.xcresult -quiet || status=$?
-    xcrun xcresulttool get test-results tests --path coverage/native/NoterNativeUITests.xcresult > coverage/native/xcuitest-results.json \
+      -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 420 \
+      -resultBundlePath "$result" -quiet || status=$?
+    xcrun xcresulttool get test-results tests --path "$result" > coverage/native/xcuitest-results.json \
       || { echo "GATE FAILED: native: could not export the XCUITest results" >&2; status=1; }
+    # `-quiet` prints no test names: name every failure (an annotation in CI).
+    if [ "$status" -ne 0 ]; then
+      xcrun xcresulttool get test-results summary --path "$result" | python3 -I -c 'import json, os, sys
+    tag = "::error title=XCUITest::" if os.environ.get("GITHUB_ACTIONS") else ""
+    for f in json.load(sys.stdin).get("testFailures", []): print(tag + "native: FAILED " + f["testIdentifierString"] + ": " + f["failureText"], file=sys.stderr)' || true
+    fi
     exit $status
 
 # Screenshot tests (98% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker

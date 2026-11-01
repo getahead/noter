@@ -17,6 +17,8 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__paused_for_5_min() {
+        // Waits out the 5 minutes, past `just native`'s 3-minute default.
+        executionTimeAllowance = 420
         launch("idle")
         startRecording()
         item("Pause", in: openMenu()).click()
