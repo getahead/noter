@@ -32,6 +32,13 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "llm runs and audit log",
         sql: include_str!("../migrations/0002_llm_runs_audit_log.sql"),
     },
+    // @cpt-dbtable:cpt-noter-dbtable-jobs:p1
+    Migration {
+        owner: "noter-db",
+        version: 3,
+        name: "jobs",
+        sql: include_str!("../migrations/0003_jobs.sql"),
+    },
 ];
 
 const HISTORY: &str = "CREATE TABLE IF NOT EXISTS schema_migrations (
