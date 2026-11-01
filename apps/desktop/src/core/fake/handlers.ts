@@ -161,6 +161,14 @@ function section(world: World, summaryId: string): OutputSection {
   return s;
 }
 
+/** A section's versions, oldest first: the seeded ones carry its written text, as in the real core. */
+const sectionVersions = new WeakMap<OutputSection, { body_md: string; kind: "generated" | "user_edit" }[]>();
+function versionsOf(s: OutputSection): { body_md: string; kind: "generated" | "user_edit" }[] {
+  let v = sectionVersions.get(s);
+  if (!v) sectionVersions.set(s, (v = Array.from({ length: Math.max(1, s.version_count) }, () => ({ body_md: s.body_md ?? "", kind: "generated" as const }))));
+  return v;
+}
+
 function topic(world: World, id: string): TopicRow {
   const t = world.topics.find((x) => x.id === id);
   if (!t) throw coreError("not_found", `topic ${id}`);
@@ -758,6 +766,7 @@ export const defaultHandlers: Handlers = {
     const s = section(world, a.summary_id);
     if (s.rev !== null) checkRev(s.rev, a.rev);
     const before = s.body_md;
+    versionsOf(s).push({ body_md: a.body_md, kind: "user_edit" });
     s.body_md = a.body_md;
     s.user_edited = true;
     s.rev = (s.rev ?? 0) + 1;
@@ -770,9 +779,10 @@ export const defaultHandlers: Handlers = {
   outputs_regenerate: (a, { world, fake, emit }) => {
     call(world, a.call_id);
     if (live(world.app.capture)) throw coreError("job_blocked", "regeneration waits for the live call to end");
-    if (!a.sections.length) throw coreError("invalid_input", "sections", { type: "validation", field: "sections", rule: "required" });
     const run = newId("run");
-    a.sections.forEach((kind, i) => {
+    // No sections means all of them, as in the real core.
+    const sections = a.sections.length ? a.sections : (world.outputs.find((o) => o.call_id === a.call_id)?.sections.map((x) => x.kind) ?? []);
+    sections.forEach((kind, i) => {
       fake.later(300 * (i + 1), () => emit("outputs:progress", { call_id: a.call_id, status: "writing", section: kind, state: { type: "writing" } }));
       fake.later(300 * (i + 2), () => emit("outputs:progress", { call_id: a.call_id, status: "ready", section: kind, state: { type: "ready" } }));
     });
@@ -780,20 +790,21 @@ export const defaultHandlers: Handlers = {
   },
   output_versions: (a, { world }) => {
     const s = section(world, a.summary_id);
-    const versions = Array.from({ length: Math.max(1, s.version_count) }, (_, i) => ({
+    const versions = versionsOf(s).map((v, i) => ({
       id: `ver_${a.summary_id}_${i + 1}`,
       n: i + 1,
-      kind: i === 0 || !s.user_edited ? ("generated" as const) : ("user_edit" as const),
-      writer: s.writer,
+      kind: v.kind,
+      writer: v.kind === "generated" ? s.writer : null,
       created_at: (s.writer?.generated_at ?? world.now) + i * MIN,
     }));
-    return { versions: versions.reverse() };
+    return { versions };
   },
   output_version_get: (a, { world }) => {
     const s = section(world, a.summary_id);
     const n = Number(a.version_id.split("_").at(-1));
-    if (!n || n > Math.max(1, s.version_count)) throw coreError("not_found", `version ${a.version_id}`);
-    return { meta: { id: a.version_id, n, kind: n === 1 ? "generated" : s.user_edited ? "user_edit" : "generated", writer: s.writer, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: n === s.version_count ? (s.body_md ?? "") : `${s.body_md ?? ""}\n\n(Version ${n}.)` };
+    const v = versionsOf(s)[n - 1];
+    if (!n || !v) throw coreError("not_found", `version ${a.version_id}`);
+    return { meta: { id: a.version_id, n, kind: v.kind, writer: v.kind === "generated" ? s.writer : null, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: v.body_md };
   },
   share_copy: (a, { world }) => {
     const out = world.outputs.find((o) => o.call_id === a.call_id);

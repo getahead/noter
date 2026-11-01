@@ -452,15 +452,69 @@ fn answer_offline(root: &Path, cmd: EngineCommand) -> Vec<EngineEvent> {
     }
 }
 
+/// A scripted `offline_done` naming an absolute file plays that recorded result for the pass `cmd`
+/// asks for: copied into the pass's own result file with the call id set, as the engine would
+/// write it; a file that cannot be read fails the pass. Anything else plays as written.
+fn played(action: &Action, cmd: &EngineCommand, container: Option<&Path>) -> Action {
+    let (
+        Action::Event(event),
+        EngineCommand::OfflinePass {
+            call_id,
+            result_path,
+            ..
+        },
+        Some(root),
+    ) = (action, cmd, container)
+    else {
+        return action.clone();
+    };
+    let EngineEvent::OfflineDone {
+        result_path: fixture,
+        ..
+    } = event.as_ref()
+    else {
+        return action.clone();
+    };
+    if !Path::new(fixture).is_absolute() {
+        return action.clone();
+    }
+    let installed = std::fs::read(fixture)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<ArchiveResult>(&bytes).ok())
+        .and_then(|mut result| {
+            result.call_id = call_id.clone();
+            for s in &mut result.segments {
+                s.call_id = call_id.clone();
+            }
+            let bytes = serde_json::to_vec(&result).ok()?;
+            write_file(root, result_path, &bytes).ok()
+        });
+    Action::Event(Box::new(match installed {
+        Some(()) => EngineEvent::OfflineDone {
+            call_id: call_id.clone(),
+            result_path: result_path.clone(),
+        },
+        None => EngineEvent::OfflineFailed {
+            call_id: call_id.clone(),
+            code: EngineErrorCode::BadCommand,
+        },
+    }))
+}
+
 /// Queues the script's steps bound to `cmd`, due `after_ms` from now; same instant keeps file order.
-fn schedule(due: &mut Vec<(Instant, Action)>, script: &Script, cmd: &EngineCommand) {
+fn schedule(
+    due: &mut Vec<(Instant, Action)>,
+    script: &Script,
+    cmd: &EngineCommand,
+    container: Option<&Path>,
+) {
     let tag = serde_json::to_value(cmd).ok();
     let tag = tag.as_ref().and_then(|v| v["type"].as_str());
     let now = Instant::now();
     for step in script.steps.iter().filter(|s| Some(s.on.as_str()) == tag) {
         due.push((
             now + std::time::Duration::from_millis(step.after_ms),
-            step.action.clone(),
+            played(&step.action, cmd, container),
         ));
     }
     due.sort_by_key(|(at, _)| *at);
@@ -566,7 +620,7 @@ async fn run(
             }
             EngineCommand::SelfTest { .. } => {
                 out.emit(ack).await;
-                schedule(&mut steps, &script, &cmd);
+                schedule(&mut steps, &script, &cmd, container.as_deref());
                 // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
                 let failure = b.self_test_failure.or(match engine.lock().system_audio {
                     PermissionState::Granted => None,
@@ -646,7 +700,7 @@ async fn run(
             _ => {
                 out.emit(ack).await;
                 // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
-                schedule(&mut steps, &script, &cmd);
+                schedule(&mut steps, &script, &cmd, container.as_deref());
                 // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
             }
         }

@@ -1840,8 +1840,13 @@ impl Surfaces for ScriptedSurfaces {
     fn call_surface_visible(&self) -> bool {
         self.1.load(Ordering::SeqCst)
     }
-    fn post_notification(&self, _: &noter_core::Notification) {
-        self.note("post_notification");
+    fn post_notification(&self, n: &noter_core::Notification) {
+        let kind = match n.kind {
+            noter_core::NotificationKind::CaptureProblem(_) => "capture_problem",
+            noter_core::NotificationKind::SummaryReady => "summary_ready",
+            noter_core::NotificationKind::SummaryFailed => "summary_failed",
+        };
+        self.note(format!("post_notification {kind} {}", n.call_id.as_str()));
     }
 }
 
