@@ -5,6 +5,9 @@
      engine/scripts/sign.sh. -->
 <plist version="1.0">
 <dict>
+    <!-- Handoff's terminal fallback drives Terminal or iTerm with Apple Events (hardened runtime). -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
     <key>com.apple.security.application-groups</key>
     <array>
         <string>TEAMID.ai.noter</string>
