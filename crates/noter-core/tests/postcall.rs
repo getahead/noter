@@ -183,6 +183,7 @@ const ORDER: [SectionKind; 7] = [
     SectionKind::CallTypeExtras,
 ];
 
+// @cpt-dod:cpt-noter-dod-core-postcall-tests:p1
 #[tokio::test(start_paused = true)]
 async fn sections_land_in_order_within_two_minutes_and_the_call_is_ready_after_the_first() {
     // Every section answers after 10 s: seven sections in order are well inside two minutes.
