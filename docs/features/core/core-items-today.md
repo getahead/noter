@@ -273,7 +273,7 @@ The user can review what a call produced, check the words behind an item, tick w
 **Transitions**:
 1. [x] - `p1` - **FROM** open **TO** done **WHEN** `item_set_done(true)` commits; suggested review becomes accepted - `inst-st-done`
 2. [x] - `p1` - **FROM** done **TO** open **WHEN** `item_set_done(false)` commits, with review unchanged - `inst-st-untick`
-3. [ ] - `p1` - **FROM** open **TO** handed_off **WHEN** handoff successfully opens or copies; a suggestion becomes accepted - `inst-st-handoff`
+3. [x] - `p1` - **FROM** open **TO** handed_off **WHEN** handoff successfully opens or copies; a suggestion becomes accepted - `inst-st-handoff`
 4. [x] - `p1` - **FROM** handed_off **TO** done **WHEN** landed or done_another_way is answered with the current revision - `inst-st-landed`
 5. [x] - `p1` - **FROM** handed_off **TO** handed_off **WHEN** keep_open or Esc leaves it awaiting the next matching call - `inst-st-keep-open`
 6. [ ] - `p1` - **FROM** open **TO** carried **WHEN** offered in a live call with the same people - `inst-st-carried`
@@ -291,7 +291,7 @@ Every transition is persisted with a change row and revision. Invalid input leav
 
 ### Item intents and evidence
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-items-today-items`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-items-today-items`
 
 The system **MUST** serve filtered pages and complete inspectors, apply revision-guarded review, edits, manual creation, wanted completion, reopen and handoff answers, and persist independent status and review with Undo. Bulk review returns one batch handle and skipped count. Evidence spans must resolve after archive replacement and without audio.
 
@@ -309,7 +309,7 @@ The system **MUST** serve filtered pages and complete inspectors, apply revision
 
 ### Today and carry-forward
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-items-today-dashboard`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-items-today-dashboard`
 
 The system **MUST** assemble Today from permitted EventKit data and local records, use the same last-two-calls carry query as initial copilot context, honor both ranking settings and retain due/done/review sections without calendar access. Calendar reads never prompt; failed authorized reads return `calendar_unavailable`.
 
@@ -340,9 +340,11 @@ The system **MUST** format exactly the selected scope, guard unreviewed items, w
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-items-today-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-items-today-tests`
 
 The system **MUST** pass unit tests for status × review, conflicts, batch undo, carry matching, both rankings, timezone boundaries, calendar guards, share scopes and tags; fake/real conformance for all fourteen commands; and the five real-core story E2E named above. Cover the M2 performance entry `items-list` with `core_items_today` over a year of fixture calls, including `items_list` and `today_get`. Native clipboard and save-panel tests use the built app, with deterministic adapters at the harness boundary. `just gate` passes.
+
+Not covered here: the built-app clipboard and save-panel XCUITest is UI M2 (owner-gated); the `items-list` performance entry is not covered (NO PERFORMANCE TESTS); the real-core story E2E exercises `keep_open` and `landed` but not `done_another_way`, which only the core unit tests cover.
 
 **Implements**:
 - `cpt-noter-algo-core-items-today-mutate`
