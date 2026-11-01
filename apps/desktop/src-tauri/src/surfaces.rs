@@ -660,6 +660,21 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
         builder
     };
     // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-chrome
+    // Without a size AppKit opens 800×600 pixels: 400×300 pt on Retina, too small for Settings.
+    // @cpt-topology:cpt-noter-topology-ui-windows:p1
+    let builder = match label {
+        WindowLabel::Settings => builder
+            .inner_size(820.0, 620.0)
+            .min_inner_size(700.0, 480.0)
+            .center(),
+        // Fixed width; the height may grow to 640 for German text.
+        WindowLabel::FirstRun => builder
+            .inner_size(760.0, 560.0)
+            .min_inner_size(760.0, 560.0)
+            .max_inner_size(760.0, 640.0)
+            .center(),
+        _ => builder,
+    };
     let window = builder.build().ok()?;
     if is_panel(label) {
         make_panel(&window);
