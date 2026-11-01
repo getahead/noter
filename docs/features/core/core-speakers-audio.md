@@ -225,10 +225,10 @@ The system **MUST** pass unit tests for line scope, call scope, Unicode term ran
 
 ## 6. Acceptance Criteria
 
-- [ ] Real-core E2E `cpt-noter-seq-call-screen-name-speaker`: name Speaker 3 as an existing or new person; all intended lines update and undo restores them.
-- [ ] Real-core E2E `cpt-noter-seq-call-page-name-speakers`: sample replay, skip and text-only naming work; dependent owners and names update while edited wording is kept.
-- [ ] A one-line rename changes one line; the archive pass respects its cannot-link constraint and whole-call must-link constraints.
-- [ ] Term fixes preserve originals and update normalized search text; glossary teaching affects future decoding without silently rewriting earlier calls.
-- [ ] Both deletion commands succeed in real-core E2E; replay after deletion returns `audio_deleted`, text evidence still opens and undo returns `not_undoable`.
-- [ ] Unit and conformance tests cover missing ids, cross-call input, invalid ranges and failed file removal without false freed-byte counts.
-- [ ] `just gate` passes.
+- [x] Real-core E2E `cpt-noter-seq-call-screen-name-speaker`: name Speaker 3 as an existing or new person; all intended lines update and undo restores them.
+- [x] Real-core E2E `cpt-noter-seq-call-page-name-speakers`: sample replay, skip and text-only naming work; dependent owners and names update while edited wording is kept.
+- [x] A one-line rename changes one line; the archive pass respects its cannot-link constraint and whole-call must-link constraints.
+- [x] Term fixes preserve originals and update normalized search text; glossary teaching affects future decoding without silently rewriting earlier calls.
+- [x] Both deletion commands succeed in real-core E2E; replay after deletion returns `audio_deleted`, text evidence still opens and undo returns `not_undoable`.
+- [x] Unit and conformance tests cover missing ids, cross-call input, invalid ranges and failed file removal without false freed-byte counts.
+- [x] `just gate` passes.
