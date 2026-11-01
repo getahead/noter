@@ -49,7 +49,7 @@ design: docs/DESIGN-core.md
 
 The post-call pipeline writes sections from the live transcript as soon as each validates, then improves them after the archive pass. It keeps every generated version and user edit, extracts suggested items with evidence spans, chunks and embeds the transcript and serves output read, edit, version and regeneration commands. Search and Ask over those chunks remain M3.
 
-> **M2 decisions (Backend Teamlead, 1 Nov 2026).**  Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26).
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).**  Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26). Two seams from 2.13 and the M4 gate (be-eng-2, 1 Nov 2026): the archive install reads `audio/<call>/constraints.json`, the file 2.13 writes for the offline pass, to keep the user's corrections across the upgrade; `TermCorrection[]` ranges are UTF-16 code-unit offsets (`TextRange`) into the segment's `text`, so a regeneration that merges text must carry them over. `inst-write-reviews` (role reviews), `inst-notify-switch` and `inst-notify-return` stay `[ ]` until M4 produces cards and role outcomes to act on.
 
 ### 1.2 Purpose
 

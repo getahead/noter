@@ -346,6 +346,8 @@ Platform, data residency and licensing constraints come from the PRD; this desig
 | Setup | First-run steps, models, permissions, self-test; never a start gate (owner decision O1) | [model/setup.rs](../crates/noter-protocol/src/model/setup.rs) `SetupStatus` |
 | Error | The one error type and its closed list of codes | [error.rs](../crates/noter-protocol/src/error.rs) `CoreError`, `ErrorCode` |
 
+The `settings` table also holds one row outside the typed sections: key `repos`, the repository mappings (`id`, `key`, `local_path`, `default_tool`) as a JSON list that `noter-handoff` reads and replaces through the change log (`repos_list`, `repo_upsert`, `repo_remove`); `path_exists` is read from the disk on each list, never stored.
+
 **Relationships**:
 
 - Call → Segment, Speaker, Mark, Gap: a call owns its transcript; confirmed segments never change position; the archive pass replaces live segments and keeps a 7-day copy of the live ones. A gap with reason `interrupted`, `engine_restart`, `device_changed` or `stalled` longer than 2 s is a dropout and counts in `metrics.dropout_ms`.
@@ -794,7 +796,7 @@ Opening a prompt in Claude Code or Codex needs Launch Services, Apple Events and
 
 ##### Responsibility scope
 
-Crate `noter-handoff`. Generates prompts on demand through the router (`skills::HandoffPromptOutput`): `handoff_generate` returns `HandoffView` in state `generating` at once and finishes through `entity:changed`, and `handoff_cancel` stops it. Caches prompts with versions and the user's edit, resolves the repository from the mappings, detects which URL handlers exist and whether Automation was denied, writes `handoffs/<item>.md`, and launches in the PRD's order with the terminal fallback. Records the handoff on the item; opening or copying it accepts a suggested item. `handoff_open` and `handoff_copy` record the `prompt_versions.id` used and whether the prompt was edited, for the Handoff metric. Also opens performance improvement briefs.
+Crate `noter-handoff`. Generates prompts on demand through the router (`skills::HandoffPromptOutput`): `handoff_generate` returns `HandoffView` in state `generating` at once and finishes through `entity:changed`, and `handoff_cancel` stops it. Caches prompts with versions and the user's edit, resolves the repository from the mappings, detects which URL handlers exist and whether Automation was denied, writes `handoffs/<item>.md`, and launches in the PRD's order with the terminal fallback. Records the handoff on the item; opening or copying it accepts a suggested item. `handoff_open` and `handoff_copy` record the `prompt_versions.id` used and whether the prompt was edited, for the Handoff metric. The repository mappings live in the `settings` row with key `repos` (see the Settings entity in 3.1). Also opens performance improvement briefs.
 
 ##### Responsibility boundaries
 
