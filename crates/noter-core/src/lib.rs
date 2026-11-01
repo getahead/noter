@@ -865,6 +865,22 @@ impl CoreApi for Core {
         self.set_call_tags(ctx, args)
     }
 
+    async fn share_copy(
+        &self,
+        _ctx: &CommandCtx,
+        args: ShareCopyArgs,
+    ) -> Result<ShareResult, CoreError> {
+        self.copy_share(args).await
+    }
+
+    async fn calls_export(
+        &self,
+        _ctx: &CommandCtx,
+        args: ExportCallsArgs,
+    ) -> Result<ExportResult, CoreError> {
+        self.export_calls(args).await
+    }
+
     async fn tags_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TagList, CoreError> {
         self.list_tags()
     }

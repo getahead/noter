@@ -341,6 +341,19 @@ fn html(blocks: &[Block]) -> String {
     out
 }
 
+impl crate::Core {
+    pub(crate) async fn copy_share(&self, _args: ShareCopyArgs) -> Result<ShareResult, CoreError> {
+        todo!("share_copy")
+    }
+
+    pub(crate) async fn export_calls(
+        &self,
+        _args: ExportCallsArgs,
+    ) -> Result<ExportResult, CoreError> {
+        todo!("calls_export")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
