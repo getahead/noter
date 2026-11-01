@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AccountsView, KeyProvider } from "../../src/core/bindings";
-import { exercised, target } from "../support/core";
+import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { StdioCore } from "../support/stdio-transport";
@@ -73,7 +73,7 @@ function scripted(lines: object[]): { core: StdioCore; done: () => Promise<void>
 
 type LlmRun = { output: { summary_md: string }; runtime: string; llm_run_id: string; audit: { llm_run_id: string; kind: string; destination: string; what: string }[] };
 
-describe.runIf(target === "stdio")("the real core's scripted runtime and Keychain stand-in (2.15 AC 7)", () => {
+describe.skipIf(isFake)("the real core's scripted runtime and Keychain stand-in (2.15 AC 7)", () => {
   let run: ReturnType<typeof scripted>;
   afterEach(async () => {
     await run.done();
