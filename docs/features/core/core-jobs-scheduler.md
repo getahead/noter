@@ -45,6 +45,8 @@ design: docs/DESIGN-core.md
 
 `noter-jobs` gains durable job definitions and runs, trigger dispatch, priorities, battery guards and progress. M2 runs PostCall, ArchivePass, Regeneration and model download, and provides the CLI-install job handler for its M3 command. Maintenance, evidence, retention and the Jobs UI commands remain M5. The previous call's PostCall runs at low priority during another live call; archive, regeneration and all other jobs wait.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** One migration per PR that first writes a table, named `000N_<tables>.sql` in merge order; `jobs` and `job_runs` are noter-db v3 and `models_download` moves onto the scheduler without changing its M0 contract (TL-22). The previous call's PostCall keeps running at low priority during a live call; everything else pauses at a checkpoint, and the session manager publishes capture state through one `CaptureGuard` watch channel that the scheduler never bypasses (TL-23). `job_runs.subject` (the call or model id a run works on, NULL when none) and `jobs.kind UNIQUE` stay, because per-call dedup and cancel-on-continue need them (TL-24; DESIGN-core `cpt-noter-dbtable-jobs`). Job definitions are created lazily on the first `define` or `trigger` (seeding at startup would add `job` change rows), the nightly window hours are UTC, and battery state comes through a `PowerSource` seam that defaults to mains until 2.21.
+
 ### 1.2 Purpose
 
 Outputs must arrive after back-to-back calls while capture and live ASR keep priority. Background writes remain bounded and logged.

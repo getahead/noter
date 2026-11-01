@@ -46,6 +46,8 @@ design: docs/DESIGN-core.md
 
 `noter-handoff` generates and caches an engineering item's prompt on demand, retains generated versions and edits, resolves repository mappings and exposes the launch plan before opening anything. Opening or copying records the version used and updates the item through the logged item service. Improvement briefs remain M5; repository work itself runs only when the user proceeds in the target tool.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).** `NativeOps` is a trait on `CoreDeps` (save panel, rich clipboard, launch, share test); the harness answers it scripted (a path under its data dir, a recorded clipboard, recorded launches, a fixed `ShareTestResult`), and the real implementations come with 2.21 native-services (TL-15). `handoff_open` and `handoff_copy` code against it from day one. Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26).
+
 ### 1.2 Purpose
 
 An item becomes a prompt with its evidence, decisions, acceptance criteria and scope guardrails, ready in Claude Code or Codex in the intended repository. The user reviews it before anything is sent.

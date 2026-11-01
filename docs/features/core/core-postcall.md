@@ -49,6 +49,8 @@ design: docs/DESIGN-core.md
 
 The post-call pipeline writes sections from the live transcript as soon as each validates, then improves them after the archive pass. It keeps every generated version and user edit, extracts suggested items with evidence spans, chunks and embeds the transcript and serves output read, edit, version and regeneration commands. Search and Ask over those chunks remain M3.
 
+> **M2 decisions (Backend Teamlead, 1 Nov 2026).**  Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26).
+
 ### 1.2 Purpose
 
 A 60-minute call produces usable outputs within two minutes on cloud or ten minutes locally, even if another call starts. Archive upgrades and regeneration never discard a user's correction, accepted item or rejected suggestion.
