@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.15.1](https://github.com/getahead/noter/compare/v0.15.0...v0.15.1) (2026-11-01)
+
+
+### Bug fixes
+
+* **core:** open Settings at 820x620 and first run at 760x560 ([#291](https://github.com/getahead/noter/issues/291)) ([2e08cb2](https://github.com/getahead/noter/commit/2e08cb261332685a228d7e1940a475e926b81508))
+* **handoff:** open in the repository without the desktop apps' deep links ([#289](https://github.com/getahead/noter/issues/289)) ([b946516](https://github.com/getahead/noter/commit/b9465161dd1f0a35b7f763c153a1c05b50b63dde))
+* **ui:** a Screen Recording answer that is not granted shows the refused row ([#292](https://github.com/getahead/noter/issues/292)) ([c84c39a](https://github.com/getahead/noter/commit/c84c39a4b3638a1cb0d725e3e8c010072c6fd5dc))
+
 ## [0.15.0](https://github.com/getahead/noter/compare/v0.14.0...v0.15.0) (2026-11-01)
 
 
