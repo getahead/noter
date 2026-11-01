@@ -820,9 +820,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.14 Engine offline pass and embeddings - MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-core-engine-offline`
+- [x] `p3` - **ID**: `cpt-noter-feature-core-engine-offline`
 
-- **Milestone**: M2 · **Lane**: engine · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-engine-offline.md](features/core/core-engine-offline.md)
+- **Milestone**: M2 · **Lane**: engine · **Status**: IMPLEMENTED (#228 #236 #279); two acceptance criteria are owner-gated: the golden-call ACs (file-mode golden calls EN/RU/DE, archive quality on the Mac runner; the DER bar is the owner's choice among the three options in #279) and the golden half of the tests DoD. FEATURE spec: [features/core/core-engine-offline.md](features/core/core-engine-offline.md)
 
 - **Purpose**: Run the offline Large v3 and VBx pass with the user's corrections as constraints, and serve speaker and text embeddings for identity and retrieval.
 
@@ -845,7 +845,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Constraints Covered**:
 
-  - [ ] `p3` - `cpt-noter-constraint-core-engine-offline`
+  - `cpt-noter-constraint-core-engine-offline`
 
 - **Domain Model Entities**:
   - Archive result
@@ -853,8 +853,8 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-engine`
-  - [ ] `p3` - `cpt-noter-component-core-engine-supervisor`
+  - `cpt-noter-component-engine`
+  - `cpt-noter-component-core-engine-supervisor`
 
 - **API**:
   - Interface `cpt-noter-interface-engine-stdio`
