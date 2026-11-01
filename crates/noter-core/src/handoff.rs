@@ -68,6 +68,9 @@ impl Core {
     pub(crate) fn handoff_view(&self, item_id: &str) -> Result<HandoffView, CoreError> {
         self.ready()?;
         let item = self.item_view(item_id)?.ok_or_else(not_found)?;
+        if !item.is_engineering {
+            return Err(invalid("item_id", ValidationRule::InvalidFormat));
+        }
         let versions = noter_handoff::versions(self.store(), item_id)?;
         // @cpt-begin:cpt-noter-algo-core-handoff-build:p1:inst-build-keep-edit
         let generated = versions

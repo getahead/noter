@@ -46,19 +46,13 @@ fn invalid(field: &str, rule: ValidationRule) -> CoreError {
     )
 }
 
-/// `VSTOR` or `VSTOR/ui`: a Jira project key, optionally a component.
+/// `VSTOR` or `VSTOR/ui`: a project key, optionally a component; no spaces, one slash at most.
 fn key_ok(key: &str) -> bool {
-    let (project, component) = match key.split_once('/') {
-        Some((p, c)) => (p, Some(c)),
-        None => (key, None),
-    };
-    project.starts_with(|c: char| c.is_ascii_uppercase())
-        && project
-            .bytes()
-            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
-        && component.map_or(true, |c| {
-            !c.is_empty()
-                && c.bytes()
+    let mut parts = key.split('/');
+    parts.clone().count() <= 2
+        && parts.all(|p| {
+            !p.is_empty()
+                && p.bytes()
                     .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
         })
 }
@@ -143,7 +137,7 @@ pub fn upsert_repo(
     write(store, meta, move |list| {
         if list
             .iter()
-            .any(|m| m.key == key && Some(&m.id) != id.as_ref())
+            .any(|m| m.key.eq_ignore_ascii_case(&key) && Some(&m.id) != id.as_ref())
         {
             return Err(invalid("key", ValidationRule::Duplicate));
         }
@@ -199,11 +193,15 @@ pub fn resolve(
     let Some(project) = linked_issue.and_then(|k| k.split_once('-')).map(|(p, _)| p) else {
         return (None, None);
     };
-    let component = format!("{project}/");
+    let component = format!("{}/", project.to_ascii_lowercase());
     let found = mappings
         .iter()
-        .find(|m| m.key == project)
-        .or_else(|| mappings.iter().find(|m| m.key.starts_with(&component)));
+        .find(|m| m.key.eq_ignore_ascii_case(project))
+        .or_else(|| {
+            mappings
+                .iter()
+                .find(|m| m.key.to_ascii_lowercase().starts_with(&component))
+        });
     match found {
         Some(m) => (Some(m.clone()), None),
         None => (None, Some(project.to_string())),
