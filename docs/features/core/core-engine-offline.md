@@ -214,7 +214,7 @@ The system **MUST** correlate speaker and text embeddings, validate their dimens
 
 ### Tests and gate
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-tests`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-tests`
 
 The system **MUST** pass Swift unit and file-mode golden-call tests, Rust supervisor tests for correlation, unsafe paths, malformed vectors, engine exit and late completions, and engine-schema conformance tests. Real-core post-call E2E covers consumption; this feature owns no IPC command or story denominator. `just gate` passes.
 
@@ -225,7 +225,7 @@ The system **MUST** pass Swift unit and file-mode golden-call tests, Rust superv
 **Touches**:
 - API: `cpt-noter-interface-engine-stdio`
 
-> **Open (TL-17).** The Swift unit tests drive the archive, clustering and vector code on synthetic calls with scripted models, and the Rust supervisor and schema tests are in; the file-mode golden-call tests need `evals/golden`, the owner's item.
+Open: the file-mode golden-call tests in English, Russian and German need `evals/golden`, and the archive quality run on the Mac runner needs the DER threshold the owner picks from #279's three options (absolute per language, relative to pyannote's pipeline, or product-facing); both are the owner's items (TL-17). The Swift unit tests (`engine/Tests/NoterEngineKitTests`: `OfflineTests`, `ArchiveTests`, `DiarizationTests`, `VectorTests`) drive the archive, VBx clustering and vector code on synthetic calls with scripted models; the Rust supervisor tests are `crates/noter-engine-client/tests/offline.rs`.
 
 ## 6. Acceptance Criteria
 
