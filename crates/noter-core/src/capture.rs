@@ -8,6 +8,7 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use noter_db::{Insert, Mutation};
+use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::engine::{AsrBackend, EngineCommand, EngineEvent, GlossaryEntry, StartSession};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx};
 use noter_protocol::model::*;
@@ -318,9 +319,23 @@ impl Core {
         change(&mut app.capture);
         let state = self.publish(event_names::CAPTURE_STATE, &mut app.capture);
         self.capture_phase.send_replace(state.phase);
+        self.feed_guard(state.phase);
         drop(app);
         self.refresh_tray();
         state
+    }
+
+    /// Tells the scheduler whether a call is live (TL-23): from the start until the call is
+    /// stopped or discarded. The resumed call stays named until the call is no longer live.
+    fn feed_guard(&self, phase: CapturePhase) {
+        let live = !matches!(phase, CapturePhase::Idle | CapturePhase::Stopped);
+        self.capture_guard.send_if_modified(|g| {
+            let next = CaptureGuardState {
+                live,
+                resumed_call: g.resumed_call.clone().filter(|_| live),
+            };
+            std::mem::replace(g, next) != *g
+        });
     }
 
     /// Waits until the phase is no longer `from`, at most [`ENGINE_WAIT`].
@@ -807,7 +822,16 @@ impl Core {
         self.clear_engine_states();
         self.release_held();
         self.close_continue_at(call_id.clone(), until, CONTINUE_MS);
-        // The post-call hand-off is a no-op until the PostCall job (M2).
+        // The call's pipeline: the post-call analysis first, then the archive pass. The handlers
+        // are seams until post-call lands; a repeated stop of the same pending work is one run.
+        for kind in [JobKind::PostCall, JobKind::ArchivePass] {
+            let req = Request::for_call(kind, Trigger::AfterCall, call_id);
+            if let Err(e) = self.in_runtime(|| self.jobs.trigger(req)) {
+                self.log(crate::object(json!({
+                    "level": "error", "module": "jobs", "message": e.message
+                })));
+            }
+        }
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopped
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-phase-stopped
         Ok(())
@@ -843,6 +867,9 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-continued
         let start = self.session_for(&call_id, Some(t1))?;
         let recorded = session.recorded(now, None);
+        // The call's queued and running pipeline is obsolete: the scheduler cancels it.
+        self.capture_guard
+            .send_modify(|g| g.resumed_call = Some(call_id.clone()));
         self.set_capture(|c| {
             c.phase = CapturePhase::Recording;
             c.continue_until = None;
@@ -970,6 +997,10 @@ impl Core {
             }
             _ => {}
         }
+        // A seeded live call is a state to show, not a capture running: it holds no pipeline
+        // work or download back (the scripted world keeps running them).
+        self.capture_guard
+            .send_replace(CaptureGuardState::default());
         Ok(())
     }
 

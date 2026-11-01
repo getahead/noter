@@ -49,6 +49,8 @@ pub struct Options {
     /// The Mac's own displays, for the app's launch hooks: its real windows are drawn on them, so
     /// once seeded the scripted Mac has these displays (a display change, as when one unplugs).
     pub displays: Option<Vec<DisplayInfo>>,
+    /// `--power battery`: the Mac runs on battery, so the jobs that need mains power wait.
+    pub battery: bool,
 }
 
 impl Options {
@@ -63,6 +65,9 @@ impl Options {
                 ("--fixture", Some("world")) => options.fixture = true,
                 ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
                 ("--clock", Some("fixed")) => options.fixed_clock = true,
+                ("--power", Some(source @ ("battery" | "ac"))) => {
+                    options.battery = source == "battery";
+                }
                 ("--engine-script", Some(file)) => {
                     let text = std::fs::read_to_string(file)
                         .map_err(|e| format!("engine script {file}: {e}"))?;
@@ -70,7 +75,7 @@ impl Options {
                         Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
                     options.engine_script = Some(script);
                 }
-                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--engine-script <file>]")),
+                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--engine-script <file>]")),
             }
         }
         Ok(options)
@@ -176,6 +181,15 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
 }
 
 /// The harness around one real core.
+/// The Mac on battery (`--power battery`).
+struct OnBattery;
+
+impl noter_core::PowerSource for OnBattery {
+    fn on_battery(&self) -> bool {
+        true
+    }
+}
+
 pub struct Harness {
     core: Arc<Core>,
     native: Arc<ScriptedNative>,
@@ -255,6 +269,11 @@ impl Harness {
         .with_engine(Arc::new(engine.clone()))
         .with_updater(updater.clone())
         .with_surfaces(surfaces.clone());
+        let deps = if options.battery {
+            deps.with_power(Arc::new(OnBattery))
+        } else {
+            deps
+        };
         let deps = host(deps);
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-inject
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-open-store

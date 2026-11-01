@@ -1561,7 +1561,7 @@ async fn power_battery_holds_the_jobs_that_need_mains_and_the_flag_parses() {
         (false, JobRunStatus::Succeeded),
     ] {
         let r = start_with(Options {
-            fixture: true,
+            fixture: false,
             fixed_clock: true,
             battery,
             ..Options::default()

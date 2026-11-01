@@ -2947,6 +2947,9 @@ async fn continue_recording_cancels_the_calls_pipeline_and_the_next_stop_queues_
     r.core
         .scheduler()
         .register(JobKind::PostCall, Arc::new(Steady { steps: 100 }));
+    r.core
+        .scheduler()
+        .register(JobKind::ArchivePass, Arc::new(Steady { steps: 100 }));
     let call_id = r.recording().await;
     r.stop(&main_window(), &call_id).await;
     tokio::time::sleep(Duration::from_millis(250)).await;
@@ -2970,11 +2973,8 @@ async fn continue_recording_cancels_the_calls_pipeline_and_the_next_stop_queues_
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].status, JobRunStatus::Cancelled);
     assert_eq!(
-        runs_of(&r, JobKind::ArchivePass)
-            .iter()
-            .filter(|a| a.status == JobRunStatus::Succeeded)
-            .count(),
-        0,
+        runs_of(&r, JobKind::ArchivePass)[0].status,
+        JobRunStatus::Cancelled,
         "no archive result lands for the resumed call"
     );
     r.session_started(&call_id);

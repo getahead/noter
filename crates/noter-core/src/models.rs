@@ -1,7 +1,7 @@
 //! Model downloads for first run (`cpt-noter-algo-core-first-run-download-task`): the pinned
 //! bundles into `models/` with range resume and checksums, reaching only the hosts that
 //! `contracts/egress-hosts.json` allows for model downloads (decision D8 F4). A setup task in
-//! M0; it moves onto the job scheduler in M2.
+//! M0; since M2 it runs as the `ModelDownload` job on the scheduler, which a live call pauses.
 //!
 //! A bundle is the folder of its files (decision D12) and its state follows the folders:
 //! `models/<name>` is ready; `models/<name>.partial` holds the files verified so far and the
@@ -10,8 +10,10 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
+
+use noter_jobs::{JobHandler, Request, RunCtx, Stop, Trigger};
 
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -26,6 +28,8 @@ const MB: u64 = 1024 * 1024;
 const MARGIN_MB: u32 = 500;
 /// Progress goes out at most twice a second.
 const PROGRESS_EVERY: Duration = Duration::from_millis(500);
+/// The job's run row follows the download once a second.
+const RUN_PROGRESS_EVERY: Duration = Duration::from_secs(1);
 
 fn ceil_mb(bytes: u64) -> u32 {
     u32::try_from(bytes.div_ceil(MB)).unwrap_or(u32::MAX)
@@ -41,6 +45,10 @@ pub(crate) struct Downloads {
     dir: PathBuf,
     /// The network stopped a download (or refused one): start again once it is back.
     resume_online: bool,
+    /// A live call paused the download: the job goes on by itself when the call ends.
+    live_paused: bool,
+    /// Downloads started so far: each is its own run, even while the one before is finishing.
+    starts: u64,
 }
 
 impl Downloads {
@@ -79,6 +87,8 @@ impl Downloads {
             pause: Arc::new(AtomicBool::new(false)),
             dir,
             resume_online: false,
+            live_paused: false,
+            starts: 0,
         }
     }
 
@@ -99,6 +109,19 @@ impl Downloads {
             .filter(|b| b.required_for_capture)
             .peekable();
         needed.peek().is_some() && needed.all(|b| b.state == BundleState::Ready)
+    }
+
+    /// A live call holds the download: its bundles show paused and it goes on when the call ends.
+    fn hold_for_call(&mut self) {
+        self.live_paused = true;
+        self.pause.store(true, Ordering::SeqCst);
+        for b in self
+            .bundles
+            .iter_mut()
+            .filter(|b| b.state == BundleState::Downloading)
+        {
+            b.state = BundleState::Paused;
+        }
     }
 
     fn set(&mut self, name: &str, state: BundleState, done_bytes: Option<u64>) {
@@ -225,8 +248,14 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-download-call
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-other-actions
         if args.action == DownloadAction::Pause {
+            d.live_paused = false;
             d.resume_online = false;
             d.pause.store(true, Ordering::SeqCst);
+            drop(d);
+            return Ok(self.setup_now());
+        }
+        // A live call holds the download; it goes on by itself when the call ends.
+        if d.live_paused {
             drop(d);
             return Ok(self.setup_now());
         }
@@ -259,9 +288,9 @@ impl Core {
             );
         }
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-check-disk
-        let Some(core) = self.this() else {
+        if self.this().is_none() {
             return Err(crate::internal("first run has not started"));
-        };
+        }
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-start-task
         // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-download
         // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-resume
@@ -280,10 +309,34 @@ impl Core {
         d.resume_online = false;
         d.running = true;
         d.pause.store(false, Ordering::SeqCst);
+        if self.capture_guard.borrow().live {
+            d.hold_for_call();
+        }
+        d.starts += 1;
+        let subject = format!("download-{}", d.starts);
         drop(d);
         // The answer shows the bundles `downloading` before the task can move them on.
         let started = self.setup_now();
-        self.spawn(async move { core.run_downloads().await });
+        // The scheduler runs it (`ModelDownload`), once no live call holds it back.
+        let queued = self.in_runtime(|| {
+            let mut req = Request::new(JobKind::ModelDownload, Trigger::OnDemand);
+            req.subject = Some(subject);
+            self.jobs.trigger(req)
+        });
+        if !matches!(queued, Ok(Some(_))) {
+            let mut d = lock(&self.downloads);
+            for b in d
+                .bundles
+                .iter_mut()
+                .filter(|b| b.state == BundleState::Downloading)
+            {
+                b.state = BundleState::Paused;
+            }
+            d.running = false;
+            drop(d);
+            self.refresh_setup();
+            return Err(crate::internal("the download could not be queued"));
+        }
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-start-task
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-return-started
         Ok(started)
@@ -301,6 +354,93 @@ impl Core {
             let _ = self.download_models(ModelsDownloadArgs {
                 action: DownloadAction::Resume,
             });
+        }
+    }
+
+    /// The download as the job's work: it stops for a live call and goes on after it, and the
+    /// run row follows the bytes. Its end is the run's: a stop with an error fails it, a pause
+    /// cancels it.
+    // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-pause
+    async fn download_job(self: &Arc<Self>, ctx: &mut RunCtx) -> Result<(), Stop> {
+        let mut guard = self.capture_guard.subscribe();
+        loop {
+            if guard.borrow().live {
+                lock(&self.downloads).hold_for_call();
+                self.refresh_setup();
+            }
+            ctx.checkpoint().await?;
+            if lock(&self.downloads).live_paused && !self.resume_after_call() {
+                return self.download_outcome();
+            }
+            let mut work = Box::pin(self.clone().run_downloads());
+            let mut tick = tokio::time::interval_at(
+                tokio::time::Instant::now() + RUN_PROGRESS_EVERY,
+                RUN_PROGRESS_EVERY,
+            );
+            let live = loop {
+                tokio::select! {
+                    biased;
+                    _ = call_is_live(&mut guard) => break true,
+                    () = &mut work => break false,
+                    _ = tick.tick() => {
+                        // A call that starts now is seen at the top of the loop.
+                        if guard.borrow().live {
+                            continue;
+                        }
+                        let s = lock(&self.downloads).status();
+                        let counts = vec![CountEntry { label: "MB downloaded".into(), n: s.done_mb }];
+                        let done = s.done_mb as f32 / s.total_mb.max(1) as f32;
+                        if let Err(stop) = ctx.commit_batch(vec![], counts, Some(done)).await {
+                            lock(&self.downloads).pause.store(true, Ordering::SeqCst);
+                            work.await;
+                            return Err(stop);
+                        }
+                    }
+                }
+            };
+            if !live {
+                return self.download_outcome();
+            }
+            lock(&self.downloads).hold_for_call();
+            work.await;
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-pause
+
+    /// Starts the paused bundles again once the call that paused them ended; `false` when the
+    /// user took the download over meanwhile.
+    fn resume_after_call(&self) -> bool {
+        let mut d = lock(&self.downloads);
+        if !std::mem::take(&mut d.live_paused) {
+            return false;
+        }
+        for b in d
+            .bundles
+            .iter_mut()
+            .filter(|b| b.state == BundleState::Paused)
+        {
+            b.state = BundleState::Downloading;
+        }
+        d.error = None;
+        d.running = true;
+        d.pause.store(false, Ordering::SeqCst);
+        drop(d);
+        self.refresh_setup();
+        true
+    }
+
+    fn download_outcome(&self) -> Result<(), Stop> {
+        let d = lock(&self.downloads);
+        match (
+            d.error,
+            d.bundles.iter().any(|b| b.state == BundleState::Paused),
+        ) {
+            (Some(code), _) => Err(Stop::Failed(CoreError::new(
+                code,
+                "the model download stopped",
+            ))),
+            (None, true) => Err(Stop::Cancelled),
+            (None, false) => Ok(()),
         }
     }
 
@@ -388,55 +528,62 @@ impl Core {
                 continue;
             }
             // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
+            // A pause that was lifted again before the fetch noticed it (Resume right after Pause)
+            // fetches the rest of the file; the half file is never verified.
             let part = partial.join(format!("{}.part", file.path));
-            let opened = private_dir(part.parent().unwrap_or(&partial)).and_then(|_| {
-                let mut options = std::fs::OpenOptions::new();
-                options.create(true).append(true);
-                #[cfg(unix)]
-                std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-                options.open(&part)
-            });
-            let Ok(mut out) = opened else {
-                // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
-                return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
-                // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
-            };
-            let from = out.metadata().map_or(0, |m| m.len());
-            let mut write_failed = false;
-            let mut last = Instant::now();
-            let name = spec.name.clone();
-            let fetched = {
-                let sink = Box::new(|bytes: &[u8]| {
-                    if pause.load(Ordering::SeqCst) {
-                        return false;
-                    }
-                    if out.write_all(bytes).is_err() {
-                        write_failed = true;
-                        return false;
-                    }
-                    done += bytes.len() as u64;
-                    if last.elapsed() >= PROGRESS_EVERY {
-                        last = Instant::now();
-                        lock(&self.downloads).set(&name, BundleState::Downloading, Some(done));
-                        self.refresh_setup();
-                    }
-                    true
+            loop {
+                let opened = private_dir(part.parent().unwrap_or(&partial)).and_then(|_| {
+                    let mut options = std::fs::OpenOptions::new();
+                    options.create(true).append(true);
+                    #[cfg(unix)]
+                    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+                    options.open(&part)
                 });
-                self.deps.models.fetch(file, from, sink).await
-            };
-            // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
-            if write_failed {
-                return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
-            }
-            match fetched {
-                // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
-                // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
-                Err(FetchError::Offline) => return Outcome::Offline(done),
-                // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
-                // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
-                Err(_) => return Outcome::Stop(BundleState::Failed, ErrorCode::Internal),
-                Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused(done),
-                Ok(()) => {}
+                let Ok(mut out) = opened else {
+                    // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
+                    return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+                    // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
+                };
+                let from = out.metadata().map_or(0, |m| m.len());
+                let mut write_failed = false;
+                let mut cut_by_pause = false;
+                let mut last = Instant::now();
+                let name = spec.name.clone();
+                let fetched = {
+                    let sink = Box::new(|bytes: &[u8]| {
+                        if pause.load(Ordering::SeqCst) {
+                            cut_by_pause = true;
+                            return false;
+                        }
+                        if out.write_all(bytes).is_err() {
+                            write_failed = true;
+                            return false;
+                        }
+                        done += bytes.len() as u64;
+                        if last.elapsed() >= PROGRESS_EVERY {
+                            last = Instant::now();
+                            lock(&self.downloads).set(&name, BundleState::Downloading, Some(done));
+                            self.refresh_setup();
+                        }
+                        true
+                    });
+                    self.deps.models.fetch(file, from, sink).await
+                };
+                // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
+                if write_failed {
+                    return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+                }
+                match fetched {
+                    // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
+                    // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
+                    Err(FetchError::Offline) => return Outcome::Offline(done),
+                    // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
+                    // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
+                    Err(_) => return Outcome::Stop(BundleState::Failed, ErrorCode::Internal),
+                    Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused(done),
+                    Ok(()) if cut_by_pause => done = dir_len(&partial),
+                    Ok(()) => break,
+                }
             }
             // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
             // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-verify
@@ -463,6 +610,25 @@ impl Core {
         Outcome::Ready
         // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-ready
         // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-move-ready
+    }
+}
+
+/// Resolves once a call is live (at once if one is).
+async fn call_is_live(guard: &mut tokio::sync::watch::Receiver<noter_jobs::CaptureGuardState>) {
+    let _ = guard.wait_for(|g| g.live).await;
+}
+
+/// The scheduler's handler for the `ModelDownload` job.
+pub(crate) struct DownloadJob(pub(crate) Weak<Core>);
+
+impl JobHandler for DownloadJob {
+    fn run<'a>(&'a self, ctx: &'a mut RunCtx) -> noter_jobs::BoxFuture<'a, Result<(), Stop>> {
+        Box::pin(async move {
+            let Some(core) = self.0.upgrade() else {
+                return Err(Stop::Cancelled);
+            };
+            core.download_job(ctx).await
+        })
     }
 }
 

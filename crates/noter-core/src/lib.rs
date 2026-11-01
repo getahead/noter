@@ -44,7 +44,7 @@ pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
 pub use models::PinnedModels;
-pub use noter_jobs::{Request, Trigger};
+pub use noter_jobs::{PowerSource, Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
 use noter_protocol::ipc::Sink;
@@ -452,6 +452,16 @@ impl Core {
                 }
             }
         }
+    }
+
+    /// Runs `f` inside the core's runtime when the caller is on a thread outside it (the
+    /// scheduler spawns its workers on the current one).
+    pub(crate) fn in_runtime<T>(&self, f: impl FnOnce() -> T) -> T {
+        let _entered = match tokio::runtime::Handle::try_current() {
+            Ok(_) => None,
+            Err(_) => self.runtime.get().map(tokio::runtime::Handle::enter),
+        };
+        f()
     }
 
     fn app(&self) -> MutexGuard<'_, AppSnapshot> {

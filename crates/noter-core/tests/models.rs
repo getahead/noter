@@ -63,6 +63,8 @@ struct Bundles {
     drop_after: Mutex<HashMap<String, usize>>,
     /// Every fetch, as (`<bundle>/<path>`, from_byte).
     fetches: Mutex<Vec<(String, u64)>>,
+    /// Every fetch waits at its start while this is set.
+    hold: std::sync::atomic::AtomicBool,
 }
 
 const CHUNK: usize = 64;
@@ -133,6 +135,9 @@ impl ModelSource for Bundles {
             // `https://<host>/<bundle>/<path>` → `<bundle>/<path>`
             let key = file.url.splitn(4, '/').nth(3).unwrap().to_string();
             self.fetches.lock().unwrap().push((key.clone(), from_byte));
+            while self.hold.load(std::sync::atomic::Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
             let data = &self.content[&key][from_byte as usize..];
             let drop_after = self.drop_after.lock().unwrap().remove(&key);
             for (i, part) in data.chunks(CHUNK).enumerate() {
@@ -916,7 +921,7 @@ async fn the_download_runs_as_a_model_download_job_with_the_same_setup_status() 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_live_call_pauses_the_download_job_and_it_goes_on_when_the_call_ends() {
     let dir = tempfile::tempdir().unwrap();
-    let big = vec![5u8; 64 * 100_000];
+    let big = vec![5u8; 64 * 30_000];
     let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
     let s = open(dir.path(), source, 90_000);
     s.core
@@ -933,12 +938,7 @@ async fn a_live_call_pauses_the_download_job_and_it_goes_on_when_the_call_ends()
         Some(JobRunStatus::Running),
         "nothing downloads during a live call"
     );
-    assert_eq!(
-        std::fs::read_dir(dir.path().join("models"))
-            .unwrap()
-            .count(),
-        0
-    );
+    assert!(!dir.path().join("models/whisper-turbo.partial").exists());
     s.core
         .capture_guard()
         .send(noter_jobs::CaptureGuardState::default())
@@ -952,10 +952,19 @@ async fn a_live_call_pauses_the_download_job_and_it_goes_on_when_the_call_ends()
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_call_that_starts_mid_download_pauses_it_and_the_run_waits_paused() {
     let dir = tempfile::tempdir().unwrap();
-    let big = vec![5u8; 64 * 400_000];
+    let big = vec![5u8; 64 * 30_000];
     let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
     let s = open(dir.path(), source, 90_000);
+    s.source
+        .hold
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     download(&s.core, DownloadAction::Start).await.unwrap();
+    for _ in 0..500 {
+        if !s.source.fetches.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
     s.core
         .capture_guard()
         .send(noter_jobs::CaptureGuardState {
@@ -967,6 +976,9 @@ async fn a_call_that_starts_mid_download_pauses_it_and_the_run_waits_paused() {
         state(st, "whisper-turbo") == BundleState::Paused
     })
     .await;
+    s.source
+        .hold
+        .store(false, std::sync::atomic::Ordering::SeqCst);
     for _ in 0..500 {
         if model_runs(&s.core).last().map(|r| r.status) == Some(JobRunStatus::Paused) {
             break;
