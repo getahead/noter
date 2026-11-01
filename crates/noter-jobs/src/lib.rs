@@ -191,7 +191,9 @@ impl Scheduler {
 
     /// Reconciles runs a previous process left unfinished, fires the
     /// startup trigger and starts the loop (guard changes, power and scheduled triggers).
-    pub async fn start(&self) -> Result<(), CoreError> {
+    // Not async, so a trigger that comes right after the core started never meets a restart
+    // reconcile that has not run yet. Needs a tokio runtime context for its loop.
+    pub fn start(&self) -> Result<(), CoreError> {
         self.0.reconcile()?;
         self.0.fire(|d| d.trigger == Trigger::Startup)?;
         let weak = Arc::downgrade(&self.0);
@@ -650,6 +652,7 @@ impl RunCtx {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-jobs-scheduler-batches:p1
     // @cpt-algo:cpt-noter-algo-core-jobs-scheduler-batch:p1
     /// Commits at most `BATCH_MAX` target rows with the run's checkpoint (`counts`, `progress`)
     /// in one logged transaction, then yields. A refused or failed batch leaves earlier batches

@@ -63,6 +63,8 @@ struct Bundles {
     drop_after: Mutex<HashMap<String, usize>>,
     /// Every fetch, as (`<bundle>/<path>`, from_byte).
     fetches: Mutex<Vec<(String, u64)>>,
+    /// Every fetch waits at its start while this is set.
+    hold: std::sync::atomic::AtomicBool,
 }
 
 const CHUNK: usize = 64;
@@ -133,6 +135,9 @@ impl ModelSource for Bundles {
             // `https://<host>/<bundle>/<path>` → `<bundle>/<path>`
             let key = file.url.splitn(4, '/').nth(3).unwrap().to_string();
             self.fetches.lock().unwrap().push((key.clone(), from_byte));
+            while self.hold.load(std::sync::atomic::Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
             let data = &self.content[&key][from_byte as usize..];
             let drop_after = self.drop_after.lock().unwrap().remove(&key);
             for (i, part) in data.chunks(CHUNK).enumerate() {
@@ -873,4 +878,123 @@ async fn a_bundle_file_outside_the_bundle_folder_fails_without_a_request() {
     .await;
     assert!(s.source.fetches.lock().unwrap().is_empty());
     assert!(!dir.path().join("models/escape.bin").exists());
+}
+
+fn model_runs(core: &Core) -> Vec<JobRunRow> {
+    core.scheduler()
+        .runs()
+        .unwrap()
+        .into_iter()
+        .filter(|r| r.kind == JobKind::ModelDownload)
+        .collect()
+}
+
+// @cpt-flow:cpt-noter-flow-core-jobs-scheduler-run:p1
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_download_runs_as_a_model_download_job_with_the_same_setup_status() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    until(&s.core, "ready", |st| {
+        st.models
+            .bundles
+            .iter()
+            .all(|b| b.state == BundleState::Ready)
+    })
+    .await;
+    for _ in 0..500 {
+        if model_runs(&s.core)
+            .iter()
+            .all(|r| r.status == JobRunStatus::Succeeded)
+            && !model_runs(&s.core).is_empty()
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let runs = model_runs(&s.core);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].status, JobRunStatus::Succeeded);
+}
+
+// @cpt-flow:cpt-noter-flow-core-jobs-scheduler-interrupt:p1
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_live_call_pauses_the_download_job_and_it_goes_on_when_the_call_ends() {
+    let dir = tempfile::tempdir().unwrap();
+    let big = vec![5u8; 64 * 30_000];
+    let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
+    let s = open(dir.path(), source, 90_000);
+    s.core
+        .capture_guard()
+        .send(noter_jobs::CaptureGuardState {
+            live: true,
+            resumed_call: None,
+        })
+        .unwrap();
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_ne!(
+        model_runs(&s.core).last().map(|r| r.status),
+        Some(JobRunStatus::Running),
+        "nothing downloads during a live call"
+    );
+    assert!(!dir.path().join("models/whisper-turbo.partial").exists());
+    s.core
+        .capture_guard()
+        .send(noter_jobs::CaptureGuardState::default())
+        .unwrap();
+    until(&s.core, "ready", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_call_that_starts_mid_download_pauses_it_and_the_run_waits_paused() {
+    let dir = tempfile::tempdir().unwrap();
+    let big = vec![5u8; 64 * 30_000];
+    let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
+    let s = open(dir.path(), source, 90_000);
+    s.source
+        .hold
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    for _ in 0..500 {
+        if !s.source.fetches.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    s.core
+        .capture_guard()
+        .send(noter_jobs::CaptureGuardState {
+            live: true,
+            resumed_call: None,
+        })
+        .unwrap();
+    until(&s.core, "paused", |st| {
+        state(st, "whisper-turbo") == BundleState::Paused
+    })
+    .await;
+    s.source
+        .hold
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    for _ in 0..500 {
+        if model_runs(&s.core).last().map(|r| r.status) == Some(JobRunStatus::Paused) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(
+        model_runs(&s.core).last().map(|r| r.status),
+        Some(JobRunStatus::Paused)
+    );
+    s.core
+        .capture_guard()
+        .send(noter_jobs::CaptureGuardState::default())
+        .unwrap();
+    until(&s.core, "ready", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
 }

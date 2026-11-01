@@ -667,7 +667,13 @@ async fn every_m0_write_leaves_one_change_row_per_record() {
     let mut want: Vec<&str> = Vec::new();
     let mut wrote = |reason: &'static str, rows: usize| {
         want.extend(std::iter::repeat_n(reason, rows));
-        let got: Vec<String> = change_rows(dir.path()).into_iter().map(|r| r.0).collect();
+        // The scheduler logs its own run rows as they change (`noter-jobs` tests count them);
+        // `models_download` queues a run, whose steps land at their own pace.
+        let got: Vec<String> = change_rows(dir.path())
+            .into_iter()
+            .map(|r| r.0)
+            .filter(|reason| reason != "job")
+            .collect();
         assert_eq!(got, want, "after {reason}");
     };
 

@@ -41,8 +41,7 @@ impl PowerSource for AcPower {
     }
 }
 
-/// A job kind whose work lands later (2.17 fills post-call and archive, 2.16's second slice
-/// the model download): its runs succeed at once.
+/// A job kind whose work lands later (2.17 fills post-call and archive): its runs succeed at once.
 struct NoOp;
 
 impl JobHandler for NoOp {
@@ -87,21 +86,21 @@ impl Core {
         &self.capture_guard
     }
 
-    /// Starts the scheduler on the runtime the host started the core on.
+    /// Starts the scheduler on the runtime the host started the core on, before any command can
+    /// queue work: the restart reconcile has finished when this returns.
     pub(crate) fn start_jobs(self: &Arc<Self>) {
         let Some(runtime) = self.runtime.get() else {
             return;
         };
-        let scheduler = self.jobs.clone();
-        let weak = Arc::downgrade(self);
-        runtime.spawn(async move {
-            if let Err(e) = scheduler.start().await {
-                if let Some(core) = weak.upgrade() {
-                    core.log(object(json!({
-                        "level": "error", "module": "jobs", "message": e.message
-                    })));
-                }
-            }
-        });
+        let _entered = runtime.enter();
+        self.jobs.register(
+            JobKind::ModelDownload,
+            Arc::new(crate::models::DownloadJob(Arc::downgrade(self))),
+        );
+        if let Err(e) = self.jobs.start() {
+            self.log(object(json!({
+                "level": "error", "module": "jobs", "message": e.message
+            })));
+        }
     }
 }
