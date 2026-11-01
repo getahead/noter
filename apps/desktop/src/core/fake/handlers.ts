@@ -333,7 +333,7 @@ export const defaultHandlers: Handlers = {
     // Like the real core: the new call has its row and an empty live transcript at once (D-37).
     const template = world.calls.find((c) => c.id === cap.call_id) ?? world.calls[0];
     if (template) {
-      const row = { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], audio_kept_until: null, audio_deleted: false, open_items: 0, review_waiting: 0 };
+      const row = { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 };
       world.calls = [row, ...world.calls];
     }
     world.transcripts.push({ subscription_id: null, call_id: id, live: true, pass: "live", archive: "not_started", segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true });
@@ -508,6 +508,7 @@ export const defaultHandlers: Handlers = {
     const calls = a.call_ids.map((id) => call(world, id)).filter((c) => !c.audio_deleted);
     calls.forEach((c) => {
       c.audio_deleted = true;
+      c.audio_deleted_at = Date.now();
       c.audio_kept_until = null;
       emit("entity:changed", { type: "call", call: c });
     });

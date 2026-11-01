@@ -88,6 +88,8 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
         unnamed_speakers: 2,
         privacy: "normal",
         audio_deleted: false,
+        audio_deleted_at: null,
+        audio_retention_days: 30,
       }),
       onPress: vi.fn(),
       onOpen,

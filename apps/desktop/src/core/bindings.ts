@@ -651,6 +651,13 @@ export type CallRow = {
 	archive: ArchiveStatus,
 	audio_kept_until: TimestampMs | null,
 	audio_deleted: boolean,
+	/**
+	 *  When the audio was deleted (by hand or by age); `null` while it is kept or never stored.
+	 *  The call page reads "Audio deleted on <date> (kept N days)" from it (D-36).
+	 */
+	audio_deleted_at: TimestampMs | null,
+	/**  Days the audio is kept under the current retention; 0 for forever and never store. */
+	audio_retention_days: number,
 	open_items: number,
 	review_waiting: number,
 };
