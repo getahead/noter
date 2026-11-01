@@ -639,6 +639,10 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
         builder
+            // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-first-click
+            // The first click on a panel of an inactive app acts, instead of only making it key.
+            .accept_first_mouse(true)
+            // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-first-click
             .content_protected(true)
             .always_on_top(true)
             .visible_on_all_workspaces(true)

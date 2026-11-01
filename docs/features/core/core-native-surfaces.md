@@ -233,8 +233,9 @@ During a call Noter must never steal focus from the call app, never appear in a 
 2. [x] - `p1` - Set the sharing type so screen capture excludes them - `inst-content-protect`
 3. [x] - `p1` - Keep them above normal windows on every Space while a call runs - `inst-level`
 4. [x] - `p1` - Draw the record prompt without a title bar on a transparent background, so the panel is its content - `inst-chrome`
-5. [x] - `p1` - API: `window_fit { width, height }` from the record prompt: resize it to its content, 360 to 440 pt wide and at most 480 pt high, keeping its top-right corner; **IF** either is 0 **RETURN** `invalid_input` - `inst-fit`
-6. [x] - `p1` - **RETURN** - `inst-return-panels`
+5. [x] - `p1` - Take the first click on a panel while another app is active: it acts at once instead of only making the panel key - `inst-first-click`
+6. [x] - `p1` - API: `window_fit { width, height }` from the record prompt: resize it to its content, 360 to 440 pt wide and at most 480 pt high, keeping its top-right corner; **IF** either is 0 **RETURN** `invalid_input` - `inst-fit`
+7. [x] - `p1` - **RETURN** - `inst-return-panels`
 
 ### Calendar facts for detection
 
