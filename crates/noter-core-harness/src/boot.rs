@@ -14,10 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
-    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink,
-    ClipboardText, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, FetchError,
-    LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices, Placement, SaveKind,
-    Scripted, Surfaces, SystemClock, TrayModel, Updater,
+    Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent,
+    CaptureEvent, ChunkSink, ClipboardText, Clock, Core, CoreDeps, EnvironmentReading,
+    EventEmitter, FetchError, LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices,
+    Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
