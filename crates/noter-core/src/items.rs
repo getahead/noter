@@ -529,8 +529,9 @@ impl Core {
         }
     }
 
-    fn write_items_file(&self, call_id: &str) -> Result<(), CoreError> {
-        let items = self.store().read(|c| {
+    /// Every item of the call, by id: one snapshot on a read connection.
+    pub(crate) fn items_of_call(&self, call_id: &str) -> Result<Vec<ItemView>, CoreError> {
+        self.store().read(|c| {
             c.prepare(&format!(
                 "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
                  WHERE i.call_id = ?1 ORDER BY i.id"
@@ -538,7 +539,11 @@ impl Core {
             .query_map([call_id], stored)?
             .map(|s| assemble(c, s?))
             .collect::<Db<Vec<_>>>()
-        })?;
+        })
+    }
+
+    fn write_items_file(&self, call_id: &str) -> Result<(), CoreError> {
+        let items = self.items_of_call(call_id)?;
         let dir = self.data_dir.join("audio").join(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
         let tmp = dir.join("items.json.tmp");

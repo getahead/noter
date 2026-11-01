@@ -1808,3 +1808,31 @@ async fn scripted_native_ops_record_launches_and_clipboard_writes_and_follow_the
     );
     r.finish().await;
 }
+
+#[tokio::test]
+async fn the_scripted_folder_panel_answers_a_folder_under_the_data_dir_and_the_clipboard_log_starts_empty(
+) {
+    let mut r = start().await;
+    assert_eq!(
+        r.ok("main", "harness.native_log", json!({})).await,
+        json!({ "launches": [], "clipboard": [] })
+    );
+    let data = r.ok("main", "harness.data_dir", json!({})).await;
+    let shown = r
+        .ok(
+            "main",
+            "calls_export",
+            json!({
+                "call_ids": ["call_backend"],
+                "include": { "summary_and_items": false, "transcript": true, "audio": false }
+            }),
+        )
+        .await;
+    let path = std::path::PathBuf::from(shown["path"].as_str().unwrap());
+    assert!(
+        path.starts_with(data["path"].as_str().unwrap()) && path.is_dir(),
+        "{path:?}"
+    );
+    assert_eq!(shown["files"], 2);
+    r.finish().await;
+}

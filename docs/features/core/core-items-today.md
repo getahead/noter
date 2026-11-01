@@ -170,7 +170,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Share or export a scope
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-items-today-share`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-items-today-share`
 
 **Actor**: Primary user (main window)
 
@@ -182,12 +182,12 @@ The user can review what a call produced, check the words behind an item, tick w
 - Unwritten outputs: `outputs_not_ready`; suggested items excluded by the request's review guard: `unreviewed_in_scope`; cancelled panel: `cancelled`.
 
 **Steps**:
-1. [ ] - `p1` - API: `share_copy { call_id, scope, format }` or `calls_export { call_ids, include, scope }`; resolve the scope with `cpt-noter-algo-core-items-today-format` - `inst-share-request`
-2. [ ] - `p1` - For copy, write rich and plain clipboard representations through native services and return `ShareResult` with text, section count, item count, unreviewed count and sensitivity - `inst-share-copy`
-3. [ ] - `p1` - For export, show the native save panel; **IF** cancelled **RETURN** `cancelled` without writing a completed export - `inst-share-panel`
-4. [ ] - `p1` - Write selected summary/items as Markdown, transcript as SRT and JSON, and audio only while stored and requested; keep scope restrictions in every format - `inst-share-export`
-5. [ ] - `p1` - **IF** requested audio has been deleted, return `audio_deleted` rather than inventing files; an I/O failure returns the typed error and no success count for incomplete output - `inst-share-fail`
-6. [ ] - `p1` - **RETURN** `ExportResult` after completion; reveal-in-Finder uses the existing external-open command - `inst-share-return`
+1. [x] - `p1` - API: `share_copy { call_id, scope, format }` or `calls_export { call_ids, include, scope }`; resolve the scope with `cpt-noter-algo-core-items-today-format` - `inst-share-request`
+2. [x] - `p1` - For copy, write rich and plain clipboard representations through native services and return `ShareResult` with text, section count, item count, unreviewed count and sensitivity - `inst-share-copy`
+3. [x] - `p1` - For export, show the native save panel; **IF** cancelled **RETURN** `cancelled` without writing a completed export - `inst-share-panel`
+4. [x] - `p1` - Write selected summary/items as Markdown, transcript as SRT and JSON, and audio only while stored and requested; keep scope restrictions in every format - `inst-share-export`
+5. [x] - `p1` - **IF** requested audio has been deleted, return `audio_deleted` rather than inventing files; an I/O failure returns the typed error and no success count for incomplete output - `inst-share-fail`
+6. [x] - `p1` - **RETURN** `ExportResult` after completion; reveal-in-Finder uses the existing external-open command - `inst-share-return`
 
 ### Set and list call tags
 
@@ -246,19 +246,19 @@ The user can review what a call produced, check the words behind an item, tick w
 
 ### Resolve and format share content
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-items-today-format`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-items-today-format`
 
 **Input**: Call ids, `ShareScope`, requested format and current committed outputs/items.
 
 **Output**: Sanitized formatted content and exact scope counts or typed error.
 
 **Steps**:
-1. [ ] - `p1` - Treat empty section or item selectors as all content within their containing selection; reject item ids outside the selected call or sections - `inst-format-scope`
-2. [ ] - `p1` - Read only committed available sections; **IF** nothing requested is ready **RETURN** `outputs_not_ready` - `inst-format-ready`
-3. [ ] - `p1` - Count suggested items in scope; **IF** present and `include_unreviewed` is false **RETURN** `unreviewed_in_scope`; otherwise include them visibly marked Not reviewed - `inst-format-review`
-4. [ ] - `p1` - Omit rejected items; render Slack, Jira or Markdown with owners, dates and evidence links, escaping target markup and excluding raw HTML - `inst-format-render`
-5. [ ] - `p1` - Keep explicit sensitive-call copies available, reporting sensitivity; this clipboard action is not an automatic cloud request - `inst-format-sensitive`
-6. [ ] - `p1` - **RETURN** the formatted content and actual counts without changing review or status - `inst-format-return`
+1. [x] - `p1` - Treat empty section or item selectors as all content within their containing selection; reject item ids outside the selected call or sections - `inst-format-scope`
+2. [x] - `p1` - Read only committed available sections; **IF** nothing requested is ready **RETURN** `outputs_not_ready` - `inst-format-ready`
+3. [x] - `p1` - Count suggested items in scope; **IF** present and `include_unreviewed` is false **RETURN** `unreviewed_in_scope`; otherwise include them visibly marked Not reviewed - `inst-format-review`
+4. [x] - `p1` - Omit rejected items; render Slack, Jira or Markdown with owners, dates and evidence links, escaping target markup and excluding raw HTML - `inst-format-render`
+5. [x] - `p1` - Keep explicit sensitive-call copies available, reporting sensitivity; this clipboard action is not an automatic cloud request - `inst-format-sensitive`
+6. [x] - `p1` - **RETURN** the formatted content and actual counts without changing review or status - `inst-format-return`
 
 ## 4. States (CDSL)
 
@@ -324,7 +324,7 @@ The system **MUST** assemble Today from permitted EventKit data and local record
 
 ### Sharing, export and tags
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-items-today-sharing`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-items-today-sharing`
 
 The system **MUST** format exactly the selected scope, guard unreviewed items, write rich clipboard formats and export only requested files through the native panel. Tag additions and removals across selected calls must be validated, case-normalized for uniqueness, serialized by the writer and undoable, with suggestions drawn only from current usage. The command has no caller-supplied revision.
 
