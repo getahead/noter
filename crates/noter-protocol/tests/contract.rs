@@ -576,3 +576,31 @@ fn engine_example_lines_cover_every_command_and_event() {
         assert_eq!(&back, l);
     }
 }
+
+/// The archive result file and its word timings: the examples Swift's tests read survive serde,
+/// and the file carries what the offline pass promises (both channels, words, overlap, corrections).
+#[test]
+fn archive_result_examples_round_trip() {
+    use noter_protocol::engine::*;
+    use noter_protocol::fixtures::engine_lines;
+    let results = engine_lines::archive_results();
+    assert!(!results.is_empty());
+    for r in &results {
+        let back: ArchiveResult = serde_json::from_str(&serde_json::to_string(r).unwrap()).unwrap();
+        assert_eq!(&back, r);
+        let channels: std::collections::BTreeSet<_> = r
+            .segments
+            .iter()
+            .map(|s| format!("{:?}", s.channel))
+            .collect();
+        assert_eq!(channels.len(), 2, "both channels");
+        assert!(r.segments.iter().all(|s| s.words_path.is_some()));
+        assert!(r.segments.iter().any(|s| s.crosstalk_labels.len() == 2));
+    }
+    let words = engine_lines::words();
+    let back: Vec<EngineWord> =
+        serde_json::from_str(&serde_json::to_string(&words).unwrap()).unwrap();
+    assert_eq!(back, words);
+    let v = serde_json::to_value(&words[0]).unwrap();
+    assert_eq!(v["t0_ms"], 1_000);
+}

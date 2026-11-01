@@ -10,10 +10,12 @@
 
 mod capture;
 mod launch;
+mod offline;
 pub mod scripted;
 
 pub use capture::{CaptureFact, Degraded, EngineSession};
 pub use launch::{EngineIo, EngineLauncher, LaunchFuture, ProcessLauncher};
+pub use offline::{OfflineError, OfflineKey, OfflineState, SPEAKER_DIMS, TEXT_DIMS};
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -146,6 +148,7 @@ struct Shared {
     stats: Stats,
     detection: (bool, Vec<String>),
     session: Option<capture::Session>,
+    offline: offline::Registry,
 }
 
 /// The running engine: its stdin and its reader task.
@@ -216,6 +219,7 @@ impl<L: EngineLauncher> EngineClient<L> {
                     stats: Stats::default(),
                     detection: (false, Vec::new()),
                     session: None,
+                    offline: offline::Registry::default(),
                 }),
                 events: broadcast::channel(1024).0,
                 facts: broadcast::channel(256).0,
@@ -362,6 +366,16 @@ impl<L: EngineLauncher> EngineClient<L> {
 
     /// Sends a command and waits for its `ack` or `error`.
     pub async fn command(&self, cmd: EngineCommand) -> Result<(), CommandError> {
+        self.command_with(cmd, |_, _| {}).await
+    }
+
+    /// [`Self::command`], telling `sent` the command's id under the state lock before the line
+    /// is written, so a reply can never arrive before the caller knows the id.
+    async fn command_with(
+        &self,
+        cmd: EngineCommand,
+        sent: impl FnOnce(&mut Shared, u64),
+    ) -> Result<(), CommandError> {
         self.ensure_ready()
             .await
             .map_err(|_| CommandError::Unavailable)?;
@@ -372,7 +386,11 @@ impl<L: EngineLauncher> EngineClient<L> {
             let Some(c) = conn.as_mut() else {
                 return Err(CommandError::Unavailable);
             };
-            self.shared().pending.insert(id, tx);
+            {
+                let mut s = self.shared();
+                s.pending.insert(id, tx);
+                sent(&mut s, id);
+            }
             if write_line(&mut *c.stdin, id, cmd).await.is_err() {
                 self.shared().pending.remove(&id);
                 return Err(CommandError::Unavailable);
@@ -442,6 +460,8 @@ impl<L: EngineLauncher> EngineClient<L> {
             }
         }
         *conn = None;
+        // Dropping the connection aborts its reader before it may see the end of stdout.
+        self.shared().offline.fail_all();
     }
     // @cpt-end:cpt-noter-state-core-engine-foundation-process:p1:inst-st-stopped
 
@@ -501,6 +521,7 @@ impl<L: EngineLauncher> EngineClient<L> {
                 if let Some(tx) = s.pending.remove(cmd_id) {
                     let _ = tx.send(Ok(()));
                 }
+                s.offline.acked(*cmd_id);
                 return;
             }
             EngineEvent::Error {
@@ -526,6 +547,7 @@ impl<L: EngineLauncher> EngineClient<L> {
         }
         // @cpt-end:cpt-noter-algo-core-engine-foundation-read-events:p1:inst-correlate
         // @cpt-begin:cpt-noter-algo-core-engine-foundation-read-events:p1:inst-route
+        s.offline.on_event(&line.event);
         drop(s);
         self.on_capture_event(&line.event);
         // No subscriber is not an error: the event is simply not wanted now.
@@ -546,6 +568,7 @@ impl<L: EngineLauncher> EngineClient<L> {
             }
             s.pings.clear();
             s.ready = None;
+            s.offline.fail_all();
             // @cpt-end:cpt-noter-algo-core-engine-foundation-restart:p1:inst-fail-waiting
             // @cpt-begin:cpt-noter-state-core-engine-foundation-process:p1:inst-st-restart
             let restart = s.state == EngineState::Ready;

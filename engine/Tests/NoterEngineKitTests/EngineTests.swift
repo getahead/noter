@@ -64,8 +64,8 @@ final class ProtocolTests: XCTestCase {
             try decode(#"{"id":5,"cmd":{"type":"stop","call_id":"call_1"}}"#),
             EngineCommandLine(id: 5, cmd: .stop(callId: "call_1")))
         XCTAssertEqual(
-            try decode(#"{"id":6,"cmd":{"type":"offline_pass","call_id":"call_1"}}"#),
-            EngineCommandLine(id: 6, cmd: .other(type: "offline_pass")))
+            try decode(#"{"id":6,"cmd":{"type":"a_later_command","call_id":"call_1"}}"#),
+            EngineCommandLine(id: 6, cmd: .other(type: "a_later_command")))
         XCTAssertThrowsError(try decode(#"{"id":7}"#))
     }
 
