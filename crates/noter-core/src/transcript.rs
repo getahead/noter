@@ -659,17 +659,20 @@ pub(crate) fn segments_of(
 ) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
     let mut stmt = c.prepare(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, s.lang_p, s.avg_logprob,
-                p.id, COALESCE(p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections
+                p.id, COALESCE(p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections,
+                s.crosstalk_with
          FROM segments s LEFT JOIN speakers p ON p.id = s.speaker_id
          WHERE s.call_id = ?1 AND s.pass = (CASE WHEN EXISTS
                (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')
                THEN 'archive' ELSE 'live' END)
          ORDER BY s.t0_ms, s.rowid",
     )?;
+    let mut crosstalk: Vec<Vec<String>> = vec![];
     let rows = stmt.query_map([call_id.as_str()], |r| {
         let channel: AudioChannel = word(&r.get::<_, String>(1)?).unwrap_or(AudioChannel::Mic);
         let label: Option<String> = r.get(9)?;
         let named_by: Option<String> = r.get(11)?;
+        crosstalk.push(serde_json::from_str(&r.get::<_, String>(15)?).unwrap_or_default());
         Ok(SegmentView {
             id: SegmentId::new(r.get::<_, String>(0)?),
             call_id: call_id.clone(),
@@ -702,10 +705,64 @@ pub(crate) fn segments_of(
         })
     })?;
     let mut all = rows.collect::<Result<Vec<_>, _>>()?;
+    // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-rechunk
+    // Both candidates of an archive overlap (D-40), labelled as their speakers are.
+    if crosstalk.iter().any(|c| !c.is_empty()) {
+        let speakers = speaker_refs(c, call_id)?;
+        for (segment, ids) in all.iter_mut().zip(crosstalk) {
+            segment.crosstalk_with = ids
+                .iter()
+                .filter_map(|id| speakers.get(id).cloned())
+                .collect();
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-rechunk
     if let Some((channel, t0, t1)) = span {
         all.retain(|s| channel.map_or(true, |c| c == s.channel) && s.t1_ms > t0 && s.t0_ms < t1);
     }
     Ok(all)
+}
+
+/// The call's speakers of its current pass, as `entity:changed` sends them.
+pub(crate) fn speaker_views(
+    c: &Connection,
+    call_id: &CallId,
+) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
+    Ok(speakers_of(c, call_id)?
+        .into_iter()
+        .map(|(_, v)| v)
+        .collect())
+}
+
+/// Every speaker of the call, of both passes, by id.
+fn speaker_refs(
+    c: &Connection,
+    call_id: &CallId,
+) -> noter_db::rusqlite::Result<HashMap<String, SpeakerRef>> {
+    let mut stmt = c.prepare(
+        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers WHERE call_id = ?1",
+    )?;
+    let rows = stmt.query_map([call_id.as_str()], |r| {
+        let id: String = r.get(0)?;
+        let channel: AudioChannel = word(&r.get::<_, String>(3)?).unwrap_or(AudioChannel::Sys);
+        let named_by: Option<String> = r.get(4)?;
+        let label = speaker_label(
+            channel,
+            &r.get::<_, String>(1)?,
+            r.get(2)?,
+            named_by.as_deref(),
+            r.get(5)?,
+            r.get::<_, Option<String>>(6)?.as_deref(),
+        );
+        Ok((
+            id.clone(),
+            SpeakerRef {
+                speaker_id: SpeakerId::new(id),
+                label,
+            },
+        ))
+    })?;
+    rows.collect()
 }
 
 /// The call's live speakers with the engine label each was created for.
@@ -904,7 +961,7 @@ fn segment_row(seg: &EngineSegment, view: &SegmentView) -> Insert {
 /// The shadow text for the keyword index: lower-cased, ё folded to е, ß to ss.
 // shortcut: no NFKC and no stemming (PRD › Retrieval function); retrieval adds both when it
 // rebuilds the shadow column from `text`.
-fn shadow(text: &str) -> String {
+pub(crate) fn shadow(text: &str) -> String {
     text.to_lowercase().replace('ё', "е").replace('ß', "ss")
 }
 
@@ -913,7 +970,7 @@ fn confidence(avg_logprob: f32) -> f32 {
     avg_logprob.exp().clamp(0.0, 1.0)
 }
 
-fn lang_word(lang: &Lang) -> String {
+pub(crate) fn lang_word(lang: &Lang) -> String {
     match lang {
         Lang::En => "en".into(),
         Lang::Ru => "ru".into(),

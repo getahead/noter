@@ -20,6 +20,8 @@ pub enum NotificationKind {
     CaptureProblem(DegradedState),
     /// The call's outputs are ready (handed over by the post-call pipeline from M2).
     SummaryReady,
+    /// No section of the call's outputs could be written.
+    SummaryFailed,
 }
 
 #[derive(Debug, PartialEq)]

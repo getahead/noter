@@ -511,7 +511,7 @@ impl Core {
     /// After a commit: the whole changed items through `entity:changed` and each call's
     /// `items.json` refreshed. A failure is logged: the change is committed.
     // @cpt-begin:cpt-noter-algo-core-items-today-mutate:p1:inst-mutate-publish
-    fn items_published(&self, items: &[ItemView]) {
+    pub(crate) fn items_published(&self, items: &[ItemView]) {
         for item in items {
             self.emit_entity_changed(&EntityChanged::Item { item: item.clone() });
         }

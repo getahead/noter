@@ -1,27 +1,33 @@
 // @cpt-component:cpt-noter-component-core-postcall:p1
-//! Post-call outputs (`cpt-noter-feature-core-postcall`, slice 1): the PostCall job writes the
-//! sections from the live transcript, one router run per section in the stated order, each
-//! committed as its own logged batch; the outputs commands read, edit and compare them.
-//! Archive install, re-chunking, the merge regeneration and notifications are slice 2.
+//! Post-call outputs (`cpt-noter-feature-core-postcall`): the PostCall job chunks the live
+//! transcript and writes the sections, one router run per section in the stated order, each
+//! committed as its own logged batch with its suggested items; the Regeneration job writes them
+//! again after the archive pass or on request, merged with the user's edits; the outputs
+//! commands read, edit and compare them. The archive pass itself is `archive.rs`.
 
 use std::collections::HashMap;
+use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
 use std::sync::{Arc, Weak};
 
-use noter_db::rusqlite::{Connection, OptionalExtension};
-use noter_db::Mutation;
+use noter_db::rusqlite::{params, Connection, OptionalExtension};
+use noter_db::{Logged, Mutation};
 use noter_jobs::{BoxFuture, JobHandler, Request, RunCtx, Stop, Trigger};
 use noter_llm::{
-    Failure, LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
+    Failure, LlmRuntime, Packet, PacketContext, PacketItem, Privacy, RunRequest, Skill,
+    SourceClass, TaskKind,
 };
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
-use noter_protocol::model::settings::AuditWhat;
+use noter_protocol::model::settings::{AuditWhat, SummaryLanguage};
 use noter_protocol::model::*;
 use noter_protocol::skills::{ExtractedItem, ParticipantNotes, PostCallOutput};
 use noter_protocol::*;
 use serde_json::{json, Value};
 
-use crate::{lock, to_json, Core};
+use crate::merge::merge;
+use crate::notify::{Notification, NotificationKind};
+use crate::{lock, object, to_json, Core};
 
 /// The post-call skill's contract version, as `summary_versions.skill_version` records it.
 const SKILL_VERSION: &str = "1.0.0";
@@ -97,9 +103,13 @@ fn aggregate(states: &[SectionState]) -> OutputsStatus {
 /// The sections of running work that have no committed row to read them from: writing, or
 /// failed with their typed failure. Committed sections are read from the store.
 // shortcut: in memory; after a restart an unwritten section of a failed run reads pending
-// until slice 2's retry stores the failure (no column for it in `summaries`).
+// until it is regenerated (no column for the failure in `summaries`).
 #[derive(Default)]
-pub(crate) struct Sections(std::sync::Mutex<HashMap<(CallId, SectionKind), SectionState>>);
+pub(crate) struct Sections(
+    std::sync::Mutex<HashMap<(CallId, SectionKind), SectionState>>,
+    /// The options of the regeneration queued for a call (none for the archive's own).
+    std::sync::Mutex<HashMap<CallId, RegenerateArgs>>,
+);
 
 impl Sections {
     fn get(&self, call: &CallId, kind: SectionKind) -> Option<SectionState> {
@@ -128,6 +138,14 @@ impl Sections {
     /// The run ended: what it was still writing goes back to pending.
     fn settle(&self, call: &CallId) {
         lock(&self.0).retain(|(c, _), s| c != call || !matches!(s, SectionState::Writing));
+    }
+
+    fn request(&self, args: &RegenerateArgs) {
+        lock(&self.1).insert(args.call_id.clone(), args.clone());
+    }
+
+    fn take_request(&self, call: &CallId) -> Option<RegenerateArgs> {
+        lock(&self.1).remove(call)
     }
 }
 
@@ -294,9 +312,7 @@ fn code_of(failure: &Failure) -> Option<ErrorCode> {
         Failure::Runtime { code } => word(code).unwrap_or(ErrorCode::RuntimeUnavailable),
         Failure::Budget => ErrorCode::BudgetPaused,
         Failure::Timeout => ErrorCode::RuntimeUnavailable,
-        // shortcut: no error code names an output that stayed invalid; Internal until the
-        // contract has one.
-        Failure::Invalid { .. } => ErrorCode::Internal,
+        Failure::Invalid { .. } => ErrorCode::OutputInvalid,
         Failure::Cancelled => return None,
     })
 }
@@ -349,7 +365,7 @@ fn body_of(kind: SectionKind, out: &PostCallOutput) -> String {
     }
 }
 
-fn speaker_name(label: &SpeakerLabel) -> String {
+pub(crate) fn speaker_name(label: &SpeakerLabel) -> String {
     match label {
         SpeakerLabel::You => "You".into(),
         SpeakerLabel::Person { person } => person.display_name.clone(),
@@ -363,11 +379,79 @@ fn clock(ms: i64) -> String {
     format!("{:02}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
 }
 
-/// One section's generated text, as the job commits it.
+/// The `items.kind` of the items a section holds; `None` for text sections.
+fn item_kind(kind: SectionKind) -> Option<&'static str> {
+    Some(match kind {
+        SectionKind::Decisions => "decision",
+        SectionKind::ActionItems => "action_item",
+        SectionKind::OpenQuestions => "open_question",
+        SectionKind::Risks => "risk",
+        _ => return None,
+    })
+}
+
+/// The items a section of a validated output extracts.
+fn items_of(kind: SectionKind, out: &PostCallOutput) -> Vec<ExtractedItem> {
+    match kind {
+        SectionKind::Decisions => out.decisions.clone(),
+        SectionKind::ActionItems => out.action_items.clone(),
+        SectionKind::OpenQuestions => out.open_questions.clone(),
+        SectionKind::Risks => out.risks.clone(),
+        _ => vec![],
+    }
+}
+
+/// An item's identity for "already reviewed": its words, case and spacing aside.
+fn identity(text: &str) -> String {
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_end_matches(['.', '!', '?'])
+        .to_lowercase()
+}
+
+/// The heading a section has in `summary.md`.
+fn heading(kind: SectionKind) -> &'static str {
+    match kind {
+        SectionKind::Summary => "Summary",
+        SectionKind::Decisions => "Decisions",
+        SectionKind::ActionItems => "Action items",
+        SectionKind::OpenQuestions => "Open questions",
+        SectionKind::PerParticipant => "Per participant",
+        SectionKind::RoleReviews => "Role reviews",
+        SectionKind::Risks => "Risks",
+        SectionKind::CallTypeExtras => "Extras",
+    }
+}
+
+/// D4: an agent switches itself off for a call type when at least 80 % of its cards over the
+/// last ten calls of that type were dismissed. `per_call` holds (dismissed, shown) per call,
+/// oldest first; fewer than ten calls with cards decide nothing.
+pub(crate) fn switches_off(per_call: &[(u32, u32)]) -> bool {
+    if per_call.len() < 10 {
+        return false;
+    }
+    let last = &per_call[per_call.len() - 10..];
+    let (dismissed, shown) = last
+        .iter()
+        .fold((0u32, 0u32), |(d, s), (cd, cs)| (d + cd, s + cs));
+    shown > 0 && dismissed * 5 >= shown * 4
+}
+
+/// One section's generated text and items, as the job commits them.
 struct Generated {
     body_md: String,
     lang: Lang,
     llm_run_id: Option<String>,
+    items: Vec<ExtractedItem>,
+}
+
+/// What a regeneration asked for beyond the call's defaults.
+#[derive(Debug, Clone, Default)]
+struct Options {
+    runtime: Option<RuntimeChoice>,
+    model: Option<String>,
+    local: bool,
 }
 
 /// The PostCall job's handler.
@@ -387,12 +471,34 @@ impl JobHandler for PostCallJob {
     }
 }
 
-/// Registers the PostCall handler on the core's scheduler.
+/// The Regeneration job's handler: after the archive pass, or for `outputs_regenerate`.
+pub(crate) struct RegenerationJob(Weak<Core>);
+
+impl JobHandler for RegenerationJob {
+    fn run<'a>(&'a self, ctx: &'a mut RunCtx) -> BoxFuture<'a, Result<(), Stop>> {
+        Box::pin(async move {
+            let (Some(core), Some(call)) = (self.0.upgrade(), ctx.subject().map(CallId::new))
+            else {
+                return Ok(());
+            };
+            let result = core.regenerate(ctx, &call).await;
+            core.postcall.settle(&call);
+            result
+        })
+    }
+}
+
+/// Registers the PostCall, ArchivePass and Regeneration handlers on the core's scheduler.
 pub(crate) fn register(core: &Arc<Core>) {
     core.jobs.register(
         JobKind::PostCall,
         Arc::new(PostCallJob(Arc::downgrade(core))),
     );
+    core.jobs.register(
+        JobKind::Regeneration,
+        Arc::new(RegenerationJob(Arc::downgrade(core))),
+    );
+    crate::archive::register(core);
 }
 
 fn call_mutation(call: &CallId, values: Vec<(&'static str, Value)>) -> Mutation {
@@ -441,15 +547,23 @@ impl Core {
         // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-current
     }
 
-    /// The evidence packet: every confirmed live segment and mark, by id.
-    fn packet(&self, call: &CallId, sensitive: bool) -> Result<Packet, CoreError> {
+    /// The evidence packet: every confirmed segment of the active pass and every mark, by id,
+    /// with the call's type, the configured summary language and the glossary's terms.
+    fn packet(&self, call: &CallId, sensitive: bool, call_type: &str) -> Result<Packet, CoreError> {
         let source = if sensitive {
             SourceClass::Sensitive
         } else {
             SourceClass::Normal
         };
+        // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-load
+        let language = match lock(&self.settings).general.summary_language {
+            SummaryLanguage::En => Some(Lang::En),
+            SummaryLanguage::Ru => Some(Lang::Ru),
+            SummaryLanguage::De => Some(Lang::De),
+            SummaryLanguage::LanguageOfTheCall => None,
+        };
         let id = call.clone();
-        let (segments, marks) = self.store().read(move |c| {
+        let (segments, marks, glossary) = self.store().read(move |c| {
             let segments = crate::transcript::segments_of(c, &id, None)?;
             let mut stmt =
                 c.prepare("SELECT id, at_ms, note FROM marks WHERE call_id = ?1 ORDER BY at_ms")?;
@@ -462,8 +576,13 @@ impl Core {
                     ))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok((segments, marks))
+            let glossary = c
+                .prepare("SELECT term FROM glossary ORDER BY term")?
+                .query_map([], |r| r.get::<_, String>(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((segments, marks, glossary))
         })?;
+        // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-load
         let mut people: Vec<String> = vec![];
         let mut items: Vec<PacketItem> = segments
             .iter()
@@ -500,6 +619,11 @@ impl Core {
             what: AuditWhat::FullTranscript,
             items,
             people,
+            context: PacketContext {
+                call_type: Some(call_type.to_owned()),
+                language,
+                glossary,
+            },
         })
     }
 
@@ -518,6 +642,7 @@ impl Core {
         kind: SectionKind,
         packet: &Packet,
         privacy: Privacy,
+        options: &Options,
     ) -> Result<Generated, Option<ErrorCode>> {
         if packet.items.is_empty() {
             // Nothing was said: every section is validly empty, and nothing goes to a model.
@@ -525,6 +650,7 @@ impl Core {
                 body_md: String::new(),
                 lang: Lang::En,
                 llm_run_id: None,
+                items: vec![],
             });
         }
         // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-model
@@ -539,12 +665,19 @@ impl Core {
             rx,
         );
         req.call_id = Some(call.clone());
+        req.settings.configured = if options.local {
+            Some(RuntimeChoice::Local)
+        } else {
+            options.runtime
+        };
+        req.settings.model.clone_from(&options.model);
         let done = self.llm().run_once(req).await.map_err(|f| code_of(&f))?;
         // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-model
         let out: PostCallOutput =
             serde_json::from_value(done.output).map_err(|_| Some(ErrorCode::Internal))?;
         Ok(Generated {
             body_md: body_of(kind, &out),
+            items: items_of(kind, &out),
             lang: out.lang,
             llm_run_id: Some(done.provenance.llm_run_id.as_str().to_owned()),
         })
@@ -560,73 +693,381 @@ impl Core {
         Ok(rows.into_iter().find(|s| s.kind == kind))
     }
 
-    /// The rows one generated section commits: a new version, and the section pointing at it.
+    /// The body of the section's newest generated version: the base a merge compares against.
+    fn generated_base(&self, summary: &str) -> Result<String, CoreError> {
+        let id = summary.to_owned();
+        Ok(self
+            .store()
+            .read(move |c| {
+                c.query_row(
+                    "SELECT body_md FROM summary_versions WHERE summary_id = ?1 AND kind = 'generated'
+                     ORDER BY n DESC LIMIT 1",
+                    [id],
+                    |r| r.get::<_, String>(0),
+                )
+                .optional()
+            })?
+            .unwrap_or_default())
+    }
+
+    fn version_row(
+        &self,
+        summary: &str,
+        n: u32,
+        kind: &str,
+        body: &str,
+        g: &Generated,
+        from_pass: &str,
+    ) -> Mutation {
+        Mutation {
+            entity_type: "summary_version",
+            table: "summary_versions",
+            id: format!("ver_{}", ulid::Ulid::generate()),
+            base_rev: None,
+            bump_rev: false,
+            values: vec![
+                ("summary_id", json!(summary)),
+                ("n", json!(n)),
+                ("kind", json!(kind)),
+                ("body_md", json!(body)),
+                ("lang", json!(text_of(&g.lang))),
+                ("skill_version", json!(SKILL_VERSION)),
+                ("llm_run_id", json!(g.llm_run_id)),
+                ("from_pass", json!(from_pass)),
+                ("created_at", json!(self.deps.clock.now().0)),
+            ],
+        }
+    }
+
+    /// The rows one generated section commits: a new generated version, and the section pointing
+    /// at it; over the user's edit, the merge of both as the current version, the candidate kept
+    /// as its own version. `None` when an edited section gets nothing new.
     fn section_rows(
         &self,
         call: &CallId,
         kind: SectionKind,
         existing: Option<&Stored>,
         g: &Generated,
-    ) -> Vec<Mutation> {
+        from_pass: &str,
+    ) -> Result<Option<Vec<Mutation>>, CoreError> {
         // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-version
         let summary = existing.map_or_else(
             || format!("sum_{}", ulid::Ulid::generate()),
             |s| s.id.clone(),
         );
-        let version = format!("ver_{}", ulid::Ulid::generate());
-        let mut section = vec![("current_version_id", json!(version))];
+        let n = existing.map_or(0, |s| s.versions);
+        let generated = self.version_row(&summary, n + 1, "generated", &g.body_md, g, from_pass);
+        let mut section = vec![("current_version_id", json!(generated.id))];
+        let mut rows = vec![generated];
+        // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-version
+        if let Some(edited) = existing.filter(|s| s.user_edited) {
+            // @cpt-begin:cpt-noter-algo-core-postcall-merge:p1:inst-merge-version
+            let base = self.generated_base(&edited.id)?;
+            if g.body_md == base {
+                return Ok(None);
+            }
+            let merged = merge(&base, &edited.body_md, &g.body_md);
+            if merged.body == g.body_md {
+                section.push(("user_edited", json!(0)));
+                section.push(("regenerated_with_edits", json!(0)));
+            } else {
+                let kept =
+                    self.version_row(&summary, n + 2, "user_edit", &merged.body, g, from_pass);
+                section = vec![
+                    ("current_version_id", json!(kept.id)),
+                    ("regenerated_with_edits", json!(1)),
+                ];
+                rows.push(kept);
+            }
+            // @cpt-end:cpt-noter-algo-core-postcall-merge:p1:inst-merge-version
+        }
         if existing.is_none() {
             section.extend([
                 ("call_id", json!(call.as_str())),
                 ("kind", json!(text_of(&kind))),
             ]);
         }
-        vec![
-            Mutation {
-                entity_type: "summary_version",
-                table: "summary_versions",
-                id: version,
-                base_rev: None,
-                bump_rev: false,
-                values: vec![
-                    ("summary_id", json!(summary)),
-                    ("n", json!(existing.map_or(0, |s| s.versions) + 1)),
-                    ("kind", json!("generated")),
-                    ("body_md", json!(g.body_md)),
-                    ("lang", json!(text_of(&g.lang))),
-                    ("skill_version", json!(SKILL_VERSION)),
-                    ("llm_run_id", json!(g.llm_run_id)),
-                    ("from_pass", json!("live")),
-                    ("created_at", json!(self.deps.clock.now().0)),
-                ],
-            },
-            Mutation {
-                entity_type: "summary",
-                table: "summaries",
-                id: summary,
-                // A section written meanwhile fails the batch rather than being overwritten.
-                base_rev: existing.map(|s| Rev(s.rev)),
-                bump_rev: true,
-                values: section,
-            },
-        ]
-        // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-version
+        rows.push(Mutation {
+            entity_type: "summary",
+            table: "summaries",
+            id: summary,
+            // A section written meanwhile fails the batch rather than being overwritten.
+            base_rev: existing.map(|s| Rev(s.rev)),
+            bump_rev: true,
+            values: section,
+        });
+        Ok(Some(rows))
     }
 
-    /// The PostCall run: every section in order, each validated, committed and published before
-    /// the next; a failed section is recorded and the next one runs; the run fails at the end
-    /// with the first failed section's typed error.
+    // @cpt-algo:cpt-noter-algo-core-postcall-store:p1
+    /// Commits one generated section with `extra` rows in one batch, then its suggested items,
+    /// and answers the section's committed state. An edit that lands while the model writes
+    /// fails the revision check; the merge then runs again on that latest edit.
+    async fn commit_section(
+        &self,
+        ctx: &mut RunCtx,
+        call: &CallId,
+        kind: SectionKind,
+        g: &Generated,
+        extra: Vec<Mutation>,
+        progress: Option<f32>,
+    ) -> Result<SectionState, Stop> {
+        let id = call.as_str().to_owned();
+        let archived: bool = self.store().read(move |c| {
+            c.query_row(
+                "SELECT EXISTS (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')",
+                [id],
+                |r| r.get(0),
+            )
+        })?;
+        let from_pass = if archived { "archive" } else { "live" };
+        // @cpt-begin:cpt-noter-algo-core-postcall-merge:p1:inst-merge-race
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+            let existing = self.stored_section(call, kind)?;
+            let Some(mut rows) = self.section_rows(call, kind, existing.as_ref(), g, from_pass)?
+            else {
+                // Nothing new for an edited section; the call's own rows still commit.
+                if !extra.is_empty() {
+                    ctx.commit_batch(extra.clone(), vec![], progress).await?;
+                }
+                break;
+            };
+            rows.extend(extra.iter().cloned());
+            // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-commit
+            match ctx.commit_batch(rows, vec![], progress).await {
+                Err(Stop::Failed(e)) if e.code == ErrorCode::Conflict && attempts < 3 => continue,
+                other => other?,
+            }
+            // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-commit
+            break;
+        }
+        // @cpt-end:cpt-noter-algo-core-postcall-merge:p1:inst-merge-race
+        self.store_items(ctx, call, kind, &g.items).await?;
+        // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-return
+        let state = section(self.stored_section(call, kind)?.as_ref(), kind, None).state;
+        self.postcall.set(call, kind, state.clone());
+        // @cpt-begin:cpt-noter-algo-core-postcall-merge:p1:inst-merge-return
+        // The merged section and its versions read through the existing fields
+        // (`regenerated_with_edits`, `version_count`); a rejection kept out leaves no row.
+        self.emit_entity_changed(&EntityChanged::Section {
+            call_id: call.clone(),
+            section: self.section_now(call, kind)?,
+        });
+        Ok(state)
+        // @cpt-end:cpt-noter-algo-core-postcall-merge:p1:inst-merge-return
+        // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-return
+    }
+
+    /// The section's suggested items: new suggestions replace the still-suggested ones of the
+    /// model; accepted, edited, pinned and rejected items stay, and a suggestion that matches
+    /// one of them by its words is not made again. Each item's evidence becomes its spans.
+    async fn store_items(
+        &self,
+        ctx: &mut RunCtx,
+        call: &CallId,
+        kind: SectionKind,
+        items: &[ExtractedItem],
+    ) -> Result<(), Stop> {
+        let Some(item_kind) = item_kind(kind) else {
+            return Ok(());
+        };
+        // @cpt-begin:cpt-noter-algo-core-postcall-merge:p1:inst-merge-items
+        let id = call.as_str().to_owned();
+        let stored: Vec<(String, String, String, String, Option<String>)> =
+            self.store().read(move |c| {
+                c.prepare(
+                    "SELECT id, review_state, created_by, text, generated_text FROM items
+                     WHERE call_id = ?1 AND kind = ?2",
+                )?
+                .query_map(params![id, item_kind], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+                })?
+                .collect()
+            })?;
+        let replaced: Vec<String> = stored
+            .iter()
+            .filter(|(_, review, by, ..)| review == "suggested" && by == "llm")
+            .map(|(id, ..)| id.clone())
+            .collect();
+        let reviewed: Vec<String> = stored
+            .iter()
+            .filter(|(_, review, by, ..)| review != "suggested" || by != "llm")
+            .flat_map(|(.., text, generated)| {
+                std::iter::once(identity(text)).chain(generated.as_deref().map(identity))
+            })
+            .collect();
+        let fresh: Vec<ExtractedItem> = items
+            .iter()
+            .filter(|i| !reviewed.contains(&identity(&i.text)))
+            .cloned()
+            .collect();
+        // @cpt-end:cpt-noter-algo-core-postcall-merge:p1:inst-merge-items
+        if replaced.is_empty() && fresh.is_empty() {
+            return Ok(());
+        }
+        ctx.checkpoint().await?;
+        let meta = ctx.change_meta("suggested items").ok_or(Stop::Cancelled)?;
+        let call_id = call.as_str().to_owned();
+        let written = self.store().write_with(meta, move |tx| {
+            let internal =
+                |e: noter_db::rusqlite::Error| CoreError::new(ErrorCode::Internal, e.to_string());
+            let mut logged = vec![];
+            let mut removed = vec![];
+            for id in &replaced {
+                // A suggestion reviewed meanwhile is the user's now and stays.
+                let gone = tx
+                    .execute(
+                        "DELETE FROM items WHERE id = ?1 AND review_state = 'suggested'",
+                        [id],
+                    )
+                    .map_err(internal)?;
+                if gone > 0 {
+                    logged.push(Logged {
+                        entity_type: "item",
+                        entity_id: id.clone(),
+                        field: None,
+                        before: None,
+                        after: None,
+                        delta: None,
+                    });
+                    removed.push(id.clone());
+                }
+            }
+            let mut ids = vec![];
+            for item in &fresh {
+                let id = format!("itm_{}", ulid::Ulid::generate());
+                // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-items
+                // Suggested, never accepted here; owners stay unresolved and topics wait for
+                // the people and topics tables.
+                tx.execute(
+                    "INSERT INTO items (id, rev, call_id, kind, text, lang, generated_text, due_date,
+                         status, review_state, created_by, is_engineering, linked_issue_key)
+                     VALUES (?1, 1, ?2, ?3, ?4, ?5, ?4, ?6, 'open', 'suggested', 'llm', ?7, ?8)",
+                    params![
+                        id,
+                        call_id,
+                        item_kind,
+                        item.text,
+                        crate::transcript::lang_word(&item.lang),
+                        item.due.as_ref().map(|d| d.0.clone()),
+                        item.is_engineering,
+                        item.linked_issue
+                    ],
+                )
+                .map_err(internal)?;
+                // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-items
+                // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-evidence
+                // Spans of call time, so the evidence survives the archive's new segment ids.
+                for seg in &item.evidence_segment_ids {
+                    tx.execute(
+                        "INSERT OR IGNORE INTO item_spans (item_id, call_id, channel, t0_ms, t1_ms)
+                         SELECT ?1, call_id, channel, t0_ms, t1_ms FROM segments
+                         WHERE id = ?2 AND call_id = ?3",
+                        params![id, seg.as_str(), call_id],
+                    )
+                    .map_err(internal)?;
+                }
+                // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-evidence
+                logged.push(Logged {
+                    entity_type: "item",
+                    entity_id: id.clone(),
+                    field: None,
+                    before: None,
+                    after: Some(item.text.clone()),
+                    delta: None,
+                });
+                ids.push(id);
+            }
+            Ok(((ids, removed), logged))
+        })?;
+        let (ids, removed) = written.value;
+        for id in removed {
+            self.emit_entity_changed(&EntityChanged::Removed {
+                kind: EntityKind::Item,
+                id,
+            });
+        }
+        let views: Vec<ItemView> = ids
+            .iter()
+            .filter_map(|id| self.item_view(id).ok().flatten())
+            .collect();
+        self.items_published(&views);
+        Ok(())
+    }
+
+    /// `summary.md` of the call from its committed sections, and `items.json`; a failure is
+    /// logged, the outputs are committed.
+    fn write_files(&self, call: &CallId) {
+        // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-files
+        let written = self.outputs_now(call).and_then(|out| {
+            let body: String = out
+                .sections
+                .iter()
+                .filter_map(|s| {
+                    let md = s.body_md.as_deref().filter(|b| !b.trim().is_empty())?;
+                    Some(format!("## {}\n\n{md}\n\n", heading(s.kind)))
+                })
+                .collect();
+            let dir = self.data_dir.join("audio").join(call.as_str());
+            let internal = |e: std::io::Error| CoreError::new(ErrorCode::Internal, e.to_string());
+            std::fs::create_dir_all(&dir).map_err(internal)?;
+            let tmp = dir.join("summary.md.tmp");
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&tmp)
+                .map_err(internal)?;
+            file.write_all(body.as_bytes()).map_err(internal)?;
+            file.sync_all().map_err(internal)?;
+            std::fs::rename(&tmp, dir.join("summary.md")).map_err(internal)
+        });
+        if let Err(e) = written {
+            self.log(object(json!({
+                "level": "error", "module": "postcall", "code": "summary_file",
+                "message_len": e.message.len()
+            })));
+        }
+        self.items_files([call.as_str().to_owned()]);
+        // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-files
+    }
+
+    /// D4 after a call: the agents whose cards were mostly dismissed over the last ten calls of
+    /// this type switch off for it. Cards and agents arrive in M4; until then no agent has
+    /// outcomes and nothing is inferred.
+    fn evaluate_role_policy(&self, call_type: &str) {
+        // @cpt-begin:cpt-noter-algo-core-postcall-notify:p1:inst-notify-no-backfill
+        // shortcut: no `cards` or `agents` table before M4, so there is no history to read; M4
+        // reads each agent's (dismissed, shown) per call of this type here and logs the
+        // undoable switch-off.
+        let outcomes: Vec<(String, Vec<(u32, u32)>)> = vec![];
+        // @cpt-end:cpt-noter-algo-core-postcall-notify:p1:inst-notify-no-backfill
+        for (agent, per_call) in outcomes {
+            if switches_off(&per_call) {
+                self.log(object(json!({
+                    "level": "info", "module": "postcall", "code": "agent_switch_off",
+                    "agent": agent, "call_type": call_type
+                })));
+            }
+        }
+    }
+
+    /// The PostCall run: the chunks of the live transcript, then every section in order, each
+    /// validated, committed and published before the next; a failed section is recorded and the
+    /// next one runs; the run fails at the end with the first failed section's typed error.
     async fn write_outputs(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
         let Some(head) = self.current(call)? else {
             return Ok(());
         };
         let kinds = sections_of(&head.call_type);
-        let packet = self.packet(call, head.sensitive)?;
-        let privacy = Privacy {
-            mode: lock(&self.settings).privacy.mode,
-            sensitive: head.sensitive,
-            offline: !self.app().environment.online,
-        };
+        // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-packet
+        self.rechunk(ctx, call).await?;
+        let packet = self.packet(call, head.sensitive, &head.call_type)?;
+        // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-packet
+        let privacy = self.privacy_of(head.sensitive);
         self.postcall.clear(call);
         let mut first_failure: Option<ErrorCode> = None;
         let mut committed = 0;
@@ -634,30 +1075,19 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-sections
         for (n, kind) in kinds.into_iter().enumerate() {
             ctx.checkpoint().await?;
-            // shortcut: an edited section is kept as it is; slice 2 merges a new generation in.
-            if self
-                .stored_section(call, kind)?
-                .is_some_and(|s| s.user_edited)
-            {
-                committed += 1;
-                continue;
-            }
             // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-validate
             self.postcall.set(call, kind, SectionState::Writing);
             self.progress(call, kind, SectionState::Writing);
-            let generated = self.generate(call, kind, &packet, privacy).await;
+            let generated = self
+                .generate(call, kind, &packet, privacy, &Options::default())
+                .await;
             // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-validate
             let g = match generated {
                 Ok(g) => g,
                 Err(None) => return Err(Stop::Cancelled),
                 // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-failed-section
                 Err(Some(code)) => {
-                    let failed = SectionState::Failed {
-                        code,
-                        local_fallback_available: self.local_fallback(),
-                    };
-                    self.postcall.set(call, kind, failed.clone());
-                    self.progress(call, kind, failed);
+                    self.section_failed(call, kind, code);
                     first_failure.get_or_insert(code);
                     // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-failed-section
                     continue;
@@ -670,20 +1100,11 @@ impl Core {
             let Some(now) = self.current(call)? else {
                 return Ok(());
             };
-            // An edit that landed while the model ran stays the current version.
-            let existing = self.stored_section(call, kind)?;
-            if let Some(edited) = existing.as_ref().filter(|s| s.user_edited) {
-                let state = section(Some(edited), kind, None).state;
-                self.postcall.set(call, kind, state.clone());
-                self.progress(call, kind, state);
-                committed += 1;
-                continue;
-            }
-            let mut rows = self.section_rows(call, kind, existing.as_ref(), &g);
             let first = committed == 0 && now.status == "processing";
+            let mut extra = vec![];
             if first {
                 // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-ready
-                rows.push(call_mutation(
+                extra.push(call_mutation(
                     call,
                     vec![
                         ("status", json!("ready")),
@@ -692,17 +1113,10 @@ impl Core {
                 ));
                 // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-ready
             }
-            // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-commit
             let progress = Some((n + 1) as f32 / total as f32);
-            ctx.commit_batch(rows, vec![], progress).await?;
-            // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-commit
-            // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-return
-            let state = if g.body_md.is_empty() {
-                SectionState::Empty
-            } else {
-                SectionState::Ready
-            };
-            // @cpt-end:cpt-noter-algo-core-postcall-store:p1:inst-store-return
+            let state = self
+                .commit_section(ctx, call, kind, &g, extra, progress)
+                .await?;
             committed += 1;
             self.postcall.set(call, kind, state.clone());
             self.progress(call, kind, state);
@@ -712,6 +1126,7 @@ impl Core {
             // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-commit
         }
         // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-sections
+        // Role reviews run last for enabled agents: none before the agents table (M4).
         let status = match (committed, first_failure) {
             (_, None) => OutputsStatus::Ready,
             (0, Some(_)) => OutputsStatus::Failed,
@@ -736,10 +1151,124 @@ impl Core {
                 .await?;
             self.publish_call_row(call);
         }
+        self.write_files(call);
+        // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-notify
+        self.notify_outputs(call, status);
+        self.evaluate_role_policy(&head.call_type);
+        // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-notify
+        // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-return
+        // The session manager queued the archive pass at the stop; it checks the audio itself.
         match first_failure {
             Some(code) => Err(Stop::Failed(CoreError::new(
                 code,
                 "a post-call section was not written",
+            ))),
+            None => Ok(()),
+        }
+        // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-return
+    }
+
+    fn privacy_of(&self, sensitive: bool) -> Privacy {
+        Privacy {
+            mode: lock(&self.settings).privacy.mode,
+            sensitive,
+            offline: !self.app().environment.online,
+        }
+    }
+
+    fn section_failed(&self, call: &CallId, kind: SectionKind, code: ErrorCode) {
+        let failed = SectionState::Failed {
+            code,
+            local_fallback_available: self.local_fallback(),
+        };
+        self.postcall.set(call, kind, failed.clone());
+        self.progress(call, kind, failed);
+    }
+
+    // @cpt-algo:cpt-noter-algo-core-postcall-notify:p1
+    /// The outcome goes to the session manager's hold rule: held while a call is live or Noter
+    /// is hidden for presenting, not sent while the main window shows the call (its page has the
+    /// sections as they arrive), else posted with the call's Summary as its target.
+    fn notify_outputs(&self, call: &CallId, status: OutputsStatus) {
+        // @cpt-begin:cpt-noter-algo-core-postcall-notify:p1:inst-notify-session
+        let kind = if status == OutputsStatus::Failed {
+            NotificationKind::SummaryFailed
+        } else {
+            NotificationKind::SummaryReady
+        };
+        // @cpt-end:cpt-noter-algo-core-postcall-notify:p1:inst-notify-session
+        // @cpt-begin:cpt-noter-algo-core-postcall-notify:p1:inst-notify-hold
+        self.notify(Notification {
+            call_id: call.clone(),
+            kind,
+        });
+        // @cpt-end:cpt-noter-algo-core-postcall-notify:p1:inst-notify-hold
+    }
+
+    /// The Regeneration run: the requested sections (all after the archive pass) written again
+    /// from the active transcript, each merged with the user's edit and its reviewed items.
+    async fn regenerate(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
+        let request = self.postcall.take_request(call);
+        let Some(head) = self.current(call)? else {
+            return Ok(());
+        };
+        // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-merge
+        let call_type = request
+            .as_ref()
+            .and_then(|r| r.skill.as_ref())
+            .map_or(head.call_type.clone(), |s| s.0.clone());
+        let kinds: Vec<SectionKind> = match &request {
+            Some(r) if !r.sections.is_empty() => r
+                .sections
+                .iter()
+                .filter(|k| **k != SectionKind::RoleReviews)
+                .copied()
+                .collect(),
+            _ => sections_of(&head.call_type),
+        };
+        let options = request.map_or_else(Options::default, |r| Options {
+            runtime: r.runtime,
+            model: r.model,
+            local: r.local,
+        });
+        let packet = self.packet(call, head.sensitive, &call_type)?;
+        let privacy = self.privacy_of(head.sensitive);
+        let total = kinds.len();
+        let mut first_failure = None;
+        for (n, kind) in kinds.into_iter().enumerate() {
+            ctx.checkpoint().await?;
+            self.postcall.set(call, kind, SectionState::Writing);
+            self.progress(call, kind, SectionState::Writing);
+            let g = match self.generate(call, kind, &packet, privacy, &options).await {
+                Ok(g) => g,
+                Err(None) => return Err(Stop::Cancelled),
+                Err(Some(code)) => {
+                    self.section_failed(call, kind, code);
+                    first_failure.get_or_insert(code);
+                    continue;
+                }
+            };
+            // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-return
+            // A capture continued meanwhile: the late output is never installed.
+            if self.current(call)?.is_none() {
+                return Ok(());
+            }
+            // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-return
+            let progress = Some((n + 1) as f32 / total as f32);
+            let state = self
+                .commit_section(ctx, call, kind, &g, vec![], progress)
+                .await?;
+            self.postcall.set(call, kind, state.clone());
+            self.progress(call, kind, state);
+        }
+        // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-merge
+        // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-publish
+        self.write_files(call);
+        // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-publish
+        match first_failure {
+            Some(code) => Err(Stop::Failed(CoreError::new(
+                code,
+                "a section was not regenerated",
             ))),
             None => Ok(()),
         }
@@ -868,9 +1397,14 @@ impl Core {
         let written = self.store().write_batch(rows, meta)?;
         // @cpt-end:cpt-noter-flow-core-postcall-edit:p1:inst-edit-commit
         // @cpt-begin:cpt-noter-flow-core-postcall-edit:p1:inst-edit-publish
-        // No per-call files or index hold a section's body yet (summary.md is slice 2, FTS M3).
+        // No index holds a section's body yet (FTS is M3).
         let section = self.section_now(&args.call_id, stored.kind)?;
         self.progress(&args.call_id, stored.kind, section.state.clone());
+        self.emit_entity_changed(&EntityChanged::Section {
+            call_id: args.call_id.clone(),
+            section: section.clone(),
+        });
+        self.write_files(&args.call_id);
         Ok(OutputMutation {
             section,
             change_id: written[1].change_id.clone(),
@@ -938,9 +1472,8 @@ impl Core {
     }
     // @cpt-end:cpt-noter-flow-core-postcall-edit:p1:inst-edit-versions
 
-    /// `outputs_regenerate`: queues a Regeneration run of the call; no sections means all.
-    // shortcut: the run's handler is a seam until slice 2, which carries the requested sections,
-    // runtime and local rewrite into the merge.
+    /// `outputs_regenerate`: queues a Regeneration run of the call with the requested sections
+    /// (none means all), runtime, model, skill and local rewrite.
     pub(crate) fn queue_regeneration(
         &self,
         args: &RegenerateArgs,
@@ -967,6 +1500,7 @@ impl Core {
             return Err(blocked());
         }
         let req = Request::for_call(JobKind::Regeneration, Trigger::OnDemand, &args.call_id);
+        self.postcall.request(args);
         let run = self.in_runtime(|| self.jobs.trigger(req))?;
         Ok(JobAccepted {
             job_run_id: run.ok_or_else(blocked)?,
@@ -980,8 +1514,13 @@ impl Core {
         let found = self.store().read(move |c| stored(c, "id", &id))?.pop();
         if let Some(s) = found {
             let call = CallId::new(s.call_id);
-            let state = self.section_now(&call, s.kind)?.state;
-            self.progress(&call, s.kind, state);
+            let section = self.section_now(&call, s.kind)?;
+            self.progress(&call, s.kind, section.state.clone());
+            self.emit_entity_changed(&EntityChanged::Section {
+                call_id: call.clone(),
+                section,
+            });
+            self.write_files(&call);
         }
         Ok(())
     }
@@ -1033,6 +1572,33 @@ mod tests {
     }
 
     #[test]
+    fn an_agent_switches_off_at_eighty_percent_dismissed_over_the_last_ten_calls() {
+        // Nine calls are not enough history.
+        assert!(!switches_off(&[(5, 5); 9]));
+        // 40 of 50 dismissed: exactly 80 %.
+        assert!(switches_off(&[(4, 5); 10]));
+        // 39 of 50: under.
+        let mut under = vec![(4, 5); 10];
+        under[0] = (3, 5);
+        assert!(!switches_off(&under));
+        // Only the last ten count: an old run of keeps does not save it.
+        let mut long = vec![(0, 5); 5];
+        long.extend([(5, 5); 10]);
+        assert!(switches_off(&long));
+        // Calls with no cards shown decide nothing.
+        assert!(!switches_off(&[(0, 0); 10]));
+    }
+
+    #[test]
+    fn an_item_is_the_same_whatever_its_case_spacing_or_final_stop() {
+        assert_eq!(identity("  Ship  the API. "), identity("ship the api"));
+        assert_ne!(identity("Ship the API"), identity("Ship the UI"));
+        assert_eq!(heading(SectionKind::ActionItems), "Action items");
+        assert_eq!(item_kind(SectionKind::Risks), Some("risk"));
+        assert_eq!(item_kind(SectionKind::Summary), None);
+    }
+
+    #[test]
     fn the_aggregate_follows_the_sections() {
         use SectionState::*;
         assert_eq!(aggregate(&[Ready, Writing]), OutputsStatus::Writing);
@@ -1063,7 +1629,7 @@ mod tests {
         let invalid = Failure::Invalid {
             reason: "citations",
         };
-        assert_eq!(code_of(&invalid), Some(ErrorCode::Internal));
+        assert_eq!(code_of(&invalid), Some(ErrorCode::OutputInvalid));
         assert_eq!(code_of(&Failure::Cancelled), None);
     }
 

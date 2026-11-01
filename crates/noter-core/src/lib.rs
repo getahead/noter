@@ -4,7 +4,9 @@
 
 mod accounts;
 mod app;
+mod archive;
 mod capture;
+mod chunks;
 mod first_run;
 mod glossary;
 mod handoff;
@@ -15,6 +17,7 @@ mod items;
 mod jobs;
 mod library;
 mod log;
+mod merge;
 mod models;
 mod native_ops;
 mod notices;
@@ -350,6 +353,13 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 6,
         name: "speaker names and constraints",
         sql: include_str!("../migrations/0006_speaker_constraints.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-chunks:p1
+    Migration {
+        owner: "noter-core",
+        version: 7,
+        name: "chunks and crosstalk",
+        sql: include_str!("../migrations/0007_chunks.sql"),
     },
 ];
 

@@ -100,17 +100,17 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Continue Recording cancels this generation; a later stop queues a new one with edits retained.
 
 **Steps**:
-1. [ ] - `p1` - Load the stopped call's current transcript, metadata, participants, glossary, configured summary language and call-type skill - `inst-write-load`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-postcall-chunks` for live segments and build a packet with known evidence ids - `inst-write-packet`
+1. [x] - `p1` - Load the stopped call's current transcript, metadata, participants, glossary, configured summary language and call-type skill - `inst-write-load`
+2. [x] - `p1` - Run `cpt-noter-algo-core-postcall-chunks` for live segments and build a packet with known evidence ids - `inst-write-packet`
 3. [x] - `p1` - Run the call-type `PostCallOutput` through the router with cancellation and the scheduler's current run generation - `inst-write-model`
 4. [x] - `p1` - **FOR EACH** output section in the stated order - `inst-write-sections`
    1. [x] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
    2. [x] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
    3. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
-5. [ ] - `p1` - Run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions - `inst-write-reviews`
-6. [ ] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
-7. [ ] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
-8. [ ] - `p1` - **RETURN** committed output state to the job; queue archive processing if audio is available - `inst-write-return`
+5. [ ] - `p1` - Run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions (M4: no agent can be enabled before the `agents` table) - `inst-write-reviews`
+6. [x] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
+7. [x] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
+8. [x] - `p1` - **RETURN** committed output state to the job; queue archive processing if audio is available - `inst-write-return`
 
 ### Read, edit and compare versions
 
@@ -134,7 +134,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 ### Upgrade or regenerate outputs
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-postcall-regenerate`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-postcall-regenerate`
 
 **Actor**: Archive job or primary user (main window)
 
@@ -146,19 +146,19 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 **Steps**:
 1. [x] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration - `inst-regen-request`
-2. [ ] - `p1` - For ArchivePass, wait until no call is live, then request `offline_pass` with the latest user constraints - `inst-regen-archive`
-3. [ ] - `p1` - **IF** audio is absent or archive fails, retain the live transcript, expose archive pending or failed state and use the scheduled retry path when audio remains available - `inst-regen-archive-fail`
-4. [ ] - `p1` - On archive success, map clusters by time overlap, retain user speaker and term corrections, install archive segments and keep the live copy for seven days - `inst-regen-install`
-5. [ ] - `p1` - Rebuild chunks and embeddings for the active pass; refresh transcript read models and archive-change information - `inst-regen-rechunk`
-6. [ ] - `p1` - Generate only the requested sections and run `cpt-noter-algo-core-postcall-merge` with current edits re-read at commit time - `inst-regen-merge`
-7. [ ] - `p1` - Publish committed changes, including archive speaker relabelling information and section progress, then refresh per-call files - `inst-regen-publish`
-8. [ ] - `p1` - **RETURN** the job's result; cancellation or a superseded generation cannot install late output - `inst-regen-return`
+2. [x] - `p1` - For ArchivePass, wait until no call is live, then request `offline_pass` with the latest user constraints - `inst-regen-archive`
+3. [x] - `p1` - **IF** audio is absent or archive fails, retain the live transcript, expose archive pending or failed state and use the scheduled retry path when audio remains available - `inst-regen-archive-fail`
+4. [x] - `p1` - On archive success, map clusters by time overlap, retain user speaker and term corrections, install archive segments and keep the live copy for seven days - `inst-regen-install`
+5. [x] - `p1` - Rebuild chunks and embeddings for the active pass; refresh transcript read models and archive-change information - `inst-regen-rechunk`
+6. [x] - `p1` - Generate only the requested sections and run `cpt-noter-algo-core-postcall-merge` with current edits re-read at commit time - `inst-regen-merge`
+7. [x] - `p1` - Publish committed changes, including archive speaker relabelling information and section progress, then refresh per-call files - `inst-regen-publish`
+8. [x] - `p1` - **RETURN** the job's result; cancellation or a superseded generation cannot install late output - `inst-regen-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Store validated sections and items
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-postcall-store`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-postcall-store`
 
 **Input**: Validated section, run id, call revision, active pass and permitted evidence segments.
 
@@ -168,42 +168,42 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 1. [x] - `p1` - Verify the call still exists, has not resumed and the job generation is current - `inst-store-current`
 2. [x] - `p1` - Append generated versions with increasing version numbers and writer runtime, model, skill version, language, time and pass - `inst-store-version`
 3. [x] - `p1` - Resolve owner hints to known people only when supported; otherwise leave ownership unset rather than inventing a match - `inst-store-owner`
-4. [ ] - `p1` - Convert cited segments into channel and time spans in `item_spans`; preserve the quote and source association across archive id changes - `inst-store-evidence`
-5. [ ] - `p1` - Write extracted items as suggested, keep pins accepted and attach supported topics; never turn an unreviewed suggestion into accepted output - `inst-store-items`
+4. [x] - `p1` - Convert cited segments into channel and time spans in `item_spans`; preserve the quote and source association across archive id changes - `inst-store-evidence`
+5. [x] - `p1` - Write extracted items as suggested, keep pins accepted and attach supported topics; never turn an unreviewed suggestion into accepted output - `inst-store-items`
 6. [x] - `p1` - Commit primary records, changes and derived indexes through the writer in batches of at most 200 rows; mark a section ready only after its complete committed state exists - `inst-store-commit`
 7. [x] - `p1` - **RETURN** section state ready, empty or failed; an empty valid section is not an error - `inst-store-return`
 
 ### Chunk and embed the active transcript
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-postcall-chunks`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-postcall-chunks`
 
 **Input**: Confirmed active-pass segments, call header and speaker labels.
 
 **Output**: Stored chunks and canonical embeddings ready for M3 retrieval.
 
 **Steps**:
-1. [ ] - `p1` - Group ordered lines along segment boundaries into roughly 200–300-token chunks with a call header and speaker prefixes - `inst-chunk-group`
-2. [ ] - `p1` - Preserve call-relative time bounds and normalize shadow text using the existing storage normalization - `inst-chunk-normalize`
-3. [ ] - `p1` - Ask the engine for local bge-m3 embeddings and validate one finite 1024-dimensional vector per chunk - `inst-chunk-embed`
-4. [ ] - `p1` - Through the writer, replace obsolete active-pass chunks and update FTS and `chunk_vec` from canonical embeddings, without a per-call vector partition - `inst-chunk-store`
-5. [ ] - `p1` - **IF** embedding fails, retain the transcript and record retryable pipeline failure without claiming vector completion or blocking readable output sections - `inst-chunk-fail`
-6. [ ] - `p1` - **RETURN** chunk ids, spans and indexing state - `inst-chunk-return`
+1. [x] - `p1` - Group ordered lines along segment boundaries into roughly 200–300-token chunks with a call header and speaker prefixes - `inst-chunk-group`
+2. [x] - `p1` - Preserve call-relative time bounds and normalize shadow text using the existing storage normalization - `inst-chunk-normalize`
+3. [x] - `p1` - Ask the engine for local bge-m3 embeddings and validate one finite 1024-dimensional vector per chunk - `inst-chunk-embed`
+4. [x] - `p1` - Through the writer, replace obsolete active-pass chunks and update FTS and `chunk_vec` from canonical embeddings, without a per-call vector partition - `inst-chunk-store`
+5. [x] - `p1` - **IF** embedding fails, retain the transcript and record retryable pipeline failure without claiming vector completion or blocking readable output sections - `inst-chunk-fail`
+6. [x] - `p1` - **RETURN** chunk ids, spans and indexing state - `inst-chunk-return`
 
 ### Merge regeneration with the user's edits
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-core-postcall-merge`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-postcall-merge`
 
 **Input**: Previous generated base, current user-edited body, new generated candidate and reviewed items.
 
 **Output**: A new generated version, preserved edit version and current merged body with diff metadata.
 
 **Steps**:
-1. [ ] - `p1` - Compute user changes against the previous generated base, and generator changes against that same base - `inst-merge-base`
-2. [ ] - `p1` - Apply non-overlapping generator changes while preserving every user change; on overlapping wording keep the user's text and retain the new candidate as a separate version - `inst-merge-text`
-3. [ ] - `p1` - Re-read current revisions at writer commit; if an edit landed during generation, re-merge against that latest edit rather than overwriting it - `inst-merge-race`
-4. [ ] - `p1` - Keep accepted, edited and pinned items; replace only still-suggested generated items; match rejected suggestions by their retained source/content identity and do not suggest them again - `inst-merge-items`
-5. [ ] - `p1` - Append versions and changes, set `regenerated_with_edits` when edits were kept and expose complete version bodies so the UI computes the diff - `inst-merge-version`
-6. [ ] - `p1` - **RETURN** the merged section and suppressed-rejection result through existing read-model fields; introduce no new contract field - `inst-merge-return`
+1. [x] - `p1` - Compute user changes against the previous generated base, and generator changes against that same base - `inst-merge-base`
+2. [x] - `p1` - Apply non-overlapping generator changes while preserving every user change; on overlapping wording keep the user's text and retain the new candidate as a separate version - `inst-merge-text`
+3. [x] - `p1` - Re-read current revisions at writer commit; if an edit landed during generation, re-merge against that latest edit rather than overwriting it - `inst-merge-race`
+4. [x] - `p1` - Keep accepted, edited and pinned items; replace only still-suggested generated items; match rejected suggestions by their retained source/content identity and do not suggest them again - `inst-merge-items`
+5. [x] - `p1` - Append versions and changes, set `regenerated_with_edits` when edits were kept and expose complete version bodies so the UI computes the diff - `inst-merge-version`
+6. [x] - `p1` - **RETURN** the merged section and suppressed-rejection result through existing read-model fields; introduce no new contract field - `inst-merge-return`
 
 ### Release notifications and evaluate role switch-off
 
@@ -214,12 +214,12 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 **Output**: Held or released notification and any logged role switch-off.
 
 **Steps**:
-1. [ ] - `p1` - Pass ready or failed outcome with its call target to the session manager's existing notification hold rule - `inst-notify-session`
-2. [ ] - `p1` - Hold while a call is live or presenting is hidden; suppress the system notification when the foreground main window already shows that call and announce readiness on the page - `inst-notify-hold`
-3. [ ] - `p1` - When released and authorization allows it, post Summary ready or the failed-summary notice with a thread per call and a `NavTarget` for Summary; clicking routes through `nav:request` - `inst-notify-release`
-4. [ ] - `p1` - For each agent with outcomes over the last ten calls of this type, calculate dismissal share; when at least 80 percent, log an undoable switch-off for that call type and its one-time Agents notice - `inst-notify-switch`
-5. [ ] - `p1` - Do not infer dismissal history before M4 produces cards, and do not back-compute behaviour metrics for calls recorded before the setting was enabled - `inst-notify-no-backfill`
-6. [ ] - `p1` - **RETURN** notification disposition and committed changes - `inst-notify-return`
+1. [x] - `p1` - Pass ready or failed outcome with its call target to the session manager's existing notification hold rule - `inst-notify-session`
+2. [x] - `p1` - Hold while a call is live or presenting is hidden; suppress the system notification when the foreground main window already shows that call and announce readiness on the page - `inst-notify-hold`
+3. [x] - `p1` - When released and authorization allows it, post Summary ready or the failed-summary notice with a thread per call and a `NavTarget` for Summary; clicking routes through `nav:request` - `inst-notify-release`
+4. [ ] - `p1` - For each agent with outcomes over the last ten calls of this type, calculate dismissal share; when at least 80 percent, log an undoable switch-off for that call type and its one-time Agents notice (M4: the rule arithmetic is in place; cards and the `agents` table arrive in M4) - `inst-notify-switch`
+5. [x] - `p1` - Do not infer dismissal history before M4 produces cards, and do not back-compute behaviour metrics for calls recorded before the setting was enabled - `inst-notify-no-backfill`
+6. [ ] - `p1` - **RETURN** notification disposition and committed changes (M4, with the switch-off changes) - `inst-notify-return`
 
 ## 4. States (CDSL)
 
@@ -264,7 +264,7 @@ The system **MUST** write validated sections in order, keep the transcript reada
 
 ### Archive, regeneration and evidence
 
-- [ ] `p1` - **ID**: `cpt-noter-dod-core-postcall-regeneration`
+- [x] `p1` - **ID**: `cpt-noter-dod-core-postcall-regeneration`
 
 The system **MUST** wait for capture before archive or regeneration, retain live segments for seven days after archive completion, preserve user constraints and evidence time spans, re-chunk and embed the active transcript and merge regeneration with edits and reviewed items. Continue Recording must invalidate obsolete work. Search commands are M3 and retention cleanup is M5.
 
@@ -310,8 +310,8 @@ The system **MUST** pass unit tests for section failure isolation, version guard
 
 - [ ] Real-core E2E `cpt-noter-seq-call-page-review-outputs` reads sections as they arrive, edits Summary, compares versions, retries a failed section locally and regenerates with edits preserved; all five commands succeed.
 - [ ] Real-app/native E2E `cpt-noter-seq-notifications-open-outputs` opens the correct call for ready and failed outcomes, suppresses a notice for the visible call and holds it through a subsequent recording. XCUITest uses `test_cpt_noter_seq_notifications_open_outputs` in its test name.
-- [ ] Accepted, pinned and edited items survive regeneration; rejected suggestions never return; missing or unknown citations cannot be persisted.
-- [ ] Archive failure leaves live evidence usable; archive success resolves the same evidence spans to new text and labels while preserving corrections and edits.
-- [ ] Concurrent user edits and Continue Recording cannot be overwritten by a late job result; unit tests prove both races.
+- [x] Accepted, pinned and edited items survive regeneration; rejected suggestions never return; missing or unknown citations cannot be persisted.
+- [x] Archive failure leaves live evidence usable; archive success resolves the same evidence spans to new text and labels while preserving corrections and edits.
+- [x] Concurrent user edits and Continue Recording cannot be overwritten by a late job result; unit tests prove both races.
 - [ ] Fake/real conformance and skill schema, citation and rubric evaluations pass; Mac timing evidence reports the stated cloud/local output targets.
 - [ ] `just gate` passes.

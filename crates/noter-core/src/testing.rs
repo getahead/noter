@@ -104,6 +104,7 @@ pub async fn llm_run(
         what: AuditWhat::FullTranscript,
         items: items.collect(),
         people: Vec::new(),
+        context: Default::default(),
     };
     let (_privacy, rx) = tokio::sync::watch::channel(Privacy {
         mode: PrivacyMode::CloudAllowed,
