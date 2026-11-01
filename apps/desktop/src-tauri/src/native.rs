@@ -5,18 +5,53 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use noter_core::{BoxFuture, EnvironmentReading, NativeOps, NativeServices, SaveKind};
-use noter_protocol::model::CalendarEventRef;
+use noter_core::{
+    BoxFuture, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps, NativeServices,
+    SaveKind,
+};
+use noter_protocol::model::{CalendarEventRef, HandoffTarget, LaunchPath, LaunchPlan};
 use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs};
 
 /// The Mac; `storage` is the folder whose volume's free space counts.
-/// The save panel and the native asks to come (TL-15).
+/// The native asks of the commands (TL-15): launches and the clipboard over noter-native.
 pub struct MacOps;
 
 impl NativeOps for MacOps {
     // shortcut: every export is cancelled until 2.21 native-services shows the real NSSavePanel.
     fn save_panel<'a>(&'a self, _: &'a str, _: SaveKind) -> BoxFuture<'a, Option<PathBuf>> {
         Box::pin(async { None })
+    }
+
+    fn launch_plan(&self, target: HandoffTarget) -> LaunchPlan {
+        noter_native::launch_plan(target)
+    }
+
+    /// On a blocking thread: macOS may wait on the user's Automation answer.
+    fn launch<'a>(
+        &'a self,
+        path: LaunchPath,
+        req: &'a LaunchRequest,
+    ) -> BoxFuture<'a, Result<(), ErrorCode>> {
+        let req = noter_native::LaunchRequest {
+            target: req.target,
+            cwd: req.cwd.clone(),
+            prompt_file: req.prompt_file.clone(),
+        };
+        Box::pin(async move {
+            tauri::async_runtime::spawn_blocking(move || noter_native::launch(path, &req))
+                .await
+                .map_err(|_| ErrorCode::Internal)?
+                .map(drop)
+        })
+    }
+
+    fn clipboard_write<'a>(&'a self, text: &'a ClipboardText) -> BoxFuture<'a, Result<(), String>> {
+        let text = noter_native::ClipboardText {
+            plain: text.plain.clone(),
+            markdown: text.markdown.clone(),
+            html: text.html.clone(),
+        };
+        Box::pin(async move { noter_native::clipboard_write(&text) })
     }
 }
 

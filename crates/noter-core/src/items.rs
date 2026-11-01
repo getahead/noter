@@ -826,6 +826,34 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-answer
     }
 
+    /// A used handoff (`handoff_open`, `handoff_copy`): handed off with its target, folder and
+    /// time, and accepted if it was suggested; the owner stays and it is not done. `reason`
+    /// names the prompt version used and whether it was edited (the Handoff metric).
+    pub(crate) fn hand_off(
+        &self,
+        ctx: &CommandCtx,
+        id: &str,
+        target: HandoffTarget,
+        cwd: Option<&str>,
+        reason: &str,
+    ) -> Result<ItemMutation, CoreError> {
+        self.ready()?;
+        let s = self
+            .store()
+            .read(|c| select_item(c, id))?
+            .ok_or_else(not_found)?;
+        let mut values = vec![
+            ("status", json!("handed_off")),
+            ("handoff_target", json!(name(&target))),
+            ("handoff_cwd", json!(cwd)),
+            ("handed_off_at", json!(self.deps.clock.now().0)),
+        ];
+        if s.review == "suggested" {
+            values.push(("review_state", json!("accepted")));
+        }
+        self.apply(ctx, s, Some(values), "Handed off", reason)
+    }
+
     pub(crate) fn create_item(
         &self,
         ctx: &CommandCtx,

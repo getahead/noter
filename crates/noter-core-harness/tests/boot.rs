@@ -1718,3 +1718,93 @@ fn llm_script_flag_reads_the_scripted_runtime_or_names_the_bad_line() {
     assert!(err.contains("line 2"), "{err}");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// Polls `handoff_get` until the prompt is ready (the scripted runtime answers at once).
+async fn handoff_ready(r: &mut Runner, item: &str) -> Value {
+    for _ in 0..250 {
+        let view = r
+            .ok("main", "handoff_get", json!({ "item_id": item }))
+            .await;
+        if view["state"]["type"] == "ready" {
+            return view;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("the {item} prompt never became ready");
+}
+
+#[tokio::test]
+async fn scripted_native_ops_record_launches_and_clipboard_writes_and_follow_the_launch_world() {
+    let mut r = start().await;
+    let args = json!({ "item_id": "itm_replay" });
+    let generating = r
+        .ok(
+            "main",
+            "handoff_generate",
+            json!({ "item_id": "itm_replay", "regenerate": false }),
+        )
+        .await;
+    assert_eq!(generating["state"]["type"], "generating");
+    let ready = handoff_ready(&mut r, "itm_replay").await;
+    assert_eq!(ready["launch"]["path"], "claude_cli_link");
+    assert_eq!(ready["unmapped_key"], "VSTOR");
+
+    // No folder given: the scripted folder panel answers one under the data folder.
+    let repos = r
+        .ok(
+            "main",
+            "repo_upsert",
+            json!({ "key": "VSTOR", "local_path": null, "default_tool": "claude_code" }),
+        )
+        .await;
+    assert_eq!(repos["mappings"][0]["path_exists"], true);
+    r.ok("main", "harness.cancel_next_save_panel", json!({}))
+        .await;
+    assert_eq!(
+        r.code(
+            "main",
+            "repo_upsert",
+            json!({ "key": "UI", "default_tool": "codex" })
+        )
+        .await,
+        "cancelled"
+    );
+
+    // Automation denied for the planned terminal: the typed error, nothing launched.
+    let denied = json!({ "plan": { "path": "terminal", "needs_automation": false, "automation_denied": true } });
+    r.ok("main", "harness.launch_world", denied).await;
+    assert_eq!(
+        r.code("main", "handoff_open", args.clone()).await,
+        "automation_denied"
+    );
+    let log = r.ok("main", "harness.native_log", json!({})).await;
+    assert_eq!(log["launches"], json!([]));
+
+    // The link fails and Terminal opens.
+    let fallback = json!({
+        "plan": { "path": "claude_cli_link", "needs_automation": false, "automation_denied": false },
+        "fail": [{ "path": "claude_cli_link", "code": "no_link_handler" }, { "path": "iterm", "code": "no_link_handler" }],
+    });
+    r.ok("main", "harness.launch_world", fallback).await;
+    let opened = r.ok("main", "handoff_open", args.clone()).await;
+    assert_eq!(opened["path_used"], "terminal");
+    assert_eq!(opened["item"]["status"], "handed_off");
+    let copied = r.ok("main", "handoff_copy", args).await;
+    assert!(copied["chars"].as_u64().unwrap() > 0);
+
+    let log = r.ok("main", "harness.native_log", json!({})).await;
+    let launch = &log["launches"][0];
+    assert_eq!(launch["path"], "terminal");
+    assert_eq!(launch["target"], "claude_code");
+    assert!(launch["prompt_file"]
+        .as_str()
+        .unwrap()
+        .ends_with("handoffs/itm_replay.md"));
+    assert_eq!(log["clipboard"][0]["markdown"], ready["prompt_md"]);
+    assert_eq!(
+        r.code("main", "harness.launch_world", json!({ "plan": "nope" }))
+            .await,
+        "invalid_input"
+    );
+    r.finish().await;
+}
