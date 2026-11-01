@@ -192,7 +192,7 @@ The system **MUST** supply the titles and bodies of NT-1, NT-2 and NT-3 from the
 
 ### Permission from a call's page
 
-- [ ] `p2` - **ID**: `cpt-noter-dod-ui-notifications-permission`
+- [x] `p2` - **ID**: `cpt-noter-dod-ui-notifications-permission`
 
 The system **MUST** ask for the Notifications permission only from **Notify Me When Summaries Are Ready** on a call's page, never at first run or during a call, and show **Notifications are off for Noter** with **Open System Settings…** in Settings › General while they are off.
 
