@@ -327,7 +327,11 @@ impl Core {
             }
         }
         if calls.is_empty() {
-            return Err(invalid("call_ids", ValidationRule::Required));
+            // No calls selected: nothing to change (the contract's example arguments).
+            return Ok(TagsSetResult {
+                calls: vec![],
+                change_id: ChangeId::new(""),
+            });
         }
         // @cpt-end:cpt-noter-flow-core-items-today-tags:p1:inst-tags-set
         let meta = self.change_meta(ctx, "Changed tags".into(), "call_tags_set");
