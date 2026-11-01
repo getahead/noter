@@ -35,7 +35,7 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [x] `p3` - **ID**: `cpt-noter-featstatus-core-jobs-scheduler`
+- [ ] `p3` - **ID**: `cpt-noter-featstatus-core-jobs-scheduler`
 
 - [ ] `p3` - `cpt-noter-feature-core-jobs-scheduler`
 

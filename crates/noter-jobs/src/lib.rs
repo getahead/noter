@@ -652,6 +652,7 @@ impl RunCtx {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-jobs-scheduler-batches:p1
     // @cpt-algo:cpt-noter-algo-core-jobs-scheduler-batch:p1
     /// Commits at most `BATCH_MAX` target rows with the run's checkpoint (`counts`, `progress`)
     /// in one logged transaction, then yields. A refused or failed batch leaves earlier batches
