@@ -136,6 +136,30 @@ fn the_plan_reports_denied_automation_and_nothing_to_launch() {
     );
 }
 
+#[test]
+fn a_denied_terminal_app_gives_way_to_one_that_is_not() {
+    let iterm_denied = FakeMac {
+        apps: vec![TERMINAL_APP, ITERM_APP],
+        denied: vec![ITERM_APP],
+        granted: vec![TERMINAL_APP],
+        ..FakeMac::default()
+    };
+    assert_eq!(
+        plan_launch(&iterm_denied, HandoffTarget::ClaudeCode),
+        plan(LaunchPath::Terminal, false, false)
+    );
+    // Both denied: the plan says so instead of picking a route that cannot open.
+    let both = FakeMac {
+        apps: vec![TERMINAL_APP, ITERM_APP],
+        denied: vec![TERMINAL_APP, ITERM_APP],
+        ..FakeMac::default()
+    };
+    assert_eq!(
+        plan_launch(&both, HandoffTarget::ClaudeCode),
+        plan(LaunchPath::Iterm, false, true)
+    );
+}
+
 fn request(target: HandoffTarget, cwd: &str) -> LaunchRequest {
     LaunchRequest {
         target,
