@@ -217,7 +217,9 @@ enum Diarization {
     static func ahc(_ x: [[Double]], threshold: Double) -> [Int] {
         let x = x.map { scaled($0, to: 1) }
         let n = x.count
-        var d = x.map { a in x.map { b in zip(a, b).reduce(0) { $0 + ($1.0 - $1.1) * ($1.0 - $1.1) } } }
+        var d: [[Double]] = x.map { a in
+            x.map { b in zip(a, b).reduce(0.0) { (sum: Double, p: (Double, Double)) -> Double in sum + (p.0 - p.1) * (p.0 - p.1) } }
+        }
         var (size, parent, alive) = (Array(repeating: 1.0, count: n), Array(0..<n), Array(repeating: true, count: n))
         while true {
             var (bi, bj, best) = (0, 0, Double.infinity)
@@ -225,9 +227,12 @@ enum Diarization {
                 for j in (i + 1)..<n where alive[j] && d[i][j] < best { (bi, bj, best) = (i, j, d[i][j]) }
             }
             guard best.squareRoot() <= threshold else { break }
-            let (ni, nj) = (size[bi], size[bj])
+            let (ni, nj): (Double, Double) = (size[bi], size[bj])
+            let m: Double = ni + nj
+            let pull: Double = ni * nj * best / (m * m)
             for k in 0..<n where alive[k] && k != bi && k != bj {
-                d[bi][k] = (ni * d[bi][k] + nj * d[bj][k]) / (ni + nj) - ni * nj * best / ((ni + nj) * (ni + nj))
+                let mean: Double = (ni * d[bi][k] + nj * d[bj][k]) / m
+                d[bi][k] = mean - pull
                 d[k][bi] = d[bi][k]
             }
             (size[bi], alive[bj], parent[bj]) = (ni + nj, false, bi)
@@ -249,24 +254,40 @@ enum Diarization {
     ) -> (gamma: [[Double]], pi: [Double]) {
         let (s, d) = ((start.max() ?? -1) + 1, phi.count)
         guard !x.isEmpty, s > 0 else { return ([], []) }
-        var gamma = start.map { k in (0..<s).map { exp($0 == k ? 7 : 0) / (exp(7) + Double(s - 1)) } }
+        // Typed sub-expressions throughout: CI's Swift cannot type-check the chained arithmetic in time.
+        let warm: Double = exp(7) + Double(s - 1)
+        var gamma: [[Double]] = start.map { k in (0..<s).map { (j: Int) -> Double in exp(j == k ? 7.0 : 0.0) / warm } }
         var pi = Array(repeating: 1 / Double(s), count: s)
-        let g = x.map { -0.5 * (dot($0, $0) + Double(d) * log(2 * .pi)) }
+        let norm: Double = Double(d) * log(2 * Double.pi)
+        let g: [Double] = x.map { (v: [Double]) -> Double in -0.5 * (dot(v, v) + norm) }
         let rho = x.map { zip($0, phi).map { $0 * $1.squareRoot() } }
+        let ratio: Double = fa / fb
         var elbo = -Double.infinity
         for _ in 0..<iterations {
             let counts = (0..<s).map { k in gamma.reduce(0) { $0 + $1[k] } }
-            let invL = counts.map { n in phi.map { 1 / (1 + fa / fb * n * $0) } }
-            let alpha = (0..<s).map { k in
-                (0..<d).map { j in fa / fb * invL[k][j] * zip(gamma, rho).reduce(0) { $0 + $1.0[k] * $1.1[j] } }
+            let invL: [[Double]] = counts.map { (n: Double) -> [Double] in phi.map { (p: Double) -> Double in 1 / (1 + ratio * n * p) } }
+            let alpha: [[Double]] = (0..<s).map { (k: Int) -> [Double] in
+                (0..<d).map { (j: Int) -> Double in
+                    var sum = 0.0
+                    for (gi, ri) in zip(gamma, rho) { sum += gi[k] * ri[j] }
+                    return ratio * invL[k][j] * sum
+                }
             }
-            let constant = (0..<s).map { k in
-                -0.5 * (0..<d).reduce(0) { $0 + (invL[k][$1] + alpha[k][$1] * alpha[k][$1]) * phi[$1] }
+            let constant: [Double] = (0..<s).map { (k: Int) -> Double in
+                var sum = 0.0
+                for j in 0..<d {
+                    let a: Double = alpha[k][j]
+                    sum += (invL[k][j] + a * a) * phi[j]
+                }
+                return -0.5 * sum
             }
             let lpi = pi.map { log($0 + 1e-8) }
             var total = 0.0
             for i in x.indices {
-                let lp = (0..<s).map { k in fa * (dot(rho[i], alpha[k]) + constant[k] + g[i]) + lpi[k] }
+                let lp: [Double] = (0..<s).map { (k: Int) -> Double in
+                    let inner: Double = dot(rho[i], alpha[k]) + constant[k] + g[i]
+                    return fa * inner + lpi[k]
+                }
                 let top = lp.max()!
                 let lse = top + log(lp.reduce(0) { $0 + exp($1 - top) })
                 gamma[i] = lp.map { exp($0 - lse) }
@@ -274,8 +295,14 @@ enum Diarization {
             }
             let shares = (0..<s).map { k in gamma.reduce(0) { $0 + $1[k] } }
             pi = shares.map { $0 / shares.reduce(0, +) }
-            let bound = (0..<s).reduce(0.0) { a, k in
-                a + (0..<d).reduce(0) { $0 + log(invL[k][$1]) - invL[k][$1] - alpha[k][$1] * alpha[k][$1] + 1 }
+            var bound = 0.0
+            for k in 0..<s {
+                var sum = 0.0
+                for j in 0..<d {
+                    let (l, a): (Double, Double) = (invL[k][j], alpha[k][j])
+                    sum += log(l) - l - a * a + 1
+                }
+                bound += sum
             }
             let next = total + fb * 0.5 * bound
             if next - elbo < 1e-6 { break }
