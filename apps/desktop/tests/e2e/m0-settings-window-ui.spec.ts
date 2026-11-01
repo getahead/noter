@@ -3,7 +3,7 @@
 // card-key modifier set. The Hotkeys story paths are in m0-settings-hotkeys-ui.spec.ts.
 import type { Page } from "@playwright/test";
 
-import { calls, openWindow } from "./support/app";
+import { calls, openWindow, type CorePlan } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
 const panes = (page: Page) => page.getByRole("navigation", { name: "Settings panes" });
@@ -86,5 +86,24 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
     await page.keyboard.up("Alt");
     await expect.poll(async () => (await sent(page, "settings_update")).length).toBe(1);
     expect((await sent(page, "settings_update"))[0]).toMatchObject({ section: { value: { card_keys: { modifiers: { control: false, option: true, command: false } } } } });
+  });
+});
+
+test.describe("cpt-noter-seq-settings-check-privacy", () => {
+  test("Error — Screen Recording not allowed: the row says macOS won’t ask again and opens the Screen Recording pane", async ({ page }) => {
+    const notAsked: CorePlan["world"] = (w) => {
+      w.app.capture.phase = "idle";
+      w.app.environment.permissions.forEach((p) => p.kind === "screen_recording" && (p.state = "not_asked"));
+    };
+    const steer = await openWindow(page, "settings", { world: notAsked });
+    await panes(page).getByRole("listitem").filter({ hasText: "Privacy" }).first().click();
+    await page.getByRole("button", { name: "Screen Share Test…" }).click();
+    await page.getByRole("button", { name: "Run Capture Test" }).click();
+    await steer.failNext("permission_request", "permission_denied");
+    await page.getByRole("button", { name: "Continue" }).click();
+    const sheet = page.getByRole("dialog", { name: "Screen Share Test" });
+    await expect(sheet).toContainText("macOS won’t ask again.");
+    await sheet.getByRole("button", { name: "Open System Settings…" }).click();
+    await expect.poll(async () => sent(page, "open_external")).toContainEqual({ target: { type: "system_settings", permission: "screen_recording" } });
   });
 });

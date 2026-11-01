@@ -50,10 +50,10 @@ export async function runShareTest(bridge: Bridge, capture: boolean): Promise<{ 
 }
 // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-api-share
 
-/** **Continue** on the test-only row: macOS asks once; true when it was granted. */
+/** **Continue** on the test-only row: macOS asks once; true only when it was granted (macOS may not prompt, or want a relaunch). */
 export async function askScreenRecording(bridge: Bridge): Promise<boolean> {
   const res = await bridge.act("share:permission", "permission_request", () => bridge.core.permissionRequest({ kind: "screen_recording" }));
-  return res.status === "ok";
+  return res.status === "ok" && res.data.state === "granted";
 }
 
 export interface ShareActionsCtx {
