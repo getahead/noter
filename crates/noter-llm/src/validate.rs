@@ -71,6 +71,12 @@ fn html() -> &'static Regex {
     })
 }
 
+/// Whether Markdown holds raw HTML (a tag or a comment): what the gate refuses in `*_md` fields,
+/// and what an edit of a section may not store either.
+pub fn raw_html(md: &str) -> bool {
+    html().is_match(md)
+}
+
 /// The first Markdown field (`*_md`) holding raw HTML.
 fn html_field(v: &Value) -> Option<String> {
     match v {

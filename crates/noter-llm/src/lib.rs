@@ -33,6 +33,7 @@ pub use runtime::{
     Tested, Usage, Validated,
 };
 pub use secrets::{key_account, KeychainLocked, MemorySecrets, Secret, SecretStore};
+pub use validate::raw_html;
 
 #[cfg(test)]
 mod fetch_tests;

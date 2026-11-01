@@ -524,7 +524,8 @@ async fn undoing_an_edit_brings_back_the_generated_version() {
         Some("Scripted summary.")
     );
     assert!(!back.sections[0].user_edited);
-    assert_eq!(back.sections[0].version_count, 1);
+    // The edit stays readable as a version of its own, as every version does.
+    assert_eq!(back.sections[0].version_count, 2);
     // The section is published again after the undo.
     let progress = events.progress();
     assert!(progress.len() > before);

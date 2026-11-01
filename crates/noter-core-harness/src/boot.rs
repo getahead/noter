@@ -665,6 +665,7 @@ impl Harness {
             }
         }
         // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
+        rows.extend(summary_rows(wanted));
         self.core.store().insert_batch(rows)
     }
 
@@ -1712,4 +1713,97 @@ fn system_audio(rows: &[PermissionRow]) -> PermissionState {
         Some(r) if r.state == PermissionState::Denied => PermissionState::Denied,
         _ => PermissionState::Granted,
     }
+}
+
+/// The world's text sections of the calls it seeds as `summaries` rows, each with its versions
+/// (all generated, the current one last) and the `llm_runs` row their writer comes from.
+fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
+    let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
+        table,
+        values,
+    };
+    // `llm_runs` outlives a world_set's call deletion: each seed writes its own run ids.
+    let seeded = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    let mut rows = vec![];
+    let calls = wanted["calls"].as_array().cloned().unwrap_or_default();
+    let seeded_call = |o: &&Value| calls.iter().any(|c| c["id"] == o["call_id"]);
+    for outputs in wanted["outputs"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(seeded_call)
+    {
+        for s in outputs["sections"].as_array().into_iter().flatten() {
+            let (Some(id), Some(body)) = (s["summary_id"].as_str(), s["body_md"].as_str()) else {
+                continue;
+            };
+            let w = &s["writer"];
+            let run = format!("llm_seed_{id}_{seeded}");
+            if w.is_object() {
+                rows.push(ins(
+                    "llm_runs",
+                    vec![
+                        ("id", json!(run)),
+                        ("adapter", json!("fixture")),
+                        ("runtime_choice", w["runtime"].clone()),
+                        ("model", w["model"].clone()),
+                        ("skill", json!("post-call")),
+                        ("skill_version", w["skill_version"].clone()),
+                        ("call_id", outputs["call_id"].clone()),
+                        ("prompt_hash", json!("fixture")),
+                        ("schema_ok", json!(1)),
+                    ],
+                ));
+            }
+            let count = s["version_count"].as_u64().unwrap_or(1).max(1);
+            rows.push(ins(
+                "summaries",
+                vec![
+                    ("id", json!(id)),
+                    ("rev", s["rev"].clone()),
+                    ("call_id", outputs["call_id"].clone()),
+                    ("kind", s["kind"].clone()),
+                    ("current_version_id", json!(format!("ver_{id}_{count}"))),
+                    ("user_edited", s["user_edited"].clone()),
+                    (
+                        "regenerated_with_edits",
+                        s["regenerated_with_edits"].clone(),
+                    ),
+                ],
+            ));
+            for n in 1..=count {
+                rows.push(ins(
+                    "summary_versions",
+                    vec![
+                        ("id", json!(format!("ver_{id}_{n}"))),
+                        ("summary_id", json!(id)),
+                        ("n", json!(n)),
+                        ("kind", json!("generated")),
+                        ("body_md", json!(body)),
+                        ("lang", json!("en")),
+                        ("skill_version", w["skill_version"].clone()),
+                        (
+                            "llm_run_id",
+                            if w.is_object() {
+                                json!(run)
+                            } else {
+                                Value::Null
+                            },
+                        ),
+                        (
+                            "from_pass",
+                            w["from_pass"].as_str().map_or(json!("live"), |p| json!(p)),
+                        ),
+                        (
+                            "created_at",
+                            w["generated_at"].as_i64().map_or(json!(0), |t| json!(t)),
+                        ),
+                    ],
+                ));
+            }
+        }
+    }
+    rows
 }

@@ -102,11 +102,11 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 **Steps**:
 1. [ ] - `p1` - Load the stopped call's current transcript, metadata, participants, glossary, configured summary language and call-type skill - `inst-write-load`
 2. [ ] - `p1` - Run `cpt-noter-algo-core-postcall-chunks` for live segments and build a packet with known evidence ids - `inst-write-packet`
-3. [ ] - `p1` - Run the call-type `PostCallOutput` through the router with cancellation and the scheduler's current run generation - `inst-write-model`
-4. [ ] - `p1` - **FOR EACH** output section in the stated order - `inst-write-sections`
-   1. [ ] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
-   2. [ ] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
-   3. [ ] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
+3. [x] - `p1` - Run the call-type `PostCallOutput` through the router with cancellation and the scheduler's current run generation - `inst-write-model`
+4. [x] - `p1` - **FOR EACH** output section in the stated order - `inst-write-sections`
+   1. [x] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
+   2. [x] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
+   3. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
 5. [ ] - `p1` - Run enabled role reviews last through the router, parallel by default, with their own evidence checks and versions - `inst-write-reviews`
 6. [ ] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
 7. [ ] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
@@ -114,7 +114,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 ### Read, edit and compare versions
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-core-postcall-edit`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-postcall-edit`
 
 **Actor**: Primary user (main window)
 
@@ -125,12 +125,12 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Missing call, section or version: `not_found`; stale section revision: `conflict` with `current_rev`; wrong call/section association: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `outputs_get { call_id }`; join summaries, current versions and items into `CallOutputs`, including archive state, local writer and review count - `inst-edit-get`
-2. [ ] - `p1` - API: `output_edit { call_id, summary_id, rev, body_md }`; validate membership, revision and Markdown without raw HTML on the writer - `inst-edit-validate`
-3. [ ] - `p1` - Append a user-edit `summary_versions` row and logged change, update current version and revision in one transaction and preserve the generated base - `inst-edit-commit`
-4. [ ] - `p1` - After commit refresh files and indexes, publish the whole changed section and return `OutputMutation` with `change_id` - `inst-edit-publish`
-5. [ ] - `p1` - API: `output_versions { summary_id }` returns ordered version metadata; `output_version_get { summary_id, version_id }` returns that version's body and provenance - `inst-edit-versions`
-6. [ ] - `p1` - **RETURN** plain Markdown bodies for the UI's diff; cancelling an editor sends no mutation - `inst-edit-return`
+1. [x] - `p1` - API: `outputs_get { call_id }`; join summaries, current versions and items into `CallOutputs`, including archive state, local writer and review count - `inst-edit-get`
+2. [x] - `p1` - API: `output_edit { call_id, summary_id, rev, body_md }`; validate membership, revision and Markdown without raw HTML on the writer - `inst-edit-validate`
+3. [x] - `p1` - Append a user-edit `summary_versions` row and logged change, update current version and revision in one transaction and preserve the generated base - `inst-edit-commit`
+4. [x] - `p1` - After commit refresh files and indexes, publish the whole changed section and return `OutputMutation` with `change_id` - `inst-edit-publish`
+5. [x] - `p1` - API: `output_versions { summary_id }` returns ordered version metadata; `output_version_get { summary_id, version_id }` returns that version's body and provenance - `inst-edit-versions`
+6. [x] - `p1` - **RETURN** plain Markdown bodies for the UI's diff; cancelling an editor sends no mutation - `inst-edit-return`
 
 ### Upgrade or regenerate outputs
 
@@ -145,7 +145,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - User regeneration during capture: `job_blocked`; an unavailable chosen runtime: typed runtime failure; failed archive leaves the live transcript usable as archive pending.
 
 **Steps**:
-1. [ ] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration - `inst-regen-request`
+1. [x] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration - `inst-regen-request`
 2. [ ] - `p1` - For ArchivePass, wait until no call is live, then request `offline_pass` with the latest user constraints - `inst-regen-archive`
 3. [ ] - `p1` - **IF** audio is absent or archive fails, retain the live transcript, expose archive pending or failed state and use the scheduled retry path when audio remains available - `inst-regen-archive-fail`
 4. [ ] - `p1` - On archive success, map clusters by time overlap, retain user speaker and term corrections, install archive segments and keep the live copy for seven days - `inst-regen-install`
@@ -165,13 +165,13 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 **Output**: Logged section version, items and progress.
 
 **Steps**:
-1. [ ] - `p1` - Verify the call still exists, has not resumed and the job generation is current - `inst-store-current`
-2. [ ] - `p1` - Append generated versions with increasing version numbers and writer runtime, model, skill version, language, time and pass - `inst-store-version`
-3. [ ] - `p1` - Resolve owner hints to known people only when supported; otherwise leave ownership unset rather than inventing a match - `inst-store-owner`
+1. [x] - `p1` - Verify the call still exists, has not resumed and the job generation is current - `inst-store-current`
+2. [x] - `p1` - Append generated versions with increasing version numbers and writer runtime, model, skill version, language, time and pass - `inst-store-version`
+3. [x] - `p1` - Resolve owner hints to known people only when supported; otherwise leave ownership unset rather than inventing a match - `inst-store-owner`
 4. [ ] - `p1` - Convert cited segments into channel and time spans in `item_spans`; preserve the quote and source association across archive id changes - `inst-store-evidence`
 5. [ ] - `p1` - Write extracted items as suggested, keep pins accepted and attach supported topics; never turn an unreviewed suggestion into accepted output - `inst-store-items`
-6. [ ] - `p1` - Commit primary records, changes and derived indexes through the writer in batches of at most 200 rows; mark a section ready only after its complete committed state exists - `inst-store-commit`
-7. [ ] - `p1` - **RETURN** section state ready, empty or failed; an empty valid section is not an error - `inst-store-return`
+6. [x] - `p1` - Commit primary records, changes and derived indexes through the writer in batches of at most 200 rows; mark a section ready only after its complete committed state exists - `inst-store-commit`
+7. [x] - `p1` - **RETURN** section state ready, empty or failed; an empty valid section is not an error - `inst-store-return`
 
 ### Chunk and embed the active transcript
 
@@ -225,21 +225,21 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 ### Output section
 
-- [ ] `p1` - **ID**: `cpt-noter-state-core-postcall-section`
+- [x] `p1` - **ID**: `cpt-noter-state-core-postcall-section`
 
 **States**: pending, writing, ready, empty, failed
 
 **Initial State**: pending
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** pending **TO** writing **WHEN** the current job starts this section - `inst-st-writing`
-2. [ ] - `p1` - **FROM** writing **TO** ready **WHEN** validated nonempty content commits - `inst-st-ready`
-3. [ ] - `p1` - **FROM** writing **TO** empty **WHEN** a valid section contains no content - `inst-st-empty`
-4. [ ] - `p1` - **FROM** writing **TO** failed **WHEN** runtime or validation fails after the permitted retry and fallback - `inst-st-failed`
-5. [ ] - `p1` - **FROM** failed **TO** writing **WHEN** retry or local rewrite is admitted - `inst-st-retry`
-6. [ ] - `p1` - **FROM** ready **TO** writing **WHEN** archive or explicit regeneration starts; the existing version and edit remain available - `inst-st-regenerate`
-7. [ ] - `p1` - **FROM** empty **TO** writing **WHEN** a new generation starts - `inst-st-empty-retry`
-8. [ ] - `p1` - **FROM** processing **TO** failed (the call's status in `cpt-noter-state-core-library-calls-status`) **WHEN** the post-call work fails - `inst-st-call-failed`
+1. [x] - `p1` - **FROM** pending **TO** writing **WHEN** the current job starts this section - `inst-st-writing`
+2. [x] - `p1` - **FROM** writing **TO** ready **WHEN** validated nonempty content commits - `inst-st-ready`
+3. [x] - `p1` - **FROM** writing **TO** empty **WHEN** a valid section contains no content - `inst-st-empty`
+4. [x] - `p1` - **FROM** writing **TO** failed **WHEN** runtime or validation fails after the permitted retry and fallback - `inst-st-failed`
+5. [x] - `p1` - **FROM** failed **TO** writing **WHEN** retry or local rewrite is admitted - `inst-st-retry`
+6. [x] - `p1` - **FROM** ready **TO** writing **WHEN** archive or explicit regeneration starts; the existing version and edit remain available - `inst-st-regenerate`
+7. [x] - `p1` - **FROM** empty **TO** writing **WHEN** a new generation starts - `inst-st-empty-retry`
+8. [x] - `p1` - **FROM** processing **TO** failed (the call's status in `cpt-noter-state-core-library-calls-status`) **WHEN** the post-call work fails - `inst-st-call-failed`
 
 Continue Recording invalidates the running generation and returns unfinished sections to pending for the next stop; committed versions are retained. Aggregate status is writing while sections run, ready when all required sections are ready or empty, partially_failed for mixed success and failure, and failed when no usable required section succeeded.
 

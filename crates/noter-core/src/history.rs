@@ -173,6 +173,7 @@ impl Core {
                     }
                 }
                 // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-undo
+                "summary" => self.publish_section(id)?,
                 "segment" | "speaker" => {
                     let table = if kind == "segment" {
                         "segments"

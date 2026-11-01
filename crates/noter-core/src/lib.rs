@@ -19,6 +19,7 @@ mod native_ops;
 mod notices;
 mod notify;
 mod playback;
+mod postcall;
 mod recovery;
 mod self_test;
 mod settings;
@@ -288,6 +289,8 @@ pub struct Core {
     playback: playback::Playback,
     /// The live transcript: batching, streams, speakers.
     transcript: transcript::Transcript,
+    /// Post-call sections being written, or failed, that have no committed row yet.
+    postcall: postcall::Sections,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -327,6 +330,14 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 4,
         name: "items and item spans",
         sql: include_str!("../migrations/0004_items.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-summaries:p1
+    // @cpt-dbtable:cpt-noter-dbtable-summary-versions:p1
+    Migration {
+        owner: "noter-core",
+        version: 5,
+        name: "summaries",
+        sql: include_str!("../migrations/0005_summaries.sql"),
     },
 ];
 
@@ -408,6 +419,7 @@ impl Core {
             audio_dir,
             playback: playback::Playback::new(),
             transcript: transcript::Transcript::new(data_dir.to_path_buf()),
+            postcall: postcall::Sections::default(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
@@ -722,6 +734,46 @@ impl CoreApi for Core {
         args: CallsDeleteArgs,
     ) -> Result<DeleteResult, CoreError> {
         self.delete_calls(ctx, args)
+    }
+
+    async fn outputs_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: CallIdArgs,
+    ) -> Result<CallOutputs, CoreError> {
+        self.outputs_now(&args.call_id)
+    }
+
+    async fn output_edit(
+        &self,
+        ctx: &CommandCtx,
+        args: OutputEditArgs,
+    ) -> Result<OutputMutation, CoreError> {
+        self.edit_output(ctx, args)
+    }
+
+    async fn outputs_regenerate(
+        &self,
+        _ctx: &CommandCtx,
+        args: RegenerateArgs,
+    ) -> Result<JobAccepted, CoreError> {
+        self.queue_regeneration(&args)
+    }
+
+    async fn output_versions(
+        &self,
+        _ctx: &CommandCtx,
+        args: SummaryIdArgs,
+    ) -> Result<VersionList, CoreError> {
+        self.output_version_list(&args.summary_id)
+    }
+
+    async fn output_version_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: VersionGetArgs,
+    ) -> Result<VersionBody, CoreError> {
+        self.output_version(&args)
     }
 
     async fn history_list(
