@@ -214,6 +214,13 @@ impl Core {
     // @cpt-end:cpt-noter-flow-core-live-transcript-replay:p1:inst-playback-events
 
     /// Playback stops for a reason of the core's own, and the engine is told to stop playing.
+    /// Ends a replay of `call_id` (its audio is about to go); one of another call plays on.
+    pub(crate) fn stop_playback_of(&self, call_id: &CallId) {
+        if lock(&self.playback.0).call_id.as_ref() == Some(call_id) {
+            self.stop_playback(PlaybackStopReason::User);
+        }
+    }
+
     fn stop_playback(&self, reason: PlaybackStopReason) {
         let mut state = lock(&self.playback.0);
         if !state.playing {

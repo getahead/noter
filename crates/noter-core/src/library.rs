@@ -56,11 +56,12 @@ struct Stored {
     audio_deleted: bool,
     audio_not_stored: bool,
     mode_used: String,
+    audio_deleted_at: Option<i64>,
 }
 
 const STORED: &str = "c.id, c.rev, c.started_at, c.ended_at, c.title, c.call_type, c.platform, \
     c.privacy_class, c.status, c.outputs_status, c.archive_status, c.audio_retention_until, \
-    c.audio_deleted, c.audio_not_stored, c.mode_used";
+    c.audio_deleted, c.audio_not_stored, c.mode_used, c.audio_deleted_at";
 
 fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
     Ok(Stored {
@@ -79,6 +80,7 @@ fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
         audio_deleted: r.get(12)?,
         audio_not_stored: r.get(13)?,
         mode_used: r.get(14)?,
+        audio_deleted_at: r.get(15)?,
     })
 }
 
@@ -181,8 +183,7 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         archive: word(s.archive_status)?,
         audio_kept_until: s.audio_retention_until.map(TimestampMs),
         audio_deleted: s.audio_deleted,
-        // The deletion time is recorded with audio deletion (2.13 slice 3).
-        audio_deleted_at: None,
+        audio_deleted_at: s.audio_deleted_at.map(TimestampMs),
         audio_retention_days: retention_days(c)?,
         open_items: 0,
         review_waiting: 0,

@@ -493,6 +493,7 @@ impl Harness {
                     ("archive_status", call["archive"].clone()),
                     ("audio_retention_until", call["audio_kept_until"].clone()),
                     ("audio_deleted", call["audio_deleted"].clone()),
+                    ("audio_deleted_at", call["audio_deleted_at"].clone()),
                     (
                         "audio_not_stored",
                         detail.map_or(json!(false), |d| d["audio_not_stored"].clone()),
