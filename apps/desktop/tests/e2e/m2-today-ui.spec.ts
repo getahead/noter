@@ -4,11 +4,12 @@
 // ticked by mistake, nothing open yet). Commands: today_get, item_set_done, item_answer_handoff_landed, change_undo,
 // permission_request (calendar), open_external, capture_resume_interrupted, window_show_call, window_navigate.
 // Written before the feature exists (tests first): they fail until today lands. They drive the real UI on the selected core
-// (NOTER_CORE=stdio → noter-core-harness). The fixture's TodayView has no calendar events, so `todayOf` builds the cards from the
-// fixture's own items and people; on the real core the harness must serve that world (data gap, _team/handoff-ui-m2-e2e-1.md).
+// (NOTER_CORE=stdio → noter-core-harness). The fixture's TodayView has no calendar events: `todayOf` builds the cards from the
+// fixture's own items and people; the real harness serves them from its calendar stub once `world_set` accepts `today` (Unblocker
+// ask #6, _team/handoff-ui-m2-e2e-1.md). Calendar states come from the permission (`W.permission`), read failed from `calendar_unavailable`.
 import type { Locator, Page } from "@playwright/test";
 
-import type { CalendarAccess, ItemView, UpcomingCall } from "../../src/core/bindings";
+import type { ItemView, UpcomingCall } from "../../src/core/bindings";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
@@ -24,6 +25,18 @@ const rowOf = (page: Page, text: string | RegExp) => page.locator(ROW).filter({ 
 const button = (scope: Page | Locator, name: string | RegExp) => scope.getByRole("button", { name });
 const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
   (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args as Record<string, unknown>);
+/** The change a mutation of `itemId` logged last, as the core's History lists it (the mutation's own `change_id`). */
+async function lastChange(page: Page, itemId: string): Promise<string> {
+  const rows = await page.evaluate(
+    async ([id]) => {
+      const args = { target: { type: "item", item_id: id }, actor: "all", job_id: null, page: {} };
+      const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
+      return (await (g.__noterFake ? g.__noterFake.invoke("history_list", args) : g.__TAURI_INTERNALS__!.invoke("history_list", { args }))) as { rows: Array<{ id: string }> };
+    },
+    [itemId],
+  );
+  return rows.rows[0]!.id;
+}
 const SPEC = "Drawer redesign spec by Friday"; // itm_spec, owed to you by Anna K.
 const VIRT = "Virtualise the 10k-row table"; // itm_virt, handed off, awaiting a PR
 
@@ -65,19 +78,17 @@ const todayOf =
     t.done_today = [];
     more(w);
   };
-const calendar = (state: CalendarAccess) => (w: World) => {
+const calendar = (state: "not_asked" | "denied") => (w: World) => {
   W.idle(w);
-  w.today.calendar = state;
-  w.today.today = [];
-  w.today.this_week = [];
+  W.permission(w, "calendar", state);
 };
 const interrupted = (w: World) => {
   w.today.banners = [{ type: "recording_interrupted_by_quit", call: { id: W.LIVE_CALL, title: W.LIVE_TITLE, started_at: w.now - 2 * HOUR, call_type: "planning" } }];
 };
 
 /** The window opens on Today, the first section (⌘1). */
-async function openToday(page: Page, world: (w: World) => void) {
-  const steer = await openWindow(page, "main", { world });
+async function openToday(page: Page, world: (w: World) => void, fail: Array<{ cmd: "today_get"; code: "calendar_unavailable" }> = []) {
+  const steer = await openWindow(page, "main", { world, fail });
   await expect(async () => {
     await page.keyboard.press("Meta+Digit1");
     await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible({ timeout: 1000 });
@@ -147,7 +158,7 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
   });
 
   test("UI — error path — Calendar read failed: Couldn't read today's calendar., Try Again repeats today_get and shows the calls", async ({ page }) => {
-    const steer = await openToday(page, calendar("read_failed"));
+    const steer = await openToday(page, W.idle, [{ cmd: "today_get", code: "calendar_unavailable" }]);
     await expect(page.getByText("Couldn't read today's calendar.")).toBeVisible();
     await expect(cards(page)).toHaveCount(0);
     const reads = (await sent(page, "today_get")).length;
@@ -243,8 +254,9 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
     await page.keyboard.press("Space");
     await button(page, /Done today/).click();
     const done = page.locator('[data-region="TD-R7"]');
+    const tick = await lastChange(page, "itm_spec"); // the change item_set_done returned
     await button(done.locator(ROW).filter({ hasText: SPEC }), "Undo").click();
-    expect(await sent(page, "change_undo")).toEqual([{ target: { type: "change", change_id: expect.any(String) } }]);
+    expect(await sent(page, "change_undo")).toEqual([{ target: { type: "change", change_id: tick } }]);
     await expect(cards(page).filter({ hasText: W.LIVE_TITLE }).locator(ROW).filter({ hasText: SPEC })).toBeVisible();
     await expect(page.locator(STRIP)).toContainText(/Undone/);
   });
