@@ -1109,6 +1109,49 @@ async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
 }
 
 #[tokio::test]
+async fn an_edited_section_is_seeded_with_the_users_edit_as_its_current_version() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let summary = world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap()["sections"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|s| s["kind"] == "summary")
+        .unwrap();
+    summary["user_edited"] = json!(true);
+    let id = summary["summary_id"].clone();
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let versions = r
+        .ok("main", "output_versions", json!({ "summary_id": id }))
+        .await;
+    let kinds: Vec<&Value> = versions["versions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| &v["kind"])
+        .collect();
+    assert_eq!(
+        kinds.last().unwrap().as_str(),
+        Some("user_edit"),
+        "{versions}"
+    );
+    // The user's edit has no model behind it.
+    assert_eq!(versions["versions"][kinds.len() - 1]["writer"], Value::Null);
+    assert_eq!(
+        kinds.first().unwrap().as_str(),
+        Some("generated"),
+        "{versions}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_seeds_output_sections_their_items_and_running_states() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;

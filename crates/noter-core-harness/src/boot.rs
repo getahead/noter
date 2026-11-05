@@ -1959,8 +1959,9 @@ fn system_audio(rows: &[PermissionRow]) -> PermissionState {
     }
 }
 
-/// The world's text sections of the calls it seeds as `summaries` rows, each with its versions
-/// (all generated, the current one last) and the `llm_runs` row their writer comes from.
+/// The world's sections of the calls it seeds as `summaries` rows, each with its versions
+/// (generated; the current one last, the user's edit when edited) and the `llm_runs` row their
+/// writer comes from.
 fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
     let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
         table,
@@ -2059,19 +2060,21 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
                 ],
             ));
             for n in 1..=count {
+                let edit = n == count && s["user_edited"] == json!(true);
                 rows.push(ins(
                     "summary_versions",
                     vec![
                         ("id", json!(format!("ver_{id}_{n}"))),
                         ("summary_id", json!(id)),
                         ("n", json!(n)),
-                        ("kind", json!("generated")),
+                        // An edited section's current version is the user's edit.
+                        ("kind", json!(if edit { "user_edit" } else { "generated" })),
                         ("body_md", json!(body)),
                         ("lang", json!("en")),
                         ("skill_version", w["skill_version"].clone()),
                         (
                             "llm_run_id",
-                            if w.is_object() {
+                            if w.is_object() && !edit {
                                 json!(run)
                             } else {
                                 Value::Null
