@@ -136,8 +136,7 @@ impl Fixture {
         self.store
             .read(move |c| {
                 let mut stmt = c.prepare(sql)?;
-                let names: Vec<String> =
-                    stmt.column_names().into_iter().map(String::from).collect();
+                let names: Vec<String> = stmt.column_names().map(String::from).collect();
                 stmt.query_row([], |r| {
                     let mut out = serde_json::Map::new();
                     for (i, n) in names.iter().enumerate() {
