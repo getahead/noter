@@ -236,12 +236,20 @@ impl Core {
     }
 }
 
+/// The entity types History lists, the ones an `EntityKind` names. The bookkeeping beside them
+/// (model runs, the egress audit, jobs and their runs, a section's versions, speaker constraints)
+/// is not a user-facing entity: it stays out of History even under the model filter.
+const LISTED: &str =
+    "('call', 'segment', 'speaker', 'person', 'item', 'summary', 'topic', 'agent', \
+                      'source', 'glossary', 'setting', 'handoff')";
+
 /// The History select over `filter`, then `tail` (order, limit).
 fn select_sql(filter: &str, tail: &str) -> String {
     format!(
         "SELECT c.rowid, c.id, c.batch_id,
                 CASE WHEN c.batch_id IS NULL THEN 1
-                     ELSE (SELECT count(*) FROM changes b WHERE b.batch_id = c.batch_id AND b.redo_of IS NULL) END,
+                     ELSE (SELECT count(*) FROM changes b WHERE b.batch_id = c.batch_id AND b.redo_of IS NULL
+                                                             AND b.entity_type IN {LISTED}) END,
                 c.ts, c.actor, c.entity_type, c.entity_id, c.field, c.before, c.after, c.delta IS NOT NULL,
                 c.summary, c.reason, c.confidence, c.status, c.undoable,
                 (EXISTS (SELECT 1 FROM changes d WHERE d.entity_type = c.entity_type AND d.entity_id = c.entity_id
@@ -294,9 +302,7 @@ fn raw_rows(
 
 /// The WHERE clause and its binds for a target, actor, job and period.
 fn filter_of(args: &HistoryListArgs) -> (String, Vec<Sql>) {
-    // The model's `llm_runs`/`audit_log` bookkeeping (2.15) is not a user-facing entity: no
-    // `EntityKind` names it, so it is out of History even under the model filter.
-    let mut clauses = vec!["c.entity_type NOT IN ('llm_run', 'audit_log')".to_string()];
+    let mut clauses = vec![format!("c.entity_type IN {LISTED}")];
     let mut binds: Vec<Sql> = Vec::new();
     let text = |s: &str| Sql::Text(s.to_string());
     match &args.target {
@@ -305,10 +311,12 @@ fn filter_of(args: &HistoryListArgs) -> (String, Vec<Sql>) {
             clauses.push(
                 "((c.entity_type = 'call' AND c.entity_id = ?)
                   OR (c.entity_type = 'segment' AND c.entity_id IN (SELECT id FROM segments WHERE call_id = ?))
-                  OR (c.entity_type = 'speaker' AND c.entity_id IN (SELECT id FROM speakers WHERE call_id = ?)))"
+                  OR (c.entity_type = 'speaker' AND c.entity_id IN (SELECT id FROM speakers WHERE call_id = ?))
+                  OR (c.entity_type = 'item' AND c.entity_id IN (SELECT id FROM items WHERE call_id = ?))
+                  OR (c.entity_type = 'summary' AND c.entity_id IN (SELECT id FROM summaries WHERE call_id = ?)))"
                     .into(),
             );
-            binds.extend(std::iter::repeat_with(|| text(call_id.as_str())).take(3));
+            binds.extend(std::iter::repeat_with(|| text(call_id.as_str())).take(5));
         }
         HistoryTarget::Item { item_id } => {
             clauses.push("(c.entity_type = 'item' AND c.entity_id = ?)".into());

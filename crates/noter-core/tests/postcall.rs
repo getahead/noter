@@ -10,12 +10,14 @@ use noter_db::Insert;
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::{
-    CallIdArgs, CallOutputs, JobKind, JobRunStatus, OutputEditArgs, OutputMutation,
-    OutputsProgress, OutputsStatus, RegenerateArgs, SectionKind, SectionState, SummaryIdArgs,
-    UndoArgs, UndoTarget, VersionGetArgs, VersionKind, WindowLabel,
+    ActorFilter, CallIdArgs, CallOutputs, EntityKind, HistoryListArgs, HistoryTarget, JobKind,
+    JobRunStatus, OutputEditArgs, OutputMutation, OutputsProgress, OutputsStatus, RegenerateArgs,
+    SectionKind, SectionState, SummaryIdArgs, UndoArgs, UndoTarget, VersionGetArgs, VersionKind,
+    WindowLabel,
 };
 use noter_protocol::{
-    CallId, CoreError, ErrorCode, ErrorDetail, JobRunId, Rev, RuntimeChoice, SummaryId, TimestampMs,
+    CallId, CoreError, ErrorCode, ErrorDetail, JobRunId, PageRequest, Rev, RuntimeChoice,
+    SummaryId, TimestampMs,
 };
 use serde_json::{json, Value};
 
@@ -571,6 +573,51 @@ async fn undoing_an_edit_brings_back_the_generated_version() {
     let progress = events.progress();
     assert!(progress.len() > before);
     assert_eq!(progress.last().unwrap().section, SectionKind::Summary);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_edit_is_in_the_history_of_everything_and_of_its_call_with_the_items() {
+    let (core, _events, _dir, o) = written().await;
+    let summary = o.sections[0].summary_id.clone().unwrap();
+    let edited = edit(&core, CALL, summary.as_str(), 1, "Mine.")
+        .await
+        .unwrap();
+    for target in [
+        HistoryTarget::All,
+        HistoryTarget::Call {
+            call_id: CallId::new(CALL),
+        },
+    ] {
+        let page = core
+            .history_list(
+                &main_window(),
+                HistoryListArgs {
+                    target: target.clone(),
+                    actor: ActorFilter::All,
+                    job_id: None,
+                    from: None,
+                    to: None,
+                    page: PageRequest {
+                        cursor: None,
+                        limit: None,
+                    },
+                },
+            )
+            .await
+            .unwrap_or_else(|e| panic!("{target:?}: {e:?}"));
+        let edit = page.rows.iter().find(|r| r.id == edited.change_id);
+        assert_eq!(
+            edit.map(|r| r.entity.kind),
+            Some(EntityKind::Summary),
+            "{target:?}"
+        );
+        // A section's versions are its bookkeeping: the section is the change.
+        assert!(page.rows.iter().all(|r| !r.entity.id.starts_with("ver_")));
+        assert!(
+            page.rows.iter().any(|r| r.entity.kind == EntityKind::Item),
+            "{target:?}: the call's items"
+        );
+    }
 }
 
 #[tokio::test(start_paused = true)]
