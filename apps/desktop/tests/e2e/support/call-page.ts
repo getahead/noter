@@ -29,8 +29,9 @@ export async function navigate(page: Page, tab: "summary" | "transcript" | "hist
   );
 }
 
-export async function openSummary(page: Page) {
+/** The call's page open on Summary (the fixture's past call unless `call` names the one the real core recorded). */
+export async function openSummary(page: Page, call: string = W.PAST_CALL) {
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
-  await navigate(page, "summary");
-  await expect(page.getByRole("heading", { name: new RegExp(PAGE_TITLE) }).first()).toBeVisible();
+  await navigate(page, "summary", call);
+  await expect(page.getByRole("tab", { name: "Summary", selected: true })).toBeVisible();
 }
