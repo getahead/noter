@@ -12,7 +12,7 @@
 [milestone]
 # Advanced by the owner when a milestone gate passes. The E2E
 # coverage gate counts what milestones.toml lists up to here.
-current = "M0"
+current = "M1"
 order = ["pre-M0", "M0", "M1", "M2", "M3", "M4", "M5"]
 
 [gates.unit]
@@ -40,6 +40,7 @@ pixel_color_threshold = 0.02  # per-pixel colour distance (0..1) under which two
 [gates.perf]
 # Not enforced: the owner took performance out of `just gate` and CI on 24 Oct 2026
 # (tests and scripts stay; `just perf` runs them by hand).
+enforced = false              # scenario coverage is reported by `just perf`, not required
 max_regression_pct = 10.0     # per scenario: head may be at most 10% worse than base (instruction counts)
 scenario_coverage_min = 60.0  # perf.toml registry entries due by the current milestone that have a scenario
 wall_runs = 10                # wall mode: measured runs per side; medians are compared
