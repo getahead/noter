@@ -767,6 +767,23 @@ export const en = {
   "notif.microphone_off_body": "Recording continues with the other side only.",
   "notif.engine_stopped": "Not recording · engine stopped",
   "notif.engine_stopped_body": "Open the call window to try again.",
+  "diff.changed": { one: "{count} word changed", other: "{count} words changed" },
+  "diff.none": "No differences",
+  "diff.unchanged_lines": { one: "{count} unchanged line", other: "{count} unchanged lines" },
+  "undo.undo": "Undo",
+  "undo.redo": "Redo",
+  "undo.dismiss": "Dismiss",
+  "undo.undone": { one: "Undone {count} change", other: "Undone {count} changes" },
+  "undo.redone": { one: "Redone {count} change", other: "Redone {count} changes" },
+  "undo.partial": "Undone {done} of {total} · {kept} kept because you edited them later",
+  "undo.partial_redo": "Redone {done} of {total} · {kept} kept because you edited them later",
+  "undo.err.not_undoable": "This change can't be undone.",
+  "undo.err.already_undone": "Already undone.",
+  "undo.err.not_undone": "Not undone, so there is nothing to redo.",
+  "undo.err.edited_later": "Edited later, so it was kept.",
+  "undo.err.undo_expired": "It's too late to undo this.",
+  "undo.err.not_found": "That change is gone.",
+  "undo.err.other": "Couldn't finish that. Try again.",
 } as const;
 
 export type MsgKey = keyof typeof en;

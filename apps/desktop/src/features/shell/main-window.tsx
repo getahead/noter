@@ -9,6 +9,7 @@ import { useWindow } from "../../app/use-window";
 import type { BannerKind, CommandName, NavTarget, Result } from "../../core/bindings";
 import type { WholeName } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
+import { UndoStrip } from "../history/UndoStrip";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
 import { SplitDivider } from "../../ui/primitives/split-divider";
 import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
@@ -249,6 +250,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-empty-one */}
         {page.banners && <page.banners route={route} bridge={bridge} appBanners={bannerList.length} />}
+        <UndoStrip bridge={bridge} />
         <div className="np-body">
           <div ref={contentRef} className="np-content" data-region="MW-R3" role="main" tabIndex={0} aria-label={page.title(route)} data-width={layout.widthClass} data-grid={layout.grid} data-columns={layout.columns} onScroll={scrollSaver(scrolls.current, routeId)}>
             {/* @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
