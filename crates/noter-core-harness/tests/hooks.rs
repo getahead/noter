@@ -147,6 +147,7 @@ async fn each_scenario_boots_the_fixture_in_its_state() {
         }),
         ("switched-to-local", |a| {
             a["degraded"]["states"][0]["type"] == "switched_to_local"
+                && a["privacy"]["effective"] == "switched_to_local"
         }),
     ];
     for (name, holds) in cases {

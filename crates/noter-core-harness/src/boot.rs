@@ -28,8 +28,8 @@ use noter_protocol::fixtures::{world, FakeWorld};
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::{
-    AudioChannel, CallId, CoreError, DetectionId, DurationMs, ErrorCode, PermissionKind,
-    PermissionState, TimestampMs,
+    AudioChannel, CallId, CoreError, DetectionId, DurationMs, EffectiveMode, ErrorCode,
+    PermissionKind, PermissionState, TimestampMs,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -177,7 +177,8 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
                 call_id: w.app.capture.call_id.clone(),
                 reason: RuntimeUnavailableReason::RateLimited,
                 retry_at: None,
-            }]
+            }];
+            w.app.privacy.effective = EffectiveMode::SwitchedToLocal;
         }
         "first-call" => {
             // After the first recorded call: the library holds only “Backend sync”, nothing records.
@@ -1085,6 +1086,10 @@ impl Harness {
             .filter(|f| after["app"]["setup"][f] != wanted["app"]["setup"][f])
             .map(|f| format!("app.setup.{f}"))
             .collect();
+        // The effective privacy follows the degraded set (switched to local).
+        if unversioned(&after["app"]["privacy"]) != unversioned(&wanted["app"]["privacy"]) {
+            drifted.push("app.privacy".into());
+        }
         // Unchanged models are not the world's to enforce: the core moves them itself (a
         // download resumes once the Mac is online again).
         if models_set && bundle_states(&after) != bundle_states(&wanted) {
@@ -1177,6 +1182,7 @@ const OWNED_APP: &[&str] = &[
     "presenting",
     "degraded",
     "detection",
+    "privacy",
 ];
 
 /// A transcript line as the scripted engine reports it.

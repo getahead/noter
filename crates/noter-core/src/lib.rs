@@ -535,9 +535,26 @@ impl Core {
         self.publish(event_names::BANNERS_CHANGED, &mut app.banners)
     }
 
-    /// Replaces the degraded set and sends `degraded:changed`.
+    /// Replaces the degraded set and sends `degraded:changed`; a call switched to local is the
+    /// effective privacy while it lasts, sent first as `privacy:changed`.
     pub fn set_degraded(&self, states: Vec<DegradedState>) -> DegradedSet {
         let mut app = self.app();
+        let switched = states
+            .iter()
+            .any(|s| matches!(s, DegradedState::SwitchedToLocal { .. }));
+        let effective = match (switched, app.privacy.effective) {
+            (true, _) => EffectiveMode::SwitchedToLocal,
+            (false, EffectiveMode::SwitchedToLocal) => match app.privacy.mode {
+                PrivacyMode::CloudAllowed => EffectiveMode::Cloud,
+                PrivacyMode::CloudRedacted => EffectiveMode::CloudRedacted,
+                PrivacyMode::LocalOnly => EffectiveMode::LocalOnly,
+            },
+            (false, e) => e,
+        };
+        if app.privacy.effective != effective {
+            app.privacy.effective = effective;
+            self.publish(event_names::PRIVACY_CHANGED, &mut app.privacy);
+        }
         app.degraded.states = states;
         self.publish(event_names::DEGRADED_CHANGED, &mut app.degraded)
     }

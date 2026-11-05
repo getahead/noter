@@ -183,6 +183,12 @@ impl WholeState for DegradedSet {
     }
 }
 
+impl WholeState for PrivacyStatus {
+    fn version(&mut self) -> &mut StateVersion {
+        &mut self.version
+    }
+}
+
 impl WholeState for PresentingState {
     fn version(&mut self) -> &mut StateVersion {
         &mut self.version
