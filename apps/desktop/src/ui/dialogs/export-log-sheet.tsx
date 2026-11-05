@@ -40,10 +40,10 @@ export function ExportLogSheet({ close, bridge, callId, callTitle, onExported }:
   }
 
   return (
-    <Sheet title={t("dialogs.export_log.title")} width={440} busy={busy} onCancel={close} onDefault={() => void run()}>
+    <Sheet title={t("dialogs.export_log.title")} width={480} busy={busy} onCancel={close} onDefault={() => void run()}>
       <div className="np-sheet__head">
         <div className="np-sheet__title">{t("dialogs.export_log.title")}</div>
-        <div className="np-dim">{callTitle}</div>
+        <div className="np-dim">{t("dialogs.export_log.call", { title: callTitle })}</div>
       </div>
       <div className="np-sheet__body">
         {/* @cpt-begin:cpt-noter-flow-ui-history-undo-export:p1:inst-choose */}
@@ -53,8 +53,8 @@ export function ExportLogSheet({ close, bridge, callId, callTitle, onExported }:
           label={t("dialogs.export_log.format")}
           value={format}
           options={[
-            { value: "markdown", label: t("dialogs.export_log.markdown") },
-            { value: "json", label: t("dialogs.export_log.json") },
+            { value: "markdown", label: t("dialogs.export_log.markdown"), note: t("dialogs.export_log.markdown_note") },
+            { value: "json", label: t("dialogs.export_log.json"), note: t("dialogs.export_log.json_note") },
           ]}
           onAction={(v) => setFormat(v as LogFormat)}
         />

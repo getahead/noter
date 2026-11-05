@@ -143,7 +143,7 @@ export interface TimelineViewProps {
 export function TimelineView(p: TimelineViewProps) {
   const { variant, state, rows, prefs, actor, jobId, jobs } = p;
   const groups = groupByDay(rows, p.now ?? Date.now(), prefs);
-  const filterName = jobId ? (jobs.find((j) => j.id === jobId)?.name ?? "") : t(ACTORS.find((a) => a.value === actor)!.label);
+  const filterName = jobId ? (jobs.find((j) => j.id === jobId)?.name ?? "") : t(ACTORS.find((a) => a.value === actor)!.label).toLowerCase();
   return (
     <section data-component="cpt-noter-component-ui-history-timeline" data-variant={variant} data-state={state.toLowerCase()} className={`pc-hist pc-hist--${variant}`} data-region={variant === "call" ? "PC-R8" : undefined} aria-label={t("history.title")}>
       <div className="pc-hist__filters">
@@ -155,9 +155,9 @@ export function TimelineView(p: TimelineViewProps) {
         {variant !== "item" && jobs.length > 0 && (
           <PopupButton options={[{ value: "", label: t("history.all_jobs") }, ...jobs.map((j) => ({ value: j.id, label: j.name }))]} value={jobId ?? ""} label={t("history.jobs_filter")} onAction={p.onJob} />
         )}
-        <span className="np-dim pc-hist__count" role="status">
-          {p.exported ? t("history.exported", { path: p.exported }) : state === "READY" ? t("history.count", { count: rows.length }) : ""}
-        </span>
+        {/* the returned count is announced politely and drawn nowhere: the prototype has no count line */}
+        <span className="pc-hist__sr" role="status">{state === "READY" ? t("history.count", { count: rows.length }) : ""}</span>
+        {p.exported && <span className="np-dim pc-hist__count" role="status">{t("history.exported", { path: p.exported })}</span>}
         <span className="np-tb__spacer" />
         {variant === "call" && <PushButton label={t("history.export")} size="small" onAction={p.onExport} />}
       </div>

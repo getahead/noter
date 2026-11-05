@@ -40,10 +40,10 @@ describe("TimelineView (cpt-noter-flow-ui-history-undo-read)", () => {
   it("EMPTY reads No changes yet; a filtered empty names the filter and the filter row stays", () => {
     expect(html({ state: "EMPTY", rows: [] })).toContain("No changes yet");
     const filtered = html({ state: "FILTERED_EMPTY", rows: [], actor: "models" });
-    expect(filtered).toContain("No changes by Models");
+    expect(filtered).toContain("No changes by models in this history");
     expect(filtered).toContain("All");
     const job = html({ state: "FILTERED_EMPTY", rows: [], actor: "jobs", jobId: "j1", jobs: [{ id: "j1", name: "Reconcile" }] });
-    expect(job).toContain("No changes by Reconcile");
+    expect(job).toContain("No changes by Reconcile in this history");
   });
 
   it("ERROR shows the section error with Try Again that repeats the read", () => {
@@ -184,8 +184,10 @@ describe("ExportLogSheet (cpt-noter-flow-ui-history-undo-export)", () => {
 
   it("names the call, Whole call, and Markdown by default", () => {
     const out = renderToString(<ExportLogSheet {...mount().p} />);
-    expect(out).toContain("Backend sync");
+    expect(out).toContain("Changes of “Backend sync”");
     expect(out).toContain("Period: Whole call");
+    expect(out).toContain("One line per change, for reading");
+    expect(out).toContain("Every field, for scripts");
     expect(out).toContain("Markdown");
     expect(out).toContain("JSON");
   });

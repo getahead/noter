@@ -76,7 +76,7 @@ test.describe("cpt-noter-dod-ui-history-undo-timeline call History", () => {
   test("filtered empty: Models names the filter", async ({ page }) => {
     await open(page, rows().filter((r) => r.actor.type !== "model"));
     await page.locator(TIMELINE).getByRole("radio", { name: "Models" }).click();
-    await expect(page.getByText("No changes by Models")).toBeVisible();
+    await expect(page.getByText("No changes by models in this history")).toBeVisible();
     await shot(page, "history-filtered-empty");
   });
 
@@ -95,6 +95,15 @@ test.describe("cpt-noter-dod-ui-history-undo-timeline call History", () => {
     await expect(page.getByText("No differences")).toBeVisible();
     await expect(page.getByText(/unchanged lines/)).toBeVisible();
     await shot(page, "history-diff");
+  });
+});
+
+test.describe("cpt-noter-flow-ui-history-undo-export Export Log sheet", () => {
+  test("the sheet: call, Whole call, Markdown and JSON with their notes", async ({ page }) => {
+    await open(page, rows());
+    await page.getByRole("button", { name: "Export Log…" }).click();
+    await expect(page.getByRole("dialog", { name: /Export Log/ })).toContainText("Every field, for scripts");
+    await shot(page, "export-log-sheet");
   });
 });
 
