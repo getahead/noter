@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.2](https://github.com/getahead/noter/compare/v0.15.1...v0.15.2) (2026-11-05)
+
+
+### Bug fixes
+
+* **deps:** Bump tokio from 1.53.3 to 1.54.1 in the cargo-minor group ([#294](https://github.com/getahead/noter/issues/294)) ([a8a4aef](https://github.com/getahead/noter/commit/a8a4aefc69bfdf796ef0112331a1956e2575c38b))
+
 ## [0.15.1](https://github.com/getahead/noter/compare/v0.15.0...v0.15.1) (2026-11-01)
 
 
