@@ -72,6 +72,7 @@ test.describe("cpt-noter-seq-settings-replace-api-key", () => {
     await field.fill("sk-ant-bad");
     await sheet(page).getByRole("button", { name: "Verify" }).click();
     await expect(sheet(page)).toContainText("rejected this key");
+    await expect(field).toBeFocused(); // step 5.1: focus returns to the secure field
     await expect(sheet(page).getByRole("button", { name: "Save" })).toBeDisabled();
     await field.fill(GOOD);
     await sheet(page).getByRole("button", { name: "Verify" }).click();
@@ -145,6 +146,7 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
     await step(page).getByRole("button", { name: "Verify" }).first().click();
     await expect(step(page)).toContainText("rejected this key");
     await expect(keyField(page)).toHaveAttribute("aria-invalid", "true");
+    await expect(keyField(page)).toBeFocused();
     await keyField(page).fill(GOOD);
     await step(page).getByRole("button", { name: "Verify" }).first().click();
     await expect(step(page)).toContainText("Stored in the Keychain");

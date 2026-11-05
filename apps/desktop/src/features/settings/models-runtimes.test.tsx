@@ -2,7 +2,7 @@
 // slice, Verify stores a key once through `api_key_set`, a refusal leaves the stored key, and the
 // Runtime per task pop-ups save the runtimes section.
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
@@ -10,6 +10,7 @@ import { find, rendered } from "../../ui/testing";
 import { installCli, loadAccounts, removeKey, setKey } from "./accounts";
 import { loadSettings } from "./actions";
 import { KeyRow } from "./CredentialRow";
+import { refocus } from "./KeyField";
 import { KeySheet } from "./KeySheet";
 import { ModelsRuntimesPane } from "./ModelsRuntimesPane";
 import { PANES, SettingsWindow } from "./SettingsWindow";
@@ -181,6 +182,16 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
     await loadAccounts(bridge);
     expect(accounts().version).toBeGreaterThanOrEqual(before);
     expect((await installCli(bridge, "ollama")).status).toBe("ok");
+  });
+
+  it("a refused key puts focus back in the field (step 5.1); without a document nothing happens", () => {
+    let focused = 0;
+    vi.stubGlobal("document", { getElementById: (id: string) => (id === "key-anthropic" ? { focus: () => void focused++ } : null) });
+    refocus("key-anthropic");
+    refocus("key-codex");
+    vi.unstubAllGlobals();
+    expect(focused).toBe(1);
+    expect(() => refocus("key-anthropic")).not.toThrow();
   });
 
   it("the key row offers Add… when not set and Replace…/Remove… otherwise, and shows Saved", () => {

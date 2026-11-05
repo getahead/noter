@@ -1,6 +1,6 @@
 // The secure key field with **Verify** and its result line: the same control in the key sheet and in the
 // first-run Assistants step. The draft lives in this component only and leaves with it.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { KeyProvider } from "../../core/bindings";
@@ -70,10 +70,16 @@ export function useKeyDraft(bridge: Bridge, provider: KeyProvider, onLocked?: ()
   return { draft, state, message, edit, verify };
 }
 
+/** A refused key puts focus back in the field so the user can paste the right one (spec step 5.1). */
+export const refocus = (id: string): void => globalThis.document?.getElementById(id)?.focus?.();
+
 /** The field, **Verify** and the result line; `id` names the field for the sheet's and the step's labels. */
 export function KeyField({ id, label, placeholder, draft: k, verifiedText }: { id: string; label: string; placeholder: string; draft: KeyDraft; verifiedText: string }) {
   const verifying = k.state === "VERIFYING";
   const invalid = k.state === "INVALID" || k.state === "LOCKED";
+  // @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-invalid
+  useEffect(() => void (invalid && refocus(id)), [invalid, id]);
+  // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-invalid
   return (
     <div className="st-keyfield" data-state={k.state.toLowerCase()}>
       <TextField id={id} variant="secure" ariaLabel={label} placeholder={placeholder} value={k.draft} invalid={invalid} message={k.message ?? undefined} disabled={verifying} onChange={k.edit} onEnter={() => void k.verify()} />
