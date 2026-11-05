@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.3](https://github.com/getahead/noter/compare/v0.15.2...v0.15.3) (2026-11-05)
+
+
+### Bug fixes
+
+* **deps:** Bump the npm-minor group with 5 updates ([#296](https://github.com/getahead/noter/issues/296)) ([94ee881](https://github.com/getahead/noter/commit/94ee88161e1deee11b540c6f9ee53770dda3315e))
+
 ## [0.15.2](https://github.com/getahead/noter/compare/v0.15.1...v0.15.2) (2026-11-05)
 
 
