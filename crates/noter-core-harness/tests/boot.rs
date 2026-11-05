@@ -1109,6 +1109,72 @@ async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
 }
 
 #[tokio::test]
+async fn world_set_adds_change_rows_the_core_lists_and_undoes() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let call = world["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "call_backend")
+        .unwrap()
+        .clone();
+    let row = |id: &str, field: &str, before: &str, after: &Value| {
+        json!({
+            "id": id, "batch_id": "bat_seeded", "batch_size": 2, "at": world["now"],
+            "actor": { "type": "job", "job_id": "job_reconcile", "name": "Reconcile" },
+            "entity": { "kind": "call", "id": "call_backend", "label": call["title"] },
+            "field": field, "before": before, "after": after, "summary": "Renamed by a job",
+            "reason": "Calendar title", "evidence": [], "confidence": "high",
+            "status": "applied", "undoable": true, "redoable": false
+        })
+    };
+    let rows = [
+        row("chg_seeded_title", "title", "Old title", &call["title"]),
+        row(
+            "chg_seeded_type",
+            "call_type",
+            "planning",
+            &call["call_type"],
+        ),
+    ];
+    world["changes"].as_array_mut().unwrap().extend(rows);
+    let (set, _) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    let page = r
+        .ok(
+            "main",
+            "history_list",
+            json!({ "target": { "type": "call", "call_id": "call_backend" }, "actor": "jobs", "page": {} }),
+        )
+        .await;
+    let seeded: Vec<&Value> = page["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["batch_id"] == "bat_seeded")
+        .collect();
+    assert_eq!(seeded.len(), 2, "{page}");
+    assert_eq!(seeded[0]["batch_size"], 2);
+    assert_eq!(seeded[0]["actor"]["job_id"], "job_reconcile");
+    let undone = r
+        .ok(
+            "main",
+            "change_undo",
+            json!({ "target": { "type": "batch", "batch_id": "bat_seeded" } }),
+        )
+        .await;
+    assert_eq!(undone["undone"], 2, "{undone}");
+    let back = r
+        .ok("main", "call_get", json!({ "call_id": "call_backend" }))
+        .await;
+    assert_eq!(back["call"]["title"], "Old title");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_puts_todays_events_in_the_calendar_the_core_reads() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;

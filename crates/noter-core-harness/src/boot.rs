@@ -981,6 +981,7 @@ impl Harness {
                         | "items"
                         | "outputs"
                         | "today"
+                        | "changes"
                 )
             {
                 continue;
@@ -1024,6 +1025,24 @@ impl Harness {
         }
         if accepted["outputs"] != wanted["outputs"] {
             self.seed_sections(&parsed);
+        }
+        // The log is append-only: the rows a world adds are written as the core writes them, after
+        // the records they name; a row the world drops stays in the log.
+        let known: Vec<&Value> = accepted["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|c| &c["id"])
+            .collect();
+        let added: Vec<noter_db::Insert> = wanted["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| !known.contains(&&c["id"]))
+            .map(change_row)
+            .collect();
+        if !added.is_empty() {
+            self.core.store().insert_batch(added)?;
         }
         // Today's cards are the core's own over the calendar: only the events are the world's.
         if accepted["today"] != wanted["today"] {
@@ -1961,6 +1980,38 @@ fn system_audio(rows: &[PermissionRow]) -> PermissionState {
     match rows.iter().find(|r| r.kind == PermissionKind::SystemAudio) {
         Some(r) if r.state == PermissionState::Denied => PermissionState::Denied,
         _ => PermissionState::Granted,
+    }
+}
+
+/// A world's `ChangeRow` as the `changes` row the core would have written for it.
+fn change_row(c: &Value) -> noter_db::Insert {
+    let actor = &c["actor"];
+    let actor = match actor["type"].as_str() {
+        Some("job") => format!("job:{}", actor["job_id"].as_str().unwrap_or_default()),
+        Some("model") => format!(
+            "llm_run:{}",
+            actor["llm_run_id"].as_str().unwrap_or_default()
+        ),
+        _ => "you".into(),
+    };
+    noter_db::Insert {
+        table: "changes",
+        values: vec![
+            ("id", c["id"].clone()),
+            ("ts", c["at"].clone()),
+            ("actor", json!(actor)),
+            ("entity_type", c["entity"]["kind"].clone()),
+            ("entity_id", c["entity"]["id"].clone()),
+            ("field", c["field"].clone()),
+            ("before", c["before"].clone()),
+            ("after", c["after"].clone()),
+            ("summary", c["summary"].clone()),
+            ("reason", json!(c["reason"].as_str().unwrap_or_default())),
+            ("confidence", c["confidence"].clone()),
+            ("status", c["status"].clone()),
+            ("batch_id", c["batch_id"].clone()),
+            ("undoable", c["undoable"].clone()),
+        ],
     }
 }
 
