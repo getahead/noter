@@ -5,29 +5,23 @@ import type { AccountProvider, AccountView, KeyView } from "../../core/bindings"
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
-import { Icon, type IconName } from "../../ui/icons";
+import type { IconName } from "../../ui/icons";
+import { Badge, type BadgeProps } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
 import { KeyField, useKeyDraft } from "./KeyField";
 import { KEY_NAME, KEY_USE, keyRowState, reasonText, type KeyRowState } from "./keys";
 
 const COMPONENT = "cpt-noter-component-ui-credential-row";
-const TAG: Record<KeyRowState, { label: MsgKey; icon: IconName | null; tone: string }> = {
-  not_set: { label: "settings.keys.not_set", icon: null, tone: "neutral" },
+const TAG: Record<KeyRowState, { label: MsgKey; icon?: IconName; tone: BadgeProps["tone"] }> = {
+  not_set: { label: "settings.keys.not_set", tone: "neutral" },
   configured: { label: "settings.keys.configured", icon: "check", tone: "success" },
   rejected: { label: "settings.keys.rejected", icon: "error", tone: "error" },
-  verifying: { label: "settings.keys.verifying", icon: null, tone: "neutral" },
+  verifying: { label: "settings.keys.verifying", tone: "neutral" },
   keychain_locked: { label: "settings.keys.locked", icon: "warning", tone: "warning" },
 };
 
-function Tag({ state }: { state: KeyRowState }) {
-  const tag = TAG[state];
-  return (
-    <span className="st-cred__tag" data-tone={tag.tone}>
-      {tag.icon && <Icon name={tag.icon} size={12} />}
-      {t(tag.label)}
-    </span>
-  );
-}
+/** The state pill (the prototype's `P.badge` with tone and icon). */
+const Tag = ({ state }: { state: KeyRowState }) => <Badge text={t(TAG[state].label)} tone={TAG[state].tone} icon={TAG[state].icon} cls="st-cred__tag" />;
 
 export interface KeyRowProps {
   view: KeyView;
@@ -37,13 +31,16 @@ export interface KeyRowProps {
   onAdd: () => void;
   onReplace: () => void;
   onRemove: () => void;
+  /** The pane's Keychain is locked: every action of every row is disabled. */
+  locked?: boolean;
 }
 
 // @cpt-component:cpt-noter-component-ui-credential-row:p1
 /** Row variant: name, use line, state tag, the Keychain line and **Add…** / **Replace…** / **Remove…**. */
-export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove }: KeyRowProps) {
+export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove, locked }: KeyRowProps) {
   const state = keyRowState(view);
-  const busy = state === "verifying" || state === "keychain_locked";
+  // while the Keychain is locked every key action waits (DESIGN › Credential row › States)
+  const busy = state === "verifying" || state === "keychain_locked" || !!locked;
   return (
     <div className="e-status st-cred" role="group" aria-label={t(KEY_NAME[view.provider])} data-component={COMPONENT} data-variant="row" data-state={state}>
       <div className="e-status__main">
@@ -56,7 +53,7 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove 
       <div className="st-cred__actions">
         {saved && <InlineStatus text={t("settings.keys.saved")} onExpire={onSavedExpire ?? (() => {})} />}
         {state === "not_set" ? (
-          <PushButton label={t("settings.keys.add")} size="small" onAction={onAdd} />
+          <PushButton label={t("settings.keys.add")} size="small" disabled={locked} onAction={onAdd} />
         ) : (
           <>
             <PushButton label={t("settings.keys.replace")} size="small" disabled={busy} onAction={onReplace} />
@@ -83,7 +80,7 @@ export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: 
           <PushButton label={t("settings.keys.remove_short")} size="small" onAction={onRemove} />
         </div>
       ) : (
-        <KeyField id={`fr-key-${view.provider}`} label={t(KEY_NAME[view.provider])} draft={draft} verifiedText={t("settings.keys.keychain")} />
+        <KeyField id={`fr-key-${view.provider}`} label={t(KEY_NAME[view.provider])} placeholder={t(view.provider === "anthropic" ? "first_run.assistants.key_placeholder_anthropic" : "first_run.assistants.key_placeholder_codex")} draft={draft} verifiedText={t("settings.keys.keychain")} />
       )}
     </div>
   );
@@ -102,9 +99,7 @@ export function AccountRow({ view }: { view: AccountView }) {
       <div className="e-status__main">
         <span className="e-status__title">{t(a.title)}</span>
         <span className="e-status__sub">{t(a.use)}</span>
-        <span className="st-cred__tag" data-tone="neutral">
-          {t("settings.accounts.not_signed_in")}
-        </span>
+        <Badge text={t("settings.accounts.not_signed_in")} tone="neutral" cls="st-cred__tag" />
       </div>
       <div className="st-cred__actions">
         <PushButton label={t(a.signin)} size="small" disabled help={t("settings.accounts.later")} />

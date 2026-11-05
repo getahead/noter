@@ -71,12 +71,12 @@ export function useKeyDraft(bridge: Bridge, provider: KeyProvider, onLocked?: ()
 }
 
 /** The field, **Verify** and the result line; `id` names the field for the sheet's and the step's labels. */
-export function KeyField({ id, label, draft: k, verifiedText }: { id: string; label: string; draft: KeyDraft; verifiedText: string }) {
+export function KeyField({ id, label, placeholder, draft: k, verifiedText }: { id: string; label: string; placeholder: string; draft: KeyDraft; verifiedText: string }) {
   const verifying = k.state === "VERIFYING";
   const invalid = k.state === "INVALID" || k.state === "LOCKED";
   return (
     <div className="st-keyfield" data-state={k.state.toLowerCase()}>
-      <TextField id={id} variant="secure" ariaLabel={label} value={k.draft} invalid={invalid} message={k.message ?? undefined} disabled={verifying} onChange={k.edit} onEnter={() => void k.verify()} />
+      <TextField id={id} variant="secure" ariaLabel={label} placeholder={placeholder} value={k.draft} invalid={invalid} message={k.message ?? undefined} disabled={verifying} onChange={k.edit} onEnter={() => void k.verify()} />
       <PushButton label={t("settings.keys.verify")} size="small" loading={verifying} disabled={!canVerify(k.state, k.draft)} onAction={() => void k.verify()} />
       {k.state === "VERIFIED" && (
         <div className="st-keyfield__ok" role="status">

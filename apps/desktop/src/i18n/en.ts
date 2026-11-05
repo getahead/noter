@@ -168,6 +168,8 @@ export const en = {
   "first_run.assistants.accounts": "Or use your own account",
   "first_run.assistants.install": "Install Ollama…",
   "first_run.assistants.not_now": "Not Now",
+  "first_run.assistants.key_placeholder_anthropic": "sk-ant-…",
+  "first_run.assistants.key_placeholder_codex": "sk-…",
   "first_run.assistants.privacy": "Privacy mode",
   "first_run.assistants.privacy_redacted": "Cloud with redaction",
   "first_run.assistants.privacy_redacted_note":
@@ -408,6 +410,7 @@ export const en = {
   "settings.keys.sheet_replace": "Replace {name}",
   "settings.keys.sheet_note": "Paste works; the key goes to the Keychain only",
   "settings.keys.field": "API key",
+  "settings.keys.placeholder": "Paste your key",
   "settings.keys.verify": "Verify",
   "settings.keys.save": "Save",
   "settings.keys.verified_anthropic": "Verified · Claude Code can use this key",

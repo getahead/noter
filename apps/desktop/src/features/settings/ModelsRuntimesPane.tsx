@@ -54,6 +54,7 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
             key={k.provider}
             view={k}
             saved={saved === k.provider}
+            locked={keychainLocked}
             onSavedExpire={() => setSaved(null)}
             onAdd={() => setSheet({ provider: k.provider, mode: "add" })}
             onReplace={() => setSheet({ provider: k.provider, mode: "replace" })}

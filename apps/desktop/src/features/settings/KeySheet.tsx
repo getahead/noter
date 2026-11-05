@@ -21,7 +21,7 @@ export function KeySheet({ bridge, provider, mode, onClose, onLocked }: { bridge
         <div className="np-sheet__sub">{t("settings.keys.sheet_note")}</div>
       </div>
       <div className="np-sheet__body">
-        <KeyField id={`key-${provider}`} label={t("settings.keys.field")} draft={draft} verifiedText={t(provider === "anthropic" ? "settings.keys.verified_anthropic" : "settings.keys.verified_codex")} />
+        <KeyField id={`key-${provider}`} label={t("settings.keys.field")} placeholder={t("settings.keys.placeholder")} draft={draft} verifiedText={t(provider === "anthropic" ? "settings.keys.verified_anthropic" : "settings.keys.verified_codex")} />
       </div>
       <SheetFooter defaultButton={<PushButton label={t("settings.keys.save")} variant="primary" disabled={!saved} onAction={() => onClose(true)} />}>
         <PushButton label={t("dialogs.cancel")} onAction={() => onClose(saved)} />
