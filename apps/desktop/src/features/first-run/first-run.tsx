@@ -19,8 +19,10 @@ import { DisplayPicker } from "../../ui/setup/display-picker";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { SelfTestPanel } from "../../ui/setup/self-test-panel";
 import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/setup/wizard-stepper";
+import { askAlert } from "../../ui/dialogs/alerts";
 import { installCli, removeKey } from "../settings/accounts";
 import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
+import { removeAlert } from "../settings/keys";
 import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
 import { dbToLevel, hearing } from "./self-test";
 import { STEP_ORDER, stepperItems, type StepperItemState } from "./steps";
@@ -243,7 +245,7 @@ export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wiza
       {/* @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-read */}
       <div className="fr-keys">
         {accounts?.keys.map((k) => (
-          <KeyFieldRow key={k.provider} bridge={bridge} view={k} onRemove={() => void removeKey(bridge, k.provider)} />
+          <KeyFieldRow key={k.provider} bridge={bridge} view={k} onRemove={() => void askAlert(removeAlert(k.provider)).then((ok) => (ok ? removeKey(bridge, k.provider) : undefined))} />
         ))}
       </div>
       {/* @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-read */}

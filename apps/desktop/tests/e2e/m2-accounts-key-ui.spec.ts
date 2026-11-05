@@ -14,7 +14,10 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const keyRow = (page: Page, name: string) => pane(page).locator('[data-component="cpt-noter-component-ui-credential-row"]').filter({ hasText: name });
 const sheet = (page: Page) => page.getByRole("dialog", { name: /Anthropic API Key/i });
 const sent = async (page: Page, name: string): Promise<unknown[]> => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
-const GOOD = "sk-ant-api03-valid-key-1234567890";
+// a stand-in the fake accepts (8+ characters, not containing "bad"); never a key shape, never asserted by value
+const GOOD = "test-stand-in-value-0001";
+/** The window sent `api_key_set` for the provider with a non-empty key, without the value reaching an assertion. */
+const keySets = async (page: Page) => (await sent(page, "api_key_set")).map((a) => ({ provider: (a as { provider: string }).provider, hasKey: typeof (a as { key?: unknown }).key === "string" && (a as { key: string }).key.length > 0 }));
 
 async function openModels(page: Page) {
   await panes(page).getByRole("listitem").filter({ hasText: "Models & Runtimes" }).click();
@@ -40,7 +43,7 @@ test.describe("cpt-noter-seq-settings-replace-api-key", () => {
     await expect(row).toContainText("Configured");
     await expect(row).toContainText("Stored in the Keychain");
     await expect(row).toContainText("Saved");
-    expect(await sent(page, "api_key_set")).toEqual([{ provider: "anthropic", key: GOOD }]);
+    expect(await keySets(page)).toEqual([{ provider: "anthropic", hasKey: true }]);
   });
 
   test("happy path: the key never shows again — the row shows dots, never the key, and a closed sheet forgets the draft", async ({ page }) => {
@@ -121,7 +124,7 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
     await step(page).getByRole("button", { name: "Verify" }).first().click();
     await expect(step(page).locator('[data-component="cpt-noter-component-ui-credential-row"]').filter({ hasText: "Anthropic API key" })).toContainText("Stored in the Keychain");
     await expect(step(page)).not.toContainText("Without an assistant");
-    expect(await sent(page, "api_key_set")).toEqual([{ provider: "anthropic", key: GOOD }]);
+    expect(await keySets(page)).toEqual([{ provider: "anthropic", hasKey: true }]);
     await page.getByRole("button", { name: "Finish", exact: true }).click();
     await expect.poll(async () => (await sent(page, "setup_set_step")).some((a) => (a as { step: string }).step === "assistants")).toBe(true);
   });
