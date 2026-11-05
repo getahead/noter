@@ -89,16 +89,16 @@ Read changes, undo or redo them, and export a call’s log.
 - `change_log_unreadable`: **Couldn’t read the history of this call.** · **Try Again**.
 
 **Steps**:
-1. [ ] - `p1` - User opens Call page › **History**, Item inspector › **History**, or the delivered person host - `inst-open`
-2. [ ] - `p1` - API: `history_list` with the record target, actor **all**, no job and the first page; show skeleton rows after 300 ms - `inst-read`
-3. [ ] - `p1` - **IF** the read fails - `inst-error`
-   1. [ ] - `p1` - Show the section error; **Try Again** repeats this read only - `inst-retry`
-   2. [ ] - `p1` - **RETURN** the retryable history error - `inst-end-error`
-4. [ ] - `p1` - UI: date groups and change rows with time, actor, description, target, batch count and available core metadata - `inst-render`
-5. [ ] - `p1` - User chooses an actor or job; request the first page for that filter, discard superseded reads, and announce the returned count politely - `inst-filter`
-6. [ ] - `p1` - User toggles **Diff** on a row with before and after; show inserted and deleted words, or **No differences** - `inst-diff`
+1. [x] - `p1` - User opens Call page › **History**, Item inspector › **History**, or the delivered person host - `inst-open`
+2. [x] - `p1` - API: `history_list` with the record target, actor **all**, no job and the first page; show skeleton rows after 300 ms - `inst-read`
+3. [x] - `p1` - **IF** the read fails - `inst-error`
+   1. [x] - `p1` - Show the section error; **Try Again** repeats this read only - `inst-retry`
+   2. [x] - `p1` - **RETURN** the retryable history error - `inst-end-error`
+4. [x] - `p1` - UI: date groups and change rows with time, actor, description, target, batch count and available core metadata - `inst-render`
+5. [x] - `p1` - User chooses an actor or job; request the first page for that filter, discard superseded reads, and announce the returned count politely - `inst-filter`
+6. [x] - `p1` - User toggles **Diff** on a row with before and after; show inserted and deleted words, or **No differences** - `inst-diff`
 7. [ ] - `p1` - User expands a batch; show at most 50 known member rows, then **Show 50 More** only when real members can be read - `inst-batch`
-8. [ ] - `p1` - **RETURN** the filtered history; **Open** routes to the changed record without losing the history filter - `inst-return`
+8. [x] - `p1` - **RETURN** the filtered history; **Open** routes to the changed record without losing the history filter - `inst-return`
 
 ### Undo or redo a change
 
@@ -127,7 +127,7 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### Export a call log
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-history-undo-export`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-history-undo-export`
 
 **Actor**: Primary user
 
@@ -138,12 +138,12 @@ Read changes, undo or redo them, and export a call’s log.
 - Save-panel cancellation changes nothing; write failure keeps the sheet and chosen format for retry.
 
 **Steps**:
-1. [ ] - `p1` - User clicks **Export Log…** in call History; dialog host opens `dlg-export-log` with the call title - `inst-open`
-2. [ ] - `p1` - UI: **Period: Whole call**, **Format: Markdown** or **JSON**, **Cancel**, **Export…** - `inst-choose`
-3. [ ] - `p1` - User exports; API: `history_export` with call log scope and selected format; the core owns the save panel - `inst-export`
-4. [ ] - `p1` - **IF** `cancelled`: **RETURN** to History without a success status - `inst-cancel`
-5. [ ] - `p1` - **IF** export fails: keep the sheet and show **Try Again**; **RETURN** no exported path - `inst-error`
-6. [ ] - `p1` - **RETURN** **Exported log to** the returned Finder-style path, announced politely - `inst-done`
+1. [x] - `p1` - User clicks **Export Log…** in call History; dialog host opens `dlg-export-log` with the call title - `inst-open`
+2. [x] - `p1` - UI: **Period: Whole call**, **Format: Markdown** or **JSON**, **Cancel**, **Export…** - `inst-choose`
+3. [x] - `p1` - User exports; API: `history_export` with call log scope and selected format; the core owns the save panel - `inst-export`
+4. [x] - `p1` - **IF** `cancelled`: **RETURN** to History without a success status - `inst-cancel`
+5. [x] - `p1` - **IF** export fails: keep the sheet and show **Try Again**; **RETURN** no exported path - `inst-error`
+6. [x] - `p1` - **RETURN** **Exported log to** the returned Finder-style path, announced politely - `inst-done`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -167,19 +167,19 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### History read
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-history-undo-read`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-history-undo-read`
 
 **States**: LOADING, READY, EMPTY, FILTERED_EMPTY, ERROR
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** READY **WHEN** the current read returns rows - `inst-ready`
-2. [ ] - `p1` - **FROM** LOADING **TO** EMPTY **WHEN** the unfiltered read returns none - `inst-empty`
-3. [ ] - `p1` - **FROM** LOADING **TO** FILTERED_EMPTY **WHEN** a selected filter returns none - `inst-filtered`
-4. [ ] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-error`
-5. [ ] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-retry`
-6. [ ] - `p1` - **FROM** READY, EMPTY, FILTERED_EMPTY **TO** LOADING **WHEN** the target or filter changes - `inst-refilter`
+1. [x] - `p1` - **FROM** LOADING **TO** READY **WHEN** the current read returns rows - `inst-ready`
+2. [x] - `p1` - **FROM** LOADING **TO** EMPTY **WHEN** the unfiltered read returns none - `inst-empty`
+3. [x] - `p1` - **FROM** LOADING **TO** FILTERED_EMPTY **WHEN** a selected filter returns none - `inst-filtered`
+4. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the read fails - `inst-error`
+5. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-retry`
+6. [x] - `p1` - **FROM** READY, EMPTY, FILTERED_EMPTY **TO** LOADING **WHEN** the target or filter changes - `inst-refilter`
 
 ### Undo strip
 

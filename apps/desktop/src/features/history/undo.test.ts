@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Clock } from "../../ui/feedback/status-timer";
 import { undoKey } from "./UndoStrip";
-import { dismissUndo, holdPointer, holdUndo, resetUndo, runUndo, UNDO_MS, useUndo } from "./undo";
+import { dismissUndo, holdPointer, holdUndo, resetUndo, runUndo, undoLast, undoMode, UNDO_MS, useUndo } from "./undo";
 
 // The hook is a thin useSyncExternalStore over the module state: read it without React.
 vi.mock("react", async (orig) => ({ ...(await orig<typeof import("react")>()), useSyncExternalStore: (_s: unknown, get: () => unknown) => get() }));
@@ -142,7 +142,7 @@ describe("runUndo (cpt-noter-flow-ui-history-undo-reverse)", () => {
 
 describe("undoKey", () => {
   const k = (o: Partial<{ code: string; metaKey: boolean; shiftKey: boolean; altKey: boolean; ctrlKey: boolean }>) => ({ code: "KeyZ", metaKey: true, shiftKey: false, altKey: false, ctrlKey: false, ...o });
-  const entry = (mode: "undo" | "redo") => ({ target: change, message: "", mode, phase: "VISIBLE" as const });
+  const entry = (mode: "undo" | "redo") => mode;
   it("⌘Z undoes, ⇧⌘Z redoes, only while a strip is shown", () => {
     expect(undoKey(k({}), entry("undo"))).toBe(true);
     expect(undoKey(k({ shiftKey: true }), entry("undo"))).toBe(false);
@@ -167,5 +167,26 @@ describe("refresh after a replaced strip", () => {
     release();
     await p;
     expect(refresh).toHaveBeenCalledOnce();
+  });
+});
+
+describe("the last applicable change", () => {
+  it("⌘Z and ⇧⌘Z keep working after the strip is dismissed, on the same target", async () => {
+    const calls: string[] = [];
+    const b = bridgeFor(ok(1), calls);
+    holdUndo({ target: change, message: "x" });
+    await runUndo(b);
+    dismissUndo();
+    expect(peek()).toBeNull();
+    expect(undoMode()).toBe("redo");
+    await undoLast(b);
+    expect(calls).toEqual(["undo", "redo"]);
+    expect(peek()).toMatchObject({ mode: "undo", target: change });
+  });
+
+  it("nothing to run before any action", async () => {
+    expect(undoMode()).toBeNull();
+    await undoLast(bridgeFor(ok(1)));
+    expect(peek()).toBeNull();
   });
 });

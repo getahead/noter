@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import type { TimeSpan } from "../../core/bindings";
+import type { CallPageTab, TimeSpan } from "../../core/bindings";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
@@ -13,12 +13,13 @@ import { audioLine, StoredTranscript } from "../transcript/hosts";
 import { LanguageTag } from "../transcript/labels";
 import { deleteCall, openCallPage, pageKey, readCall, readKey, reportView } from "./actions";
 import { holdDeleteError, useDeleteError, useExtras } from "./cache";
-import { afterTimer, pageState } from "./logic";
+import { afterTimer, callViews, pageState } from "./logic";
+import { registeredViews, views } from "./views";
 import "./call-page.css";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
 // @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p2
-export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: string; span?: TimeSpan | null }) {
+export function CallPage({ bridge, callId, span, tab = "transcript" }: { bridge: Bridge; callId: string; span?: TimeSpan | null; tab?: CallPageTab }) {
   // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-ready
   // entity:changed replaces the stored call (title, type, sensitivity, audio): the page draws again from it
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
@@ -62,6 +63,9 @@ export function CallPage({ bridge, callId, span }: { bridge: Bridge; callId: str
   // @cpt-begin:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
   if (state === "LOADING") return skeleton ? <Skeleton /> : null;
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-loading-ready
+
+  const view = callViews(registeredViews(), tab).view;
+  if (view !== "transcript" && call) return <div className={`pc pc--${view}`} data-state="ready">{views[view]!({ bridge, callId, callTitle: call.title })}</div>;
 
   // the page already read the call: the transcript asks the core for nothing more
   const detail = call ? { call, audio_not_stored: extras?.audio_not_stored ?? false } : null;

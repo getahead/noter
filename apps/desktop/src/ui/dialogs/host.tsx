@@ -11,6 +11,7 @@ import {
 } from "react";
 import { askAlert, type AlertSpec } from "./alerts";
 import { DeleteOldAudioSheet } from "./delete-old-audio-sheet";
+import { ExportLogSheet } from "./export-log-sheet";
 import { createSheets, type Sheets } from "./sheets";
 
 const Ctx = createContext<Sheets | null>(null);
@@ -38,6 +39,7 @@ export function DialogsProvider({
 /** The sheets this feature delivers; features add theirs with `register`. */
 function withM1Sheets(s: Sheets) {
   s.register("delete-old-audio", DeleteOldAudioSheet as never);
+  s.register("export-log", ExportLogSheet as never);
   return s;
 }
 
