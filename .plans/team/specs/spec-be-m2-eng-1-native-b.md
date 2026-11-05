@@ -1,0 +1,16 @@
+# be-eng-1 (Opus 5.5, senior, core lane) — 2.21 Native services, part B: the src-tauri NativeOps implementation and share_test_run
+
+Worktree `~/orca/workspaces/noter/be-eng-1` (start from fresh `origin/main`; #255 is merging). Read `spec-be-m2-common.md`, `PLAN-be-m2.md` (TL-15 and the Status log: #243's `noter_native::{launch_plan, launch, clipboard_write, save_panel, share_test}` surface and its note on the apple-events entitlement, #238/#251 `NativeOps` + `MacOps`, #250/items-share for the folder panel), `docs/features/core/core-native-services.md` (flows `-share-test` and `-operation`, the `[ ]` steps left by #243: `inst-op-dispatch`, `inst-test-request` and friends; DoDs; ACs), `apps/desktop/src-tauri/src` (`MacOps`, `TauriSurfaces` and the main-thread rule from #233), `crates/noter-native/src` (part A), the M1 Tauri host tests (handler parity, window capabilities).
+
+**Target:** `feat(core): MacOps over noter-native and share_test_run`, one PR on `lane/core/native-services-host` (core lane: `apps/desktop/src-tauri/**`, `crates/noter-core` for the command). Closes 2.21 except what only the owner's Mac can prove (`claude://`/`codex://` parameters, a real TCC prompt): name those.
+
+**Change:**
+1. `MacOps` implements every `NativeOps` method over part A: `save_panel` (file and folder variants, suggested name/extensions, parent window, cancelled → `None`) on the main thread via the host's dispatch helper (never from a tokio worker: #233), `clipboard_write`, `launch_plan`/`launch` (the entitlement and usage string are in from #251: verify), `share_test`.
+2. `share_test_run` in noter-core: the flow `cpt-noter-flow-core-native-services-share-test` over `NativeOps::share_test` (window list from `Surfaces`/the host, `call_live` from the capture guard, menu-bar title state, `now` from `Clock`), `ShareTestResult` per the contract; the state `-probe` transitions are part A's: reuse, do not duplicate. The harness answers a fixed `ShareTestResult` (control to vary it) so the real-core conformance proves the command.
+3. Tauri host tests (`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml`, the CI macOS job): handler parity for `share_test_run`, `MacOps` calls go through the main-thread helper (a test with an injected presenter), panel cancelled path, clipboard round trip where the runner allows (else through the injected seam, never `#[ignore]`).
+4. Conformance for `share_test_run` against fake and real cores (contract lane commit on its own branch `lane/contract/share-test-e2e` if the lane guard refuses the mix); the fake core handler if missing. No story is owned by 2.21.
+5. AC 6 of 2.19 (the noter-native query-cap test) if it is a unit test you can add in src-tauri/noter-core without the Mac: do it; else name it for the owner.
+
+**Constraints:** core lane (+ the contract commit on its own branch). No noter-native changes (part A is be-eng-2's; if a function is missing, say which in `worker_done` and stub through the trait). No new IPC command (`share_test_run` exists in `milestones.toml` M2). Update `apps/desktop/src-tauri/Cargo.lock` for any new dependency.
+
+**Acceptance:** every 2.21 CDSL item `[x]` with markers except the owner-Mac items (one-line notes); `just gate` green; the CI macOS job green; PR(s) published with self-reviews; `worker_done` names the PR(s) and the owner-Mac list.

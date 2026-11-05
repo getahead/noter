@@ -1,0 +1,20 @@
+# Handoff ui-e2e r9: #203 XCUITest on this Mac (head 47238e9)
+- Built: `pnpm --dir apps/desktop exec tauri build --debug --bundles app` → bundle at apps/desktop/src-tauri/target/debug/bundle/macos/Noter.app (not target/…). Ran `NOTER_APP_PATH=… just native` three times.
+- Result: 1/26 → **3/26 pass**, stable: hotkey_hides_and_restores_every_surface, panel_lands_inside_remaining_display, hide_and_show_noter_items.
+- Test-side fixes (cca081f, 47238e9):
+  - call panel = AX dialog; menu info lines = menu items; hotkeys typed from Finder;
+  - item key read via AXMenuItemCmdChar; status menu closed by a second click (Escape does nothing);
+  - tests start their own capture; precondition messages; fresh $HOME per test, removed in tearDown;
+  - copy per menu-bar.md; removed a false-pass glyph screenshot check.
+- App-side gaps (6 fail), core-lane tray in surfaces.rs:
+  - first line `Not recording` (not **Noter — Not recording**); no hotkeys on items;
+  - no setup-incomplete or degraded lines; empty VoiceOver label and no hidden badge;
+  - ⌃⌥⌘N makes Noter the foreground app.
+- Missing launch hooks, owner/backend (17 fail):
+  - recording ×9: `start_guard` needs the live model, none on this Mac; needs a scripted engine with ready test models for the built app;
+  - detected call ×3; seeded calls ("Backend sync") ×4; disk < 500 MB ×1.
+- Owner: the `native` recipe's pnpm call is broken on 10.28, so the macOS CI job fails until the justfile is fixed. terminate() leaves no commands-*.json, so native runs add nothing to the E2E bar.
+- Local gate-fast:
+  - arch needs engine/.build moved aside (WhisperKit checkouts);
+  - trace reports 2 lost markers only because main (+3) added them after base 634c1a9; CI's trace on the merge ref passes; no conflict, so the branch was not updated.
+- Self-review `.prs/203/review.md`: COMMENT, ponytail findings fixed. **Not published** (per brief).

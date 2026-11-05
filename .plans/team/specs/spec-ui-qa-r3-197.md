@@ -1,0 +1,4 @@
+# ui-qa r3 — QA #197 library calls @b1bcef2 (read spec-ui-qa.md, spec-ui-r3-common.md)
+
+Worktree ~/orca/workspaces/noter/ui-qa (read-only QA; temp worktree, main merged locally). Previous: 197-r2.md FAIL at 4e651cd (stdio :93 detection_enabled, :146 speaker rows, m-1 Maximum update depth). Author (ui-mid-1): spec 7/7 fake+stdio, D-36 copy, :110 empty-state seeds call_details too, ⌘3 key race fixed; CI green at b1bcef2; self-review COMMENT published. Handoff _team/handoff-ui-mid-1-r3.md.
+Run: unit, own spec `m1-library-calls-ui.spec.ts` fake + stdio under the lock, `just gate-fast`, `just docs`, cfs markers; check each r2 finding is closed; say whether the diff changes any screenshot baseline (then the designer is needed). Report `_team/ui/qa/197-r3.md` + PR comment; send `--type status --subject "QA #197 PASS|FAIL @b1bcef2"` one line; worker_done.

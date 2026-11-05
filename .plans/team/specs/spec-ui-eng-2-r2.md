@@ -1,0 +1,11 @@
+# ui-eng-2 (Opus) — task: land 2.11 live-transcript: #186 green on CI and merged, then the 2.11 tick docs PR
+
+Worktree `~/orca/workspaces/noter/ui-eng-2`, branch `lane/ui/live-transcript` = PR #186 (28778bf, on main incl. #198; QA PASS, Design OK, self-review APPROVE, auto-merge on). Read `spec-ui-r2-common.md`, your `handoff-ui-eng-2.md`.
+
+**Problem:** CI at 28778bf is red (run 40134226966): End-to-end tests — `m1-live-transcript-ui.spec.ts:293` (replay-line happy path: `toBeInViewport` failed) and `:439` (stored error path: inline banner Try Again — element not found); Screenshots — `tests/visual/first-run.spec.ts:105` "Back from System Settings (Checking…)" element not found (not your file: a flake or a main-side change). The Teamlead re-ran the failed jobs at ~22:0xZ; `gh pr checks 186` shows the result.
+
+**Do:**
+1. If the rerun is green: nothing to push; #186 auto-merges. Go to step 3.
+2. If still red: reproduce locally on the real core (`NOTER_CORE=stdio`, harness rebuilt from your branch) with CI-like timing (two Playwright workers, or `--repeat-each 3`); fix the UI side or make the two tests robust (never remove a title, copy, command or assertion that proves the story). For the first-run visual: check whether it fails on main's latest run too (`gh run list --branch main --workflow ci -L 3`); if it is main's flake, say so in the PR and re-run once; if your change causes it (dialog plugin, i18n), fix it. New commit → `just gate` → new `/cf-sdlc-pr-review 186` (+ `/ponytail-review`) → `just review-publish 186`.
+3. After #186 merges: branch `docs/ui-m1-tick-2.11` from fresh main, tick DESIGN.md components transcript-view, transcript-segment-row, speaker-label, language-tag, playback-bar, then DECOMPOSITION 2.11 (`[x]`, Status IMPLEMENTED, its 5 nested refs) and live-transcript.md featstatus + feature ref; `cfs validate` + `just docs` + `just gate-fast`; PR `docs(ui): tick the live-transcript feature (2.11)`; self-review; review-publish. Tell the Teamlead `send --type status --subject "merged #186; tick PR #N"`.
+Then handoff + `worker_done`. Note for #188 (ui-eng-1): it rebases on your merged head; if you change `transcript/hosts.tsx` API, say so in the handoff.
