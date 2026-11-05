@@ -220,7 +220,7 @@ The system **MUST** render all three timeline variants, actor and job filters, e
 
 ### Shared reversible actions
 
-- [x] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-undo`
+- [ ] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-undo`
 
 The system **MUST** bind row, strip and app-menu actions to core targets, show partial counts, preserve actions after expiry, pause timers on hover/focus and keep standard editor undo.
 
