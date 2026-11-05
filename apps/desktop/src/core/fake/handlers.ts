@@ -919,8 +919,9 @@ export const defaultHandlers: Handlers = {
     return { rows, next_cursor: null, total: rows.length };
   },
   call_get: (a, { world }) => {
+    // The calls row is the live one (call_update writes it): the detail answers it, as the real core does.
     const d = world.call_details.find((x) => x.call.id === a.call_id);
-    if (d) return d;
+    if (d) return { ...d, call: world.calls.find((x) => x.id === a.call_id) ?? d.call };
     const c = call(world, a.call_id);
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
     return { call: c, calendar_event: null, speakers: t?.speakers ?? [], marks: t?.marks ?? [], gaps: t?.gaps ?? [], mode_used: world.app.privacy.effective, audio_not_stored: false, first_recorded_call: false, folder: `/Users/you/Library/Application Support/Noter/audio/${a.call_id}` };
