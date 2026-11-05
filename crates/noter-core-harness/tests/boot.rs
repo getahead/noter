@@ -1109,6 +1109,32 @@ async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
 }
 
 #[tokio::test]
+async fn reseeding_the_calls_leaves_no_change_the_user_never_made() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // Any change to the calls re-seeds them all.
+    world["calls"][0]["title"] = json!("Renamed by the world");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let page = r
+        .ok(
+            "main",
+            "history_list",
+            json!({ "target": { "type": "all" }, "actor": "all", "page": {} }),
+        )
+        .await;
+    assert!(
+        page["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["summary"] != "harness world_set"),
+        "{page}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_adds_change_rows_the_core_lists_and_undoes() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;

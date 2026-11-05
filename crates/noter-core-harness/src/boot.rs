@@ -426,27 +426,16 @@ impl Harness {
         Ok(())
     }
 
-    /// Removes every call (and with it its segments, speakers, marks, gaps and tags).
+    /// Removes every call (and with it its segments, speakers, marks, gaps and tags), leaving no
+    /// change row behind: a seed is not something the user did, and the store logs every write
+    /// it is given (the log is append-only), so the harness deletes on a connection of its own.
     fn clear_calls(&self) -> Result<(), CoreError> {
-        let ids: Vec<String> = self.core.store().read(|c| {
-            c.prepare("SELECT id FROM calls")?
-                .query_map([], |r| r.get(0))?
-                .collect()
-        })?;
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let meta = noter_db::ChangeMeta {
-            actor: Actor::You,
-            summary: "harness world_set".into(),
-            reason: "harness".into(),
-            evidence_ids: vec![],
-            batch_id: None,
-            undoable: false,
-            surface: None,
-        };
-        self.core.store().delete("call", "calls", ids, meta)?;
-        Ok(())
+        let db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
+            .map_err(crate::internal)?;
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .map_err(crate::internal)?;
+        db.execute_batch("PRAGMA foreign_keys = ON; DELETE FROM calls;")
+            .map_err(crate::internal)
     }
 
     /// Writes the world's calls, speakers, segments, marks and gaps as rows, the way capture
