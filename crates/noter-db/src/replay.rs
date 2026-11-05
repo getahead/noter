@@ -550,7 +550,7 @@ fn current_row(
     let mut stmt = conn
         .prepare(&format!("SELECT * FROM {table} WHERE id = ?1"))
         .map_err(internal)?;
-    let names: Vec<String> = stmt.column_names().into_iter().map(String::from).collect();
+    let names: Vec<String> = stmt.column_names().map(String::from).collect();
     stmt.query_row([id], |row| {
         names
             .iter()

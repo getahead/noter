@@ -507,7 +507,7 @@ fn check(table: &str, values: &[(&'static str, Value)]) -> Result<(), CoreError>
 
 fn select_row(tx: &Transaction, m: &Mutation) -> rusqlite::Result<Option<Value>> {
     let mut stmt = tx.prepare(&format!("SELECT * FROM {} WHERE id = ?1", m.table))?;
-    let names: Vec<String> = stmt.column_names().into_iter().map(String::from).collect();
+    let names: Vec<String> = stmt.column_names().map(String::from).collect();
     stmt.query_row([&m.id], |row| {
         let mut record = Map::new();
         for (i, name) in names.iter().enumerate() {
