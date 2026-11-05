@@ -80,3 +80,14 @@
 .e-status__sub { font-size: 12px; color: var(--label-2); }
 .st-row__err { flex-basis: 100%; color: var(--warning); font-size: 12px; display: flex; gap: 6px; align-items: center; }
 .st-banner button { margin-left: 8px; }
+/* Credential rows (Models & Runtimes › API keys, Your own accounts) and the key field of the sheet and first run. */
+.st-cred__tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--label-2); }
+.st-cred__tag[data-tone="success"] { color: var(--success, var(--label)); }
+.st-cred__tag[data-tone="error"] { color: var(--error, var(--warning)); }
+.st-cred__tag[data-tone="warning"] { color: var(--warning); }
+.st-cred__dots { font-size: 12px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+.st-cred__actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.st-keyfield { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.st-keyfield > :first-child { flex: 1 1 240px; min-width: 0; }
+.st-keyfield__ok { flex-basis: 100%; font-size: 12px; color: var(--label-2); }
+.st-cred--field { display: grid; gap: 6px; }

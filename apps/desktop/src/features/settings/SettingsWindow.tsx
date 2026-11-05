@@ -13,6 +13,7 @@ import { AudioPane } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
 import { HotkeysPane } from "./HotkeysPane";
+import { ModelsRuntimesPane } from "./ModelsRuntimesPane";
 import type { PaneProps } from "./pane-props";
 import { PerformancePane } from "./PerformancePane";
 import { PrivacyPane } from "./PrivacyPane";
@@ -25,9 +26,10 @@ const ICONS: Record<SettingsPane, IconName> = {
   repositories: "branch", knowledge_sources: "books", maintenance: "wand", performance: "gauge", updates: "download",
 };
 
-const PANES: Partial<Record<SettingsPane, (p: PaneProps) => React.ReactNode>> = {
+export const PANES: Partial<Record<SettingsPane, (p: PaneProps) => React.ReactNode>> = {
   general: (p) => <GeneralPane {...p} />,
   audio_and_transcription: (p) => <AudioPane {...p} />,
+  models_and_runtimes: (p) => <ModelsRuntimesPane {...p} />,
   privacy: (p) => <PrivacyPane {...p} />,
   call_screen_and_menu_bar: (p) => <CallScreenPane {...p} />,
   hotkeys: (p) => <HotkeysPane bridge={p.bridge} />,
@@ -36,7 +38,7 @@ const PANES: Partial<Record<SettingsPane, (p: PaneProps) => React.ReactNode>> = 
 };
 
 /** The panes a later feature fills show their frame and the milestone, never a blank area. */
-const LATER = new Set<SettingsPane>(["models_and_runtimes", "repositories", "knowledge_sources", "maintenance"]);
+const LATER = new Set<SettingsPane>(["repositories", "knowledge_sources", "maintenance"]);
 
 // @cpt-component:cpt-noter-component-screen-settings:p1
 // @cpt-dod:cpt-noter-dod-ui-settings-window:p1

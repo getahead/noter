@@ -2,7 +2,9 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../app/App";
-import { FirstRun } from "./first-run";
+import { find, rendered } from "../../ui/testing";
+import { Assistants, FirstRun } from "./first-run";
+import { createWizard } from "./wizard";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
@@ -119,6 +121,15 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     });
     expect(assistants).toContain("Privacy mode");
     expect(assistants).toContain("Cloud with redaction");
+    // the key field form and the own-account frames of cpt-noter-feature-ui-accounts (M2 key part)
+    expect(assistants).toContain('data-variant="field"');
+    expect(assistants).toContain("Anthropic API key");
+    expect(assistants).toContain("Codex API key");
+    expect(assistants).toContain(">Verify<");
+    expect(assistants).toContain("Or use your own account");
+    expect(assistants).toContain("Your Claude account");
+    expect(assistants).toContain(">Install Ollama…<");
+    expect(assistants).toContain(">Not Now<");
     expect(assistants).toContain("Local runtime");
     expect(assistants).toContain("none found");
     expect(assistants).toContain("Without an assistant Noter still records and transcribes");
@@ -130,6 +141,30 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     const html = await screen((w) => (at("assistants")(w), (w.app.accounts.local.running = true)));
     expect(html).toContain("Ollama detected");
     expect(html).not.toContain("Without an assistant");
+  });
+
+  it("Install Ollama… runs cli_install and Not Now folds the offer", async () => {
+    const fake = new FakeCore({ window: "first-run" });
+    fake.setWorld((w) => (W.firstRun(w, { modelsReady: true }), at("assistants")(w), (w.app.accounts.local.running = false)));
+    bridge = createBridge("first-run", fake);
+    await bridge.open();
+    const seen: string[] = [];
+    const invoke = fake.invoke.bind(fake);
+    fake.invoke = ((cmd: string, ...rest: unknown[]) => (seen.push(cmd), (invoke as (...a: unknown[]) => unknown)(cmd, ...rest))) as typeof fake.invoke;
+    const wizard = createWizard(bridge, () => {});
+    const tree = rendered(Assistants, { bridge, wizard, w: wizard.store.getState() });
+    const on = (label: string) => find(tree, (p) => p.label === label && typeof p.onAction === "function").props.onAction as () => void;
+    on("Not Now")();
+    on("Install Ollama…")();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(seen).toContain("cli_install");
+  });
+
+  it("shows a stored key as the Keychain line with Remove instead of the field", async () => {
+    const html = await screen((w) => (at("assistants")(w), (w.app.accounts.keys[0]!.status = { type: "configured", verified_at: 1 })));
+    expect(html).toContain("Stored in the Keychain");
+    expect(html).toContain(">Remove<");
+    expect(html).toContain('id="fr-key-codex"'); // the other key still offers its field
   });
 
   it("says so with Try Again when the core refuses a save", async () => {
