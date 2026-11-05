@@ -679,6 +679,17 @@ impl Harness {
         self.core.store().insert_batch(rows)
     }
 
+    /// The running states of the world's sections (writing, failed) live in the core, not in
+    /// rows: every section of a changed `outputs` is set again, with its `outputs:progress`.
+    fn seed_sections(&self, w: &FakeWorld) {
+        let seeded = |id: &CallId| w.calls.iter().any(|c| c.id == *id);
+        for o in w.outputs.iter().filter(|o| seeded(&o.call_id)) {
+            for s in &o.sections {
+                noter_core::testing::seed_section(&self.core, &o.call_id, s.kind, s.state.clone());
+            }
+        }
+    }
+
     async fn call(&self, window: WindowLabel, cmd: &str, args: Value) -> Result<Value, CoreError> {
         dispatch_json(
             &*self.core,
@@ -961,7 +972,14 @@ impl Harness {
             if current.get(key) == Some(value)
                 || matches!(
                     key.as_str(),
-                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts" | "items"
+                    "now"
+                        | "settings"
+                        | "app"
+                        | "calls"
+                        | "call_details"
+                        | "transcripts"
+                        | "items"
+                        | "outputs"
                 )
             {
                 continue;
@@ -995,13 +1013,16 @@ impl Harness {
             }
             v
         };
-        if ["calls", "transcripts", "items"]
+        if ["calls", "transcripts", "items", "outputs"]
             .iter()
             .any(|k| accepted[k] != wanted[k])
             || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"])
         {
             self.clear_calls()?;
             self.seed_calls(&wanted)?;
+        }
+        if accepted["outputs"] != wanted["outputs"] {
+            self.seed_sections(&parsed);
         }
         if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
             noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());
@@ -1958,10 +1979,51 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
         .flatten()
         .filter(seeded_call)
     {
+        let call = &outputs["call_id"];
         for s in outputs["sections"].as_array().into_iter().flatten() {
-            let (Some(id), Some(body)) = (s["summary_id"].as_str(), s["body_md"].as_str()) else {
-                continue;
+            // An item section's row says only ready (its items as the body) or empty; the items
+            // themselves are the world's `items`, as the core lists them.
+            let item_kind = match s["kind"].as_str() {
+                Some("decisions") => Some("decision"),
+                Some("action_items") => Some("action_item"),
+                Some("open_questions") => Some("open_question"),
+                Some("risks") => Some("risk"),
+                _ => None,
             };
+            let body = match (
+                s["body_md"].as_str(),
+                item_kind,
+                s["state"]["type"].as_str(),
+            ) {
+                (Some(body), _, _) => body.to_owned(),
+                (None, Some(kind), Some("ready")) => {
+                    let lines: Vec<String> = wanted["items"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|i| i["call"]["id"] == *call && i["kind"] == kind)
+                        .map(|i| format!("- {}", i["text"].as_str().unwrap_or_default()))
+                        .collect();
+                    if lines.is_empty() {
+                        "-".to_owned()
+                    } else {
+                        lines.join("\n")
+                    }
+                }
+                (None, Some(_), Some("empty")) => String::new(),
+                _ => continue,
+            };
+            let id = s["summary_id"].as_str().map_or_else(
+                || {
+                    format!(
+                        "sum_{}_{}",
+                        call.as_str().unwrap_or_default(),
+                        s["kind"].as_str().unwrap_or_default()
+                    )
+                },
+                str::to_owned,
+            );
+            let (id, body) = (id.as_str(), body.as_str());
             let w = &s["writer"];
             let run = format!("llm_seed_{id}_{seeded}");
             if w.is_object() {
@@ -1985,7 +2047,7 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
                 "summaries",
                 vec![
                     ("id", json!(id)),
-                    ("rev", s["rev"].clone()),
+                    ("rev", s["rev"].as_u64().map_or(json!(1), |r| json!(r))),
                     ("call_id", outputs["call_id"].clone()),
                     ("kind", s["kind"].clone()),
                     ("current_version_id", json!(format!("ver_{id}_{count}"))),

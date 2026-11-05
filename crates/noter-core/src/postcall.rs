@@ -290,8 +290,6 @@ fn section(
         summary_id: stored.map(|s| SummaryId::new(s.id.clone())),
         rev: stored.map(|s| Rev(s.rev)),
         body_md: stored.map(|s| s.body_md.clone()),
-        // Items arrive with the items tables (2.18); until then their sections carry them as
-        // Markdown.
         items: vec![],
         reviews: vec![],
         writer: stored.and_then(|s| s.writer.clone()),
@@ -352,6 +350,16 @@ fn participants_md(notes: &[ParticipantNotes]) -> String {
 }
 
 /// The Markdown body of one section of a validated output; empty when it holds nothing.
+/// The section an item of this kind is listed in.
+fn item_section(kind: ItemKind) -> SectionKind {
+    match kind {
+        ItemKind::Decision => SectionKind::Decisions,
+        ItemKind::ActionItem => SectionKind::ActionItems,
+        ItemKind::OpenQuestion => SectionKind::OpenQuestions,
+        ItemKind::Risk => SectionKind::Risks,
+    }
+}
+
 fn body_of(kind: SectionKind, out: &PostCallOutput) -> String {
     match kind {
         SectionKind::Summary => out.summary_md.trim().to_owned(),
@@ -513,6 +521,22 @@ fn call_mutation(call: &CallId, values: Vec<(&'static str, Value)>) -> Mutation 
 }
 
 impl Core {
+    /// A section's running state as `harness.world_set` seeds it (writing or failed; any other
+    /// state leaves the stored row to say), heard by the UI as the core's own progress
+    /// (feature `harness`).
+    #[cfg(feature = "harness")]
+    pub(crate) fn seed_section(&self, call: &CallId, kind: SectionKind, state: SectionState) {
+        let key = (call.clone(), kind);
+        match state {
+            SectionState::Writing | SectionState::Failed { .. } => {
+                lock(&self.postcall.0).insert(key, state.clone())
+            }
+            _ => lock(&self.postcall.0).remove(&key),
+        };
+        let now = self.section_now(call, kind).map_or(state, |s| s.state);
+        self.progress(call, kind, now);
+    }
+
     fn progress(&self, call: &CallId, kind: SectionKind, state: SectionState) {
         let states: Vec<SectionState> = self
             .outputs_now(call)
@@ -1312,11 +1336,33 @@ impl Core {
                 kinds.push(row.kind);
             }
         }
+        // Item sections list the call's items of their kind; a rejected suggestion is gone (D75).
+        let items: Vec<ItemView> = self
+            .list_items(ItemsListArgs {
+                filter: ItemFilter {
+                    call_id: Some(call.clone()),
+                    ..ItemFilter::default()
+                },
+                page: PageRequest {
+                    cursor: None,
+                    limit: Some(500),
+                },
+            })?
+            .rows
+            .into_iter()
+            .filter(|i| i.review != ReviewState::Rejected)
+            .collect();
         let sections: Vec<OutputSection> = kinds
             .into_iter()
             .map(|kind| {
                 let row = rows.iter().find(|s| s.kind == kind);
-                section(row, kind, self.postcall.get(call, kind))
+                let mut out = section(row, kind, self.postcall.get(call, kind));
+                out.items = items
+                    .iter()
+                    .filter(|i| item_section(i.kind) == kind)
+                    .cloned()
+                    .collect();
+                out
             })
             .collect();
         let writing = sections.iter().any(|s| s.state == SectionState::Writing);
@@ -1328,8 +1374,10 @@ impl Core {
                 word(&head.outputs_status).unwrap_or(OutputsStatus::NotStarted)
             },
             archive: word(&head.archive_status).unwrap_or(ArchiveStatus::NotStarted),
-            // Suggested items wait for review once the items tables land (2.18).
-            review_waiting: 0,
+            review_waiting: items
+                .iter()
+                .filter(|i| i.review == ReviewState::Suggested)
+                .count() as u32,
             sensitive: head.sensitive,
             written_locally: sections.iter().any(|s| {
                 s.writer

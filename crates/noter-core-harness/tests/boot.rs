@@ -253,16 +253,13 @@ async fn world_set_writes_owned_slices_through_the_core() {
 async fn world_set_refuses_a_slice_no_service_owns_yet() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
-    world["outputs"] = json!([]);
+    world["cards"] = json!([]);
     let (set, events) = r
         .call("main", "harness.world_set", json!({ "world": world }))
         .await;
     assert_eq!(set["error"]["code"], "not_implemented");
     assert!(
-        set["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("outputs"),
+        set["error"]["message"].as_str().unwrap().contains("cards"),
         "{set}"
     );
     assert!(
@@ -1107,6 +1104,80 @@ async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
             .unwrap()
             .contains("app.privacy"),
         "{set}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_seeds_output_sections_their_items_and_running_states() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // A suggested decision on the ready call: its section lists it, and it waits for review.
+    let mut decision = world["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["call"]["id"] == "call_backend")
+        .unwrap()
+        .clone();
+    decision["id"] = json!("itm_seeded_decision");
+    decision["kind"] = json!("decision");
+    decision["review"] = json!("suggested");
+    decision["status"] = json!("open");
+    decision["done_at"] = Value::Null;
+    world["items"].as_array_mut().unwrap().push(decision);
+    let outputs = world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap();
+    let section = |kind: &str, state: Value| {
+        json!({ "kind": kind, "state": state, "summary_id": null, "rev": null, "body_md": null,
+                "items": [], "reviews": [], "writer": null, "user_edited": false,
+                "regenerated_with_edits": false, "version_count": 0 })
+    };
+    let sections = outputs["sections"].as_array_mut().unwrap();
+    sections.retain(|s| s["kind"] == "summary");
+    sections.push(section("decisions", json!({ "type": "ready" })));
+    sections.push(section(
+        "open_questions",
+        json!({ "type": "failed", "code": "runtime_unavailable", "local_fallback_available": true }),
+    ));
+    sections.push(section("per_participant", json!({ "type": "writing" })));
+    let (set, events) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    let o = r
+        .ok("main", "outputs_get", json!({ "call_id": "call_backend" }))
+        .await;
+    let of = |kind: &str| -> Value {
+        o["sections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["kind"] == kind)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(of("summary")["state"]["type"], "ready", "{o}");
+    assert_eq!(of("decisions")["state"]["type"], "ready", "{o}");
+    assert!(of("decisions")["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|i| i["id"] == "itm_seeded_decision"));
+    assert_eq!(of("open_questions")["state"]["type"], "failed", "{o}");
+    assert_eq!(of("per_participant")["state"]["type"], "writing", "{o}");
+    assert_eq!(o["status"], "writing", "{o}");
+    assert_eq!(o["review_waiting"], 1, "{o}");
+    // The UI hears the seeded states as the core's own progress.
+    assert!(
+        events.iter().any(|e| e["event"] == "outputs:progress"
+            && e["payload"]["section"] == "per_participant"
+            && e["payload"]["state"]["type"] == "writing"),
+        "{events:?}"
     );
     r.finish().await;
 }
