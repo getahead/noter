@@ -980,6 +980,7 @@ impl Harness {
                         | "transcripts"
                         | "items"
                         | "outputs"
+                        | "today"
                 )
             {
                 continue;
@@ -1023,6 +1024,10 @@ impl Harness {
         }
         if accepted["outputs"] != wanted["outputs"] {
             self.seed_sections(&parsed);
+        }
+        // Today's cards are the core's own over the calendar: only the events are the world's.
+        if accepted["today"] != wanted["today"] {
+            self.native.set_calendar(&parsed.today);
         }
         if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
             noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());

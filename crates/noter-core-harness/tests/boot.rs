@@ -1109,6 +1109,40 @@ async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
 }
 
 #[tokio::test]
+async fn world_set_puts_todays_events_in_the_calendar_the_core_reads() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // The core's clock is the fixture's `now`.
+    let now = world["now"].as_i64().unwrap();
+    world["today"]["today"] = json!([{
+        "event_id": "evt_seeded", "title": "Seeded sync", "starts_at": now + 60_000,
+        "ends_at": now + 120_000, "platform": "zoom", "sensitive": false, "call_id": null,
+        "last_time": null, "items": [], "questions": [], "handed_off": [], "open_count": 0,
+        "attendees": [{ "person": null, "name": "Dmitri S.", "email": "dmitri@example.com" }]
+    }]);
+    world["today"]["this_week"] = json!([]);
+    let (set, _) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    let today = r.ok("main", "today_get", json!({})).await;
+    let cards: Vec<Value> = today["today"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(today["this_week"].as_array().unwrap())
+        .cloned()
+        .collect();
+    assert!(
+        cards
+            .iter()
+            .any(|c| c["event_id"] == "evt_seeded" && c["title"] == "Seeded sync"),
+        "{today}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn an_edited_section_is_seeded_with_the_users_edit_as_its_current_version() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
