@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.4](https://github.com/getahead/noter/compare/v0.15.3...v0.15.4) (2026-11-05)
+
+
+### Bug fixes
+
+* **deps:** Bump rusqlite from 0.40.2 to 0.41.0 ([#295](https://github.com/getahead/noter/issues/295)) ([b28b236](https://github.com/getahead/noter/commit/b28b236b14e2092d91bfb5241b7f58c27c161e17))
+
 ## [0.15.3](https://github.com/getahead/noter/compare/v0.15.2...v0.15.3) (2026-11-05)
 
 
