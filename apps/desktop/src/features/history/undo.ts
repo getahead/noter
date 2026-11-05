@@ -119,8 +119,10 @@ const done = (r: UndoResult, mode: "undo" | "redo") =>
 // @cpt-flow:cpt-noter-flow-ui-history-undo-reverse:p1
 /** Runs the strip's action on its own target; a second call while the first runs does nothing. */
 export async function runUndo(bridge: Bridge): Promise<void> {
+  // @cpt-begin:cpt-noter-flow-ui-history-undo-reverse:p1:inst-choose
   const e = entry;
   if (!e || e.phase === "WORKING") return;
+  // @cpt-end:cpt-noter-flow-ui-history-undo-reverse:p1:inst-choose
   // @cpt-begin:cpt-noter-flow-ui-history-undo-reverse:p1:inst-working
   // @cpt-begin:cpt-noter-algo-ui-history-undo-strip:p1:inst-work
   // @cpt-begin:cpt-noter-state-ui-history-undo-strip:p1:inst-work
@@ -129,6 +131,7 @@ export async function runUndo(bridge: Bridge): Promise<void> {
   // @cpt-end:cpt-noter-state-ui-history-undo-strip:p1:inst-work
   // @cpt-end:cpt-noter-algo-ui-history-undo-strip:p1:inst-work
   // @cpt-end:cpt-noter-flow-ui-history-undo-reverse:p1:inst-working
+  const reread = refresh; // the strip may be dismissed or replaced while the command runs; the source view is still re-read
   const id = e.target.type === "change" ? e.target.change_id : e.target.batch_id;
   // @cpt-begin:cpt-noter-flow-ui-history-undo-reverse:p1:inst-call
   const res = await bridge.act(`undo:${id}`, e.mode === "undo" ? "change_undo" : "change_redo", () => (e.mode === "undo" ? bridge.core.changeUndo({ target: e.target }) : bridge.core.changeRedo({ target: e.target })), {
@@ -136,7 +139,7 @@ export async function runUndo(bridge: Bridge): Promise<void> {
     screen: "undo-strip",
   });
   // @cpt-end:cpt-noter-flow-ui-history-undo-reverse:p1:inst-call
-  if (entry?.target !== e.target) return; // a newer action replaced this strip while the command ran
+  if (entry?.target !== e.target) return void (await reread?.()); // a newer action replaced this strip while the command ran
   if (res.status === "ok") {
     const partial = res.data.skipped_edited_later > 0;
     // @cpt-begin:cpt-noter-flow-ui-history-undo-reverse:p1:inst-strip
@@ -153,7 +156,9 @@ export async function runUndo(bridge: Bridge): Promise<void> {
     // @cpt-begin:cpt-noter-flow-ui-history-undo-reverse:p1:inst-keep
     // @cpt-begin:cpt-noter-state-ui-history-undo-strip:p1:inst-fail
     const key = `undo.err.${res.error.code}` as MsgKey;
+    // @cpt-begin:cpt-noter-flow-ui-history-undo-reverse:p1:inst-return-failure
     set({ ...e, phase: "VISIBLE", context: t(NAMED[res.error.code] ? key : "undo.err.other") });
+    // @cpt-end:cpt-noter-flow-ui-history-undo-reverse:p1:inst-return-failure
     // @cpt-end:cpt-noter-state-ui-history-undo-strip:p1:inst-fail
     // @cpt-end:cpt-noter-flow-ui-history-undo-reverse:p1:inst-keep
     // @cpt-end:cpt-noter-flow-ui-history-undo-reverse:p1:inst-failed

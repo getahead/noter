@@ -20,6 +20,14 @@ describe("diffWords (cpt-noter-component-ui-diff-view)", () => {
   });
 });
 
+describe("line cap", () => {
+  it("compares whole lines past 60 lines", () => {
+    const big = Array.from({ length: 70 }, (_, i) => `a b ${i}`).join("\n");
+    const parts = diffWords(big, big.replace("a b 3\n", "a c 3\n"));
+    expect(parts.filter((p) => p.op === "del").map((p) => p.text)).toEqual(["a b 3"]);
+  });
+});
+
 describe("fold", () => {
   const text = (n: number) => Array.from({ length: n }, (_, i) => `line${i}`).join("\n");
   it("folds an unchanged run longer than three lines and keeps shorter ones", () => {

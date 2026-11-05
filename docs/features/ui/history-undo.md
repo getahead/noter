@@ -102,7 +102,7 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### Undo or redo a change
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-history-undo-reverse`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-history-undo-reverse`
 
 **Actor**: Primary user
 
@@ -115,15 +115,15 @@ Read changes, undo or redo them, and export a call’s log.
 - `not_undoable`, `already_undone`, `not_undone`, `edited_later`, `undo_expired` or `not_found` leave records intact and refresh available actions.
 
 **Steps**:
-1. [ ] - `p1` - User chooses **Undo** or **Redo**; resolve the returned change id or batch id, never a row index - `inst-choose`
-2. [ ] - `p1` - UI: busy action, suppress duplicate submissions for that target - `inst-working`
-3. [ ] - `p1` - API: `change_undo` or `change_redo` with the typed `UndoTarget` - `inst-call`
-4. [ ] - `p1` - **IF** the command fails - `inst-failed`
-   1. [ ] - `p1` - Keep the current records; show the named error, refresh History and enable an explicit retry only when still valid - `inst-keep`
-   2. [ ] - `p1` - **RETURN** the unchanged view - `inst-return-failure`
-5. [ ] - `p1` - Refresh the affected core views and `history_list`; do not locally reconstruct inverse writes - `inst-refresh`
-6. [ ] - `p1` - UI: **Undone 37 changes · Redo**, or the single-change message, using the returned counts; partial result offers **Show** for kept records when available - `inst-strip`
-7. [ ] - `p1` - **RETURN** the core’s restored records and append-only history - `inst-finish`
+1. [x] - `p1` - User chooses **Undo** or **Redo**; resolve the returned change id or batch id, never a row index - `inst-choose`
+2. [x] - `p1` - UI: busy action, suppress duplicate submissions for that target - `inst-working`
+3. [x] - `p1` - API: `change_undo` or `change_redo` with the typed `UndoTarget` - `inst-call`
+4. [x] - `p1` - **IF** the command fails - `inst-failed`
+   1. [x] - `p1` - Keep the current records; show the named error, refresh History and enable an explicit retry only when still valid - `inst-keep`
+   2. [x] - `p1` - **RETURN** the unchanged view - `inst-return-failure`
+5. [x] - `p1` - Refresh the affected core views and `history_list`; do not locally reconstruct inverse writes - `inst-refresh`
+6. [x] - `p1` - UI: **Undone 37 changes · Redo**, or the single-change message, using the returned counts; partial result offers **Show** for kept records when available - `inst-strip`
+7. [x] - `p1` - **RETURN** the core’s restored records and append-only history - `inst-finish`
 
 ### Export a call log
 
@@ -149,19 +149,19 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### Undo strip timing and target
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-history-undo-strip`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-history-undo-strip`
 
 **Input**: Core change or batch target, outcome, pointer and focus, elapsed visible time
 
 **Output**: Visible strip and available action
 
 **Steps**:
-1. [ ] - `p1` - Keep the immutable target with the message; show for 10 s without taking focus or drawing a countdown - `inst-show`
-2. [ ] - `p1` - **IF** hovered or focused: pause expiry; restart 10 s only when both end - `inst-pause`
-3. [ ] - `p1` - **IF** working: retain the message and spinner until the command settles - `inst-work`
-4. [ ] - `p1` - **IF** undo succeeded: switch once to **Redo** for the same target; subsequent actions remain in History - `inst-switch`
-5. [ ] - `p1` - **IF** 10 s elapse or × is clicked or Esc is pressed on the strip: hide it without removing row actions - `inst-dismiss`
-6. [ ] - `p1` - **RETURN** the strip; ⌘Z and ⇧⌘Z use this target only while it remains the last applicable change; text fields keep native text undo - `inst-return`
+1. [x] - `p1` - Keep the immutable target with the message; show for 10 s without taking focus or drawing a countdown - `inst-show`
+2. [x] - `p1` - **IF** hovered or focused: pause expiry; restart 10 s only when both end - `inst-pause`
+3. [x] - `p1` - **IF** working: retain the message and spinner until the command settles - `inst-work`
+4. [x] - `p1` - **IF** undo succeeded: switch once to **Redo** for the same target; subsequent actions remain in History - `inst-switch`
+5. [x] - `p1` - **IF** 10 s elapse or × is clicked or Esc is pressed on the strip: hide it without removing row actions - `inst-dismiss`
+6. [x] - `p1` - **RETURN** the strip; ⌘Z and ⇧⌘Z use this target only while it remains the last applicable change; text fields keep native text undo - `inst-return`
 
 ## 4. States (CDSL)
 
@@ -183,21 +183,21 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### Undo strip
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-history-undo-strip`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-history-undo-strip`
 
 **States**: HIDDEN, VISIBLE, PAUSED, WORKING, SWITCHED, PARTIAL
 
 **Initial State**: HIDDEN
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** HIDDEN **TO** VISIBLE **WHEN** an undoable action returns a target - `inst-show`
-2. [ ] - `p1` - **FROM** VISIBLE, SWITCHED, PARTIAL **TO** PAUSED **WHEN** hover or focus starts; retain the action and message - `inst-pause`
-3. [ ] - `p1` - **FROM** PAUSED **TO** VISIBLE **WHEN** hover and focus both end; retain the action and restart 10 s - `inst-resume`
-4. [ ] - `p1` - **FROM** VISIBLE, PAUSED, SWITCHED, PARTIAL **TO** WORKING **WHEN** the action is invoked - `inst-work`
-5. [ ] - `p1` - **FROM** WORKING **TO** SWITCHED **WHEN** the command succeeds fully - `inst-undo`
-6. [ ] - `p1` - **FROM** WORKING **TO** PARTIAL **WHEN** edited-later records were skipped - `inst-partial`
-7. [ ] - `p1` - **FROM** WORKING **TO** VISIBLE **WHEN** the command fails; show error without a success message - `inst-fail`
-8. [ ] - `p1` - **FROM** VISIBLE, SWITCHED, PARTIAL, PAUSED **TO** HIDDEN **WHEN** dismissed, or the unpaused timer expires - `inst-hide`
+1. [x] - `p1` - **FROM** HIDDEN **TO** VISIBLE **WHEN** an undoable action returns a target - `inst-show`
+2. [x] - `p1` - **FROM** VISIBLE, SWITCHED, PARTIAL **TO** PAUSED **WHEN** hover or focus starts; retain the action and message - `inst-pause`
+3. [x] - `p1` - **FROM** PAUSED **TO** VISIBLE **WHEN** hover and focus both end; retain the action and restart 10 s - `inst-resume`
+4. [x] - `p1` - **FROM** VISIBLE, PAUSED, SWITCHED, PARTIAL **TO** WORKING **WHEN** the action is invoked - `inst-work`
+5. [x] - `p1` - **FROM** WORKING **TO** SWITCHED **WHEN** the command succeeds fully - `inst-undo`
+6. [x] - `p1` - **FROM** WORKING **TO** PARTIAL **WHEN** edited-later records were skipped - `inst-partial`
+7. [x] - `p1` - **FROM** WORKING **TO** VISIBLE **WHEN** the command fails; show error without a success message - `inst-fail`
+8. [x] - `p1` - **FROM** VISIBLE, SWITCHED, PARTIAL, PAUSED **TO** HIDDEN **WHEN** dismissed, or the unpaused timer expires - `inst-hide`
 
 ## 5. Definitions of Done
 
@@ -220,7 +220,7 @@ The system **MUST** render all three timeline variants, actor and job filters, e
 
 ### Shared reversible actions
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-undo`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-undo`
 
 The system **MUST** bind row, strip and app-menu actions to core targets, show partial counts, preserve actions after expiry, pause timers on hover/focus and keep standard editor undo.
 

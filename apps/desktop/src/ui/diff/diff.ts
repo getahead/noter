@@ -1,5 +1,6 @@
 // Word diff of the diff view (prototype C.diffView): LCS over whitespace-separated tokens.
-// shortcut: no cap on input size (quadratic table), fine for change-log before/after text; add a line cap if outputs of whole documents arrive.
+// Over MAX_LINES lines a side is compared line by line, which keeps the quadratic table small.
+export const MAX_LINES = 60;
 
 export type Op = "eq" | "ins" | "del";
 export interface Part {
@@ -8,8 +9,9 @@ export interface Part {
 }
 
 export function diffWords(before: string, after: string): Part[] {
-  const a = before.split(/(\s+)/).filter(Boolean);
-  const b = after.split(/(\s+)/).filter(Boolean);
+  const split = before.split("\n").length > MAX_LINES || after.split("\n").length > MAX_LINES ? /(\n)/ : /(\s+)/;
+  const a = before.split(split).filter(Boolean);
+  const b = after.split(split).filter(Boolean);
   const n = a.length;
   const m = b.length;
   const dp = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));

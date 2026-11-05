@@ -152,3 +152,20 @@ describe("undoKey", () => {
     expect(undoKey(k({ metaKey: false }), entry("undo"))).toBe(false);
   });
 });
+
+describe("refresh after a replaced strip", () => {
+  it("re-reads the source view even when the strip was dismissed while the command ran", async () => {
+    const refresh = vi.fn();
+    holdUndo({ target: change, message: "x", refresh });
+    let release!: () => void;
+    const b = {
+      core: { changeUndo: () => new Promise((r) => (release = () => r(ok(1)()))) },
+      act: async (_k: string, _c: string, run: () => Promise<unknown>) => run(),
+    } as unknown as Bridge;
+    const p = runUndo(b);
+    dismissUndo();
+    release();
+    await p;
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+});
