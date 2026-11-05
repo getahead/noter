@@ -19,5 +19,11 @@ env:
 jobs:
   full-gate:
     uses: ./.github/workflows/ci.yml
+    # A called workflow can only lower the caller's token, never raise it: grant what ci.yml's
+    # jobs ask for (changes and e2e read runs, the coverage report comments), or the run never starts.
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
     secrets:
       CF_STUDIO_TOKEN: ${{ secrets.CF_STUDIO_TOKEN }}
