@@ -230,10 +230,11 @@ test.describe("cpt-noter-flow-ui-history-undo-read (call History, PC-R8)", () =>
 
   test("UI — diff: Diff on a row with before and after marks inserted and deleted words", async ({ page }) => {
     await openSeeded(page);
-    const row = rowOf(page, RENAME).first();
-    await button(row, "Diff").click();
-    await expect(row.locator("ins, [data-diff='insert']").first()).toBeVisible();
-    await expect(row.locator("del, [data-diff='delete']").first()).toBeVisible();
+    // the two renames of the seed (title → draft, draft → title): one inserts a word, the other deletes it
+    const renames = rowOf(page, RENAME);
+    for (let i = 0; i < 2; i++) await button(renames.nth(i), "Diff").click();
+    await expect(renames.locator("ins, [data-diff='insert']").first()).toBeVisible();
+    await expect(renames.locator("del, [data-diff='delete']").first()).toBeVisible();
   });
 });
 
