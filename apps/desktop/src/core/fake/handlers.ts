@@ -166,7 +166,9 @@ function section(world: World, summaryId: string): OutputSection {
 const sectionVersions = new WeakMap<OutputSection, { body_md: string; kind: "generated" | "user_edit" }[]>();
 function versionsOf(s: OutputSection): { body_md: string; kind: "generated" | "user_edit" }[] {
   let v = sectionVersions.get(s);
-  if (!v) sectionVersions.set(s, (v = Array.from({ length: Math.max(1, s.version_count) }, () => ({ body_md: s.body_md ?? "", kind: "generated" as const }))));
+  // An edited section's current (last) version is the user's edit, as in the real core.
+  const n = Math.max(1, s.version_count);
+  if (!v) sectionVersions.set(s, (v = Array.from({ length: n }, (_, i) => ({ body_md: s.body_md ?? "", kind: s.user_edited && i === n - 1 ? ("user_edit" as const) : ("generated" as const) }))));
   return v;
 }
 
