@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonChip, SegmentView, SpeakerView } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
-import { SpeakerNamingPanel } from "./SpeakerNamingPanel";
+import { NameRow, SpeakerNamingPanel } from "./SpeakerNamingPanel";
 
 const chip = (id: string, name: string): PersonChip => ({
   id,
@@ -99,5 +99,21 @@ describe("SpeakerNamingPanel", () => {
         { call_id: "c1", assignments: [{ speaker_id: "s3", person: null }] },
       ]),
     );
+  });
+  it("Play Sample asks the core for the speaker's sample, and a refusal drops Playing…", async () => {
+    const played: unknown[] = [];
+    const row = (res: unknown) =>
+      rendered(NameRow, {
+        p: props({ bridge: bridge({ audioPlay: async (a: unknown) => (played.push(a), res) }) }),
+        speaker: spk("s3", 3),
+        people: null,
+        line: null,
+        onSkip: () => {},
+      });
+    for (const res of [{ status: "ok", data: {} }, { status: "error", error: { code: "refused" } }]) {
+      const tree = row(res);
+      (find(tree, (pr) => pr.label === "Play Sample").props as { onAction: () => void }).onAction();
+    }
+    await vi.waitFor(() => expect(played).toEqual([{ call_id: "c1", from_ms: 1000, to_ms: 6000 }, { call_id: "c1", from_ms: 1000, to_ms: 6000 }]));
   });
 });

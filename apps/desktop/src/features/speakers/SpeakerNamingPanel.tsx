@@ -179,7 +179,7 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
   );
 }
 
-function NameRow({
+export function NameRow({
   p,
   speaker,
   people,
