@@ -78,7 +78,7 @@ Implement credential row, field and account-login variants, key sheets and remov
 
 ### Add, replace or remove an API key
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-accounts-key`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-accounts-key`
 
 Delivered in M2 (see Milestone notes). Steps 7, 8 and 9.1 call M3 commands: M2 builds them against the fake core, and they pass against the real core in M3.
 
@@ -94,19 +94,19 @@ Delivered in M2 (see Milestone notes). Steps 7, 8 and 9.1 call M3 commands: M2 b
 - Local runtime missing or model not ready: Install Ollama or Download; recording and transcription remain available
 
 **Steps**:
-1. [ ] - `p1` - User opens Models & Runtimes or first-run Assistants; API: `accounts_get`; UI shows keys and two independent account-login rows - `inst-read`
-2. [ ] - `p1` - User chooses Add or Replace; UI opens an empty secure field accepting paste, with Verify and Save; the stored key is never filled in - `inst-open-key`
-3. [ ] - `p1` - User enters the key; Return runs Verify; disable duplicate submission while verifying - `inst-enter`
-4. [ ] - `p1` - API: `api_key_set` with provider and the entered key once; this frozen command verifies and stores, as distinguished from the prototype's separate actions below - `inst-set`
-5. [ ] - `p1` - **IF** verification fails - `inst-if-rejected`
-   1. [ ] - `p1` - UI: show the provider's safe reason and invalid state, return focus to the secure field and allow a new input; clear the secret draft on close - `inst-invalid`
-6. [ ] - `p1` - **ELSE** replace the account slice from the core, clear the draft, show Configured and **•••••••• Stored in the Keychain**; Save closes an already stored result without resending the secret - `inst-saved`
-7. [ ] - `p1` - User chooses Remove; native alert explains the runtime becomes unavailable and the key leaves the Keychain; Cancel is default - `inst-remove-alert`
-8. [ ] - `p1` - On confirmation API: `api_key_remove`; replace the slice only after success; no local credential deletion - `inst-remove`
-9. [ ] - `p1` - **IF** the local runtime is missing - `inst-if-local`
-   1. [ ] - `p1` - User chooses Install Ollama; API: `cli_install` for Ollama; model Download has the contract limitation below; job/account updates determine readiness - `inst-install-local`
-10. [ ] - `p1` - User may choose Not Now in first run; UI explains **Without an assistant Noter still records and transcribes; summaries wait until one is connected.** and allows Finish - `inst-skip`
-11. [ ] - `p1` - **RETURN** the core's credential status; show Saved for 2 s after successful storage - `inst-return-key`
+1. [x] - `p1` - User opens Models & Runtimes or first-run Assistants; API: `accounts_get`; UI shows keys and two independent account-login rows - `inst-read`
+2. [x] - `p1` - User chooses Add or Replace; UI opens an empty secure field accepting paste, with Verify and Save; the stored key is never filled in - `inst-open-key`
+3. [x] - `p1` - User enters the key; Return runs Verify; disable duplicate submission while verifying - `inst-enter`
+4. [x] - `p1` - API: `api_key_set` with provider and the entered key once; this frozen command verifies and stores, as distinguished from the prototype's separate actions below - `inst-set`
+5. [x] - `p1` - **IF** verification fails - `inst-if-rejected`
+   1. [x] - `p1` - UI: show the provider's safe reason and invalid state, return focus to the secure field and allow a new input; clear the secret draft on close - `inst-invalid`
+6. [x] - `p1` - **ELSE** replace the account slice from the core, clear the draft, show Configured and **•••••••• Stored in the Keychain**; Save closes an already stored result without resending the secret - `inst-saved`
+7. [x] - `p1` - User chooses Remove; native alert explains the runtime becomes unavailable and the key leaves the Keychain; Cancel is default - `inst-remove-alert`
+8. [x] - `p1` - On confirmation API: `api_key_remove`; replace the slice only after success; no local credential deletion - `inst-remove`
+9. [x] - `p1` - **IF** the local runtime is missing - `inst-if-local`
+   1. [x] - `p1` - User chooses Install Ollama; API: `cli_install` for Ollama; model Download has the contract limitation below; job/account updates determine readiness - `inst-install-local`
+10. [x] - `p1` - User may choose Not Now in first run; UI explains **Without an assistant Noter still records and transcribes; summaries wait until one is connected.** and allows Finish - `inst-skip`
+11. [x] - `p1` - **RETURN** the core's credential status; show Saved for 2 s after successful storage - `inst-return-key`
 
 ### Sign in through the user's CLI
 
@@ -160,8 +160,8 @@ Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes 
 
 **Steps**:
 1. [ ] - `p1` - User chooses Test; API: `account_test`; show actual latency only if ok, otherwise its mapped error - `inst-test`
-2. [ ] - `p1` - User selects a connected runtime for Live copilot, Post-call analysis or Search answers; UI keeps disconnected choices visible and disabled - `inst-task`
-3. [ ] - `p1` - API: `settings_update` with runtimes section and revision through Settings; restore core values on failure - `inst-save-task`
+2. [x] - `p1` - User selects a connected runtime for Live copilot, Post-call analysis or Search answers; UI keeps disconnected choices visible and disabled - `inst-task`
+3. [x] - `p1` - API: `settings_update` with runtimes section and revision through Settings; restore core values on failure - `inst-save-task`
 4. [ ] - `p1` - User chooses Sign Out; alert names agents falling back to the matching key or pausing without one, and explains the CLI stays signed in unless **Also sign out of … on this Mac** is chosen - `inst-signout-alert`
 5. [ ] - `p1` - User confirms; API: `account_sign_out` with provider and `also_in_cli`; accounts events determine the result - `inst-signout`
 6. [ ] - `p1` - On provider-ended state show the expired row and affected-agent count; Sign In Again reuses the sign-in flow; never silently bind agents to another account - `inst-expired`
@@ -210,16 +210,16 @@ The key transitions 11 to 14 are M2; the account transitions 1 to 10 are M3. The
 8. [ ] - `p1` - **FROM** BROWSER **TO** SIGNIN_ERROR **WHEN** cancellation, timeout, ineligible plan or offline is reported; retry starts a new guarded session - `inst-error`
 9. [ ] - `p1` - **FROM** SIGNED_IN **TO** EXPIRED **WHEN** the provider ends the session; Sign In Again returns to PREPARE - `inst-expired`
 10. [ ] - `p1` - **FROM** SIGNED_IN **TO** SIGNED_OUT **WHEN** explicit sign-out succeeds - `inst-signout`
-11. [ ] - `p1` - **FROM** KEY_DRAFT **TO** KEY_VERIFYING **WHEN** a nonblank key is submitted once - `inst-key-verify`
-12. [ ] - `p1` - **FROM** KEY_VERIFYING **TO** KEY_INVALID **WHEN** the provider rejects it; corrected input returns to KEY_DRAFT - `inst-key-invalid`
-13. [ ] - `p1` - **FROM** KEY_VERIFYING **TO** KEY_CONFIGURED **WHEN** api_key_set succeeds - `inst-key-configured`
-14. [ ] - `p1` - **FROM** KEY_DRAFT **TO** KEYCHAIN_LOCKED **WHEN** the core reports keychain_locked; explicit recovery refreshes account state - `inst-locked`
+11. [x] - `p1` - **FROM** KEY_DRAFT **TO** KEY_VERIFYING **WHEN** a nonblank key is submitted once - `inst-key-verify`
+12. [x] - `p1` - **FROM** KEY_VERIFYING **TO** KEY_INVALID **WHEN** the provider rejects it; corrected input returns to KEY_DRAFT - `inst-key-invalid`
+13. [x] - `p1` - **FROM** KEY_VERIFYING **TO** KEY_CONFIGURED **WHEN** api_key_set succeeds - `inst-key-configured`
+14. [x] - `p1` - **FROM** KEY_DRAFT **TO** KEYCHAIN_LOCKED **WHEN** the core reports keychain_locked; explicit recovery refreshes account state - `inst-locked`
 
 ## 5. Definitions of Done
 
 ### Credential rows and keys
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-accounts-keys`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-accounts-keys`
 
 The system **MUST** share row/field forms between Settings and Assistants, permit paste, mask stored-key presence, report verification and Keychain failures, remove keys only after confirmation and keep setup finishable without an assistant.
 

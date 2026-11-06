@@ -99,3 +99,5 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 /* One display: the name block sits above the floating-panel drawing, so the drawing never covers it. */
 .fr-dp__one .fr-dp__screen { justify-content: flex-start; padding-top: 10px; }
 .fr-dp__float { top: auto; bottom: 8px; height: 44px; }
+/* Step 6: the key field forms and the own-account frames (cpt-noter-component-ui-credential-row). */
+.fr-keys { display: grid; gap: 12px; margin-bottom: 16px; }

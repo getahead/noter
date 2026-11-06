@@ -19,6 +19,10 @@ import { DisplayPicker } from "../../ui/setup/display-picker";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { SelfTestPanel } from "../../ui/setup/self-test-panel";
 import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/setup/wizard-stepper";
+import { askAlert } from "../../ui/dialogs/alerts";
+import { installCli, removeKey } from "../settings/accounts";
+import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
+import { removeAlert } from "../settings/keys";
 import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
 import { dbToLevel, hearing } from "./self-test";
 import { STEP_ORDER, stepperItems, type StepperItemState } from "./steps";
@@ -224,9 +228,11 @@ function AudioStorage({ wizard, w }: { wizard: Wizard; w: WizardState }) {
 }
 
 // Step 6's key fields and own-account rows belong to cpt-noter-feature-ui-accounts (M2, M3): this is its frame.
-function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
+export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
   const accounts = useSelect(bridge.store, (s) => s.whole.accounts);
   const local = accounts?.local.running ?? false;
+  // **Not Now** on the local runtime line: the offer folds, the explanation below stays until an assistant is connected
+  const [notNow, setNotNow] = useState(false);
   // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-if-no-assistant
   const none = !local && !accounts?.keys.some((k) => k.status.type === "configured") && !accounts?.accounts.some((a) => a.status.type === "signed_in");
   // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-if-no-assistant
@@ -236,6 +242,21 @@ function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: 
       <p className="fr-p">
         <Msg id="first_run.assistants.body" />
       </p>
+      {/* @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-read */}
+      <div className="fr-keys">
+        {accounts?.keys.map((k) => (
+          <KeyFieldRow key={k.provider} bridge={bridge} view={k} onRemove={() => void askAlert(removeAlert(k.provider)).then((ok) => (ok ? removeKey(bridge, k.provider) : undefined))} />
+        ))}
+      </div>
+      {/* @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-read */}
+      <div className="fr-sublabel">
+        <Msg id="first_run.assistants.accounts" />
+      </div>
+      <div className="fr-keys">
+        {accounts?.accounts.map((a) => (
+          <AccountRow key={a.provider} view={a} />
+        ))}
+      </div>
       <div className="fr-runtime">
         <span>
           <strong>
@@ -243,6 +264,14 @@ function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: 
           </strong>{" "}
           <Msg id={local ? "first_run.assistants.runtime_found" : "first_run.assistants.runtime_none"} />
         </span>
+        {/* @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-if-local */}
+        {!local && !notNow && (
+          <>
+            <PushButton label={t("first_run.assistants.install")} size="small" onAction={() => void installCli(bridge, "ollama")} />
+            <PushButton label={t("first_run.assistants.not_now")} size="small" variant="quiet" onAction={() => setNotNow(true)} />
+          </>
+        )}
+        {/* @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-if-local */}
       </div>
       <div className="fr-privacy">
         <div className="fr-sublabel">
@@ -261,7 +290,9 @@ function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: 
         />
       </div>
       {/* @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-no-assistant */}
+      {/* @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-skip */}
       {none && <InlineBanner banner={{ id: "no-assistant", severity: "warning", text: t("first_run.assistants.none") }} />}
+      {/* @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-skip */}
       {/* @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-no-assistant */}
     </>
   );
