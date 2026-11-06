@@ -119,7 +119,7 @@ describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     expect(created.item.review).toBe("accepted");
     const batch = ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] }));
     expect(batch.items.map((i: ItemView) => i.id)).toContain("itm_reconnect_q");
-    if (s.target === "stdio" && batch.batch_id) {
+    if (batch.batch_id) {
       expect(ok(await main.changeUndo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBeGreaterThan(0);
       expect((await get("itm_reconnect_q")).review).toBe("suggested");
     }

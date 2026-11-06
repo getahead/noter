@@ -44,7 +44,7 @@ function checkRev(current: Rev, sent: Rev): void {
   if (current !== sent) throw coreError("conflict", "rev is stale", { type: "conflict", current_rev: current });
 }
 
-type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable">>;
+type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable" | "batch_id">>;
 
 function logChange(world: World, row: ChangeInput): ChangeId {
   const id = newId("chg");
@@ -57,10 +57,10 @@ function logChange(world: World, row: ChangeInput): ChangeId {
     after: null,
     reason: null,
     undoable: true,
+    batch_id: null,
     ...row,
     id,
     at: now(),
-    batch_id: null,
     batch_size: 1,
     evidence: [],
     confidence: null,
@@ -688,8 +688,12 @@ export const defaultHandlers: Handlers = {
   },
   items_review_all: (a, { world }) => {
     const items = world.items.filter((i) => i.call.id === a.call_id && i.review === "suggested" && (!a.kinds.length || a.kinds.includes(i.kind)));
-    items.forEach((i) => bump(Object.assign(i, { review: "accepted" as const })));
-    return { items, batch_id: items.length ? newId("bat") : null, skipped: 0 };
+    const batch_id = items.length ? newId("bat") : null;
+    items.forEach((i) => {
+      bump(Object.assign(i, { review: "accepted" as const }));
+      logChange(world, { entity: { kind: "item", id: i.id, label: i.text }, field: "review", before: "suggested", after: "accepted", summary: "Accepted suggested items", batch_id });
+    });
+    return { items, batch_id, skipped: 0 };
   },
   item_edit: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
@@ -1100,6 +1104,11 @@ export const defaultHandlers: Handlers = {
     if (rows.every((r) => r.status === "undone")) throw coreError("already_undone");
     if (rows.some((r) => !r.undoable)) throw coreError("not_undoable");
     rows.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
+    // An undone item change puts its field back; other entities only mark the row.
+    rows.forEach((r) => {
+      const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
+      if (item) bump(Object.assign(item, { [r.field as string]: r.before }));
+    });
     return { undone: rows.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: 0 };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
