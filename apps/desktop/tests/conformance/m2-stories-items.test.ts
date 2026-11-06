@@ -123,14 +123,15 @@ describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     const batch = ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] }));
     expect(batch.items.map((i: ItemView) => i.id)).toContain("itm_reconnect_q");
     expect(batch.items.length).toBeGreaterThan(1);
+    expect(batch.batch_id).not.toBeNull();
     if (batch.batch_id) {
       const history = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} }));
       expect(history.rows.filter((r) => r.batch_id === batch.batch_id).map((r) => r.batch_size)).toEqual(batch.items.map(() => batch.items.length));
       expect(ok(await main.itemGet({ item_id: "itm_reconnect_q" })).history.find((r) => r.batch_id === batch.batch_id)?.batch_size).toBe(batch.items.length);
       expect(ok(await main.changeUndo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBe(batch.items.length);
-      expect((await get("itm_reconnect_q")).review).toBe("suggested");
+      for (const item of batch.items) expect((await get(item.id)).review).toBe("suggested");
       expect(ok(await main.changeRedo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBe(batch.items.length);
-      expect((await get("itm_reconnect_q")).review).toBe("accepted");
+      for (const item of batch.items) expect((await get(item.id)).review).toBe("accepted");
     }
   });
 });
