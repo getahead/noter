@@ -18,6 +18,8 @@ const sent = async (page: Page, name: string): Promise<Array<Record<string, unkn
 const calendar = (state: "not_asked" | "denied") => (w: Parameters<typeof W.idle>[0]) => {
   W.idle(w);
   W.permission(w, "calendar", state);
+  // the real core derives these from the permission (and refuses a changed `today`); the fake world serves them as given
+  if (process.env.NOTER_CORE !== "stdio") Object.assign(w.today, { calendar: state, today: [], this_week: [] });
 };
 
 /** The window opens on Today, the first section (⌘1). */

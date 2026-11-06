@@ -29,12 +29,13 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   const read = useWindow(bridge, (s) => s.commands[READ_KEY]) ?? { state: "IDLE" };
   const ask = useWindow(bridge, (s) => s.commands["today:calendar"]);
   // the same read again when what it shows can have changed: capture, setup or environment, and an item or call
+  const ready = useWindow(bridge, (s) => s.status === "READY"); // the snapshot is the window's first command
   const capture = useWindow(bridge, (s) => s.whole.capture?.version);
   const env = useWindow(bridge, (s) => s.whole.environment);
   const items = useWindow(bridge, (s) => s.entities.item);
   const calls = useWindow(bridge, (s) => s.entities.call);
   // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-regions
-  useEffect(() => void loadToday(bridge), [bridge, capture, env, items, calls]);
+  useEffect(() => void (ready && loadToday(bridge)), [bridge, ready, capture, env, items, calls]);
   // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-regions
   const state = calendarState(read, view, ask?.state === "WAITING");
   const skeleton = useAfter(300, state === "LOADING" || (state === "ERROR" && read.state === "WAITING"));
