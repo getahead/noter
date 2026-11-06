@@ -2,8 +2,8 @@
 // `cpt-noter-seq-call-page-review-suggested-items`. Commands: items_list, items_review_all, change_undo.
 // This file keeps what runs green on both cores today: the review banner and Accept All. The paths that need the
 // Summary view's rows (Start Review focus, A/E/R, Rejected · Undo, regenerate, inspector) stay on lane/ui/e2e-m2-1
-// until 2.18's sections land; the fake does not log a batch change for `items_review_all`, so its batch Undo is
-// proved on the real core only. The fixture's "Planning: VHI 8.0 drawer redesign" (call_live, idle) has 3 suggested items.
+// until their follow-up slice lands. Batch Undo is proved on both cores now that #312 records fake batch history.
+// The fixture's "Planning: VHI 8.0 drawer redesign" (call_live, idle) has 3 suggested items.
 import type { Locator, Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
@@ -11,7 +11,6 @@ import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
-const FAKE = process.env.NOTER_CORE !== "stdio";
 const STRIP = '[data-component="cpt-noter-component-ui-undo-strip"]';
 const banner = (page: Page) => page.locator('[data-region="PC-R2"]');
 const strip = (page: Page) => page.locator(STRIP);
@@ -65,7 +64,6 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     await expect(strip(page)).toContainText("Accepted 3 suggested items");
     await expect(banner(page).getByText(/suggested items to review/)).toHaveCount(0);
     await expect(button(strip(page), "Undo")).toBeVisible();
-    if (FAKE) return; // the fake logs no change for a batch accept: Undo is real-core only
     await button(strip(page), "Undo").click();
     expect(await sent(page, "change_undo")).toEqual([{ target: { type: "batch", batch_id: expect.any(String) } }]); // one batch, one undo
     await expect(banner(page)).toContainText("3 suggested items to review before sharing");

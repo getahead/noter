@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
+import type { Banner } from "../../ui/feedback/inline-banner";
+import { rendered } from "../../ui/testing";
+import { loadOutputs } from "../call-page/outputs-actions";
+import { holdOutputs, resetOutputsCache } from "../call-page/outputs-cache";
 import { resetUndo } from "../history/undo";
 import { resetLocal } from "./local";
 import { startReview, useReviewBanner } from "./review-banner";
@@ -17,7 +21,7 @@ vi.mock("react", async (original) => ({
 
 let bridge: Bridge;
 let fake: FakeCore;
-beforeEach(() => (resetLocal(), resetUndo(), effects.pending.length = 0));
+beforeEach(() => (resetLocal(), resetUndo(), resetOutputsCache(), effects.pending.length = 0));
 afterEach(() => {
   vi.unstubAllGlobals();
   return bridge.close();
@@ -36,6 +40,18 @@ function bannerOf(callId: string) {
 }
 
 describe("review banner (PC-R2)", () => {
+  it("keeps the writing banner before item review when both are present", async () => {
+    await ready();
+    await loadItems(bridge, "call_live");
+    const outputs = await loadOutputs(bridge, "call_live");
+    if (outputs.status !== "ok") throw new Error("Fixture outputs were not loaded");
+    holdOutputs({ ...outputs.data, status: "writing", written_locally: false });
+    const tree = rendered(CallBanners, { route: { section: "library", key: "call:call_live:summary" }, bridge, appBanners: 0 });
+    const banners = tree.props.banners as Banner[];
+    expect(banners.map((banner) => banner.id)).toEqual(["writing", "review"]);
+    expect(banners[1]!.text).toBe("3 suggested items to review before sharing");
+  });
+
   it("shows a failed initial item read with Try Again even before any suggestions were loaded", async () => {
     await ready();
     const read = bridge.core.itemsList;
