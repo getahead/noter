@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { settled } from "./freeze";
 
 const WIDTHS = { wide: 1400, medium: 1000, narrow: 700 } as const;
 const ROW = '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
@@ -21,7 +22,9 @@ async function calls(page: Page, width: number, world: (w: World) => void, laten
   }).toPass();
 }
 const shot = async (page: Page, name: string, width: string) => {
+  await page.mouse.move(0, 0);
   await page.evaluate(() => ((document.activeElement as HTMLElement | null)?.blur(), scrollTo(0, 0)));
+  await settled(page);
   await expect(page).toHaveScreenshot(`${name}-${width}.png`);
 };
 
