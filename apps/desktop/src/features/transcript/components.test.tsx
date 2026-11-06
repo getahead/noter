@@ -36,6 +36,31 @@ describe("speaker label and language tag", () => {
 });
 
 describe("SegmentRow (cpt-noter-component-ui-transcript-segment-row)", () => {
+  it("Fix Term… opens from the context menu on selected words, and the label click opens Rename", () => {
+    const r = rowOf();
+    const onFixTerm = vi.fn();
+    const onRename = vi.fn();
+    const tree = rendered(SegmentRow, { row: r, variant: "live", speakers: [], onFixTerm, onRename });
+    const text = find(tree, (p) => "onContextMenu" in p).props as { onContextMenu: (e: unknown) => void };
+    const el = { contains: () => true };
+    const event = { currentTarget: el, preventDefault: vi.fn() };
+    vi.stubGlobal("document", { createRange: () => ({ selectNodeContents() {}, setEnd() {}, toString: () => "ab" }) });
+    vi.stubGlobal("getSelection", () => ({ rangeCount: 1, isCollapsed: false, getRangeAt: () => ({ startContainer: {}, endContainer: {}, startOffset: 0, toString: () => "cd" }) }));
+    text.onContextMenu(event);
+    expect(onFixTerm).toHaveBeenCalledWith(expect.anything(), { start: 2, end: 4 }, el);
+    expect(event.preventDefault).toHaveBeenCalled();
+    vi.stubGlobal("getSelection", () => null);
+    text.onContextMenu(event);
+    expect(onFixTerm).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+    const label = find(tree, (p) => "onRename" in p && "text" in p).props as { onRename: (a: unknown) => void };
+    label.onRename(el);
+    expect(onRename).toHaveBeenCalledWith(expect.any(String), expect.anything(), el);
+    const btn = find(rendered(SpeakerLabel, { text: "Speaker 3", variant: "unnamed" as never, onRename }), (p) => "onClick" in p).props as { onClick: (e: unknown) => void };
+    btn.onClick({ currentTarget: el });
+    expect(onRename).toHaveBeenCalledTimes(2);
+  });
+
   it("draws a confirmed row with its time, speaker, text, lang, tag and play control", () => {
     const html = renderToString(<SegmentRow row={rowOf()} variant="live" speakers={[]} control={{ state: "enabled", help: "transcript.play" }} />);
     expect(html).toContain('lang="ru"');
