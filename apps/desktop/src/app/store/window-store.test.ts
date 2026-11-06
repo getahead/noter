@@ -157,13 +157,6 @@ describe("window store", () => {
         payload: { type: "removed", kind: "glossary", id: "g" },
       }),
     ).toBe(s);
-    // A whole output section is the call page's to read (UI M2); the store keeps nothing of it.
-    expect(
-      applyEvent(s, {
-        event: "entity:changed",
-        payload: { type: "section", call_id: "c", section: { kind: "summary" } as never },
-      }),
-    ).toBe(s);
   });
 
   it("writes a command's returned record by identity, keeping the higher rev", () => {
@@ -209,6 +202,12 @@ describe("window store", () => {
     expect(other.streams.transcript_subscribe).toBe(open.streams.transcript_subscribe);
     const ev = applyEvent(open, { event: "entity:changed", payload: { type: "speakers", call_id: "c1", speakers: [named] } } as never);
     expect(ev.streams.transcript_subscribe?.data?.speakers[1].label.type).toBe("you");
+  });
+
+  it("keeps a section the core sent whole, by call and kind", () => {
+    const section = { kind: "summary", state: { type: "ready" }, body_md: "x" } as never;
+    const s = applyEvent(initialState("main"), { event: "entity:changed", payload: { type: "section", call_id: "c1", section } });
+    expect(s.sections["c1/summary"]).toBe(section);
   });
 
   it("keeps outputs, jobs, sign-ins and the last navigation request", () => {

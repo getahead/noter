@@ -15,15 +15,16 @@ import { TextField } from "../../ui/primitives/text-field";
 import type { PageToolbarProps } from "../shell/pages";
 import { MainToolbar } from "../shell/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallRow, CallTypeInfo } from "../../core/bindings";
+import type { CallRow, CallTypeInfo, CallPageTab } from "../../core/bindings";
 import { menuActs, saveTitle } from "./actions";
 import { useTypes } from "./cache";
+import { useRegenerate } from "./RegenerateSheet";
 import { registeredViews } from "./views";
 import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
 
 
 /** The ⋯ menu's items for a call (the later items join with their features). */
-export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null }): MenuItem[] {
+export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void }): MenuItem[] {
   const sensitive = call.privacy === "sensitive";
   return [
     // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
@@ -32,6 +33,7 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
     // @cpt-end:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
     { label: sensitive ? t("callpage.sensitive") : t("callpage.mark_sensitive"), checked: sensitive, onSelect: act.sensitive },
     { divider: true },
+    ...(act.regenerate ? [{ label: t("outputs.menu.regenerate"), onSelect: act.regenerate }] : []),
     { label: t("callpage.show_in_finder"), onSelect: act.finder },
     { divider: true },
     { label: t("callpage.delete"), destructive: true, kbd: "⌘⌫", disabled: act.remove === null, onSelect: act.remove ?? undefined },
@@ -43,10 +45,12 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const call = useWindow(bridge, (s) => s.entities.call[at.callId]);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const types = useTypes();
+  const openRegenerate = useRegenerate(bridge, at.callId);
   const [renaming, setRenaming] = useState(false);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const { segments, view } = callViews(registeredViews(), at.tab);
   const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));
+  const openTab = (tab: string) => void bridge.core.windowNavigate({ target: { type: "call_page", call_id: at.callId, tab: tab as CallPageTab } });
   const title = call ? call.title : "";
   const sub = call && prefs ? subtitleOf(call, Date.now(), prefs) : undefined;
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-toolbar
@@ -59,7 +63,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
       titleNode={call && renaming ? <TitleField bridge={bridge} call={call} onDone={() => setRenaming(false)} /> : undefined}
       center={
         // @cpt-begin:cpt-noter-algo-ui-call-page-frame-views:p1:inst-narrow
-        base.narrow ? <PopupButton options={views} value={view} variant="toolbar" label={t("callpage.view")} /> : <SegmentedControl items={views} value={view} variant="view" label={t("callpage.view")} />
+        base.narrow ? <PopupButton options={views} value={view} variant="toolbar" label={t("callpage.view")} onAction={openTab} /> : <SegmentedControl items={views} value={view} variant="view" label={t("callpage.view")} onAction={openTab} />
         // @cpt-end:cpt-noter-algo-ui-call-page-frame-views:p1:inst-narrow
       }
       trailing={
@@ -70,7 +74,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
           {menu && call && (
             <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
               <Menu
-                items={moreItems(call, types, menuActs(bridge, call, () => setRenaming(true)))}
+                items={moreItems(call, types, { ...menuActs(bridge, call, () => setRenaming(true)), regenerate: () => openRegenerate(["summary", "decisions", "action_items", "open_questions"]) })}
                 onClose={() => setMenu(null)}
               />
             </Popover>

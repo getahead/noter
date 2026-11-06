@@ -11,6 +11,8 @@ import type { Route } from "../shell/history";
 import { requestNotifications } from "./actions";
 import { dismissed as closed, useExtras } from "./cache";
 import { parseCallKey } from "./logic";
+import { useOutputs } from "./outputs-cache";
+import { useRegenerate } from "./RegenerateSheet";
 
 // The × is view state for this window's lifetime: `banner_dismiss` has no notification-consent `BannerKind`, so
 // nothing is sent and nothing persists (contract gap for the owner, call-page-frame.md).
@@ -28,8 +30,23 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
   const offer = !!extras?.first_recorded_call && !!call && notAsked && !live && !asked && !closed.has("notify") && appBanners === 0;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
+  const outputs = useOutputs(callId);
+  const openRegenerate = useRegenerate(bridge, callId);
+  const tab = parseCallKey(route.key)!.tab;
+  const list: Banner[] = [];
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-writing
+  if (tab === "summary" && outputs?.status === "writing")
+    list.push({
+      id: "writing",
+      severity: "info",
+      text: t(outputs.written_locally ? "outputs.banner.writing_local" : "outputs.banner.writing"),
+      actions: [{ label: t("outputs.banner.read_transcript"), onAction: () => void bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "transcript" } }) }],
+    });
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-writing
+  else if (tab === "summary" && outputs?.written_locally && outputs.status !== "not_started")
+    list.push({ id: "local", severity: "info", text: t("outputs.banner.written_locally"), actions: [{ label: t("outputs.banner.regenerate_claude"), onAction: () => openRegenerate(["summary"]) }] });
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
-  if (!offer) return null;
+  if (!offer && list.length === 0) return null;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
   // @cpt-begin:cpt-noter-flow-ui-notifications-allow:p1:inst-banner-flow
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-banner
@@ -55,7 +72,7 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-banner-flow
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-if-close
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-local-dismiss
-  return <BannerSlot banners={[banner]} region="PC-R2" onDismiss={() => (closed.add("notify"), redraw((n) => n + 1))} />;
+  return <BannerSlot banners={offer ? [...list, banner] : list} region="PC-R2" onDismiss={() => (closed.add("notify"), redraw((n) => n + 1))} />;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-local-dismiss
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-if-close
 }

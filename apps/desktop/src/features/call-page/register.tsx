@@ -6,9 +6,14 @@ import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
 import { CallToolbar } from "./CallToolbar";
 import { parseCallKey } from "./logic";
+import { OutputsView } from "./OutputsView";
+import { views } from "./views";
 import { t } from "../../i18n/format";
 
 const at = (key: string) => parseCallKey(key)!;
+
+// Summary (call-page-outputs) registers its view with the page body seam; the page draws it for the `summary` tab.
+views.summary = ({ bridge, callId }) => <OutputsView bridge={bridge} callId={callId} />;
 
 registerPage(
   "library",

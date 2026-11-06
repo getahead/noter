@@ -16,6 +16,7 @@ import { holdDeleteError, useDeleteError, useExtras } from "./cache";
 import { afterTimer, callViews, pageState } from "./logic";
 import { registeredViews, views } from "./views";
 import "./call-page.css";
+import "./outputs.css";
 
 // @cpt-component:cpt-noter-component-screen-call-page:p1
 // @cpt-dod:cpt-noter-dod-ui-call-page-frame-frame:p2
