@@ -43,6 +43,8 @@ async function confirmSystemAudio(page: Page): Promise<void> {
     await backInNoter(page);
   }
   await expect(sys).toContainText("Granted", { timeout: 15_000 }); // the core's short tap takes a few seconds
+  // The fake's first levels tick inserts the microphone meter and can move Run Test during a click.
+  if (FAKE) await expect(permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" })).toBeVisible();
 }
 
 /** Both audio permissions granted. */
