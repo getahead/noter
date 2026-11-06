@@ -5,8 +5,10 @@ import type { ItemView } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
 import { IconButton } from "../../ui/primitives/icon-button";
+import { ShareMenu } from "../call-page/ShareMenu";
+import { SECTION_OF } from "./review";
 import { undoRow } from "./actions";
-import { ReviewButtons, useItem } from "./ActionItemRow";
+import { elementId, ReviewButtons, useItem } from "./ActionItemRow";
 import { patchLocal, useLocal } from "./local";
 import { ProvenanceChip } from "./ProvenanceChip";
 import { slots } from "./slots";
@@ -23,6 +25,7 @@ export function ItemTail({ bridge, item }: { bridge: Bridge; item: ItemView }) {
       )}
       {it.review === "suggested" && !local.outcome && <ReviewButtons it={it} bridge={bridge} retryOnly={!!local.retryAccept} edit={inspect} />}
       {local.error && <span className="it-row__error" role="alert">{local.error}</span>}
+      <ShareMenu bridge={bridge} callId={it.call.id} origin={{ type: "row", kind: SECTION_OF[it.kind], id: it.id }} id={elementId("share", it.id)} />
       {inspect && <IconButton icon="info" label={t("items.inspect")} size="inline" onAction={inspect} />}
     </>
   );

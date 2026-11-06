@@ -8,6 +8,8 @@ const out = (o: Partial<CallOutputs>) => ({ status: "ready", sensitive: false, s
 describe("share scope", () => {
   it("is the whole call from the toolbar, one section from a section, and never broader than asked", () => {
     expect(scopeOf({ type: "toolbar" }, false)).toEqual({ sections: [], item_ids: [], include_unreviewed: false });
+    expect(scopeOf({ type: "row", kind: "action_items", id: "itm_a0" }, false)).toEqual({ sections: ["action_items"], item_ids: ["itm_a0"], include_unreviewed: false });
+    expect(scopeLine({ type: "row", kind: "action_items", id: "itm_a0" })).toBe("This item");
     expect(scopeOf({ type: "section", kind: "decisions" }, true)).toEqual({ sections: ["decisions"], item_ids: [], include_unreviewed: true });
   });
   it("names the scope on the menu's first line", () => {

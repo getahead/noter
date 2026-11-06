@@ -5,18 +5,20 @@ import { t } from "../../i18n/format";
 import { SECTION_LABEL } from "./outputs-logic";
 
 /** Where Share was invoked: the toolbar (whole call) or a section's own button. */
-export type ShareOrigin = { type: "toolbar" } | { type: "section"; kind: SectionKind };
+export type ShareOrigin = { type: "toolbar" } | { type: "section"; kind: SectionKind } | { type: "row"; kind: SectionKind; id: string };
 
 // @cpt-algo:cpt-noter-algo-ui-call-page-outputs-project:p1
 /** The core's scope for the invoking control; `include_unreviewed` only when the notice made it explicit. */
 export function scopeOf(origin: ShareOrigin, includeUnreviewed: boolean): ShareScope {
   // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
-  return { sections: origin.type === "section" ? [origin.kind] : [], item_ids: [], include_unreviewed: includeUnreviewed };
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
+  return { sections: origin.type === "toolbar" ? [] : [origin.kind], item_ids: origin.type === "row" ? [origin.id] : [], include_unreviewed: includeUnreviewed };
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
   // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
 }
 
 /** The menu's first line. */
-export const scopeLine = (origin: ShareOrigin): string => (origin.type === "section" ? t(SECTION_LABEL[origin.kind]) : t("share.whole_call"));
+export const scopeLine = (origin: ShareOrigin): string => (origin.type === "row" ? t("share.this_item") : origin.type === "section" ? t(SECTION_LABEL[origin.kind]) : t("share.whole_call"));
 
 /** Copying needs ready outputs (before they are read the core decides: `outputs_not_ready`); a sensitive call says so and confirms with a plain **Copied**. */
 export const shareState = (o: Pick<CallOutputs, "status" | "sensitive"> | undefined, privacy?: CallRow["privacy"]) => ({ ready: !o || (o.status !== "writing" && o.status !== "not_started"), sensitive: privacy ? privacy === "sensitive" : !!o?.sensitive });

@@ -146,7 +146,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - Sensitive call: **Sensitive call · copying puts the text on your clipboard**; Slack/Jira success reads **Copied**.
 
 **Steps**:
-1. [ ] - `p1` - User opens Share or invokes ⌘⇧C, ⌥⌘C, ⌥⇧⌘C or ⌘E; resolve scope from the invoking control and current row selection - `inst-scope`
+1. [x] - `p1` - User opens Share or invokes ⌘⇧C, ⌥⌘C, ⌥⇧⌘C or ⌘E; resolve scope from the invoking control and current row selection - `inst-scope`
 2. [x] - `p1` - Show the scope first, then unreviewed/sensitive notices, three copy formats and Export; keep normal ⌘C as standard text copy - `inst-menu`
 3. [x] - `p1` - User copies; API: `share_copy` with call id, scope and format; set include_unreviewed only when the shown scope notice makes their inclusion explicit - `inst-copy`
 4. [x] - `p1` - **IF** `unreviewed_in_scope`: keep the scope, show its notice and offer Start Review through Items; never silently change the requested inclusion - `inst-review`

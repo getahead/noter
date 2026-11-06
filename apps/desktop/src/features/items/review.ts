@@ -100,3 +100,6 @@ export const isOverdue = (due: string | null, done: boolean, today: string): boo
 
 /** Items the checkbox shows as ticked: done, or closed by the core's evidence or an answer in a call. */
 export const isDone = (status: ItemView["status"]): boolean => status === "done" || status === "closed_by_evidence" || status === "answered_in_call";
+
+/** The output section an item kind is listed in (Share's row scope names it). */
+export const SECTION_OF = { decision: "decisions", action_item: "action_items", open_question: "open_questions", risk: "risks" } as const;

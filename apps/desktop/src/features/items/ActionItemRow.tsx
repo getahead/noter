@@ -22,12 +22,13 @@ import { TextField } from "../../ui/primitives/text-field";
 import type { ActionItemRowProps } from "../call-page/slots";
 import { acceptSaved, answerHandoff, review, reviewAll, reopen, saveDraft, setDone, undoRow } from "./actions";
 import { patchLocal, useLocal, type Local } from "./local";
-import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, type Draft } from "./review";
+import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, SECTION_OF, type Draft } from "./review";
+import { ShareMenu } from "../call-page/ShareMenu";
 import { ProvenanceChip } from "./ProvenanceChip";
 import { slots } from "./slots";
 import "./items.css";
 
-const elementId = (kind: string, id: string) => [kind, id].join("-");
+export const elementId = (kind: string, id: string) => [kind, id].join("-");
 const today = () => new Date().toLocaleDateString("sv"); // YYYY-MM-DD in the local zone
 const dueText = (due: string) => new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${due}T00:00`));
 
@@ -272,6 +273,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
       <div className="it-row__actions">
         {outcome || (suggested && <ReviewButtons it={it} bridge={bridge} retryOnly={!!local.retryAccept} edit={edit} />)}
         {handoff}
+        <ShareMenu bridge={bridge} callId={it.call.id} origin={{ type: "row", kind: SECTION_OF[it.kind], id: it.id }} id={elementId("share", it.id)} />
         {info}
       </div>
     </div>

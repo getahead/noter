@@ -884,6 +884,8 @@ export const en = {
   "outputs.regen.failed": "Couldn't start regenerating. Try again.",
   "outputs.menu.regenerate": "Regenerate Outputs…",
   "share.whole_call": "Whole call",
+  "share.this_item": "This item",
+  "share.item": "Share item",
   "share.copied": "Copied",
   "share.copied.slack": "Copied for Slack",
   "share.copied.jira": "Copied for Jira",

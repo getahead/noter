@@ -248,4 +248,11 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     // the section is read again for the new row (the fake does not add it to the written outputs; the real core does)
     await expect.poll(async () => (await sent(page, "outputs_get")).length).toBeGreaterThan(1);
   });
+
+  test("UI — Other — Share one item: the row's Share menu copies with that item's id only", async ({ page }) => {
+    await openCall(page, suggest());
+    await button(rowOf(page, SPEC), "Share item").click();
+    await page.getByRole("menuitem", { name: /Slack/ }).click();
+    expect(await sent(page, "share_copy")).toEqual([expect.objectContaining({ scope: expect.objectContaining({ item_ids: ["itm_a3"] }) })]);
+  });
 });
