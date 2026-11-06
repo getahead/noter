@@ -1058,6 +1058,60 @@ async fn world_set_sets_the_degraded_set() {
 }
 
 #[tokio::test]
+async fn world_set_switches_to_local_through_the_degraded_set_and_privacy_follows() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["degraded"]["states"] = json!([{
+        "type": "switched_to_local", "call_id": null, "reason": "offline", "retry_at": null
+    }]);
+    world["app"]["privacy"]["effective"] = json!("switched_to_local");
+    let (set, events) = r
+        .call(
+            "main",
+            "harness.world_set",
+            json!({ "world": world.clone() }),
+        )
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    assert!(
+        events
+            .iter()
+            .any(|e| e["event"] == "privacy:changed"
+                && e["payload"]["effective"] == "switched_to_local"),
+        "{events:?}"
+    );
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(snap["privacy"]["effective"], "switched_to_local");
+    // Back online: the effective mode is the chosen one again.
+    world["app"]["degraded"]["states"] = json!([]);
+    world["app"]["privacy"]["effective"] = json!("cloud_redacted");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let snap = r.ok("main", "app_snapshot", json!({})).await;
+    assert_eq!(snap["privacy"]["effective"], "cloud_redacted");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["privacy"]["effective"] = json!("switched_to_local");
+    let (set, _) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert_eq!(set["error"]["code"], "invalid_input", "{set}");
+    assert!(
+        set["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("app.privacy"),
+        "{set}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_accepts_transcripts_and_seeds_their_rows() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
