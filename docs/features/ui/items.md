@@ -157,20 +157,20 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 ### Save an item draft
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-items-save`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-items-save`
 
 **Input**: Item id, base rev, draft fields, inline-review or inspector context
 
 **Output**: Updated item and change target, or retained draft and error
 
 **Steps**:
-1. [ ] - `p1` - Require non-empty trimmed text; map cleared Owner, Due and Linked issue to their typed clear variants, not null which leaves fields unchanged - `inst-normalize`
-2. [ ] - `p1` - API: `item_edit` with base rev and only changed fields; retain the draft until success - `inst-edit`
-3. [ ] - `p1` - **IF** conflict: fetch `item_get`, keep the draft separate from current values, show **Item changed since** and require the user to save again; **RETURN** the conflict - `inst-conflict`
-4. [ ] - `p1` - **IF** another error: show field validation or section retry and **RETURN** the retained draft - `inst-error`
-5. [ ] - `p1` - **IF** inline review saved a suggestion: `item_review` with **accept** and the new rev; show **Saved and accepted** for 4 s only after both calls succeed - `inst-accept`
-6. [ ] - `p1` - **IF** acceptance fails after editing: keep the saved edit visible and Suggested, with retry for acceptance only - `inst-partial`
-7. [ ] - `p1` - **RETURN** returned item and change targets; inspector Save shows **Saved** for 2 s without implicitly accepting - `inst-return`
+1. [x] - `p1` - Require non-empty trimmed text; map cleared Owner, Due and Linked issue to their typed clear variants, not null which leaves fields unchanged - `inst-normalize`
+2. [x] - `p1` - API: `item_edit` with base rev and only changed fields; retain the draft until success - `inst-edit`
+3. [x] - `p1` - **IF** conflict: fetch `item_get`, keep the draft separate from current values, show **Item changed since** and require the user to save again; **RETURN** the conflict - `inst-conflict`
+4. [x] - `p1` - **IF** another error: show field validation or section retry and **RETURN** the retained draft - `inst-error`
+5. [x] - `p1` - **IF** inline review saved a suggestion: `item_review` with **accept** and the new rev; show **Saved and accepted** for 4 s only after both calls succeed - `inst-accept`
+6. [x] - `p1` - **IF** acceptance fails after editing: keep the saved edit visible and Suggested, with retry for acceptance only - `inst-partial`
+7. [x] - `p1` - **RETURN** returned item and change targets; inspector Save shows **Saved** for 2 s without implicitly accepting - `inst-return`
 
 ## 4. States (CDSL)
 
@@ -217,7 +217,7 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 ### Rows, review and completion
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-items-actions`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-items-actions`
 
 The system **MUST** render full, compact, done and read-only action rows; bind review keys, counts, timers, batch targets, restore, wanted-state completion and handoff answers to typed commands; never infer completion from keywords or commits.
 

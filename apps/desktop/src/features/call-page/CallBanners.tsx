@@ -6,6 +6,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { BannerSlot, type Banner } from "../../ui/feedback/inline-banner";
+import { useReviewBanner } from "../items/review-banner";
 import { permissionState } from "../notifications/notifications";
 import type { Route } from "../shell/history";
 import { requestNotifications } from "./actions";
@@ -27,6 +28,7 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   const notAsked = useWindow(bridge, (s) => permissionState(s.whole.environment?.notifications) === "NOT_ASKED");
   const [asked, setAsked] = useState(false);
   const [, redraw] = useState(0);
+  const review = useReviewBanner(bridge, callId);
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
   const offer = !!extras?.first_recorded_call && !!call && notAsked && !live && !asked && !closed.has("notify") && appBanners === 0;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
@@ -45,6 +47,7 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-writing
   else if (tab === "summary" && outputs?.written_locally && outputs.status !== "not_started")
     list.push({ id: "local", severity: "info", text: t("outputs.banner.written_locally"), actions: [{ label: t("outputs.banner.regenerate_claude"), onAction: () => openRegenerate(["summary"]) }] });
+  if (review) list.push(review);
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
   if (!offer && list.length === 0) return null;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner

@@ -15,6 +15,8 @@ export interface InlineStatusProps {
   actionLabel?: string;
   onAction?: () => void;
   kbd?: string;
+  /** How long it shows, when the variant's time does not fit (**Accepted** 4 s on a row outcome). */
+  ms?: number;
   /** The time ended or the action ran: the owner removes the status and its control shows its own label. */
   onExpire: () => void;
 }
@@ -49,7 +51,7 @@ export function startStatusTimer(ms: number, cb: { current: () => void }, held: 
 
 // @cpt-flow:cpt-noter-flow-ui-primitives-inline-status:p1
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
-export function InlineStatus({ text, variant = "trailing", actionLabel, onAction, kbd, onExpire }: InlineStatusProps) {
+export function InlineStatus({ text, variant = "trailing", actionLabel, onAction, kbd, ms, onExpire }: InlineStatusProps) {
   const timer = useRef<StatusTimer | null>(null);
   const held = useRef({ hover: false, focus: false });
   const expire = useRef(onExpire);
@@ -57,9 +59,9 @@ export function InlineStatus({ text, variant = "trailing", actionLabel, onAction
   // @cpt-begin:cpt-noter-state-ui-primitives-inline-status:p1:inst-hidden-shown
   useEffect(() => {
     if (!text) return;
-    timer.current = startStatusTimer(STATUS_MS[variant], expire, held.current);
+    timer.current = startStatusTimer(ms ?? STATUS_MS[variant], expire, held.current);
     return timer.current.cancel;
-  }, [text, variant]); // a new onExpire must not restart the time; an owner passes a new key to restart it
+  }, [text, variant, ms]); // a new onExpire must not restart the time; an owner passes a new key to restart it
   // @cpt-end:cpt-noter-state-ui-primitives-inline-status:p1:inst-hidden-shown
   if (!text) return null;
   // @cpt-begin:cpt-noter-flow-ui-primitives-inline-status:p1:inst-return-label
