@@ -12,7 +12,7 @@ import { slots } from "./slots";
 export function OutputItemRow({ bridge, item: listed }: { bridge: Bridge; item: ItemView }) {
   // a review or edit since the section was read: the store holds the newer record
   const held = useWindow(bridge, (s) => s.entities.item[listed.id]);
-  const item = held && held.rev >= listed.rev ? held : listed;
+  const item = held && held.rev > listed.rev ? held : listed;
   const Tail = slots.itemTail;
   const span = item.spans[0];
   return (

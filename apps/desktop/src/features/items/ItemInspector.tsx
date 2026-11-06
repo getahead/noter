@@ -20,6 +20,8 @@ import { ProvenanceChip } from "./ProvenanceChip";
 import { draftOf, draftPatch, draftValid, langOf } from "./review";
 import { slots } from "./slots";
 
+const STATUS = { open: "items.status.open", carried: "items.status.carried", handed_off: "items.status.handed_off", done: "items.status.done", closed_by_evidence: "items.status.closed_by_evidence", answered_in_call: "items.status.answered_in_call" } as const;
+const KIND = { decision: "items.kind.decision", action_item: "items.kind.action_item", open_question: "items.kind.open_question", risk: "items.kind.risk" } as const;
 type Tab = "details" | "history";
 type Saved = "idle" | "saving" | "saved" | string;
 
@@ -93,7 +95,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
           </label>
           <div className="it-field">
             <span>{t("items.field.status")}</span>
-            <span>{t(`items.status.${it.status}`)}</span>
+            <span>{t(STATUS[it.status])}</span>
           </div>
         </>
       )}
@@ -140,7 +142,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   return (
     <div data-component="cpt-noter-component-ui-item-inspector" data-kind={it.kind} className="ii" onKeyDown={(e) => e.key === "Escape" && !e.defaultPrevented && closeInspector()}>
       <div className="ii-head">
-        <Badge kind="kind" text={t(`items.kind.${it.kind}`)} />
+        <Badge kind="kind" text={t(KIND[it.kind])} />
         <SegmentedControl items={[{ value: "details", label: t("items.details") }, { value: "history", label: t("items.history") }]} value={tab} label={t("items.inspector")} onAction={(v) => setTab(v as Tab)} />
       </div>
       {tab === "details" ? details : history}

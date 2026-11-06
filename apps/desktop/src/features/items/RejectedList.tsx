@@ -18,7 +18,7 @@ export function RejectedList({ bridge, items }: { bridge: Bridge; items: ItemVie
   const locals = useLocals();
   const held = useWindow(bridge, (s) => s.entities.item);
   // a row still showing its **Rejected · Undo** outcome is not folded in yet; the store knows a review the section has not been re-read for
-  const rows = items.map((i) => (held[i.id] && held[i.id]!.rev >= i.rev ? held[i.id]! : i)).filter((i) => i.review === "rejected" && !locals.get(i.id)?.outcome);
+  const rows = items.map((i) => (held[i.id] && held[i.id]!.rev > i.rev ? held[i.id]! : i)).filter((i) => i.review === "rejected" && !locals.get(i.id)?.outcome);
   if (!rows.length) return null;
   return (
     <div className="it-rejected">

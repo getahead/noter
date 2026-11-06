@@ -312,15 +312,22 @@ describe("rowKey (flow inst-action)", () => {
     expect(localOf("itm_replay").phase).toBe("editing");
   });
 
-  it("does nothing on an accepted row, in a text field, in composition or for ⇧A (the section's)", async () => {
+  it("does nothing on an accepted row, in a text field or in composition", async () => {
     await ready();
     const seen = sent();
     rowKey(bridge, item("itm_spec"), {}, key("KeyA"));
     rowKey(bridge, item("itm_replay"), {}, key("KeyA", { target: { tagName: "TEXTAREA" } }));
     rowKey(bridge, item("itm_replay"), {}, key("KeyA", { isComposing: true }));
-    rowKey(bridge, item("itm_replay"), {}, key("KeyA", { shiftKey: true }));
     await settle();
     expect(seen).toEqual([]);
+  });
+
+  it("⇧A on a suggested row accepts its kind as one batch", async () => {
+    await ready();
+    const seen = sent();
+    rowKey(bridge, item("itm_replay"), {}, key("KeyA", { shiftKey: true }));
+    await settle();
+    expect(seen).toEqual([["items_review_all", { call_id: "call_live", kinds: ["action_item"] }]]);
   });
 
   it("while editing Esc discards the draft and ⌘Return saves it; other keys do nothing", async () => {
