@@ -253,16 +253,13 @@ async fn world_set_writes_owned_slices_through_the_core() {
 async fn world_set_refuses_a_slice_no_service_owns_yet() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
-    world["outputs"] = json!([]);
+    world["cards"] = json!([]);
     let (set, events) = r
         .call("main", "harness.world_set", json!({ "world": world }))
         .await;
     assert_eq!(set["error"]["code"], "not_implemented");
     assert!(
-        set["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("outputs"),
+        set["error"]["message"].as_str().unwrap().contains("cards"),
         "{set}"
     );
     assert!(
@@ -1107,6 +1104,295 @@ async fn world_set_refuses_a_privacy_the_core_would_not_derive() {
             .unwrap()
             .contains("app.privacy"),
         "{set}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn reseeding_the_calls_leaves_no_change_the_user_never_made() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // Any change to the calls re-seeds them all.
+    world["calls"][0]["title"] = json!("Renamed by the world");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let page = r
+        .ok(
+            "main",
+            "history_list",
+            json!({ "target": { "type": "all" }, "actor": "all", "page": {} }),
+        )
+        .await;
+    assert!(
+        page["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["summary"] != "harness world_set"),
+        "{page}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_adds_change_rows_the_core_lists_and_undoes() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let call = world["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == "call_backend")
+        .unwrap()
+        .clone();
+    let row = |id: &str, field: &str, before: &str, after: &Value| {
+        json!({
+            "id": id, "batch_id": "bat_seeded", "batch_size": 2, "at": world["now"],
+            "actor": { "type": "job", "job_id": "job_reconcile", "name": "Reconcile" },
+            "entity": { "kind": "call", "id": "call_backend", "label": call["title"] },
+            "field": field, "before": before, "after": after, "summary": "Renamed by a job",
+            "reason": "Calendar title", "evidence": [], "confidence": "high",
+            "status": "applied", "undoable": true, "redoable": false
+        })
+    };
+    let rows = [
+        row("chg_seeded_title", "title", "Old title", &call["title"]),
+        row(
+            "chg_seeded_type",
+            "call_type",
+            "planning",
+            &call["call_type"],
+        ),
+    ];
+    world["changes"].as_array_mut().unwrap().extend(rows);
+    let (set, _) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    let page = r
+        .ok(
+            "main",
+            "history_list",
+            json!({ "target": { "type": "call", "call_id": "call_backend" }, "actor": "jobs", "page": {} }),
+        )
+        .await;
+    let seeded: Vec<&Value> = page["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["batch_id"] == "bat_seeded")
+        .collect();
+    assert_eq!(seeded.len(), 2, "{page}");
+    assert_eq!(seeded[0]["batch_size"], 2);
+    assert_eq!(seeded[0]["actor"]["job_id"], "job_reconcile");
+    let undone = r
+        .ok(
+            "main",
+            "change_undo",
+            json!({ "target": { "type": "batch", "batch_id": "bat_seeded" } }),
+        )
+        .await;
+    assert_eq!(undone["undone"], 2, "{undone}");
+    let back = r
+        .ok("main", "call_get", json!({ "call_id": "call_backend" }))
+        .await;
+    assert_eq!(back["call"]["title"], "Old title");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_puts_todays_events_in_the_calendar_the_core_reads() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // The core's clock is the fixture's `now`.
+    let now = world["now"].as_i64().unwrap();
+    world["today"]["today"] = json!([{
+        "event_id": "evt_seeded", "title": "Seeded sync", "starts_at": now + 60_000,
+        "ends_at": now + 120_000, "platform": "zoom", "sensitive": false, "call_id": null,
+        "last_time": null, "items": [], "questions": [], "handed_off": [], "open_count": 0,
+        "attendees": [{ "person": null, "name": "Dmitri S.", "email": "dmitri@example.com" }]
+    }]);
+    world["today"]["this_week"] = json!([]);
+    let (set, _) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    let today = r.ok("main", "today_get", json!({})).await;
+    let cards: Vec<Value> = today["today"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(today["this_week"].as_array().unwrap())
+        .cloned()
+        .collect();
+    assert!(
+        cards
+            .iter()
+            .any(|c| c["event_id"] == "evt_seeded" && c["title"] == "Seeded sync"),
+        "{today}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn an_edited_section_is_seeded_with_the_users_edit_as_its_current_version() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let summary = world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap()["sections"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|s| s["kind"] == "summary")
+        .unwrap();
+    summary["user_edited"] = json!(true);
+    let id = summary["summary_id"].clone();
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let versions = r
+        .ok("main", "output_versions", json!({ "summary_id": id }))
+        .await;
+    let kinds: Vec<&Value> = versions["versions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| &v["kind"])
+        .collect();
+    assert_eq!(
+        kinds.last().unwrap().as_str(),
+        Some("user_edit"),
+        "{versions}"
+    );
+    // The user's edit has no model behind it.
+    assert_eq!(versions["versions"][kinds.len() - 1]["writer"], Value::Null);
+    assert_eq!(
+        kinds.first().unwrap().as_str(),
+        Some("generated"),
+        "{versions}"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_removes_running_states_of_sections_dropped_from_the_world() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let outputs = world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap();
+    let summary = outputs["sections"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|s| s["kind"] == "summary")
+        .unwrap();
+    summary["state"] = json!({
+        "type": "failed", "code": "runtime_unavailable", "local_fallback_available": true
+    });
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap()["sections"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|s| s["kind"] != "summary");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let outputs = r
+        .ok("main", "outputs_get", json!({ "call_id": "call_backend" }))
+        .await;
+    let summary = outputs["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["kind"] == "summary")
+        .unwrap();
+    assert_eq!(summary["state"]["type"], "pending", "{outputs}");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn world_set_seeds_output_sections_their_items_and_running_states() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    // A suggested decision on the ready call: its section lists it, and it waits for review.
+    let mut decision = world["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["call"]["id"] == "call_backend")
+        .unwrap()
+        .clone();
+    decision["id"] = json!("itm_seeded_decision");
+    decision["kind"] = json!("decision");
+    decision["review"] = json!("suggested");
+    decision["status"] = json!("open");
+    decision["done_at"] = Value::Null;
+    world["items"].as_array_mut().unwrap().push(decision);
+    let outputs = world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap();
+    let section = |kind: &str, state: Value| {
+        json!({ "kind": kind, "state": state, "summary_id": null, "rev": null, "body_md": null,
+                "items": [], "reviews": [], "writer": null, "user_edited": false,
+                "regenerated_with_edits": false, "version_count": 0 })
+    };
+    let sections = outputs["sections"].as_array_mut().unwrap();
+    sections.retain(|s| s["kind"] == "summary");
+    sections.push(section("decisions", json!({ "type": "ready" })));
+    sections.push(section(
+        "open_questions",
+        json!({ "type": "failed", "code": "runtime_unavailable", "local_fallback_available": true }),
+    ));
+    sections.push(section("per_participant", json!({ "type": "writing" })));
+    let (set, events) = r
+        .call("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    assert!(set.get("ok").is_some(), "{set}");
+    let o = r
+        .ok("main", "outputs_get", json!({ "call_id": "call_backend" }))
+        .await;
+    let of = |kind: &str| -> Value {
+        o["sections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["kind"] == kind)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(of("summary")["state"]["type"], "ready", "{o}");
+    assert_eq!(of("decisions")["state"]["type"], "ready", "{o}");
+    assert!(of("decisions")["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|i| i["id"] == "itm_seeded_decision"));
+    assert_eq!(of("open_questions")["state"]["type"], "failed", "{o}");
+    assert_eq!(of("per_participant")["state"]["type"], "writing", "{o}");
+    assert_eq!(o["status"], "writing", "{o}");
+    assert_eq!(o["review_waiting"], 1, "{o}");
+    // The UI hears the seeded states as the core's own progress.
+    assert!(
+        events.iter().any(|e| e["event"] == "outputs:progress"
+            && e["payload"]["section"] == "per_participant"
+            && e["payload"]["state"]["type"] == "writing"),
+        "{events:?}"
     );
     r.finish().await;
 }

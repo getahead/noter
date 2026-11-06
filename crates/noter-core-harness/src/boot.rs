@@ -426,27 +426,16 @@ impl Harness {
         Ok(())
     }
 
-    /// Removes every call (and with it its segments, speakers, marks, gaps and tags).
+    /// Removes every call (and with it its segments, speakers, marks, gaps and tags), leaving no
+    /// change row behind: a seed is not something the user did, and the store logs every write
+    /// it is given (the log is append-only), so the harness deletes on a connection of its own.
     fn clear_calls(&self) -> Result<(), CoreError> {
-        let ids: Vec<String> = self.core.store().read(|c| {
-            c.prepare("SELECT id FROM calls")?
-                .query_map([], |r| r.get(0))?
-                .collect()
-        })?;
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let meta = noter_db::ChangeMeta {
-            actor: Actor::You,
-            summary: "harness world_set".into(),
-            reason: "harness".into(),
-            evidence_ids: vec![],
-            batch_id: None,
-            undoable: false,
-            surface: None,
-        };
-        self.core.store().delete("call", "calls", ids, meta)?;
-        Ok(())
+        let db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
+            .map_err(crate::internal)?;
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .map_err(crate::internal)?;
+        db.execute_batch("PRAGMA foreign_keys = ON; DELETE FROM calls;")
+            .map_err(crate::internal)
     }
 
     /// Writes the world's calls, speakers, segments, marks and gaps as rows, the way capture
@@ -677,6 +666,29 @@ impl Harness {
         // @cpt-end:cpt-noter-algo-core-library-calls-fixture-parity:p2:inst-parity-seed
         rows.extend(summary_rows(wanted));
         self.core.store().insert_batch(rows)
+    }
+
+    /// The running states of the world's sections (writing, failed) live in the core, not in
+    /// rows: every section of a changed `outputs` is set again, with its `outputs:progress`.
+    // @cpt-flow:cpt-noter-flow-core-harness-session:p1
+    fn seed_sections(&self, w: &FakeWorld) {
+        // A section omitted by the replacement world must lose its old running state too.
+        for o in &lock(&self.world).outputs {
+            for s in &o.sections {
+                noter_core::testing::seed_section(
+                    &self.core,
+                    &o.call_id,
+                    s.kind,
+                    SectionState::Pending,
+                );
+            }
+        }
+        let seeded = |id: &CallId| w.calls.iter().any(|c| c.id == *id);
+        for o in w.outputs.iter().filter(|o| seeded(&o.call_id)) {
+            for s in &o.sections {
+                noter_core::testing::seed_section(&self.core, &o.call_id, s.kind, s.state.clone());
+            }
+        }
     }
 
     async fn call(&self, window: WindowLabel, cmd: &str, args: Value) -> Result<Value, CoreError> {
@@ -961,7 +973,16 @@ impl Harness {
             if current.get(key) == Some(value)
                 || matches!(
                     key.as_str(),
-                    "now" | "settings" | "app" | "calls" | "call_details" | "transcripts" | "items"
+                    "now"
+                        | "settings"
+                        | "app"
+                        | "calls"
+                        | "call_details"
+                        | "transcripts"
+                        | "items"
+                        | "outputs"
+                        | "today"
+                        | "changes"
                 )
             {
                 continue;
@@ -995,13 +1016,38 @@ impl Harness {
             }
             v
         };
-        if ["calls", "transcripts", "items"]
+        if ["calls", "transcripts", "items", "outputs"]
             .iter()
             .any(|k| accepted[k] != wanted[k])
             || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"])
         {
             self.clear_calls()?;
             self.seed_calls(&wanted)?;
+        }
+        if accepted["outputs"] != wanted["outputs"] {
+            self.seed_sections(&parsed);
+        }
+        // The log is append-only: the rows a world adds are written as the core writes them, after
+        // the records they name; a row the world drops stays in the log.
+        let known: Vec<&Value> = accepted["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|c| &c["id"])
+            .collect();
+        let added: Vec<noter_db::Insert> = wanted["changes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| !known.contains(&&c["id"]))
+            .map(change_row)
+            .collect();
+        if !added.is_empty() {
+            self.core.store().insert_batch(added)?;
+        }
+        // Today's cards are the core's own over the calendar: only the events are the world's.
+        if accepted["today"] != wanted["today"] {
+            self.native.set_calendar(&parsed.today);
         }
         if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
             noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());
@@ -1938,8 +1984,41 @@ fn system_audio(rows: &[PermissionRow]) -> PermissionState {
     }
 }
 
-/// The world's text sections of the calls it seeds as `summaries` rows, each with its versions
-/// (all generated, the current one last) and the `llm_runs` row their writer comes from.
+/// A world's `ChangeRow` as the `changes` row the core would have written for it.
+fn change_row(c: &Value) -> noter_db::Insert {
+    let actor = &c["actor"];
+    let actor = match actor["type"].as_str() {
+        Some("job") => format!("job:{}", actor["job_id"].as_str().unwrap_or_default()),
+        Some("model") => format!(
+            "llm_run:{}",
+            actor["llm_run_id"].as_str().unwrap_or_default()
+        ),
+        _ => "you".into(),
+    };
+    noter_db::Insert {
+        table: "changes",
+        values: vec![
+            ("id", c["id"].clone()),
+            ("ts", c["at"].clone()),
+            ("actor", json!(actor)),
+            ("entity_type", c["entity"]["kind"].clone()),
+            ("entity_id", c["entity"]["id"].clone()),
+            ("field", c["field"].clone()),
+            ("before", c["before"].clone()),
+            ("after", c["after"].clone()),
+            ("summary", c["summary"].clone()),
+            ("reason", json!(c["reason"].as_str().unwrap_or_default())),
+            ("confidence", c["confidence"].clone()),
+            ("status", c["status"].clone()),
+            ("batch_id", c["batch_id"].clone()),
+            ("undoable", c["undoable"].clone()),
+        ],
+    }
+}
+
+/// The world's sections of the calls it seeds as `summaries` rows, each with its versions
+/// (generated; the current one last, the user's edit when edited) and the `llm_runs` row their
+/// writer comes from.
 fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
     let ins = |table: &'static str, values: Vec<(&'static str, Value)>| noter_db::Insert {
         table,
@@ -1958,10 +2037,51 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
         .flatten()
         .filter(seeded_call)
     {
+        let call = &outputs["call_id"];
         for s in outputs["sections"].as_array().into_iter().flatten() {
-            let (Some(id), Some(body)) = (s["summary_id"].as_str(), s["body_md"].as_str()) else {
-                continue;
+            // An item section's row says only ready (its items as the body) or empty; the items
+            // themselves are the world's `items`, as the core lists them.
+            let item_kind = match s["kind"].as_str() {
+                Some("decisions") => Some("decision"),
+                Some("action_items") => Some("action_item"),
+                Some("open_questions") => Some("open_question"),
+                Some("risks") => Some("risk"),
+                _ => None,
             };
+            let body = match (
+                s["body_md"].as_str(),
+                item_kind,
+                s["state"]["type"].as_str(),
+            ) {
+                (Some(body), _, _) => body.to_owned(),
+                (None, Some(kind), Some("ready")) => {
+                    let lines: Vec<String> = wanted["items"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|i| i["call"]["id"] == *call && i["kind"] == kind)
+                        .map(|i| format!("- {}", i["text"].as_str().unwrap_or_default()))
+                        .collect();
+                    if lines.is_empty() {
+                        "-".to_owned()
+                    } else {
+                        lines.join("\n")
+                    }
+                }
+                (None, Some(_), Some("empty")) => String::new(),
+                _ => continue,
+            };
+            let id = s["summary_id"].as_str().map_or_else(
+                || {
+                    format!(
+                        "sum_{}_{}",
+                        call.as_str().unwrap_or_default(),
+                        s["kind"].as_str().unwrap_or_default()
+                    )
+                },
+                str::to_owned,
+            );
+            let (id, body) = (id.as_str(), body.as_str());
             let w = &s["writer"];
             let run = format!("llm_seed_{id}_{seeded}");
             if w.is_object() {
@@ -1985,7 +2105,7 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
                 "summaries",
                 vec![
                     ("id", json!(id)),
-                    ("rev", s["rev"].clone()),
+                    ("rev", s["rev"].as_u64().map_or(json!(1), |r| json!(r))),
                     ("call_id", outputs["call_id"].clone()),
                     ("kind", s["kind"].clone()),
                     ("current_version_id", json!(format!("ver_{id}_{count}"))),
@@ -1997,19 +2117,21 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
                 ],
             ));
             for n in 1..=count {
+                let edit = n == count && s["user_edited"] == json!(true);
                 rows.push(ins(
                     "summary_versions",
                     vec![
                         ("id", json!(format!("ver_{id}_{n}"))),
                         ("summary_id", json!(id)),
                         ("n", json!(n)),
-                        ("kind", json!("generated")),
+                        // An edited section's current version is the user's edit.
+                        ("kind", json!(if edit { "user_edit" } else { "generated" })),
                         ("body_md", json!(body)),
                         ("lang", json!("en")),
                         ("skill_version", w["skill_version"].clone()),
                         (
                             "llm_run_id",
-                            if w.is_object() {
+                            if w.is_object() && !edit {
                                 json!(run)
                             } else {
                                 Value::Null

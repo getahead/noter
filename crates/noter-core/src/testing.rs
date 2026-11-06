@@ -50,6 +50,17 @@ pub fn end_transcript_stream(
     core.end_transcript_stream(call_id, reason);
 }
 
+/// A section's running state (writing, failed) as `harness.world_set` seeds it, with its
+/// `outputs:progress`; for any other state the stored row says.
+pub fn seed_section(
+    core: &Core,
+    call: &noter_protocol::CallId,
+    kind: noter_protocol::model::SectionKind,
+    state: noter_protocol::model::SectionState,
+) {
+    core.seed_section(call, kind, state);
+}
+
 pub fn seed_presenting(core: &Core, hidden: bool) {
     core.seed_presenting(hidden);
 }

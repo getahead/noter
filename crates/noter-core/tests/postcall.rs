@@ -10,10 +10,10 @@ use noter_db::Insert;
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::{
-    ActorFilter, CallIdArgs, CallOutputs, EntityKind, HistoryListArgs, HistoryTarget, JobKind,
-    JobRunStatus, OutputEditArgs, OutputMutation, OutputsProgress, OutputsStatus, RegenerateArgs,
-    SectionKind, SectionState, SummaryIdArgs, UndoArgs, UndoTarget, VersionGetArgs, VersionKind,
-    WindowLabel,
+    ActorFilter, CallIdArgs, CallOutputs, EntityKind, HistoryListArgs, HistoryTarget, ItemFilter,
+    ItemKind, ItemReviewArgs, ItemsListArgs, JobKind, JobRunStatus, OutputEditArgs, OutputMutation,
+    OutputsProgress, OutputsStatus, RegenerateArgs, ReviewDecision, ReviewState, SectionKind,
+    SectionState, SummaryIdArgs, UndoArgs, UndoTarget, VersionGetArgs, VersionKind, WindowLabel,
 };
 use noter_protocol::{
     CallId, CoreError, ErrorCode, ErrorDetail, JobRunId, PageRequest, Rev, RuntimeChoice,
@@ -422,6 +422,64 @@ async fn written() -> (Arc<Core>, Arc<Events>, tempfile::TempDir, CallOutputs) {
     let o = outputs(&core, CALL).await;
     assert_eq!(o.status, OutputsStatus::Ready);
     (core, events, dir, o)
+}
+
+#[tokio::test(start_paused = true)]
+async fn item_sections_list_their_items_and_suggested_ones_wait_for_review() {
+    let (core, _events, _dir, o) = written().await;
+    let items = core
+        .items_list(
+            &main_window(),
+            ItemsListArgs {
+                filter: ItemFilter {
+                    call_id: Some(CallId::new(CALL)),
+                    ..ItemFilter::default()
+                },
+                page: PageRequest {
+                    cursor: None,
+                    limit: None,
+                },
+            },
+        )
+        .await
+        .unwrap()
+        .rows;
+    assert!(!items.is_empty(), "the scripted run suggests items");
+    for (section, kind) in [
+        (SectionKind::Decisions, ItemKind::Decision),
+        (SectionKind::ActionItems, ItemKind::ActionItem),
+    ] {
+        let listed = &o.sections.iter().find(|s| s.kind == section).unwrap().items;
+        let want: Vec<_> = items.iter().filter(|i| i.kind == kind).collect();
+        assert_eq!(listed.iter().collect::<Vec<_>>(), want, "{section:?}");
+    }
+    let suggested = items
+        .iter()
+        .filter(|i| i.review == ReviewState::Suggested)
+        .count();
+    assert!(suggested > 0);
+    assert_eq!(o.review_waiting as usize, suggested);
+    // A rejected suggestion is gone from its section and no longer waits (D75).
+    let gone = items
+        .iter()
+        .find(|i| i.review == ReviewState::Suggested)
+        .unwrap();
+    core.item_review(
+        &main_window(),
+        ItemReviewArgs {
+            item_id: gone.id.clone(),
+            rev: gone.rev,
+            decision: ReviewDecision::Reject,
+        },
+    )
+    .await
+    .unwrap();
+    let after = outputs(&core, CALL).await;
+    assert!(after
+        .sections
+        .iter()
+        .all(|s| s.items.iter().all(|i| i.id != gone.id)));
+    assert_eq!(after.review_waiting as usize, suggested - 1);
 }
 
 async fn edit(
