@@ -53,7 +53,7 @@ export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; call
   const label = origin.type === "section" ? t("share.section", { section: t(SECTION_LABEL[origin.kind as SectionKind]) }) : t("callpage.share");
   return (
     <span data-component="cpt-noter-component-ui-share-menu" style={{ display: "contents" }}>
-      {origin.type === "section" ? <IconButton id={id} icon="export" label={label} size="inline" onAction={toggle} /> : <PullDownButton id={id} label={mine?.kind === "copied" ? mine.text : label} ariaLabel={label} variant="toolbar" open={anchor !== null} onAction={toggle} />}
+      {origin.type === "section" ? <IconButton id={id} icon="export" label={label} size="inline" onAction={toggle} /> : <PullDownButton id={id} icon="export" label={mine?.kind === "copied" ? mine.text : label} ariaLabel={label} variant="toolbar" open={anchor !== null} onAction={toggle} />}
       {mine?.kind === "copied" && <InlineStatus text={mine.text} variant="on-label" onExpire={() => setShareStatus(null)} />}
       {(mine?.kind === "nothing" || mine?.kind === "failed") && <span role="status" className="np-dim">{t(mine.kind === "nothing" ? "share.nothing" : "share.failed")}</span>}
       {anchor && (

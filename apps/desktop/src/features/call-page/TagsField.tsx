@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { t } from "../../i18n/format";
-import { Icon } from "../../ui/icons";
+import { SearchField } from "../../ui/primitives/search-field";
 import { setTags, loadTags } from "./share-actions";
 import { validateTag } from "./share-logic";
 
@@ -29,28 +29,18 @@ export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: st
 
   return (
     <div className="pc-tags">
-      <div className="pc-tags__chips">
-        {tags.map((x) => (
-          <span key={x} className="pc-tag">
-            {x}
-            <button type="button" className="pc-tag__x" aria-label={t("tags.remove", { tag: x })} onClick={() => void remove(x)}>
-              <Icon name="x" size={9} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <input
-        className="np-field pc-tags__input"
-        aria-label={t("tags.label")}
+      <SearchField
+        variant="token-field"
+        cls="pc-tags__field"
+        ariaLabel={t("tags.label")}
         placeholder={t("tags.add")}
         list={listId}
         value={text}
-        aria-invalid={error ? true : undefined}
-        onChange={(e) => (setText(e.target.value), setError(null))}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") (e.preventDefault(), void add(text));
-          else if (e.key === "Backspace" && !text && tags.length) void remove(tags[tags.length - 1]!);
-        }}
+        tokens={tags.map((label) => ({ label, kind: "tag" }))}
+        invalid={!!error}
+        onChange={(value) => (setText(value), setError(null))}
+        onAddToken={(value) => void add(value)}
+        onRemoveToken={(index) => { const tag = tags[index]; if (tag) void remove(tag); }}
       />
       <datalist id={listId}>{known.filter((x) => !tags.some((y) => y.toLowerCase() === x.toLowerCase())).map((x) => <option key={x} value={x} />)}</datalist>
       {error && <div role="alert" className="pc-sec__error">{error}</div>}

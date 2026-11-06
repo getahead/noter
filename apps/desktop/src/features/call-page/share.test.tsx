@@ -15,6 +15,7 @@ import { undoMode } from "../history/undo";
 import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { deleteAudio, exportCall, setTags } from "./share-actions";
 import { exportOpener, runShare, setShareStatus } from "./share-run";
+import { SearchField, type SearchFieldProps } from "../../ui/primitives/search-field";
 import { find, rendered } from "../../ui/testing";
 import { ShareMenu, shareItems } from "./ShareMenu";
 import { TagsField } from "./TagsField";
@@ -143,7 +144,7 @@ describe("tags", () => {
   it("draws chips with remove buttons, and rejects a duplicate without sending", async () => {
     await open([]);
     const html = renderToString(<TagsField bridge={bridge} callId={id} tags={["bug", "q4"]} />);
-    expect(html).toContain("Remove tag bug");
+    expect(html).toContain("Remove bug");
     expect(html).toContain("Add tag…");
   });
 });
@@ -196,9 +197,11 @@ describe("Tags field actions", () => {
     await setTags(bridge, id, ["release", "backend"], []);
     const seen = sent();
     const tree = rendered(TagsField, { bridge, callId: id, tags: ["release", "backend"] });
-    (find(tree, (p) => p["aria-label"] === "Remove tag release").props.onClick as () => void)();
+    const field = find(tree, (_, type) => type === SearchField).props as unknown as SearchFieldProps;
+    const control = SearchField(field);
+    (find(control, (p) => p["aria-label"] === "Remove release").props.onClick as () => void)();
     await new Promise((r) => setTimeout(r));
-    (find(tree, (_, type) => type === "input").props.onKeyDown as (e: { key: string }) => void)({ key: "Backspace" });
+    (find(control, (_, type) => type === "input").props.onKeyDown as (e: unknown) => void)({ key: "Backspace", currentTarget: { value: "", selectionEnd: 0 }, nativeEvent: { isComposing: false }, preventDefault() {} });
     await new Promise((r) => setTimeout(r));
     expect(seen.filter(([c]) => c === "call_tags_set").map(([, a]) => a)).toEqual([
       { call_ids: [id], add: [], remove: ["release"] },
@@ -208,19 +211,17 @@ describe("Tags field actions", () => {
     expect(bridge.store.getState().entities.call[id]?.tags).not.toContain("backend");
   });
 
-  it("does not send an empty tag from Return or comma and keeps existing tags on removal failure", async () => {
+  it("does not submit an empty tag and keeps existing tags on removal failure", async () => {
     await open([]);
     await setTags(bridge, id, ["release"], []);
     const seen = sent();
     const tree = rendered(TagsField, { bridge, callId: id, tags: ["release"] });
-    const key = find(tree, (_, type) => type === "input").props.onKeyDown as (e: { key: string; preventDefault: () => void }) => void;
-    let prevented = 0;
-    key({ key: "Enter", preventDefault: () => prevented++ });
-    key({ key: ",", preventDefault: () => prevented++ });
-    expect(prevented).toBe(2);
+    const field = find(tree, (_, type) => type === SearchField).props as unknown as SearchFieldProps;
+    field.onAddToken?.("");
+    field.onAddToken?.("  ");
     expect(seen.filter(([c]) => c === "call_tags_set")).toHaveLength(0);
     fake.failNext("call_tags_set", "internal");
-    (find(tree, (p) => p["aria-label"] === "Remove tag release").props.onClick as () => void)();
+    field.onRemoveToken?.(0);
     await new Promise((r) => setTimeout(r));
     expect(bridge.store.getState().entities.call[id]?.tags).toContain("release");
   });
@@ -249,4 +250,34 @@ describe("Share control feedback", () => {
     (find(tree, (p) => typeof p.onExpire === "function").props.onExpire as () => void)();
     expect(renderToString(<ShareMenu {...props} />)).not.toContain("Copied for Slack");
   });
+});
+
+
+describe("the designed Share and Tags controls", () => {
+  it("keeps the tags and draft inside the shared token field", async () => {
+    await open([]);
+    const html = renderToString(<TagsField bridge={bridge} callId={id} tags={["release", "backend"]} />);
+    expect(html).toContain("np-search--token-field");
+    expect(html).toContain('data-token-kind="tag"');
+    expect(html).toMatch(/<label[^>]*>.*release.*backend.*<input[^>]*placeholder="Add tag…"[^>]*>.*<\/label>/);
+  });
+
+  it("shows the share glyph in the toolbar pull-down", async () => {
+    await open([]);
+    const tree = rendered(ShareMenu, { bridge, callId: id, origin: whole, id: "pc-share" });
+    expect(find(tree, (p) => p.variant === "toolbar").props.icon).toBe("export");
+  });
+});
+
+
+it("adds a typed token through the shared tag control and rejects duplicate tags before the core", async () => {
+  await open([]);
+  const seen = sent();
+  const tree = rendered(TagsField, { bridge, callId: id, tags: ["existing"] });
+  const field = find(tree, (_, type) => type === SearchField).props as unknown as SearchFieldProps;
+  field.onAddToken?.("  release  ");
+  await new Promise((r) => setTimeout(r));
+  expect(bridge.store.getState().entities.call[id]?.tags).toContain("release");
+  field.onAddToken?.("EXISTING");
+  expect(seen.filter(([c]) => c === "call_tags_set")).toHaveLength(1);
 });

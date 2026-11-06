@@ -17,15 +17,15 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     const field = page.getByLabel("Tags", { exact: true });
     await field.fill("release");
     await field.press("Enter");
-    await expect(page.getByRole("button", { name: "Remove tag release" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove release" })).toBeVisible();
     expect(await sent(page, "call_tags_set")).toEqual([{ call_ids: [call], add: ["release"], remove: [] }]);
     await expect(page.getByText("Added “release”")).toBeVisible();
     await field.fill("RELEASE");
     await field.press("Enter");
     await expect(page.getByRole("alert").filter({ hasText: "This call has that tag already" })).toBeVisible();
     expect(await sent(page, "call_tags_set")).toHaveLength(1); // validated in the page, no command
-    await page.getByRole("button", { name: "Remove tag release" }).click();
-    await expect(page.getByRole("button", { name: "Remove tag release" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Remove release" }).click();
+    await expect(page.getByRole("button", { name: "Remove release" })).toHaveCount(0);
     expect((await sent(page, "tags_list")).length).toBeGreaterThan(0);
   });
 

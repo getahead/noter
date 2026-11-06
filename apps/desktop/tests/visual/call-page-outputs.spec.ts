@@ -44,7 +44,7 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
 
   test("call info with tags and Delete Audio Now…", async ({ page }) => {
     await open(page);
-    await expect(page.getByRole("button", { name: "Remove tag release" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove release" })).toBeVisible();
     await shot(page, "call-page-call-info-tags");
   });
 
