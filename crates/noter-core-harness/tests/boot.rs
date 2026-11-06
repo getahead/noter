@@ -1278,6 +1278,52 @@ async fn an_edited_section_is_seeded_with_the_users_edit_as_its_current_version(
 }
 
 #[tokio::test]
+async fn world_set_removes_running_states_of_sections_dropped_from_the_world() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let outputs = world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap();
+    let summary = outputs["sections"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|s| s["kind"] == "summary")
+        .unwrap();
+    summary["state"] = json!({
+        "type": "failed", "code": "runtime_unavailable", "local_fallback_available": true
+    });
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["outputs"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|o| o["call_id"] == "call_backend")
+        .unwrap()["sections"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|s| s["kind"] != "summary");
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let outputs = r
+        .ok("main", "outputs_get", json!({ "call_id": "call_backend" }))
+        .await;
+    let summary = outputs["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["kind"] == "summary")
+        .unwrap();
+    assert_eq!(summary["state"]["type"], "pending", "{outputs}");
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_seeds_output_sections_their_items_and_running_states() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;

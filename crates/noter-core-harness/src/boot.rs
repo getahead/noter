@@ -670,7 +670,19 @@ impl Harness {
 
     /// The running states of the world's sections (writing, failed) live in the core, not in
     /// rows: every section of a changed `outputs` is set again, with its `outputs:progress`.
+    // @cpt-flow:cpt-noter-flow-core-harness-session:p1
     fn seed_sections(&self, w: &FakeWorld) {
+        // A section omitted by the replacement world must lose its old running state too.
+        for o in &lock(&self.world).outputs {
+            for s in &o.sections {
+                noter_core::testing::seed_section(
+                    &self.core,
+                    &o.call_id,
+                    s.kind,
+                    SectionState::Pending,
+                );
+            }
+        }
         let seeded = |id: &CallId| w.calls.iter().any(|c| c.id == *id);
         for o in w.outputs.iter().filter(|o| seeded(&o.call_id)) {
             for s in &o.sections {
