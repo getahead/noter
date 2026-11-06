@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { test as base } from "@playwright/test";
 
 import type { CommandName, CoreError } from "../../../src/core/bindings";
+import { pageExercised } from "./app";
 import { registerJsonModules } from "../../support/json-modules";
 import { isLaterMilestone } from "../../support/milestones";
 import type { Scenario, World } from "../../support/scenario";
@@ -30,7 +31,7 @@ const target = process.env.NOTER_CORE === "stdio" ? "stdio" : "fake";
 const outDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "..", "coverage", "e2e");
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-export const test = base.extend<{ scenario: Scenario }, { commandLog: Map<string, Set<CommandName>> }>({
+export const test = base.extend<{ scenario: Scenario; pageLog: void }, { commandLog: Map<string, Set<CommandName>> }>({
   commandLog: [
     // eslint-disable-next-line no-empty-pattern
     async ({}, use, workerInfo) => {
@@ -43,6 +44,19 @@ export const test = base.extend<{ scenario: Scenario }, { commandLog: Map<string
       writeFileSync(join(outDir, `commands-ui-e2e-flows-${target}-${workerInfo.workerIndex}-${process.pid}.json`), JSON.stringify(data, null, 2) + "\n");
     },
     { scope: "worker", auto: true },
+  ],
+  // The UI flows drive the app's own windows: what their pages ran counts like what a scenario client ran.
+  pageLog: [
+    async ({ commandLog }, use, testInfo) => {
+      pageExercised.clear();
+      await use();
+      if (testInfo.status !== "passed" || !pageExercised.size) return;
+      const spec = relative(appRoot, testInfo.file).split("\\").join("/");
+      const cmds = commandLog.get(spec) ?? new Set<CommandName>();
+      pageExercised.forEach((c) => cmds.add(c));
+      commandLog.set(spec, cmds);
+    },
+    { auto: true },
   ],
   scenario: async ({ commandLog }, use, testInfo) => {
     const { openScenario } = await import("../../support/scenario");

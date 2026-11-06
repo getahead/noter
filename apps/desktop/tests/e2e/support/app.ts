@@ -121,6 +121,9 @@ function tauriIpcStandIn(): void {
   };
 }
 
+/** Commands the pages of the running test sent and the real core answered; fixtures.ts counts them when the test passes. */
+export const pageExercised = new Set<CommandName>();
+
 const WINDOWS = COMMANDS.app_snapshot.windows as readonly string[];
 
 /** Node side of the stdio target: one core process per page, closed with the page. */
@@ -163,6 +166,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     const onMessage = channel === null ? undefined : (message: unknown) => void deliver(doc, channel, { index: index++, message });
     try {
       const ok = await core.invoke(win, cmd, args, onMessage);
+      pageExercised.add(cmd);
       // The test plays a core of another contract version.
       return { ok: cmd === "app_snapshot" && plan.contractVersion ? { ...(ok as object), contract_version: plan.contractVersion } : ok };
     } catch (error) {
