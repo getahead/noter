@@ -60,6 +60,8 @@ export function HistoryTimeline({ bridge, target, variant, callId, callTitle }: 
   // @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-read
   const reload = useRef(load);
   reload.current = load;
+  // the strip's ⌘Z target outlives the page: after unmount its refresh reads nothing
+  useEffect(() => () => void (reload.current = () => Promise.resolve()), []);
   // once per key and instance: a development remount must not ask the core twice
   const asked = useRef<string | null>(null);
   // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-open

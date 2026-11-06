@@ -252,6 +252,8 @@ The system **MUST** bind row, strip and app-menu actions to core targets, show p
 
 **DESIGN versus prototype.** Prototype batch members and model metadata are sample strings; they are source-of-truth presentation only. The prototype’s short in-memory diffs and synthetic batch rows cannot stand in for persisted changes. Single-key U and app undo need production wiring (README limitation).
 
+**Open.** **Open** on a row (route to the changed record) joins with the Item inspector in 2.17 (`slots.openItem`) and Activity in M5; in the call History every row belongs to the open call.
+
 **Contract limits.** `history_list` has no batch-member filter; `ChangeRow` has no full member list, skill/cost metadata or kept-record details in `UndoResult`. Show only returned rows and counts. Full arbitrary batch expansion, model metadata and **Show** for kept rows need owner contract work before those details can pass acceptance; do not synthesize records. The fake changes log flags on undo and does not restore every underlying entity, so real-core conformance must prove restoration and append-only undo rows.
 
 **Data.** Core-owned `cpt-noter-dbtable-changes`; the UI reads through the bridge only.
