@@ -12,7 +12,8 @@ import { holdDeleteError, holdExtras, holdTypes, resetCache } from "./cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
-import { CallToolbar, moreItems, REGISTERED_VIEWS } from "./CallToolbar";
+import { CallToolbar, moreItems } from "./CallToolbar";
+import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { slots } from "./slots";
@@ -89,7 +90,7 @@ describe("CallToolbar", () => {
     expect(html).toContain("Transcript");
     for (const later of ["Summary", "Agent Reviews", "History"]) expect(html).not.toContain(later);
     expect(html).toContain("Hide Inspector");
-    expect(REGISTERED_VIEWS).toEqual(["transcript"]);
+    expect(registeredViews()).toEqual(["transcript"]);
   });
 
   it("at Narrow width the view control is a pop-up button with the same views", async () => {

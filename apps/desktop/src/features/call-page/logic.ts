@@ -56,14 +56,14 @@ export function pageState(read: CommandState | undefined, haveCall: boolean): Pa
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-error-loading
 }
 
-const dayOf = (ms: number, prefs: UiPrefs): string => {
+export const dayOf = (ms: number, prefs: UiPrefs): string => {
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone: prefs.time_zone || undefined }).format(ms);
   } catch {
     return new Intl.DateTimeFormat("en-CA").format(ms);
   }
 };
-const clock = (ms: number, prefs: UiPrefs): string => {
+export const clock = (ms: number, prefs: UiPrefs): string => {
   const o: Intl.DateTimeFormatOptions = { timeStyle: "short", hourCycle: prefs.time_format === "h12" ? "h12" : "h23" };
   try {
     return new Intl.DateTimeFormat("en", { ...o, timeZone: prefs.time_zone || undefined }).format(ms);

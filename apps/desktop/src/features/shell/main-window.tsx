@@ -27,6 +27,7 @@ import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
 import "../call-page/register";
+import "../history/register";
 import { slots } from "../call-page/slots";
 import { deleteFromPage } from "../../ui/dialogs/delete-calls";
 import "./shell.css";

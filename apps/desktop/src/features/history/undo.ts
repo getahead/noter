@@ -25,6 +25,8 @@ export interface HoldUndo {
   target: UndoTarget;
   message: string;
   context?: string;
+  /** Redo on a row that was already undone starts the strip in Redo mode. */
+  mode?: "undo" | "redo";
   /** Re-reads what the command touched (History, or the record's own read) once it settled. */
   refresh?: () => void | Promise<void>;
 }
@@ -34,6 +36,8 @@ const NAMED: Record<string, string> = Object.fromEntries(["not_undoable", "alrea
 let clock: Clock | undefined;
 let entry: UndoEntry | null = null;
 let refresh: HoldUndo["refresh"];
+/** The last applicable change: ⌘Z and ⇧⌘Z keep using it after the strip is hidden, until another action replaces it. */
+let last: HoldUndo | null = null;
 let timer: StatusTimer | null = null;
 const held = { hover: false, focus: false };
 /** The phase to return to when hover and focus both end. */
@@ -54,6 +58,7 @@ export function resetUndo(c?: Clock) {
   clock = c;
   held.hover = held.focus = false;
   refresh = undefined;
+  last = null;
   set(null);
 }
 
@@ -73,11 +78,24 @@ function arm() {
 // @cpt-state:cpt-noter-state-ui-history-undo-strip:p1
 export function holdUndo(h: HoldUndo) {
   refresh = h.refresh;
+  last = h;
   // @cpt-begin:cpt-noter-state-ui-history-undo-strip:p1:inst-show
-  set({ target: h.target, message: h.message, context: h.context, mode: "undo", phase: "VISIBLE" });
+  set({ target: h.target, message: h.message, context: h.context, mode: h.mode ?? "undo", phase: "VISIBLE" });
   // @cpt-end:cpt-noter-state-ui-history-undo-strip:p1:inst-show
   arm();
 }
+
+/** What ⌘Z (undo) or ⇧⌘Z (redo) would do now: the strip's action, or the last applicable change after the strip left. */
+export const undoMode = (): "undo" | "redo" | null => entry?.mode ?? last?.mode ?? null;
+
+/** ⌘Z or ⇧⌘Z: runs the shown strip, or shows it again for the last applicable change. */
+export function undoLast(bridge: Bridge): Promise<void> {
+  if (!entry && last) holdUndo(last);
+  return runUndo(bridge);
+}
+
+/** A command of the strip is running: a row must not start a second one. */
+export const undoWorking = () => entry?.phase === "WORKING";
 
 export function dismissUndo() {
   // @cpt-begin:cpt-noter-algo-ui-history-undo-strip:p1:inst-dismiss
@@ -147,6 +165,7 @@ export async function runUndo(bridge: Bridge): Promise<void> {
     // @cpt-begin:cpt-noter-state-ui-history-undo-strip:p1:inst-undo
     // @cpt-begin:cpt-noter-state-ui-history-undo-strip:p1:inst-partial
     set({ target: e.target, message: done(res.data, e.mode), mode: e.mode === "undo" ? "redo" : "undo", phase: partial ? "PARTIAL" : "SWITCHED" });
+    last = { target: e.target, message: done(res.data, e.mode), mode: e.mode === "undo" ? "redo" : "undo", refresh: reread };
     // @cpt-end:cpt-noter-state-ui-history-undo-strip:p1:inst-partial
     // @cpt-end:cpt-noter-state-ui-history-undo-strip:p1:inst-undo
     // @cpt-end:cpt-noter-algo-ui-history-undo-strip:p1:inst-switch

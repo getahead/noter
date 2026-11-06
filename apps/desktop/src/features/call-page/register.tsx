@@ -14,7 +14,7 @@ registerPage(
   "library",
   {
     title: () => t("callpage.title"),
-    render: (route, bridge) => <CallPage bridge={bridge!} callId={at(route.key).callId} />,
+    render: (route, bridge) => <CallPage bridge={bridge!} callId={at(route.key).callId} tab={at(route.key).tab} />,
     toolbar: CallToolbar,
     banners: CallBanners,
     inspector: { width: 280, label: "callpage.info", openByDefault: true, render: (route, bridge) => <CallInfo bridge={bridge} callId={at(route.key).callId} /> },

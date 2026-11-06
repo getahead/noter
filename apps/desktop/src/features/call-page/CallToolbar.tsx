@@ -18,11 +18,9 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow, CallTypeInfo } from "../../core/bindings";
 import { menuActs, saveTitle } from "./actions";
 import { useTypes } from "./cache";
+import { registeredViews } from "./views";
 import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
-import type { CallPageTab } from "../../core/bindings";
 
-/** The views a delivered feature registered: Transcript in M1; Summary, Agent Reviews and History join in M2 and M4. */
-export const REGISTERED_VIEWS: readonly CallPageTab[] = ["transcript"];
 
 /** The ⋯ menu's items for a call (the later items join with their features). */
 export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null }): MenuItem[] {
@@ -47,7 +45,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const types = useTypes();
   const [renaming, setRenaming] = useState(false);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
-  const { segments, view } = callViews(REGISTERED_VIEWS, at.tab);
+  const { segments, view } = callViews(registeredViews(), at.tab);
   const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));
   const title = call ? call.title : "";
   const sub = call && prefs ? subtitleOf(call, Date.now(), prefs) : undefined;

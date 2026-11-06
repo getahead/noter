@@ -7,11 +7,11 @@ import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import "../../styles/components";
-import { dismissUndo, holdPointer, runUndo, useUndo, type UndoEntry } from "./undo";
+import { dismissUndo, holdPointer, runUndo, undoLast, undoMode, useUndo } from "./undo";
 
 /** ⌘Z while the strip offers Undo, ⇧⌘Z while it offers Redo; true when the key is for the strip. */
-export const undoKey = (e: { code: string; metaKey: boolean; shiftKey: boolean; altKey: boolean; ctrlKey: boolean }, entry: UndoEntry | null) =>
-  !!entry && e.code === "KeyZ" && e.metaKey && !e.altKey && !e.ctrlKey && e.shiftKey === (entry.mode === "redo");
+export const undoKey = (e: { code: string; metaKey: boolean; shiftKey: boolean; altKey: boolean; ctrlKey: boolean }, mode: "undo" | "redo" | null) =>
+  !!mode && e.code === "KeyZ" && e.metaKey && !e.altKey && !e.ctrlKey && e.shiftKey === (mode === "redo");
 
 // @cpt-component:cpt-noter-component-ui-undo-strip:p1
 export function UndoStrip({ bridge }: { bridge: Bridge }) {
@@ -19,14 +19,14 @@ export function UndoStrip({ bridge }: { bridge: Bridge }) {
   useEffect(() => {
     const on = (e: globalThis.KeyboardEvent) => {
       // @cpt-begin:cpt-noter-algo-ui-history-undo-strip:p1:inst-return
-      if (!undoKey(e, entry) || isTyping(e.target) || e.repeat) return;
+      if (!undoKey(e, undoMode()) || isTyping(e.target) || e.repeat) return;
       e.preventDefault();
-      void runUndo(bridge);
+      void undoLast(bridge);
       // @cpt-end:cpt-noter-algo-ui-history-undo-strip:p1:inst-return
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
-  }, [bridge, entry]);
+  }, [bridge]);
   if (!entry) return null;
   const label = t(entry.mode === "undo" ? "undo.undo" : "undo.redo");
   return (
@@ -36,6 +36,7 @@ export function UndoStrip({ bridge }: { bridge: Bridge }) {
       data-state={entry.phase.toLowerCase()}
       className="np-undo"
       role="status"
+      tabIndex={-1}
       onPointerEnter={() => holdPointer("hover", true)}
       onPointerLeave={() => holdPointer("hover", false)}
       onFocus={() => holdPointer("focus", true)}

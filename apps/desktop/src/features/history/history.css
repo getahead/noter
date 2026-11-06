@@ -1,0 +1,23 @@
+.pc-hist { display: grid; gap: 12px; }
+.pc-hist__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pc-hist__group { display: grid; gap: 4px; }
+.pc-hist__day { font: 600 11px/14px var(--font); color: var(--label-3); position: sticky; top: -20px; background: var(--content-bg); padding: 4px 0; z-index: 1; }
+.pc-hist__list { list-style: none; margin: 0; padding: 0; display: grid; }
+.pc-chg { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 4px 10px; padding: 8px 4px; border-bottom: 1px solid var(--sep); align-items: start; }
+.pc-chg:hover { background: var(--sel-unemph); }
+.pc-chg__time { color: var(--label-3); font-size: 12px; padding-top: 1px; }
+.pc-chg__main { min-width: 0; display: grid; gap: 4px; }
+.pc-chg__line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pc-chg__actor { font-size: 12px; color: var(--label-2); background: var(--sel-unemph); border-radius: var(--r-tag); padding: 0 5px; }
+.pc-chg__err { color: var(--error); }
+.pc-chg__meta { font-size: 12px; color: var(--label-3); }
+.pc-chg__actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.pc-chg.is-undone .pc-chg__what { color: var(--label-3); text-decoration: line-through; }
+.pc-chg__recs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12px; }
+.pc-chg__recs .pc-diff { display: inline-grid; padding: 2px 6px; margin-left: 4px; }
+.pc-chg__recs .pc-diff__head { display: none; }
+.pc-hist--item .pc-chg { grid-template-columns: 38px minmax(0, 1fr); }
+.pc-hist--item .pc-chg__actions { grid-column: 2; justify-content: flex-start; }
+.pc-chg { scroll-margin-top: 28px; }
+.pc-hist__count { min-width: 0; }
+.pc-hist__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
