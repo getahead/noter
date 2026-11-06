@@ -1,4 +1,4 @@
-// M2 history conformance (2.20): history_list, change_undo, change_redo and history_export answer
+// M2 history conformance (2.20): history_list, change_undo (partial undo too), change_redo and history_export answer
 // the same on the fake and the real core — scopes, page shape, UndoResult and every typed error.
 // @cpt-dod:cpt-noter-dod-core-history-undo-tests:p1
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -7,7 +7,7 @@ import type { ChangeId, Core, HistoryListArgs } from "../../src/core/bindings";
 import { exercised } from "../support/core";
 import { ok, refused } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
-import { PAST_CALL } from "../support/world-presets";
+import { LIVE_CALL, PAST_CALL } from "../support/world-presets";
 import { cancelNextSavePanel } from "./history-support";
 
 let s: Scenario;
@@ -64,6 +64,18 @@ describe("change_undo and change_redo", () => {
     const undone = ok(await list()).rows.find((r) => r.id === id)!;
     expect(undone).toMatchObject({ status: "undone", redoable: true });
     expect(ok(await main.changeRedo(byChange(id)))).toEqual({ undone: 1, skipped_edited_later: 0 });
+  });
+
+  it("a batch with one row edited later reverses the rest and counts the kept row", async () => {
+    const set = ok(await main.callTagsSet({ call_ids: [LIVE_CALL, PAST_CALL], add: ["Launch"], remove: [] }));
+    const batch = { target: { type: "batch" as const, batch_id: set.batch_id! } };
+    ok(await main.callTagsSet({ call_ids: [PAST_CALL], add: ["Later"], remove: [] }));
+    expect(ok(await main.changeUndo(batch))).toEqual({ undone: 1, skipped_edited_later: 1 });
+    const tags = async (call_id: string) => ok(await main.callGet({ call_id })).call.tags.map((t) => t.toLowerCase());
+    expect(await tags(LIVE_CALL)).not.toContain("launch");
+    expect(await tags(PAST_CALL)).toEqual(expect.arrayContaining(["launch", "later"]));
+    // only the kept row is left, and it was edited later
+    expect(refused(await main.changeUndo(batch)).code).toBe("edited_later");
   });
 
   it("every wrong state is its typed error", async () => {
