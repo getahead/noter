@@ -63,7 +63,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
     return () => clearTimeout(id);
   }, [exported]);
   // ⌘E reaches the sheet through the page key
-  useEffect(() => ((exportOpener.open = openExport), () => void (exportOpener.open = null)));
+  useEffect(() => ((exportOpener.open = openExport), () => void (exportOpener.open = null)), [openExport]);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const { segments, view } = callViews(registeredViews(), at.tab);
   const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));
@@ -89,7 +89,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
           {exported && (
             <span role="status" className="pc-export-done">
               {t("export.done", { path: exported })} ·{" "}
-              <button type="button" className="np-link" onClick={() => void revealExport(bridge, exported)}>{t("export.show")}</button>
+              <button type="button" className="np-link" onClick={() => void revealExport(bridge, at.callId, exported)}>{t("export.show")}</button>
             </span>
           )}
           <PullDownButton id="pc-more" iconOnly icon="ellipsis" label={t("callpage.more")} ariaLabel={t("callpage.more")} variant="item-menu" size="toolbar" open={menu !== null} onAction={() => setMenu(menu ? null : globalThis.document?.getElementById("pc-more") ?? null)} />

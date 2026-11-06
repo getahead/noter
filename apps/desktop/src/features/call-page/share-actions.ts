@@ -32,7 +32,7 @@ export async function runExport(bridge: Bridge, callId: string, include: ExportI
 }
 
 /** **Show in Finder** for an export: the path the core returned. */
-export const revealExport = (bridge: Bridge, path: string) => bridge.act("calls:export:reveal", "open_external", () => bridge.core.openExternal({ target: { type: "reveal_in_finder", path } }));
+export const revealExport = (bridge: Bridge, callId: string, path: string) => bridge.act(`calls:export:reveal:${callId}`, "open_external", () => bridge.core.openExternal({ target: { type: "reveal_in_finder", path } }));
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1
 /** `tags_list`: the tags in use, offered while typing. */

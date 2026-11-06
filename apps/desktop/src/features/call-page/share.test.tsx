@@ -143,7 +143,7 @@ describe("tags", () => {
     await open([]);
     const html = renderToString(<TagsField bridge={bridge} callId={id} tags={["bug", "q4"]} />);
     expect(html).toContain("Remove tag bug");
-    expect(html).toContain("Add a tag");
+    expect(html).toContain("Add tag…");
   });
 });
 

@@ -14,7 +14,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
   test("UI — other path: Tags — Return adds, the strip offers Undo, a duplicate is refused inline, × removes", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
     await openSummary(page, call);
-    const field = page.getByLabel("Add a tag");
+    const field = page.getByLabel("Tags", { exact: true });
     await field.fill("release");
     await field.press("Enter");
     await expect(page.getByRole("button", { name: "Remove tag release" })).toBeVisible();

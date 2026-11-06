@@ -71,7 +71,7 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.audio")}</h3>
         <p className={info.audioKept ? undefined : "np-dim"}>{info.audio}</p>
-        {info.audioKept && <PushButton label={t("audio.delete")} variant="quiet" onAction={() => void deleteAudio(bridge, callId)} />}
+        {info.audioKept && <PushButton label={t("audio.delete")} variant="destructive" size="small" onAction={() => void deleteAudio(bridge, callId)} />}
       </div>
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.processing")}</h3>

@@ -38,17 +38,20 @@ export function shareItems(o: { origin: ShareOrigin; ready: boolean; sensitive: 
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-menu
 }
 
+// @cpt-component:cpt-noter-component-ui-share-menu:p1
+const sameOrigin = (a: ShareOrigin, b: ShareOrigin) => a.type === b.type && (a.type !== "section" || a.kind === (b as typeof a).kind);
+
 /** One Share control: a labelled pull-down on the toolbar, an icon button on a section. */
 export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; callId: string; origin: ShareOrigin; id: string }) {
   const outputs = useOutputs(callId);
   const status = useShareStatus();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const mine = status && status.callId === callId && JSON.stringify(status.origin) === JSON.stringify(origin) ? status : null;
+  const mine = status && status.callId === callId && sameOrigin(status.origin, origin) ? status : null;
   const { ready, sensitive } = shareState(outputs);
   const toggle = () => setAnchor(anchor ? null : globalThis.document?.getElementById(id) ?? null);
   const label = origin.type === "section" ? t("share.section", { section: t(SECTION_LABEL[origin.kind as SectionKind]) }) : t("callpage.share");
   return (
-    <>
+    <span data-component="cpt-noter-component-ui-share-menu" style={{ display: "contents" }}>
       {origin.type === "section" ? <IconButton id={id} icon="export" label={label} size="inline" onAction={toggle} /> : <PullDownButton id={id} label={mine?.kind === "copied" ? mine.text : label} ariaLabel={label} variant="toolbar" open={anchor !== null} onAction={toggle} />}
       {mine?.kind === "copied" && <InlineStatus text={mine.text} variant="on-label" onExpire={() => setShareStatus(null)} />}
       {(mine?.kind === "nothing" || mine?.kind === "failed") && <span role="status" className="np-dim">{t(mine.kind === "nothing" ? "share.nothing" : "share.failed")}</span>}
@@ -57,6 +60,6 @@ export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; call
           <Menu items={shareItems({ origin, ready, sensitive, unreviewed: Math.max(unreviewedIn(callId, origin), mine?.kind === "unreviewed" ? mine.count : 0), status: mine, copy: (f, u) => void runShare(bridge, callId, origin, f, u ?? unreviewedIn(callId, origin) > 0), exportIt: () => exportOpener.open?.(origin) })} onClose={() => setAnchor(null)} />
         </Popover>
       )}
-    </>
+    </span>
   );
 }

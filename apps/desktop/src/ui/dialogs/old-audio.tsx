@@ -34,9 +34,9 @@ function OldAudioSheet({ close, bridge, onFreed }: SheetProps & { bridge: Bridge
 export function OldAudio({ bridge, nav }: { bridge: Bridge; nav: NavTarget | null }) {
   const sheets = useSheetIfAny();
   const [freed, setFreed] = useState<string | null>(null);
-  useEffect(() => sheets?.register("old-audio", OldAudioSheet as never), [sheets]);
+  useEffect(() => sheets?.register("delete-old-audio", OldAudioSheet as never), [sheets]);
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-old
-  useEffect(() => void (nav?.type === "delete_old_audio" && sheets?.open("old-audio", { bridge, onFreed: setFreed })), [nav, sheets, bridge]);
+  useEffect(() => void (nav?.type === "delete_old_audio" && sheets?.open("delete-old-audio", { bridge, onFreed: setFreed })), [nav, sheets, bridge]);
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-old
   return freed ? <InlineStatus text={freed} variant="notice" onExpire={() => setFreed(null)} /> : null;
 }

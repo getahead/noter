@@ -42,6 +42,7 @@ export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKep
         <Checkbox label={t("export.summary")} checked={on.summary_and_items} onAction={flip("summary_and_items")} />
         <Checkbox label={t("export.transcript")} checked={on.transcript} onAction={flip("transcript")} />
         {audioKept && <Checkbox label={t("export.audio")} checked={on.audio} onAction={flip("audio")} />}
+        <p className="np-dim">{t("export.note")}</p>
         {none && <p className="np-dim" role="status">{t("export.none")}</p>}
         {failed && <InlineBanner banner={{ id: "export-error", severity: "error", text: t("export.failed"), actions: [{ label: t("action.try_again"), onAction: () => void run() }] }} />}
       </div>

@@ -28,7 +28,7 @@ export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: st
   const remove = async (tag: string) => (await setTags(bridge, callId, [], [tag])).status === "ok" ? setError(null) : fail();
 
   return (
-    <div className="pc-tags" data-component="tags-field">
+    <div className="pc-tags">
       <div className="pc-tags__chips">
         {tags.map((x) => (
           <span key={x} className="pc-tag">
@@ -41,7 +41,7 @@ export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: st
       </div>
       <input
         className="np-field pc-tags__input"
-        aria-label={t("tags.add")}
+        aria-label={t("tags.label")}
         placeholder={t("tags.add")}
         list={listId}
         value={text}
