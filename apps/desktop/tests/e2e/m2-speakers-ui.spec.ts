@@ -7,7 +7,6 @@
 import type { Page } from "@playwright/test";
 
 import { openWindow } from "./support/app";
-import { openSummary } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import { sent } from "./support/call-page";
 import * as S from "./support/speakers-world";
@@ -17,8 +16,6 @@ const live = (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = () 
 const transcript = (page: Page) => page.locator('[data-region="CS-R2"], [data-region="FP-R5"]');
 const strip = (page: Page) => page.locator('[data-region="CS-R5"], [data-region="FP-R6"]');
 const popover = (page: Page, name: string | RegExp) => page.getByRole("dialog", { name });
-const panel = (page: Page) => page.locator('[data-region="PC-R9"]');
-const rowOf = (page: Page, label: string) => panel(page).getByRole("group", { name: label });
 const LINES = /\d+ lines?/;
 
 test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
