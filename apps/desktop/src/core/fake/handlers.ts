@@ -75,6 +75,14 @@ function bump(item: ItemView): ItemView {
   return item;
 }
 
+// @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
+function replayItemChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
+  rows.forEach((r) => {
+    const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
+    if (item) bump(Object.assign(item, { [r.field as string]: r[value] }));
+  });
+}
+
 function call(world: World, id: string): CallRow {
   const c = world.calls.find((x) => x.id === id);
   if (!c) throw coreError("not_found", `call ${id}`);
@@ -1104,11 +1112,7 @@ export const defaultHandlers: Handlers = {
     if (rows.every((r) => r.status === "undone")) throw coreError("already_undone");
     if (rows.some((r) => !r.undoable)) throw coreError("not_undoable");
     rows.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
-    // An undone item change puts its field back; other entities only mark the row.
-    rows.forEach((r) => {
-      const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
-      if (item) bump(Object.assign(item, { [r.field as string]: r.before }));
-    });
+    replayItemChanges(world, rows, "before");
     return { undone: rows.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: 0 };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
@@ -1120,6 +1124,7 @@ export const defaultHandlers: Handlers = {
     const redoable = rows.filter((r) => r.redoable);
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
+    replayItemChanges(world, redoable, "after");
     logChange(world, { entity: rows[0].entity, summary: `Redid: ${rows[0].summary}`, field: rows[0].field, before: rows[0].before, after: rows[0].after });
     return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: rows.length - redoable.length };
   },

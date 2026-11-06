@@ -122,6 +122,8 @@ describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     if (batch.batch_id) {
       expect(ok(await main.changeUndo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBeGreaterThan(0);
       expect((await get("itm_reconnect_q")).review).toBe("suggested");
+      expect(ok(await main.changeRedo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBe(batch.items.length);
+      expect((await get("itm_reconnect_q")).review).toBe("accepted");
     }
   });
 });
