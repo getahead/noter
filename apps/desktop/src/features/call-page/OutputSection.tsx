@@ -16,6 +16,7 @@ import { OutputItemRow } from "./OutputItemRow";
 import { commitDraft, loadVersions, readVersion } from "./outputs-actions";
 import { bodyOf, useVersions } from "./outputs-cache";
 import { isProse, versionName, metaLine, SECTION_LABEL, sectionCounts, sectionId } from "./outputs-logic";
+import { slots } from "./slots";
 import { VersionSwitcher } from "./VersionSwitcher";
 
 const EMPTY: Partial<Record<Section["kind"], MsgKey>> = { decisions: "outputs.empty.decisions", action_items: "outputs.empty.action_items", open_questions: "outputs.empty.open_questions" };
@@ -126,7 +127,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
       if (comparing && shown) return <DiffView before={shown.body_md} after={section.body_md ?? ""} title={t("outputs.diff_head", { from: versionName(shown.meta), to: section.user_edited ? t("outputs.your_edit_short") : t("outputs.current") })} />;
       return <MarkdownBody md={shown ? shown.body_md : (section.body_md ?? "")} />;
     }
-    return <ul className="pc-items">{section.items.filter((i) => i.review !== "rejected").map((i) => <OutputItemRow key={i.id} bridge={bridge} item={i} />)}</ul>;
+    return <ul className="pc-items">{section.items.filter((i) => i.review !== "rejected").map((i) => (section.kind === "action_items" && slots.actionItemRow ? <li key={i.id}>{slots.actionItemRow({ bridge, item: i })}</li> : <OutputItemRow key={i.id} bridge={bridge} item={i} />))}</ul>;
   };
 
   return (

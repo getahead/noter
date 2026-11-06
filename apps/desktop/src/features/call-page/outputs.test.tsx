@@ -18,6 +18,7 @@ import { RegenerateSheet } from "./RegenerateSheet";
 import { VersionSwitcher } from "./VersionSwitcher";
 import { OutputItemRow } from "./OutputItemRow";
 import { CallToolbar, moreItems } from "./CallToolbar";
+import { slots } from "./slots";
 import "./register";
 
 let bridge: Bridge;
@@ -238,5 +239,17 @@ describe("commitDraft and readVersion", () => {
     expect(await readVersion(bridge, s.summary_id!, id0)).toBe(true);
     expect(seen.filter(([c]) => c === "output_version_get")).toHaveLength(1);
     expect(await readVersion(bridge, s.summary_id!, "ver_none")).toBe(false);
+  });
+});
+
+describe("the action item row slot", () => {
+  afterEach(() => void (slots.actionItemRow = null));
+  it("draws the registered row for action items and the plain row otherwise", async () => {
+    await open([sec("action_items", { items: [row("Send it")] }), sec("decisions", { items: [row("Ship it")] })]);
+    slots.actionItemRow = ({ item }) => <b>{`review:${item.text}`}</b>;
+    const html = view();
+    expect(html).toContain("review:Send it");
+    expect(html).not.toContain("review:Ship it");
+    expect(html).toContain("Ship it");
   });
 });

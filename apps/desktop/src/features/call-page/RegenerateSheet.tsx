@@ -25,9 +25,9 @@ const GROUPS: ReadonlyArray<{ id: string; label: MsgKey; kinds: SectionKind[] }>
 ];
 // shortcut: the models are DESIGN's static list; read them from the runtime's own list when the core has one
 const RUNTIMES: ReadonlyArray<{ value: string; label: MsgKey; runtime: RuntimeChoice; model: string }> = [
-  { value: "sonnet", label: "outputs.regen.sonnet", runtime: "claude_account", model: "claude-sonnet" },
-  { value: "opus", label: "outputs.regen.opus", runtime: "claude_account", model: "claude-opus" },
-  { value: "codex", label: "outputs.regen.codex", runtime: "chatgpt_account", model: "gpt-5-codex" },
+  { value: "sonnet", label: "outputs.regen.sonnet", runtime: "claude_api_key", model: "claude-sonnet" },
+  { value: "opus", label: "outputs.regen.opus", runtime: "claude_api_key", model: "claude-opus" },
+  { value: "codex", label: "outputs.regen.codex", runtime: "codex_api_key", model: "gpt-5-codex" },
   { value: "local", label: "outputs.regen.local", runtime: "local", model: "qwen3-14b" },
 ];
 
