@@ -448,7 +448,7 @@ async fn a_log_the_core_cannot_read_is_change_log_unreadable() {
     let raw = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
     raw.execute(
         "INSERT INTO changes (id, ts, actor, entity_type, entity_id, summary, reason, status)
-         VALUES ('chg_odd', 1, 'robot', 'widget', 'w1', 's', 'r', 'applied')",
+         VALUES ('chg_odd', 1, 'robot', 'call', 'call_a', 's', 'r', 'applied')",
         [],
     )
     .unwrap();
