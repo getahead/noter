@@ -147,9 +147,9 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     await expect(failed.getByRole("button", { name: "Try Again" })).toBeVisible();
     expect(await sent(page, "outputs_regenerate")).toEqual([]); // opening a failure never retries on its own
     await failed.getByRole("button", { name: "Try Again" }).click();
-    // The scripted real runtime can finish before the browser observes its writing state.
-    // Check the completed output there; the fake holds the job in writing until steered.
-    await expect(failed).toContainText(process.env.NOTER_CORE === "stdio" ? "Scripted action item" : "Writing");
+    // Both cores can finish before the browser observes the transient writing state.
+    await expect(failed).toHaveAttribute("data-state", "ready");
+    if (process.env.NOTER_CORE === "stdio") await expect(failed).toContainText("Scripted action item");
     expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"] })]);
   });
 
