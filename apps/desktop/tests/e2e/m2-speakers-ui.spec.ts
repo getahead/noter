@@ -7,6 +7,7 @@
 import type { Page } from "@playwright/test";
 
 import { openWindow } from "./support/app";
+import { navigate } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import { sent } from "./support/call-page";
 import * as S from "./support/speakers-world";
@@ -16,6 +17,8 @@ const live = (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = () 
 const transcript = (page: Page) => page.locator('[data-region="CS-R2"], [data-region="FP-R5"]');
 const strip = (page: Page) => page.locator('[data-region="CS-R5"], [data-region="FP-R6"]');
 const popover = (page: Page, name: string | RegExp) => page.getByRole("dialog", { name });
+const panel = (page: Page) => page.locator('[data-region="PC-R9"]');
+const rowOf = (page: Page, label: string) => panel(page).getByRole("group", { name: label });
 const LINES = /\d+ lines?/;
 
 test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
@@ -92,5 +95,23 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await rename.getByRole("option", { name: /^Pavel/ }).click();
     await rename.getByRole("button", { name: "Rename" }).click();
     expect(await sent(page, "transcript_rename_speaker")).toEqual([expect.objectContaining({ scope: expect.objectContaining({ type: "one_segment" }) })]);
+  });
+});
+
+test.describe("cpt-noter-seq-call-page-name-speakers", () => {
+  const open = async (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = (w) => S.unnamed(w, 2)) => {
+    const steer = await openWindow(page, "main", { world });
+    await navigate(page, "transcript", S.CALL);
+    await expect(page.locator('[data-region="PC-R5"]')).toBeVisible();
+    return steer;
+  };
+
+  test("UI — other path: Hide ▴ leaves 3 speakers not named · Show, Show brings the panel back", async ({ page }) => {
+    await open(page);
+    await panel(page).getByRole("button", { name: "Hide ▴" }).click();
+    await expect(panel(page)).toContainText("3 speakers not named");
+    await expect(panel(page).getByRole("button", { name: "Show" })).toBeVisible();
+    await panel(page).getByRole("button", { name: "Show" }).click();
+    await expect(panel(page)).toContainText("Name speakers · 3 not named");
   });
 });
