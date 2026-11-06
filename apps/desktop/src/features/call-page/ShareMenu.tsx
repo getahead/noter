@@ -38,10 +38,10 @@ export function shareItems(o: { origin: ShareOrigin; ready: boolean; sensitive: 
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-menu
 }
 
-// @cpt-component:cpt-noter-component-ui-share-menu:p1
 const sameOrigin = (a: ShareOrigin, b: ShareOrigin) => a.type === b.type && (a.type !== "section" || a.kind === (b as typeof a).kind);
 
 /** One Share control: a labelled pull-down on the toolbar, an icon button on a section. */
+// @cpt-component:cpt-noter-component-ui-share-menu:p1
 export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; callId: string; origin: ShareOrigin; id: string }) {
   const outputs = useOutputs(callId);
   const status = useShareStatus();
