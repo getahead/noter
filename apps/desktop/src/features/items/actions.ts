@@ -192,8 +192,9 @@ export async function acceptSaved(bridge: Bridge, item: ItemView): Promise<SaveR
 
 /** **Undo** on a row's outcome: `change_undo` of the change the command returned, then the core's item again; nothing is rebuilt locally. */
 export async function undoRow(bridge: Bridge, id: string, target: UndoTarget) {
+  const outcome = localOf(id).outcome;
   const res = await bridge.act(`item:undo:${id}`, "change_undo", () => bridge.core.changeUndo({ target }));
-  if (res.status !== "ok") return patchLocal(id, { error: errorText(res.error.code === "conflict" ? "conflict" : "internal") });
+  if (res.status !== "ok") return patchLocal(id, { outcome, error: errorText(res.error.code === "conflict" ? "conflict" : "internal") });
   patchLocal(id, { outcome: undefined, error: undefined });
   await refresh(bridge, id);
 }

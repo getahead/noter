@@ -159,6 +159,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
       <div data-component="cpt-noter-component-ui-action-item-row" data-variant={variant} data-state="outcome" data-item-id={it.id} data-review={it.review} className={`it-row it-row--${variant} is-outcome`} lang={langOf(it.lang)} id={elementId("row", it.id)}>
         {outcome}
         <span className={`it-row__ghost${it.review === "rejected" ? " is-rej" : ""}`}>{it.text}</span>
+        {local.error && <span className="it-row__error" role="alert">{local.error}</span>}
       </div>
     );
 

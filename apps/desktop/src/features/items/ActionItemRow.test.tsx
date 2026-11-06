@@ -99,6 +99,21 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
     expect(localOf("itm_replay").outcome).toBeUndefined();
   });
 
+  it("a refused Undo remains visible on a rejected row after the status control expires", async () => {
+    await ready();
+    bridge.core.changeUndo = async () => ({ status: "error", error: { code: "edited_later", message: "Edited later", detail: null, retryable: false } });
+    patchLocal("itm_replay", { outcome: { text: "Rejected", target: { type: "change", change_id: "chg_9" }, ms: 10_000 } });
+    const rejected = item("itm_replay", { review: "rejected" });
+    const status = find(rendered(ActionItemRow, { bridge, item: rejected }), (p) => p.actionLabel === "Undo");
+    (status.props.onAction as () => void)();
+    (status.props.onExpire as () => void)(); // InlineStatus expires its action immediately
+    await settle();
+    const html = renderToString(<ActionItemRow bridge={bridge} item={rejected} />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("finish that. Try again.");
+    expect(html).toContain(">Undo<");
+  });
+
   it("an editing row draws the text, Owner, Due and Engineering fields with Cancel and Save", async () => {
     await ready();
     patchLocal("itm_a11y", { phase: "editing", draft: { text: "Draft text", owner: "per_anna", due: "", engineering: false, linked_issue: "" } });
