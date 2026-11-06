@@ -6,7 +6,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import type { Banner } from "../../ui/feedback/inline-banner";
-import { loadItems, reviewAll } from "./actions";
+import { errorText, loadItems, reviewAll } from "./actions";
 
 /** Focus the first suggested row in the order the rows are on the page (**Start Review**). */
 export function startReview(): boolean {
@@ -19,18 +19,27 @@ export function startReview(): boolean {
 /** The banner for `callId`, or null with nothing to review; opening a call reads its items. */
 export function useReviewBanner(bridge: Bridge, callId: string): Banner | null {
   const waiting = useWindow(bridge, (s) => Object.values(s.entities.item).filter((i) => i.call.id === callId && i.review === "suggested").length);
+  const list = useWindow(bridge, (s) => s.commands[`items:list:${callId}`]);
+  const batch = useWindow(bridge, (s) => s.commands[`items:review_all:${callId}`]);
   useEffect(() => {
     void loadItems(bridge, callId);
   }, [bridge, callId]);
+  if (list?.error) return {
+    id: "review",
+    severity: "error",
+    dismissible: false,
+    text: errorText(list.error.code ?? "internal"),
+    actions: [{ label: t("action.try_again"), onAction: () => void loadItems(bridge, callId) }],
+  };
   if (!waiting) return null;
   return {
     id: "review",
-    severity: "info",
+    severity: batch?.error ? "error" : "info",
     dismissible: false,
-    text: t("items.banner", { count: waiting }),
+    text: batch?.error ? errorText(batch.error.code ?? "internal") : t("items.banner", { count: waiting }),
     actions: [
       { label: t("items.start_review"), onAction: () => void startReview() },
-      { label: t("items.accept_all"), onAction: () => void reviewAll(bridge, callId, []) },
+      { label: t(batch?.error ? "action.try_again" : "items.accept_all"), loading: batch?.state === "WAITING", onAction: () => void reviewAll(bridge, callId, []) },
     ],
   };
 }

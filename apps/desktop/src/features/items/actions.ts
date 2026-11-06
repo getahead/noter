@@ -15,7 +15,7 @@ const OUTCOME_MS = 10_000;
 const SAVED_MS = 2000;
 
 const ERRORS: Partial<Record<ErrorCode, MsgKey>> = { conflict: "items.err.conflict", invalid_input: "items.err.invalid", not_found: "items.err.gone" };
-const errorText = (code: ErrorCode) => t(ERRORS[code] ?? "items.err.other");
+export const errorText = (code: ErrorCode) => t(ERRORS[code] ?? "items.err.other");
 
 /** The item as the store holds it now (an edit or an event may have moved its `rev` since the row last rendered). */
 const current = (bridge: Bridge, item: ItemView): ItemView => bridge.store.getState().entities.item[item.id] ?? item;

@@ -6,7 +6,7 @@ import { FakeCore } from "../../core/fake/fake-core";
 import { resetUndo } from "../history/undo";
 import { resetLocal } from "./local";
 import { startReview, useReviewBanner } from "./review-banner";
-import { loadItems } from "./actions";
+import { loadItems, reviewAll } from "./actions";
 import { CallBanners } from "../call-page/CallBanners";
 
 const effects = vi.hoisted(() => ({ pending: [] as Array<() => unknown> }));
@@ -36,6 +36,35 @@ function bannerOf(callId: string) {
 }
 
 describe("review banner (PC-R2)", () => {
+  it("shows a failed initial item read with Try Again even before any suggestions were loaded", async () => {
+    await ready();
+    const read = bridge.core.itemsList;
+    bridge.core.itemsList = async () => ({ status: "error", error: { code: "internal", message: "Temporary read failure", detail: null, retryable: true } });
+    await loadItems(bridge, "call_live");
+    const banner = bannerOf("call_live")!;
+    expect(banner).toMatchObject({ severity: "error", text: "Couldn't finish that. Try again." });
+    expect(banner.actions?.map((action) => action.label)).toEqual(["Try Again"]);
+    bridge.core.itemsList = read;
+    banner.actions![0]!.onAction?.();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(bannerOf("call_live")?.text).toBe("3 suggested items to review before sharing");
+  });
+
+  it("shows a refused Accept All as an error and retries without claiming success", async () => {
+    await ready();
+    await loadItems(bridge, "call_live");
+    const accept = bridge.core.itemsReviewAll;
+    bridge.core.itemsReviewAll = async () => ({ status: "error", error: { code: "conflict", message: "Changed elsewhere", detail: null, retryable: true } });
+    await reviewAll(bridge, "call_live", []);
+    const banner = bannerOf("call_live")!;
+    expect(banner).toMatchObject({ severity: "error", text: "Item changed since you opened it. Check the current text and save again." });
+    expect(banner.actions?.map((action) => action.label)).toEqual(["Start Review", "Try Again"]);
+    bridge.core.itemsReviewAll = accept;
+    banner.actions![1]!.onAction?.();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(bannerOf("call_live")).toBeNull();
+  });
+
   it("reloads the call's suggestions when revisited after an earlier failed read", async () => {
     await ready();
     const invoke = fake.invoke.bind(fake);
