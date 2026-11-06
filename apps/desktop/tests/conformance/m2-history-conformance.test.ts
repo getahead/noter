@@ -76,6 +76,9 @@ describe("change_undo and change_redo", () => {
     expect(await tags(PAST_CALL)).toEqual(expect.arrayContaining(["launch", "later"]));
     // only the kept row is left, and it was edited later
     expect(refused(await main.changeUndo(batch)).code).toBe("edited_later");
+    // redo applies the undone row again and leaves the kept one alone
+    expect(ok(await main.changeRedo(batch))).toEqual({ undone: 1, skipped_edited_later: 0 });
+    expect(await tags(LIVE_CALL)).toContain("launch");
   });
 
   it("every wrong state is its typed error", async () => {

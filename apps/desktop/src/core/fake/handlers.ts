@@ -1162,13 +1162,15 @@ export const defaultHandlers: Handlers = {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
-    if (rows.some((r) => r.status !== "undone")) throw coreError("not_undone");
-    const redoable = rows.filter((r) => r.redoable);
+    // After a partial undo the rows edited later are still applied: redo the undone ones.
+    const undone = rows.filter((r) => r.status === "undone");
+    if (!undone.length) throw coreError("not_undone");
+    const redoable = undone.filter((r) => r.redoable);
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
     replayChanges(world, redoable, "after");
     logChange(world, { entity: rows[0].entity, summary: `Redid: ${rows[0].summary}`, field: rows[0].field, before: rows[0].before, after: rows[0].after });
-    return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: rows.length - redoable.length };
+    return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: undone.length - redoable.length };
   },
   proposals_list: (a, { world }) => {
     const rows = world.proposals.filter((p) => !a.kinds.length || a.kinds.includes(p.kind));
