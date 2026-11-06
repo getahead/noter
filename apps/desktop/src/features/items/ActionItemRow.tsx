@@ -25,7 +25,7 @@ import { patchLocal, useLocal, type Local } from "./local";
 import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, SECTION_OF, type Draft } from "./review";
 import { ShareMenu } from "../call-page/ShareMenu";
 import { ProvenanceChip } from "./ProvenanceChip";
-import { slots } from "./slots";
+import { handoffButtonId, slots } from "./slots";
 import "./items.css";
 
 export const elementId = (kind: string, id: string) => [kind, id].join("-");
@@ -227,7 +227,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     </div>
   );
   const error = local.error && <span className="it-row__error" role="alert">{local.error}</span>;
-  const handoff = it.is_engineering && !done && variant !== "read-only" && slots.openHandoff && <PushButton label={t("items.handoff")} size="small" icon="terminal" onAction={() => slots.openHandoff!(bridge, it.id)} />;
+  const handoff = it.is_engineering && !done && variant !== "read-only" && slots.openHandoff && <PushButton id={handoffButtonId(it.id)} label={t("items.handoff")} size="small" icon="terminal" onAction={() => slots.openHandoff!(bridge, it.id)} />;
   const info = variant !== "read-only" && slots.inspect && <IconButton icon="info" label={t("items.inspect")} size="inline" onAction={() => slots.inspect!(bridge, it.id)} />;
   const suggested = it.review === "suggested" && !local.outcome;
   const owner = it.owner && <Owner person={it.owner} />;

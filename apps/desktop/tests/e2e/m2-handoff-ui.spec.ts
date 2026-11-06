@@ -1,0 +1,160 @@
+// M2 — Handoff to Claude Code and Codex (docs/features/ui/handoff.md, DESIGN.md Handoff drawer HD-R1..R7, Prompt editor, Add Mapping
+// sheet). Real-core stories of cpt-noter-seq-call-page-hand-off-item (every path). Written before the screens exist (tests first).
+// Assumptions: the fixture's itm_replay stands for both the user's own item (made so with world_set) and Dmitri's; the VSTOR mapping
+// is made with repo_upsert on a temp folder; launch results come from harness.launch_world and harness.native_log; the folder
+// picker of Add Mapping is typed into its Folder field when the harness has no open panel. Copy and labels are DESIGN's.
+import type { Page } from "@playwright/test";
+
+import { openWindow } from "./support/app";
+import { navigate, sent } from "./support/call-page";
+import { expect, test } from "./support/fixtures";
+import * as H from "./support/handoff-world";
+
+const { REAL } = H;
+
+const drawer = (page: Page) => page.locator('[data-region="HD-R1"], [data-region="HD"]').first();
+const region = (page: Page, id: string) => page.locator(`[data-region="${id}"]`);
+const row = (page: Page) => page.getByRole("row", { name: /Replay buffer/ }).or(page.locator('[data-component="cpt-noter-component-ui-action-item-row"]').filter({ hasText: "Replay buffer" })).first();
+const PROMPT_LINE = "Opens Claude Code in your usual terminal with the prompt filled in; nothing is sent until you press Return.";
+
+/** The call page of the item with the drawer open; `mapped` creates the VSTOR mapping first. */
+async function open(page: Page, opts: { own?: boolean; mapped?: boolean; sensitive?: boolean; failGenerate?: boolean; launch?: () => Promise<void> } = {}) {
+  let callId = "";
+  const steer = await openWindow(page, "main", {
+    world: (w) => {
+      H.place(w);
+      if (opts.own ?? true) H.own(w);
+      if (opts.sensitive) H.sensitive(w);
+      if (opts.mapped === false) H.unmap(w);
+      callId = H.callOf(w);
+    },
+  });
+  await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
+  if (opts.mapped ?? true) await H.map(page);
+  await navigate(page, "summary", callId);
+  // fixture gap (lead told): the real core's call has no written outputs to show the item on and world_set does not own outputs
+  if (REAL) return null;
+  await opts.launch?.();
+  if (opts.failGenerate) await steer.failNext("handoff_generate", "runtime_unavailable");
+  await row(page).getByRole("button", { name: "Handoff" }).click();
+  return steer;
+}
+
+test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
+  test("UI — happy path: Handoff opens the drawer, Writing the handoff prompt… with Cancel, the prompt with Claude Code and the repository, the launch line, Edited and Your Edit, ⌘Return opens it and the drawer says Handed off to Claude Code", async ({ page }) => {
+    if (!(await open(page))) return;
+    expect((await sent(page, "handoff_get"))[0]).toEqual({ item_id: H.ITEM });
+    await expect(region(page, "HD-R4").getByRole("textbox")).toBeVisible();
+    if (REAL) expect(await sent(page, "handoff_generate")).toEqual([{ item_id: H.ITEM, regenerate: false }]); // the fake has the prompt already
+    await expect(region(page, "HD-R2").getByRole("radio", { name: "Claude Code" })).toBeChecked();
+    await expect(region(page, "HD-R3")).toContainText(/frontend/);
+    await expect(region(page, "HD-R5")).toContainText(PROMPT_LINE);
+
+    const prompt = region(page, "HD-R4").getByRole("textbox");
+    await prompt.fill("Fix the replay buffer overflow in the virtualised table.");
+    await expect(drawer(page)).toContainText("Edited");
+    await region(page, "HD-R4").getByRole("button", { name: /Version/ }).click();
+    await expect(page.getByRole("menu")).toContainText("Your Edit");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("Meta+Enter");
+    expect(await sent(page, "handoff_edit")).toEqual([expect.objectContaining({ item_id: H.ITEM, prompt_md: "Fix the replay buffer overflow in the virtualised table." })]);
+    expect(await sent(page, "handoff_open")).toEqual([expect.objectContaining({ item_id: H.ITEM })]);
+    await expect(region(page, "HD-R6")).toContainText(/Handed off to Claude Code · \w{3} \d{1,2} \d{1,2}:\d{2}/);
+    await expect(row(page)).toContainText("Handed off");
+  });
+
+  test("UI — error path: No Claude Code link handler — the launch line names iTerm and the one-time Automation question, Open says Opened in iTerm · item marked Handed off", async ({ page }) => {
+    if (!(await open(page, { launch: () => H.launch(page, "iterm", { needsAutomation: true }) }))) return;
+    if (!REAL) return; // the launch path is what the Mac reports (harness.launch_world): the fake core has no Mac
+    await expect(region(page, "HD-R5")).toContainText(/No Claude Code link handler found\. Noter will open iTerm and run claude in .+; macOS asks once to allow Automation\./);
+    await region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" }).click();
+    await expect(region(page, "HD-R6")).toContainText("Opened in iTerm · item marked Handed off");
+    if (REAL) expect(JSON.stringify(await H.nativeLog(page))).toContain("iterm");
+  });
+
+  test("UI — error path: Automation denied — Couldn't open Claude Code · use Copy Prompt, Copy Prompt says Copied and puts the prompt on the clipboard", async ({ page }) => {
+    if (!(await open(page, { launch: () => H.launch(page, "iterm", { needsAutomation: true, denied: true, fail: [{ path: "iterm", code: "automation_denied" }] }) }))) return;
+    if (!REAL) return; // Automation is the Mac's answer (harness.launch_world): the fake core never refuses
+    await region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" }).click();
+    await expect(region(page, "HD-R7")).toContainText("Couldn't open Claude Code · use Copy Prompt");
+    await expect(drawer(page)).not.toContainText("Handed off to");
+    await region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" }).click();
+    expect(await sent(page, "handoff_copy")).toEqual([expect.objectContaining({ item_id: H.ITEM })]);
+    await expect(region(page, "HD-R7")).toContainText("Copied");
+    if (REAL) expect(JSON.stringify(await H.nativeLog(page))).toContain("clipboard");
+  });
+
+  test("UI — error path: No repository mapped — No repository mapped for VSTOR · Add Mapping…, Open disabled and Copy Prompt enabled", async ({ page }) => {
+    if (!(await open(page, { mapped: false }))) return;
+    await expect(region(page, "HD-R3")).toContainText("No repository mapped for VSTOR");
+    await expect(region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" })).toBeDisabled();
+    await expect(region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" })).toBeEnabled();
+  });
+
+  test("UI — empty path: Item owned by someone else — Copy Prompt is the default (⌘Return) with Open in Claude Code to its left, Copied, the item stays open and owned by Dmitri S.", async ({ page }) => {
+    if (!(await open(page, { own: false }))) return;
+    const footer = region(page, "HD-R7");
+    const names = await footer.getByRole("button").allInnerTexts();
+    expect(names.findIndex((n) => /Open in Claude Code/.test(n))).toBeLessThan(names.findIndex((n) => /Copy Prompt/.test(n)));
+    await expect(drawer(page)).toContainText("Opening or copying accepts this suggested item.");
+    await page.keyboard.press("Meta+Enter");
+    expect(await sent(page, "handoff_copy")).toHaveLength(1);
+    expect(await sent(page, "handoff_open")).toEqual([]);
+    await expect(footer).toContainText("Copied");
+    await expect(row(page)).toContainText("Dmitri S.");
+  });
+
+  test("UI — error path: Prompt not written — Couldn't write the prompt with Try Again, Try Again says Writing the handoff prompt… and the prompt follows", async ({ page }) => {
+    if (!(await open(page, { failGenerate: true }))) return;
+    if (!REAL) return; // the fake core answers handoff_get with a written prompt: only the real core starts at not_generated
+    await expect(region(page, "HD-R4")).toContainText("Couldn't write the prompt");
+    await region(page, "HD-R4").getByRole("button", { name: "Try Again" }).click();
+    await expect(region(page, "HD-R4")).toContainText(/Writing the handoff prompt…|Generated/);
+    await expect(region(page, "HD-R4").getByRole("textbox")).toBeVisible();
+    expect(await sent(page, "handoff_generate")).toHaveLength(2);
+  });
+
+  test("UI — other path: Check the prompt against the generated version — Diff shows Showing changes with words added and removed, Hide Diff returns to the same edit", async ({ page }) => {
+    if (!(await open(page))) return;
+    const prompt = region(page, "HD-R4");
+    await prompt.getByRole("textbox").fill("A different prompt entirely.");
+    await prompt.getByRole("button", { name: "Diff" }).click();
+    await expect(prompt).toContainText("Showing changes");
+    await expect(prompt.locator("ins").first()).toBeVisible();
+    await expect(prompt.locator("del").first()).toBeVisible();
+    await prompt.getByRole("button", { name: "Hide Diff" }).click();
+    await expect(prompt.getByRole("textbox")).toHaveValue("A different prompt entirely.");
+  });
+
+  test("UI — other path: Codex — Target Codex changes the Open label and the launch line, and opening it accepts a suggested item", async ({ page }) => {
+    if (!(await open(page, { own: false }))) return;
+    await region(page, "HD-R2").getByRole("radio", { name: "Codex" }).check();
+    expect(await sent(page, "handoff_set_target")).toEqual([expect.objectContaining({ item_id: H.ITEM, target: "codex" })]);
+    await expect(region(page, "HD-R7").getByRole("button", { name: "Open in Codex" })).toBeVisible();
+    await expect(region(page, "HD-R5")).toContainText("Codex");
+    await region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" }).click();
+    await expect(row(page).getByText("Not reviewed")).toHaveCount(0); // copying accepted the suggestion
+  });
+
+  test("UI — empty path: Sensitive call — the drawer says This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal., nothing is sent by Noter", async ({ page }) => {
+    if (!(await open(page, { sensitive: true }))) return;
+    await expect(drawer(page)).toContainText("This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal.");
+  });
+
+  test("UI — other path: Cancel while the prompt is being written restores the previous state and a late completion is ignored", async ({ page }) => {
+    if (!(await open(page))) return;
+    if (!REAL) return; // the fake core answers handoff_get with a written prompt: only the real core starts at not_generated
+    await region(page, "HD-R4").getByRole("button", { name: "Cancel" }).click();
+    expect(await sent(page, "handoff_cancel")).toEqual([{ item_id: H.ITEM }]);
+    await expect(region(page, "HD-R4")).not.toContainText("Writing the handoff prompt…");
+    await expect(region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" })).toBeDisabled(); // no usable prompt after a cancelled first write
+  });
+
+  test("UI — other path: Esc closes the drawer and returns focus to the item's Handoff row", async ({ page }) => {
+    if (!(await open(page))) return;
+    await page.keyboard.press("Escape");
+    await expect(drawer(page)).toHaveCount(0);
+    await expect(row(page).getByRole("button", { name: "Handoff" })).toBeFocused();
+  });
+});
