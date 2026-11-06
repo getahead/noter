@@ -130,6 +130,8 @@ export interface StripProps {
   marked: string | null;
   busy: { pause: boolean; stop: boolean; mark: boolean; retry: boolean };
   feedback: Feedback | null;
+  /** A Noter field has the keys (the panel is key): the legend reads the ⌘ chords, not the card keys. */
+  typing?: boolean;
   onFeedbackExpire: () => void;
   onMark: () => void;
   onPause: (paused: boolean) => void;
@@ -146,6 +148,7 @@ export function CallStatusStrip(p: StripProps) {
   const state = stopped ? "stopped" : failed ? "engine-stopped" : paused ? "paused" : "recording";
   const fb = p.feedback && <InlineStatus key={p.feedback.text} text={p.feedback.text} variant={p.feedback.variant} onExpire={p.onFeedbackExpire} />;
   const mode = <ModeIndicator view={p.mode} variant="floating" />;
+  const legend = p.typing && <span className="cw-strip__legend">{t("cw.legend.typing")}</span>;
   if (p.variant === "compact") {
     const items: MenuItem[] = failed
       ? [{ label: t("action.try_again"), onSelect: p.onRetry }]
@@ -164,6 +167,7 @@ export function CallStatusStrip(p: StripProps) {
     return (
       <div data-component="cpt-noter-component-ui-call-status-strip" data-variant="copilot-off" data-state={state} className="cw-strip cw-strip--compact">
         {fb && <div className="cw-strip__fb">{fb}</div>}
+        {legend}
         <div className="cw-strip__row">
           {!stopped && (
             <PushButton
@@ -189,6 +193,7 @@ export function CallStatusStrip(p: StripProps) {
       <RecordingIndicator variant="dot-text" status={p.status} />
       {mode}
       <span className="cw-strip__fb">{fb}</span>
+      {legend}
       <span className="np-tb__spacer" />
       {stopped ? null : failed ? (
         <PushButton label={t("action.try_again")} variant="primary" loading={p.busy.retry} onAction={p.onRetry} />

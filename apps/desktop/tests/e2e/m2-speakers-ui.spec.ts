@@ -33,11 +33,11 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
 
     await page.keyboard.press("ArrowDown");
     await expect(rename.getByRole("option", { selected: true })).toContainText(/Pavel|Anna|Dmitri/);
-    await rename.getByRole("option", { name: /Pavel/ }).click();
+    await rename.getByRole("option", { name: /^Pavel/ }).click();
     await rename.getByRole("button", { name: "Rename" }).click();
 
     expect(await sent(page, "transcript_rename_speaker")).toEqual([
-      expect.objectContaining({ call_id: S.CALL, speaker_id: "spk_3", scope: "whole_call", person: expect.objectContaining({ type: "existing" }) }),
+      expect.objectContaining({ call_id: S.CALL, speaker_id: "spk_3", scope: { type: "whole_call" }, person: expect.objectContaining({ type: "existing" }) }),
     ]);
     await expect(strip(page)).toContainText(new RegExp(`Named Speaker 3 as Pavel[^·]* · ${LINES.source}`));
     await expect(transcript(page).getByText("Speaker 3")).toHaveCount(0); // every line of the call carries the name
@@ -86,7 +86,7 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
     const rename = popover(page, "Rename Speaker 3");
     await rename.getByRole("combobox", { name: "Name…" }).fill("Pavel");
-    await rename.getByRole("option", { name: /Pavel/ }).click();
+    await rename.getByRole("option", { name: /^Pavel/ }).click();
     await steer.failNext("transcript_rename_speaker", "not_found");
     await rename.getByRole("button", { name: "Rename" }).click();
     await expect(rename.getByRole("alert")).toBeVisible();
@@ -101,7 +101,7 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
     const rename = popover(page, "Rename Speaker 3");
     await rename.getByRole("radio", { name: "Only this line" }).check();
-    await rename.getByRole("option", { name: /Pavel/ }).click();
+    await rename.getByRole("option", { name: /^Pavel/ }).click();
     await rename.getByRole("button", { name: "Rename" }).click();
     expect(await sent(page, "transcript_rename_speaker")).toEqual([expect.objectContaining({ scope: expect.objectContaining({ type: "one_segment" }) })]);
   });
@@ -183,7 +183,7 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     const row = rowOf(page, "Speaker 4");
     await expect(row).toBeVisible();
     await row.getByRole("textbox", { name: "Name…" }).fill("Pav");
-    await row.getByRole("option", { name: /Pavel/ }).click();
+    await row.getByRole("option", { name: /^Pavel/ }).click();
     await row.getByRole("button", { name: "Name", exact: true }).click();
     await expect(page.getByText(new RegExp(`Named Speaker 4 as Pavel[^·]* · ${LINES.source}`))).toBeVisible();
   });

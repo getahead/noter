@@ -32,6 +32,8 @@ export interface SegmentRowProps {
   /** The time's help tag when the audio is gone. */
   timeHelp?: string;
   onPlay?: (seg: SegmentView) => void;
+  /** The speaker label was chosen on this line: open Rename Speaker. */
+  onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
   onReason?: (key: string, text: string) => void;
   onStatusDone?: () => void;
   ref?: Ref<HTMLDivElement>;
@@ -51,7 +53,7 @@ function Text({ text, find }: { text: string; find?: string }) {
 }
 
 // @cpt-component:cpt-noter-component-ui-transcript-segment-row:p1
-export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, status, timeHelp, onPlay, onReason, onStatusDone, ref }: SegmentRowProps) {
+export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, status, timeHelp, onPlay, onRename, onReason, onStatusDone, ref }: SegmentRowProps) {
   const tail = variant === "tail";
   if (row.kind === "gap") {
     return (
@@ -105,7 +107,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
         {tail ? "" : clock(seg.t0_ms)}
       </span>
       <span className="cw-seg__spk">
-        <SpeakerLabel text={spk.text} variant={spk.variant} />
+        <SpeakerLabel text={spk.text} variant={spk.variant} onRename={onRename && v !== "you" && v !== "crosstalk" ? (anchor) => onRename(seg.speaker.speaker_id, seg, anchor) : undefined} />
         {v === "crosstalk" && (
           <>
             {" "}

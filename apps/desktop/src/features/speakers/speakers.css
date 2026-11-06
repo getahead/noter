@@ -1,0 +1,26 @@
+/* Person picker and speaker rename popover (prototype 20-b.css .cw-pp*), on the shared tokens. */
+.cw-pp { display: grid; gap: 6px; }
+.cw-pp .np-field { width: 100%; }
+.cw-pp__list { display: grid; max-height: 240px; overflow: auto; border: 1px solid var(--sep); border-radius: var(--r-row); padding: 4px; }
+.cw-pp__hdr { font: 600 11px/14px var(--font); color: var(--label-3); padding: 6px 6px 2px; }
+.cw-pp__opt { display: flex; align-items: center; gap: 8px; text-align: left; border: 0; background: transparent; padding: 4px 6px; border-radius: var(--r-control); cursor: pointer; color: var(--label); font: inherit; }
+.cw-pp__opt:hover { background: var(--sel-unemph); }
+.cw-pp__opt.is-sel { background: var(--accent-fill); color: var(--on-accent); }
+.cw-pp__opt.is-sel .cw-pp__role { color: inherit; opacity: .85; }
+.cw-pp__optmain { display: grid; min-width: 0; }
+.cw-pp__name { font-weight: 600; }
+.cw-pp__role { font-size: 11px; color: var(--label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-pp__new { color: var(--accent-text); border-top: 1px solid var(--sep); border-radius: 0 0 6px 6px; margin-top: 2px; }
+.cw-pp__none { padding: 6px; color: var(--label-2); }
+.cw-pp__lbl { display: grid; gap: 3px; font-size: 12px; color: var(--label-2); }
+.cw-pp__err { font-size: 12px; color: var(--danger-text, var(--label-2)); }
+.cw-pp__dup { display: grid; gap: 4px 6px; font-size: 12px; color: var(--label-2); background: var(--info-tint); border-radius: var(--r-control); padding: 6px 8px; }
+.cw-pp__dupacts { display: flex; gap: 6px; flex-wrap: wrap; }
+.cw-pp__foot { display: flex; gap: 8px; align-items: center; }
+.cw-pp--field { position: relative; display: block; min-width: 180px; }
+.cw-pp__list--drop { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 6; background: var(--card-bg); box-shadow: var(--shadow-pop); }
+.cw-pr { display: grid; gap: 10px; padding: 12px; }
+.cw-pr__title { font: 600 13px/16px var(--font); margin: 0; }
+.cw-pr__foot { display: flex; justify-content: flex-end; gap: 8px; }
+/* the radios' hidden input takes the click through the dot, as the label does */
+.cw-pr .np-radio__dot { pointer-events: none; }

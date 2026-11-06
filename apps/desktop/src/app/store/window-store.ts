@@ -252,12 +252,21 @@ export function applyRecord(
   const records = (
     kind === "speaker" ? (d.speakers ?? [d]) : [d[kind] ?? d]
   ) as Array<{ id?: string; rev?: number | null; item?: { id: string } }>;
-  return records.reduce((acc, r) => {
+  const written = records.reduce((acc, r) => {
     const id = kind === "handoff" ? r.item!.id : r.id!;
     const held = acc.entities[kind][id] as { rev?: number | null } | undefined;
     if (held?.rev != null && r.rev != null && held.rev > r.rev) return acc;
     return setEntity(acc, kind, id, r as never);
   }, s);
+  return kind === "speaker" ? withStreamSpeakers(written, records as unknown as SpeakerView[]) : written;
+}
+
+/** A rename's speakers also replace the transcript Channel's, which the lines read their labels from. */
+export function withStreamSpeakers(s: WindowState, speakers: SpeakerView[]): WindowState {
+  const stream = s.streams.transcript_subscribe;
+  const data = stream?.data;
+  if (!stream || !data || !speakers.some((x) => x.call_id === data.call_id)) return s;
+  return { ...s, streams: { ...s.streams, transcript_subscribe: { ...stream, data: { ...data, speakers: upsert(data.speakers, speakers) } } } };
 }
 
 /** Apply one of the 20 events: whole state by version, records by identity, the rest as sent. */
@@ -281,9 +290,9 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
         case "handoff":
           return setEntity(s, "handoff", c.handoff.item.id, c.handoff);
         case "speakers":
-          return c.speakers.reduce(
-            (acc, sp) => setEntity(acc, "speaker", sp.id, sp),
-            s,
+          return withStreamSpeakers(
+            c.speakers.reduce((acc, sp) => setEntity(acc, "speaker", sp.id, sp), s),
+            c.speakers,
           );
         case "section":
           return s;

@@ -43,6 +43,7 @@ export interface TranscriptViewProps {
   refused?: { key: string; text: string } | null;
   onRefusedDone?: () => void;
   onPlay?: (seg: SegmentView) => void;
+  onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
 }
 
 const smooth = (): ScrollBehavior => (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth");
@@ -185,6 +186,7 @@ export function TranscriptView(p: TranscriptViewProps) {
               status={(status?.key === row.key ? status.text : undefined) ?? (p.refused?.key === row.key ? p.refused.text : undefined)}
               timeHelp={p.timeHelp}
               onPlay={p.onPlay}
+              onRename={p.onRename}
               onReason={(key, text) => setStatus({ key, text })}
               onStatusDone={() => (setStatus(null), p.onRefusedDone?.())}
             />
