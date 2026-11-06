@@ -7,7 +7,7 @@ import type { ItemView } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { resetUndo } from "../history/undo";
-import { slots as outputSlots } from "../outputs/slots";
+import { slots as outputSlots } from "../call-page/slots";
 import { ActionItemRow, EditFields, focusNext, reviewMenu, ReviewButtons, rowKey } from "./ActionItemRow";
 import { localOf, patchLocal, resetLocal } from "./local";
 import { RejectedList } from "./RejectedList";
@@ -43,6 +43,7 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
   it("the outputs section's seam is filled with it", async () => {
     await ready();
     expect(outputSlots.actionItemRow).toBe(ActionItemRow);
+    expect(outputSlots.rejectedList).toBe(RejectedList);
   });
 
   it("a suggested full row names its component, variant and state, with Accept, Edit and Reject", async () => {

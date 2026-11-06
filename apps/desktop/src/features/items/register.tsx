@@ -1,5 +1,7 @@
-// Fills the outputs section's seam with the action item row, and the call page's banner with the review banner.
-import { slots } from "../outputs/slots";
+// Fills the call page's output-section seam (`call-page/slots.ts`) with the action item row and the Rejected list.
+import { slots } from "../call-page/slots";
 import { ActionItemRow } from "./ActionItemRow";
+import { RejectedList } from "./RejectedList";
 
 slots.actionItemRow = ActionItemRow;
+slots.rejectedList = RejectedList;

@@ -19,7 +19,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
-import type { ActionItemRowProps } from "../outputs/slots";
+import type { ActionItemRowProps } from "../call-page/slots";
 import { acceptSaved, answerHandoff, review, reopen, saveDraft, setDone, undoRow } from "./actions";
 import { patchLocal, useLocal, type Local } from "./local";
 import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, type Draft } from "./review";
