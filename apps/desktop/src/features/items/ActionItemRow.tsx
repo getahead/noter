@@ -20,9 +20,10 @@ import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
 import type { ActionItemRowProps } from "../call-page/slots";
-import { acceptSaved, answerHandoff, review, reopen, saveDraft, setDone, undoRow } from "./actions";
+import { acceptSaved, answerHandoff, review, reviewAll, reopen, saveDraft, setDone, undoRow } from "./actions";
 import { patchLocal, useLocal, type Local } from "./local";
 import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, type Draft } from "./review";
+import { ProvenanceChip } from "./ProvenanceChip";
 import { slots } from "./slots";
 import "./items.css";
 
@@ -31,7 +32,7 @@ const today = () => new Date().toLocaleDateString("sv"); // YYYY-MM-DD in the lo
 const dueText = (due: string) => new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${due}T00:00`));
 
 /** The live item: the store's record unless the section handed over a newer one. */
-function useItem(bridge: Bridge, item: ItemView): ItemView {
+export function useItem(bridge: Bridge, item: ItemView): ItemView {
   const held = useWindow(bridge, (s) => s.entities.item[item.id]);
   return held && held.rev >= item.rev ? held : item;
 }
@@ -40,8 +41,10 @@ function useItem(bridge: Bridge, item: ItemView): ItemView {
 export function focusNext(id: string): boolean {
   const rows = Array.from(globalThis.document?.querySelectorAll<HTMLElement>("[data-item-id]") ?? []);
   const next = nextSuggested(rows.map((r) => ({ id: r.dataset.itemId!, review: r.dataset.review! })), id);
+  // @cpt-begin:cpt-noter-flow-ui-items-review:p1:inst-return
   rows.find((r) => r.dataset.itemId === next)?.focus();
   return next !== null;
+  // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-return
 }
 
 function Owner({ person }: { person: PersonChip }) {
@@ -114,7 +117,9 @@ export function EditFields({ it, bridge, draft, saving, error }: { it: ItemView;
     </div>
   );
 }
+// @cpt-begin:cpt-noter-state-ui-items-review:p1:inst-cancel
 const cancelEdit = (id: string) => patchLocal(id, { phase: undefined, draft: undefined, draftBase: undefined, error: undefined });
+// @cpt-end:cpt-noter-state-ui-items-review:p1:inst-cancel
 
 /** What a key does on a row: the review keys on a suggested row, Esc and ⌘Return while editing, Esc on the handoff question. */
 export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEvent, variant: ActionItemRowProps["variant"] = "full"): void {
@@ -128,11 +133,16 @@ export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEv
   if (local.asking && e.key === "Escape") return stop(), void answerHandoff(bridge, it, "keep_open");
   if (e.metaKey && e.code === "KeyI" && slots.inspect) return stop(), slots.inspect(bridge, it.id);
   const key = keyOf(e);
-  if (it.review !== "suggested" || !key || key === "accept_all") return;
+  if (it.review !== "suggested" || !key) return;
   stop();
+  if (key === "accept_all") return void reviewAll(bridge, it.call.id, [it.kind]); // ⇧A: this row's kind, one batch
   if (key === "edit") {
+    // @cpt-begin:cpt-noter-flow-ui-items-review:p1:inst-edit
     if (variant === "full") startEdit(it);
+    // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-edit
+    // @cpt-begin:cpt-noter-flow-ui-items-review:p1:inst-inspect
     else slots.inspect?.(bridge, it.id);
+    // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-inspect
   }
   else void review(bridge, it, key === "accept" ? "accept" : "reject").then((r) => r.status === "ok" && focusNext(it.id));
 }
@@ -165,7 +175,9 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
 
   const edit = it.review === "suggested" && full ? () => startEdit(it) : slots.inspect ? () => slots.inspect!(bridge, it.id) : null;
   const overdue = isOverdue(it.due, done, today());
+  // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-handoff
   const tick1 = (checked: boolean) => (it.status === "handed_off" ? patchLocal(it.id, { asking: true }) : void setDone(bridge, it, checked));
+  // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-handoff
   const attrs = {
     "data-component": "cpt-noter-component-ui-action-item-row",
     "data-variant": variant,
@@ -201,8 +213,10 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
       {dueText(it.due)}
     </span>
   );
+  // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-tick
   const check =
     variant === "read-only" ? <Icon name="check" size={12} /> : <Checkbox ariaLabel={t("items.done_aria", { text: quote(it.text, langOf(it.lang)) })} checked={done} onAction={tick1} />;
+  // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-tick
   const question = asking && (
     <div className="it-row__landed" role="group" aria-label={t("items.landed.ask")}>
       <span className="t-headline">{t("items.landed.ask")}</span>
@@ -216,6 +230,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
   const info = variant !== "read-only" && slots.inspect && <IconButton icon="info" label={t("items.inspect")} size="inline" onAction={() => slots.inspect!(bridge, it.id)} />;
   const suggested = it.review === "suggested" && !local.outcome;
   const owner = it.owner && <Owner person={it.owner} />;
+  const prov = it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />;
   const text = <span className="it-row__text">{it.text}</span>;
 
   if (!full)
@@ -227,6 +242,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {text}
           {due}
           {tags}
+          {prov}
           <span className="np-tb__spacer" />
           {variant === "done" && <PushButton label={t("items.undo")} size="small" variant="quiet" onAction={() => void setDone(bridge, it, false)} />}
           {handoff}
@@ -248,6 +264,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
         <div className="it-row__line2">
           {due}
           {tags}
+          {prov}
         </div>
         {question}
         {error}

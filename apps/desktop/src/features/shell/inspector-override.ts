@@ -26,7 +26,9 @@ export const openInspector = (o: InspectorOverride) => set(o);
 export function closeInspector() {
   const was = current;
   set(null);
-  was?.onClose?.();
+  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-return
+  was?.onClose?.(); // the opener puts focus back on its row
+  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-return
 }
 
 export const inspectorOverride = () => current;

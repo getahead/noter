@@ -77,7 +77,7 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 ### Review suggested items
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-items-review`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-items-review`
 
 **Actor**: Primary user
 
@@ -90,21 +90,21 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 - Regeneration preserves accepted and edited items and rejected suppression; **1 item not suggested again because you rejected it** comes from core state.
 
 **Steps**:
-1. [ ] - `p1` - Read `items_list` for the call, with page cursors, and render the core review states; **Start Review** selects the first suggested row in section order - `inst-list`
-2. [ ] - `p1` - **MATCH** the focused row action, outside text inputs and input-method composition - `inst-action`
-   1. [ ] - `p1` - **CASE** A or **Accept**: `item_review` with item id, current rev and **accept**; show **Accepted** for 4 s and move focus to the next suggestion - `inst-accept`
-   2. [ ] - `p1` - **CASE** R or **Reject**: `item_review` with **reject**; show **Rejected · Undo** for 10 s, then fold into **Rejected (n)**; move focus to the next suggestion - `inst-reject`
-   3. [ ] - `p1` - **CASE** E on a full action row: fields for text, Owner, Due and Engineering; Cancel or Esc discards the draft; Save or ⌘Return invokes the edit process - `inst-edit`
-   4. [ ] - `p1` - **CASE** E on a decision, question or compact row: open the Item inspector; saving details and accepting remain separate actions there - `inst-inspect`
-   5. [ ] - `p1` - **CASE** ⇧A or section **Accept All**: `items_review_all` with call id and that section's kinds; banner **Accept All** uses empty kinds for all - `inst-all`
-3. [ ] - `p1` - For a batch, show **Accepted 7 suggested items · Undo** using returned items and batch id; do not count skipped items as accepted - `inst-batch`
-4. [ ] - `p1` - **IF** Restore is chosen: `item_review` with **restore** and current rev; return the rejected row to Suggested - `inst-restore`
-5. [ ] - `p1` - **IF** any mutation fails: retain its draft, show the typed error and no success status; on conflict refresh `item_get` and require a new user save - `inst-error`
-6. [ ] - `p1` - **RETURN** core review states, updated counts and the next suggested focus, or the section header when none remain - `inst-return`
+1. [x] - `p1` - Read `items_list` for the call, with page cursors, and render the core review states; **Start Review** selects the first suggested row in section order - `inst-list`
+2. [x] - `p1` - **MATCH** the focused row action, outside text inputs and input-method composition - `inst-action`
+   1. [x] - `p1` - **CASE** A or **Accept**: `item_review` with item id, current rev and **accept**; show **Accepted** for 4 s and move focus to the next suggestion - `inst-accept`
+   2. [x] - `p1` - **CASE** R or **Reject**: `item_review` with **reject**; show **Rejected · Undo** for 10 s, then fold into **Rejected (n)**; move focus to the next suggestion - `inst-reject`
+   3. [x] - `p1` - **CASE** E on a full action row: fields for text, Owner, Due and Engineering; Cancel or Esc discards the draft; Save or ⌘Return invokes the edit process - `inst-edit`
+   4. [x] - `p1` - **CASE** E on a decision, question or compact row: open the Item inspector; saving details and accepting remain separate actions there - `inst-inspect`
+   5. [x] - `p1` - **CASE** ⇧A or section **Accept All**: `items_review_all` with call id and that section's kinds; banner **Accept All** uses empty kinds for all - `inst-all`
+3. [x] - `p1` - For a batch, show **Accepted 7 suggested items · Undo** using returned items and batch id; do not count skipped items as accepted - `inst-batch`
+4. [x] - `p1` - **IF** Restore is chosen: `item_review` with **restore** and current rev; return the rejected row to Suggested - `inst-restore`
+5. [x] - `p1` - **IF** any mutation fails: retain its draft, show the typed error and no success status; on conflict refresh `item_get` and require a new user save - `inst-error`
+6. [x] - `p1` - **RETURN** core review states, updated counts and the next suggested focus, or the section header when none remain - `inst-return`
 
 ### Tick, reopen or add an item
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-items-status`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-items-status`
 
 **Actor**: Primary user
 
@@ -117,15 +117,15 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 - `conflict`, empty text or a removed item never produces a success message.
 
 **Steps**:
-1. [ ] - `p1` - User ticks an action item; decisions and questions have no checkbox - `inst-tick`
-2. [ ] - `p1` - **IF** its status is handed_off - `inst-handoff`
-   1. [ ] - `p1` - Show **Yes, Landed**, **Done Another Way**, **Keep Open**; send `item_answer_handoff_landed` with current rev and **landed**, **done_another_way** or **keep_open** - `inst-answer`
-3. [ ] - `p1` - **ELSE**: `item_set_done` with current rev and the desired done state; never send a toggle - `inst-done`
-4. [ ] - `p1` - Render the returned item and retain its change id for Undo; Today moves it into Done today after the inline feedback - `inst-result`
-5. [ ] - `p1` - **IF** the user chooses **Reopen** on closed_by_evidence or answered_in_call: `item_reopen` with current rev, then **Reopened · Undo** - `inst-reopen`
-6. [ ] - `p1` - **IF** the user chooses **Add Action Item**: show **What needs doing, and who does it?**; trim and require text; Return or Add calls `item_create` for action_item with the user's existing person reference - `inst-create`
-7. [ ] - `p1` - **IF** an operation fails: keep the previous view and draft, show the named error and allow explicit retry after refresh - `inst-failure`
-8. [ ] - `p1` - **RETURN** the core item; row Undo uses the returned change target through History, preserving prior review and handoff state - `inst-return`
+1. [x] - `p1` - User ticks an action item; decisions and questions have no checkbox - `inst-tick`
+2. [x] - `p1` - **IF** its status is handed_off - `inst-handoff`
+   1. [x] - `p1` - Show **Yes, Landed**, **Done Another Way**, **Keep Open**; send `item_answer_handoff_landed` with current rev and **landed**, **done_another_way** or **keep_open** - `inst-answer`
+3. [x] - `p1` - **ELSE**: `item_set_done` with current rev and the desired done state; never send a toggle - `inst-done`
+4. [x] - `p1` - Render the returned item and retain its change id for Undo; Today moves it into Done today after the inline feedback - `inst-result`
+5. [x] - `p1` - **IF** the user chooses **Reopen** on closed_by_evidence or answered_in_call: `item_reopen` with current rev, then **Reopened · Undo** - `inst-reopen`
+6. [x] - `p1` - **IF** the user chooses **Add Action Item**: show **What needs doing, and who does it?**; trim and require text; Return or Add calls `item_create` for action_item with the user's existing person reference - `inst-create`
+7. [x] - `p1` - **IF** an operation fails: keep the previous view and draft, show the named error and allow explicit retry after refresh - `inst-failure`
+8. [x] - `p1` - **RETURN** the core item; row Undo uses the returned change target through History, preserving prior review and handoff state - `inst-return`
 
 ### Inspect details and check evidence
 
@@ -142,16 +142,16 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 - Archive pending: evidence opens the live span. Transcript upgraded: resolve the span again, show the archive notice and allow Show/Hide Archive Changes with user edits kept.
 
 **Steps**:
-1. [ ] - `p1` - User opens (i) or ⌘I; `item_get` returns the item, evidence and initial history - `inst-get`
-2. [ ] - `p1` - UI: action details include text, Owner, Due with calendar button, Status, Linked issue and its automatic-close helper, Engineering with Handoff, review actions, Evidence, source quote and handoff record - `inst-details`
-3. [ ] - `p1` - For decisions and questions show text, Linked issue, evidence and quote; omit Owner, Due, Status and Engineering - `inst-kind`
-4. [ ] - `p1` - User changes Owner, Status or Engineering; apply supported commands immediately; text, Due and Linked issue wait for Save - `inst-edit`
-5. [ ] - `p1` - User chooses History; mount the item variant of the history timeline with actor pop-up, no job filter and no export - `inst-history`
-6. [ ] - `p1` - User opens a provenance time; `transcript_span` with its TimeSpan resolves current segments rather than a cached row index; navigate to Transcript and focus the first resolved line - `inst-resolve`
+1. [x] - `p1` - User opens (i) or ⌘I; `item_get` returns the item, evidence and initial history - `inst-get`
+2. [x] - `p1` - UI: action details include text, Owner, Due with calendar button, Status, Linked issue and its automatic-close helper, Engineering with Handoff, review actions, Evidence, source quote and handoff record - `inst-details`
+3. [x] - `p1` - For decisions and questions show text, Linked issue, evidence and quote; omit Owner, Due, Status and Engineering - `inst-kind`
+4. [x] - `p1` - User changes Owner, Status or Engineering; apply supported commands immediately; text, Due and Linked issue wait for Save - `inst-edit`
+5. [x] - `p1` - User chooses History; mount the item variant of the history timeline with actor pop-up, no job filter and no export - `inst-history`
+6. [x] - `p1` - User opens a provenance time; `transcript_span` with its TimeSpan resolves current segments rather than a cached row index; navigate to Transcript and focus the first resolved line - `inst-resolve`
 7. [ ] - `p1` - **IF** audio is unavailable: show the deletion or never-stored line and omit play; **ELSE** Space uses the existing playback flow and safety rules - `inst-audio`
 8. [ ] - `p1` - **IF** the archive upgraded the transcript: resolve against the current pass and offer the archive diff; pending archive keeps the live evidence usable - `inst-archive`
-9. [ ] - `p1` - **IF** the source is deleted: render **Source deleted** without a dead link; unresolved reads show **Finding the source…**, then a retryable error - `inst-source`
-10. [ ] - `p1` - **RETURN** the evidence or inspector; Esc closes the inspector and returns focus to its row; back navigation restores the origin and scroll - `inst-return`
+9. [x] - `p1` - **IF** the source is deleted: render **Source deleted** without a dead link; unresolved reads show **Finding the source…**, then a retryable error - `inst-source`
+10. [x] - `p1` - **RETURN** the evidence or inspector; Esc closes the inspector and returns focus to its row; back navigation restores the origin and scroll - `inst-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -176,42 +176,42 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 ### Item review
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-items-review`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-items-review`
 
 **States**: SUGGESTED, EDITING, SAVING, ACCEPTED, REJECTED_OUTCOME, REJECTED
 
 **Initial State**: SUGGESTED for extracted items; ACCEPTED for user-created and pinned items
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** SUGGESTED **TO** EDITING **WHEN** Edit opens a draft - `inst-edit`
-2. [ ] - `p1` - **FROM** EDITING **TO** SUGGESTED **WHEN** Cancel discards the draft - `inst-cancel`
-3. [ ] - `p1` - **FROM** EDITING **TO** SAVING **WHEN** Save submits valid fields - `inst-save`
-4. [ ] - `p1` - **FROM** SAVING **TO** ACCEPTED **WHEN** inline edit and acceptance both succeed - `inst-saved`
-5. [ ] - `p1` - **FROM** SAVING **TO** EDITING **WHEN** save fails; retain the draft - `inst-failed`
-6. [ ] - `p1` - **FROM** SAVING **TO** SUGGESTED **WHEN** inspector save succeeds or inline acceptance fails after the edit - `inst-separate`
-7. [ ] - `p1` - **FROM** SUGGESTED **TO** ACCEPTED **WHEN** accept, batch accept, tick or handoff succeeds - `inst-accept`
-8. [ ] - `p1` - **FROM** SUGGESTED **TO** REJECTED_OUTCOME **WHEN** rejection succeeds - `inst-reject`
-9. [ ] - `p1` - **FROM** REJECTED_OUTCOME **TO** REJECTED **WHEN** its 10-second outcome expires - `inst-fold`
-10. [ ] - `p1` - **FROM** REJECTED_OUTCOME, REJECTED, ACCEPTED **TO** SUGGESTED **WHEN** restore or the matching core undo restores the suggestion - `inst-restore`
+1. [x] - `p1` - **FROM** SUGGESTED **TO** EDITING **WHEN** Edit opens a draft - `inst-edit`
+2. [x] - `p1` - **FROM** EDITING **TO** SUGGESTED **WHEN** Cancel discards the draft - `inst-cancel`
+3. [x] - `p1` - **FROM** EDITING **TO** SAVING **WHEN** Save submits valid fields - `inst-save`
+4. [x] - `p1` - **FROM** SAVING **TO** ACCEPTED **WHEN** inline edit and acceptance both succeed - `inst-saved`
+5. [x] - `p1` - **FROM** SAVING **TO** EDITING **WHEN** save fails; retain the draft - `inst-failed`
+6. [x] - `p1` - **FROM** SAVING **TO** SUGGESTED **WHEN** inspector save succeeds or inline acceptance fails after the edit - `inst-separate`
+7. [x] - `p1` - **FROM** SUGGESTED **TO** ACCEPTED **WHEN** accept, batch accept, tick or handoff succeeds - `inst-accept`
+8. [x] - `p1` - **FROM** SUGGESTED **TO** REJECTED_OUTCOME **WHEN** rejection succeeds - `inst-reject`
+9. [x] - `p1` - **FROM** REJECTED_OUTCOME **TO** REJECTED **WHEN** its 10-second outcome expires - `inst-fold`
+10. [x] - `p1` - **FROM** REJECTED_OUTCOME, REJECTED, ACCEPTED **TO** SUGGESTED **WHEN** restore or the matching core undo restores the suggestion - `inst-restore`
 
 ### Item completion
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-items-completion`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-items-completion`
 
 **States**: OPEN, CARRIED, HANDOFF_QUESTION, HANDED_OFF, DONE, CLOSED_BY_EVIDENCE, ANSWERED_IN_CALL
 
 **Initial State**: The core's ItemView.status
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** OPEN, CARRIED **TO** DONE **WHEN** item_set_done succeeds - `inst-done`
-2. [ ] - `p1` - **FROM** HANDED_OFF **TO** HANDOFF_QUESTION **WHEN** the checkbox is invoked - `inst-ask`
-3. [ ] - `p1` - **FROM** HANDOFF_QUESTION **TO** DONE **WHEN** landed or done_another_way succeeds - `inst-landed`
-4. [ ] - `p1` - **FROM** HANDOFF_QUESTION **TO** HANDED_OFF **WHEN** keep_open or Esc is chosen - `inst-keep`
-5. [ ] - `p1` - **FROM** OPEN, CARRIED **TO** HANDED_OFF **WHEN** core reports a successful handoff launch - `inst-handoff`
-6. [ ] - `p1` - **FROM** OPEN, CARRIED, HANDED_OFF **TO** CLOSED_BY_EVIDENCE **WHEN** core supplies qualifying linked-key evidence - `inst-evidence`
-7. [ ] - `p1` - **FROM** OPEN, CARRIED **TO** ANSWERED_IN_CALL **WHEN** core reports an answered question - `inst-answered`
-8. [ ] - `p1` - **FROM** DONE, CLOSED_BY_EVIDENCE, ANSWERED_IN_CALL **TO** OPEN **WHEN** untick or Reopen succeeds; core undo may restore a prior handed-off or carried status instead - `inst-reopen`
-9. [ ] - `p1` - **FROM** CARRIED **TO** OPEN **WHEN** core reports the carry-forward call ended - `inst-returned`
+1. [x] - `p1` - **FROM** OPEN, CARRIED **TO** DONE **WHEN** item_set_done succeeds - `inst-done`
+2. [x] - `p1` - **FROM** HANDED_OFF **TO** HANDOFF_QUESTION **WHEN** the checkbox is invoked - `inst-ask`
+3. [x] - `p1` - **FROM** HANDOFF_QUESTION **TO** DONE **WHEN** landed or done_another_way succeeds - `inst-landed`
+4. [x] - `p1` - **FROM** HANDOFF_QUESTION **TO** HANDED_OFF **WHEN** keep_open or Esc is chosen - `inst-keep`
+5. [x] - `p1` - **FROM** OPEN, CARRIED **TO** HANDED_OFF **WHEN** core reports a successful handoff launch - `inst-handoff`
+6. [x] - `p1` - **FROM** OPEN, CARRIED, HANDED_OFF **TO** CLOSED_BY_EVIDENCE **WHEN** core supplies qualifying linked-key evidence - `inst-evidence`
+7. [x] - `p1` - **FROM** OPEN, CARRIED **TO** ANSWERED_IN_CALL **WHEN** core reports an answered question - `inst-answered`
+8. [x] - `p1` - **FROM** DONE, CLOSED_BY_EVIDENCE, ANSWERED_IN_CALL **TO** OPEN **WHEN** untick or Reopen succeeds; core undo may restore a prior handed-off or carried status instead - `inst-reopen`
+9. [x] - `p1` - **FROM** CARRIED **TO** OPEN **WHEN** core reports the carry-forward call ended - `inst-returned`
 
 ## 5. Definitions of Done
 

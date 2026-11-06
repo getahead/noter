@@ -22,6 +22,7 @@ describe("route key", () => {
     expect(parseCallKey(callKey("call_x", "transcript"))).toEqual({ callId: "call_x", tab: "transcript" });
   });
   it("is null for a key that is not a call page", () => {
+    expect(parseCallKey("call:call_x:transcript:12000:20000")).toEqual({ callId: "call_x", tab: "transcript", span: { call_id: "call_x", channel: null, t0_ms: 12000, t1_ms: 20000 } });
     expect(parseCallKey("root")).toBeNull();
     expect(parseCallKey("item:i1")).toBeNull();
   });

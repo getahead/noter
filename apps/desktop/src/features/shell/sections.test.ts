@@ -17,6 +17,8 @@ describe("sections", () => {
   it("routes the core's navigation requests to a section page, and leaves the other windows' targets alone", () => {
     expect(navRoute({ type: "activity" })).toEqual({ section: "activity", key: "root" });
     expect(navRoute({ type: "call_page", call_id: "call_1", tab: "summary" })).toEqual({ section: "library", key: "call:call_1:summary" });
+    // evidence opens the Transcript on a span: it rides in the route so the page can highlight it
+    expect(navRoute({ type: "call_page", call_id: "call_1", tab: "transcript", span: { call_id: "call_1", channel: null, t0_ms: 5, t1_ms: 9 } })).toEqual({ section: "library", key: "call:call_1:transcript:5:9" });
     expect(navRoute({ type: "person", person_id: "p1" })).toEqual({ section: "people", key: "person:p1" });
     expect(navRoute({ type: "topic", topic_id: "t1" })).toEqual({ section: "topics", key: "topic:t1" });
     expect(navRoute({ type: "item", item_id: "i1" })).toEqual({ section: "activity", key: "item:i1" });

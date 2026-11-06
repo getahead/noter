@@ -9,6 +9,7 @@ import { t } from "../../i18n/format";
 import { holdUndo } from "../history/undo";
 import { localOf, patchLocal } from "./local";
 import { draftPatch, draftValid, type Draft } from "./review";
+import type { ItemPatch } from "../../core/bindings";
 
 const ACCEPTED_MS = 4000;
 const OUTCOME_MS = 10_000;
@@ -22,7 +23,7 @@ const current = (bridge: Bridge, item: ItemView): ItemView => bridge.store.getSt
 const changeOf = (m: ItemMutation): UndoTarget => ({ type: "change", change_id: m.change_id });
 
 /** `item_get`: the core's current item into the store, after a conflict or an undo. */
-const refresh = (bridge: Bridge, id: string) => bridge.act(`item:get:${id}`, "item_get", () => bridge.core.itemGet({ item_id: id }), { entity: "item" });
+export const refresh = (bridge: Bridge, id: string) => bridge.act(`item:get:${id}`, "item_get", () => bridge.core.itemGet({ item_id: id }), { entity: "item" });
 
 // @cpt-begin:cpt-noter-flow-ui-items-review:p1:inst-error
 // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-failure
@@ -195,6 +196,20 @@ export async function undoRow(bridge: Bridge, id: string, target: UndoTarget) {
   const outcome = localOf(id).outcome;
   const res = await bridge.act(`item:undo:${id}`, "change_undo", () => bridge.core.changeUndo({ target }));
   if (res.status !== "ok") return patchLocal(id, { outcome, error: errorText(res.error.code === "conflict" ? "conflict" : "internal") });
+  // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-return
   patchLocal(id, { outcome: undefined, error: undefined });
-  await refresh(bridge, id);
+  await refresh(bridge, id); // the core's item again, with its prior review and handoff state
+  // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-return
+}
+
+export type EditResult = "ok" | "invalid" | "conflict" | "failed";
+
+/** Item inspector edit: `item_edit` of the changed fields with the item's current rev; a conflict reads the item again and the user saves anew. */
+export async function editItem(bridge: Bridge, item: ItemView, patch: ItemPatch): Promise<EditResult> {
+  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-edit
+  const res = await bridge.act(`item:edit:${item.id}`, "item_edit", () => bridge.core.itemEdit({ item_id: item.id, rev: current(bridge, item).rev, patch }), { entity: "item" });
+  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-edit
+  if (res.status === "ok") return "ok";
+  if (res.error.code === "conflict") await refresh(bridge, item.id);
+  return res.error.code === "conflict" ? "conflict" : res.error.code === "invalid_input" ? "invalid" : "failed";
 }

@@ -24,14 +24,4 @@ export async function openEvidence(bridge: Bridge, span: TimeSpan): Promise<Reso
   return r;
 }
 
-/** What an evidence row says about its source: the audio line when the audio is gone, the archive notice when the words changed. */
-export const evidenceNotes = (p: SpanPreview): Array<"audio_gone" | "archive"> => [
-  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-audio
-  ...(p.audio_available ? [] : (["audio_gone"] as const)),
-  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-audio
-  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-archive
-  ...(p.upgraded_by_archive ? (["archive"] as const) : []),
-  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-archive
-];
-
 export const spanTime = (s: TimeSpan) => clock(s.t0_ms);

@@ -34,3 +34,19 @@
 .it-rejected { display: grid; gap: 4px; padding-top: 4px; }
 .it-rejected__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .it-rejected__list li { display: flex; align-items: center; gap: 8px; }
+
+/* Item inspector (II-R1/II-R2) and Add Action Item */
+.ii { display: grid; gap: 10px; padding: 12px 14px; align-content: start; }
+.ii-head { display: flex; align-items: center; gap: 8px; padding-right: 28px; }
+.ii-details { display: grid; gap: 10px; }
+.ii-actions { display: flex; align-items: center; gap: 6px; }
+.ii-helper { margin: 0; font-size: 12px; }
+.ii-evidence-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ii-evidence { display: flex; align-items: baseline; gap: 8px; }
+.ii-error { color: var(--error); }
+.it-add { display: flex; align-items: flex-start; gap: 6px; padding-top: 6px; }
+.it-add .np-field { flex: 1; }
+.np-prov { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--accent); cursor: pointer; font-variant-numeric: tabular-nums; }
+.np-prov:disabled { color: var(--label-3); cursor: default; }
+.np-prov.is-gone { color: var(--label-3); }
+.np-prov__error { color: var(--error); font-size: 12px; }
