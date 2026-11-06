@@ -114,10 +114,11 @@ export function EditFields({ it, bridge, draft, saving, error }: { it: ItemView;
     </div>
   );
 }
-const cancelEdit = (id: string) => patchLocal(id, { phase: undefined, draft: undefined, error: undefined });
+const cancelEdit = (id: string) => patchLocal(id, { phase: undefined, draft: undefined, draftBase: undefined, error: undefined });
 
 /** What a key does on a row: the review keys on a suggested row, Esc and ⌘Return while editing, Esc on the handoff question. */
-export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEvent): void {
+export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEvent, variant: ActionItemRowProps["variant"] = "full"): void {
+  if (variant === "read-only" || e.nativeEvent?.isComposing || (e as KeyboardEvent & { isComposing?: boolean }).isComposing || local.phase === "saving") return;
   const stop = () => (e.preventDefault(), e.stopPropagation());
   if (local.phase) {
     if (e.key === "Escape") (stop(), cancelEdit(it.id));
@@ -129,16 +130,20 @@ export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEv
   const key = keyOf(e);
   if (it.review !== "suggested" || !key || key === "accept_all") return;
   stop();
-  if (key === "edit") startEdit(it);
+  if (key === "edit") {
+    if (variant === "full") startEdit(it);
+    else slots.inspect?.(bridge, it.id);
+  }
   else void review(bridge, it, key === "accept" ? "accept" : "reject").then((r) => r.status === "ok" && focusNext(it.id));
 }
-const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft: draftOf(it), error: undefined });
+const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft: draftOf(it), draftBase: { ...it }, error: undefined });
 
 // @cpt-component:cpt-noter-component-ui-action-item-row:p1
 // @cpt-dod:cpt-noter-dod-ui-items-actions:p1
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
   const it = useItem(bridge, item);
-  const local = useLocal(it.id);
+  const heldLocal = useLocal(it.id);
+  const local: Local = variant === "read-only" ? {} : heldLocal;
   const state = rowState(it, { phase: local.phase, outcome: !!local.outcome });
   const full = variant === "full";
   const done = isDone(it.status);
@@ -168,7 +173,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     "data-review": it.review,
     lang: langOf(it.lang),
     id: elementId("row", it.id),
-    onKeyDown: (e: KeyboardEvent) => rowKey(bridge, it, local, e),
+    onKeyDown: (e: KeyboardEvent) => rowKey(bridge, it, local, e, variant),
   };
   if (state === "EDITING" || state === "SAVING")
     return (
@@ -183,7 +188,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
       {it.is_engineering && full && <Badge kind="kind" text={t("items.engineering")} />}
       {it.status === "handed_off" && <Badge kind="status" tone="info" text={t("items.handed_off")} />}
       {(it.status === "closed_by_evidence" || it.status === "answered_in_call") && (
-        <span className="it-row__closed">{t("items.closed", { summary: it.closed_by?.summary ?? it.status.replace(/_/g, " ") })} · <Link label={t("items.reopen")} onAction={() => void reopen(bridge, it)} /></span>
+        <span className="it-row__closed">{t("items.closed", { summary: it.closed_by?.summary ?? it.status.replace(/_/g, " ") })}{variant !== "read-only" && <> · <Link label={t("items.reopen")} onAction={() => void reopen(bridge, it)} /></>}</span>
       )}
       {it.carried_from && <Badge kind="status" text={t("items.carried", { call: it.carried_from.title })} />}
       {it.review === "suggested" && <Badge kind="status" text={t("items.suggested")} />}

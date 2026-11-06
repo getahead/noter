@@ -9,9 +9,15 @@ import { startReview, useReviewBanner } from "./review-banner";
 import { loadItems } from "./actions";
 import { CallBanners } from "../call-page/CallBanners";
 
+const effects = vi.hoisted(() => ({ pending: [] as Array<() => unknown> }));
+vi.mock("react", async (original) => ({
+  ...await original<typeof import("react")>(),
+  useEffect: (effect: () => unknown) => { effects.pending.push(effect); },
+}));
+
 let bridge: Bridge;
 let fake: FakeCore;
-beforeEach(() => (resetLocal(), resetUndo()));
+beforeEach(() => (resetLocal(), resetUndo(), effects.pending.length = 0));
 afterEach(() => {
   vi.unstubAllGlobals();
   return bridge.close();
@@ -30,6 +36,26 @@ function bannerOf(callId: string) {
 }
 
 describe("review banner (PC-R2)", () => {
+  it("reloads the call's suggestions when revisited after an earlier failed read", async () => {
+    await ready();
+    const invoke = fake.invoke.bind(fake);
+    let reads = 0;
+    fake.invoke = ((cmd: string, args: unknown) => {
+      if (cmd === "items_list" && ++reads === 1)
+        return Promise.reject({ code: "internal", message: "Temporary read failure", retryable: true });
+      return (invoke as (...args: unknown[]) => unknown)(cmd, args);
+    }) as typeof fake.invoke;
+    bannerOf("call_live");
+    effects.pending.at(-1)!(); // mount the call page
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(reads).toBe(1);
+    bannerOf("call_live");
+    effects.pending.at(-1)!(); // revisit the same call in the same window
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(reads).toBe(2);
+    expect(bannerOf("call_live")?.text).toBe("3 suggested items to review before sharing");
+  });
+
   it("is absent with nothing to review: no banner, no Accept All", async () => {
     await ready();
     expect(bannerOf("call_backend")).toBeNull();

@@ -7,7 +7,7 @@ import type { ErrorCode, ItemKind, ItemMutation, ItemView, ReviewDecision, UndoT
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 import { holdUndo } from "../history/undo";
-import { patchLocal } from "./local";
+import { localOf, patchLocal } from "./local";
 import { draftPatch, draftValid, type Draft } from "./review";
 
 const ACCEPTED_MS = 4000;
@@ -145,7 +145,7 @@ export type SaveResult = "ok" | "invalid" | "conflict" | "failed" | "partial";
 // @cpt-algo:cpt-noter-algo-ui-items-save:p1
 /** Save an edit draft: `item_edit` with the changed fields, then (inline review) `item_review accept` with the new rev. */
 export async function saveDraft(bridge: Bridge, item: ItemView, draft: Draft, thenAccept: boolean): Promise<SaveResult> {
-  const it = current(bridge, item);
+  const it = localOf(item.id).draftBase ?? item;
   if (!draftValid(draft)) return patchLocal(it.id, { error: errorText("invalid_input") }), "invalid";
   // @cpt-begin:cpt-noter-state-ui-items-review:p1:inst-save
   patchLocal(it.id, { phase: "saving", error: undefined });
@@ -160,6 +160,7 @@ export async function saveDraft(bridge: Bridge, item: ItemView, draft: Draft, th
       // @cpt-begin:cpt-noter-algo-ui-items-save:p1:inst-error
       // @cpt-begin:cpt-noter-state-ui-items-review:p1:inst-failed
       await failed(bridge, it.id, res.error.code, { phase: "editing", draft });
+      if (res.error.code === "conflict") patchLocal(it.id, { draftBase: { ...current(bridge, it) } });
       // @cpt-end:cpt-noter-state-ui-items-review:p1:inst-failed
       // @cpt-end:cpt-noter-algo-ui-items-save:p1:inst-error
       return res.error.code === "conflict" ? "conflict" : "failed";
@@ -168,7 +169,7 @@ export async function saveDraft(bridge: Bridge, item: ItemView, draft: Draft, th
   }
   // @cpt-begin:cpt-noter-algo-ui-items-save:p1:inst-return
   // @cpt-begin:cpt-noter-state-ui-items-review:p1:inst-separate
-  if (!thenAccept) return patchLocal(it.id, { phase: undefined, draft: undefined, outcome: { text: t("items.outcome.saved"), target: null, ms: SAVED_MS } }), "ok";
+  if (!thenAccept) return patchLocal(it.id, { phase: undefined, draft: undefined, draftBase: undefined, outcome: { text: t("items.outcome.saved"), target: null, ms: SAVED_MS } }), "ok";
   // @cpt-end:cpt-noter-state-ui-items-review:p1:inst-separate
   // @cpt-end:cpt-noter-algo-ui-items-save:p1:inst-return
   return acceptSaved(bridge, it);
@@ -182,9 +183,9 @@ export async function acceptSaved(bridge: Bridge, item: ItemView): Promise<SaveR
   const res = await review(bridge, item, "accept", "items.outcome.saved_accepted");
   // @cpt-end:cpt-noter-state-ui-items-review:p1:inst-saved
   // @cpt-end:cpt-noter-algo-ui-items-save:p1:inst-accept
-  if (res.status === "ok") return patchLocal(id, { phase: undefined, draft: undefined }), "ok";
+  if (res.status === "ok") return patchLocal(id, { phase: undefined, draft: undefined, draftBase: undefined }), "ok";
   // @cpt-begin:cpt-noter-algo-ui-items-save:p1:inst-partial
-  patchLocal(id, { phase: undefined, draft: undefined, retryAccept: true, error: t("items.err.partial") });
+  patchLocal(id, { phase: undefined, draft: undefined, draftBase: undefined, retryAccept: true, error: t("items.err.partial") });
   // @cpt-end:cpt-noter-algo-ui-items-save:p1:inst-partial
   return "partial";
 }

@@ -237,6 +237,34 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
     expect(html).not.toContain('type="checkbox"');
   });
 
+  it("read-only rows ignore review shortcuts and hide Reopen on closed items", async () => {
+    await ready();
+    const seen = sent();
+    const tree = rendered(ActionItemRow, { bridge, item: item("itm_replay"), variant: "read-only" });
+    const handler = tree.props.onKeyDown as ((e: unknown) => void) | undefined;
+    handler?.(key("KeyA"));
+    handler?.(key("KeyE"));
+    await settle();
+    expect(seen).toEqual([]);
+    expect(localOf("itm_replay").phase).toBeUndefined();
+    const closed = renderToString(<ActionItemRow bridge={bridge} item={item("itm_token")} variant="read-only" />);
+    expect(closed).not.toContain(">Reopen<");
+    patchLocal("itm_replay", { outcome: { text: "Accepted", target: { type: "change", change_id: "chg_1" }, ms: 4000 } });
+    expect(renderToString(<ActionItemRow bridge={bridge} item={item("itm_replay")} variant="read-only" />)).not.toContain(">Undo<");
+    patchLocal("itm_replay", { phase: "editing", draft: { text: "Draft", owner: "", due: "", engineering: false, linked_issue: "" } });
+    expect(renderToString(<ActionItemRow bridge={bridge} item={item("itm_replay")} variant="read-only" />)).not.toContain('data-state="editing"');
+  });
+
+  it("E on a compact suggestion opens the inspector without starting an inline draft", async () => {
+    await ready();
+    const inspect = vi.fn();
+    slots.inspect = inspect;
+    const tree = rendered(ActionItemRow, { bridge, item: item("itm_replay"), variant: "compact" });
+    (tree.props.onKeyDown as (e: unknown) => void)(key("KeyE"));
+    expect(inspect).toHaveBeenCalledWith(bridge, "itm_replay");
+    expect(localOf("itm_replay").phase).toBeUndefined();
+  });
+
   it("a failed command shows its error on the row", async () => {
     await ready();
     patchLocal("itm_replay", { error: "Couldn't finish that. Try again." });
@@ -292,6 +320,39 @@ describe("rowKey (flow inst-action)", () => {
     rowKey(bridge, it, { phase: "editing", draft }, key("Enter", { key: "Enter", metaKey: true }));
     await settle();
     expect(seen.map((s) => s[0])).toContain("item_edit");
+  });
+
+  it("composition and an in-flight save cannot discard an edit draft", async () => {
+    await ready();
+    const draft = { text: "Mine", owner: "", due: "", engineering: false, linked_issue: "" };
+    patchLocal("itm_a11y", { phase: "editing", draft });
+    rowKey(bridge, item("itm_a11y"), { phase: "editing", draft }, key("Escape", { key: "Escape", isComposing: true }));
+    expect(localOf("itm_a11y").draft).toEqual(draft);
+    rowKey(bridge, item("itm_a11y"), { phase: "editing", draft }, key("Enter", { key: "Enter", metaKey: true, nativeEvent: { isComposing: true } }));
+    expect(localOf("itm_a11y").draft).toEqual(draft);
+    patchLocal("itm_a11y", { phase: "saving" });
+    rowKey(bridge, item("itm_a11y"), { phase: "saving", draft }, key("Escape", { key: "Escape" }));
+    expect(localOf("itm_a11y").phase).toBe("saving");
+  });
+
+  it("a streamed edit while drafting requires a conflict and an explicit second Save", async () => {
+    await ready();
+    const { loadItems, saveDraft } = await import("./actions");
+    await loadItems(bridge, "call_live");
+    const original = item("itm_a11y");
+    rowKey(bridge, original, {}, key("KeyE"));
+    const draft = { ...localOf(original.id).draft!, text: "My draft" };
+    patchLocal(original.id, { draft });
+    await bridge.core.itemEdit({ item_id: original.id, rev: original.rev, patch: { text: "Other edit" } });
+    const updated = bridge.store.getState().entities.item[original.id]!;
+    expect(updated.text).toBe("Other edit");
+    const seen = sent();
+    expect(await saveDraft(bridge, updated, draft, true)).toBe("conflict");
+    expect(seen[0]).toEqual(["item_edit", { item_id: original.id, rev: original.rev, patch: { text: "My draft" } }]);
+    expect(localOf(original.id).draft).toEqual(draft);
+    expect(bridge.store.getState().entities.item[original.id]!.text).toBe("Other edit");
+    expect(await saveDraft(bridge, bridge.store.getState().entities.item[original.id]!, draft, true)).toBe("ok");
+    expect(bridge.store.getState().entities.item[original.id]!.text).toBe("My draft");
   });
 
   it("Esc on the handoff question keeps the item handed off; ⌘I opens the inspector once it exists", async () => {

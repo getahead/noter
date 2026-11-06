@@ -3,7 +3,7 @@
 // A module store like the undo strip's, so the commands in `actions.ts` drive it and the rows only read it.
 import { useSyncExternalStore } from "react";
 
-import type { UndoTarget } from "../../core/bindings";
+import type { ItemView, UndoTarget } from "../../core/bindings";
 import type { Draft } from "./review";
 
 export interface Outcome {
@@ -17,6 +17,8 @@ export interface Outcome {
 export interface Local {
   phase?: "editing" | "saving";
   draft?: Draft;
+  /** The item when editing began; streamed revisions must not silently replace the draft's base. */
+  draftBase?: ItemView;
   outcome?: Outcome;
   /** **Did the handoff land?** is open. */
   asking?: boolean;
