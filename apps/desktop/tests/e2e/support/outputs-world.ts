@@ -37,7 +37,7 @@ export function written(w: World): void {
     itemSection("open_questions", [item(w, "itm_q1", "open_question", "Who owns the soak run?", "accepted"), item(w, "itm_q2", "open_question", "Does Safari need the fallback?", "accepted")]),
     textSection("per_participant", "sum_pp_backend", "Dmitri: flag. Oleg: soak run. You: spec.", 1, 1),
   ];
-  w.items = [...w.items.filter((i) => !o.sections.some((s) => s.items.some((x) => x.id === i.id))), ...o.sections.flatMap((s) => s.items)];
+  w.items = [...w.items.filter((i) => i.call.id !== W.PAST_CALL), ...o.sections.flatMap((s) => s.items)];
 }
 
 /** A section's state with its body kept (writing, failed, pending). */
@@ -50,15 +50,26 @@ export function writing(w: World): void {
   written(w);
   const o = outputsOf(w);
   o.status = "writing";
+  w.items = w.items.filter((i) => i.call.id !== W.PAST_CALL);
   for (const s of o.sections) {
     Object.assign(s, { state: { type: s.kind === "summary" ? "writing" : "pending" }, body_md: null, items: [], summary_id: null, rev: null, version_count: 0 });
   }
+}
+
+/** Local writing has provenance in a stored empty draft, not only the fake world's aggregate flag. */
+export function writingLocally(w: World): void {
+  writing(w);
+  outputsOf(w).written_locally = true;
+  const summary = sectionOf(w, "summary");
+  summary.body_md = "";
+  summary.writer = { ...WRITER, runtime: "local" };
 }
 
 /** Action items failed (Claude Code timed out); the others stay ready. */
 export function actionItemsFailed(w: World): void {
   written(w);
   outputsOf(w).status = "partially_failed";
+  w.items = w.items.filter((i) => i.call.id !== W.PAST_CALL || i.kind !== "action_item");
   Object.assign(sectionOf(w, "action_items"), { state: { type: "failed", code: "runtime_unavailable", local_fallback_available: true }, items: [] });
 }
 

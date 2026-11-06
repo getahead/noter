@@ -74,7 +74,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
 
   test("UI — empty path: the local runtime says Writing with the local model · up to 10 min · role reviews follow in the background", async ({ page }) => {
     await openWindow(page, "main", {
-      world: (w) => (O.writing(w), (O.outputsOf(w).written_locally = true)),
+      world: O.writingLocally,
     });
     await openSummary(page);
     await expect(banner(page)).toContainText("Writing with the local model · up to 10 min · role reviews follow in the background");
