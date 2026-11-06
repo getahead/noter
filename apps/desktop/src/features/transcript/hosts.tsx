@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   CallDetail,
   SegmentView,
+  TextRange,
   TimeSpan,
   UiPrefs,
 } from "../../core/bindings";
@@ -16,6 +17,7 @@ import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { holdUndo } from "../history/undo";
 import { SpeakerNamingPanel } from "../speakers/SpeakerNamingPanel";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
+import { TermFixPopover } from "../speakers/TermFixPopover";
 import {
   buildRows,
   speakerColumn,
@@ -340,6 +342,7 @@ export function TranscriptLog({
     segmentId: string;
     anchor: HTMLElement;
   } | null>(null);
+  const [fixing, setFixing] = useState<{ seg: SegmentView; range: TextRange; anchor: HTMLElement } | null>(null);
   const call = useWindow(tr.bridge, (s) => s.entities.call[tr.callId]);
   const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
   const rows = useMemo(
@@ -407,7 +410,11 @@ export function TranscriptLog({
             : (speakerId, seg, anchor) =>
                 setRenaming({ speakerId, segmentId: seg.id, anchor })
         }
+        onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor }) : undefined}
       />
+      {fixing && (
+        <TermFixPopover bridge={tr.bridge} segment={fixing.seg} range={fixing.range} anchor={fixing.anchor} onClose={() => setFixing(null)} onFixed={named} />
+      )}
       {renamed && (
         <SpeakerRenamePopover
           bridge={tr.bridge}

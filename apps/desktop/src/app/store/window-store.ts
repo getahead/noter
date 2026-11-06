@@ -30,6 +30,7 @@ import type {
   SelfTestMsg,
   SignInProgress,
   SourceRow,
+  SegmentView,
   SpeakerView,
   StreamEndReason,
   SubscriptionHandle,
@@ -271,6 +272,14 @@ export function withStreamSpeakers(s: WindowState, speakers: SpeakerView[]): Win
   const data = stream?.data;
   if (!stream || !data || !speakers.some((x) => x.call_id === data.call_id)) return s;
   return { ...s, streams: { ...s.streams, transcript_subscribe: { ...stream, data: { ...data, speakers: upsert(data.speakers, speakers) } } } };
+}
+
+/** A fixed term's segment replaces the line in the transcript Channel, which the rows read their text from. */
+export function withStreamSegment(s: WindowState, segment: SegmentView): WindowState {
+  const stream = s.streams.transcript_subscribe;
+  const data = stream?.data;
+  if (!stream || !data || data.call_id !== segment.call_id) return s;
+  return { ...s, streams: { ...s.streams, transcript_subscribe: { ...stream, data: { ...data, segments: upsert(data.segments, [segment]) } } } };
 }
 
 /** Apply one of the 20 events: whole state by version, records by identity, the rest as sent. */

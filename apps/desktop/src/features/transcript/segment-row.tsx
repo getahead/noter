@@ -2,7 +2,7 @@
 // src/js/20-b-components.js C.segmentRow). Markup and classes as the prototype's; the view decides the play control.
 import type { Ref } from "react";
 
-import type { SegmentView, SpeakerView } from "../../core/bindings";
+import type { SegmentView, SpeakerView, TextRange } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
 import { Icon } from "../../ui/icons";
@@ -34,9 +34,23 @@ export interface SegmentRowProps {
   onPlay?: (seg: SegmentView) => void;
   /** The speaker label was chosen on this line: open Rename Speaker. */
   onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
+  /** Fix Term… on the selected words of this line (context menu): the range is in UTF-16 units of the line's text. */
+  onFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
   onReason?: (key: string, text: string) => void;
   onStatusDone?: () => void;
   ref?: Ref<HTMLDivElement>;
+}
+
+/** The selection inside `el` as offsets into its text (the find highlight splits nodes, so count characters); `null` when empty or outside. */
+export function selectedRange(el: HTMLElement, sel: Selection | null): TextRange | null {
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return null;
+  const pre = document.createRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(r.startContainer, r.startOffset);
+  const start = pre.toString().length;
+  return { start, end: start + r.toString().length };
 }
 
 /** The text with the find match highlighted. */
@@ -53,7 +67,7 @@ function Text({ text, find }: { text: string; find?: string }) {
 }
 
 // @cpt-component:cpt-noter-component-ui-transcript-segment-row:p1
-export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, status, timeHelp, onPlay, onRename, onReason, onStatusDone, ref }: SegmentRowProps) {
+export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, status, timeHelp, onPlay, onRename, onFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
   const tail = variant === "tail";
   if (row.kind === "gap") {
     return (
@@ -115,7 +129,20 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
           </>
         )}
       </span>
-      <span className={cx("cw-seg__text", low && "is-lowconf")} title={low ? t("transcript.low_confidence") : undefined}>
+      <span
+        className={cx("cw-seg__text", low && "is-lowconf")}
+        title={low ? t("transcript.low_confidence") : undefined}
+        onContextMenu={
+          onFixTerm && !tail
+            ? (e) => {
+                const range = selectedRange(e.currentTarget, globalThis.getSelection());
+                if (!range) return;
+                e.preventDefault();
+                onFixTerm(seg, range, e.currentTarget);
+              }
+            : undefined
+        }
+      >
         <Text text={seg.text} find={find} />
       </span>
       <span className="cw-seg__end">
