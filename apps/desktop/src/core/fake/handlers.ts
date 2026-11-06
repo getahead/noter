@@ -75,6 +75,12 @@ function bump(item: ItemView): ItemView {
   return item;
 }
 
+// @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
+function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
+  // Fixture rows can already summarize a batch; new batches have one stored row per item.
+  return rows.map((r) => r.batch_id ? { ...r, batch_size: Math.max(r.batch_size, world.changes.filter((c) => c.batch_id === r.batch_id).length) } : r);
+}
+
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
 function replayItemChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
   rows.forEach((r) => {
@@ -676,7 +682,7 @@ export const defaultHandlers: Handlers = {
   },
   item_get: (a, { world }) => {
     const item = findItem(world, a.item_id);
-    return { item, evidence: item.closed_by ? [item.closed_by] : [], history: world.changes.filter((c) => c.entity.id === item.id) };
+    return { item, evidence: item.closed_by ? [item.closed_by] : [], history: historyRows(world, world.changes.filter((c) => c.entity.id === item.id)) };
   },
   item_set_done: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
@@ -1103,7 +1109,7 @@ export const defaultHandlers: Handlers = {
         (a.actor === "all" || (a.actor === "you" && c.actor.type === "you") || (a.actor === "jobs" && c.actor.type === "job") || (a.actor === "models" && c.actor.type === "model")) &&
         (!a.job_id || (c.actor.type === "job" && c.actor.job_id === a.job_id)),
     );
-    return { rows, next_cursor: null, total: rows.length };
+    return { rows: historyRows(world, rows), next_cursor: null, total: rows.length };
   },
   change_undo: (a, { world }) => {
     const target = a.target;
