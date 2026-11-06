@@ -195,6 +195,22 @@ describe("window store", () => {
     expect(Object.keys(s.entities.speaker)).toEqual(["sp1", "sp2"]);
   });
 
+  it("a rename's speakers replace the transcript Channel's, by identity, for that call only", () => {
+    const spk = (id: string, call_id: string, n: number) => ({ id, call_id, label: { type: "unnamed", n } });
+    const base = initialState("main");
+    const open = {
+      ...base,
+      streams: { transcript_subscribe: { data: { call_id: "c1", speakers: [spk("a", "c1", 1), spk("b", "c1", 2)] }, error: null } },
+    } as unknown as typeof base;
+    const named = { id: "b", call_id: "c1", label: { type: "you" } };
+    const s = applyRecord(open, "speaker", { speakers: [named], change_id: "ch" });
+    expect(s.streams.transcript_subscribe?.data?.speakers.map((x) => x.label.type)).toEqual(["unnamed", "you"]);
+    const other = applyRecord(open, "speaker", { speakers: [spk("z", "c2", 9)], change_id: "ch" });
+    expect(other.streams.transcript_subscribe).toBe(open.streams.transcript_subscribe);
+    const ev = applyEvent(open, { event: "entity:changed", payload: { type: "speakers", call_id: "c1", speakers: [named] } } as never);
+    expect(ev.streams.transcript_subscribe?.data?.speakers[1].label.type).toBe("you");
+  });
+
   it("keeps outputs, jobs, sign-ins and the last navigation request", () => {
     let s = initialState("main");
     s = applyEvent(s, {

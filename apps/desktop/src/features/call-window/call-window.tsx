@@ -478,7 +478,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                   </div>
                 )}
                 <div className="cs-r2" data-region="CS-R2" aria-label={t("cw.transcript")}>
-                  <TranscriptLog tr={tr} variant="live" />
+                  <TranscriptLog tr={tr} variant="live" onNamed={(text) => setFeedback({ text, variant: "notice" })} />
                 </div>
                 <TranscriptBar tr={tr} variant="live" />
               </div>

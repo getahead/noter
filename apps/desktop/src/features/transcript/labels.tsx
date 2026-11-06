@@ -1,17 +1,20 @@
 // Speaker label and language tag (DESIGN › Speaker label, Language tag; prototype src/js/04-shared.js C.speakerLabel,
-// C.languageTag). Display only: the rename popover arrives with cpt-noter-feature-ui-speakers (M2).
+// C.languageTag). A named or provisional speaker is a button that opens the rename popover (cpt-noter-feature-ui-speakers).
 import type { Lang } from "../../core/bindings";
 import { cx } from "../../ui/primitives/attrs";
 import { langTag, type SpeakerVariant } from "./model";
 
 // @cpt-component:cpt-noter-component-ui-speaker-label:p1
 // @cpt-dod:cpt-noter-dod-ui-live-transcript-labels:p1
-export function SpeakerLabel({ text, variant }: { text: string; variant: SpeakerVariant }) {
+export function SpeakerLabel({ text, variant, onRename }: { text: string; variant: SpeakerVariant; onRename?: (anchor: HTMLElement) => void }) {
   const secondary = variant !== "you" && variant !== "resolved";
-  return (
-    <span data-component="cpt-noter-component-ui-speaker-label" data-variant={variant} className={cx("np-spk", secondary && "is-secondary")} title={text}>
+  const props = { "data-component": "cpt-noter-component-ui-speaker-label", "data-variant": variant, className: cx("np-spk", secondary && "is-secondary", onRename && "np-spk--btn"), title: text };
+  return onRename ? (
+    <button type="button" {...props} onClick={(e) => onRename(e.currentTarget)}>
       {text}
-    </span>
+    </button>
+  ) : (
+    <span {...props}>{text}</span>
   );
 }
 

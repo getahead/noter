@@ -8,6 +8,8 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { duration, t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { holdUndo } from "../history/undo";
+import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 import { buildRows, speakerColumn, spanKeys, type Row, type Variant } from "./model";
 import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
@@ -207,10 +209,14 @@ export interface TranscriptLogProps {
   tailLines?: number;
   /** The stored variant's audio line; by default from the call's details. */
   header?: string | null;
+  /** A speaker was named from a label: by default the undo strip carries the result; the call window shows it in its strip. */
+  onNamed?: (text: string, change_id: string) => void;
 }
 
 /** The transcript view of `useTranscript`'s call, in the host's region (CS-R2, FP-R5 or PC-R5). */
-export function TranscriptLog({ tr, variant, tailLines, header }: TranscriptLogProps) {
+export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: TranscriptLogProps) {
+  const [renaming, setRenaming] = useState<{ speakerId: string; segmentId: string; anchor: HTMLElement } | null>(null);
+  const call = useWindow(tr.bridge, (s) => s.entities.call[tr.callId]);
   const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
   const rows = useMemo(() => (variant === "tail" && tr.data ? buildRows(tr.data, "tail", tailLines) : tr.rows), [variant, tr.data, tr.rows, tailLines]);
   const line = header !== undefined ? header : variant === "stored" ? audioLine(tr.detail, prefs) : null;
@@ -218,7 +224,11 @@ export function TranscriptLog({ tr, variant, tailLines, header }: TranscriptLogP
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-return-stored
   const error = tr.error && <InlineBanner banner={{ id: "transcript-error", severity: "error", text: t("transcript.error"), actions: [{ label: t("action.try_again"), onAction: tr.retry }] }} />;
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-return-stored
+  const speakers = tr.data?.speakers ?? [];
+  const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
+  const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
   return (
+    <>
     <TranscriptView
       key={tr.callId}
       variant={variant}
@@ -237,7 +247,22 @@ export function TranscriptLog({ tr, variant, tailLines, header }: TranscriptLogP
       onRefusedDone={tr.clearRefused}
       timeHelp={gone ? (tr.detail!.audio_not_stored ? t("transcript.audio.not_stored") : t("transcript.audio.deleted_help")) : undefined}
       onPlay={(seg) => void tr.play(seg)}
+      onRename={variant === "tail" ? undefined : (speakerId, seg, anchor) => setRenaming({ speakerId, segmentId: seg.id, anchor })}
     />
+    {renamed && (
+      <SpeakerRenamePopover
+        bridge={tr.bridge}
+        callId={tr.callId}
+        speaker={renamed}
+        segmentId={renaming.segmentId}
+        participants={tr.detail?.call.participants ?? call?.participants ?? []}
+        speakers={speakers}
+        anchor={renaming.anchor}
+        onClose={() => setRenaming(null)}
+        onNamed={named}
+      />
+    )}
+    </>
   );
 }
 
