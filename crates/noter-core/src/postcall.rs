@@ -349,7 +349,6 @@ fn participants_md(notes: &[ParticipantNotes]) -> String {
         .join("\n\n")
 }
 
-/// The Markdown body of one section of a validated output; empty when it holds nothing.
 /// The section an item of this kind is listed in.
 fn item_section(kind: ItemKind) -> SectionKind {
     match kind {
@@ -360,6 +359,7 @@ fn item_section(kind: ItemKind) -> SectionKind {
     }
 }
 
+/// The Markdown body of one section of a validated output; empty when it holds nothing.
 fn body_of(kind: SectionKind, out: &PostCallOutput) -> String {
     match kind {
         SectionKind::Summary => out.summary_md.trim().to_owned(),
@@ -1337,6 +1337,7 @@ impl Core {
             }
         }
         // Item sections list the call's items of their kind; a rejected suggestion is gone (D75).
+        // shortcut: one page (500 items per call), page through if a call can hold more.
         let items: Vec<ItemView> = self
             .list_items(ItemsListArgs {
                 filter: ItemFilter {
