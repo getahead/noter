@@ -15,6 +15,7 @@ import { tauriTransport } from "./core/tauri-transport";
 import { installTabNavigation, installUnobscure } from "./app/a11y/focus";
 import "./features/library/register";
 import "./features/items/register";
+import "./features/today/register";
 import { setPseudo, type Pseudo } from "./i18n/format";
 
 const LABELS = COMMANDS.app_snapshot.windows as readonly WindowLabel[];
