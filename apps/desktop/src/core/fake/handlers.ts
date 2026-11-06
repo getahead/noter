@@ -86,7 +86,7 @@ function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
 function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
   rows.forEach((r) => {
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
-    if (tagged) tagged.tags = r[value] ? r[value].split(", ") : [];
+    if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
     if (item) bump(Object.assign(item, { [r.field as string]: r[value] }));
   });
@@ -95,7 +95,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
 function editedLater(world: World, r: ChangeRow): boolean {
   const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
-  if (tagged) return tagged.tags.join(", ") !== r.after;
+  if (tagged) return JSON.stringify(tagged.tags) !== r.after;
   const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
   return !!item && String((item as Record<string, unknown>)[r.field as string] ?? "") !== (r.after ?? "");
 }
@@ -996,9 +996,9 @@ export const defaultHandlers: Handlers = {
     // One change row a call, under one batch when several change together (as the core logs it).
     const batch_id = calls.length > 1 ? newId("bat") : null;
     const [change_id] = calls.map((c) => {
-      const before = c.tags.join(", ");
+      const before = JSON.stringify(c.tags);
       c.tags = [...new Set([...c.tags.filter((t) => !a.remove.includes(t)), ...a.add])];
-      return logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, field: "tags", before, after: c.tags.join(", "), summary: "Changed tags", batch_id });
+      return logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, field: "tags", before, after: JSON.stringify(c.tags), summary: "Changed tags", batch_id });
     });
     return { calls, change_id, batch_id };
   },
@@ -1169,7 +1169,7 @@ export const defaultHandlers: Handlers = {
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
     replayChanges(world, redoable, "after");
-    logChange(world, { entity: rows[0].entity, summary: `Redid: ${rows[0].summary}`, field: rows[0].field, before: rows[0].before, after: rows[0].after });
+    redoable.forEach((r) => logChange(world, { entity: r.entity, summary: `Redid: ${r.summary}`, field: r.field, before: r.before, after: r.after }));
     return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: undone.length - redoable.length };
   },
   proposals_list: (a, { world }) => {

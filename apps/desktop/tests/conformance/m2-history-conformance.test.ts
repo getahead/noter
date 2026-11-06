@@ -77,8 +77,24 @@ describe("change_undo and change_redo", () => {
     // only the kept row is left, and it was edited later
     expect(refused(await main.changeUndo(batch)).code).toBe("edited_later");
     // redo applies the undone row again and leaves the kept one alone
+    const previous = new Set(ok(await list()).rows.map((r) => r.id));
     expect(ok(await main.changeRedo(batch))).toEqual({ undone: 1, skipped_edited_later: 0 });
     expect(await tags(LIVE_CALL)).toContain("launch");
+    const redone = ok(await list()).rows.filter((r) => !previous.has(r.id));
+    expect(redone).toHaveLength(1);
+    expect(redone[0].entity.id).toBe(LIVE_CALL);
+    expect(await tags(PAST_CALL)).toEqual(expect.arrayContaining(["launch", "later"]));
+  });
+
+  it("undo and redo preserve a tag containing a comma and space", async () => {
+    ok(await main.callTagsSet({ call_ids: [PAST_CALL], add: ["design, review"], remove: [] }));
+    const before = ok(await main.callGet({ call_id: PAST_CALL })).call.tags;
+    const changed = ok(await main.callTagsSet({ call_ids: [PAST_CALL], add: ["launch"], remove: [] }));
+    const after = ok(await main.callGet({ call_id: PAST_CALL })).call.tags;
+    ok(await main.changeUndo(byChange(changed.change_id)));
+    expect(ok(await main.callGet({ call_id: PAST_CALL })).call.tags).toEqual(before);
+    ok(await main.changeRedo(byChange(changed.change_id)));
+    expect(ok(await main.callGet({ call_id: PAST_CALL })).call.tags).toEqual(after);
   });
 
   it("every wrong state is its typed error", async () => {
