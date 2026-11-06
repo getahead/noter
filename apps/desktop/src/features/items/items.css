@@ -1,0 +1,36 @@
+/* Ported from the prototype's 30-c.css (.it-*): the action item row in its full, compact and editing forms. */
+.it-row { min-width: 0; }
+.it-row--full { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 4px 8px; padding: 9px 4px; border-bottom: 1px solid var(--sep); align-items: start; border-radius: var(--r-tag); }
+.it-row--full:focus-visible, .it-row--full.is-focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.it-row__check { padding-top: 2px; }
+.it-row__main { min-width: 0; display: grid; gap: 3px; }
+.it-row__line1 { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.it-row__line1 .np-person { flex: none; }
+.it-row__text { min-width: 0; }
+.it-row--full .it-row__text { overflow-wrap: anywhere; }
+.it-row__line2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--label-2); }
+.it-row__actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.it-row__review { display: flex; gap: 4px; }
+.it-row__review .np-btn .np-kbd { display: none; }
+.it-row__due.is-overdue { color: var(--warning); display: inline-flex; gap: 3px; align-items: center; }
+.it-row__closed { color: var(--success); font-size: 12px; }
+.it-row.is-done .it-row__text { text-decoration: line-through; color: var(--label-2); }
+.it-row--compact { padding: 4px 0; }
+.it-row__line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.it-row--compact .it-row__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.it-row--compact .it-row__due, .it-row--compact .np-badge { flex: none; }
+.it-row__outcome { padding: 2px 0 0 24px; }
+.it-row.is-outcome { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--sep); }
+.it-row__ghost { color: var(--label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.it-row__ghost.is-rej { text-decoration: line-through; }
+.it-row__landed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; margin-top: 4px; background: var(--info-tint); border-radius: var(--r-control); }
+.it-row__error { color: var(--error); font-size: 12px; }
+.it-row--editing { grid-template-columns: 1fr; }
+.it-row__edit { display: grid; gap: 8px; }
+.it-row__edit-text { width: 100%; }
+.it-row__edit-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.it-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--label-2); }
+.it-field__due { width: 120px; }
+.it-rejected { display: grid; gap: 4px; padding-top: 4px; }
+.it-rejected__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.it-rejected__list li { display: flex; align-items: center; gap: 8px; }
