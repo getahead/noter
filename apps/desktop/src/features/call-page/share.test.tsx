@@ -15,6 +15,7 @@ import { undoMode } from "../history/undo";
 import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { deleteAudio, exportCall, setTags } from "./share-actions";
 import { exportOpener, runShare, setShareStatus } from "./share-run";
+import { find, rendered } from "../../ui/testing";
 import { ShareMenu, shareItems } from "./ShareMenu";
 import { TagsField } from "./TagsField";
 import { type MenuItem } from "../../ui/primitives/menu";
@@ -158,5 +159,94 @@ describe("Delete Audio Now…", () => {
     expect(await deleteAudio(bridge, id, async () => true)).toBe("deleted");
     expect(seen.find(([c]) => c === "audio_delete")![1]).toEqual({ call_ids: [id] });
     expect(bridge.store.getState().entities.call[id]?.audio_deleted).toBe(true);
+  });
+});
+
+
+describe("Export sheet actions", () => {
+  it("runs the scoped export from the sheet and reports the returned path before closing", async () => {
+    await open([]);
+    const seen = sent();
+    const outcomes: string[] = [];
+    const scope = { sections: ["decisions" as const], item_ids: [], include_unreviewed: false };
+    const tree = rendered(ExportSheet, { bridge, callId: id, scopeLabel: "Decisions", scope, audioKept: false, onExported: (path: string) => outcomes.push(path), close: () => outcomes.push("closed") });
+    (find(tree, (p) => typeof p.onDefault === "function").props.onDefault as () => void)();
+    await new Promise((r) => setTimeout(r));
+    expect(seen.find(([c]) => c === "calls_export")?.[1]).toEqual({ call_ids: [id], scope, include: { summary_and_items: true, transcript: false, audio: false } });
+    expect(outcomes).toEqual([expect.stringContaining("Noter export"), "closed"]);
+  });
+
+  it("closes a cancelled export without success feedback, and keeps a failed export open", async () => {
+    await open([]);
+    for (const code of ["cancelled", "internal"] as const) {
+      fake.failNext("calls_export", code);
+      const outcomes: string[] = [];
+      const tree = rendered(ExportSheet, { bridge, callId: id, scopeLabel: "Whole call", scope: null, audioKept: true, onExported: () => outcomes.push("exported"), close: () => outcomes.push("closed") });
+      const button = find(tree, (p) => !!p.defaultButton).props.defaultButton as { props: { onAction: () => void } };
+      button.props.onAction();
+      await new Promise((r) => setTimeout(r));
+      expect(outcomes).toEqual(code === "cancelled" ? ["closed"] : []);
+    }
+  });
+});
+
+describe("Tags field actions", () => {
+  it("removes the named chip, or the last tag on Backspace, through the core", async () => {
+    await open([]);
+    await setTags(bridge, id, ["release", "backend"], []);
+    const seen = sent();
+    const tree = rendered(TagsField, { bridge, callId: id, tags: ["release", "backend"] });
+    (find(tree, (p) => p["aria-label"] === "Remove tag release").props.onClick as () => void)();
+    await new Promise((r) => setTimeout(r));
+    (find(tree, (_, type) => type === "input").props.onKeyDown as (e: { key: string }) => void)({ key: "Backspace" });
+    await new Promise((r) => setTimeout(r));
+    expect(seen.filter(([c]) => c === "call_tags_set").map(([, a]) => a)).toEqual([
+      { call_ids: [id], add: [], remove: ["release"] },
+      { call_ids: [id], add: [], remove: ["backend"] },
+    ]);
+    expect(bridge.store.getState().entities.call[id]?.tags).not.toContain("release");
+    expect(bridge.store.getState().entities.call[id]?.tags).not.toContain("backend");
+  });
+
+  it("does not send an empty tag from Return or comma and keeps existing tags on removal failure", async () => {
+    await open([]);
+    await setTags(bridge, id, ["release"], []);
+    const seen = sent();
+    const tree = rendered(TagsField, { bridge, callId: id, tags: ["release"] });
+    const key = find(tree, (_, type) => type === "input").props.onKeyDown as (e: { key: string; preventDefault: () => void }) => void;
+    let prevented = 0;
+    key({ key: "Enter", preventDefault: () => prevented++ });
+    key({ key: ",", preventDefault: () => prevented++ });
+    expect(prevented).toBe(2);
+    expect(seen.filter(([c]) => c === "call_tags_set")).toHaveLength(0);
+    fake.failNext("call_tags_set", "internal");
+    (find(tree, (p) => p["aria-label"] === "Remove tag release").props.onClick as () => void)();
+    await new Promise((r) => setTimeout(r));
+    expect(bridge.store.getState().entities.call[id]?.tags).toContain("release");
+  });
+});
+
+
+describe("Share control feedback", () => {
+  it("routes each menu format and explicit Copy anyway to the requested copy action", () => {
+    const copied: unknown[] = [];
+    const items = shareItems({ origin: whole, ready: true, sensitive: false, unreviewed: 2, status: { callId: "c", origin: whole, kind: "unreviewed", count: 2, format: "jira" }, copy: (format, include) => copied.push([format, include]), exportIt: () => {} });
+    for (const label of ["Copy for Slack", "Copy for Jira", "Copy as Markdown", "Copy anyway"]) {
+      const item = items.find((i) => "label" in i && i.label === label) as { onSelect: () => void };
+      item.onSelect();
+    }
+    expect(copied).toEqual([["slack", undefined], ["jira", undefined], ["markdown", undefined], ["jira", true]]);
+  });
+
+  it("expires feedback only on its matching section control", async () => {
+    await open([]);
+    const origin = { type: "section", kind: "decisions" } as const;
+    setShareStatus({ callId: id, origin, kind: "copied", text: "Copied for Slack" });
+    const props = { bridge, callId: id, origin, id: "section-share" };
+    const tree = rendered(ShareMenu, props);
+    expect(renderToString(tree)).toContain("Copied for Slack");
+    expect(renderToString(<ShareMenu {...props} origin={{ type: "section", kind: "action_items" }} />)).not.toContain("Copied for Slack");
+    (find(tree, (p) => typeof p.onExpire === "function").props.onExpire as () => void)();
+    expect(renderToString(<ShareMenu {...props} />)).not.toContain("Copied for Slack");
   });
 });
