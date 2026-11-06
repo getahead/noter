@@ -20,6 +20,7 @@ import type {
   OutputSection,
   PersonRow,
   Rev,
+  SectionKind,
   SourceRow,
   TimestampMs,
   TopicRow,
@@ -82,11 +83,21 @@ function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
 }
 
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
-function replayItemChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
+function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
   rows.forEach((r) => {
+    const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
+    if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
     if (item) bump(Object.assign(item, { [r.field as string]: r[value] }));
   });
+}
+
+/** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
+function editedLater(world: World, r: ChangeRow): boolean {
+  const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
+  if (tagged) return JSON.stringify(tagged.tags) !== r.after;
+  const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
+  return !!item && String((item as Record<string, unknown>)[r.field as string] ?? "") !== (r.after ?? "");
 }
 
 function call(world: World, id: string): CallRow {
@@ -427,7 +438,8 @@ export const defaultHandlers: Handlers = {
       return { subscription_id: null, call_id: c.id, live: false, pass: "archive", archive: c.archive, segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: !c.audio_deleted };
     }
     const isLive = snap.live && world.app.capture.call_id === a.call_id && live(world.app.capture);
-    if (!isLive) return { ...snap, subscription_id: null, live: false };
+    // Deleting a call's audio keeps its transcript and ends replay.
+    if (!isLive) return { ...snap, subscription_id: null, live: false, audio_available: snap.audio_available && !world.calls.find((c) => c.id === a.call_id)?.audio_deleted };
     const sub = newId("sub");
     fake.openChannel(sub, "transcript_subscribe", send as (m: unknown) => void, snap.last_seq);
     // Like the real core, messages can reach the page before this snapshot resolves: one the
@@ -832,16 +844,34 @@ export const defaultHandlers: Handlers = {
     if (!n || !v) throw coreError("not_found", `version ${a.version_id}`);
     return { meta: { id: a.version_id, n, kind: v.kind, writer: v.kind === "generated" ? s.writer : null, created_at: (s.writer?.generated_at ?? world.now) + (n - 1) * MIN }, body_md: v.body_md };
   },
+  // As the core's share render: only ready sections, never a rejected item; an item section copies the call's items as
+  // they are now, and counts as ready once the outputs are written.
   share_copy: (a, { world }) => {
-    call(world, a.call_id);
+    const c = call(world, a.call_id);
     const out = world.outputs.find((o) => o.call_id === a.call_id);
-    if (!out || out.status === "writing" || out.status === "not_started") throw coreError("outputs_not_ready");
-    const sections = out.sections.filter((s) => !a.scope.sections.length || a.scope.sections.includes(s.kind));
-    const items = sections.flatMap((s) => s.items).filter((i) => !a.scope.item_ids.length || a.scope.item_ids.includes(i.id));
-    const unreviewed = items.filter((i) => i.review === "suggested").length;
+    const finished = out?.status === "ready" || out?.status === "partially_failed";
+    const kinds: Partial<Record<SectionKind, ItemView["kind"]>> = { decisions: "decision", action_items: "action_item", open_questions: "open_question", risks: "risk" };
+    const chosen = (out?.sections ?? [])
+      .filter((x) => !a.scope.sections.length || a.scope.sections.includes(x.kind))
+      .map((x) => {
+        const mine = world.items.filter((i) => i.call.id === c.id && i.kind === kinds[x.kind]);
+        if (!mine.length) return x;
+        const state = finished && (x.state.type === "pending" || x.state.type === "empty") ? { type: "ready" as const } : x.state;
+        return { ...x, items: mine, body_md: null, state };
+      });
+    if (!a.scope.item_ids.every((id) => chosen.some((x) => x.items.some((i) => i.id === id))))
+      throw coreError("invalid_input", "scope.item_ids", { type: "validation", field: "scope.item_ids", rule: "out_of_range" });
+    const picked = (i: ItemView) => i.review !== "rejected" && (!a.scope.item_ids.length || a.scope.item_ids.includes(i.id));
+    const blocks = chosen
+      .filter((x) => x.state.type === "ready")
+      .map((x) => ({ kind: x.kind, body: a.scope.item_ids.length ? null : x.body_md, lines: x.items.filter(picked) }))
+      .filter((b) => b.body || b.lines.length);
+    const unreviewed = blocks.flatMap((b) => b.lines).filter((i) => i.review === "suggested").length;
     if (unreviewed && !a.scope.include_unreviewed) throw coreError("unreviewed_in_scope");
-    const text = sections.map((s) => s.body_md ?? s.items.map((i) => `- ${i.text}`).join("\n")).join("\n\n");
-    return { text, sections: sections.length, items: items.length, unreviewed_in_scope: unreviewed, sensitive: out.sensitive };
+    if (!blocks.length) throw coreError("outputs_not_ready", "nothing to share yet");
+    const heading = { markdown: (k: string) => `## ${k}`, slack: (k: string) => `*${k}*`, jira: (k: string) => `h2. ${k}` }[a.format];
+    const text = blocks.map((b) => [heading(b.kind), ...(b.body ? [b.body] : []), ...b.lines.map((i) => `- ${i.text}`)].join("\n")).join("\n\n");
+    return { text, sections: blocks.length, items: blocks.reduce((n, b) => n + b.lines.length, 0), unreviewed_in_scope: unreviewed, sensitive: out?.sensitive ?? false };
   },
   calls_export: (a, { world }) => {
     if (!a.call_ids.length) throw coreError("invalid_input", "call_ids", { type: "validation", field: "call_ids", rule: "required" });
@@ -962,13 +992,15 @@ export const defaultHandlers: Handlers = {
   },
   call_tags_set: (a, { world }) => {
     for (const t of a.add) if (t.length < 1 || t.length > 32) throw coreError("invalid_input", "tag length", { type: "validation", field: "add", rule: t.length ? "too_long" : "too_short" });
-    const calls = a.call_ids.map((id) => {
-      const c = call(world, id);
+    const calls = a.call_ids.map((id) => call(world, id));
+    // One change row a call, under one batch when several change together (as the core logs it).
+    const batch_id = calls.length > 1 ? newId("bat") : null;
+    const [change_id] = calls.map((c) => {
+      const before = JSON.stringify(c.tags);
       c.tags = [...new Set([...c.tags.filter((t) => !a.remove.includes(t)), ...a.add])];
-      return c;
+      return logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, field: "tags", before, after: JSON.stringify(c.tags), summary: "Changed tags", batch_id });
     });
-    const change_id = logChange(world, { entity: { kind: "call", id: a.call_ids[0], label: "Tags" }, field: "tags", after: a.add.join(", "), summary: "Changed tags" });
-    return { calls, change_id, batch_id: a.call_ids.length > 1 ? `bat_${change_id}` : null };
+    return { calls, change_id, batch_id };
   },
   tags_list: (_a, { world }) => {
     const counts = new Map<string, number>();
@@ -1115,24 +1147,30 @@ export const defaultHandlers: Handlers = {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
-    if (rows.every((r) => r.status === "undone")) throw coreError("already_undone");
-    if (rows.some((r) => !r.undoable)) throw coreError("not_undoable");
-    rows.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
-    replayItemChanges(world, rows, "before");
-    return { undone: rows.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: 0 };
+    const open = rows.filter((r) => r.status !== "undone");
+    if (!open.length) throw coreError("already_undone");
+    if (open.some((r) => !r.undoable)) throw coreError("not_undoable");
+    // Rows edited later keep their value and are counted; the rest are undone.
+    const undo = open.filter((r) => !editedLater(world, r));
+    if (!undo.length) throw coreError("edited_later");
+    undo.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
+    replayChanges(world, undo, "before");
+    return { undone: undo.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: open.length - undo.length };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
   change_redo: (a, { world }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
-    if (rows.some((r) => r.status !== "undone")) throw coreError("not_undone");
-    const redoable = rows.filter((r) => r.redoable);
+    // After a partial undo the rows edited later are still applied: redo the undone ones.
+    const undone = rows.filter((r) => r.status === "undone");
+    if (!undone.length) throw coreError("not_undone");
+    const redoable = undone.filter((r) => r.redoable);
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
-    replayItemChanges(world, redoable, "after");
-    logChange(world, { entity: rows[0].entity, summary: `Redid: ${rows[0].summary}`, field: rows[0].field, before: rows[0].before, after: rows[0].after });
-    return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: rows.length - redoable.length };
+    replayChanges(world, redoable, "after");
+    redoable.forEach((r) => logChange(world, { entity: r.entity, summary: `Redid: ${r.summary}`, field: r.field, before: r.before, after: r.after }));
+    return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: undone.length - redoable.length };
   },
   proposals_list: (a, { world }) => {
     const rows = world.proposals.filter((p) => !a.kinds.length || a.kinds.includes(p.kind));
