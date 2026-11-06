@@ -5,8 +5,7 @@ import type { ExportInclude, ShareFormat, ShareScope } from "../../core/bindings
 import { t } from "../../i18n/format";
 import { askAlert } from "../../ui/dialogs/alerts";
 import { holdUndo } from "../history/undo";
-import { loadCall } from "./actions";
-import { loadOutputs } from "./outputs-actions";
+import { applyRecord } from "../../app/store/window-store";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-share:p1
 /** `share_copy`; `unreviewed_in_scope` comes back as the command's error for the menu to explain. */
@@ -39,14 +38,15 @@ export const revealExport = (bridge: Bridge, path: string) => bridge.act("calls:
 /** `tags_list`: the tags in use, offered while typing. */
 export const loadTags = (bridge: Bridge) => bridge.act("tags:list", "tags_list", () => bridge.core.tagsList({}));
 
-/** `call_tags_set` for one call; the undo strip gets the change (or batch) and the call row is read again. */
+/** `call_tags_set` for one call; the undo strip gets the change (or batch) and the returned call row replaces the held one. */
 export async function setTags(bridge: Bridge, callId: string, add: string[], remove: string[]) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-set
   const r = await bridge.act(`tags:set:${callId}`, "call_tags_set", () => bridge.core.callTagsSet({ call_ids: [callId], add, remove }));
   if (r.status !== "ok") return r;
   const message = add.length ? t("tags.added", { tag: add[0]! }) : t("tags.removed", { tag: remove[0]! });
-  holdUndo({ target: r.data.batch_id ? { type: "batch", batch_id: r.data.batch_id } : { type: "change", change_id: r.data.change_id }, message, refresh: () => void loadCall(bridge, callId) });
-  void loadCall(bridge, callId);
+  holdUndo({ target: r.data.batch_id ? { type: "batch", batch_id: r.data.batch_id } : { type: "change", change_id: r.data.change_id }, message });
+  // the call row comes back with its tags; nothing else is read again
+  bridge.store.setState((st) => applyRecord(st, "call", { call: r.data.calls[0] }));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-set
   return r;
 }
@@ -61,7 +61,5 @@ export async function deleteAudio(bridge: Bridge, callId: string, ask: typeof as
   const r = await bridge.act(`audio:delete:${callId}`, "audio_delete", () => bridge.core.audioDelete({ call_ids: [callId] }));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete
   if (r.status !== "ok") return "failed";
-  void loadCall(bridge, callId);
-  void loadOutputs(bridge, callId);
-  return "deleted";
+  return "deleted"; // `entity:changed call` carries `audio_deleted`
 }
