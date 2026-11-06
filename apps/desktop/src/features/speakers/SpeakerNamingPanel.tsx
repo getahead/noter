@@ -115,8 +115,8 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
       <header className="pc-name__head">
         <h3 className="pc-name__title">
           {hidden
-            ? t("speakers.panel.hidden", { count: rows.unnamed })
-            : t("speakers.panel.title", { count: rows.unnamed })}
+            ? t("speakers.panel.hidden", { count: rows.open.length })
+            : t("speakers.panel.title", { count: rows.open.length })}
         </h3>
         <PushButton
           variant="quiet"

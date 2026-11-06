@@ -2,9 +2,9 @@
 // PC-R9 speaker naming panel, Person picker). Real-core stories of cpt-noter-seq-call-screen-name-speaker (every path); the page story (S2) follows with its panel. The call window's typing focus (the non-activating panel becoming key for
 // the popover field) is native: XCUITest test_cpt_noter_seq_call_screen_name_speaker; the webview parts are here. Written before
 // the screens exist (tests first). Assumptions: the real core's unnamed speaker has one line, so counts are read from the core's
-// speaker rows, not DESIGN's 12/14; the person to pick is Pavel (a participant of the fixture call); `people_list` is M3
+// speaker rows, not DESIGN's 12/14; the person to pick is Pavel (a participant of the fixture call; the real core offers no invite chip for it); `people_list` is M3
 // (not_implemented), so Recent people is not asserted. Copy and labels are DESIGN's, never adjusted to the markup.
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { openWindow } from "./support/app";
 import { navigate } from "./support/call-page";
@@ -99,12 +99,80 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
 });
 
 test.describe("cpt-noter-seq-call-page-name-speakers", () => {
+  const pick = async (row: Locator, q = "Pav") => {
+    await row.getByRole("combobox", { name: "Name…" }).fill(q);
+    await row.getByRole("option", { name: /^Pavel/ }).click();
+  };
   const open = async (page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = (w) => S.unnamed(w, 2)) => {
     const steer = await openWindow(page, "main", { world });
     await navigate(page, "transcript", S.CALL);
     await expect(page.locator('[data-region="PC-R5"]')).toBeVisible();
     return steer;
   };
+
+  test("UI — happy path: Name speakers · 3 not named, Play Sample shows Playing…, typing Pav and picking Pavel fills Name…, Name says Named Speaker 3 as … · N lines with Undo", async ({ page }) => {
+    await open(page);
+    await expect(panel(page)).toContainText("Name speakers · 3 not named");
+    const row = rowOf(page, "Speaker 3");
+    await expect(row).toContainText(LINES);
+    await row.getByRole("button", { name: "Play Sample" }).click();
+    expect(await sent(page, "audio_play")).toEqual([expect.objectContaining({ call_id: S.CALL })]);
+    await expect(row).toContainText("Playing…");
+
+    await pick(row);
+    await expect(row.getByRole("combobox", { name: "Name…" })).toHaveValue(/Pavel/);
+    await row.getByRole("button", { name: "Name", exact: true }).click();
+    expect(await sent(page, "transcript_name_speakers")).toEqual([
+      expect.objectContaining({ call_id: S.CALL, assignments: [expect.objectContaining({ speaker_id: "spk_3", person: expect.objectContaining({ type: "existing" }) })] }),
+    ]);
+    await expect(page.getByText(new RegExp(`Named Speaker 3 as Pavel[^·]* · ${LINES.source}`))).toBeVisible();
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
+    await expect(panel(page)).toContainText("Name speakers · 2 not named");
+  });
+
+  test("UI — happy path: naming the last speaker says All speakers named · Undo, and Undo restores the row", async ({ page }) => {
+    await open(page, () => {});
+    await pick(rowOf(page, "Speaker 3"));
+    await rowOf(page, "Speaker 3").getByRole("button", { name: "Name", exact: true }).click();
+    await expect(panel(page)).toContainText("All speakers named");
+    await page.getByRole("button", { name: "Undo" }).click();
+    expect((await sent(page, "change_undo")).length).toBe(1);
+    await expect(panel(page)).toContainText("Name speakers · 1 not named");
+  });
+
+  test("UI — empty path: Speaker skipped — Skip moves the row into Skipped (1), the count drops, Speaker 4 stays the label", async ({ page }) => {
+    await open(page);
+    await rowOf(page, "Speaker 4").getByRole("button", { name: "Skip" }).click();
+    expect(await sent(page, "transcript_name_speakers")).toEqual([
+      expect.objectContaining({ assignments: [expect.objectContaining({ speaker_id: "spk_4", person: null })] }),
+    ]);
+    await expect(panel(page)).toContainText("Skipped (1)");
+    await expect(panel(page)).toContainText("Name speakers · 2 not named");
+    await expect(rowOf(page, "Speaker 4")).toHaveCount(0);
+  });
+
+  test("UI — empty path: Audio no longer kept — no Play Sample, the first line and the count stay, typing and Name name the speaker from the text", async ({ page }) => {
+    await open(page, (w) => (S.unnamed(w, 1), S.audioGone(w)));
+    await expect(panel(page)).toContainText("Name speakers · 2 not named");
+    await expect(panel(page).getByRole("button", { name: "Play Sample" })).toHaveCount(0);
+    await expect(rowOf(page, "Speaker 3")).toContainText(LINES);
+    await pick(rowOf(page, "Speaker 3"));
+    await rowOf(page, "Speaker 3").getByRole("button", { name: "Name", exact: true }).click();
+    expect(await sent(page, "audio_play")).toEqual([]);
+    expect((await sent(page, "transcript_name_speakers")).length).toBe(1);
+  });
+
+  test("UI — other path: Name a skipped speaker later — Skipped (1) › Name… brings Speaker 4 back, typing opens the matches, Name says Named Speaker 4 as Pavel", async ({ page }) => {
+    await open(page);
+    await rowOf(page, "Speaker 4").getByRole("button", { name: "Skip" }).click();
+    await panel(page).getByRole("button", { name: /Skipped \(1\)/ }).click();
+    await panel(page).getByRole("button", { name: "Name…" }).click();
+    const row = rowOf(page, "Speaker 4");
+    await expect(row).toBeVisible();
+    await pick(row);
+    await row.getByRole("button", { name: "Name", exact: true }).click();
+    await expect(page.getByText(new RegExp(`Named Speaker 4 as Pavel[^·]* · ${LINES.source}`))).toBeVisible();
+  });
 
   test("UI — other path: Hide ▴ leaves 3 speakers not named · Show, Show brings the panel back", async ({ page }) => {
     await open(page);
@@ -113,5 +181,18 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await expect(panel(page).getByRole("button", { name: "Show" })).toBeVisible();
     await panel(page).getByRole("button", { name: "Show" }).click();
     await expect(panel(page)).toContainText("Name speakers · 3 not named");
+  });
+
+  test("UI — error path: a failed Name keeps the row with its chosen person and offers a retry", async ({ page }) => {
+    const steer = await open(page);
+    const row = rowOf(page, "Speaker 3");
+    await pick(row);
+    await steer.failNext("transcript_name_speakers", "not_found");
+    await row.getByRole("button", { name: "Name", exact: true }).click();
+    await expect(row.getByRole("alert")).toBeVisible();
+    await expect(row.getByRole("combobox", { name: "Name…" })).toHaveValue(/Pavel/);
+    expect(await sent(page, "transcript_name_speakers")).toHaveLength(1);
+    await row.getByRole("button", { name: "Name", exact: true }).click();
+    await expect.poll(async () => (await sent(page, "transcript_name_speakers")).length).toBe(2);
   });
 });
