@@ -243,7 +243,26 @@ describe("commitDraft and readVersion", () => {
 });
 
 describe("the action item row slot", () => {
-  afterEach(() => void (slots.actionItemRow = null));
+  afterEach(() => { slots.actionItemRow = null; slots.rejectedList = null; });
+  it("keeps the action row as a React component and passes rejected rows to the registered slots", async () => {
+    const accepted = row("Send it");
+    const rejected = row("Not this", "rejected");
+    await open([]);
+    const Row = ({ item }: { item: ItemView }) => <b>{item.text}</b>;
+    const Rejected = ({ items }: { items: ItemView[] }) => <aside>{items.map((i) => i.text).join()}</aside>;
+    slots.actionItemRow = Row;
+    slots.rejectedList = Rejected;
+    const section = sec("action_items", { items: [accepted, rejected] });
+    const props = { bridge, call: bridge.store.getState().entities.call[id]!, prefs: bridge.store.getState().app!.prefs, section, writing: false, onRegenerate() {} };
+    const tree = rendered(OutputSection, props);
+    expect(find(tree, (p, type) => type === Row && p.item === rejected).props.bridge).toBe(bridge);
+    expect(find(tree, (_, type) => type === Rejected).props.items).toEqual([accepted, rejected]);
+    const html = renderToString(tree);
+    expect(html.indexOf("</ul>")).toBeLessThan(html.indexOf("<aside>"));
+    const decisions = rendered(OutputSection, { ...props, section: { ...section, kind: "decisions" as const } });
+    expect(find(decisions, (_, type) => type === Rejected).props.items).toEqual([accepted, rejected]);
+    expect(() => find(decisions, (_, type) => type === Row)).toThrow("no matching element");
+  });
   it("draws the registered row for action items and the plain row otherwise", async () => {
     await open([sec("action_items", { items: [row("Send it")] }), sec("decisions", { items: [row("Ship it")] })]);
     slots.actionItemRow = ({ item }) => <b>{`review:${item.text}`}</b>;

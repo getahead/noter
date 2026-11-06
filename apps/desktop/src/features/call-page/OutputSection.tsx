@@ -41,6 +41,8 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
     if (section.regenerated_with_edits && section.summary_id && !versions) void loadVersions(bridge, section.summary_id);
   }, [bridge, section.regenerated_with_edits, section.summary_id, versions]);
   const counts = sectionCounts(section);
+  const Row = section.kind === "action_items" ? slots.actionItemRow : null;
+  const RejectedList = slots.rejectedList;
 
   useEffect(() => {
     if (!saved) return;
@@ -126,7 +128,10 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
       if (comparing && shown) return <DiffView before={shown.body_md} after={section.body_md ?? ""} title={t("outputs.diff_head", { from: versionName(shown.meta), to: section.user_edited ? t("outputs.your_edit_short") : t("outputs.current") })} />;
       return <MarkdownBody md={shown ? shown.body_md : (section.body_md ?? "")} />;
     }
-    return <ul className="pc-items">{section.items.filter((i) => i.review !== "rejected").map((i) => (section.kind === "action_items" && slots.actionItemRow ? <li key={i.id}>{slots.actionItemRow({ bridge, item: i })}</li> : <OutputItemRow key={i.id} bridge={bridge} item={i} />))}</ul>;
+    return <>
+      <ul className="pc-items">{section.items.filter((i) => Row || i.review !== "rejected").map((i) => (Row ? <li key={i.id}><Row bridge={bridge} item={i} /></li> : <OutputItemRow key={i.id} bridge={bridge} item={i} />))}</ul>
+      {RejectedList && <RejectedList bridge={bridge} items={section.items} />}
+    </>;
   };
 
   return (
