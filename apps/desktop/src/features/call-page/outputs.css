@@ -19,3 +19,8 @@
 .pc-item__text { flex: 1 1 auto; min-width: 0; }
 .pc-regen { display: grid; gap: 12px; }
 .pc-regen__row { display: grid; gap: 4px; border: 0; padding: 0; margin: 0; }
+
+/* Tags (Call info), Export status */
+.pc-tags { display: flex; flex-direction: column; gap: 6px; }
+.pc-tags__field { width: 100%; box-sizing: border-box; }
+.pc-export-done { font-size: 11px; color: var(--text-secondary, inherit); white-space: nowrap; }

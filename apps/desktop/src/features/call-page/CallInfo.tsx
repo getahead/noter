@@ -10,6 +10,9 @@ import { Toggle } from "../../ui/primitives/toggle";
 import { openPrivacySettings, setCallType, setSensitive } from "./actions";
 import { useExtras, useTypes } from "./cache";
 import { callInfo } from "./logic";
+import { deleteAudio } from "./share-actions";
+import { TagsField } from "./TagsField";
+import { PushButton } from "../../ui/primitives/push-button";
 
 // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-call-info
 export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string }) {
@@ -55,6 +58,8 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
             </dd>,
           ])}
         </dl>
+        <h3 className="pc-info__h">{t("tags.label")}</h3>
+        <TagsField bridge={bridge} callId={callId} tags={call.tags} />
       </div>
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.privacy")}</h3>
@@ -66,6 +71,7 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.audio")}</h3>
         <p className={info.audioKept ? undefined : "np-dim"}>{info.audio}</p>
+        {info.audioKept && <PushButton label={t("audio.delete")} variant="destructive" size="small" onAction={() => void deleteAudio(bridge, callId)} />}
       </div>
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.processing")}</h3>

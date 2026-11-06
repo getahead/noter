@@ -24,6 +24,7 @@ export const resetOutputsCache = () => ((held = { outputs: new Map(), versions: 
 
 export const useOutputs = (callId: string): CallOutputs | undefined => useSyncExternalStore(subscribe, () => held.outputs.get(callId), () => held.outputs.get(callId));
 export const useVersions = (summaryId: string | null): VersionList | undefined => useSyncExternalStore(subscribe, () => (summaryId ? held.versions.get(summaryId) : undefined), () => undefined);
+export const getOutputs = (callId: string): CallOutputs | undefined => held.outputs.get(callId);
 export const bodyOf = (summaryId: string, versionId: string): VersionBody | undefined => held.bodies.get(`${summaryId}/${versionId}`);
 export const useBody = (summaryId: string | null, versionId: string | null): VersionBody | undefined =>
   useSyncExternalStore(subscribe, () => (summaryId && versionId ? held.bodies.get(`${summaryId}/${versionId}`) : undefined), () => undefined);

@@ -45,17 +45,23 @@ async function open(page: Page, world: (w: World) => void, latency = 0) {
     [W.PAST_CALL, latency],
   );
 }
-const shot = async (page: Page, name: string) => {
+const shot = async (page: Page, name: string, timeout?: number) => {
   await page.evaluate(() => ((document.activeElement as HTMLElement | null)?.blur(), scrollTo(0, 0)));
-  await expect(page).toHaveScreenshot(`${name}.png`);
+  await expect(page).toHaveScreenshot(`${name}.png`, { timeout });
 };
 
 test.describe("cpt-noter-dod-ui-call-page-frame-frame call page", () => {
   test("transcript view with Call info, audio kept", async ({ page }) => {
+    // The virtualised transcript measures its rows after fonts load; keep its scroll instant and dates fixed.
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.clock.setFixedTime(new Date("2026-11-06T12:00:00Z"));
     await open(page, quiet(fuller));
     await stored(page, /audio kept until/);
     await expect(page.locator('[data-region="MW-R4"]')).toContainText("Kept until");
-    await shot(page, "transcript-audio-kept");
+    await expect(page.getByRole("combobox", { name: "Tags", exact: true })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    // Linux WebKit's first capture can consume the default 5 s before the second stability capture starts.
+    await shot(page, "transcript-audio-kept", 15_000);
   });
 
   test("Call info: audio deleted, transcript kept", async ({ page }) => {

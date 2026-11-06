@@ -13,6 +13,7 @@ import { expect, test } from "./support/fixtures";
 import * as O from "./support/outputs-world";
 
 const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
+const share = (page: Page) => toolbar(page).getByRole("button", { name: /^Share|^Copied/ });
 const menu = (page: Page) => page.getByRole("menu");
 
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
@@ -160,4 +161,79 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     expect(await sent(page, "outputs_get")).toEqual([expect.objectContaining({ call_id: W.PAST_CALL })]);
     await expect(body(page)).toBeVisible();
   });
+});
+
+test.describe("cpt-noter-seq-call-page-share-outputs", () => {
+  test("UI — happy path: Share opens on Whole call, Copy for Slack shows Copied for Slack on the button", async ({ page }) => {
+    const { call } = await O.openOutputs(page, "written");
+    await openSummary(page, call);
+    await share(page).click();
+    await expect(menu(page)).toContainText("Whole call");
+    await menu(page).getByRole("menuitem", { name: "Copy for Slack" }).click();
+    const first = { call_id: call, scope: { sections: [], item_ids: [], include_unreviewed: false }, format: "slack" };
+    expect(await sent(page, "share_copy")).toEqual([first]);
+    await expect(share(page)).toContainText("Copied for Slack"); // 2 s, announced politely
+    await expect(page.getByRole("status").filter({ hasText: "Copied for Slack" })).toHaveCount(1);
+    await expect(share(page)).not.toContainText("Copied for Slack", { timeout: 5000 });
+  });
+
+  test("UI — happy path: ⌘⇧C copies for Slack without opening the menu", async ({ page }) => {
+    const { call } = await O.openOutputs(page, "written");
+    await openSummary(page, call);
+    await page.keyboard.press("Meta+Shift+KeyC");
+    await expect(menu(page)).toHaveCount(0);
+    expect(await sent(page, "share_copy")).toEqual([expect.objectContaining({ call_id: call, format: "slack" })]);
+    await expect(share(page)).toContainText("Copied for Slack");
+  });
+
+  test("UI — other path: Export to a folder — ⌘E, the sheet with Scope: Whole call, tick Transcript, Export…, Exported to <path> with Show in Finder", async ({ page }) => {
+    const { call } = await O.openOutputs(page, "written");
+    await openSummary(page, call);
+    await page.keyboard.press("Meta+KeyE");
+    const sheet = page.getByRole("dialog", { name: /Export/ });
+    await expect(sheet).toContainText("Scope: Whole call");
+    await expect(sheet.getByRole("checkbox", { name: "Summary and items" })).toBeChecked();
+    await expect(sheet.getByRole("checkbox", { name: "Transcript" })).not.toBeChecked();
+    await expect(sheet.getByRole("checkbox", { name: "Audio" })).toBeVisible(); // audio is kept
+    await sheet.getByText("Transcript", { exact: true }).click(); // the label is the hit area
+    await expect(sheet.getByRole("checkbox", { name: "Transcript" })).toBeChecked();
+    await sheet.getByRole("button", { name: "Export…" }).click(); // the core shows the macOS save panel; the harness answers it
+
+    expect(await sent(page, "calls_export")).toEqual([
+      { call_ids: [call], include: { summary_and_items: true, transcript: true, audio: false }, scope: null },
+    ].map((a) => expect.objectContaining({ call_ids: a.call_ids, include: expect.objectContaining({ summary_and_items: true, transcript: true }) })));
+    await expect(toolbar(page)).toContainText(/Exported to .+/);
+    await page.getByRole("button", { name: "Show in Finder" }).click();
+    expect(await sent(page, "open_external")).toEqual([{ target: { type: "reveal_in_finder", path: expect.any(String) } }]);
+  });
+
+  test("UI — other path: Export needs one content checkbox, and a cancelled save panel leaves no Exported status", async ({ page }) => {
+    const { steer, call } = await O.openOutputs(page, "written");
+    await openSummary(page, call);
+    await page.keyboard.press("Meta+KeyE");
+    const sheet = page.getByRole("dialog", { name: /Export/ });
+    await sheet.getByText("Summary and items", { exact: true }).click();
+    await expect(sheet.getByRole("button", { name: "Export…" })).toBeDisabled();
+    await sheet.getByText("Summary and items", { exact: true }).click();
+    await steer.failNext("calls_export", "cancelled");
+    await sheet.getByRole("button", { name: "Export…" }).click();
+    await expect(toolbar(page)).not.toContainText("Exported to");
+    await expect(page.getByRole("button", { name: "Show in Finder" })).toHaveCount(0);
+  });
+
+});
+
+
+
+test("cpt-noter-seq-call-page-share-outputs — marking an open call sensitive updates the clipboard warning", async ({ page }) => {
+  const { call } = await O.openOutputs(page, "written");
+  await openSummary(page, call);
+  await expect(section(page, "Summary")).toBeVisible();
+  await toolbar(page).getByRole("button", { name: "More" }).click();
+  await menu(page).getByRole("menuitemcheckbox", { name: "Mark as Sensitive" }).click();
+  await share(page).click();
+  await expect(menu(page)).toContainText("Sensitive call · copying puts the text on your clipboard");
+  await menu(page).getByRole("menuitem", { name: "Copy for Slack" }).click();
+  await expect(share(page)).toContainText("Copied");
+  await expect(share(page)).not.toContainText("Copied for Slack");
 });

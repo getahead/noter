@@ -9,7 +9,6 @@ import { Menu, type MenuItem } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
-import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { TextField } from "../../ui/primitives/text-field";
 import type { PageToolbarProps } from "../shell/pages";
@@ -17,6 +16,11 @@ import { MainToolbar } from "../shell/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow, CallTypeInfo, CallPageTab } from "../../core/bindings";
 import { menuActs, saveTitle } from "./actions";
+import { useExtras } from "./cache";
+import { useExport } from "./ExportSheet";
+import { deleteAudio, revealExport } from "./share-actions";
+import { ShareMenu } from "./ShareMenu";
+import { exportOpener } from "./share-run";
 import { useTypes } from "./cache";
 import { useRegenerate } from "./RegenerateSheet";
 import { registeredViews } from "./views";
@@ -24,7 +28,7 @@ import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
 
 
 /** The ⋯ menu's items for a call (the later items join with their features). */
-export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void }): MenuItem[] {
+export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; deleteAudio?: (() => void) | null; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void }): MenuItem[] {
   const sensitive = call.privacy === "sensitive";
   return [
     // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
@@ -35,6 +39,7 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
     { divider: true },
     ...(act.regenerate ? [{ label: t("outputs.menu.regenerate"), onSelect: act.regenerate }] : []),
     { label: t("callpage.show_in_finder"), onSelect: act.finder },
+    ...(act.deleteAudio ? [{ label: t("audio.delete"), onSelect: act.deleteAudio }] : []),
     { divider: true },
     { label: t("callpage.delete"), destructive: true, kbd: "⌘⌫", disabled: act.remove === null, onSelect: act.remove ?? undefined },
   ];
@@ -46,7 +51,19 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const types = useTypes();
   const openRegenerate = useRegenerate(bridge, at.callId);
+  const extras = useExtras(at.callId);
   const [renaming, setRenaming] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
+  const audioKept = !!call && !call.audio_deleted && !extras?.audio_not_stored;
+  const openExport = useExport(bridge, at.callId, audioKept, setExported);
+  // the status stays 8 s
+  useEffect(() => {
+    if (!exported) return;
+    const id = setTimeout(() => setExported(null), 8000);
+    return () => clearTimeout(id);
+  }, [exported]);
+  // ⌘E reaches the sheet through the page key
+  useEffect(() => ((exportOpener.open = openExport), () => void (exportOpener.open = null)), [openExport]);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const { segments, view } = callViews(registeredViews(), at.tab);
   const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));
@@ -68,13 +85,19 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
       }
       trailing={
         <>
-          <PushButton label={t("callpage.share")} variant="secondary" disabled />
+          <ShareMenu bridge={bridge} callId={at.callId} origin={{ type: "toolbar" }} id="pc-share" />
+          {exported && (
+            <span role="status" className="pc-export-done">
+              {t("export.done", { path: exported })} ·{" "}
+              <button type="button" className="np-link" onClick={() => void revealExport(bridge, at.callId, exported)}>{t("export.show")}</button>
+            </span>
+          )}
           <PullDownButton id="pc-more" iconOnly icon="ellipsis" label={t("callpage.more")} ariaLabel={t("callpage.more")} variant="item-menu" size="toolbar" open={menu !== null} onAction={() => setMenu(menu ? null : globalThis.document?.getElementById("pc-more") ?? null)} />
           {/* @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-user-more */}
           {menu && call && (
             <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
               <Menu
-                items={moreItems(call, types, { ...menuActs(bridge, call, () => setRenaming(true)), regenerate: () => openRegenerate(["summary", "decisions", "action_items", "open_questions"]) })}
+                items={moreItems(call, types, { ...menuActs(bridge, call, () => setRenaming(true)), regenerate: () => openRegenerate(["summary", "decisions", "action_items", "open_questions"]), deleteAudio: audioKept ? () => void deleteAudio(bridge, at.callId) : null })}
                 onClose={() => setMenu(null)}
               />
             </Popover>

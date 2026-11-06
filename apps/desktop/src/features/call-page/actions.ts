@@ -2,6 +2,8 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow } from "../../core/bindings";
 import { chord, isTyping, type ShortcutEvent } from "../../app/a11y/keys";
 import { extrasOf, holdDeleteError, holdExtras, holdTypes } from "./cache";
+import { exportOpener, runShare } from "./share-run";
+import { shareKey } from "./share-logic";
 import { slots } from "./slots";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-frame-open:p1
@@ -90,8 +92,18 @@ export async function deleteCall(bridge: Bridge, callId: string): Promise<void> 
   if (res.outcome === "failed") holdDeleteError(callId, res.error);
 }
 
+/** ⌘⇧C ⌥⌘C ⌥⇧⌘C copy the whole call and ⌘E exports it, except while typing; ⌘C stays the standard copy. */
+export function shareShortcut(bridge: Bridge, callId: string, e: ShortcutEvent & { repeat: boolean }) {
+  const what = shareKey(chord(e));
+  if (!what || e.repeat || isTyping(e.target)) return;
+  e.preventDefault();
+  if (what === "export") exportOpener.open?.({ type: "toolbar" });
+  else void runShare(bridge, callId, { type: "toolbar" }, what);
+}
+
 /** ⌘⌫ on the call page is Delete Call… once the call is read (as the ⋯ menu), except in a text field (the title being renamed). */
 export function pageKey(bridge: Bridge, callId: string, e: ShortcutEvent & { repeat: boolean }) {
+  shareShortcut(bridge, callId, e);
   // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
   if (chord(e) !== "Meta+Backspace" || e.repeat || isTyping(e.target) || !slots.deleteCall || !bridge.store.getState().entities.call[callId]) return;
   e.preventDefault();

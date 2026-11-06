@@ -1,6 +1,9 @@
 // Starting states of the call-page outputs stories (DESIGN.md Screen — Call page PC-R2/PC-R3), as mutations of the
 // fixture world: the fixture's past call "Backend sync" with its outputs written the way the stories' preconditions
 // say. Tests only; the real core takes the whole world through harness.world_set, the fake through the plan.
+import type { Page } from "@playwright/test";
+import { openWindow } from "./app";
+
 import type { ItemView, OutputSection, SectionKind, SectionState } from "../../../src/core/bindings";
 import * as W from "../../support/world-presets";
 import type { World } from "../../support/scenario";
@@ -91,4 +94,11 @@ export function sensitive(w: World): void {
   const d = w.call_details.find((x) => x.call.id === W.PAST_CALL)!;
   d.call.privacy = "sensitive";
   w.calls.find((c) => c.id === W.PAST_CALL)!.privacy = "sensitive";
+}
+
+/** The shared written fixture works on both cores now that #312 imports outputs into the database. */
+export async function openOutputs(page: Page, kind: "written") {
+  const presets = { written };
+  const steer = await openWindow(page, "main", { world: presets[kind] });
+  return { steer, call: W.PAST_CALL };
 }

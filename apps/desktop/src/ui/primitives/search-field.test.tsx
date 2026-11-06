@@ -91,3 +91,10 @@ describe("search-field keys (cpt-noter-flow-ui-primitives-operate-control)", () 
     expect(press("Escape", { value: "にほ", selectionStart: 2, selectionEnd: 2 }, { composing: true }).onChange).not.toHaveBeenCalled();
   });
 });
+
+
+it("keeps native tag suggestions and invalid state on the token field input", () => {
+  const html = renderToString(<SearchField variant="token-field" list="known-tags" invalid ariaLabel="Tags" />);
+  expect(html).toMatch(/<input[^>]*list="known-tags"[^>]*aria-invalid="true"/);
+  expect(renderToString(<SearchField />)).not.toContain("aria-invalid");
+});

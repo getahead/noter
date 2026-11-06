@@ -16,6 +16,7 @@ import { OutputItemRow } from "./OutputItemRow";
 import { commitDraft, loadVersions, readVersion } from "./outputs-actions";
 import { bodyOf, useVersions } from "./outputs-cache";
 import { isProse, versionName, metaLine, SECTION_LABEL, sectionCounts, sectionId } from "./outputs-logic";
+import { ShareMenu } from "./ShareMenu";
 import { slots } from "./slots";
 import { VersionSwitcher } from "./VersionSwitcher";
 
@@ -143,6 +144,11 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
           {counts.review > 0 && <Badge kind="count" tone="accent" text={t("outputs.review_count", { n: counts.review })} />}
           {section.user_edited && <Badge kind="status" text={t("outputs.edited")} />}
         </span>
+        {!prose && state === "ready" && (
+          <span className="pc-sec__actions">
+            <ShareMenu bridge={bridge} callId={call.id} origin={{ type: "section", kind: section.kind }} id={`pc-share-${section.kind}`} />
+          </span>
+        )}
         {prose && state === "ready" && !draft && (
           <span className="pc-sec__actions">
             {saved && <span className="np-dim" role="status">{t("outputs.saved")}</span>}
