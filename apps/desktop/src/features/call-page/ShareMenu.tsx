@@ -47,7 +47,8 @@ export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; call
   const status = useShareStatus();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const mine = status && status.callId === callId && sameOrigin(status.origin, origin) ? status : null;
-  const { ready, sensitive } = shareState(outputs);
+  const privacy = useWindow(bridge, (s) => s.entities.call[callId]?.privacy);
+  const { ready, sensitive } = shareState(outputs, privacy);
   const toggle = () => setAnchor(anchor ? null : globalThis.document?.getElementById(id) ?? null);
   const label = origin.type === "section" ? t("share.section", { section: t(SECTION_LABEL[origin.kind as SectionKind]) }) : t("callpage.share");
   return (

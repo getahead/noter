@@ -1,6 +1,6 @@
 // Pure rules of Share, Export and tags on the call page: the scope a control stands for, whether copying can start,
 // the label that confirms it and tag validation. Nothing here reads the store or draws.
-import type { CallOutputs, SectionKind, ShareFormat, ShareScope } from "../../core/bindings";
+import type { CallRow, CallOutputs, SectionKind, ShareFormat, ShareScope } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { SECTION_LABEL } from "./outputs-logic";
 
@@ -19,7 +19,7 @@ export function scopeOf(origin: ShareOrigin, includeUnreviewed: boolean): ShareS
 export const scopeLine = (origin: ShareOrigin): string => (origin.type === "section" ? t(SECTION_LABEL[origin.kind]) : t("share.whole_call"));
 
 /** Copying needs ready outputs (before they are read the core decides: `outputs_not_ready`); a sensitive call says so and confirms with a plain **Copied**. */
-export const shareState = (o: Pick<CallOutputs, "status" | "sensitive"> | undefined) => ({ ready: !o || (o.status !== "writing" && o.status !== "not_started"), sensitive: !!o?.sensitive });
+export const shareState = (o: Pick<CallOutputs, "status" | "sensitive"> | undefined, privacy?: CallRow["privacy"]) => ({ ready: !o || (o.status !== "writing" && o.status !== "not_started"), sensitive: privacy ? privacy === "sensitive" : !!o?.sensitive });
 
 const FORMAT_LABEL = { slack: "share.copied.slack", jira: "share.copied.jira", markdown: "share.copied.markdown" } as const;
 export const copiedLabel = (f: ShareFormat, sensitive: boolean): string => t(sensitive ? "share.copied" : FORMAT_LABEL[f]);

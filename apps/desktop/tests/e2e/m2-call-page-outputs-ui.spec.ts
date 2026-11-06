@@ -223,3 +223,17 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
 
 });
 
+
+
+test("cpt-noter-seq-call-page-share-outputs — marking an open call sensitive updates the clipboard warning", async ({ page }) => {
+  const { call } = await O.openOutputs(page, "written");
+  await openSummary(page, call);
+  await expect(section(page, "Summary")).toBeVisible();
+  await toolbar(page).getByRole("button", { name: "More" }).click();
+  await menu(page).getByRole("menuitemcheckbox", { name: "Mark as Sensitive" }).click();
+  await share(page).click();
+  await expect(menu(page)).toContainText("Sensitive call · copying puts the text on your clipboard");
+  await menu(page).getByRole("menuitem", { name: "Copy for Slack" }).click();
+  await expect(share(page)).toContainText("Copied");
+  await expect(share(page)).not.toContainText("Copied for Slack");
+});

@@ -23,6 +23,11 @@ describe("share state", () => {
     expect(shareState(out({ status: "ready", sensitive: true }))).toEqual({ ready: true, sensitive: true });
     expect(shareState(undefined).ready).toBe(true); // not read yet: the core answers `outputs_not_ready`
   });
+  it("uses the current call privacy when the held outputs still have the earlier privacy", () => {
+    expect(shareState(out({ sensitive: false }), "sensitive").sensitive).toBe(true);
+    expect(shareState(out({ sensitive: true }), "normal").sensitive).toBe(false);
+    expect(shareState(undefined, "sensitive").sensitive).toBe(true);
+  });
   it("labels the copy for the format, and plain Copied for a sensitive call", () => {
     expect(copiedLabel("slack", false)).toBe("Copied for Slack");
     expect(copiedLabel("jira", false)).toBe("Copied for Jira");
