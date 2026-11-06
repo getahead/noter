@@ -22,9 +22,8 @@ export const ITEM = "itm_replay";
 export const itemOf = (w: World): ItemView => w.items.find((i) => i.id === ITEM)!;
 export const callOf = (w: World) => itemOf(w).call.id;
 
-/** The item stands in the fake's written outputs of the past call, so its call page shows it (the real core's own call page does). */
+/** The item stands in the written outputs of the past call (both cores take the world: the real one through harness.world_set), so its call page shows it. */
 export function place(w: World): void {
-  if (REAL) return;
   written(w);
   const it = itemOf(w);
   it.call = { ...it.call, id: W.PAST_CALL, title: "Backend sync" };

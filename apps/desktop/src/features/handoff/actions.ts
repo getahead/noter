@@ -20,6 +20,16 @@ const get = (bridge: Bridge, itemId: string) => bridge.act(`handoff:${itemId}`, 
 // @cpt-flow:cpt-noter-flow-ui-handoff-prepare:p1
 /** `handoff_get`, then `handoff_generate` when no prompt exists yet; the finished prompt arrives as `entity:changed handoff`. */
 export async function load(bridge: Bridge, itemId: string) {
+  if (loading.has(itemId)) return;
+  loading.add(itemId);
+  try {
+    await read(bridge, itemId);
+  } finally {
+    loading.delete(itemId);
+  }
+}
+
+async function read(bridge: Bridge, itemId: string) {
   patchLocal(itemId, { loadFailed: undefined, genFailed: undefined });
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-get
   const res = await get(bridge, itemId);
@@ -28,8 +38,22 @@ export async function load(bridge: Bridge, itemId: string) {
   if (res.data.state.type === "not_generated") await generate(bridge, itemId, false);
 }
 
+/** Items whose first write is being asked for: the drawer may mount twice (strict mode), the core is asked once. */
+const asking = new Set<string>();
+const loading = new Set<string>();
+
 /** Write the prompt (again): **Regenerate** drops the user's edit, **Try Again** repeats a failed first write. */
 export async function generate(bridge: Bridge, itemId: string, regenerate: boolean) {
+  if (!regenerate && asking.has(itemId)) return;
+  asking.add(itemId);
+  try {
+    await write(bridge, itemId, regenerate);
+  } finally {
+    asking.delete(itemId);
+  }
+}
+
+async function write(bridge: Bridge, itemId: string, regenerate: boolean) {
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-regenerate
   patchLocal(itemId, { restored: undefined, genFailed: undefined, loadFailed: undefined, ...(regenerate ? { draft: undefined, showDiff: undefined, opened: undefined, openFailed: undefined, error: undefined } : {}) });
   const res = await bridge.act(`handoff:gen:${itemId}`, "handoff_generate", () => bridge.core.handoffGenerate({ item_id: itemId, regenerate }), { entity: "handoff" });
