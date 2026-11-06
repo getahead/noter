@@ -81,7 +81,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await openCall(page);
     // the real core sends no participants yet (CallRow.participants is empty), so its subtitle ends at the length
     await expect(toolbar(page)).toContainText(STDIO ? /52 min/ : /52 min · Dmitri S\., Oleg M\., You/);
-    await expect(button(page, "Back")).toBeEnabled();
+    await expect(button(page, /^Back$/)).toBeEnabled();
     await expect(toolbar(page).getByText("Transcript", { exact: true })).toBeVisible(); // the view control lists what is delivered
     await expect(toolbar(page).getByText("History", { exact: true })).toBeVisible(); // delivered by history-undo (M2)
     await expect(toolbar(page).getByText("Summary", { exact: true })).toBeVisible(); // M2: Call page outputs
@@ -108,7 +108,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     expect(await sent(page, "window_report_view")).toContainEqual({
       call_id: W.PAST_CALL,
     });
-    await button(page, "Back").click();
+    await button(page, /^Back$/).click();
     await expect.poll(async () => (await sent(page, "window_report_view")).at(-1)).toEqual({ call_id: null });
   });
 
@@ -129,7 +129,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await steer.failNext("call_get", "not_found");
     await openCall(page).catch(() => {}); // no title to wait for: the page is its empty state
     await expect(page.locator('[data-component="cpt-noter-component-ui-empty-state"]')).toBeVisible();
-    await button(page, "Back").click();
+    await button(page, /^Back$/).click();
     await expect(page.locator('[data-region="MW-R3"]').getByRole("heading", { name: "Calls" })).toBeVisible();
   });
 
@@ -367,7 +367,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
       .getByRole("button", { name: /^(Dismiss|Close)/ })
       .click();
     await expect(banner(page)).toHaveCount(0);
-    await button(page, "Back").click();
+    await button(page, /^Back$/).click();
     await openCall(page);
     await expect(banner(page)).toHaveCount(0); // local view state: no command, no persistence
     expect(await sent(page, "permission_request")).toHaveLength(0);
