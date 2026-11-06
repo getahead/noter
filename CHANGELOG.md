@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.16.0](https://github.com/getahead/noter/compare/v0.15.4...v0.16.0) (2026-11-06)
+
+
+### Features
+
+* **ui:** action item row, review banner and item commands (2.17 S1) ([#311](https://github.com/getahead/noter/issues/311)) ([7ba6bb9](https://github.com/getahead/noter/commit/7ba6bb96f30a2225e645ff55885ecd6a6f5bf00c))
+* **ui:** add API keys and Runtime per task to Models & Runtimes and first-run step 6 ([#301](https://github.com/getahead/noter/issues/301)) ([d8c6263](https://github.com/getahead/noter/commit/d8c626356cc48063e3a2742d60e141c16e89bebe))
+* **ui:** add the History timeline, change rows, Export Log sheet and undo on rows (2.16 S2) ([#306](https://github.com/getahead/noter/issues/306)) ([9f3dfeb](https://github.com/getahead/noter/commit/9f3dfeb04ddb0974b9d9cc020c257679eee3361f))
+* **ui:** call page Share menu, Export sheet, Tags and Delete Audio wiring (2.18 S2) ([#313](https://github.com/getahead/noter/issues/313)) ([a4a08b5](https://github.com/getahead/noter/commit/a4a08b5eba229469f06063be65817b9c3a79391f))
+* **ui:** call page Summary view, output sections, versions and regenerate (2.18 S1) ([#308](https://github.com/getahead/noter/issues/308)) ([dc94ded](https://github.com/getahead/noter/commit/dc94ded18bacf357d28c73380e40aab7d29a05b7))
+* **ui:** person picker and live speaker rename (2.19 S1) ([#307](https://github.com/getahead/noter/issues/307)) ([bea4fce](https://github.com/getahead/noter/commit/bea4fce3a5e1064ca9944d0fc9b8ec902e315085))
+* **ui:** undo strip, shared diff view and ⌘Z wiring (2.16 S1) ([#302](https://github.com/getahead/noter/issues/302)) ([8db5260](https://github.com/getahead/noter/commit/8db52608e09a14e284494db79b090dd6e6f0a2f9))
+
+
+### Bug fixes
+
+* **core:** a call switched to local is the effective privacy; harness world_set owns app.privacy ([#309](https://github.com/getahead/noter/issues/309)) ([0feed2c](https://github.com/getahead/noter/commit/0feed2c55abec9e1545086e0b91bf380b7bd9b39))
+* **core:** item sections list their items; harness world_set owns outputs, today and changes ([#312](https://github.com/getahead/noter/issues/312)) ([a2b972a](https://github.com/getahead/noter/commit/a2b972a87b5c814a7f0ebaa30831818f930da9a0))
+* **core:** read History past bookkeeping rows; a call's History lists its items and outputs ([#310](https://github.com/getahead/noter/issues/310)) ([6dd59f6](https://github.com/getahead/noter/commit/6dd59f6adc6710b6a8660a0bd744311c5bf2bd90))
+* **fake:** align M2 versions, revisions and batch history ([#314](https://github.com/getahead/noter/issues/314)) ([db586d9](https://github.com/getahead/noter/commit/db586d9e1c6bfa98534d74b9653931ad192666f9))
+
 ## [0.15.4](https://github.com/getahead/noter/compare/v0.15.3...v0.15.4) (2026-11-05)
 
 
