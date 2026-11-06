@@ -1,0 +1,5 @@
+.td { display: flex; flex-direction: column; gap: var(--np-space-4, 16px); padding: 16px 24px; }
+.td-h { margin: 0; font: var(--np-font-headline, 600 15px/20px system-ui); }
+.td-review, .td-empty { color: var(--np-text-secondary, inherit); margin: 0; }
+.td-skel { height: 96px; border-radius: 8px; background: var(--np-fill-quaternary); }
+.td-live { background: none; border: 0; padding: 0 8px; cursor: default; font: inherit; color: inherit; }
