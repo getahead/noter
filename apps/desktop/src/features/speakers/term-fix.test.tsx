@@ -1,6 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { find, rendered } from "../../ui/testing";
+
 import type { Bridge } from "../../app/bridge/bridge";
 import type { SegmentView } from "../../core/bindings";
 import { TermFixPopover } from "./TermFixPopover";
@@ -16,5 +18,12 @@ describe("TermFixPopover", () => {
     expect(html).toContain("Add to glossary");
     expect(html).toContain("Older calls get a proposal in Activity");
     expect(html).toContain('data-state="invalid"');
+  });
+  it("the controls take input; Fix stays inert with nothing typed", () => {
+    const tree = rendered(TermFixPopover, { bridge, segment, range: { start: 9, end: 21 }, anchor: null, onClose: () => {}, onFixed: () => {} });
+    (find(tree, (pr) => "onEnter" in pr).props as { onChange: (v: string) => void; onEnter: () => void }).onChange("notifier");
+    (find(tree, (pr) => "onEnter" in pr).props as { onEnter: () => void }).onEnter();
+    (find(tree, (pr) => pr.label === "Add to glossary").props as { onAction: (v: boolean) => void }).onAction(false);
+    (find(tree, (pr) => pr.label === "Fix").props as { onAction: () => void }).onAction();
   });
 });

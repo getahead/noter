@@ -116,4 +116,23 @@ describe("SpeakerNamingPanel", () => {
     }
     await vi.waitFor(() => expect(played).toEqual([{ call_id: "c1", from_ms: 1000, to_ms: 6000 }, { call_id: "c1", from_ms: 1000, to_ms: 6000 }]));
   });
+  it("Name, a picked chip, the picker and Hide reach the core and the row's state", async () => {
+    const sent: unknown[] = [];
+    const b = bridge({
+      transcriptNameSpeakers: async (a: unknown) => (sent.push(a), { status: "error", error: { code: "not_found" } }),
+    });
+    const sp = spk("s3", 3, { suggestion: { type: "existing", person_id: "p1" } } as never);
+    const tree = rendered(NameRow, { p: props({ bridge: b, speakers: [sp] }), speaker: sp, people: null, line: "hi", onSkip: () => {} });
+    const picker = find(tree, (pr) => "onConfirm" in pr).props as {
+      onPick: (r: unknown, to: string) => void;
+      onConfirm: (r: unknown, to: string) => void;
+    };
+    picker.onPick({ type: "existing", person_id: "p1" }, "Pavel Romanov");
+    picker.onPick(null, "x");
+    picker.onConfirm({ type: "existing", person_id: "p1" }, "Pavel Romanov");
+    (find(tree, (pr) => pr.label === "Name").props as { onAction: () => void }).onAction();
+    await vi.waitFor(() => expect(sent.length).toBeGreaterThan(0));
+    const panel = rendered(SpeakerNamingPanel, props());
+    (find(panel, (pr) => pr.label === "Hide ▴").props as { onAction: () => void }).onAction();
+  });
 });
