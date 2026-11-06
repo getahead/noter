@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { ItemView, TimeSpan } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
+import { OutputItemRow } from "../call-page/OutputItemRow";
 import { slots as outputSlots } from "../call-page/slots";
+import { find, rendered } from "../../ui/testing";
 import { closeInspector, inspectorOverride, openInspector } from "../shell/inspector-override";
-import { create } from "./actions";
+import { addItem, applyPatch, create, loadDetail, saveFields } from "./actions";
 import { AddItem } from "./AddItem";
 import { openEvidence, resolveSpan, spanTime } from "./evidence";
 import { ItemInspector } from "./ItemInspector";
@@ -131,5 +133,74 @@ describe("rows of the Summary view", () => {
     await settle();
     expect(outputSlots.addItem).toBe(AddItem);
     expect(renderToString(<AddItem bridge={bridge} callId="call_live" />)).toContain("Add Action Item");
+  });
+});
+
+describe("inspector and add-item commands", () => {
+  const log = () => {
+    const seen: Array<[string, unknown]> = [];
+    const invoke = fake.invoke.bind(fake);
+    fake.invoke = ((cmd: string, args: unknown) => (seen.push([cmd, args]), (invoke as (...a: unknown[]) => unknown)(cmd, args))) as typeof fake.invoke;
+    return seen;
+  };
+
+  it("addItem refuses empty text, adds and re-reads the section, and shows a refusal", async () => {
+    await ready();
+    const seen = log();
+    expect(await addItem(bridge, "call_live", "  ")).toBe("Enter some text for the item.");
+    expect(await addItem(bridge, "call_live", "Send it")).toBeNull();
+    expect(seen.map(([c]) => c)).toEqual(["item_create", "outputs_get"]);
+    expect(await addItem(bridge, "call_missing", "x")).not.toBeNull();
+  });
+
+  it("loadDetail returns the evidence and puts the item in the store; a missing item is null", async () => {
+    await ready();
+    expect(Array.isArray(await loadDetail(bridge, "itm_a11y"))).toBe(true);
+    expect(bridge.store.getState().entities.item.itm_a11y).toBeTruthy();
+    expect(await loadDetail(bridge, "itm_none")).toBeNull();
+  });
+
+  it("saveFields sends only the changed fields, nothing when unchanged, and refuses empty text", async () => {
+    await ready();
+    const it = item("itm_a11y");
+    store(it);
+    const seen = log();
+    const same = { text: it.text, due: it.due ?? "", linked_issue: it.linked_issue ?? "" };
+    expect(await saveFields(bridge, it, same)).toBeNull();
+    expect(await saveFields(bridge, it, { ...same, text: " " })).not.toBeNull();
+    expect(seen).toEqual([]);
+    expect(await saveFields(bridge, it, { ...same, due: "2026-10-17" })).toBeNull();
+    expect(seen).toEqual([["item_edit", { item_id: "itm_a11y", rev: it.rev, patch: { due: { type: "set", date: "2026-10-17" } } }]]);
+  });
+
+  it("applyPatch names a conflict and reads the item again", async () => {
+    await ready();
+    const it = item("itm_a11y");
+    const seen = log();
+    expect(await applyPatch(bridge, { ...it, rev: it.rev + 5 }, { is_engineering: true })).toMatch(/^Item changed since you opened it/);
+    expect(seen.map(([c]) => c)).toContain("item_get");
+  });
+
+  it("the inspector's buttons review and edit the item", async () => {
+    await ready();
+    store(item("itm_a11y", { review: "suggested" }));
+    const seen = log();
+    const tree = rendered(ItemInspector, { bridge, itemId: "itm_a11y" });
+    (find(tree, (p) => p.label === "Accept" && typeof p.onAction === "function").props.onAction as () => void)();
+    (find(tree, (p) => p.label === "Reject" && typeof p.onAction === "function").props.onAction as () => void)();
+    (find(tree, (p) => p.label === "Engineering" && typeof p.onAction === "function").props.onAction as (v: boolean) => void)(true);
+    await settle();
+    expect(seen.map(([c]) => c)).toEqual(expect.arrayContaining(["item_review", "item_edit"]));
+  });
+
+  it("a decision row hands its keys to the items seam", async () => {
+    await ready();
+    const keys: string[] = [];
+    const was = outputSlots.itemKeys;
+    outputSlots.itemKeys = (_b, i, e) => void keys.push(i.id + e.key);
+    const tree = rendered(OutputItemRow, { bridge, item: item("itm_notif") });
+    (tree.props.onKeyDown as (e: unknown) => void)({ key: "a" });
+    outputSlots.itemKeys = was;
+    expect(keys).toEqual(["itm_notifa"]);
   });
 });

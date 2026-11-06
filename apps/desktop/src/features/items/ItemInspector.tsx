@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { EvidenceView, ItemView } from "../../core/bindings";
+import type { EvidenceView, ItemPatch, ItemView } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
 import { Checkbox } from "../../ui/primitives/checkbox";
@@ -15,9 +15,9 @@ import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { TextField } from "../../ui/primitives/text-field";
 import { closeInspector } from "../shell/inspector-override";
 import { HistoryTimeline } from "../history/HistoryTimeline";
-import { editItem, errorText, refresh, reopen, review } from "./actions";
+import { applyPatch, loadDetail, reopen, review, saveFields } from "./actions";
 import { ProvenanceChip } from "./ProvenanceChip";
-import { draftOf, draftPatch, draftValid, langOf } from "./review";
+import { draftOf, draftPatch, langOf } from "./review";
 import { slots } from "./slots";
 
 const STATUS = { open: "items.status.open", carried: "items.status.carried", handed_off: "items.status.handed_off", done: "items.status.done", closed_by_evidence: "items.status.closed_by_evidence", answered_in_call: "items.status.answered_in_call" } as const;
@@ -48,9 +48,9 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   const load = async () => {
     setLoadError(false);
     // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-get
-    const res = await refresh(bridge, itemId);
+    const found = await loadDetail(bridge, itemId);
     // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-get
-    if (res.status === "ok") setEvidence(res.data.evidence);
+    if (found) setEvidence(found);
     else setLoadError(true);
   };
   useEffect(() => void load(), [itemId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -65,16 +65,16 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   const fields = draft ?? { text: it.text, due: it.due ?? "", linked_issue: it.linked_issue ?? "" };
   const dirty = draft !== null;
   const owners = [...(it.owner && !people.some((p) => p.id === it.owner!.id) ? [it.owner] : []), ...people];
-  const apply = async (item: ItemView, patch: Parameters<typeof editItem>[2]) => {
-    const r = await editItem(bridge, item, patch);
-    if (r !== "ok") setSaved(errorText(r === "conflict" ? "conflict" : r === "invalid" ? "invalid_input" : "internal"));
-    return r;
+  const apply = async (item: ItemView, patch: ItemPatch) => {
+    const err = await applyPatch(bridge, item, patch);
+    if (err) setSaved(err);
   };
   const save = async () => {
-    if (!draftValid({ ...draftOf(it), ...fields })) return setSaved(errorText("invalid_input"));
     setSaved("saving");
-    const patch = draftPatch({ ...draftOf(it), ...fields }, it);
-    if (!Object.keys(patch).length || (await apply(it, patch)) === "ok") (setDraft(null), setSaved("saved"));
+    const err = await saveFields(bridge, it, fields);
+    if (err) return setSaved(err);
+    setDraft(null);
+    setSaved("saved");
   };
   const set = (p: Partial<NonNullable<typeof draft>>) => setDraft({ ...fields, ...p });
 

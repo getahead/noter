@@ -8,8 +8,9 @@ import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 import { holdUndo } from "../history/undo";
 import { localOf, patchLocal } from "./local";
-import { draftPatch, draftValid, type Draft } from "./review";
-import type { ItemPatch } from "../../core/bindings";
+import { draftOf, draftPatch, draftValid, type Draft } from "./review";
+import type { EvidenceView, ItemPatch } from "../../core/bindings";
+import { loadOutputs } from "../call-page/outputs-actions";
 
 const ACCEPTED_MS = 4000;
 const OUTCOME_MS = 10_000;
@@ -212,4 +213,33 @@ export async function editItem(bridge: Bridge, item: ItemView, patch: ItemPatch)
   if (res.status === "ok") return "ok";
   if (res.error.code === "conflict") await refresh(bridge, item.id);
   return res.error.code === "conflict" ? "conflict" : res.error.code === "invalid_input" ? "invalid" : "failed";
+}
+
+/** **Add Action Item**: null when the item was added and the section read again, else the error to show (the text stays). */
+export async function addItem(bridge: Bridge, callId: string, text: string): Promise<string | null> {
+  const res = await create(bridge, callId, text);
+  if (!res) return errorText("invalid_input");
+  if (res.status !== "ok") return errorText(res.error.code);
+  await loadOutputs(bridge, callId); // the section lists the new row
+  return null;
+}
+
+/** The inspector's `item_get`: the item lands in the store, its evidence is returned; null when the read failed. */
+export async function loadDetail(bridge: Bridge, id: string): Promise<EvidenceView[] | null> {
+  const res = await refresh(bridge, id);
+  return res.status === "ok" ? res.data.evidence : null;
+}
+
+/** One inspector edit: null when saved, else the error text. */
+export async function applyPatch(bridge: Bridge, item: ItemView, patch: ItemPatch): Promise<string | null> {
+  const r = await editItem(bridge, item, patch);
+  return r === "ok" ? null : errorText(r === "conflict" ? "conflict" : r === "invalid" ? "invalid_input" : "internal");
+}
+
+/** Inspector **Save**: text, Due and Linked issue as one edit of the changed fields; null when saved (nothing changed counts), else the error text. */
+export async function saveFields(bridge: Bridge, item: ItemView, fields: Pick<Draft, "text" | "due" | "linked_issue">): Promise<string | null> {
+  const draft = { ...draftOf(item), ...fields };
+  if (!draftValid(draft)) return errorText("invalid_input");
+  const patch = draftPatch(draft, item);
+  return Object.keys(patch).length ? applyPatch(bridge, item, patch) : null;
 }
