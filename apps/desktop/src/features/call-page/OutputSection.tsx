@@ -23,7 +23,6 @@ const EMPTY: Partial<Record<Section["kind"], MsgKey>> = { decisions: "outputs.em
 type Draft = { summaryId: string; baseRev: number; text: string };
 
 // @cpt-component:cpt-noter-component-ui-output-section:p1
-// @cpt-dod:cpt-noter-dod-ui-call-page-outputs-content:p1
 export function OutputSection({ bridge, call, section, prefs, writing, onRegenerate }: { bridge: Bridge; call: CallRow; section: Section; prefs: UiPrefs; writing: boolean; onRegenerate: (local: boolean) => void }) {
   const heading = t(SECTION_LABEL[section.kind]);
   const prose = isProse(section.kind);
