@@ -997,7 +997,7 @@ export const en = {
   "items.suggested": "Suggested",
   "items.engineering": "Engineering",
   "items.handoff": "Handoff",
-  "items.handed_off": "Handed off",
+  "items.handed_off": "Handed off · awaiting PR",
   "items.carried": "Carried from {call}",
   "items.closed": "Closed: {summary}",
   "items.reopen": "Reopen",
