@@ -239,10 +239,10 @@ The system **MUST** bind row, strip and app-menu actions to core targets, show p
 
 ## 6. Acceptance Criteria
 
-- [ ] No checkbox or timer expiry removes Undo or Redo from History.
-- [ ] Filtering announces one count, keeps roving row focus and never hides it under sticky headers.
-- [ ] Undo and redo use returned counts and core views, including partial results.
-- [ ] Export cancellation produces no exported status; JSON and Markdown export the selected call only.
+- [x] No checkbox or timer expiry removes Undo or Redo from History.
+- [x] Filtering announces one count, keeps roving row focus and never hides it under sticky headers.
+- [x] Undo and redo use returned counts and core views, including partial results.
+- [x] Export cancellation produces no exported status; JSON and Markdown export the selected call only.
 
 ## 7. Additional Context
 

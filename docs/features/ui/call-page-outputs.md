@@ -93,16 +93,16 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - Empty Decisions, Action items and Open questions name their emptiness; Add Action Item delegates to Items; Risks is omitted when empty.
 
 **Steps**:
-1. [ ] - `p1` - User opens Summary; API: `outputs_get` with call id; mount sections from typed states and refresh on matching progress events - `inst-get`
-2. [ ] - `p1` - While writing, show **Writing the outputs · the transcript is ready to read** with **Read Transcript**; local writing says **Writing with the local model · up to 10 min · role reviews follow in the background** - `inst-writing`
-3. [ ] - `p1` - Render ready sections immediately in PRD order, preserving failed or waiting neighbours; mount action and output rows with the shared Items review actions - `inst-sections`
-4. [ ] - `p1` - User chooses Edit on prose; keep a draft with base summary id and rev; show **⌘Return saves · Esc cancels**, Cancel and Save - `inst-edit`
-5. [ ] - `p1` - **IF** Esc or Cancel: discard only the draft and **RETURN** the persisted text - `inst-cancel`
-6. [ ] - `p1` - Save or ⌘Return calls `output_edit` with call id, summary id, base rev and Markdown; raw HTML is never rendered - `inst-save`
-7. [ ] - `p1` - **IF** conflict or validation error: keep the draft, refresh current output and show the error; require an explicit new save - `inst-error`
-8. [ ] - `p1` - **ELSE** render the returned section, Edited badge, refreshed version list and **Saved** for 2 s - `inst-saved`
+1. [x] - `p1` - User opens Summary; API: `outputs_get` with call id; mount sections from typed states and refresh on matching progress events - `inst-get`
+2. [x] - `p1` - While writing, show **Writing the outputs · the transcript is ready to read** with **Read Transcript**; local writing says **Writing with the local model · up to 10 min · role reviews follow in the background** - `inst-writing`
+3. [x] - `p1` - Render ready sections immediately in PRD order, preserving failed or waiting neighbours; mount action and output rows with the shared Items review actions - `inst-sections`
+4. [x] - `p1` - User chooses Edit on prose; keep a draft with base summary id and rev; show **⌘Return saves · Esc cancels**, Cancel and Save - `inst-edit`
+5. [x] - `p1` - **IF** Esc or Cancel: discard only the draft and **RETURN** the persisted text - `inst-cancel`
+6. [x] - `p1` - Save or ⌘Return calls `output_edit` with call id, summary id, base rev and Markdown; raw HTML is never rendered - `inst-save`
+7. [x] - `p1` - **IF** conflict or validation error: keep the draft, refresh current output and show the error; require an explicit new save - `inst-error`
+8. [x] - `p1` - **ELSE** render the returned section, Edited badge, refreshed version list and **Saved** for 2 s - `inst-saved`
 9. [ ] - `p1` - User clicks the NT-1 or NT-2 notification; `nav:request` opens the call's **Summary** in the main window - `inst-nt-click`
-10. [ ] - `p1` - **RETURN** readable outputs with each item's evidence one action away - `inst-return`
+10. [x] - `p1` - **RETURN** readable outputs with each item's evidence one action away - `inst-return`
 
 ### Regenerate and compare versions
 
@@ -120,13 +120,13 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 
 **Steps**:
 1. [ ] - `p1` - User chooses **Regenerate Outputs…**, **With a Different Model…** or **Regenerate with Claude Code…**; dialog host shows Runtime and model, Skill, Sections and **Your edits are kept and shown as a diff.** - `inst-sheet`
-2. [ ] - `p1` - User selects at least one section; API: `outputs_regenerate` with selected SectionKind values, runtime/model, call-type skill and local flag; **With Current Settings** sends current defaults - `inst-call`
+2. [x] - `p1` - User selects at least one section; API: `outputs_regenerate` with selected SectionKind values, runtime/model, call-type skill and local flag; **With Current Settings** sends current defaults - `inst-call`
 3. [ ] - `p1` - A section's Try Again requests that section only; Use Local Model sets local true and later shows **Written by the local model after Claude Code timed out** - `inst-section`
-4. [ ] - `p1` - Accept the job id as scheduled work, not completion; keep previous content while matching `outputs:progress` updates it; refetch `outputs_get` for final bodies - `inst-job`
+4. [x] - `p1` - Accept the job id as scheduled work, not completion; keep previous content while matching `outputs:progress` updates it; refetch `outputs_get` for final bodies - `inst-job`
 5. [ ] - `p1` - Core keeps user prose edits and accepted/edited items, replaces only remaining suggestions and preserves rejected suppression; UI renders the returned notices and counts - `inst-preserve`
-6. [ ] - `p1` - User opens the version menu; `output_versions` lists generated and user versions with writer/time; hide the switcher with only one version - `inst-versions`
-7. [ ] - `p1` - User selects a version; `output_version_get` returns its body for read-only inspection; selecting it never writes it over the current edit - `inst-version`
-8. [ ] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, fold long unchanged stretches - `inst-diff`
+6. [x] - `p1` - User opens the version menu; `output_versions` lists generated and user versions with writer/time; hide the switcher with only one version - `inst-versions`
+7. [x] - `p1` - User selects a version; `output_version_get` returns its body for read-only inspection; selecting it never writes it over the current edit - `inst-version`
+8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, fold long unchanged stretches - `inst-diff`
 9. [ ] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
 10. [ ] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
 
@@ -147,12 +147,12 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 
 **Steps**:
 1. [ ] - `p1` - User opens Share or invokes ⌘⇧C, ⌥⌘C, ⌥⇧⌘C or ⌘E; resolve scope from the invoking control and current row selection - `inst-scope`
-2. [ ] - `p1` - Show the scope first, then unreviewed/sensitive notices, three copy formats and Export; keep normal ⌘C as standard text copy - `inst-menu`
-3. [ ] - `p1` - User copies; API: `share_copy` with call id, scope and format; set include_unreviewed only when the shown scope notice makes their inclusion explicit - `inst-copy`
-4. [ ] - `p1` - **IF** `unreviewed_in_scope`: keep the scope, show its notice and offer Start Review through Items; never silently change the requested inclusion - `inst-review`
-5. [ ] - `p1` - **IF** copy succeeds: core writes rich and plain clipboard formats; show **Copied for Slack**, **Copied for Jira** or **Copied as Markdown** on the invoking control for 2 s, announced politely - `inst-copied`
-6. [ ] - `p1` - User exports; open Export with its scope, require at least one content checkbox; call `calls_export` with call_ids, include options and scope, or null scope for whole call - `inst-export`
-7. [ ] - `p1` - **IF** save panel is cancelled: **RETURN** no exported status; **IF** export fails: retain options and show retry - `inst-cancel`
+2. [x] - `p1` - Show the scope first, then unreviewed/sensitive notices, three copy formats and Export; keep normal ⌘C as standard text copy - `inst-menu`
+3. [x] - `p1` - User copies; API: `share_copy` with call id, scope and format; set include_unreviewed only when the shown scope notice makes their inclusion explicit - `inst-copy`
+4. [x] - `p1` - **IF** `unreviewed_in_scope`: keep the scope, show its notice and offer Start Review through Items; never silently change the requested inclusion - `inst-review`
+5. [x] - `p1` - **IF** copy succeeds: core writes rich and plain clipboard formats; show **Copied for Slack**, **Copied for Jira** or **Copied as Markdown** on the invoking control for 2 s, announced politely - `inst-copied`
+6. [x] - `p1` - User exports; open Export with its scope, require at least one content checkbox; call `calls_export` with call_ids, include options and scope, or null scope for whole call - `inst-export`
+7. [x] - `p1` - **IF** save panel is cancelled: **RETURN** no exported status; **IF** export fails: retain options and show retry - `inst-cancel`
 8. [ ] - `p1` - **RETURN** **Exported to** the returned Finder-style path with **Show in Finder** for 8 s; `open_external` reveals that path - `inst-return`
 
 ### Maintain tags and stored audio
@@ -170,15 +170,15 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - Both destructive actions require their designed alert/sheet; neither offers Undo.
 
 **Steps**:
-1. [ ] - `p1` - Read `tags_list` for suggestions from tags in use; trim additions, reject empty, duplicate ignoring case and overlong values and keep each tag's script - `inst-tags`
-2. [ ] - `p1` - Submit `call_tags_set` with selected call ids and the typed add/remove lists; show returned change or batch target, then refresh Call info - `inst-set`
-3. [ ] - `p1` - User chooses **Delete Audio Now…**; native alert **Delete the audio of this call?** explains transcript, summary and items stay, replay stops, and it cannot be undone; Cancel is default - `inst-alert`
-4. [ ] - `p1` - **IF** Delete Audio is confirmed: `audio_delete` with the call id; use core audio state to stop playback and remove play, sample and export-audio controls - `inst-delete`
-5. [ ] - `p1` - User opens **Delete Old Audio…** from the capture/disk warning; main-window dialog host shows the 30-day choice and **Recording goes on while this runs.** - `inst-old`
-6. [ ] - `p1` - **IF** Delete Audio is confirmed: `audio_delete_older` with older_than_days 30; show returned call count and freed MB, never prototype fixture totals - `inst-delete-old`
+1. [x] - `p1` - Read `tags_list` for suggestions from tags in use; trim additions, reject empty, duplicate ignoring case and overlong values and keep each tag's script - `inst-tags`
+2. [x] - `p1` - Submit `call_tags_set` with selected call ids and the typed add/remove lists; show returned change or batch target, then refresh Call info - `inst-set`
+3. [x] - `p1` - User chooses **Delete Audio Now…**; native alert **Delete the audio of this call?** explains transcript, summary and items stay, replay stops, and it cannot be undone; Cancel is default - `inst-alert`
+4. [x] - `p1` - **IF** Delete Audio is confirmed: `audio_delete` with the call id; use core audio state to stop playback and remove play, sample and export-audio controls - `inst-delete`
+5. [x] - `p1` - User opens **Delete Old Audio…** from the capture/disk warning; main-window dialog host shows the 30-day choice and **Recording goes on while this runs.** - `inst-old`
+6. [x] - `p1` - **IF** Delete Audio is confirmed: `audio_delete_older` with older_than_days 30; show returned call count and freed MB, never prototype fixture totals - `inst-delete-old`
 7. [ ] - `p1` - User fills the sheet and presses the primary button; the dialogs host keeps the button busy with its label while the command runs (from `cpt-noter-flow-ui-dialogs-host-sheet`, owner decision A, 28 Oct 2026) - `inst-sheet-submit`
 8. [ ] - `p1` - **IF** the command fails with invalid input: focus moves to the first invalid field with its message under it; a resubmit runs the command again - `inst-sheet-invalid`
-9. [ ] - `p1` - **RETURN** the sheet closed on success with the result shown where it applies; other errors show as a sheet banner - `inst-sheet-return`
+9. [x] - `p1` - **RETURN** the sheet closed on success with the result shown where it applies; other errors show as a sheet banner - `inst-sheet-return`
 10. [ ] - `p1` - **RETURN** refreshed audio retention/deletion text with transcripts and outputs still usable; cancelled alerts send no deletion command - `inst-return`
 
 ### Open ready or failed outputs from a notification
@@ -212,10 +212,10 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 **Output**: Ordered sections, counts, notices and ShareScope
 
 **Steps**:
-1. [ ] - `p1` - Keep Summary, Decisions, Action items, Open questions, Per participant, optional Risks, call-type extras and Marked moments in their defined order; role reviews use the separate M4 view - `inst-order`
-2. [ ] - `p1` - Apply progress only to its call and section; hydrate bodies with outputs_get and ignore reads superseded by navigation or newer state - `inst-progress`
-3. [ ] - `p1` - Count only visible non-rejected rows; review counts include suggestions only; hide review controls while still writing or when none remain - `inst-count`
-4. [ ] - `p1` - Resolve invocation scope: section means its SectionKind; row means its id or the selection containing it; toolbar means selected ids or Whole call - `inst-scope`
+1. [x] - `p1` - Keep Summary, Decisions, Action items, Open questions, Per participant, optional Risks, call-type extras and Marked moments in their defined order; role reviews use the separate M4 view - `inst-order`
+2. [x] - `p1` - Apply progress only to its call and section; hydrate bodies with outputs_get and ignore reads superseded by navigation or newer state - `inst-progress`
+3. [x] - `p1` - Count only visible non-rejected rows; review counts include suggestions only; hide review controls while still writing or when none remain - `inst-count`
+4. [x] - `p1` - Resolve invocation scope: section means its SectionKind; row means its id or the selection containing it; toolbar means selected ids or Whole call - `inst-scope`
 5. [ ] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
 6. [ ] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
 
@@ -234,14 +234,14 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 2. [ ] - `p1` - **FROM** WRITING **TO** STREAMING **WHEN** partial text becomes available - `inst-stream`
 3. [ ] - `p1` - **FROM** WRITING, STREAMING, REGENERATING **TO** READY, EMPTY **WHEN** the core completes with content or no items - `inst-ready`
 4. [ ] - `p1` - **FROM** WRITING, STREAMING, REGENERATING **TO** FAILED **WHEN** the section fails; retain prior text - `inst-failed`
-5. [ ] - `p1` - **FROM** READY **TO** EDITING **WHEN** Edit starts a draft - `inst-edit`
-6. [ ] - `p1` - **FROM** EDITING **TO** READY **WHEN** Cancel or Esc discards it - `inst-cancel`
+5. [x] - `p1` - **FROM** READY **TO** EDITING **WHEN** Edit starts a draft - `inst-edit`
+6. [x] - `p1` - **FROM** EDITING **TO** READY **WHEN** Cancel or Esc discards it - `inst-cancel`
 7. [ ] - `p1` - **FROM** EDITING **TO** SAVING **WHEN** Save submits the draft - `inst-save`
-8. [ ] - `p1` - **FROM** SAVING **TO** READY **WHEN** save succeeds with a new rev and Edited badge - `inst-saved`
-9. [ ] - `p1` - **FROM** SAVING **TO** EDITING **WHEN** save fails or conflicts; keep the draft - `inst-save-error`
+8. [x] - `p1` - **FROM** SAVING **TO** READY **WHEN** save succeeds with a new rev and Edited badge - `inst-saved`
+9. [x] - `p1` - **FROM** SAVING **TO** EDITING **WHEN** save fails or conflicts; keep the draft - `inst-save-error`
 10. [ ] - `p1` - **FROM** READY, EMPTY, FAILED **TO** REGENERATING **WHEN** a regeneration request is accepted - `inst-regen`
-11. [ ] - `p1` - **FROM** READY **TO** COMPARING **WHEN** both comparison bodies load - `inst-compare`
-12. [ ] - `p1` - **FROM** COMPARING **TO** READY **WHEN** Compare or Hide Diff is chosen again - `inst-hide`
+11. [x] - `p1` - **FROM** READY **TO** COMPARING **WHEN** both comparison bodies load - `inst-compare`
+12. [x] - `p1` - **FROM** COMPARING **TO** READY **WHEN** Compare or Hide Diff is chosen again - `inst-hide`
 
 ## 5. Definitions of Done
 
@@ -284,10 +284,10 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 
 ## 6. Acceptance Criteria
 
-- [ ] Ready sections remain usable when another fails; old prose stays readable during regeneration
-- [ ] Save retains user edits as a version; regeneration and naming preserve them and rejected suppression
+- [x] Ready sections remain usable when another fails; old prose stays readable during regeneration
+- [x] Save retains user edits as a version; regeneration and naming preserve them and rejected suppression
 - [ ] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
-- [ ] No success feedback follows a failed or cancelled copy/export/delete
+- [x] No success feedback follows a failed or cancelled copy/export/delete
 - [ ] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
 - [ ] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
 
