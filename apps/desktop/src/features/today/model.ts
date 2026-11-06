@@ -1,6 +1,6 @@
 // Today's pure projection of `TodayView` (docs/features/ui/today.md): the calendar region's state, the review line,
 // the proposal preview and what dims Record. The core ranks and counts; nothing here reorders or invents a number.
-import type { EnvironmentState, ProposalRow, SetupStatus, TodayView } from "../../core/bindings";
+import type { CallRow, EnvironmentState, ItemView, ProposalRow, SetupStatus, TodayView, UpcomingCall } from "../../core/bindings";
 
 export type CalendarState = "LOADING" | "NOT_ASKED" | "ASKING" | "DENIED" | "READY" | "NO_CALLS" | "ERROR";
 
@@ -35,3 +35,46 @@ export function recordBlock(setup: Pick<SetupStatus, "models"> | undefined, env:
   if (env && env.disk_free_mb < 500) return "disk_full";
   return null;
 }
+
+export type CardVariant = "today" | "this-week" | "live" | "unmatched";
+export interface Card {
+  variant: CardVariant;
+  /** The calendar event, absent on the unmatched live card. */
+  event: UpcomingCall | null;
+  live: CallRow | null;
+}
+
+// @cpt-algo:cpt-noter-algo-ui-today-project:p1
+/** The cards of `today`: the core's order, with the card of the recorded call first; a live call no event matches is its own card. */
+export function cards(view: TodayView): Card[] {
+  const live = view.live_call;
+  // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-order
+  const day: Card[] = view.today.map((event) => ({ variant: live && event.call_id === live.id ? "live" : "today", event, live: live && event.call_id === live.id ? live : null }));
+  const at = day.findIndex((c) => c.variant === "live");
+  if (at > 0) day.unshift(...day.splice(at, 1));
+  if (live && at < 0) day.unshift({ variant: "unmatched", event: null, live });
+  return day;
+  // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-order
+}
+
+/** This week's cards, in the core's order; they start collapsed. */
+export const weekCards = (view: TodayView): Card[] => view.this_week.map((event) => ({ variant: "this-week", event, live: null }));
+
+/** At most five combined action and question rows until **Show N More**; the core's order within each kind. */
+export function cardRows(card: UpcomingCall, all: boolean): { rows: ItemView[]; more: number } {
+  const every = [...card.items, ...card.questions];
+  // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-disclosures
+  return all ? { rows: every, more: 0 } : { rows: every.slice(0, 5), more: Math.max(0, every.length - 5) };
+  // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-disclosures
+}
+
+// @cpt-state:cpt-noter-state-ui-today-card:p1
+/** Expanded or collapsed: the next call starts expanded, later and week cards collapsed, and the user's own choice (by event id) wins. */
+export function isExpanded(eventId: string, user: ReadonlyMap<string, boolean>, isNext: boolean): boolean {
+  // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-expand
+  // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-collapse
+  return user.get(eventId) ?? isNext;
+  // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-collapse
+  // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-expand
+}
+

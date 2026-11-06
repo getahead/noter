@@ -45,3 +45,8 @@ export function showCall(bridge: Bridge) {
   return bridge.act("window_show_call", "window_show_call", () => bridge.core.windowShowCall({}));
   // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-live
 }
+
+/** **Show Previous Call** and **Last time:**: the previous call's Summary. */
+export function showPreviousCall(bridge: Bridge, callId: string) {
+  return bridge.act("today:last_time", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } }));
+}

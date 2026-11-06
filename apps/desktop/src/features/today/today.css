@@ -3,3 +3,12 @@
 .td-review, .td-empty { color: var(--np-text-secondary, inherit); margin: 0; }
 .td-skel { height: 96px; border-radius: 8px; background: var(--np-fill-quaternary); }
 .td-live { background: none; border: 0; padding: 0 8px; cursor: default; font: inherit; color: inherit; }
+.td-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border: 1px solid var(--np-separator); border-radius: 8px; background: var(--np-bg-elevated, transparent); }
+.td-card__head { display: flex; align-items: center; gap: 8px; }
+.td-card__time { color: var(--np-text-secondary, inherit); min-width: 64px; font-variant-numeric: tabular-nums; }
+.td-card__title { flex: 1; margin: 0; font: var(--np-font-headline, 600 15px/20px system-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-card__meta { display: flex; flex-wrap: wrap; gap: 6px; color: var(--np-text-secondary, inherit); }
+.td-card__local { font-weight: 600; }
+.td-card__last { margin: 0; color: var(--np-text-secondary, inherit); }
+.td-card__link { background: none; border: 0; padding: 0; font: inherit; color: var(--np-accent, inherit); cursor: pointer; }
+.td-week { display: flex; flex-direction: column; gap: 8px; }

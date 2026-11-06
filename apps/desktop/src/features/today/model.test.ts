@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TodayView } from "../../core/bindings";
-import { calendarState, proposalPreview, recordBlock, reviewLine } from "./model";
+import { calendarState, cardRows, cards, isExpanded, proposalPreview, recordBlock, reviewLine } from "./model";
 
 const view = (over: Partial<TodayView> = {}): TodayView =>
   ({ date: "2026-11-05", ranking: "owed_to_todays_people", calendar: "granted", live_call: null, today: [], this_week: [], due_without_call: [], done_today: [], review_waiting: 0, proposals: [], proposals_total: 0, banners: [], first_use: false, ...over }) as TodayView;
@@ -53,5 +53,44 @@ describe("recordBlock (TD-R1)", () => {
     expect(recordBlock(missing, { disk_free_mb: 9000 } as never)).toBe("model_missing");
     expect(recordBlock(ready, { disk_free_mb: 499 } as never)).toBe("disk_full");
     expect(recordBlock(undefined, undefined)).toBeNull();
+  });
+});
+
+const ev = (id: string, over: Record<string, unknown> = {}) => ({ event_id: id, call_id: null, items: [], questions: [], sensitive: false, ...over }) as never;
+const item = (n: number) => ({ id: `itm_${n}` }) as never;
+
+describe("cards (cpt-noter-algo-ui-today-project)", () => {
+  it("keeps the core's order", () => {
+    expect(cards(view({ today: [ev("a"), ev("b")] })).map((c) => c.event?.event_id)).toEqual(["a", "b"]);
+  });
+  it("moves the card of the recorded call first", () => {
+    const out = cards(view({ today: [ev("a"), ev("b", { call_id: "call_1" })], live_call: { id: "call_1" } as never }));
+    expect(out.map((c) => [c.event?.event_id, c.variant])).toEqual([["b", "live"], ["a", "today"]]);
+  });
+  it("makes a live call no event matches its own card", () => {
+    const out = cards(view({ today: [ev("a")], live_call: { id: "call_9" } as never }));
+    expect(out.map((c) => c.variant)).toEqual(["unmatched", "today"]);
+    expect(out[0]!.event).toBeNull();
+  });
+});
+
+describe("cardRows", () => {
+  const card = { items: [1, 2, 3, 4].map(item), questions: [5, 6, 7].map(item) } as never;
+  it("shows five rows and counts the rest", () => {
+    const r = cardRows(card, false);
+    expect(r.rows).toHaveLength(5);
+    expect(r.more).toBe(2);
+  });
+  it("shows all of them after Show More", () => expect(cardRows(card, true)).toMatchObject({ more: 0, rows: expect.any(Array) }));
+});
+
+describe("isExpanded (cpt-noter-state-ui-today-card)", () => {
+  it("opens the next call and collapses later ones", () => {
+    expect(isExpanded("a", new Map(), true)).toBe(true);
+    expect(isExpanded("b", new Map(), false)).toBe(false);
+  });
+  it("keeps the user's choice by event id", () => {
+    expect(isExpanded("b", new Map([["b", true]]), false)).toBe(true);
+    expect(isExpanded("a", new Map([["a", false]]), true)).toBe(false);
   });
 });
