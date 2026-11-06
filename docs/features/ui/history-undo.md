@@ -76,7 +76,7 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### Read and filter a history
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-history-undo-read`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-history-undo-read`
 
 **Actor**: Primary user
 
@@ -97,7 +97,7 @@ Read changes, undo or redo them, and export a call’s log.
 4. [x] - `p1` - UI: date groups and change rows with time, actor, description, target, batch count and available core metadata - `inst-render`
 5. [x] - `p1` - User chooses an actor or job; request the first page for that filter, discard superseded reads, and announce the returned count politely - `inst-filter`
 6. [x] - `p1` - User toggles **Diff** on a row with before and after; show inserted and deleted words, or **No differences** - `inst-diff`
-7. [ ] - `p1` - User expands a batch; show at most 50 known member rows, then **Show 50 More** only when real members can be read - `inst-batch`
+7. [x] - `p1` - User expands a batch; show at most 50 known member rows, then **Show 50 More** only when real members can be read (owner, 6 Nov: ticked as "where the contract supplies members"; the contract supplies none, so the row shows **batch · N** and does not expand) - `inst-batch`
 8. [x] - `p1` - **RETURN** the filtered history; **Open** routes to the changed record without losing the history filter - `inst-return`
 
 ### Undo or redo a change

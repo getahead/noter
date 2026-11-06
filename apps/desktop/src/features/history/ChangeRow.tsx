@@ -48,7 +48,9 @@ export function ChangeRow({ row, prefs, busy, onReverse, tabIndex = -1 }: Change
         <div className="pc-chg__line">
           <span className="pc-chg__actor">{actorLabel(row)}</span>
           <span className="pc-chg__what">{row.summary}</span>
+          {/* @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-batch */}
           {row.batch_size > 1 && <Badge text={t("history.batch", { count: row.batch_size })} kind="kind" tone="neutral" />}
+          {/* @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-batch */}
         </div>
         <div className="pc-chg__meta">{meta}</div>
         {diff && canDiff && <DiffView before={row.before!} after={row.after!} />}
