@@ -26,7 +26,7 @@ export function ProvenanceChip({ bridge, span, variant = "timestamp", unverified
       </button>
       {phase === "error" && (
         <span role="alert" className="np-prov__error">
-          {t("items.source_error")} <button type="button" className="np-link" onClick={() => void open()}>{t("shell.try_again")}</button>
+          {t("items.source_error")} <button type="button" className="np-link" onClick={() => void open()}>{t("action.try_again")}</button>
         </span>
       )}
     </>

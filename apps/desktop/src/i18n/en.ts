@@ -1107,6 +1107,10 @@ export const en = {
   "today.nothing_waiting": "Nothing waiting. Noter asks before it changes older records.",
   "today.record_already": "A recording is already running. Use the indicator to open it.",
   "today.record_failed": "Couldn’t start recording. Try again.",
+  "items.source_deleted": "Source deleted",
+  "items.open_source": "Open the source at {at}",
+  "items.finding_source": "Finding the source…",
+  "items.source_error": "Couldn't find the source.",
 } as const;
 
 export type MsgKey = keyof typeof en;
