@@ -101,7 +101,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const [kept, setKept] = useState<{ call: string | null; ids: ReadonlySet<string> }>({ call: null, ids: new Set() });
   const [marked, setMarked] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [typing, setTyping] = useState(false);
   const [continueClosed, setContinueClosed] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -351,7 +350,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
         retry: busy("capture_resume_interrupted"),
       }}
       feedback={feedback}
-      typing={typing}
       onFeedbackExpire={() => setFeedback(null)}
       onMark={() => void mark()}
       onPause={pause}
@@ -480,7 +478,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                   </div>
                 )}
                 <div className="cs-r2" data-region="CS-R2" aria-label={t("cw.transcript")}>
-                  <TranscriptLog tr={tr} variant="live" onNamed={(text) => setFeedback({ text, variant: "notice" })} onEditing={setTyping} />
+                  <TranscriptLog tr={tr} variant="live" onNamed={(text) => setFeedback({ text, variant: "notice" })} />
                 </div>
                 <TranscriptBar tr={tr} variant="live" />
               </div>

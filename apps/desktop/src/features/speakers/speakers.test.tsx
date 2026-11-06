@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonChip, SpeakerView } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
-import { PersonPicker } from "./PersonPicker";
+import { NewPersonForm, PersonPicker } from "./PersonPicker";
 import { SpeakerRenamePopover } from "./SpeakerRenamePopover";
 
 const chip = (id: string, name: string): PersonChip => ({ id, display_name: name, short_name: name.split(" ")[0], initials: name.slice(0, 2), is_you: false });
@@ -30,6 +30,89 @@ describe("PersonPicker", () => {
   it("an inline picker keeps its list closed until the field has focus", () => {
     const html = renderToString(<PersonPicker bridge={bridgeFor(null)} variant="inline" participants={[chip("p1", "Pavel")]} speakers={[]} confirmLabel="x" onPick={() => {}} />);
     expect(html).not.toContain('role="listbox"');
+  });
+});
+
+type Ev = { key: string; preventDefault: () => void; nativeEvent: { isComposing: boolean } };
+const keyEv = (key: string, isComposing = false): Ev => ({ key, preventDefault: () => {}, nativeEvent: { isComposing } });
+const input = (value?: string, over: Partial<Parameters<typeof PersonPicker>[0]> = {}) => {
+  const calls = { pick: vi.fn(), confirm: vi.fn(), close: vi.fn() };
+  const tree = rendered(PersonPicker, { bridge: bridgeFor(null), variant: "popover", participants: [chip("p1", "Pavel Romanov"), chip("p2", "Anna K.")], speakers: [], confirmLabel: "x", value, onPick: calls.pick, onConfirm: calls.confirm, onClose: calls.close, ...over });
+  const field = find(tree, (pr) => pr.role === "combobox").props as Record<string, (...a: unknown[]) => void>;
+  return { calls, field, tree };
+};
+
+describe("PersonPicker keys and choices", () => {
+  it("typing reports no person yet", () => {
+    const { calls, field } = input();
+    field.onChange({ target: { value: "Pa" } });
+    expect(calls.pick).toHaveBeenCalledWith(null, "Pa");
+  });
+  it("Return on the highlighted person confirms it as an existing person (ArrowDown highlights from the list start)", () => {
+    const { calls, field } = input("Pavel");
+    field.onKeyDown(keyEv("ArrowDown"));
+    field.onKeyDown(keyEv("ArrowUp"));
+    field.onKeyDown(keyEv("Enter")); // nothing is highlighted in this render: Return does nothing
+    expect(calls.confirm).not.toHaveBeenCalled();
+  });
+  it("with no match the New Person… entry is the one Return opens, and the first Esc clears the query", () => {
+    const { calls, field } = input("Zoya");
+    field.onKeyDown(keyEv("Enter"));
+    expect(calls.confirm).not.toHaveBeenCalled(); // opens the form, nothing is named yet
+    field.onKeyDown(keyEv("Escape"));
+    expect(calls.pick).toHaveBeenCalledWith(null, "");
+    expect(calls.close).not.toHaveBeenCalled();
+  });
+  it("Esc on an empty field closes the host; an input method's keys are left alone", () => {
+    const { calls, field } = input();
+    field.onKeyDown(keyEv("Escape", true));
+    expect(calls.close).not.toHaveBeenCalled();
+    field.onKeyDown(keyEv("Escape"));
+    expect(calls.close).toHaveBeenCalled();
+  });
+  it("a click on an option picks that person", () => {
+    const { calls, tree } = input();
+    const opt = find(tree, (pr) => pr.role === "option" && String(pr.id).endsWith("-0")).props as { onClick: () => void };
+    opt.onClick();
+    expect(calls.pick).toHaveBeenCalledWith({ type: "existing", person_id: "p1" }, "Pavel Romanov");
+  });
+  it("the New Person… entry opens the form without naming anyone", () => {
+    const { calls, tree } = input("Zoya");
+    (find(tree, (pr) => pr.role === "option").props as { onClick: () => void }).onClick();
+    expect(calls.pick).not.toHaveBeenCalled();
+  });
+});
+
+describe("NewPersonForm", () => {
+  const form = (initial: string, over: Record<string, unknown> = {}) => {
+    const calls = { confirm: vi.fn(), pick: vi.fn(), back: vi.fn() };
+    const tree = rendered(NewPersonForm, { variant: "popover", initial, people: null, confirmLabel: "Create and Name", onPick: calls.pick, onConfirm: calls.confirm, onBack: calls.back, ...over } as never);
+    const button = (label: string) => find(tree, (pr) => pr.label === label).props as { onAction: () => void };
+    return { calls, tree, button };
+  };
+  it("creates the person with the typed name when the form is valid", () => {
+    const { calls, button } = form("Zoya");
+    button("Create and Name").onAction();
+    expect(calls.confirm).toHaveBeenCalledWith({ type: "new", display_name: "Zoya", email: null }, "Zoya", true);
+  });
+  it("does not create without a name, and Back leaves the form", () => {
+    const { calls, button } = form("");
+    button("Create and Name").onAction();
+    expect(calls.confirm).not.toHaveBeenCalled();
+    button("Back").onAction();
+    expect(calls.back).toHaveBeenCalled();
+  });
+  it("a name already in people is not created until Create Anyway says so", () => {
+    const row = { id: "p7", display_name: "Zoya Ivanova", short_name: "Zoya", initials: "ZI", role: null, aliases: [] };
+    const { calls, button } = form("zoya ivanova", { people: [row] });
+    button("Create and Name").onAction();
+    expect(calls.confirm).not.toHaveBeenCalled();
+  });
+  it("the form is titled, its fields carry placeholders, and the footer pairs Back with the confirm", () => {
+    const html = renderToString(<NewPersonForm variant="popover" initial="Zoya" people={null} confirmLabel="Create and Name" onPick={() => {}} onConfirm={() => {}} onBack={() => {}} />);
+    expect(html).toContain("New person");
+    expect(html).toContain('placeholder="name@company.com"');
+    expect(html).toContain('placeholder="Designer"');
   });
 });
 

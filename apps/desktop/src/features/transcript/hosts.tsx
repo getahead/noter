@@ -211,16 +211,12 @@ export interface TranscriptLogProps {
   header?: string | null;
   /** A speaker was named from a label: by default the undo strip carries the result; the call window shows it in its strip. */
   onNamed?: (text: string, change_id: string) => void;
-  /** A popover field of the log has the keys (the call window's legend follows it). */
-  onEditing?: (on: boolean) => void;
 }
 
 /** The transcript view of `useTranscript`'s call, in the host's region (CS-R2, FP-R5 or PC-R5). */
-export function TranscriptLog({ tr, variant, tailLines, header, onNamed, onEditing }: TranscriptLogProps) {
+export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: TranscriptLogProps) {
   const [renaming, setRenaming] = useState<{ speakerId: string; segmentId: string; anchor: HTMLElement } | null>(null);
   const call = useWindow(tr.bridge, (s) => s.entities.call[tr.callId]);
-  const editing = !!renaming;
-  useEffect(() => void onEditing?.(editing), [editing]); // 
   const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
   const rows = useMemo(() => (variant === "tail" && tr.data ? buildRows(tr.data, "tail", tailLines) : tr.rows), [variant, tr.data, tr.rows, tailLines]);
   const line = header !== undefined ? header : variant === "stored" ? audioLine(tr.detail, prefs) : null;
