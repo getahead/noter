@@ -399,6 +399,17 @@ describe("focusNext", () => {
 });
 
 describe("RejectedList", () => {
+  it("keeps a refused Restore visible even while the rejected list is folded", async () => {
+    await ready();
+    bridge.core.itemReview = async () => ({ status: "error", error: { code: "conflict", message: "Changed elsewhere", detail: null, retryable: true } });
+    const rejected = item("itm_replay", { review: "rejected" });
+    const { review } = await import("./actions");
+    await review(bridge, rejected, "restore");
+    const html = renderToString(<RejectedList bridge={bridge} items={[rejected]} />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Item changed since you opened it.");
+  });
+
   it("shows Rejected (n) folded; rows still in their outcome are not counted", async () => {
     await ready();
     const a = item("itm_replay", { review: "rejected" });

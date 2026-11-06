@@ -21,6 +21,7 @@ export function RejectedList({ bridge, items }: { bridge: Bridge; items: ItemVie
   return (
     <div className="it-rejected">
       <Disclosure label={t("items.rejected_n", { count: rows.length })} open={open} variant="row" onAction={() => setOpen(!open)} />
+      {rows.map((i) => locals.get(i.id)?.error && <span key={i.id} className="it-row__error" role="alert">{locals.get(i.id)!.error}</span>)}
       {open && (
         <ul className="it-rejected__list">
           {rows.map((i) => (
