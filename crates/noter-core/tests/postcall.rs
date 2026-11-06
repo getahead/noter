@@ -11,9 +11,9 @@ use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::{
     ActorFilter, CallIdArgs, CallOutputs, EntityKind, HistoryListArgs, HistoryTarget, ItemFilter,
-    ItemKind, ItemsListArgs, JobKind, JobRunStatus, OutputEditArgs, OutputMutation,
-    OutputsProgress, OutputsStatus, RegenerateArgs, ReviewState, SectionKind, SectionState,
-    SummaryIdArgs, UndoArgs, UndoTarget, VersionGetArgs, VersionKind, WindowLabel,
+    ItemKind, ItemReviewArgs, ItemsListArgs, JobKind, JobRunStatus, OutputEditArgs, OutputMutation,
+    OutputsProgress, OutputsStatus, RegenerateArgs, ReviewDecision, ReviewState, SectionKind,
+    SectionState, SummaryIdArgs, UndoArgs, UndoTarget, VersionGetArgs, VersionKind, WindowLabel,
 };
 use noter_protocol::{
     CallId, CoreError, ErrorCode, ErrorDetail, JobRunId, PageRequest, Rev, RuntimeChoice,
@@ -459,6 +459,27 @@ async fn item_sections_list_their_items_and_suggested_ones_wait_for_review() {
         .count();
     assert!(suggested > 0);
     assert_eq!(o.review_waiting as usize, suggested);
+    // A rejected suggestion is gone from its section and no longer waits (D75).
+    let gone = items
+        .iter()
+        .find(|i| i.review == ReviewState::Suggested)
+        .unwrap();
+    core.item_review(
+        &main_window(),
+        ItemReviewArgs {
+            item_id: gone.id.clone(),
+            rev: gone.rev,
+            decision: ReviewDecision::Reject,
+        },
+    )
+    .await
+    .unwrap();
+    let after = outputs(&core, CALL).await;
+    assert!(after
+        .sections
+        .iter()
+        .all(|s| s.items.iter().all(|i| i.id != gone.id)));
+    assert_eq!(after.review_waiting as usize, suggested - 1);
 }
 
 async fn edit(
