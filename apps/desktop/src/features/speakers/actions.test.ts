@@ -31,8 +31,15 @@ describe("nameSpeaker", () => {
     const named = { ...speaker, label: { type: "person", person: { short_name: "Pavel" } }, segment_count: 7 };
     const { b } = bridge({ status: "ok", data: { speakers: [named], change_id: "ch" } });
     const out = await nameSpeaker(b, "c1", speaker, { type: "existing", person_id: "p1" }, "Pavel R.");
-    expect(out).toEqual({ undo: { target: { type: "change", change_id: "ch" }, message: expect.stringContaining("Pavel") } });
+    expect(out).toEqual({ undo: { refresh: expect.any(Function), target: { type: "change", change_id: "ch" }, message: expect.stringContaining("Pavel") } });
     expect(JSON.stringify(out)).toContain("7");
+  });
+  it("the undo re-reads the call's speakers into the store", async () => {
+    const { b, setState } = bridge({ status: "ok", data: { speakers: [], change_id: "ch" } });
+    (b.core as unknown as { callGet: unknown }).callGet = async () => ({ status: "ok", data: { speakers: [speaker] } });
+    const out = await nameSpeaker(b, "c1", speaker, { type: "existing", person_id: "p1" }, "P");
+    await (out as { undo: { refresh: () => Promise<void> } }).undo.refresh();
+    expect(setState).toHaveBeenCalledTimes(1);
   });
   it("falls back to the typed name and the speaker's own count", async () => {
     const { b } = bridge({ status: "ok", data: { speakers: [], change_id: "ch" } });

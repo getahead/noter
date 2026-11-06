@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import { applyRecord } from "../../app/store/window-store";
 import { useWindow } from "../../app/use-window";
 import type {
   PersonChip,
@@ -57,7 +58,13 @@ export async function nameSpeaker(bridge: Bridge, callId: string, speaker: Speak
   // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-outcome
   const named = res.data.speakers.find((s) => s.id === speaker.id);
   const short = named?.label.type === "person" ? named.label.person.short_name : to;
+  // an Undo re-reads the call's speakers: no event orders the restored rows after this answer
+  const refresh = async () => {
+    const detail = await bridge.core.callGet({ call_id: callId });
+    if (detail.status === "ok") bridge.store.setState((s) => applyRecord(s, "speaker", { speakers: detail.data.speakers }));
+  };
   const undo = {
+    refresh,
     target: { type: "change" as const, change_id: res.data.change_id },
     message: t("speakers.named", { from: label, to: short, count: named?.segment_count ?? speaker.segment_count }),
   };
