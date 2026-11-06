@@ -1,11 +1,12 @@
-// The Today dashboard (docs/features/ui/today.md): TD-R3 the calendar region, TD-R6 proposals waiting and TD-R8 the
-// review line, with the call cards and This week. The item regions (TD-R5 due, TD-R7 Done today) and the rows inside
-// the cards join with the Items rows (2.17).
+// The Today dashboard (docs/features/ui/today.md): TD-R3 the calendar region with its call cards, This week, TD-R5 due
+// without a call, TD-R6 proposals waiting, TD-R7 Done today and the TD-R8 review line. Item rows are the Items feature's.
 import { useEffect, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
+import { ActionItemRow } from "../items/ActionItemRow";
+import { Disclosure } from "../../ui/primitives/disclosure";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { afterTimer } from "../call-page/logic";
@@ -23,6 +24,7 @@ function useAfter(ms: number, active: boolean): boolean {
 }
 
 // @cpt-component:cpt-noter-component-screen-today:p1
+// @cpt-flow:cpt-noter-flow-ui-today-tick:p1
 export function TodayPage({ bridge }: { bridge: Bridge }) {
   const view = useToday();
   const read = useWindow(bridge, (s) => s.commands[READ_KEY]) ?? { state: "IDLE" };
@@ -41,6 +43,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   // the user's own open/closed choice by event id; the next call is the first card that is not live
   const [user, setUser] = useState<ReadonlyMap<string, boolean>>(new Map());
   const toggle = (id: string, now: boolean) => setUser((m) => new Map(m).set(id, !now));
+  const [doneOpen, setDoneOpen] = useState<boolean | undefined>(undefined);
   const tryAgain = () => void loadToday(bridge);
   const review = view ? reviewLine(view) : null;
   const proposals = view ? proposalPreview(view) : null;
@@ -55,6 +58,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
           {t("today.review", { count: review.count })}
         </section>
       )}
+      {view?.first_use && <EmptyState variant="first-use" icon="inbox" title={t("today.first_use_title")} body={t("today.first_use_body")} />}
       <section data-region="TD-R3" className="td-calendar" aria-label={t("today.title")}>
         {state === "LOADING" && skeleton && <div className="td-skel" role="status" aria-label={t("today.loading")} />}
         {state === "NOT_ASKED" && <EmptyState variant="first-use" icon="calendar" title={t("today.not_asked_title")} body={t("today.not_asked_body")} actionLabel={t("today.allow_calendar")} onAction={() => void allowCalendar(bridge)} />}
@@ -75,6 +79,12 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
           ))}
         </section>
       )}
+      {view && (
+        <section data-region="TD-R5" className="td-due">
+          <h2 className="td-h">{t("today.due")}</h2>
+          {view.due_without_call.length === 0 ? <EmptyState variant="section" title={t("today.nothing_due")} /> : view.due_without_call.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />)}
+        </section>
+      )}
       {proposals && (
         <section data-region="TD-R6" className="td-proposals">
           <h2 className="td-h">{t("today.proposals", { count: proposals.total })}</h2>
@@ -87,6 +97,12 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
               ))}
             </ul>
           )}
+        </section>
+      )}
+      {view && (
+        <section data-region="TD-R7" className="td-done">
+          <Disclosure label={t("today.done_today", { count: view.done_today.length })} open={doneOpen ?? view.done_today.length === 0} onAction={() => setDoneOpen(!(doneOpen ?? view.done_today.length === 0))} />
+          {(doneOpen ?? view.done_today.length === 0) && (view.done_today.length === 0 ? <EmptyState variant="section" title={t("today.nothing_ticked")} /> : view.done_today.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="done" />))}
         </section>
       )}
     </div>

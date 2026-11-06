@@ -1,9 +1,10 @@
 // M2 — Today (docs/features/ui/today.md, DESIGN.md › Screen — Today TD-R1–TD-R8, Upcoming call card), slice S1.
 // Stories: `cpt-noter-seq-today-review-before-call`: Return to a live call, Calendar not allowed yet and Calendar access denied.
-// Commands: today_get, permission_request (calendar), open_external, window_show_call. These run on the real core
-// (NOTER_CORE=stdio → noter-core-harness). The other paths of the two stories (call cards with items, read failed, quit banner,
-// due list, Done today, tick, handoff, Undo) need `world_set today` (Unblocker ask #6) or the item rows (2.17) and stay on
-// lane/ui/e2e-m2-1 until S2.
+// Commands: today_get, permission_request (calendar), open_external, window_show_call, item_set_done. They run on the fake
+// and on the real core (NOTER_CORE=stdio → noter-core-harness). S2 adds `cpt-noter-seq-today-tick-item` over the due list
+// (TD-R5) and Done today (TD-R7) of the default world. The card paths (items on a card, Show More, read failed before the
+// first read, quit banner, handoff answer) stay on lane/ui/e2e-m2-1: the real core ranks card items itself, so a card's
+// rows cannot be set by the test.
 import type { Locator, Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
@@ -12,6 +13,10 @@ import { expect, test } from "./support/fixtures";
 
 const CARD = '[data-component="cpt-noter-component-ui-upcoming-call-card"]';
 const cards = (page: Page) => page.locator(CARD);
+const ROW = '[data-component="cpt-noter-component-ui-action-item-row"]';
+const SPEC = "Drawer redesign spec by Friday"; // itm_spec, due without a call in the fixture world
+// the row's own Undo button, or the Undo link of its fresh outcome
+const undo = (row: Locator) => row.getByRole("button", { name: "Undo" }).or(row.getByRole("link", { name: "Undo" }));
 const button = (scope: Page | Locator, name: string | RegExp) => scope.getByRole("button", { name });
 const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
   (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args as Record<string, unknown>);
@@ -61,5 +66,32 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     await expect(cards(page)).toHaveCount(0);
     await button(page, "Open System Settings…").click();
     expect(await sent(page, "open_external")).toEqual([{ target: { type: "system_settings", permission: "calendar" } }]);
+  });
+});
+
+test.describe("cpt-noter-seq-today-tick-item", () => {
+  test.skip(process.env.NOTER_CORE !== "stdio", "the fake core's Today read does not regroup due and Done today after a tick; the real core does");
+  test("UI — happy path: Space on a due row's checkbox ticks it (item_set_done with the rev), it reads Done and Done today lists it with Undo", async ({ page }) => {
+    await openToday(page, () => {});
+    const due = page.locator('[data-region="TD-R5"]');
+    const row = due.locator(ROW).filter({ hasText: SPEC });
+    await row.getByRole("checkbox").focus();
+    await page.keyboard.press("Space");
+    expect(await sent(page, "item_set_done")).toEqual([{ item_id: "itm_spec", rev: expect.any(Number), done: true }]);
+    const done = page.locator('[data-region="TD-R7"]');
+    await button(done, /Done today/).click();
+    await expect(done.locator(ROW).filter({ hasText: SPEC })).toBeVisible();
+    await expect(undo(done.locator(ROW).filter({ hasText: SPEC }))).toBeVisible();
+  });
+
+  test("UI — error path — Ticked by mistake: Undo in Done today opens the item again in the due list", async ({ page }) => {
+    await openToday(page, () => {});
+    await page.locator('[data-region="TD-R5"]').locator(ROW).filter({ hasText: SPEC }).getByRole("checkbox").focus();
+    await page.keyboard.press("Space");
+    const done = page.locator('[data-region="TD-R7"]');
+    await button(done, /Done today/).click();
+    await undo(done.locator(ROW).filter({ hasText: SPEC })).click();
+    await expect(page.locator('[data-region="TD-R5"]').locator(ROW).filter({ hasText: SPEC })).toBeVisible();
+    await expect(done.locator(ROW).filter({ hasText: SPEC })).toHaveCount(0);
   });
 });

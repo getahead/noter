@@ -117,3 +117,40 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
     expect(out).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: "call_1", tab: "summary" } }]);
   });
 });
+
+describe("item regions (TD-R5, TD-R7) and card rows", () => {
+  const items = () => (fake.world as unknown as { items: Array<Record<string, unknown>> }).items;
+  const today = () => (fake.world as unknown as { today: Record<string, unknown> }).today;
+  it("lists the due items and Done today with their counts, and the empty lines", async () => {
+    await open();
+    Object.assign(today(), { due_without_call: [items()[0]], done_today: [items()[1]], first_use: false });
+    await loadToday(bridge);
+    let html = renderToString(<TodayPage bridge={bridge} />);
+    expect(html).toContain('data-region="TD-R5"');
+    expect(html).toContain("Due this week, no call");
+    expect(html).toContain("Done today · 1");
+    expect(html).toContain('data-variant="compact"');
+    Object.assign(today(), { due_without_call: [], done_today: [] });
+    await loadToday(bridge);
+    html = renderToString(<TodayPage bridge={bridge} />);
+    expect(html).toContain("Nothing due without a call");
+    expect(html).toContain("Nothing ticked today"); // an empty Done today shows its line open
+  });
+  it("says what will fill the page on first use", async () => {
+    await open();
+    Object.assign(today(), { first_use: true });
+    await loadToday(bridge);
+    expect(renderToString(<TodayPage bridge={bridge} />)).toContain("Nothing open yet");
+  });
+  it("shows at most five rows in an expanded card, then Show N More", async () => {
+    await open();
+    const rows = [0, 1, 2, 3, 4, 5, 6].map((n) => ({ ...items()[0], id: `itm_${n}`, text: `Row ${n}` }));
+    const ev = { event_id: "e1", title: "Sync", starts_at: 1_700_000_000_000, ends_at: 1_700_003_600_000, platform: null, attendees: [], sensitive: false, call_id: null, last_time: null, items: rows, questions: [], handed_off: [], open_count: 7 };
+    Object.assign(today(), { today: [ev], this_week: [], live_call: null });
+    await loadToday(bridge);
+    const html = renderToString(<TodayPage bridge={bridge} />);
+    expect(html).toContain("Row 4");
+    expect(html).not.toContain("Row 5");
+    expect(html).toContain("Show 2 More");
+  });
+});

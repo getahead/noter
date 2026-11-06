@@ -60,9 +60,9 @@ export function cards(view: TodayView): Card[] {
 /** This week's cards, in the core's order; they start collapsed. */
 export const weekCards = (view: TodayView): Card[] => view.this_week.map((event) => ({ variant: "this-week", event, live: null }));
 
-/** At most five combined action and question rows until **Show N More**; the core's order within each kind. */
+/** At most five combined action, question and handed-off rows until **Show N More**; the core's order within each kind. */
 export function cardRows(card: UpcomingCall, all: boolean): { rows: ItemView[]; more: number } {
-  const every = [...card.items, ...card.questions];
+  const every = [...card.items, ...card.questions, ...card.handed_off]; // a handed-off action is still owed
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-disclosures
   return all ? { rows: every, more: 0 } : { rows: every.slice(0, 5), more: Math.max(0, every.length - 5) };
   // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-disclosures

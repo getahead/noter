@@ -75,7 +75,7 @@ describe("cards (cpt-noter-algo-ui-today-project)", () => {
 });
 
 describe("cardRows", () => {
-  const card = { items: [1, 2, 3, 4].map(item), questions: [5, 6, 7].map(item) } as never;
+  const card = { items: [1, 2, 3, 4].map(item), questions: [5, 6, 7].map(item), handed_off: [] } as never;
   it("shows five rows and counts the rest", () => {
     const r = cardRows(card, false);
     expect(r.rows).toHaveLength(5);

@@ -14,7 +14,9 @@ import { setCallType, setSensitive } from "../call-page/actions";
 import { useTypes } from "../call-page/cache";
 import { RecordingIndicator } from "../call-window/strip";
 import { showCall, showPreviousCall } from "./actions";
-import type { Card } from "./model";
+import { ActionItemRow } from "../items/ActionItemRow";
+import { OutputItemRow } from "../call-page/OutputItemRow";
+import { cardRows, type Card } from "./model";
 
 const clock = (ms: number) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(ms);
 
@@ -24,6 +26,8 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   const types = useTypes();
   const call = useWindow(bridge, (s) => (e?.call_id ? s.entities.call[e.call_id] : undefined));
   const [menu, setMenu] = useState<HTMLElement | null>(null);
+  const [all, setAll] = useState(false);
+  const rows = e && expanded ? cardRows(e, all) : null;
   const live = card.variant === "live" || card.variant === "unmatched";
   const title = e?.title ?? card.live?.title ?? "";
   const open = e ? e.open_count : 0;
@@ -68,6 +72,12 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
             <span key={i} className="td-card__att">{a.name}</span>
           ))}
           {e.sensitive && <span className="td-card__local">{t("today.local_only")}</span>}
+        </div>
+      )}
+      {rows && rows.rows.length > 0 && (
+        <div className="td-card__rows">
+          {rows.rows.map((it) => (it.kind === "open_question" ? <ul key={it.id} className="td-card__q"><OutputItemRow bridge={bridge} item={it} /></ul> : <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />))}
+          {rows.more > 0 && <PushButton label={t("today.show_more", { count: rows.more })} variant="quiet" size="small" onAction={() => setAll(true)} />}
         </div>
       )}
       {e?.last_time && (
