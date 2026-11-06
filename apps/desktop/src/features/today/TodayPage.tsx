@@ -23,7 +23,6 @@ function useAfter(ms: number, active: boolean): boolean {
 }
 
 // @cpt-component:cpt-noter-component-screen-today:p1
-// @cpt-dod:cpt-noter-dod-ui-today-dashboard:p3
 export function TodayPage({ bridge }: { bridge: Bridge }) {
   const view = useToday();
   const read = useWindow(bridge, (s) => s.commands[READ_KEY]) ?? { state: "IDLE" };
