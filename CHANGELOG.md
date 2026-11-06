@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/getahead/noter/compare/v0.16.0...v0.16.1) (2026-11-06)
+
+
+### Bug fixes
+
+* **fake:** share only ready sections and never a rejected item; undo a batch around rows edited later ([#317](https://github.com/getahead/noter/issues/317)) ([13603fd](https://github.com/getahead/noter/commit/13603fd022e9b4cbe42f5a13df5b043f3cae1dd8))
+
 ## [0.16.0](https://github.com/getahead/noter/compare/v0.15.4...v0.16.0) (2026-11-06)
 
 
