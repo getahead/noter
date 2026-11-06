@@ -16,6 +16,7 @@ import {
   createWindowStore,
   initialState,
   reduceStream,
+  withStreamSegment,
 } from "./window-store";
 
 const world = new FakeCore({ window: "main" }).world;
@@ -208,6 +209,14 @@ describe("window store", () => {
     const section = { kind: "summary", state: { type: "ready" }, body_md: "x" } as never;
     const s = applyEvent(initialState("main"), { event: "entity:changed", payload: { type: "section", call_id: "c1", section } });
     expect(s.sections["c1/summary"]).toBe(section);
+  });
+
+  it("a fixed term's segment replaces that line in the transcript Channel, for that call only", () => {
+    const seg = (id: string, call_id: string, text: string) => ({ id, call_id, text });
+    const open = { ...initialState("main"), streams: { transcript_subscribe: { data: { call_id: "c1", segments: [seg("s1", "c1", "old")] }, error: null } } } as never;
+    const fixed = withStreamSegment(open, seg("s1", "c1", "new") as never);
+    expect(fixed.streams.transcript_subscribe?.data?.segments.map((x) => x.text)).toEqual(["new"]);
+    expect(withStreamSegment(open, seg("s1", "c2", "x") as never)).toBe(open);
   });
 
   it("keeps outputs, jobs, sign-ins and the last navigation request", () => {

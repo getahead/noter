@@ -15,7 +15,7 @@ import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
 import { Disclosure } from "../../ui/primitives/disclosure";
 import { PushButton } from "../../ui/primitives/push-button";
-import { holdUndo } from "../history/undo";
+import { holdUndo, type HoldUndo } from "../history/undo";
 import { REFUSED } from "../transcript/play-control";
 import { speakerName } from "../transcript/model";
 import {
@@ -40,6 +40,29 @@ export interface SpeakerNamingPanelProps {
   participants: readonly PersonChip[];
   /** The call's audio is stored and available: Play Sample shows. */
   audio: boolean;
+}
+
+/** Name one speaker: the error text (the row keeps its draft) or the undo strip for the new name. */
+export async function nameSpeaker(bridge: Bridge, callId: string, speaker: SpeakerView, ref: PersonRef, to: string): Promise<{ error: string } | { undo: HoldUndo }> {
+  const label = speakerName(speaker.label);
+  const res = await bridge.act(
+    nameKey(speaker.id),
+    "transcript_name_speakers",
+    () => bridge.core.transcriptNameSpeakers({ call_id: callId, assignments: [{ speaker_id: speaker.id, person: ref }] }),
+    { entity: "speaker", named: NAMED },
+  );
+  // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-error
+  if (res.status === "error") return { error: t(res.error.code === "not_found" ? "speakers.err_gone" : "speakers.name_err", { name: label }) };
+  // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-error
+  // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-outcome
+  const named = res.data.speakers.find((s) => s.id === speaker.id);
+  const short = named?.label.type === "person" ? named.label.person.short_name : to;
+  const undo = {
+    target: { type: "change" as const, change_id: res.data.change_id },
+    message: t("speakers.named", { from: label, to: short, count: named?.segment_count ?? speaker.segment_count }),
+  };
+  // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-outcome
+  return { undo };
 }
 
 // @cpt-component:cpt-noter-component-ui-speaker-naming-panel:p1
@@ -202,42 +225,11 @@ function NameRow({
     if (busy) return;
     setBusy(true);
     setError(null);
-    const res = await p.bridge.act(
-      nameKey(speaker.id),
-      "transcript_name_speakers",
-      () =>
-        p.bridge.core.transcriptNameSpeakers({
-          call_id: p.callId,
-          assignments: [{ speaker_id: speaker.id, person: ref }],
-        }),
-      { entity: "speaker", named: NAMED },
-    );
+    const out = await nameSpeaker(p.bridge, p.callId, speaker, ref, to);
     setBusy(false);
+    if ("error" in out) return setError(out.error);
+    holdUndo(out.undo);
     // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-name
-    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-error
-    if (res.status === "error")
-      return setError(
-        t(
-          res.error.code === "not_found"
-            ? "speakers.err_gone"
-            : "speakers.name_err",
-          { name: label },
-        ),
-      );
-    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-error
-    // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-outcome
-    const named = res.data.speakers.find((s) => s.id === speaker.id);
-    const short =
-      named?.label.type === "person" ? named.label.person.short_name : to;
-    holdUndo({
-      target: { type: "change", change_id: res.data.change_id },
-      message: t("speakers.named", {
-        from: label,
-        to: short,
-        count: named?.segment_count ?? speaker.segment_count,
-      }),
-    });
-    // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-outcome
   };
   const chip = (c: PersonChip) => (
     <button

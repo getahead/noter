@@ -26,6 +26,21 @@ export interface TermFixPopoverProps {
 // @cpt-component:cpt-noter-component-ui-term-fix-popover:p1
 // @cpt-flow:cpt-noter-flow-ui-speakers-fix-term:p1
 // @cpt-state:cpt-noter-state-ui-speakers-correction:p1
+/** Fix the term: the segment replaces the line in the transcript Channel; an error text keeps the replacement. */
+export async function applyFix(bridge: Bridge, segment: SegmentView, range: TextRange, text: string, glossary: boolean): Promise<{ error: string } | { message: string; change_id: string }> {
+  // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-call
+  const res = await bridge.act(fixKey(segment.id), "transcript_fix_term", () => bridge.core.transcriptFixTerm({ call_id: segment.call_id, segment_id: segment.id, range, replacement: text, add_to_glossary: glossary }), {});
+  // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-call
+  // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-error
+  // the replacement stays; a stale range is never retried by offset: the person selects the words again
+  if (res.status === "error") return { error: t(staleFix(res.error.code) ? "speakers.fix.stale" : "speakers.fix.err") };
+  // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-error
+  // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
+  bridge.store.setState((s) => withStreamSegment(s, res.data.segment));
+  return { message: fixMessage(text, res.data.glossary_term_id), change_id: res.data.change_id };
+  // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
+}
+
 export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixed }: TermFixPopoverProps) {
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-range
   const selected = segment.text.slice(range.start, range.end);
@@ -44,18 +59,10 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
     if (!valid || busy) return;
     setBusy(true);
     setError(null);
-    // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-call
-    const res = await bridge.act(fixKey(segment.id), "transcript_fix_term", () => bridge.core.transcriptFixTerm({ call_id: segment.call_id, segment_id: segment.id, range, replacement: text.trim(), add_to_glossary: glossary }), {});
-    // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-call
+    const out = await applyFix(bridge, segment, range, text.trim(), glossary);
     setBusy(false);
-    // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-error
-    // the replacement stays; a stale range is never retried by offset: the person selects the words again
-    if (res.status === "error") return setError(t(staleFix(res.error.code) ? "speakers.fix.stale" : "speakers.fix.err"));
-    // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-error
-    // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
-    bridge.store.setState((s) => withStreamSegment(s, res.data.segment));
-    onFixed(fixMessage(text.trim(), res.data.glossary_term_id), res.data.change_id);
-    // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
+    if ("error" in out) return setError(out.error);
+    onFixed(out.message, out.change_id);
     // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
     onClose();
     // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
