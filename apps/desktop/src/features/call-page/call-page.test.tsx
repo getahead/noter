@@ -82,15 +82,16 @@ describe("CallInfo", () => {
 describe("CallToolbar", () => {
   const base = { title: "", actions: [], hasSearch: true, narrow: false, canBack: true, canForward: false, showToggle: false, search: "", searchOpen: false, onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
 
-  it("lists only the delivered view, with the call's title and subtitle in PC-R1", async () => {
+  it("lists only the delivered views, with the call's title and subtitle in PC-R1", async () => {
     await ready();
     const html = renderToString(<CallToolbar route={route()} bridge={bridge} base={base} inspectorOpen onToggleInspector={() => {}} />);
     expect(html).toContain('data-region="PC-R1"');
     expect(html).toContain(fake.world.calls.find((c) => c.id === id)!.title);
     expect(html).toContain("Transcript");
-    for (const later of ["Summary", "Agent Reviews", "History"]) expect(html).not.toContain(later);
+    expect(html).toContain("Summary"); // registered by register.tsx (call-page-outputs)
+    for (const later of ["Agent Reviews", "History"]) expect(html).not.toContain(later);
     expect(html).toContain("Hide Inspector");
-    expect(registeredViews()).toEqual(["transcript"]);
+    expect(registeredViews()).toEqual(["transcript", "summary"]);
   });
 
   it("at Narrow width the view control is a pop-up button with the same views", async () => {

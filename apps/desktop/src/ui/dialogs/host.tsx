@@ -50,6 +50,9 @@ export function useSheet() {
   return host;
 }
 
+/** The sheets of the nearest provider, or null outside one (a page whose toolbar or banner is drawn alone). */
+export const useSheetIfAny = () => useContext(Ctx);
+
 /** Asks a native alert; focus returns to the control that asked once it is answered (Cancel on Return and Esc). */
 export function useAlert() {
   return useCallback(async (alert: AlertSpec) => {

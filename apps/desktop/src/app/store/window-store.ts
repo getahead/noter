@@ -24,6 +24,7 @@ import type {
   JobRunRow,
   LevelsMsg,
   NavTarget,
+  OutputSection,
   OutputsProgress,
   PersonRow,
   SelfTestMsg,
@@ -140,6 +141,8 @@ export interface WindowState {
   entities: Entities;
   /** `outputs:progress`, keyed `call_id/section`. */
   outputs: Record<string, OutputsProgress>;
+  /** The sections the core sent whole with `entity:changed`, keyed `call_id/kind`. */
+  sections: Record<string, OutputSection>;
   jobs: Record<string, JobRunRow>;
   signin: Record<string, SignInProgress>;
   /** The core's last navigation request (`nav:request`). */
@@ -175,6 +178,7 @@ export function initialState(
       speaker: {},
     },
     outputs: {},
+    sections: {},
     jobs: {},
     signin: {},
     nav: null,
@@ -295,7 +299,7 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
             c.speakers,
           );
         case "section":
-          return s;
+          return { ...s, sections: { ...s.sections, [`${c.call_id}/${c.section.kind}`]: c.section } };
         case "removed": {
           const slice = (
             s.entities as unknown as Record<string, Record<string, unknown>>

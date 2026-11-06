@@ -84,7 +84,8 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await expect(button(page, "Back")).toBeEnabled();
     await expect(toolbar(page).getByText("Transcript", { exact: true })).toBeVisible(); // the view control lists what is delivered
     await expect(toolbar(page).getByText("History", { exact: true })).toBeVisible(); // delivered by history-undo (M2)
-    for (const later of ["Summary", "Agent Reviews"]) await expect(toolbar(page).getByText(later, { exact: true })).toHaveCount(0);
+    await expect(toolbar(page).getByText("Summary", { exact: true })).toBeVisible(); // M2: Call page outputs
+    await expect(toolbar(page).getByText("Agent Reviews", { exact: true })).toHaveCount(0);
     await expect(toolbar(page).getByRole("button", { name: "Share" })).toBeVisible(); // placeholder until M2
     await expect(button(page, /^(Hide|Show) Inspector/)).toBeVisible();
 
@@ -151,7 +152,8 @@ test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
     await openMore(page);
     for (const name of ["Rename…", "Call Type", "Mark as Sensitive", "Show in Finder", "Delete Call…"]) await expect(menuItem(page, name)).toBeVisible();
     await expect(menuItem(page, "Delete Call…")).toContainText("⌘⌫");
-    for (const later of ["Regenerate Outputs…", "Show Performance"]) await expect(menuItem(page, later)).toHaveCount(0); // M2, M5
+    await expect(menuItem(page, "Regenerate Outputs…")).toBeVisible(); // M2
+    await expect(menuItem(page, "Show Performance")).toHaveCount(0); // M5
     expect(await sent(page, "calls_delete")).toHaveLength(0); // never without the native alert (XCUITest)
   });
 
