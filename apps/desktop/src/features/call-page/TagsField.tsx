@@ -10,6 +10,7 @@ import { validateTag } from "./share-logic";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1
 export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: string; tags: string[] }) {
+  const listId = callId;
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [known, setKnown] = useState<string[]>([]);
@@ -42,7 +43,7 @@ export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: st
         className="np-field pc-tags__input"
         aria-label={t("tags.add")}
         placeholder={t("tags.add")}
-        list={`tags-${callId}`}
+        list={listId}
         value={text}
         aria-invalid={error ? true : undefined}
         onChange={(e) => (setText(e.target.value), setError(null))}
@@ -51,7 +52,7 @@ export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: st
           else if (e.key === "Backspace" && !text && tags.length) void remove(tags[tags.length - 1]!);
         }}
       />
-      <datalist id={`tags-${callId}`}>{known.filter((x) => !tags.some((y) => y.toLowerCase() === x.toLowerCase())).map((x) => <option key={x} value={x} />)}</datalist>
+      <datalist id={listId}>{known.filter((x) => !tags.some((y) => y.toLowerCase() === x.toLowerCase())).map((x) => <option key={x} value={x} />)}</datalist>
       {error && <div role="alert" className="pc-sec__error">{error}</div>}
     </div>
   );
