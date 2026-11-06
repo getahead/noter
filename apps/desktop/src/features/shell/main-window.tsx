@@ -16,6 +16,7 @@ import { SplitDivider } from "../../ui/primitives/split-divider";
 import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
 import { frameState } from "./frame";
 import { InspectorSlot } from "./inspector";
+import { closeInspector, useInspectorOverride } from "./inspector-override";
 import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
 import { elapsedSeconds, isLive, shortTitle } from "./live-row";
 import { modeIndicator } from "./mode-indicator";
@@ -85,6 +86,9 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const route = currentRoute(shell.history);
   const page = pageFor(route.section, route);
   const routeId = `${route.section}/${route.key}`;
+  const override = useInspectorOverride();
+  // a route change closes an inspector a feature opened (its row is gone from the page)
+  useEffect(() => closeInspector, [routeId]);
 
   // Zoom: the layout width the page sees is the window width divided by the zoom (CSS zoom scales every length),
   // which is the width `collapse()` takes; zoom itself only feeds its sidebar rule.
@@ -99,7 +103,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
       windowWidth: viewport / zoom,
       zoom: shell.zoom,
       sidebarWidth: shell.sidebarWidth,
-      inspectorWidth: shell.history.inspectorOpen && page.inspector ? page.inspector.width : null,
+      inspectorWidth: override ? override.width : shell.history.inspectorOpen && page.inspector ? page.inspector.width : null,
       need: page.need ?? NO_NEED,
     },
     !shell.sidebar,
@@ -183,7 +187,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const bannerList = appBanners({ banners, setup }, bannerActions, commandFailures(commands));
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banners
 
-  const inspector = shell.history.inspectorOpen ? page.inspector : undefined;
+  const inspector = override ?? (shell.history.inspectorOpen ? page.inspector : undefined);
   const subtitle = page.subtitle?.(route);
   const classes = ["np-win", "np-win--main", !sidebarShown && "no-sidebar", overlay && "is-sidebar-collapsed"].filter(Boolean).join(" ");
 
@@ -272,7 +276,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             )}
             {/* @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
           </div>
-          <InspectorSlot def={inspector} route={route} bridge={bridge} overlay={layout.inspector === "overlay"} onClose={() => dispatch({ type: "close-inspector" })} />
+          <InspectorSlot def={inspector} route={route} bridge={bridge} overlay={layout.inspector === "overlay"} onClose={() => (override ? closeInspector() : dispatch({ type: "close-inspector" }))} />
         </div>
       </div>
     </div>
