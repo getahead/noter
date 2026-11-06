@@ -19,3 +19,11 @@
 .pc-item__text { flex: 1 1 auto; min-width: 0; }
 .pc-regen { display: grid; gap: 12px; }
 .pc-regen__row { display: grid; gap: 4px; border: 0; padding: 0; margin: 0; }
+
+/* Tags (Call info), Export status */
+.pc-tags { display: flex; flex-direction: column; gap: 6px; }
+.pc-tags__chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.pc-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 999px; background: var(--fill-quaternary, rgba(127, 127, 127, 0.15)); font-size: 11px; }
+.pc-tag__x { display: inline-flex; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; opacity: 0.7; }
+.pc-tags__input { width: 100%; }
+.pc-export-done { font-size: 11px; color: var(--text-secondary, inherit); white-space: nowrap; }

@@ -1,4 +1,5 @@
 import { t } from "../../i18n/format";
+import { InlineBanner } from "../feedback/inline-banner";
 import { PushButton } from "../primitives/push-button";
 import { Sheet, SheetFooter } from "../primitives/sheet";
 import type { SheetProps } from "./sheets";
@@ -9,7 +10,8 @@ export function DeleteOldAudioSheet({
   days = 30,
   busy,
   onDelete,
-}: SheetProps & { days?: number; busy?: boolean; onDelete?: () => void }) {
+  error,
+}: SheetProps & { days?: number; busy?: boolean; onDelete?: () => void; error?: string }) {
   return (
     <Sheet
       title={t("dialogs.old_audio.title")}
@@ -23,6 +25,7 @@ export function DeleteOldAudioSheet({
       <div className="np-sheet__body">
         <p>{t("dialogs.old_audio.message", { days })}</p>
         <p className="np-dim">{t("dialogs.old_audio.note")}</p>
+        {error && <InlineBanner banner={{ id: "old-audio-error", severity: "error", text: error }} />}
       </div>
       <SheetFooter
         defaultButton={

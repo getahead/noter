@@ -11,6 +11,7 @@ import type { WholeName } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
 import { UndoStrip } from "../history/UndoStrip";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
+import { OldAudio } from "../../ui/dialogs/old-audio";
 import { SplitDivider } from "../../ui/primitives/split-divider";
 import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
 import { frameState } from "./frame";
@@ -245,6 +246,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-empty */}
+        <OldAudio bridge={bridge} nav={nav} />
         <BannerSlot banners={bannerList} region="MW-R5" onDismiss={(id) => (isBannerKind(id) ? dismissBanner(id) : undefined)} />
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-empty */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
