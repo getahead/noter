@@ -26,7 +26,6 @@ const byChange = (change_id: ChangeId) => ({ target: { type: "change" as const, 
 
 /** Renames the call and returns the change that logged it. */
 async function rename(title: string): Promise<ChangeId> {
-  // The list's rev is the live one on both cores (the fake's call detail keeps its first rev).
   const row = ok(await main.callsList({ filter: {}, sort: "newest", page: {} })).rows.find((r) => r.id === PAST_CALL)!;
   return ok(await main.callUpdate({ call_id: PAST_CALL, rev: row.rev, title })).change_id;
 }
@@ -114,5 +113,14 @@ describe("history_export", () => {
   it("a cancelled panel is cancelled", async () => {
     await cancelNextSavePanel(s);
     expect(refused(await main.historyExport({ scope: { type: "today" }, format: "markdown" })).code).toBe("cancelled");
+  });
+});
+
+describe("call revisions", () => {
+  it("call_get answers the live rev after a change, so an edit from the call page is not stale", async () => {
+    await rename("History rev");
+    const got = ok(await main.callGet({ call_id: PAST_CALL }));
+    expect(got.call.title).toBe("History rev");
+    ok(await main.callUpdate({ call_id: PAST_CALL, rev: got.call.rev, title: "Renamed again" }));
   });
 });

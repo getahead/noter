@@ -61,6 +61,19 @@ describe("post-call output commands (2.17)", () => {
     expect(first.body_md).toContain("websocket notifications");
   });
 
+  it("output_versions of a section the world says was edited ends with the user's edit", async () => {
+    s = openScenario({
+      alsoRecord: exercised,
+      world: (w) => {
+        summaryOf(w.outputs.find((o) => o.call_id === CALL)!.sections).user_edited = true;
+      },
+    });
+    const versions = ok(await s.core("main").outputVersions({ summary_id: SUMMARY })).versions;
+    expect(versions.length).toBeGreaterThan(1);
+    expect(versions.at(-1)).toMatchObject({ kind: "user_edit" });
+    expect(versions[0]).toMatchObject({ kind: "generated" });
+  });
+
   it("outputs_regenerate answers a job run, the sections pass through outputs:progress, and the user's edit is kept", async () => {
     s = openScenario({ alsoRecord: exercised, world: W.idle });
     const main = s.core("main");

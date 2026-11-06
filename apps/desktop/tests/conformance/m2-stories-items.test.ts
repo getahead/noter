@@ -96,7 +96,10 @@ describe("cpt-noter-seq-today-tick-item", () => {
 
 describe("cpt-noter-seq-call-page-review-suggested-items", () => {
   it("happy path: accept, edit then accept, reject, restore, then accept the rest in one batch that undo reverses", async () => {
-    s = openScenario({ alsoRecord: exercised });
+    s = openScenario({ alsoRecord: exercised, world: (w) => {
+      const suggested = w.items.find((i) => i.id === "itm_reconnect_q")!;
+      w.items.push({ ...suggested, id: "itm_batch_second" });
+    } });
     const main = s.core("main");
     const get = async (id: string) => ok(await main.itemGet({ item_id: id })).item;
 
@@ -119,9 +122,16 @@ describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     expect(created.item.review).toBe("accepted");
     const batch = ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] }));
     expect(batch.items.map((i: ItemView) => i.id)).toContain("itm_reconnect_q");
-    if (s.target === "stdio" && batch.batch_id) {
-      expect(ok(await main.changeUndo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBeGreaterThan(0);
-      expect((await get("itm_reconnect_q")).review).toBe("suggested");
+    expect(batch.items.length).toBeGreaterThan(1);
+    expect(batch.batch_id).not.toBeNull();
+    if (batch.batch_id) {
+      const history = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} }));
+      expect(history.rows.filter((r) => r.batch_id === batch.batch_id).map((r) => r.batch_size)).toEqual(batch.items.map(() => batch.items.length));
+      expect(ok(await main.itemGet({ item_id: "itm_reconnect_q" })).history.find((r) => r.batch_id === batch.batch_id)?.batch_size).toBe(batch.items.length);
+      expect(ok(await main.changeUndo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBe(batch.items.length);
+      for (const item of batch.items) expect((await get(item.id)).review).toBe("suggested");
+      expect(ok(await main.changeRedo({ target: { type: "batch", batch_id: batch.batch_id } })).undone).toBe(batch.items.length);
+      for (const item of batch.items) expect((await get(item.id)).review).toBe("accepted");
     }
   });
 });

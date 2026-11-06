@@ -44,7 +44,7 @@ function checkRev(current: Rev, sent: Rev): void {
   if (current !== sent) throw coreError("conflict", "rev is stale", { type: "conflict", current_rev: current });
 }
 
-type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable">>;
+type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable" | "batch_id">>;
 
 function logChange(world: World, row: ChangeInput): ChangeId {
   const id = newId("chg");
@@ -57,10 +57,10 @@ function logChange(world: World, row: ChangeInput): ChangeId {
     after: null,
     reason: null,
     undoable: true,
+    batch_id: null,
     ...row,
     id,
     at: now(),
-    batch_id: null,
     batch_size: 1,
     evidence: [],
     confidence: null,
@@ -73,6 +73,20 @@ function logChange(world: World, row: ChangeInput): ChangeId {
 function bump(item: ItemView): ItemView {
   item.rev = item.rev + 1;
   return item;
+}
+
+// @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
+function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
+  // Fixture rows can already summarize a batch; new batches have one stored row per item.
+  return rows.map((r) => r.batch_id ? { ...r, batch_size: Math.max(r.batch_size, world.changes.filter((c) => c.batch_id === r.batch_id).length) } : r);
+}
+
+// @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
+function replayItemChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
+  rows.forEach((r) => {
+    const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
+    if (item) bump(Object.assign(item, { [r.field as string]: r[value] }));
+  });
 }
 
 function call(world: World, id: string): CallRow {
@@ -166,7 +180,9 @@ function section(world: World, summaryId: string): OutputSection {
 const sectionVersions = new WeakMap<OutputSection, { body_md: string; kind: "generated" | "user_edit" }[]>();
 function versionsOf(s: OutputSection): { body_md: string; kind: "generated" | "user_edit" }[] {
   let v = sectionVersions.get(s);
-  if (!v) sectionVersions.set(s, (v = Array.from({ length: Math.max(1, s.version_count) }, () => ({ body_md: s.body_md ?? "", kind: "generated" as const }))));
+  // An edited section's current (last) version is the user's edit, as in the real core.
+  const n = Math.max(1, s.version_count);
+  if (!v) sectionVersions.set(s, (v = Array.from({ length: n }, (_, i) => ({ body_md: s.body_md ?? "", kind: s.user_edited && i === n - 1 ? ("user_edit" as const) : ("generated" as const) }))));
   return v;
 }
 
@@ -666,7 +682,7 @@ export const defaultHandlers: Handlers = {
   },
   item_get: (a, { world }) => {
     const item = findItem(world, a.item_id);
-    return { item, evidence: item.closed_by ? [item.closed_by] : [], history: world.changes.filter((c) => c.entity.id === item.id) };
+    return { item, evidence: item.closed_by ? [item.closed_by] : [], history: historyRows(world, world.changes.filter((c) => c.entity.id === item.id)) };
   },
   item_set_done: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
@@ -686,8 +702,12 @@ export const defaultHandlers: Handlers = {
   },
   items_review_all: (a, { world }) => {
     const items = world.items.filter((i) => i.call.id === a.call_id && i.review === "suggested" && (!a.kinds.length || a.kinds.includes(i.kind)));
-    items.forEach((i) => bump(Object.assign(i, { review: "accepted" as const })));
-    return { items, batch_id: items.length ? newId("bat") : null, skipped: 0 };
+    const batch_id = items.length ? newId("bat") : null;
+    items.forEach((i) => {
+      bump(Object.assign(i, { review: "accepted" as const }));
+      logChange(world, { entity: { kind: "item", id: i.id, label: i.text }, field: "review", before: "suggested", after: "accepted", summary: "Accepted suggested items", batch_id });
+    });
+    return { items, batch_id, skipped: 0 };
   },
   item_edit: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
@@ -917,8 +937,9 @@ export const defaultHandlers: Handlers = {
     return { rows, next_cursor: null, total: rows.length };
   },
   call_get: (a, { world }) => {
+    // The calls row is the live one (call_update writes it): the detail answers it, as the real core does.
     const d = world.call_details.find((x) => x.call.id === a.call_id);
-    if (d) return d;
+    if (d) return { ...d, call: world.calls.find((x) => x.id === a.call_id) ?? d.call };
     const c = call(world, a.call_id);
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
     return { call: c, calendar_event: null, speakers: t?.speakers ?? [], marks: t?.marks ?? [], gaps: t?.gaps ?? [], mode_used: world.app.privacy.effective, audio_not_stored: false, first_recorded_call: false, folder: `/Users/you/Library/Application Support/Noter/audio/${a.call_id}` };
@@ -1088,7 +1109,7 @@ export const defaultHandlers: Handlers = {
         (a.actor === "all" || (a.actor === "you" && c.actor.type === "you") || (a.actor === "jobs" && c.actor.type === "job") || (a.actor === "models" && c.actor.type === "model")) &&
         (!a.job_id || (c.actor.type === "job" && c.actor.job_id === a.job_id)),
     );
-    return { rows, next_cursor: null, total: rows.length };
+    return { rows: historyRows(world, rows), next_cursor: null, total: rows.length };
   },
   change_undo: (a, { world }) => {
     const target = a.target;
@@ -1097,6 +1118,7 @@ export const defaultHandlers: Handlers = {
     if (rows.every((r) => r.status === "undone")) throw coreError("already_undone");
     if (rows.some((r) => !r.undoable)) throw coreError("not_undoable");
     rows.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
+    replayItemChanges(world, rows, "before");
     return { undone: rows.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: 0 };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
@@ -1108,6 +1130,7 @@ export const defaultHandlers: Handlers = {
     const redoable = rows.filter((r) => r.redoable);
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
+    replayItemChanges(world, redoable, "after");
     logChange(world, { entity: rows[0].entity, summary: `Redid: ${rows[0].summary}`, field: rows[0].field, before: rows[0].before, after: rows[0].after });
     return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: rows.length - redoable.length };
   },
