@@ -638,6 +638,25 @@ fn vectors_add_weak_cross_language_hits_and_keyword_only_has_none() {
     });
     assert_eq!(ids(&both.calls), ["seg_a1"]);
     assert!(both.calls[0].keyword && both.calls[0].semantic);
+    // Dates reach the vector scan too (`started_at` metadata): call_b is before the 20th.
+    let later = lib.find(Query {
+        vector: Some(vector(2)),
+        filter: CallFilter {
+            from: Some(LocalDate("2026-10-20".into())),
+            ..CallFilter::default()
+        },
+        ..query("zzz")
+    });
+    assert!(later.is_empty());
+    let earlier = lib.find(Query {
+        vector: Some(vector(2)),
+        filter: CallFilter {
+            to: Some(LocalDate("2026-10-10".into())),
+            ..CallFilter::default()
+        },
+        ..query("zzz")
+    });
+    assert_eq!(ids(&earlier.calls), ["chk_b"]);
     // Item vectors: once the item has one, it is found by meaning too.
     lib.db
         .execute(
