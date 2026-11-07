@@ -53,6 +53,8 @@ design: docs/DESIGN-core.md
 
 The credentials service verifies API keys into the Keychain, drives separate Claude and ChatGPT sign-ins through their CLIs and reports runtime availability. It binds selected agents with Undo, installs missing CLIs as jobs and serves the Privacy pane over the existing append-only audit log. `storage_move` stays draft and is available only if Q4 results in an unsandboxed engine.
 
+> **M3 decisions (Backend Teamlead, 7 Nov 2026).** `storage_move` returns `not_implemented`: Q4 was decided on 20 Oct (the app is unsandboxed, the engine sandboxed) and the move does not ship, so only `inst-storage-guard` is implemented and ticked; the other storage steps and the storage DoD stay `[ ]` with the note "Q4: does not ship", and the command is outside the E2E denominator (38 provable commands) (TL-29). There is no `agents` table before `core-agents` (M4): `account_bind_agents` rejects every agent id with `not_found`, and with an empty `agent_ids` writes `default_for_new_agents` into the account's non-secret metadata as one undoable change; the sign-out fallback and the provider-ended pause act on the three `RuntimeSettings` roles (`live_copilot`, `post_call`, `search_answers`), switching a `claude_account`/`chatgpt_account` role to the matching API-key runtime through the logged settings writer, or marking it unavailable in `AccountsView` when no usable key exists; the per-agent switch lands with `core-agents` (option A cross-reference, TL-30, TL-27). Reading the Claude plan from the CLI (Q8) needs a real signed-in CLI and is an owner-Mac item: M3 ships the test-request fallback for both providers and `inst-check-spike` stays `[ ]` without holding the box (TL-31). `noter_llm::AccountCli` (`status`, `login`, `cancel`, `logout`, `install`) is the seam for the pinned CLIs; the harness scripts it through `harness.world_set` and the `--clock` (five-minute deadline), and real-CLI sign-in, sign-out and install on the owner's Mac are owner-gated (TL-32). Secret accounts are named in 3 (TL-33): a locked Keychain is `keychain_locked`, never a plaintext fallback. No table is added (TL-34).
+
 ### 1.2 Purpose
 
 The user can connect an assistant during first run or repair it later without interrupting recording. Keys remain the default; own accounts are explicit choices. The Privacy pane makes the existing M2 egress audit readable and exportable in M3.
@@ -202,6 +204,8 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 
 ### Move storage when Q4 permits it
 
+Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implemented`; this flow stays open apart from `inst-storage-guard`.
+
 - [ ] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-storage`
 
 **Actor**: Primary user (Settings › General › Storage location)
@@ -249,7 +253,7 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 **Steps**:
 1. [ ] - `p1` - Reject an expired or cancelled session before applying its result; use only provider identity and plan status supplied by the CLI - `inst-check-session`
 2. [ ] - `p1` - Require confirmed personal use for Claude and a Pro or Max plan; ChatGPT accepts Plus, Pro, Business or Enterprise independently - `inst-check-plan`
-3. [ ] - `p1` - Use the M3 Q8 spike's verified Claude plan signal when available; otherwise use the short test-request fallback rather than reading a stored token or guessing from email - `inst-check-spike`
+3. [ ] - `p1` - Use the M3 Q8 spike's verified Claude plan signal when available; otherwise use the short test-request fallback rather than reading a stored token or guessing from email (owner-Mac item: M3 ships the test-request fallback only, TL-31) - `inst-check-spike`
 4. [ ] - `p1` - Run a short test through the router, with the same per-run isolation, tool restrictions and egress audit as other own-account requests - `inst-check-test`
 5. [ ] - `p1` - Map cancellation, five-minute timeout, ineligible plan, offline and provider-ended session to the contract errors; failed checks leave agent bindings unchanged - `inst-check-error`
 6. [ ] - `p1` - Recheck the session is still current before committing identity, plan and connected time through the writer; **RETURN** success - `inst-check-return`
@@ -374,6 +378,8 @@ The system **MUST** page and export run, tool_result and lookup metadata by date
 - Entities: `AuditEntry`, `ExportResult`
 
 ### Conditional storage job
+
+Q4: does not ship (TL-29). The DoD stays open; only the `not_implemented` guard is delivered.
 
 - [ ] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-storage`
 
