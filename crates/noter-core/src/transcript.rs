@@ -659,7 +659,7 @@ pub(crate) fn segments_of(
 ) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
     let mut stmt = c.prepare(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, s.lang_p, s.avg_logprob,
-                p.id, COALESCE(p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections,
+                p.id, COALESCE((SELECT display_name FROM people WHERE id = p.person_id), p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections,
                 s.crosstalk_with
          FROM segments s LEFT JOIN speakers p ON p.id = s.speaker_id
          WHERE s.call_id = ?1 AND s.pass = (CASE WHEN EXISTS
@@ -740,7 +740,9 @@ fn speaker_refs(
     call_id: &CallId,
 ) -> noter_db::rusqlite::Result<HashMap<String, SpeakerRef>> {
     let mut stmt = c.prepare(
-        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers WHERE call_id = ?1",
+        "SELECT id, label, n, channel, named_by, person_id,
+                COALESCE((SELECT display_name FROM people WHERE id = speakers.person_id), name)
+         FROM speakers WHERE call_id = ?1",
     )?;
     let rows = stmt.query_map([call_id.as_str()], |r| {
         let id: String = r.get(0)?;
@@ -771,7 +773,9 @@ fn speakers_of(
     call_id: &CallId,
 ) -> noter_db::rusqlite::Result<Vec<(String, SpeakerView)>> {
     let mut stmt = c.prepare(
-        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers
+        "SELECT id, label, n, channel, named_by, person_id,
+                COALESCE((SELECT display_name FROM people WHERE id = speakers.person_id), name)
+         FROM speakers
          WHERE call_id = ?1 AND pass = (CASE WHEN EXISTS
                (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive')
                THEN 'archive' ELSE 'live' END)

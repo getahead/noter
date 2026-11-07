@@ -49,7 +49,7 @@ design: docs/DESIGN-core.md
 
 The people service builds Person pages from calls and items, keeps aliases and speaker links, and merges identities as undoable batches. Voice profiles require an explicit opt-in for each person, stay encrypted on this Mac and can be deleted without removing existing names. Behaviour metrics are computed only from enablement onward, never back-computed (D5).
 
-> **M3 decisions (Backend Teamlead, 7 Nov 2026).** `0009_people.sql` in `noter-core` creates `people` (with the single seeded `is_you` row `per_you`), `person_aliases`, `call_participants` and `voice_profiles`, columns as the `cpt-noter-dbtable-*` entries (TL-34). It replaces the M2 chip shortcuts: `items::owner_chip` and `speakers::person` read `people`, `PersonRef::New` inserts a `people` row, and `people_merge` and `person_delete` rewrite `speakers.person_id`, `items.owner_person_id` and `call_participants` (TL-39). The carry-forward steps (`inst-carry-*`, moved from 2.18) are called from `capture.rs`: `people::carry_start(call)` on the first segment of a call and `carry_end(call)` at stop, over `call_participants` (calendar attendees through `NativeServices` plus named speakers) (TL-39). The voice-profile key is the `SecretStore` account `voice-profile-key` (32 random bytes, created on the first profile); centroids are encrypted with an AEAD crate (`chacha20poly1305` or `aes-gcm`) and `apps/desktop/src-tauri/Cargo.lock` changes in the same PR (TL-33). After the archive install in `postcall.rs` the core calls `people::match_profiles(call)`: each archive speaker's 256-d centroid against opted-in, non-decayed profiles, cosine ≥ 0.75 with a margin over the runner-up, attendees first; a match sets `speakers.person_id` and `named_by = 'voice_profile'` through the writer and `last_used_at`, ambiguity stays unnamed with a suggestion, and decay is 90 days unused on the injected clock (TL-40).
+> **M3 decisions (Backend Teamlead, 7 Nov 2026).** `0010_people.sql` in `noter-core` creates `people` (with the single seeded `is_you` row `per_you`), `person_aliases`, `call_participants` and `voice_profiles`, columns as the `cpt-noter-dbtable-*` entries (TL-34). It replaces the M2 chip shortcuts: `items::owner_chip` and `speakers::person` read `people`, `PersonRef::New` inserts a `people` row, and `people_merge` and `person_delete` rewrite `speakers.person_id`, `items.owner_person_id` and `call_participants` (TL-39). The carry-forward steps (`inst-carry-*`, moved from 2.18) are called from `capture.rs`: `people::carry_start(call)` on the first segment of a call and `carry_end(call)` at stop, over `call_participants` (calendar attendees through `NativeServices` plus named speakers) (TL-39). The voice-profile key is the `SecretStore` account `voice-profile-key` (32 random bytes, created on the first profile); centroids are encrypted with an AEAD crate (`chacha20poly1305` or `aes-gcm`) and `apps/desktop/src-tauri/Cargo.lock` changes in the same PR (TL-33). After the archive install in `postcall.rs` the core calls `people::match_profiles(call)`: each archive speaker's 256-d centroid against opted-in, non-decayed profiles, cosine ≥ 0.75 with a margin over the runner-up, attendees first; a match sets `speakers.person_id` and `named_by = 'voice_profile'` through the writer and `last_used_at`, ambiguity stays unnamed with a suggestion, and decay is 90 days unused on the injected clock (TL-40).
 
 ### 1.2 Purpose
 
@@ -89,7 +89,7 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 
 ### Read people and prepare a call
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-people-read`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-people-read`
 
 **Actor**: Primary user (main › People, or the call-screen person picker)
 
@@ -101,14 +101,14 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - Unknown person: `not_found`; read failure: typed error suitable for retry.
 
 **Steps**:
-1. [ ] - `p1` - API: `people_list { query }` from main or call-screen; normalize names and aliases for lookup without changing their display text - `inst-read-list`
-2. [ ] - `p1` - Read people and the unnamed queue with `cpt-noter-algo-core-people-page`; return `PeopleList` - `inst-read-people`
-3. [ ] - `p1` - API: `person_get { person_id }` from main; assemble `PersonPage` from read-only queries - `inst-read-page`
-4. [ ] - `p1` - **RETURN** the complete page, with nullable `talk_share`; selected items, calls and topics open through existing navigation and evidence commands - `inst-read-return`
+1. [x] - `p1` - API: `people_list { query }` from main or call-screen; normalize names and aliases for lookup without changing their display text - `inst-read-list`
+2. [x] - `p1` - Read people and the unnamed queue with `cpt-noter-algo-core-people-page`; return `PeopleList` - `inst-read-people`
+3. [x] - `p1` - API: `person_get { person_id }` from main; assemble `PersonPage` from read-only queries - `inst-read-page`
+4. [x] - `p1` - **RETURN** the complete page, with nullable `talk_share`; selected items, calls and topics open through existing navigation and evidence commands - `inst-read-return`
 
 ### Create or edit a person and name a speaker
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-people-edit`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-people-edit`
 
 **Actor**: Primary user (New Person, Edit Details or Name Speaker)
 
@@ -120,16 +120,16 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - Empty name or invalid reference: `invalid_input`; stale edit: `conflict` with `detail.current_rev`.
 
 **Steps**:
-1. [ ] - `p1` - API: `person_create { display_name, email, role, org }` from main or call-screen; validate a non-empty name - `inst-edit-create`
-2. [ ] - `p1` - DB: create a `per_` id with initial revision, derived short name and no voice opt-in, together with a change row; **RETURN** `PersonMutation` - `inst-edit-insert`
-3. [ ] - `p1` - **IF** the user chose Create and Name, pass the new person id to the existing transcript naming flow and retain its own returned change id for naming Undo - `inst-edit-name`
-4. [ ] - `p1` - API: `person_update { person_id, rev, patch }` from main; validate names and normalize and deduplicate aliases - `inst-edit-update`
-5. [ ] - `p1` - DB: guard revision and apply only present patch fields with their before/after change row; retaining the old name uses the supplied aliases list - `inst-edit-commit`
-6. [ ] - `p1` - Emit `entity:changed` for affected read models after commit; **RETURN** `PersonMutation` with new revision and `change_id` - `inst-edit-return`
+1. [x] - `p1` - API: `person_create { display_name, email, role, org }` from main or call-screen; validate a non-empty name - `inst-edit-create`
+2. [x] - `p1` - DB: create a `per_` id with initial revision, derived short name and no voice opt-in, together with a change row; **RETURN** `PersonMutation` - `inst-edit-insert`
+3. [x] - `p1` - **IF** the user chose Create and Name, pass the new person id to the existing transcript naming flow and retain its own returned change id for naming Undo - `inst-edit-name`
+4. [x] - `p1` - API: `person_update { person_id, rev, patch }` from main; validate names and normalize and deduplicate aliases - `inst-edit-update`
+5. [x] - `p1` - DB: guard revision and apply only present patch fields with their before/after change row; retaining the old name uses the supplied aliases list - `inst-edit-commit`
+6. [x] - `p1` - Emit `entity:changed` for affected read models after commit; **RETURN** `PersonMutation` with new revision and `change_id` - `inst-edit-return`
 
 ### Merge or delete an identity
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-people-merge-delete`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-people-merge-delete`
 
 **Actor**: Primary user (main › People)
 
@@ -141,12 +141,12 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - Self-merge or an operation that would break the single You identity: `invalid_input`; missing identity: `not_found`; transaction failure rolls back all links.
 
 **Steps**:
-1. [ ] - `p1` - API: `people_merge { source, target }` after the user reviews what moves; validate distinct existing ids - `inst-identity-merge`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-people-merge`; **RETURN** the target `PersonMutation` with the batch's `change_id` - `inst-identity-merged`
-3. [ ] - `p1` - API: `person_delete { person_id }` after the destructive alert; validate the identity invariant - `inst-identity-delete`
-4. [ ] - `p1` - DB: in one writer transaction remove voice profiles, aliases and participation, unlink speaker/person and item ownership references, then delete the person; write a non-undoable change without biometric or deleted personal content - `inst-identity-remove`
-5. [ ] - `p1` - Invalidate cached identity and matching data so in-flight matches cannot restore the deleted person; emit removed and changed entity ids after commit - `inst-identity-publish`
-6. [ ] - `p1` - **RETURN** `DeleteResult`; transcript text and existing calls remain under unnamed speaker labels - `inst-identity-return`
+1. [x] - `p1` - API: `people_merge { source, target }` after the user reviews what moves; validate distinct existing ids - `inst-identity-merge`
+2. [x] - `p1` - Run `cpt-noter-algo-core-people-merge`; **RETURN** the target `PersonMutation` with the batch's `change_id` - `inst-identity-merged`
+3. [x] - `p1` - API: `person_delete { person_id }` after the destructive alert; validate the identity invariant - `inst-identity-delete`
+4. [x] - `p1` - DB: in one writer transaction remove voice profiles, aliases and participation, unlink speaker/person and item ownership references, then delete the person; write a non-undoable change without biometric or deleted personal content - `inst-identity-remove`
+5. [x] - `p1` - Invalidate cached identity and matching data so in-flight matches cannot restore the deleted person; emit removed and changed entity ids after commit - `inst-identity-publish`
+6. [x] - `p1` - **RETURN** `DeleteResult`; transcript text and existing calls remain under unnamed speaker labels - `inst-identity-return`
 
 ### Opt into or delete a voice profile
 
@@ -191,36 +191,36 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 
 ### Assemble pages and the unnamed queue
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-people-page`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-people-page`
 
 **Input**: Optional normalized name query or person id, read-pool connection, behaviour-metrics enablement time.
 
 **Output**: `PeopleList` or `PersonPage` complete for its view.
 
 **Steps**:
-1. [ ] - `p1` - DB: SELECT people and matching `person_aliases`, with last call and open-item counts in grouped queries - `inst-page-people`
-2. [ ] - `p1` - DB: SELECT unnamed speakers with their call, segment count, playable sample when audio remains and identity suggestion; group only by established speaker links, not label text - `inst-page-unnamed`
-3. [ ] - `p1` - For a Person page, join participation and named speakers to calls, item ownership and requests to open commitments, things the user owes and open questions, and shared-call item links to topics - `inst-page-joins`
-4. [ ] - `p1` - Keep empty collections for a person without calls; derive chip names from the current person row so renames need no transcript-text rewrite - `inst-page-empty`
-5. [ ] - `p1` - **IF** behaviour metrics are enabled, compute talk share only from `call_participants.talk_time_ms` recorded since enablement; otherwise return no talk share - `inst-page-metrics`
-6. [ ] - `p1` - **RETURN** complete read models without per-row follow-up queries or biometric data - `inst-page-return`
+1. [x] - `p1` - DB: SELECT people and matching `person_aliases`, with last call and open-item counts in grouped queries - `inst-page-people`
+2. [x] - `p1` - DB: SELECT unnamed speakers with their call, segment count, playable sample when audio remains and identity suggestion; group only by established speaker links, not label text - `inst-page-unnamed`
+3. [x] - `p1` - For a Person page, join participation and named speakers to calls, item ownership and requests to open commitments, things the user owes and open questions, and shared-call item links to topics - `inst-page-joins`
+4. [x] - `p1` - Keep empty collections for a person without calls; derive chip names from the current person row so renames need no transcript-text rewrite - `inst-page-empty`
+5. [x] - `p1` - **IF** behaviour metrics are enabled, compute talk share only from `call_participants.talk_time_ms` recorded since enablement; otherwise return no talk share - `inst-page-metrics`
+6. [x] - `p1` - **RETURN** complete read models without per-row follow-up queries or biometric data - `inst-page-return`
 
 ### Merge all identity references
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-people-merge`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-people-merge`
 
 **Input**: Existing distinct source and target people; current relationships.
 
 **Output**: Target with new revision and one undoable change batch.
 
 **Steps**:
-1. [ ] - `p1` - Begin a writer transaction and read both people and all affected references; preserve exactly one `is_you` row - `inst-merge-read`
-2. [ ] - `p1` - Move source speaker links, deduplicated participation, item ownership and scoped person references to target; preserve target identity and details - `inst-merge-links`
-3. [ ] - `p1` - Add source display name and aliases to target aliases, deduplicated by normalized text - `inst-merge-aliases`
-4. [ ] - `p1` - Transfer opted-in encrypted profile centroids without exporting or decrypting them into the change log; preserve the recorded opt-in and profile metadata needed by Undo - `inst-merge-profile`
-5. [ ] - `p1` - Remove source and increment target revision; store reversible relational before/after deltas under one batch id, using the history service's revision guards - `inst-merge-batch`
-6. [ ] - `p1` - **TRY** commit; **CATCH** any failure, roll back the whole batch and **RETURN** `internal` - `inst-merge-commit`
-7. [ ] - `p1` - Publish affected people, calls and items after commit; **RETURN** the target and change id - `inst-merge-return`
+1. [x] - `p1` - Begin a writer transaction and read both people and all affected references; preserve exactly one `is_you` row - `inst-merge-read`
+2. [x] - `p1` - Move source speaker links, deduplicated participation, item ownership and scoped person references to target; preserve target identity and details - `inst-merge-links`
+3. [x] - `p1` - Add source display name and aliases to target aliases, deduplicated by normalized text - `inst-merge-aliases`
+4. [x] - `p1` - Transfer opted-in encrypted profile centroids without exporting or decrypting them into the change log; preserve the recorded opt-in and profile metadata needed by Undo - `inst-merge-profile`
+5. [x] - `p1` - Remove source and increment target revision; store reversible relational before/after deltas under one batch id, using the history service's revision guards - `inst-merge-batch`
+6. [x] - `p1` - **TRY** commit; **CATCH** any failure, roll back the whole batch and **RETURN** `internal` - `inst-merge-commit`
+7. [x] - `p1` - Publish affected people, calls and items after commit; **RETURN** the target and change id - `inst-merge-return`
 
 ### Build and match local profiles
 

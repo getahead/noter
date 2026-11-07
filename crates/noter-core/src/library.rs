@@ -756,7 +756,7 @@ pub(crate) fn speakers_of(
     call_id: &str,
 ) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
     let mut stmt = c.prepare(&format!(
-        "SELECT s.id, COALESCE(s.name, s.label), s.n, s.channel, s.person_id, s.named_by,
+        "SELECT s.id, COALESCE((SELECT display_name FROM people WHERE id = s.person_id), s.name, s.label), s.n, s.channel, s.person_id, s.named_by,
                 (SELECT count(*) FROM segments g WHERE g.speaker_id = s.id)
          FROM speakers s WHERE s.call_id = ?1 AND s.pass = {SHOWN_PASS} ORDER BY s.rowid"
     ))?;

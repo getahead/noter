@@ -23,6 +23,7 @@ mod models;
 mod native_ops;
 mod notices;
 mod notify;
+mod people;
 mod playback;
 mod postcall;
 mod recovery;
@@ -373,6 +374,15 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 9,
         name: "output speaker naming state",
         sql: include_str!("../migrations/0009_names_updated.sql"),
+    },
+    // @cpt-dbtable:cpt-noter-dbtable-people:p1
+    // @cpt-dbtable:cpt-noter-dbtable-call-participants:p1
+    // @cpt-dbtable:cpt-noter-dbtable-voice-profiles:p1
+    Migration {
+        owner: "noter-core",
+        version: 10,
+        name: "people, aliases, participants and voice profiles",
+        sql: include_str!("../migrations/0010_people.sql"),
     },
 ];
 
@@ -917,6 +927,54 @@ impl CoreApi for Core {
         args: ItemsListArgs,
     ) -> Result<Page<ItemView>, CoreError> {
         self.list_items(args)
+    }
+
+    async fn people_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: PeopleListArgs,
+    ) -> Result<PeopleList, CoreError> {
+        self.list_people(args)
+    }
+
+    async fn person_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: PersonIdArgs,
+    ) -> Result<PersonPage, CoreError> {
+        self.get_person(args)
+    }
+
+    async fn person_create(
+        &self,
+        ctx: &CommandCtx,
+        args: PersonCreateArgs,
+    ) -> Result<PersonMutation, CoreError> {
+        self.create_person(ctx, args)
+    }
+
+    async fn person_update(
+        &self,
+        ctx: &CommandCtx,
+        args: PersonUpdateArgs,
+    ) -> Result<PersonMutation, CoreError> {
+        self.update_person(ctx, args)
+    }
+
+    async fn people_merge(
+        &self,
+        ctx: &CommandCtx,
+        args: PeopleMergeArgs,
+    ) -> Result<PersonMutation, CoreError> {
+        self.merge_people(ctx, args)
+    }
+
+    async fn person_delete(
+        &self,
+        ctx: &CommandCtx,
+        args: PersonIdArgs,
+    ) -> Result<DeleteResult, CoreError> {
+        self.delete_person(ctx, args)
     }
 
     async fn today_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TodayView, CoreError> {

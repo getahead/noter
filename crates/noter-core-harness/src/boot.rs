@@ -453,6 +453,7 @@ impl Harness {
                 .await?;
         }
         self.write_setup(&wanted["app"]["setup"]).await?;
+        self.seed_people(&wanted)?;
         self.seed_calls(&wanted)?;
         self.native.set_calendar(&w.today);
         if !w.app.banners.banners.is_empty() {
@@ -462,6 +463,67 @@ impl Harness {
             noter_core::testing::seed_capture(&self.core, w.app.capture.clone()).await?;
         }
         Ok(())
+    }
+
+    /// Writes the world's people as rows without change rows (a seed is not something the user
+    /// did): the seeded You keeps its row and takes the world's details, everyone else is
+    /// replaced, aliases and opt-in flags included. Profiles are never seeded.
+    fn seed_people(&self, wanted: &Value) -> Result<(), CoreError> {
+        let db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
+            .map_err(crate::internal)?;
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .map_err(crate::internal)?;
+        db.execute_batch("PRAGMA foreign_keys = ON; DELETE FROM people WHERE is_you = 0;")
+            .map_err(crate::internal)?;
+        let empty = vec![];
+        let mut rows = vec![];
+        for p in wanted["people"].as_array().unwrap_or(&empty) {
+            if p["is_you"] == json!(true) {
+                db.execute(
+                    "UPDATE people SET display_name = ?1, short_name = ?2, email = ?3, role = ?4, org = ?5
+                     WHERE is_you = 1",
+                    noter_db::rusqlite::params![
+                        p["display_name"].as_str(),
+                        p["short_name"].as_str(),
+                        p["email"].as_str(),
+                        p["role"].as_str(),
+                        p["org"].as_str()
+                    ],
+                )
+                .map_err(crate::internal)?;
+                continue;
+            }
+            rows.push(noter_db::Insert {
+                table: "people",
+                values: vec![
+                    ("id", p["id"].clone()),
+                    ("rev", p["rev"].clone()),
+                    ("display_name", p["display_name"].clone()),
+                    ("short_name", p["short_name"].clone()),
+                    ("email", p["email"].clone()),
+                    ("role", p["role"].clone()),
+                    ("org", p["org"].clone()),
+                    ("is_you", json!(0)),
+                    ("voice_profile_optin", p["voice_profile"].clone()),
+                ],
+            });
+            for (n, alias) in p["aliases"].as_array().unwrap_or(&empty).iter().enumerate() {
+                let text = alias.as_str().unwrap_or_default();
+                rows.push(noter_db::Insert {
+                    table: "person_aliases",
+                    values: vec![
+                        (
+                            "id",
+                            json!(format!("pal_{}_{n}", p["id"].as_str().unwrap_or_default())),
+                        ),
+                        ("person_id", p["id"].clone()),
+                        ("alias", json!(text)),
+                        ("alias_norm", json!(text.to_lowercase().replace('ё', "е"))),
+                    ],
+                });
+            }
+        }
+        self.core.store().insert_batch(rows)
     }
 
     /// Removes every call (and with it its segments, speakers, marks, gaps and tags), leaving no
@@ -986,6 +1048,10 @@ impl Harness {
             }
         }
         w["items"] = Value::Array(items);
+        w["people"] = self
+            .call(WindowLabel::Main, "people_list", json!({}))
+            .await?["people"]
+            .clone();
         w["call_types"] = self
             .call(WindowLabel::Main, "call_types_list", json!({}))
             .await?;
@@ -1018,6 +1084,7 @@ impl Harness {
                         | "call_details"
                         | "transcripts"
                         | "items"
+                        | "people"
                         | "outputs"
                         | "today"
                         | "changes"
@@ -1054,6 +1121,9 @@ impl Harness {
             }
             v
         };
+        if accepted["people"] != wanted["people"] {
+            self.seed_people(&wanted)?;
+        }
         if ["calls", "transcripts", "items", "outputs"]
             .iter()
             .any(|k| accepted[k] != wanted[k])

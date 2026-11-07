@@ -153,6 +153,15 @@ fn world(core: &Core) {
         .insert_batch(vec![
             call("call_a", STARTED),
             call("call_b", STARTED - 86_400_000),
+            row(
+                "people",
+                &[
+                    ("id", json!("per_anna")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Anna Koval")),
+                    ("short_name", json!("Anna K.")),
+                ],
+            ),
             speaker("spk_anna", "call_a", "Anna Koval", "per_anna"),
             item("itm_1", "call_a", "action_item", "open", "suggested"),
             item("itm_2", "call_a", "decision", "open", "accepted"),

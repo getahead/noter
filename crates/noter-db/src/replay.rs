@@ -496,14 +496,17 @@ struct Column {
     required: bool,
 }
 
-/// The table an entity type is stored in: its own name or the plural (`summary`: `summaries`).
+/// The table an entity type is stored in: its own name or the plural (`summary`: `summaries`,
+/// `person`: `people`).
 fn table_of(conn: &Connection, entity_type: &str) -> Result<String, CoreError> {
     let ies = entity_type
         .strip_suffix('y')
         .map(|stem| format!("{stem}ies"));
+    let irregular = (entity_type == "person").then(|| "people".to_string());
     for name in [entity_type.to_string(), format!("{entity_type}s")]
         .into_iter()
         .chain(ies)
+        .chain(irregular)
     {
         let found: Option<String> = conn
             .query_row(

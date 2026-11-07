@@ -19,9 +19,9 @@ use crate::settings::invalid;
 use crate::transcript::segments_of;
 use crate::{internal, object, Core};
 
-/// Change rows with these reasons are one action: the `change_id` the commands return undoes
+/// Change rows with these reasons (a people merge too) are one action: the `change_id` the commands return undoes
 /// every row of their batch.
-const ACTION_REASONS: [&str; 2] = ["speaker_name", "term_fix"];
+const ACTION_REASONS: [&str; 3] = ["speaker_name", "term_fix", "people_merge"];
 
 /// One speaker to name, with the lines it covers.
 struct Assignment {
@@ -66,19 +66,19 @@ fn constraint(call_id: &str, kind: &str, a: (i64, i64), b: (i64, i64)) -> Mutati
     }
 }
 
-/// The person an assignment names: an existing one a speaker row carries, or a new one the core
-/// mints (the same name twice in one batch is one person).
+/// The person an assignment names: one in `people`, or a new one made in the same batch (the
+/// same name twice in one batch is one person).
 fn resolve(
     c: &Connection,
     person: &PersonRef,
     minted: &mut HashMap<String, String>,
+    mutations: &mut Vec<Mutation>,
 ) -> Result<(String, String), CoreError> {
     match person {
         PersonRef::Existing { person_id } => {
             let name: Option<String> = db(c
                 .query_row(
-                    "SELECT COALESCE(name, label) FROM speakers WHERE person_id = ?1
-                     ORDER BY rowid DESC LIMIT 1",
+                    "SELECT display_name FROM people WHERE id = ?1",
                     [person_id.as_str()],
                     |r| r.get(0),
                 )
@@ -86,15 +86,41 @@ fn resolve(
             let name = name.ok_or_else(|| not_found("person"))?;
             Ok((person_id.as_str().to_string(), name))
         }
-        PersonRef::New { display_name, .. } => {
+        PersonRef::New {
+            display_name,
+            email,
+        } => {
             let name = display_name.trim();
             if name.is_empty() {
                 return Err(invalid("display_name", ValidationRule::Required));
             }
-            let id = minted
-                .entry(name.to_lowercase())
-                .or_insert_with(|| format!("per_{}", ulid::Ulid::generate()));
-            Ok((id.clone(), name.to_string()))
+            let key = crate::people::norm(name);
+            if let Some(id) = minted.get(&key) {
+                return Ok((id.clone(), name.to_string()));
+            }
+            // @cpt-begin:cpt-noter-flow-core-people-edit:p1:inst-edit-name
+            // The person row is part of the naming batch, so one Undo removes both.
+            let id = format!("per_{}", ulid::Ulid::generate());
+            mutations.push(Mutation {
+                entity_type: "person",
+                table: "people",
+                id: id.clone(),
+                base_rev: None,
+                bump_rev: true,
+                values: vec![
+                    ("display_name", json!(name)),
+                    ("short_name", json!(crate::people::short_of(name))),
+                    (
+                        "email",
+                        json!(email.as_deref().map(str::trim).filter(|e| !e.is_empty())),
+                    ),
+                    ("is_you", json!(0)),
+                    ("voice_profile_optin", json!(0)),
+                ],
+            });
+            // @cpt-end:cpt-noter-flow-core-people-edit:p1:inst-edit-name
+            minted.insert(key, id.clone());
+            Ok((id, name.to_string()))
         }
     }
 }
@@ -138,7 +164,7 @@ fn plan_names(
             return Err(belongs("speaker_id"));
         }
         // @cpt-end:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-load
-        let (person_id, name) = resolve(c, person, &mut minted)?;
+        let (person_id, name) = resolve(c, person, &mut minted, &mut plan.mutations)?;
         // @cpt-begin:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-no-enroll
         // The name is the user's own word; no voice profile is made or touched here (M3).
         let named = [
@@ -539,7 +565,7 @@ impl Core {
     /// After a committed correction: the call file, the constraints, the open windows. A
     /// failure to write a file after the commit is logged; a window that missed an event catches
     /// up on its next read.
-    fn publish_corrected(
+    pub(crate) fn publish_corrected(
         &self,
         call_id: &CallId,
         changed: &[SegmentId],

@@ -177,6 +177,14 @@ impl Core {
                     }
                 }
                 // @cpt-end:cpt-noter-flow-core-items-today-tick:p1:inst-tick-undo
+                // A merge undone brings the removed person back, a naming undone removes one.
+                "person" => match self.person_row(id)? {
+                    Some(person) => self.emit_entity_changed(&EntityChanged::Person { person }),
+                    None => self.emit_entity_changed(&EntityChanged::Removed {
+                        kind: EntityKind::Person,
+                        id: id.clone(),
+                    }),
+                },
                 "summary" => self.publish_section(id)?,
                 "segment" | "speaker" => {
                     let table = if kind == "segment" {
