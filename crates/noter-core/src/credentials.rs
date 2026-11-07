@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use crate::Core;
 
-fn cli_code(e: CliError) -> CoreError {
+pub(crate) fn cli_code(e: CliError) -> CoreError {
     match e {
         CliError::Missing => CoreError::new(ErrorCode::CliMissing, "the tool is not installed"),
         CliError::Unsupported => CoreError::new(

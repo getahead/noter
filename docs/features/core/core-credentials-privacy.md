@@ -138,7 +138,7 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 
 ### Sign in or reuse an existing account
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-signin`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-signin`
 
 **Actor**: Primary user (Prepare, Sign in and Check steps)
 
@@ -151,18 +151,18 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Closing the sheet leaves the session running; explicit Cancel stops it.
 
 **Steps**:
-1. [ ] - `p1` - API: `account_signin_start { provider, personal_use_confirmed }`; reject Claude without confirmation and reject missing or unsupported CLI before starting login - `inst-signin-validate`
-2. [ ] - `p1` - Start the unmodified CLI's browser login and create a provider-specific session; **RETURN** `SignInSession` with URL, optional one-time code and expiry five minutes after start - `inst-signin-start`
-3. [ ] - `p1` - Publish `signin:progress` as waiting_for_browser; account status is signing_in; keep the process owned by the core, independent of sheet visibility - `inst-signin-wait`
-4. [ ] - `p1` - On CLI success, run `cpt-noter-algo-core-credentials-privacy-check-account` and emit signed_in, checking_plan, sending_test_request and done progress for that session - `inst-signin-check`
-5. [ ] - `p1` - **IF** cancellation, timeout or failure wins the session, stop the login task and publish the exact error; ignore late success and do not bind agents - `inst-signin-fail`
-6. [ ] - `p1` - API: `account_signin_cancel { session_id }` cancels the matching active session, refreshes availability and **RETURN** `AccountsView` - `inst-signin-cancel`
-7. [ ] - `p1` - API: `account_use_existing { provider }` rechecks CLI status and runs the same eligibility and test checks; Claude reuse requires a verifiable personal-use confirmation as noted in 1.4 - `inst-signin-existing`
-8. [ ] - `p1` - Save non-secret identity, plan and connection metadata through the writer; emit versioned `accounts:changed`; **RETURN** `AccountsView` for reuse, or complete the browser session through progress - `inst-signin-return`
+1. [x] - `p1` - API: `account_signin_start { provider, personal_use_confirmed }`; reject Claude without confirmation and reject missing or unsupported CLI before starting login - `inst-signin-validate`
+2. [x] - `p1` - Start the unmodified CLI's browser login and create a provider-specific session; **RETURN** `SignInSession` with URL, optional one-time code and expiry five minutes after start - `inst-signin-start`
+3. [x] - `p1` - Publish `signin:progress` as waiting_for_browser; account status is signing_in; keep the process owned by the core, independent of sheet visibility - `inst-signin-wait`
+4. [x] - `p1` - On CLI success, run `cpt-noter-algo-core-credentials-privacy-check-account` and emit signed_in, checking_plan, sending_test_request and done progress for that session - `inst-signin-check`
+5. [x] - `p1` - **IF** cancellation, timeout or failure wins the session, stop the login task and publish the exact error; ignore late success and do not bind agents - `inst-signin-fail`
+6. [x] - `p1` - API: `account_signin_cancel { session_id }` cancels the matching active session, refreshes availability and **RETURN** `AccountsView` - `inst-signin-cancel`
+7. [x] - `p1` - API: `account_use_existing { provider }` rechecks CLI status and runs the same eligibility and test checks; Claude reuse requires a verifiable personal-use confirmation as noted in 1.4 - `inst-signin-existing`
+8. [x] - `p1` - Save non-secret identity, plan and connection metadata through the writer; emit versioned `accounts:changed`; **RETURN** `AccountsView` for reuse, or complete the browser session through progress - `inst-signin-return`
 
 ### Bind agents, test and sign out
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-bind-signout`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-bind-signout`
 
 **Actor**: Primary user (Use step, Models & Runtimes or account repair)
 
@@ -174,13 +174,13 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Unknown agent: `not_found`; unavailable account: `account_signed_out` or `runtime_unavailable`; a provider-ended session pauses agents until reconnection rather than silently rebinding them.
 
 **Steps**:
-1. [ ] - `p1` - API: `account_bind_agents { provider, agent_ids, default_for_new_agents }`; validate a checked eligible account and each requested agent - `inst-bind-validate`
-2. [ ] - `p1` - DB: in one undoable change batch switch only those agents to claude_account or chatgpt_account and update the requested new-agent preference; retain all before values for Undo - `inst-bind-write`
-3. [ ] - `p1` - After commit, recompute availability and publish account and affected agent changes; **RETURN** `AccountBindResult` with `change_id` - `inst-bind-return`
-4. [ ] - `p1` - API: `account_test { provider }` sends a short test through the same router and gate; **RETURN** `AccountTestResult` with ok, latency or typed error - `inst-account-test`
-5. [ ] - `p1` - API: `account_sign_out { provider, also_in_cli }`; cancel that provider's pending sign-in and remove its Noter connection metadata - `inst-signout-request`
-6. [ ] - `p1` - Switch affected agents back to the matching API-key runtime through the logged writer; if no usable key exists mark them unavailable; sign the CLI out only when requested - `inst-signout-apply`
-7. [ ] - `p1` - **RETURN** `AccountsView` and emit `accounts:changed`; errors in optional CLI logout must not claim that the CLI is signed out - `inst-signout-return`
+1. [x] - `p1` - API: `account_bind_agents { provider, agent_ids, default_for_new_agents }`; validate a checked eligible account and each requested agent - `inst-bind-validate`
+2. [x] - `p1` - DB: in one undoable change batch switch only those agents to claude_account or chatgpt_account and update the requested new-agent preference; retain all before values for Undo - `inst-bind-write`
+3. [x] - `p1` - After commit, recompute availability and publish account and affected agent changes; **RETURN** `AccountBindResult` with `change_id` - `inst-bind-return`
+4. [x] - `p1` - API: `account_test { provider }` sends a short test through the same router and gate; **RETURN** `AccountTestResult` with ok, latency or typed error - `inst-account-test`
+5. [x] - `p1` - API: `account_sign_out { provider, also_in_cli }`; cancel that provider's pending sign-in and remove its Noter connection metadata - `inst-signout-request`
+6. [x] - `p1` - Switch affected agents back to the matching API-key runtime through the logged writer; if no usable key exists mark them unavailable; sign the CLI out only when requested - `inst-signout-apply`
+7. [x] - `p1` - **RETURN** `AccountsView` and emit `accounts:changed`; errors in optional CLI logout must not claim that the CLI is signed out - `inst-signout-return`
 
 ### Read and export the egress audit
 
@@ -228,7 +228,7 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 
 ### Assemble availability and detect ended sessions
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-credentials-privacy-availability`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-credentials-privacy-availability`
 
 **Input**: Keychain status, non-secret connection metadata, CLI path/version/auth checks, Ollama status and current agent bindings.
 
@@ -237,8 +237,8 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 **Steps**:
 1. [x] - `p1` - Query key presence and verification state without returning values; report not_set, configured, rejected or keychain_locked - `inst-availability-keys`
 2. [x] - `p1` - Detect each CLI's installed path, tested version support and provider-reported identity; detect Ollama readiness and available local models - `inst-availability-clis`
-3. [ ] - `p1` - **IF** a connected account's provider has ended the session, mark signed_out_by_provider with time, pause its agents and publish the one-step sign-in fix - `inst-availability-ended`
-4. [ ] - `p1` - Join agents using each account and apply current runtime availability; account usage does not consume the per-call API budget share - `inst-availability-bindings`
+3. [x] - `p1` - **IF** a connected account's provider has ended the session, mark signed_out_by_provider with time, pause its agents and publish the one-step sign-in fix - `inst-availability-ended`
+4. [x] - `p1` - Join agents using each account and apply current runtime availability; account usage does not consume the per-call API budget share - `inst-availability-bindings`
 5. [x] - `p1` - Stamp a monotonic version shared by the command result, snapshot slice and `accounts:changed`; coalesce unchanged observations - `inst-availability-version`
 6. [x] - `p1` - **RETURN** public statuses only; transcript, document, key, CLI token and one-time code never enter diagnostics - `inst-availability-return`
 
@@ -251,16 +251,16 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 **Output**: Checked account metadata or a typed sign-in failure; no agent switch.
 
 **Steps**:
-1. [ ] - `p1` - Reject an expired or cancelled session before applying its result; use only provider identity and plan status supplied by the CLI - `inst-check-session`
-2. [ ] - `p1` - Require confirmed personal use for Claude and a Pro or Max plan; ChatGPT accepts Plus, Pro, Business or Enterprise independently - `inst-check-plan`
+1. [x] - `p1` - Reject an expired or cancelled session before applying its result; use only provider identity and plan status supplied by the CLI - `inst-check-session`
+2. [x] - `p1` - Require confirmed personal use for Claude and a Pro or Max plan; ChatGPT accepts Plus, Pro, Business or Enterprise independently - `inst-check-plan`
 3. [ ] - `p1` - Use the M3 Q8 spike's verified Claude plan signal when available; otherwise use the short test-request fallback rather than reading a stored token or guessing from email (owner-Mac item: M3 ships the test-request fallback only, TL-31) - `inst-check-spike`
-4. [ ] - `p1` - Run a short test through the router, with the same per-run isolation, tool restrictions and egress audit as other own-account requests - `inst-check-test`
-5. [ ] - `p1` - Map cancellation, five-minute timeout, ineligible plan, offline and provider-ended session to the contract errors; failed checks leave agent bindings unchanged - `inst-check-error`
-6. [ ] - `p1` - Recheck the session is still current before committing identity, plan and connected time through the writer; **RETURN** success - `inst-check-return`
+4. [x] - `p1` - Run a short test through the router, with the same per-run isolation, tool restrictions and egress audit as other own-account requests - `inst-check-test`
+5. [x] - `p1` - Map cancellation, five-minute timeout, ineligible plan, offline and provider-ended session to the contract errors; failed checks leave agent bindings unchanged - `inst-check-error`
+6. [x] - `p1` - Recheck the session is still current before committing identity, plan and connected time through the writer; **RETURN** success - `inst-check-return`
 
 ### Keep secrets outside records and logs
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-credentials-privacy-secret-boundary`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-credentials-privacy-secret-boundary`
 
 **Input**: A credentials command, Keychain operation or CLI auth observation.
 
@@ -268,8 +268,8 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 
 **Steps**:
 1. [x] - `p1` - Pass API key values only to candidate verification, Keychain storage and authorized runtime invocation; never serialize them into settings, changes or events - `inst-secret-key`
-2. [ ] - `p1` - Let the unmodified CLI own account passwords and tokens; never read its credential files or copy its token into Noter's isolated run configuration - `inst-secret-account`
-3. [ ] - `p1` - Persist only identity, plan, connection state, references and revisioned agent preferences - `inst-secret-metadata`
+2. [x] - `p1` - Let the unmodified CLI own account passwords and tokens; never read its credential files or copy its token into Noter's isolated run configuration - `inst-secret-account`
+3. [x] - `p1` - Persist only identity, plan, connection state, references and revisioned agent preferences - `inst-secret-metadata`
 4. [x] - `p1` - Scrub secret-bearing process output and command arguments; release candidate-key buffers after use - `inst-secret-scrub`
 5. [x] - `p1` - **RETURN** status-only views; no masked key value is reconstructed by reading the saved secret for display - `inst-secret-return`
 
@@ -277,19 +277,19 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 
 ### Account connection and sign-in session
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-credentials-privacy-account`
+- [x] `p4` - **ID**: `cpt-noter-state-core-credentials-privacy-account`
 
 **States**: not_signed_in, signing_in, signed_in, signed_out_by_provider
 
 **Initial State**: not_signed_in
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** not_signed_in **TO** signing_in **WHEN** an eligible browser sign-in starts; also from signed_out_by_provider on retry - `inst-account-start`
-2. [ ] - `p1` - **FROM** signing_in **TO** signed_in **WHEN** identity, plan and test checks succeed before the five-minute deadline - `inst-account-connected`
-3. [ ] - `p1` - **FROM** signing_in **TO** not_signed_in **WHEN** Cancel, timeout, failed eligibility or connectivity ends the attempt; never accept its late success - `inst-account-failed`
-4. [ ] - `p1` - **FROM** not_signed_in **TO** signed_in **WHEN** an existing CLI session passes the same checks and required confirmation; also from signed_out_by_provider - `inst-account-existing`
-5. [ ] - `p1` - **FROM** signed_in **TO** not_signed_in **WHEN** explicit Noter sign-out moves agents to the matching key or unavailable state - `inst-account-signout`
-6. [ ] - `p1` - **FROM** signed_in **TO** signed_out_by_provider **WHEN** provider auth ends; agents stay bound but paused until repaired - `inst-account-provider-ended`
+1. [x] - `p1` - **FROM** not_signed_in **TO** signing_in **WHEN** an eligible browser sign-in starts; also from signed_out_by_provider on retry - `inst-account-start`
+2. [x] - `p1` - **FROM** signing_in **TO** signed_in **WHEN** identity, plan and test checks succeed before the five-minute deadline - `inst-account-connected`
+3. [x] - `p1` - **FROM** signing_in **TO** not_signed_in **WHEN** Cancel, timeout, failed eligibility or connectivity ends the attempt; never accept its late success - `inst-account-failed`
+4. [x] - `p1` - **FROM** not_signed_in **TO** signed_in **WHEN** an existing CLI session passes the same checks and required confirmation; also from signed_out_by_provider - `inst-account-existing`
+5. [x] - `p1` - **FROM** signed_in **TO** not_signed_in **WHEN** explicit Noter sign-out moves agents to the matching key or unavailable state - `inst-account-signout`
+6. [x] - `p1` - **FROM** signed_in **TO** signed_out_by_provider **WHEN** provider auth ends; agents stay bound but paused until repaired - `inst-account-provider-ended`
 
 Within signing_in, `SignInStep` progresses through waiting_for_browser, signed_in, checking_plan, sending_test_request and done; session progress is not a whole-state event. A closed sheet does not cancel the session. Provider sessions are independent; restart rechecks CLI state rather than resuming a stale in-memory login process.
 
@@ -333,7 +333,7 @@ The system **MUST** verify and store keys in Keychain, preserve a working key on
 
 ### CLI sign-in without owning tokens
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-signin`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-signin`
 
 The system **MUST** prepare, install, sign in, reuse and cancel through the CLIs, with independent providers, explicit Claude personal-use confirmation, a five-minute deadline, eligibility checks and a test request. Complete the Q8 spike before claiming accurate Claude plan detection; retain its documented test fallback. The existing-account confirmation gap in 1.4 must be resolved upstream before that Claude reuse path is accepted.
 
@@ -350,7 +350,7 @@ The system **MUST** prepare, install, sign in, reuse and cancel through the CLIs
 
 ### Logged binding and sign-out
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-binding`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-binding`
 
 The system **MUST** bind only selected agents and the requested default preference in one undoable batch, test the connected account through the gate, and distinguish explicit sign-out fallback from provider-ended pause. No account sign-in silently selects agents, changes privacy mode or exposes user hooks and MCP servers to a run.
 

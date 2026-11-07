@@ -155,6 +155,7 @@ impl Core {
         mut item_calls: BTreeSet<String>,
     ) -> Result<(), CoreError> {
         let mut settings_keys = BTreeSet::new();
+        let mut accounts = false;
         let mut glossary = false;
         let mut transcripts = BTreeSet::new();
         let mut speakers = BTreeSet::new();
@@ -165,6 +166,8 @@ impl Core {
                         self.emit_entity_changed(&EntityChanged::Call { call });
                     }
                 }
+                // The account metadata is not a settings section: Accounts reads its row again.
+                "setting" if id == crate::accounts::ROW => accounts = true,
                 "setting" => {
                     settings_keys.insert(id.clone());
                 }
@@ -212,9 +215,14 @@ impl Core {
                 _ => {}
             }
         }
-        if !settings_keys.is_empty() {
+        if accounts {
+            self.accounts.reload();
+        }
+        if !settings_keys.is_empty() || accounts {
             let mut settings = lock(&self.settings);
             let fresh = crate::settings::load(self.store())?;
+            // Undo bumped the revision whichever row it restored.
+            settings.rev = fresh.rev;
             for key in settings_keys {
                 let tagged = json!({ "section": key, "value": section_of(&fresh, &key)? });
                 let section = serde_json::from_value(tagged).map_err(crate::internal)?;

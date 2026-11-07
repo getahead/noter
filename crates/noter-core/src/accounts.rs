@@ -12,13 +12,18 @@ use noter_protocol::error::{RuntimeUnavailableReason, ValidationRule};
 use noter_protocol::ipc::event_names;
 use noter_protocol::model::*;
 use noter_protocol::*;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::Notify;
 
 use crate::app::{self, WholeState};
 use crate::{lock, Clock, EventEmitter};
 
 /// The `settings` row that holds each key's status (never the key).
 const KEYS_ROW: &str = "keys";
+
+/// The `settings` row that holds each connected account's non-secret metadata.
+pub(crate) const ROW: &str = "accounts";
 
 const PROVIDERS: [KeyProvider; 2] = [KeyProvider::Anthropic, KeyProvider::Codex];
 
@@ -40,7 +45,42 @@ fn provider_of(runtime: RuntimeChoice) -> Option<KeyProvider> {
 /// Configured with its verification time, or rejected.
 type Saved = HashMap<KeyProvider, KeyStatus>;
 
+// @cpt-begin:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-metadata
+/// What Noter keeps of a connected account: identity, plan and times, never a token, a password
+/// or the sign-in's one-time code.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct Connection {
+    pub identity: AccountIdentity,
+    pub since: TimestampMs,
+    /// Claude only: personal use was confirmed by a `account_signin_start`. `account_use_existing`
+    /// carries no such field, so it relies on this record (the 1.4 gap).
+    #[serde(default)]
+    pub personal_use_confirmed: bool,
+    /// Offer the account first for new agents (`account_bind_agents`).
+    #[serde(default)]
+    pub default_for_new_agents: bool,
+    /// The provider ended the session (`signed_out_by_provider`); the binding stays.
+    #[serde(default)]
+    pub ended_at: Option<TimestampMs>,
+}
+
+// @cpt-end:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-metadata
+
+type Connections = HashMap<AccountProvider, Connection>;
+
+/// A browser sign-in the core owns, independent of the sheet.
+#[derive(Clone)]
+pub(crate) struct Session {
+    pub id: SignInSessionId,
+    pub expires_at: TimestampMs,
+    pub confirmed: bool,
+    /// Wakes the task that waits for the browser when the session is cancelled.
+    pub stop: Arc<Notify>,
+}
+
 struct State {
+    connections: Connections,
+    sessions: HashMap<AccountProvider, Session>,
     saved: Saved,
     verifying: HashSet<KeyProvider>,
     /// The runtimes as last observed.
@@ -84,12 +124,15 @@ impl Accounts {
         let saved = row
             .and_then(|v| serde_json::from_str(&v).ok())
             .unwrap_or_default();
+        let connections = read_connections(&store)?;
         let accounts = Self {
             store,
             secrets,
             events,
             clock,
             state: Mutex::new(State {
+                connections,
+                sessions: HashMap::new(),
                 saved,
                 verifying: HashSet::new(),
                 availability: Vec::new(),
@@ -135,10 +178,12 @@ impl Accounts {
         .into_iter()
         .map(|(provider, tool, runtime)| AccountView {
             provider,
-            // Sign-in arrives with the credentials feature (M3).
-            status: AccountStatus::NotSignedIn,
+            status: account_status(&state, provider),
             cli: cli_info(tool, find(runtime)),
+            // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-bindings
+            // Agents arrive with `core-agents` (M4): until then no agent runs on an account.
             agents: Vec::new(),
+            // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-bindings
         })
         .collect();
         let local = find(RuntimeChoice::Local);
@@ -170,6 +215,168 @@ impl Accounts {
         // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-return
         state.view.clone()
         // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-return
+    }
+
+    pub(crate) fn connection(&self, provider: AccountProvider) -> Option<Connection> {
+        lock(&self.state).connections.get(&provider).cloned()
+    }
+
+    pub(crate) fn session(&self, provider: AccountProvider) -> Option<Session> {
+        lock(&self.state).sessions.get(&provider).cloned()
+    }
+
+    /// The provider whose active session is `id`.
+    pub(crate) fn session_provider(&self, id: &SignInSessionId) -> Option<AccountProvider> {
+        let state = lock(&self.state);
+        let found = state.sessions.iter().find(|(_, s)| s.id == *id);
+        found.map(|(provider, _)| *provider)
+    }
+
+    /// `id` is still the provider's active session (not cancelled, not timed out, not replaced).
+    pub(crate) fn current(&self, provider: AccountProvider, id: &SignInSessionId) -> bool {
+        lock(&self.state)
+            .sessions
+            .get(&provider)
+            .is_some_and(|s| s.id == *id)
+    }
+
+    /// A session starts: the account is `signing_in`.
+    pub(crate) fn begin(&self, provider: AccountProvider, session: Session) {
+        lock(&self.state).sessions.insert(provider, session);
+        self.observe(None);
+    }
+
+    /// The session `id` ends without connecting; `false` when it was not the active one.
+    pub(crate) fn end(&self, provider: AccountProvider, id: &SignInSessionId) -> bool {
+        let mut state = lock(&self.state);
+        if !state.sessions.get(&provider).is_some_and(|s| s.id == *id) {
+            return false;
+        }
+        state.sessions.remove(&provider);
+        drop(state);
+        self.observe(None);
+        true
+    }
+
+    /// Commits a checked account: a browser session (`Some`, still current or nothing is
+    /// written) or a reuse (`None`). `false` when the session was no longer current.
+    pub(crate) fn connect(
+        &self,
+        meta: ChangeMeta,
+        provider: AccountProvider,
+        session: Option<&SignInSessionId>,
+        mut next: Connection,
+    ) -> Result<bool, CoreError> {
+        let mut state = lock(&self.state);
+        if let Some(id) = session {
+            if !state.sessions.get(&provider).is_some_and(|s| s.id == *id) {
+                return Ok(false);
+            }
+        }
+        if let Some(prior) = state.connections.get(&provider) {
+            next.default_for_new_agents = prior.default_for_new_agents;
+            next.personal_use_confirmed |= prior.personal_use_confirmed;
+        }
+        let mut connections = state.connections.clone();
+        connections.insert(provider, next);
+        self.write_connections(&mut state, meta, connections)?;
+        state.sessions.remove(&provider);
+        drop(state);
+        self.observe(None);
+        Ok(true)
+    }
+
+    /// Forgets Noter's connection metadata of `provider`.
+    pub(crate) fn disconnect(
+        &self,
+        meta: ChangeMeta,
+        provider: AccountProvider,
+    ) -> Result<(), CoreError> {
+        let mut state = lock(&self.state);
+        if state.connections.contains_key(&provider) {
+            let mut connections = state.connections.clone();
+            connections.remove(&provider);
+            self.write_connections(&mut state, meta, connections)?;
+        }
+        Ok(())
+    }
+
+    /// The provider ended the session: the account stays bound, paused until repaired.
+    pub(crate) fn ended(
+        &self,
+        meta: ChangeMeta,
+        provider: AccountProvider,
+        at: TimestampMs,
+    ) -> Result<(), CoreError> {
+        let mut state = lock(&self.state);
+        let Some(connection) = state.connections.get(&provider) else {
+            return Ok(());
+        };
+        let mut connections = state.connections.clone();
+        connections.insert(
+            provider,
+            Connection {
+                ended_at: Some(at),
+                ..connection.clone()
+            },
+        );
+        self.write_connections(&mut state, meta, connections)
+            .map(drop)
+    }
+
+    /// One undoable change: the account's `default_for_new_agents`.
+    pub(crate) fn set_default(
+        &self,
+        meta: ChangeMeta,
+        provider: AccountProvider,
+        default_for_new_agents: bool,
+    ) -> Result<ChangeId, CoreError> {
+        let mut state = lock(&self.state);
+        let Some(connection) = state.connections.get(&provider) else {
+            return Err(CoreError::new(
+                ErrorCode::AccountSignedOut,
+                "the account is not connected",
+            ));
+        };
+        let mut connections = state.connections.clone();
+        connections.insert(
+            provider,
+            Connection {
+                default_for_new_agents,
+                ..connection.clone()
+            },
+        );
+        self.write_connections(&mut state, meta, connections)
+    }
+
+    /// Reads the metadata again after History restored the row.
+    pub(crate) fn reload(&self) -> AccountsView {
+        if let Ok(connections) = read_connections(&self.store) {
+            lock(&self.state).connections = connections;
+        }
+        self.observe(None)
+    }
+
+    /// Writes the connections row through the change-log writer and keeps it in memory; the
+    /// binding's own change is undoable, the rest follow the sign-in and are not.
+    fn write_connections(
+        &self,
+        state: &mut State,
+        meta: ChangeMeta,
+        next: Connections,
+    ) -> Result<ChangeId, CoreError> {
+        let before = to_value(&state.connections)?;
+        let after = to_value(&next)?;
+        let written = self.store.write_with(meta, move |tx| {
+            let logged = crate::settings::put(tx, ROW, &before, &after, None)?;
+            Ok(((), vec![logged]))
+        })?;
+        state.connections = next;
+        written
+            .change_ids
+            .into_iter()
+            .next()
+            .ok_or_else(|| crate::internal("the account write logged nothing"))
     }
 
     /// Each key's status from the Keychain and the saved status, never its value.
@@ -348,8 +555,40 @@ fn rejected() -> KeyStatus {
     }
 }
 
-fn to_value(saved: &Saved) -> Result<Value, CoreError> {
+fn to_value<T: Serialize>(saved: &T) -> Result<Value, CoreError> {
     serde_json::to_value(saved).map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))
+}
+
+fn read_connections(store: &Store) -> Result<Connections, CoreError> {
+    let row: Option<String> = store.read(|c| {
+        use noter_db::rusqlite::OptionalExtension;
+        c.query_row("SELECT value FROM settings WHERE key = ?1", [ROW], |r| {
+            r.get(0)
+        })
+        .optional()
+    })?;
+    Ok(row
+        .and_then(|v| serde_json::from_str(&v).ok())
+        .unwrap_or_default())
+}
+
+// @cpt-state:cpt-noter-state-core-credentials-privacy-account:p1
+fn account_status(state: &State, provider: AccountProvider) -> AccountStatus {
+    if let Some(session) = state.sessions.get(&provider) {
+        return AccountStatus::SigningIn {
+            session_id: session.id.clone(),
+        };
+    }
+    match state.connections.get(&provider) {
+        Some(Connection {
+            ended_at: Some(at), ..
+        }) => AccountStatus::SignedOutByProvider { at: *at },
+        Some(c) => AccountStatus::SignedIn {
+            identity: c.identity.clone(),
+            since: c.since,
+        },
+        None => AccountStatus::NotSignedIn,
+    }
 }
 
 fn cli_info(tool: CliTool, a: Option<&Availability>) -> CliInfo {

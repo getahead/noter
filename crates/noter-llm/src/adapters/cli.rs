@@ -234,20 +234,22 @@ pub(crate) fn effort(effort: Effort) -> &'static str {
 }
 
 // ── the account seam over the pinned CLIs (TL-32) ──
-// shortcut: status and install only; browser sign-in and sign-out run the CLIs' own login
-// flows on the owner's Mac (account sign-in sessions, slice 2), until then they report `Failed`.
+// shortcut: status and install only; the CLIs' own browser sign-in and sign-out are driven on
+// the owner's Mac (owner-gated, TL-32), until then they report `Failed`.
 
-/// The official install command of each tool and the hosts it reaches, all in the
-/// `cli_install` group of the egress allow-list.
+/// The official install command of each tool, pinned to the version the adapter was tested with
+/// (the lower end of its `TESTED` range), and the hosts it reaches, all in the `cli_install`
+/// group of the egress allow-list.
+// shortcut: Ollama has no tested range, so its installer takes the latest.
 pub(crate) const INSTALLERS: [(CliTool, &str, &[&str]); 3] = [
     (
         CliTool::ClaudeCode,
-        "curl -fsSL https://claude.ai/install.sh | bash",
+        "curl -fsSL https://claude.ai/install.sh | bash -s 2.1.0",
         &["claude.ai", "storage.googleapis.com"],
     ),
     (
         CliTool::Codex,
-        "npm install -g @openai/codex",
+        "npm install -g @openai/codex@0.163.0",
         &["registry.npmjs.org"],
     ),
     (
