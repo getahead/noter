@@ -8,3 +8,6 @@ export const slots: {
   /** Opens the Handoff drawer for an engineering item (`cpt-noter-component-ui-handoff-drawer`). */
   openHandoff: ((bridge: Bridge, itemId: string) => void) | null;
 } = { inspect: null, openHandoff: null };
+
+/** The id of an item row's **Handoff** button, where focus returns when the drawer closes. */
+export const handoffButtonId = (itemId: string) => `handoff-${itemId}`;
