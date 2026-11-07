@@ -206,7 +206,7 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 
 ### Project section progress and sharing scope
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-call-page-outputs-project`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-call-page-outputs-project`
 
 **Input**: CallOutputs, matching progress events, selected ids, invocation origin and readiness
 
@@ -218,7 +218,7 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 3. [x] - `p1` - Count only visible non-rejected rows; review counts include suggestions only; hide review controls while still writing or when none remain - `inst-count`
 4. [x] - `p1` - Resolve invocation scope: section means its SectionKind; row means its id or the selection containing it; toolbar means selected ids or Whole call - `inst-scope`
 5. [x] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
-6. [ ] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
+6. [x] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
 
 Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered with Items (2.17 S2); removing an unavailable row must never broaden its scope to Whole call.
 
@@ -228,23 +228,23 @@ Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered
 
 ### Output section
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-call-page-outputs-section`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-call-page-outputs-section`
 
 **States**: WAITING, WRITING, STREAMING, READY, EMPTY, EDITING, SAVING, REGENERATING, COMPARING, FAILED
 
 **Initial State**: The core section state, or WAITING before its first read
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** WAITING **TO** WRITING **WHEN** matching progress starts that section - `inst-start`
-2. [ ] - `p1` - **FROM** WRITING **TO** STREAMING **WHEN** partial text becomes available - `inst-stream`
-3. [ ] - `p1` - **FROM** WRITING, STREAMING, REGENERATING **TO** READY, EMPTY **WHEN** the core completes with content or no items - `inst-ready`
-4. [ ] - `p1` - **FROM** WRITING, STREAMING, REGENERATING **TO** FAILED **WHEN** the section fails; retain prior text - `inst-failed`
+1. [x] - `p1` - **FROM** WAITING **TO** WRITING **WHEN** matching progress starts that section - `inst-start`
+2. [x] - `p1` - **FROM** WRITING **TO** STREAMING **WHEN** partial text becomes available - `inst-stream`
+3. [x] - `p1` - **FROM** WRITING, STREAMING, REGENERATING **TO** READY, EMPTY **WHEN** the core completes with content or no items - `inst-ready`
+4. [x] - `p1` - **FROM** WRITING, STREAMING, REGENERATING **TO** FAILED **WHEN** the section fails; retain prior text - `inst-failed`
 5. [x] - `p1` - **FROM** READY **TO** EDITING **WHEN** Edit starts a draft - `inst-edit`
 6. [x] - `p1` - **FROM** EDITING **TO** READY **WHEN** Cancel or Esc discards it - `inst-cancel`
-7. [ ] - `p1` - **FROM** EDITING **TO** SAVING **WHEN** Save submits the draft - `inst-save`
+7. [x] - `p1` - **FROM** EDITING **TO** SAVING **WHEN** Save submits the draft - `inst-save`
 8. [x] - `p1` - **FROM** SAVING **TO** READY **WHEN** save succeeds with a new rev and Edited badge - `inst-saved`
 9. [x] - `p1` - **FROM** SAVING **TO** EDITING **WHEN** save fails or conflicts; keep the draft - `inst-save-error`
-10. [ ] - `p1` - **FROM** READY, EMPTY, FAILED **TO** REGENERATING **WHEN** a regeneration request is accepted - `inst-regen`
+10. [x] - `p1` - **FROM** READY, EMPTY, FAILED **TO** REGENERATING **WHEN** a regeneration request is accepted - `inst-regen`
 11. [x] - `p1` - **FROM** READY **TO** COMPARING **WHEN** both comparison bodies load - `inst-compare`
 12. [x] - `p1` - **FROM** COMPARING **TO** READY **WHEN** Compare or Hide Diff is chosen again - `inst-hide`
 

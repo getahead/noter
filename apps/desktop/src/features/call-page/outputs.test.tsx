@@ -78,6 +78,21 @@ describe("OutputsView", () => {
 describe("OutputSection", () => {
   const props = (s: Section, onRegenerate = () => {}) => ({ bridge, call: bridge.store.getState().entities.call[id]!, section: s, prefs: { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never, writing: false, onRegenerate });
 
+  it("keeps the old text readable while a section writes again, and shows partial text as it streams", async () => {
+    await open([]);
+    const waiting = renderToString(<OutputSection {...props(sec("summary", { state: { type: "pending" } }))} />);
+    expect(waiting).toContain("Waiting for the summary");
+    const writing = renderToString(<OutputSection {...props(sec("summary", { state: { type: "writing" } }))} />);
+    expect(writing).toContain("Writing summary…");
+    const regenerating = renderToString(<OutputSection {...props(sec("summary", { state: { type: "writing" }, summary_id: "s1", rev: 1, body_md: "The old text stays" }))} />);
+    expect(regenerating).toContain("The old text stays");
+    expect(regenerating).toContain("Regenerating…");
+    const failed = renderToString(<OutputSection {...props(sec("summary", { state: { type: "failed", code: "internal", local_fallback_available: false } as never, summary_id: "s1", rev: 1, body_md: "Prior text survives a failure" }))} />);
+    expect(failed).toContain("Try Again");
+    const ready = renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "Done" }))} />);
+    expect(ready).not.toContain("Regenerating…");
+  });
+
   it("regenerates a failed section alone, and locally on Use Local Model", async () => {
     await open([]);
     const asked: boolean[] = [];

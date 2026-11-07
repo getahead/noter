@@ -14,7 +14,9 @@ export function scopeOf(origin: ShareOrigin, includeUnreviewed: boolean): ShareS
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
   // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-selection
   // D-34: selection is one row. Keep its explicit id even if core filtering removes it; [] would broaden the scope.
+  // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-return
   return { sections: origin.type === "toolbar" ? [] : [origin.kind], item_ids: origin.type === "row" ? [origin.id] : [], include_unreviewed: includeUnreviewed };
+  // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-return
   // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-selection
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
   // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
@@ -24,7 +26,9 @@ export function scopeOf(origin: ShareOrigin, includeUnreviewed: boolean): ShareS
 export const scopeLine = (origin: ShareOrigin): string => (origin.type === "row" ? t("share.this_item") : origin.type === "section" ? t(SECTION_LABEL[origin.kind]) : t("share.whole_call"));
 
 /** Copying needs ready outputs (before they are read the core decides: `outputs_not_ready`); a sensitive call says so and confirms with a plain **Copied**. */
+// @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-return
 export const shareState = (o: Pick<CallOutputs, "status" | "sensitive"> | undefined, privacy?: CallRow["privacy"]) => ({ ready: !o || (o.status !== "writing" && o.status !== "not_started"), sensitive: privacy ? privacy === "sensitive" : !!o?.sensitive });
+// @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-return
 
 const FORMAT_LABEL = { slack: "share.copied.slack", jira: "share.copied.jira", markdown: "share.copied.markdown" } as const;
 export const copiedLabel = (f: ShareFormat, sensitive: boolean): string => t(sensitive ? "share.copied" : FORMAT_LABEL[f]);
