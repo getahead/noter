@@ -16,8 +16,12 @@ export async function sent(page: Page, name: string): Promise<Array<Record<strin
   return (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => (c.args ?? {}) as Record<string, unknown>);
 }
 
+/** The window subscribed to the core's events and applied its snapshot (the bridge is READY). */
+export const windowReady = (page: Page) => expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
+
 /** The core's navigation to a call page tab, as a notification click or a Calls row does it. */
 export async function navigate(page: Page, tab: "summary" | "transcript" | "history" = "summary", callId: string = W.PAST_CALL) {
+  await windowReady(page); // a `nav:request` published before the window subscribed to events is lost
   await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
   await page.evaluate(
     async ([id, t]) => {
@@ -31,7 +35,6 @@ export async function navigate(page: Page, tab: "summary" | "transcript" | "hist
 
 /** The call's page open on Summary (the fixture's past call unless `call` names the one the real core recorded). */
 export async function openSummary(page: Page, call: string = W.PAST_CALL) {
-  await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
   await navigate(page, "summary", call);
   await expect(page.getByRole("tab", { name: "Summary", selected: true })).toBeVisible();
 }
