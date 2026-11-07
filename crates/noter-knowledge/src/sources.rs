@@ -2,6 +2,7 @@
 //! index. Every write goes through the change-log writer and logs no document content.
 
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use noter_db::rusqlite::types::Type;
 use noter_db::rusqlite::{self, params, Connection, OptionalExtension, Row, Transaction};
@@ -232,10 +233,12 @@ fn checked_schedule(schedule: &str) -> Result<String, CoreError> {
 /// Adds an MCP source and returns its row. Indexed: the server's own sign-in through `mcp`, the
 /// token into `secrets` under [`token_account`] and only that name in the row; a failed insert
 /// deletes the new Keychain item. Live: the configuration alone, with no token and no index. A
-/// failed or cancelled sign-in writes nothing.
+/// failed or cancelled sign-in writes nothing but the `lookup` audit rows of its requests (at
+/// `now`), each committed before its request left.
 pub async fn add_mcp(
     store: &Store,
     meta: ChangeMeta,
+    now: &(dyn Fn() -> TimestampMs + Send + Sync),
     mcp: &dyn McpSource,
     secrets: &dyn SecretStore,
     args: SourceAddMcpArgs,
@@ -272,7 +275,21 @@ pub async fn add_mcp(
     let token_ref = match args.mode {
         SourceMode::Indexed => {
             // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-oauth
-            let token = Secret::new(mcp.oauth(&server).await?);
+            let unaudited: Mutex<Option<CoreError>> = Mutex::new(None);
+            let audit = |destination: &str, request: &[u8]| {
+                let row = noter_llm::audit_lookup(store, meta.clone(), now(), destination, request);
+                let failed = row.err();
+                let sent = failed.is_none();
+                if failed.is_some() {
+                    *unaudited.lock().unwrap_or_else(|p| p.into_inner()) = failed;
+                }
+                sent
+            };
+            let token = mcp.oauth(&server, &audit).await.map_err(|e| {
+                let failed = unaudited.lock().unwrap_or_else(|p| p.into_inner()).take();
+                failed.unwrap_or_else(|| e.into())
+            })?;
+            let token = Secret::new(token);
             let account = token_account(&id);
             secrets
                 .set(&account, &token)

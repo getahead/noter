@@ -65,6 +65,7 @@ pub use first_run::{
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
+pub use knowledge::HttpMcp;
 pub use mcp::{McpRegistration, McpSession};
 pub use models::PinnedModels;
 pub use native_ops::{ClipboardText, LaunchRequest, NativeOps, SaveKind};

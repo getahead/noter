@@ -132,7 +132,9 @@ impl Core {
         let meta = self.change_meta(ctx, "Added an MCP source".into(), "source_add_mcp");
         let mcp = self.deps.mcp_source.as_ref();
         let secrets = self.deps.secrets.as_ref();
-        let row = noter_knowledge::add_mcp(self.store(), meta, mcp, secrets, args).await?;
+        let clock = self.deps.clock.clone();
+        let now = move || clock.now();
+        let row = noter_knowledge::add_mcp(self.store(), meta, &now, mcp, secrets, args).await?;
         // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-schedule
         // The hourly pass queues it again whenever its schedule makes it due.
         if row.mode == SourceMode::Indexed {
@@ -391,5 +393,117 @@ impl Core {
             self.resend_after(&id, Some(run));
         }
         result
+    }
+}
+
+/// The real indexed-MCP transport (TL-42): noter-llm's streamable-HTTP client with the server's
+/// OAuth behind the `McpSource` seam. The app sets it through `CoreDeps::with_mcp_source`; tests
+/// and noter-core-harness keep the scripted servers.
+pub struct HttpMcp(noter_llm::McpClient);
+
+impl HttpMcp {
+    /// `open` shows a URL (the server's sign-in page) in the user's browser.
+    pub fn new(open: Arc<dyn Fn(&str) + Send + Sync>) -> Self {
+        Self(noter_llm::McpClient::new(open))
+    }
+}
+
+fn mcp_error(e: noter_llm::McpClientError) -> noter_knowledge::McpError {
+    use noter_knowledge::McpError;
+    use noter_llm::McpClientError as E;
+    match e {
+        E::Cancelled => McpError::Cancelled,
+        E::Offline => McpError::Offline,
+        E::Unauthorized => McpError::Rejected,
+        E::Invalid => McpError::Invalid,
+        E::Unaudited => McpError::Unaudited,
+    }
+}
+
+fn mcp_call<'a>(
+    server: &'a str,
+    token: &'a str,
+    remote: &'a noter_knowledge::Remote<'a>,
+) -> noter_llm::Call<'a> {
+    noter_llm::Call {
+        server,
+        token,
+        audit: remote.audit,
+        renewed: remote.renewed,
+    }
+}
+
+fn remote_doc(r: noter_llm::Resource) -> noter_knowledge::RemoteDoc {
+    noter_knowledge::RemoteDoc {
+        uri: r.uri,
+        title: r.title,
+        // The server's version stands for the content hash: unchanged pages are not read again.
+        hash: r.version,
+    }
+}
+
+impl noter_knowledge::McpSource for HttpMcp {
+    fn oauth<'a>(
+        &'a self,
+        server: &'a str,
+        audit: noter_knowledge::Audit<'a>,
+    ) -> BoxFuture<'a, Result<String, noter_knowledge::McpError>> {
+        Box::pin(async move { self.0.sign_in(server, audit).await.map_err(mcp_error) })
+    }
+
+    fn list_resources<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        remote: &'a noter_knowledge::Remote<'a>,
+    ) -> BoxFuture<'a, Result<Option<noter_knowledge::Listing>, noter_knowledge::McpError>> {
+        Box::pin(async move {
+            let listed = self.0.list(&mcp_call(server, token, remote)).await;
+            Ok(listed
+                .map_err(mcp_error)?
+                .map(|r| noter_knowledge::Listing {
+                    items: r.items.into_iter().map(remote_doc).collect(),
+                    complete: r.complete,
+                }))
+        })
+    }
+
+    fn read_resource<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        uri: &'a str,
+        remote: &'a noter_knowledge::Remote<'a>,
+    ) -> BoxFuture<'a, Result<noter_knowledge::Page, noter_knowledge::McpError>> {
+        Box::pin(async move {
+            let read = self.0.read(&mcp_call(server, token, remote), uri).await;
+            let contents = read.map_err(mcp_error)?;
+            Ok(noter_knowledge::Page {
+                // The listing's title is the page's.
+                title: String::new(),
+                mime: contents.mime,
+                text: contents.text,
+            })
+        })
+    }
+
+    fn seed_query<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        query: &'a str,
+        remote: &'a noter_knowledge::Remote<'a>,
+    ) -> BoxFuture<'a, Result<noter_knowledge::Listing, noter_knowledge::McpError>> {
+        Box::pin(async move {
+            let found = self.0.search(&mcp_call(server, token, remote), query).await;
+            Ok(noter_knowledge::Listing {
+                items: found
+                    .map_err(mcp_error)?
+                    .into_iter()
+                    .map(remote_doc)
+                    .collect(),
+                complete: false,
+            })
+        })
     }
 }

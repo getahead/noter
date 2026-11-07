@@ -547,7 +547,8 @@ async fn a_failed_insert_deletes_the_new_keychain_token() {
         privacy: PrivacyClass::Normal,
         scope: SourceScope::AllCalls,
     };
-    let added = noter_knowledge::add_mcp(&store, meta(), &mcp, &secrets, args).await;
+    let added =
+        noter_knowledge::add_mcp(&store, meta(), &|| TimestampMs(0), &mcp, &secrets, args).await;
     assert!(added.is_err());
     let calls = secrets.0.lock().unwrap().clone();
     assert_eq!(calls.len(), 2);
