@@ -138,7 +138,11 @@ describe("cpt-noter-seq-library-follow-topic", () => {
 
   it("other — a merge keeps the source's name as an alias, change_undo restores both, and Keep Separate is stored", async () => {
     open();
+    const before = ok(await main.topicsList({})).topics;
     expect(refused(await main.topicsMerge({ source: "top_ws", target: "top_ws" })).code).toBe("invalid_input");
+    expect(refused(await main.topicsMerge({ source: "top_none", target: "top_drawer" })).code).toBe("not_found");
+    // A failed merge changes nothing.
+    expect(ok(await main.topicsList({})).topics).toEqual(before);
     const merged = ok(await main.topicsMerge({ source: "top_ws", target: "top_drawer" }));
     expect(merged.topic.aliases).toContain("Websocket notifications");
     expect(ok(await main.topicsList({})).topics.map((t) => t.id)).not.toContain("top_ws");

@@ -346,10 +346,10 @@ Owner item (Backend Teamlead TL-35): the golden sets and the two performance sce
 ## 6. Acceptance Criteria
 
 - [ ] E2E against the real core, `cpt-noter-seq-library-search-calls`: mixed Russian and English finds cited spans; keyword-only rebuild, no hits and weak-only hits carry distinct metadata.
-- [ ] E2E against the real core, `cpt-noter-seq-library-filter-calls`: people and open-item filters combine with type and tags; clearing filters restores rows; M2 export writes the selection.
-- [ ] E2E against the real core, `cpt-noter-seq-library-follow-topic`: thread groups open the cited call; rename propagates; merge is undoable; Keep Separate survives restart.
+- [x] E2E against the real core, `cpt-noter-seq-library-filter-calls`: people and open-item filters combine with type and tags; clearing filters restores rows; M2 export writes the selection.
+- [x] E2E against the real core, `cpt-noter-seq-library-follow-topic`: thread groups open the cited call; rename propagates; merge is undoable; Keep Separate survives restart (stored as its suppression row in the story; the restart itself in noter-core tests/topics.rs, the harness has no restart control).
 - [ ] E2E against the real core, `cpt-noter-seq-ask-cited-answer`: cited answers open evidence; unknown citations fail validation; no citations yields `found: false`; cloud excludes sensitive sources while local can cite them.
-- [ ] E2E against the real core, `cpt-noter-seq-ask-follow-up-and-copy`: reopen, append a follow-up and copy Markdown with citations; deleting a source marks old citations deleted.
+- [x] E2E against the real core, `cpt-noter-seq-ask-follow-up-and-copy`: reopen, append a follow-up and copy Markdown with citations; deleting a source marks old citations deleted.
 - [ ] Stop, timeout, lag and thread deletion release work and subscriptions; late output cannot recreate deleted rows or emit a second terminal result.
-- [ ] Each of the twelve frozen commands succeeds at least once in real-core E2E runs; stale renames and failed merge transactions change nothing.
+- [x] Each of the twelve frozen commands succeeds at least once in real-core E2E runs; stale renames and failed merge transactions change nothing.
 - [ ] Both retrieval performance scenarios and citation evaluations pass; `just gate-fast` and `just gate` pass.
