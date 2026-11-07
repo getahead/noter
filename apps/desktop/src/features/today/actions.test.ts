@@ -38,3 +38,25 @@ it("never requests Calendar while recording, even when an old permission button 
   await allowCalendar(bridge);
   expect(request).not.toHaveBeenCalled();
 });
+
+it("a refresh landing as a read finishes is never dropped, at any microtask offset", async () => {
+  for (let depth = 0; depth <= 8; depth++) {
+    const fake = new FakeCore({ window: "main" });
+    bridge = createBridge("main", fake);
+    await bridge.open();
+    const read = bridge.core.todayGet.bind(bridge.core);
+    let late: Promise<unknown> | undefined;
+    const spy = vi.spyOn(bridge.core, "todayGet").mockImplementationOnce(async () => {
+      const res = await read({});
+      let tick: Promise<void> = Promise.resolve();
+      for (let i = 0; i < depth; i++) tick = tick.then(() => undefined);
+      void tick.then(() => { late = loadToday(bridge); });
+      return res;
+    }).mockImplementation(read);
+    await loadToday(bridge);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await late;
+    expect(spy, `microtask offset ${depth}`).toHaveBeenCalledTimes(2);
+    await bridge.close();
+  }
+});

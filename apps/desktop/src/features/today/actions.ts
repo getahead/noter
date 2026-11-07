@@ -16,17 +16,22 @@ export function loadToday(bridge: Bridge): Promise<ReadResult> {
     pending.dirty = true;
     return pending.promise;
   }
-  const job = { dirty: true, promise: Promise.resolve().then(async () => {
+  const job = { dirty: true, promise: undefined as unknown as Promise<ReadResult> };
+  job.promise = Promise.resolve().then(async () => {
     let res: ReadResult;
-    do {
-      job.dirty = false;
-      // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-get
-      res = await bridge.act(READ_KEY, "today_get", () => bridge.core.todayGet({}));
-      // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-get
-      if (!job.dirty && res.status === "ok") holdToday(res.data);
-    } while (job.dirty);
+    try {
+      do {
+        job.dirty = false;
+        // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-get
+        res = await bridge.act(READ_KEY, "today_get", () => bridge.core.todayGet({}));
+        // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-get
+        if (!job.dirty && res.status === "ok") holdToday(res.data);
+      } while (job.dirty);
+    } finally {
+      reads.delete(bridge); // in the same turn as the last check, so a later call starts a new read instead of marking a finished one
+    }
     return res;
-  }).finally(() => reads.delete(bridge)) };
+  });
   reads.set(bridge, job);
   return job.promise;
 }

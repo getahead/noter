@@ -32,9 +32,9 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   const live = card.variant === "live" || card.variant === "unmatched";
   const capture = useWindow(bridge, (s) => s.whole.capture);
   const elapsed = useRecordingClock(live ? capture : undefined);
-// @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-live
+  // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-live
   const details = expanded || live;
-// @cpt-end:cpt-noter-state-ui-today-card:p1:inst-live
+  // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-live
   const [all, setAll] = useState(positionOf(bridge).all.has(e?.event_id ?? "live"));
   const rows = e && details ? cardRows(e, all) : null;
   const week = card.variant === "this-week";

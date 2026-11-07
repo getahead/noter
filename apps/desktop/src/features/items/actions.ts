@@ -31,9 +31,9 @@ export const refresh = (bridge: Bridge, id: string) => bridge.act(`item:get:${id
 /** A refused command: its named error stays on the row, no success status; a conflict reads the item again. */
 async function failed(bridge: Bridge, id: string, code: ErrorCode, local: Parameters<typeof patchLocal>[1] = {}) {
   patchLocal(id, { ...local, error: errorText(code) });
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-error
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-error
   if (code === "conflict") await refresh(bridge, id);
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-error
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-error
 }
 // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-failure
 // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-error
@@ -117,9 +117,9 @@ export async function answerHandoff(bridge: Bridge, item: ItemView, answer: "lan
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-answer
   // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-landed
   // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-keep
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-handoff
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-handoff
   const res = await bridge.act(`item:handoff:${it.id}`, "item_answer_handoff_landed", () => bridge.core.itemAnswerHandoffLanded({ item_id: it.id, rev: it.rev, answer }), { entity: "item" });
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-handoff
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-handoff
   // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-keep
   // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-landed
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-answer
@@ -259,7 +259,7 @@ async function refreshCompletion(bridge: Bridge, id: string, target: UndoTarget)
 
 /** Completion shares History's keyboard Undo, while the row keeps its own persistent target. */
 function holdCompletion(bridge: Bridge, id: string, target: UndoTarget, message: string) {
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-undo
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-undo
   holdUndo({ target, message, refresh: () => refreshCompletion(bridge, id, target) });
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-undo
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-undo
 }

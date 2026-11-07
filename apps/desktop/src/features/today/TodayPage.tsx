@@ -44,51 +44,57 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   const settings = useWindow(bridge, (s) => s.whole.settings);
   const calls = useWindow(bridge, (s) => s.entities.call);
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-refresh
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-refresh
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-refresh
   useEffect(() => void (ready && loadToday(bridge)), [bridge, ready, capture, env, settings, items, calls]);
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-refresh
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-refresh
   // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-refresh
-// @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-calendar
+  // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-calendar
   const state = calendarState(read, view, ask?.state === "WAITING");
-// @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-calendar
+  // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-calendar
   const skeleton = useAfter(300, state === "LOADING" || (state === "ERROR" && read.state === "WAITING"));
   // the user's own open/closed choice by event id; the next call is the first card that is not live
   const [user, setUser] = useState<ReadonlyMap<string, boolean>>(position.expanded);
-  const toggle = (id: string, now: boolean) => setUser((m) => (position.expanded = new Map(m).set(id, !now)));
+  const toggle = (id: string, now: boolean) => {
+    position.expanded = new Map(position.expanded).set(id, !now);
+    setUser(position.expanded);
+  };
   const [doneOpen, setDoneOpen] = useState<boolean | undefined>(position.doneOpen);
-// @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-retry
+  // @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-retry
   const tryAgain = () => void loadToday(bridge);
-// @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-retry
+  // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-retry
   const review = view ? reviewLine(view) : null;
   const proposals = view ? proposalPreview(view) : null;
   const day = view ? cards(view) : [];
   const next = day.findIndex((c) => c.variant !== "live" && c.variant !== "unmatched");
   const week = view ? weekCards(view) : [];
   const liveEvent = day.find((card) => card.variant === "live")?.event?.event_id;
-  useEffect(() => setUser((user) => (position.expanded = expandLive(user, liveEvent))), [position, liveEvent]);
+  useEffect(() => {
+    position.expanded = expandLive(position.expanded, liveEvent);
+    setUser(position.expanded);
+  }, [position, liveEvent]);
 
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-return
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-return
   useLayoutEffect(() => restorePosition(root.current, position));
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-return
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-return
   const rowKey = (event: KeyboardEvent<HTMLDivElement>) => {
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-tick
+    // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-tick
     if (moveFocus(event, "[data-item-id]", false)) return;
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-tick
+    // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-tick
     const target = event.target as HTMLElement;
     if (!target.matches("[data-item-id]") || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return;
     if (event.key === " ") {
       event.preventDefault();
-// @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-tick
+      // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-tick
       target.querySelector<HTMLElement>('[role="checkbox"], input[type="checkbox"]')?.click();
-// @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-tick
+      // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-tick
     } else if (event.key === "Enter") {
       const item = view && [...view.due_without_call, ...view.done_today, ...view.today.flatMap((c) => [...c.items, ...c.questions, ...c.handed_off]), ...view.this_week.flatMap((c) => [...c.items, ...c.questions, ...c.handed_off])].find((it) => it.id === target.dataset.itemId);
       const span = item?.spans[0];
       if (span) {
         event.preventDefault();
-// @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-links
+        // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-links
         void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }), { screen: "main-window-shell" });
-// @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-links
+        // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-links
       }
     }
   };
@@ -156,7 +162,10 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       )}
       {view && (
         <section data-region="TD-R7" data-today-group="done" className="td-done">
-          <Disclosure label={t("today.done_today", { count: view.done_today.length })} open={doneOpen ?? view.done_today.length === 0} onAction={() => setDoneOpen(position.doneOpen = !(doneOpen ?? view.done_today.length === 0))} />
+          <Disclosure label={t("today.done_today", { count: view.done_today.length })} open={doneOpen ?? view.done_today.length === 0} onAction={() => {
+            position.doneOpen = !(doneOpen ?? view.done_today.length === 0);
+            setDoneOpen(position.doneOpen);
+          }} />
           {(doneOpen ?? view.done_today.length === 0) && (view.done_today.length === 0 ? <EmptyState variant="section" title={t("today.nothing_ticked")} /> : view.done_today.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="done" />))}
         </section>
       )}
