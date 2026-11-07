@@ -1064,11 +1064,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.17 Items, review and evidence — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-items`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-items`
 
 - **Purpose**: Let the user review suggested items, tick, edit and reopen items, and open each item's evidence in one click, in rows and in the Item inspector.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/items.md`](features/ui/items.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/items.md`](features/ui/items.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-history-undo`
 
@@ -1083,7 +1083,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p3` - `cpt-noter-principle-evidence-one-click`
+  - [x] `p3` - `cpt-noter-principle-evidence-one-click`
 
 - **Design Constraints Covered**:
 
@@ -1094,9 +1094,9 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-action-item-row`
-  - [ ] `p3` - `cpt-noter-component-ui-item-inspector`
-  - [ ] `p3` - `cpt-noter-component-ui-provenance-chip`
+  - [x] `p3` - `cpt-noter-component-ui-action-item-row`
+  - [x] `p3` - `cpt-noter-component-ui-item-inspector`
+  - [x] `p3` - `cpt-noter-component-ui-provenance-chip`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `items_list`
@@ -1425,7 +1425,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Principles Covered**:
 
-  - [ ] `p4` - `cpt-noter-principle-evidence-one-click`
+  - [x] `p4` - `cpt-noter-principle-evidence-one-click`
 
 - **Design Constraints Covered**:
 

@@ -225,7 +225,7 @@ Every control works with the keyboard and VoiceOver, meets the WCAG 2.2 AA targe
 
 #### Evidence one click away
 
-- [ ] `p1` - **ID**: `cpt-noter-principle-evidence-one-click`
+- [x] `p1` - **ID**: `cpt-noter-principle-evidence-one-click`
 
 Every generated fact (a card, decision, action item, answer or closure) shows where it came from, and one click or Return opens that source. A claim without a source is labelled **Model guess · unverified** and never looks like a fact. An answer without citations says so and does not guess.
 
@@ -5353,7 +5353,7 @@ Each card carries one monochrome badge naming the role that raised it, so the us
 
 #### Component — Provenance chip
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-provenance-chip`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-provenance-chip`
 
 ##### Why this component exists
 
@@ -5596,7 +5596,7 @@ An output section is one generated part of a call's outputs: the summary, decisi
 
 #### Component — Action item row
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-action-item-row`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-action-item-row`
 
 ##### Why this component exists
 
@@ -6268,7 +6268,7 @@ Edits are kept when outputs regenerate, the archive pass can change transcript w
 
 #### Component — Item inspector
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-item-inspector`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-item-inspector`
 
 ##### Why this component exists
 
