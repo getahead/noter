@@ -28,7 +28,7 @@ const calendar = (state: "not_asked" | "denied") => (w: Parameters<typeof W.idle
 
 /** The window opens on Today, the first section (⌘1). */
 async function openToday(page: Page, world: (w: Parameters<typeof W.idle>[0]) => void) {
-  const steer = await openWindow(page, "main", { world });
+  const steer = await openWindow(page, "main", { world, fixedClock: true });
   await expect(async () => {
     await page.keyboard.press("Meta+Digit1");
     await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible({ timeout: 1000 });
@@ -147,7 +147,7 @@ function cardWorld(w: Parameters<typeof W.idle>[0]) {
   const base = { ...w.today.today[0] };
   // Calendar events are harness input; the real core derives their carried items from participant history.
   const rows = w.items.filter((it) => it.call.id === W.LIVE_CALL);
-  const now = Date.now();
+  const now = w.now;
   const event = {
     ...base, event_id: "evt_today_s2", title: "Today preparation", starts_at: now + 60_000, ends_at: now + 3_600_000,
     platform: "Microsoft Teams", attendees: [{ name: "Anna Kuznetsova", email: null, person: rows[0]!.owner }],
