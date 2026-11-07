@@ -8,7 +8,7 @@ import type { OutputSection as Section, SectionKind } from "../../core/bindings"
 import { t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { OutputSection } from "./OutputSection";
-import { loadOutputs, outputsKey, regenerate } from "./outputs-actions";
+import { announceSummaryOnce, loadOutputs, outputsKey, regenerate } from "./outputs-actions";
 import { useOutputs } from "./outputs-cache";
 import { isWriting, mergeSection, orderSections } from "./outputs-logic";
 import { useRegenerate } from "./RegenerateSheet";
@@ -36,11 +36,13 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
     return p && p !== s.state.type && p !== "pending" && p !== "writing" ? [`${s.kind}:${p}`] : [];
   }).join();
   const lastSettled = useRef("");
+  const announced = useRef<string | null>(null);
   useEffect(() => {
     if (!settled) return void (lastSettled.current = "");
     if (lastSettled.current === settled) return;
     lastSettled.current = settled;
     void loadOutputs(bridge, callId);
+    announceSummaryOnce(bridge, callId, settled, announced);
   }, [bridge, callId, settled]);
 
   if (!call || !prefs) return null;

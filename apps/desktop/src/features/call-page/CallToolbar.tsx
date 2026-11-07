@@ -86,12 +86,14 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
       trailing={
         <>
           <ShareMenu bridge={bridge} callId={at.callId} origin={{ type: "toolbar" }} id="pc-share" />
+          {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-return */}
           {exported && (
             <span role="status" className="pc-export-done">
               {t("export.done", { path: exported })} ·{" "}
               <button type="button" className="np-link" onClick={() => void revealExport(bridge, at.callId, exported)}>{t("export.show")}</button>
             </span>
           )}
+          {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-return */}
           <PullDownButton id="pc-more" iconOnly icon="ellipsis" label={t("callpage.more")} ariaLabel={t("callpage.more")} variant="item-menu" size="toolbar" open={menu !== null} onAction={() => setMenu(menu ? null : globalThis.document?.getElementById("pc-more") ?? null)} />
           {/* @cpt-begin:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-user-more */}
           {menu && call && (

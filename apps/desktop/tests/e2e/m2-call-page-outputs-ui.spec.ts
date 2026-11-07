@@ -7,7 +7,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { openWindow } from "./support/app";
+import { calls, openWindow } from "./support/app";
 import { banner, body, navigate, openSummary, section, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import * as O from "./support/outputs-world";
@@ -157,6 +157,24 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     if (!real) await page.clock.runFor(400);
     await expect(failed).toContainText(real ? "Scripted action item" : "Writing");
     expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"] })]);
+  });
+
+  test("UI — happy path: the page is already visible when the Summary finishes — Summary ready is announced once, without a second announcement", async ({ page }) => {
+    await openWindow(page, "main", {
+      world: (w) => {
+        O.written(w);
+        O.setState(w, "summary", { type: "failed", code: "runtime_unavailable", local_fallback_available: true });
+        O.sectionOf(w, "summary").body_md = null;
+        O.outputsOf(w).status = "partially_failed";
+      },
+    });
+    await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+    await navigate(page, "summary");
+    await section(page, /^Summary/).getByRole("button", { name: "Try Again" }).click();
+    await expect(async () => {
+      const said = (await calls(page)).filter((c) => c.kind === "invoke" && c.name === "window_announce" && JSON.stringify(c.args).includes("Summary ready"));
+      expect(said).toHaveLength(1);
+    }).toPass();
   });
 
   test("UI — empty path: the next call is recording — opening the finished call's Summary still reads its outputs while the live call goes on", async ({ page }) => {
