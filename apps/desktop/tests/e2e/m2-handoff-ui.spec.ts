@@ -60,9 +60,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(page.getByRole("menu")).toContainText("Your Edit");
     await page.keyboard.press("Escape");
 
-    // the real core never marks an item owned by the user (is_you is always false there): Open is not its default, so click it
-    if (REAL) await region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" }).click();
-    else await page.keyboard.press("Meta+Enter");
+    await page.keyboard.press("Meta+Enter");
     expect(await sent(page, "handoff_edit")).toEqual([expect.objectContaining({ item_id: H.ITEM, prompt_md: "Fix the replay buffer overflow in the virtualised table." })]);
     await expect.poll(() => sent(page, "handoff_open")).toEqual([expect.objectContaining({ item_id: H.ITEM })]);
     await expect(region(page, "HD-R6")).toContainText(/Handed off to Claude Code · \w{3} \d{1,2} \d{1,2}:\d{2}/);
