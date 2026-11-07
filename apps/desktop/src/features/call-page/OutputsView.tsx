@@ -48,7 +48,9 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
   }, [bridge, callId, settled]);
 
   if (!call || !prefs) return null;
-  if (!outputs) return read?.state === "ERROR" ? <InlineBanner banner={{ id: "outputs-error", severity: "error", text: t("callpage.error"), actions: [{ label: t("action.try_again"), onAction: () => void loadOutputs(bridge, callId) }] }} /> : null;
+  // naming does not wait for the outputs: a call whose outputs cannot be read still names its speakers
+  const naming = <SummaryNamingPanel bridge={bridge} callId={callId} detail={{ call, audio_not_stored: extrasOf(callId)?.audio_not_stored ?? false }} />;
+  if (!outputs) return <>{naming}{read?.state === "ERROR" ? <InlineBanner banner={{ id: "outputs-error", severity: "error", text: t("callpage.error"), actions: [{ label: t("action.try_again"), onAction: () => void loadOutputs(bridge, callId) }] }} /> : null}</>;
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-sections
   const sections = orderSections(outputs.sections.flatMap((r) => mergeSection(r, sent[`${callId}/${r.kind}`], progress[`${callId}/${r.kind}`]) ?? []));
@@ -59,7 +61,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-return
     <div className="pc-sum" data-region="PC-R3" data-state={outputs.status}>
       {/* @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
-      <SummaryNamingPanel bridge={bridge} callId={callId} detail={{ call, audio_not_stored: extrasOf(callId)?.audio_not_stored ?? false }} />
+      {naming}
       {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
       {sections.map((s: Section) => (
         <OutputSection key={s.kind} bridge={bridge} call={call} section={s} prefs={prefs} writing={writing} onRegenerate={(local) => (s.state.type === "failed" ? again(s.kind, local) : openRegenerate([s.kind]))} />

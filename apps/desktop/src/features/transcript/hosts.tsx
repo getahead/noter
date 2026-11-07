@@ -365,9 +365,9 @@ function NamingPanel({ tr, audioKept }: { tr: ReturnType<typeof useTranscript>; 
   ) : null;
 }
 
-/** The call's speakers and every line, read once (no Channel): the first lines the naming rows quote. */
+/** The call's speakers and every line, read once (no Channel; the span ends at the protocol's u32 OffsetMs maximum): the first lines the naming rows quote. */
 export async function readNaming(bridge: Bridge, callId: string): Promise<{ speakers: SpeakerView[]; segments: SegmentView[] } | null> {
-  const [c, t] = await Promise.all([bridge.core.callGet({ call_id: callId }), bridge.core.transcriptSpan({ span: { call_id: callId, t0_ms: 0, t1_ms: Number.MAX_SAFE_INTEGER } })]);
+  const [c, t] = await Promise.all([bridge.core.callGet({ call_id: callId }), bridge.core.transcriptSpan({ span: { call_id: callId, t0_ms: 0, t1_ms: 0xffff_ffff } })]);
   return c.status === "ok" && t.status === "ok" ? { speakers: c.data.speakers, segments: t.data.segments } : null;
 }
 
