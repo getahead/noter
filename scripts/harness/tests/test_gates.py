@@ -259,6 +259,8 @@ class PerfGateTests(unittest.TestCase):
         self.assertIn("b (M0", report)
 
     def test_registry_scenarios_exist_for_the_current_milestone(self):
+        if not CFG["gates"]["perf"].get("enforced", True):
+            self.skipTest("perf is out of the gate (harness.toml [gates.perf].enforced = false, owner 24 Oct 2026)")
         errors, _ = perf_gate.coverage(CFG, perf_gate.perf_config())
         self.assertEqual(errors, [])
 
