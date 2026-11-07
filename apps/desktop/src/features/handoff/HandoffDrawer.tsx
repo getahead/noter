@@ -16,7 +16,7 @@ import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { clock, shortDay } from "../call-page/logic";
 import { useOutputs } from "../call-page/outputs-cache";
 import { closeInspector } from "../shell/inspector-override";
-import { cancel, copy, generate, load, open, setTarget, viewOf } from "./actions";
+import { cancel, copy, generate, load, open, setTarget } from "./actions";
 import { copyEnabled, drawerState, footer, launchLine, noMapping, openDisabledReason, openLabel, promptOf, schemeHelp, toolLabel, type DrawerState } from "./controls";
 import { patchLocal, useLocal, type Local } from "./local";
 import { PromptEditor } from "./PromptEditor";

@@ -72,7 +72,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(region(page, "HD-R5")).toContainText(/No Claude Code link handler found\. Noter will open iTerm and run claude in .+; macOS asks once to allow Automation\./);
     await region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" }).click();
     await expect(region(page, "HD-R6")).toContainText("Opened in iTerm · item marked Handed off");
-    if (REAL) expect(JSON.stringify(await H.nativeLog(page))).toContain("iterm");
+    expect(JSON.stringify(await H.nativeLog(page))).toContain("iterm");
   });
 
   test("UI — error path: Automation denied — Couldn't open Claude Code · use Copy Prompt, Copy Prompt says Copied and puts the prompt on the clipboard", async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" }).click();
     expect(await sent(page, "handoff_copy")).toEqual([expect.objectContaining({ item_id: H.ITEM })]);
     await expect(region(page, "HD-R7")).toContainText("Copied");
-    if (REAL) expect(JSON.stringify(await H.nativeLog(page))).toContain("clipboard");
+    expect(JSON.stringify(await H.nativeLog(page))).toContain("clipboard");
   });
 
   test("UI — error path: No repository mapped — No repository mapped for VSTOR · Add Mapping…, Open disabled and Copy Prompt enabled", async ({ page }) => {

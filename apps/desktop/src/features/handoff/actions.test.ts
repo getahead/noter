@@ -1,5 +1,5 @@
 // The handoff commands against the real bridge and the fake core: what each sends, what the drawer then shows and keeps.
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CommandName, ErrorCode, HandoffView } from "../../core/bindings";
