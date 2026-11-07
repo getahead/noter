@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.21.0](https://github.com/getahead/noter/compare/v0.20.0...v0.21.0) (2026-11-07)
+
+
+### Features
+
+* **contract:** archive old-vs-new text in spanpreview and the transcript_upgraded case ([#359](https://github.com/getahead/noter/issues/359)) ([ee80fa3](https://github.com/getahead/noter/commit/ee80fa33d4a1fa8444f92a76d73bf24c5ce18127))
+* **harness:** advance_clock control moves the core clock ([#360](https://github.com/getahead/noter/issues/360)) ([21e25cd](https://github.com/getahead/noter/commit/21e25cd6df7afe8857d7f7c0cdea43d4fe1dbb21))
+* **knowledge:** document hits in search through the source policy ([#362](https://github.com/getahead/noter/issues/362)) ([7f71fbd](https://github.com/getahead/noter/commit/7f71fbdef28d895099708863a9cf8deebdf7eb89))
+* **knowledge:** real indexed-MCP transport over the egress gate with OAuth ([#376](https://github.com/getahead/noter/issues/376)) ([b319a20](https://github.com/getahead/noter/commit/b319a201a0f4a9b9e82b19adbb61afe67038e670))
+* **mcp:** cloud result gate, staged pins and corrections, and the router's tool server ([#356](https://github.com/getahead/noter/issues/356)) ([f0628cb](https://github.com/getahead/noter/commit/f0628cbab031ea3c1d8a6cf56271a569c06d4624))
+* **retrieval:** ask threads, cited streamed answers, stop and delete ([#361](https://github.com/getahead/noter/issues/361)) ([7b944ab](https://github.com/getahead/noter/commit/7b944ab9f844de1c65d2dc98947516ee794f4392))
+* **retrieval:** topics, post-call attachment and Ask tool refinement ([#375](https://github.com/getahead/noter/issues/375)) ([fc666a4](https://github.com/getahead/noter/commit/fc666a4ed8e1531d33b5f14fe9fafb01715cb0b3))
+* **ui:** show/hide archive changes diff and archive-upgraded/pending evidence (2.17 archive) ([#369](https://github.com/getahead/noter/issues/369)) ([3419df0](https://github.com/getahead/noter/commit/3419df0abd8b09fb919d846f2f2e7f997897fd8c))
+* **ui:** trace the outputs notification flow steps (2.18 gaps) ([#358](https://github.com/getahead/noter/issues/358)) ([d18a641](https://github.com/getahead/noter/commit/d18a641259e30ece970e793ebc28b6bc2cb11292))
+
+
+### Bug fixes
+
+* **ui:** inspector screenshots, Share/(i) kept together, deletion day in the Transcript header (2.17 gaps) ([#357](https://github.com/getahead/noter/issues/357)) ([d544ed7](https://github.com/getahead/noter/commit/d544ed7e94fb849dd6da22e668ae83b4a2c5a29a))
+
 ## [0.20.0](https://github.com/getahead/noter/compare/v0.19.0...v0.20.0) (2026-11-07)
 
 
