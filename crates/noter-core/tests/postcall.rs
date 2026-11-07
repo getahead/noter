@@ -480,6 +480,18 @@ async fn item_sections_list_their_items_and_suggested_ones_wait_for_review() {
         .iter()
         .all(|s| s.items.iter().all(|i| i.id != gone.id)));
     assert_eq!(after.review_waiting as usize, suggested - 1);
+    // It counts as suppressed in its own section only: a regeneration does not suggest it again.
+    let home = after
+        .sections
+        .iter()
+        .filter(|s| s.suppressed_count > 0)
+        .map(|s| (s.kind, s.suppressed_count))
+        .collect::<Vec<_>>();
+    let kind = match gone.kind {
+        ItemKind::Decision => SectionKind::Decisions,
+        _ => SectionKind::ActionItems,
+    };
+    assert_eq!(home, vec![(kind, 1)]);
 }
 
 async fn edit(
