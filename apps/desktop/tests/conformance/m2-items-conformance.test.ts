@@ -42,6 +42,13 @@ describe("items_list and item_get", () => {
     expect(Array.isArray(detail.history)).toBe(true);
     expect(refused(await main.itemGet({ item_id: "itm_nobody" })).code).toBe("not_found");
   });
+
+  it("item_get marks an item owned by the user as yours and one owned by someone else as not", async () => {
+    const mine = await get("itm_token");
+    expect(mine.owner?.is_you).toBe(true);
+    expect(mine.owed).toBe("by_you");
+    expect((await get("itm_spec")).owner?.is_you).toBe(false);
+  });
 });
 
 describe("item mutations", () => {
