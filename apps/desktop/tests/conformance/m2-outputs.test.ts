@@ -117,7 +117,6 @@ it("Use Local Model (regenerate with local) makes the local model the section's 
   expect(after.sections.filter((x) => x.kind !== "summary").every((x) => x.writer?.runtime !== "local")).toBe(true);
 });
 
-// @cpt-flow:cpt-noter-flow-ui-call-page-outputs-regenerate:p1
 it("a rejected suggestion leaves its section and counts as suppressed in that section only, on both cores", async () => {
   s = openScenario({
     alsoRecord: exercised,
