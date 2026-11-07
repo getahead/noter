@@ -16,6 +16,12 @@ const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
 const share = (page: Page) => toolbar(page).getByRole("button", { name: /^Share|^Copied/ });
 const menu = (page: Page) => page.getByRole("menu");
 
+/** The shortcuts live on the toolbar's Share control and read the loaded outputs: press them only once both are there. */
+const shortcutsReady = async (page: Page) => {
+  await expect(share(page)).toBeVisible();
+  await expect(body(page)).toBeVisible();
+};
+
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
   test("UI — happy path: Summary meta line, the four sections, Edit, ⌘Return, Edited badge and Your Edit in the version menu", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
@@ -215,6 +221,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
   test("UI — happy path: ⌘⇧C copies for Slack without opening the menu", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
     await openSummary(page, call);
+    await shortcutsReady(page);
     await page.keyboard.press("Meta+Shift+KeyC");
     await expect(menu(page)).toHaveCount(0);
     // the menu never opens, so nothing above waits for the invoke: poll until the core has been asked
@@ -225,6 +232,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
   test("UI — other path: Export to a folder — ⌘E, the sheet with Scope: Whole call, tick Transcript, Export…, Exported to <path> with Show in Finder", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
     await openSummary(page, call);
+    await shortcutsReady(page);
     await page.keyboard.press("Meta+KeyE");
     const sheet = page.getByRole("dialog", { name: /Export/ });
     await expect(sheet).toContainText("Scope: Whole call");
@@ -246,6 +254,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
   test("UI — other path: Export needs one content checkbox, and a cancelled save panel leaves no Exported status", async ({ page }) => {
     const { steer, call } = await O.openOutputs(page, "written");
     await openSummary(page, call);
+    await shortcutsReady(page);
     await page.keyboard.press("Meta+KeyE");
     const sheet = page.getByRole("dialog", { name: /Export/ });
     await sheet.getByText("Summary and items", { exact: true }).click();
@@ -253,6 +262,8 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await sheet.getByText("Summary and items", { exact: true }).click();
     await steer.failNext("calls_export", "cancelled");
     await sheet.getByRole("button", { name: "Export…" }).click();
+    await expect.poll(() => sent(page, "calls_export")).toHaveLength(1); // the core has answered (cancelled) before we look for a status
+    await expect(sheet).toHaveCount(0);
     await expect(toolbar(page)).not.toContainText("Exported to");
     await expect(page.getByRole("button", { name: "Show in Finder" })).toHaveCount(0);
   });
