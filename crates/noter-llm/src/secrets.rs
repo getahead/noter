@@ -43,7 +43,7 @@ pub struct KeychainLocked;
 pub trait SecretStore: Send + Sync {
     fn get(&self, account: &str) -> Result<Option<Secret>, KeychainLocked>;
     fn set(&self, account: &str, secret: &Secret) -> Result<(), KeychainLocked>;
-    /// For `api_key_remove` (M3); no M2 command calls it.
+    /// For `api_key_remove`.
     fn remove(&self, account: &str) -> Result<(), KeychainLocked>;
 }
 

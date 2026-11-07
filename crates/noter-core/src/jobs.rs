@@ -99,6 +99,7 @@ impl Core {
             Arc::new(crate::models::DownloadJob(Arc::downgrade(self))),
         );
         crate::postcall::register(self);
+        crate::credentials::register(self);
         if let Err(e) = self.jobs.start() {
             self.log(object(json!({
                 "level": "error", "module": "jobs", "message": e.message

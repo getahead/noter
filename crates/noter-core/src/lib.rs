@@ -6,8 +6,10 @@ mod accounts;
 mod app;
 mod archive;
 mod audio;
+mod audit;
 mod capture;
 mod chunks;
+mod credentials;
 mod first_run;
 mod glossary;
 mod handoff;
@@ -62,8 +64,8 @@ pub use noter_jobs::{PowerSource, Request, Trigger};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
 pub use noter_llm::{
-    Adapters, CliConfig, KeychainLocked, Llm, MemorySecrets, OllamaConfig, Scripted, Secret,
-    SecretStore,
+    AccountCli, Adapters, CliAccounts, CliConfig, KeychainLocked, Llm, MemorySecrets, NoAccountCli,
+    OllamaConfig, Scripted, ScriptedAccountCli, Secret, SecretStore, ToolScript,
 };
 use noter_protocol::ipc::Sink;
 pub use notify::{Notification, NotificationKind};
@@ -127,6 +129,9 @@ pub struct CoreDeps {
     pub llm: Adapters,
     /// API keys (the Keychain in the app, memory in the harness and tests).
     pub secrets: Arc<dyn SecretStore>,
+    /// Claude Code, Codex and Ollama as accounts and installs (the pinned CLIs in the app, a
+    /// scripted one in the harness and tests, TL-32); nothing is installed until the host sets it.
+    pub account_cli: Arc<dyn AccountCli>,
     /// Whether the Mac is on battery, for the jobs that do not run on it (mains power if unset).
     pub power: Arc<dyn noter_jobs::PowerSource>,
     /// Save panel and the native asks to come (`NativeOps`); every panel cancels until set.
@@ -150,6 +155,7 @@ impl CoreDeps {
             surfaces: Arc::new(capture::NoSurfaces),
             llm: Adapters::none(),
             secrets: Arc::new(MemorySecrets::default()),
+            account_cli: Arc::new(NoAccountCli),
             power: Arc::new(jobs::AcPower),
             native_ops: Arc::new(native_ops::NoNativeOps),
         }
@@ -167,6 +173,11 @@ impl CoreDeps {
 
     pub fn with_secrets(mut self, secrets: Arc<dyn SecretStore>) -> Self {
         self.secrets = secrets;
+        self
+    }
+
+    pub fn with_account_cli(mut self, cli: Arc<dyn AccountCli>) -> Self {
+        self.account_cli = cli;
         self
     }
 
@@ -1485,6 +1496,61 @@ impl CoreApi for Core {
             "api_key_set",
         );
         self.accounts.settle(meta, provider, &candidate, verified)
+    }
+
+    async fn api_key_remove(
+        &self,
+        ctx: &CommandCtx,
+        args: KeyProviderArgs,
+    ) -> Result<AccountsView, CoreError> {
+        self.remove_key(ctx, args.provider).await
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-audit:p1
+    async fn audit_list(
+        &self,
+        _ctx: &CommandCtx,
+        args: AuditListArgs,
+    ) -> Result<Page<AuditEntry>, CoreError> {
+        self.audit_page(args)
+    }
+
+    async fn audit_export(
+        &self,
+        _ctx: &CommandCtx,
+        args: AuditExportArgs,
+    ) -> Result<ExportResult, CoreError> {
+        self.export_audit(args).await
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-storage:p1
+    async fn storage_move(
+        &self,
+        _ctx: &CommandCtx,
+        _args: StorageMoveArgs,
+    ) -> Result<JobAccepted, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-credentials-privacy-storage:p1:inst-storage-guard
+        // Q4 (20 Oct): the app stays unsandboxed and the engine sandboxed, so the move does not
+        // ship (TL-29).
+        Err(CoreError::new(ErrorCode::NotImplemented, "storage_move"))
+        // @cpt-end:cpt-noter-flow-core-credentials-privacy-storage:p1:inst-storage-guard
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-prepare:p1
+    async fn account_signin_prepare(
+        &self,
+        _ctx: &CommandCtx,
+        args: AccountProviderArgs,
+    ) -> Result<SignInPrepare, CoreError> {
+        self.signin_prepare(args.provider).await
+    }
+
+    async fn cli_install(
+        &self,
+        _ctx: &CommandCtx,
+        args: CliInstallArgs,
+    ) -> Result<JobAccepted, CoreError> {
+        self.queue_install(args.tool)
     }
 
     // @cpt-dod:cpt-noter-dod-core-ipc-host-snapshot:p1

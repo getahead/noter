@@ -17,7 +17,8 @@ use noter_core::{
     Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent,
     CaptureEvent, ChunkSink, ClipboardText, Clock, Core, CoreDeps, EnvironmentReading,
     EventEmitter, FetchError, LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices,
-    Placement, SaveKind, Scripted, Surfaces, SystemClock, TrayModel, Updater,
+    Placement, SaveKind, Scripted, ScriptedAccountCli, Surfaces, SystemClock, ToolScript,
+    TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -249,6 +250,8 @@ pub struct Harness {
     surfaces: Arc<ScriptedSurfaces>,
     /// The Keychain stand-in (TL-13).
     secrets: Arc<MemorySecrets>,
+    /// Claude Code, Codex and Ollama as accounts and installs (TL-32).
+    account_cli: ScriptedAccountCli,
     panel: Arc<ScriptedPanel>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
@@ -319,6 +322,7 @@ impl Harness {
         let surfaces = Arc::new(ScriptedSurfaces::default());
         let llm = Adapters::scripted(&options.llm_script.clone().unwrap_or_default());
         let secrets = Arc::new(MemorySecrets::default());
+        let account_cli = ScriptedAccountCli::new();
         let panel = Arc::new(ScriptedPanel {
             dir: dir.join("exports"),
             cancel_next: AtomicBool::new(false),
@@ -338,6 +342,7 @@ impl Harness {
         .with_surfaces(surfaces.clone())
         .with_llm(llm)
         .with_secrets(secrets.clone())
+        .with_account_cli(Arc::new(account_cli.clone()))
         .with_native_ops(panel.clone());
         let deps = if options.battery {
             deps.with_power(Arc::new(OnBattery))
@@ -360,6 +365,7 @@ impl Harness {
             engine,
             surfaces,
             secrets,
+            account_cli,
             panel,
             world: Mutex::new(w.clone()),
             dir,
@@ -1456,6 +1462,22 @@ impl Controls for Harness {
                     };
                     noter_core::testing::llm_run(&self.core, skill, items).await
                 }
+                // `{ tool, installed?, path?, version?, supported?, identity?, login_identity?,
+                // install?: { fail?, delay_ms?, version? }, login?: { url?, code?, outcome?,
+                // delay_ms? } }`: replaces what the scripted CLI of `tool` (`claude_code`,
+                // `codex`, `ollama`) is, answers and does (TL-32). Unset fields are the defaults:
+                // not installed, supported, signed out, installs `1.0.0`, signs in at once.
+                "account_cli" => {
+                    let script: ToolScript = parse(
+                        args,
+                        "harness.account_cli needs { tool, installed?, path?, version?, supported?, identity?, login_identity?, install?, login? }",
+                    )?;
+                    self.account_cli.set(script);
+                    Ok(json!({}))
+                }
+                // `{}` → `{ calls }`: the installs and sign-ins the scripted CLIs ran, oldest
+                // first (`install:ClaudeCode`, `login:Claude`).
+                "account_cli_log" => Ok(json!({ "calls": self.account_cli.log() })),
                 // `{ locked }`: the Keychain stand-in fails every access while locked.
                 "keychain" => {
                     self.secrets
