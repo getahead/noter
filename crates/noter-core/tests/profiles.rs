@@ -26,17 +26,6 @@ impl EventEmitter for Events {
     }
 }
 
-impl Events {
-    fn named(&self, name: &str) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(e, _)| *e == name);
-        *all = kept;
-        taken.into_iter().map(|(_, p)| p).collect()
-    }
-}
-
 struct Moving(AtomicI64);
 
 impl Clock for Moving {
@@ -127,18 +116,6 @@ fn person(id: &str, name: &str) -> Insert {
     )
 }
 
-fn alias(id: &str, person: &str, alias: &str, norm: &str) -> Insert {
-    row(
-        "person_aliases",
-        &[
-            ("id", json!(id)),
-            ("person_id", json!(person)),
-            ("alias", json!(alias)),
-            ("alias_norm", json!(norm)),
-        ],
-    )
-}
-
 fn part(call_id: &str, person: &str) -> Insert {
     row(
         "call_participants",
@@ -185,23 +162,6 @@ fn item(id: &str, call_id: &str, kind: &str, owner: Option<&str>) -> Insert {
     )
 }
 
-fn segment(id: &str, call_id: &str, speaker: &str, t0: i64) -> Insert {
-    row(
-        "segments",
-        &[
-            ("id", json!(id)),
-            ("call_id", json!(call_id)),
-            ("speaker_id", json!(speaker)),
-            ("channel", json!("sys")),
-            ("t0_ms", json!(t0)),
-            ("t1_ms", json!(t0 + 4_000)),
-            ("text", json!("hello there")),
-            ("text_norm", json!("hello there")),
-            ("pass", json!("live")),
-        ],
-    )
-}
-
 fn archive(id: &str, call_id: &str, person: Option<&str>, n: i64) -> Insert {
     row(
         "speakers",
@@ -240,7 +200,7 @@ fn voice(hot: usize, tilt: f32) -> Vec<f32> {
 fn args(person: &str, from: Option<&str>) -> VoiceProfileArgs {
     VoiceProfileArgs {
         person_id: PersonId::new(person),
-        from_speaker: from.map(|s| SpeakerId::new(s)),
+        from_speaker: from.map(SpeakerId::new),
     }
 }
 
