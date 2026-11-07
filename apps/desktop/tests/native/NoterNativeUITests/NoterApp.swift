@@ -77,21 +77,26 @@ class NoterTestCase: XCTestCase {
         return condition()
     }
 
-    /// Windows of the app on screen, read from the window server. XCUITest's queries can time out while the app
-    /// hides itself for presenting, so that state is read here (the menu bar extra's own window is too small to count).
-    func onScreenWindowCount() -> Int {
+    /// Windows of the app on screen, read from the window server as (number, description). XCUITest's queries can
+    /// time out while the app hides itself for presenting, so that state is read here. The menu bar extra's own
+    /// window is too small to count, and a window with no alpha is not on screen.
+    func onScreenWindows() -> [(number: Int, text: String)] {
         guard let path = ProcessInfo.processInfo.environment["NOTER_APP_PATH"],
               let id = Bundle(url: URL(fileURLWithPath: path))?.bundleIdentifier,
               let pid = NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.processIdentifier,
               let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]
-        else { return 0 }
-        return list.filter { window in
+        else { return [] }
+        return list.compactMap { window in
             guard (window[kCGWindowOwnerPID as String] as? Int32) == pid,
-                  let bounds = (window[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0 as CFDictionary) })
-            else { return false }
-            return bounds.width >= 100 && bounds.height >= 60
-        }.count
+                  let number = window[kCGWindowNumber as String] as? Int,
+                  let bounds = (window[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0 as CFDictionary) }),
+                  bounds.width >= 100, bounds.height >= 60,
+                  (window[kCGWindowAlpha as String] as? Double ?? 1) > 0.01
+            else { return nil }
+            return (number, "#\(number) layer \(window[kCGWindowLayer as String] ?? "?") alpha \(window[kCGWindowAlpha as String] ?? "?") \(bounds)")
+        }
     }
+    func onScreenWindowCount() -> Int { onScreenWindows().count }
 
     /// Closes the menu with a second click: Escape does not reach a status menu.
     func closeMenu() {

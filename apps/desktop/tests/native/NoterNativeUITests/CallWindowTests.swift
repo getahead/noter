@@ -25,10 +25,12 @@ final class CallWindowTests: NoterTestCase {
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
         XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
-        XCTAssertGreaterThan(onScreenWindowCount(), 1, "the main window and the call window are on screen")
+        let shown = onScreenWindows().map(\.number)
+        XCTAssertGreaterThan(shown.count, 1, "the main window and the call window are on screen")
         hotkey("0")
-        // Hidden: no window of the app is on screen (read from the window server: a query on a hiding app can time out).
-        XCTAssertTrue(waitUntil(10) { onScreenWindowCount() == 0 }, "Hide for Presenting leaves a window on screen")
+        // Hidden: none of the windows that were shown is on screen (read from the window server: a query on a hiding app can time out).
+        XCTAssertTrue(waitUntil(10) { onScreenWindows().allSatisfy { !shown.contains($0.number) } },
+                      "Hide for Presenting leaves a window on screen: \(onScreenWindows().map(\.text))")
         hotkey("0")
         XCTAssertTrue(waitUntil(10) { onScreenWindowCount() > 1 }, "the second press brings every surface back")
         XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
