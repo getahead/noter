@@ -39,9 +39,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-core-people`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-core-people`
 
-- [ ] `p4` - `cpt-noter-feature-core-people`
+- [x] `p4` - `cpt-noter-feature-core-people`
 
 ## 1. Feature Context
 
@@ -50,6 +50,8 @@ design: docs/DESIGN-core.md
 The people service builds Person pages from calls and items, keeps aliases and speaker links, and merges identities as undoable batches. Voice profiles require an explicit opt-in for each person, stay encrypted on this Mac and can be deleted without removing existing names. Behaviour metrics are computed only from enablement onward, never back-computed (D5).
 
 > **M3 decisions (Backend Teamlead, 7 Nov 2026).** `0010_people.sql` in `noter-core` creates `people` (with the single seeded `is_you` row `per_you`), `person_aliases`, `call_participants` and `voice_profiles`, columns as the `cpt-noter-dbtable-*` entries (TL-34). It replaces the M2 chip shortcuts: `items::owner_chip` and `speakers::person` read `people`, `PersonRef::New` inserts a `people` row, and `people_merge` and `person_delete` rewrite `speakers.person_id`, `items.owner_person_id` and `call_participants` (TL-39). The carry-forward steps (`inst-carry-*`, moved from 2.18) are called from `capture.rs`: `people::carry_start(call)` on the first segment of a call and `carry_end(call)` at stop, over `call_participants` (calendar attendees through `NativeServices` plus named speakers) (TL-39). The voice-profile key is the `SecretStore` account `voice-profile-key` (32 random bytes, created on the first profile); centroids are encrypted with an AEAD crate (`chacha20poly1305` or `aes-gcm`) and `apps/desktop/src-tauri/Cargo.lock` changes in the same PR (TL-33). After the archive install in `postcall.rs` the core calls `people::match_profiles(call)`: each archive speaker's 256-d centroid against opted-in, non-decayed profiles, cosine ≥ 0.75 with a margin over the runner-up, attendees first; a match sets `speakers.person_id` and `named_by = 'voice_profile'` through the writer and `last_used_at`, ambiguity stays unnamed with a suggestion, and decay is 90 days unused on the injected clock (TL-40).
+
+> **Delivered (#335 #343 #355 #366).** The migration is `0010_people.sql` (main took 0009 mid-flight). `person_aliases` and `call_participants` carry an `id` column because replay keys rows by id: a DESIGN-core delta, listed in the owner batch of `BE-STATUS.md`. `call_participants` is filled at call start (calendar attendees) and on naming. The 90-day decay story stands in with a backdated `voice_profiles.last_used_at`, because the harness has no movable clock for stories; the injected-clock proof is in `crates/noter-core/tests/profiles.rs`. The fake has gaps (alias search, merge moves and undo, centroid counts) that the story tests guard with `s.target`. The pages and identity DoDs are ticked with this change: their `@cpt-dod` markers (comment lines only) were missing in `people.rs` and are added here. Acceptance criterion 4 stays `[ ]` because no story test covers it, though its parts are unit-tested in `crates/noter-core/tests/people.rs`: overlapping-call deduplication and Undo (`merge_moves_every_reference_and_undo_restores_links_and_revs`) and a forced transaction failure (`a_failed_merge_transaction_moves_nothing`).
 
 ### 1.2 Purpose
 
@@ -261,7 +263,7 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 
 ### People and complete Person pages
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-people-pages`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-people-pages`
 
 The system **MUST** implement list, create, revision-guarded edits, normalized aliases and query-built Person pages. The unnamed queue uses real speaker relationships and the existing naming service; creating or naming a person never creates a profile. Metrics remain absent when disabled and never backfill earlier calls.
 
@@ -277,7 +279,7 @@ The system **MUST** implement list, create, revision-guarded edits, normalized a
 
 ### Merge and delete in one action
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-people-identity`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-people-identity`
 
 The system **MUST** merge every source reference as one undoable batch, retain aliases and profile opt-in, and preserve the unique You identity. Person deletion removes profiles and participation and unnames speakers everywhere without deleting their words. Neither deletion nor a stale in-flight match can recreate biometric data.
 

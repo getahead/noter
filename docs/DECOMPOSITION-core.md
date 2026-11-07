@@ -1285,9 +1285,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.23 People, identity and voice profiles - MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-core-people`
+- [x] `p4` - **ID**: `cpt-noter-feature-core-people`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-people.md](features/core/core-people.md)
+- **Milestone**: M3 · **Lane**: core · **Status**: IMPLEMENTED (#335 #343 #355 #366). FEATURE spec: [features/core/core-people.md](features/core/core-people.md)
 
 - **Purpose**: Person pages, aliases, merges, one-action deletion and opt-in encrypted voice profiles, with speaker matching against them.
 
@@ -1310,7 +1310,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Constraints Covered**:
 
-  - [ ] `p4` - `cpt-noter-constraint-core-local-data`
+  - `cpt-noter-constraint-core-local-data`
 
 - **Domain Model Entities**:
   - Person
@@ -1318,7 +1318,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-core-people`
+  - `cpt-noter-component-core-people`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `people_list`, `person_get`, `person_create`, `person_update`, `people_merge`, `person_delete`, `voice_profile_create`, `voice_profile_delete`
