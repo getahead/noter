@@ -532,12 +532,11 @@ impl<L: EngineLauncher> Lookups<'_, L> {
             noter_llm::audit_lookup(self.env.store, meta, (self.env.now)(), destination, request)
                 .map_err(Stop::from)
         });
-        let stopped = row.err();
-        let sent = stopped.is_none();
-        if stopped.is_some() {
-            *self.stopped.lock().unwrap_or_else(|p| p.into_inner()) = stopped;
-        }
-        sent
+        let Err(stop) = row else {
+            return true;
+        };
+        *self.stopped.lock().unwrap_or_else(|p| p.into_inner()) = Some(stop);
+        false
     }
 
     // A Keychain that refuses the renewed token leaves the old one: the next run signs in again.

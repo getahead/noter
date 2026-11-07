@@ -662,3 +662,68 @@ async fn the_gate_refuses_a_token_endpoint_off_the_authorization_server() {
     assert!(elsewhere.requests().is_empty());
     assert!(world.opened().is_empty(), "no browser for a refused flow");
 }
+
+#[tokio::test]
+async fn a_session_the_server_forgot_is_opened_again() {
+    let forgot = Arc::new(Mutex::new(true));
+    let once = forgot.clone();
+    let stub = mcp(true, move |method, _, r| {
+        if method != "resources/list" {
+            return None;
+        }
+        if std::mem::replace(&mut *lock(&once), false) {
+            return Some(StubResponse::status(404));
+        }
+        Some(rpc(id(r), json!({"resources": []})))
+    });
+    let audit = |_: &str, _: &[u8]| true;
+    let renewed = no_renewal();
+    let server = stub.url("/mcp");
+    let call = Call {
+        server: &server,
+        token: "t",
+        audit: &audit,
+        renewed: &renewed,
+    };
+    assert!(client().list(&call).await.unwrap().is_some());
+    let requests = stub.requests();
+    let initialized = requests
+        .iter()
+        .filter(|r| r.json()["method"] == "initialize");
+    assert_eq!(initialized.count(), 2);
+}
+
+#[tokio::test]
+async fn an_authorization_server_without_registration_or_s256_is_refused() {
+    for metadata in [
+        json!({"authorization_endpoint": "/authorize", "token_endpoint": "/token"}),
+        json!({"authorization_endpoint": "/authorize", "token_endpoint": "/token",
+            "registration_endpoint": "/register", "code_challenge_methods_supported": ["plain"]}),
+    ] {
+        // The server is its own authorization server: no protected-resource metadata.
+        let port: Arc<Mutex<u16>> = Arc::default();
+        let base = port.clone();
+        let stub = StubServer::start(move |r| {
+            let base = format!("http://127.0.0.1:{}", *lock(&base));
+            let mut absolute = metadata.clone();
+            for v in absolute.as_object_mut().unwrap().values_mut() {
+                if let Some(path) = v.as_str() {
+                    *v = json!(format!("{base}{path}"));
+                }
+            }
+            match r.path.as_str() {
+                "/.well-known/oauth-authorization-server" => StubResponse::json(200, absolute),
+                _ => StubResponse::status(401),
+            }
+        });
+        *lock(&port) = stub.port;
+        let audit = |_: &str, _: &[u8]| true;
+        let opened = Arc::new(Mutex::new(0));
+        let count = opened.clone();
+        let client = McpClient::new(Arc::new(move |_: &str| *lock(&count) += 1));
+        let e = client.sign_in(&stub.url("/mcp"), &audit).await.err();
+        assert_eq!(e, Some(McpClientError::Invalid));
+        assert_eq!(*lock(&opened), 0);
+        assert!(stub.requests().iter().all(|r| r.path != "/register"));
+    }
+}

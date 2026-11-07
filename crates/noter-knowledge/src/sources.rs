@@ -278,12 +278,11 @@ pub async fn add_mcp(
             let unaudited: Mutex<Option<CoreError>> = Mutex::new(None);
             let audit = |destination: &str, request: &[u8]| {
                 let row = noter_llm::audit_lookup(store, meta.clone(), now(), destination, request);
-                let failed = row.err();
-                let sent = failed.is_none();
-                if failed.is_some() {
-                    *unaudited.lock().unwrap_or_else(|p| p.into_inner()) = failed;
-                }
-                sent
+                let Err(e) = row else {
+                    return true;
+                };
+                *unaudited.lock().unwrap_or_else(|p| p.into_inner()) = Some(e);
+                false
             };
             let token = mcp.oauth(&server, &audit).await.map_err(|e| {
                 let failed = unaudited.lock().unwrap_or_else(|p| p.into_inner()).take();
