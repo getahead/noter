@@ -653,61 +653,79 @@ fn items_of(
     Ok(items)
 }
 
-/// `a.person_id`, or the person a speaker named `a.name` stands for. shortcut: no `people`
-/// table before 2.23, so a person is the `person_id` of the calls' named speakers and the
-/// aliases are the other names those speakers carried; 2.23 resolves names and aliases itself.
+/// `a.person_id`, or the person whose display name or alias is `a.name` (case, spacing and ё
+/// folded). A cloud run only finds people who took part in a call it may read, and sees only
+/// those calls.
 fn person_of(
     c: &Connection,
     a: &GetPersonInput,
     cloud: bool,
 ) -> noter_db::rusqlite::Result<Result<Value, Rpc>> {
-    let fold = |s: &str| s.trim().to_lowercase().replace('ё', "е");
+    let person: Option<(String, String, Option<String>)> = match (&a.person_id, &a.name) {
+        (Some(id), _) => c
+            .query_row(
+                "SELECT id, display_name, role FROM people WHERE id = ?1",
+                [id.as_str()],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()?,
+        (None, Some(name)) => {
+            let wanted = crate::people::norm(name);
+            let people: Vec<(String, String, Option<String>)> = c
+                .prepare("SELECT id, display_name, role FROM people ORDER BY rowid")?
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<Result<_, _>>()?;
+            let by_alias: Option<String> = c
+                .query_row(
+                    "SELECT person_id FROM person_aliases WHERE alias_norm = ?1",
+                    [&wanted],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            people.into_iter().find(|p| {
+                by_alias.as_deref() == Some(p.0.as_str()) || crate::people::norm(&p.1) == wanted
+            })
+        }
+        (None, None) => None,
+    };
+    let Some((id, display_name, role)) = person else {
+        return Ok(Err(MISSING));
+    };
     let sensitive = if cloud {
         "AND c.privacy_class = 'normal'"
     } else {
         ""
     };
-    let rows: Vec<(String, String, String)> = c
+    let recent_calls: Vec<CallId> = c
         .prepare(&format!(
-            "SELECT s.person_id, COALESCE(s.name, s.label), c.id FROM speakers s
-             JOIN calls c ON c.id = s.call_id WHERE s.person_id IS NOT NULL {sensitive}
-             ORDER BY c.started_at DESC, s.rowid DESC"
+            "SELECT c.id FROM calls c WHERE c.id IN
+               (SELECT call_id FROM call_participants WHERE person_id = ?1
+                UNION SELECT call_id FROM speakers WHERE person_id = ?1) {sensitive}
+             ORDER BY c.started_at DESC LIMIT {MAX_RECENT_CALLS}"
         ))?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .query_map([&id], |r| Ok(CallId::new(r.get::<_, String>(0)?)))?
         .collect::<Result<_, _>>()?;
-    let wanted = match (&a.person_id, &a.name) {
-        (Some(id), _) => rows.iter().find(|r| r.0 == id.as_str()),
-        (None, Some(name)) => rows.iter().find(|r| fold(&r.1) == fold(name)),
-        (None, None) => None,
-    };
-    let Some((person, display, _)) = wanted else {
+    if cloud && recent_calls.is_empty() {
         return Ok(Err(MISSING));
-    };
-    let mut aliases: Vec<String> = vec![];
-    let mut calls: Vec<CallId> = vec![];
-    for (_, name, call) in rows.iter().filter(|r| r.0 == *person) {
-        if name != display && !aliases.contains(name) {
-            aliases.push(name.clone());
-        }
-        let call = CallId::new(call.clone());
-        if !calls.contains(&call) && calls.len() < MAX_RECENT_CALLS {
-            calls.push(call);
-        }
     }
-    let items = items_of(
+    let aliases = c
+        .prepare("SELECT alias FROM person_aliases WHERE person_id = ?1 ORDER BY rowid")?
+        .query_map([&id], |r| r.get(0))?
+        .collect::<Result<_, _>>()?;
+    let open_items = items_of(
         c,
         &format!("i.owner_person_id = ? AND {OPEN}"),
-        vec![Sql::Text(person.clone())],
+        vec![Sql::Text(id.clone())],
         cloud,
         |_| true,
     )?;
     Ok(Ok(to_json(&GetPersonOutput {
-        person_id: PersonId::new(person.clone()),
-        display_name: display.clone(),
-        role: None,
+        person_id: PersonId::new(id),
+        display_name,
+        role,
         aliases,
-        recent_calls: calls,
-        open_items: items,
+        recent_calls,
+        open_items,
     })))
 }
 
@@ -731,7 +749,9 @@ mod tests {
         noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
             .unwrap()
             .execute_batch(
-                "INSERT INTO calls (id, rev, started_at, title, call_type, status, mode_used, privacy_class) VALUES
+                "INSERT INTO people (id, rev, display_name, short_name) VALUES
+                   ('p_n', 1, 'Nina', 'Nina'), ('p_s', 1, 'Sam', 'Sam');
+                 INSERT INTO calls (id, rev, started_at, title, call_type, status, mode_used, privacy_class) VALUES
                    ('c_n', 1, 1, 'N', 'planning', 'ready', 'cloud', 'normal'),
                    ('c_s', 1, 2, 'S', 'planning', 'ready', 'local_only', 'sensitive');
                  INSERT INTO speakers (id, call_id, label, channel, person_id, name, pass) VALUES

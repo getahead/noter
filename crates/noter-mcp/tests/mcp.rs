@@ -44,6 +44,10 @@ INSERT INTO calls (id, rev, started_at, ended_at, title, call_type, status, mode
   ('call_o', 1, 1792000000000, 1792000600000, 'Older', 'planning', 'ready', 'cloud', 'normal'),
   ('call_a', 1, 1792130000000, 1792130600000, 'Planning', 'planning', 'ready', 'cloud', 'normal'),
   ('call_s', 1, 1792135000000, 1792135600000, 'Secret', 'planning', 'ready', 'local_only', 'sensitive');
+INSERT INTO people (id, rev, display_name, short_name, role) VALUES
+  ('person_anna', 1, 'Anna', 'Anna', 'Engineer'),
+  ('person_boris', 1, 'Boris', 'Boris', NULL);
+INSERT INTO person_aliases (id, person_id, alias, alias_norm) VALUES ('al_1', 'person_anna', 'Аня', 'аня');
 INSERT INTO speakers (id, call_id, label, n, channel, person_id, named_by, name, pass) VALUES
   ('sp_o', 'call_o', 'spk_1', 1, 'sys', 'person_anna', 'you', 'Аня', 'live'),
   ('sp_a', 'call_a', 'spk_1', 1, 'sys', 'person_anna', 'you', 'Anna', 'live'),
@@ -318,6 +322,7 @@ async fn every_slice_one_tool_round_trips() {
         .unwrap();
     assert_eq!(by_id["display_name"], "Anna");
     assert_eq!(by_id["aliases"], json!(["Аня"]));
+    assert_eq!(by_id["role"], "Engineer");
     assert_eq!(by_id["recent_calls"], json!(["call_a", "call_o"]));
     let open: Vec<&str> = by_id["open_items"]
         .as_array()

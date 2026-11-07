@@ -2327,6 +2327,7 @@ async fn native_launch_environment_drives_denial_copy_and_terminal_fallback() {
         }
         r.finish().await;
     }
+}
 
 // TL-38: `harness.mcp_run` registers a run as the router will and serves the core socket, so a
 // conformance test can speak to it; `harness.mcp_close` revokes it.
