@@ -24,11 +24,13 @@ final class CallWindowTests: NoterTestCase {
         launch()
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
-        XCTAssertTrue(window("Noter").exists)
+        XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(onScreenWindowCount(), 1, "the main window and the call window are on screen")
         hotkey("0")
-        XCTAssertTrue(callWindow.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(window("Noter").waitForNonExistence(timeout: 5))
+        // Hidden: no window of the app is on screen (read from the window server: a query on a hiding app can time out).
+        XCTAssertTrue(waitUntil(10) { onScreenWindowCount() == 0 }, "Hide for Presenting leaves a window on screen")
         hotkey("0")
+        XCTAssertTrue(waitUntil(10) { onScreenWindowCount() > 1 }, "the second press brings every surface back")
         XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
     }

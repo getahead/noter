@@ -3,6 +3,7 @@
 // harness's scripted Mac, engine and models (the launch hooks, NOTER_TEST_FIXTURE): no model, permission or call
 // of the machine it runs on is needed.
 // Story tests are named after the DESIGN story they prove (`cpt-noter-seq-…` with underscores, docs/HARNESS.md).
+import CoreGraphics
 import XCTest
 
 class NoterTestCase: XCTestCase {
@@ -56,9 +57,40 @@ class NoterTestCase: XCTestCase {
     func openMenu(file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         XCTAssertTrue(statusItem.waitForExistence(timeout: 10), "the menu bar extra is not in the menu bar", file: file, line: line)
         let menu = statusItem.menus.firstMatch
-        if !isOpen(menu) { statusItem.click() }
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), "the menu did not open", file: file, line: line)
+        // A click can be lost while the menu bar settles, and a closed menu can stay in the tree with an empty
+        // frame: click again (only while it is not drawn) and wait for it to be open, not merely present.
+        for _ in 0..<3 {
+            if !isOpen(menu) { statusItem.click() }
+            if waitUntil(5, { isOpen(menu) }) { break }
+        }
+        XCTAssertTrue(isOpen(menu), "the menu did not open", file: file, line: line)
         return menu
+    }
+
+    /// Polls `condition` until it holds or `timeout` seconds pass: a bounded wait that issues no UI query of its own.
+    func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if condition() { return true }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        return condition()
+    }
+
+    /// Windows of the app on screen, read from the window server. XCUITest's queries can time out while the app
+    /// hides itself for presenting, so that state is read here (the menu bar extra's own window is too small to count).
+    func onScreenWindowCount() -> Int {
+        guard let path = ProcessInfo.processInfo.environment["NOTER_APP_PATH"],
+              let id = Bundle(url: URL(fileURLWithPath: path))?.bundleIdentifier,
+              let pid = NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.processIdentifier,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]
+        else { return 0 }
+        return list.filter { window in
+            guard (window[kCGWindowOwnerPID as String] as? Int32) == pid,
+                  let bounds = (window[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0 as CFDictionary) })
+            else { return false }
+            return bounds.width >= 100 && bounds.height >= 60
+        }.count
     }
 
     /// Closes the menu with a second click: Escape does not reach a status menu.
