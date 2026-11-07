@@ -10,7 +10,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
@@ -254,6 +254,9 @@ pub struct Harness {
     account_cli: ScriptedAccountCli,
     /// The indexed MCP servers (TL-42); none until `harness.mcp_server` adds one.
     mcp: Arc<ScriptedMcp>,
+    /// The core's clock and the milliseconds `harness.advance_clock` added to it.
+    clock: Arc<dyn Clock>,
+    skew: Arc<AtomicI64>,
     panel: Arc<ScriptedPanel>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
@@ -298,11 +301,13 @@ impl Harness {
         models
             .place(&dir.join("models"), &w.app.setup.models)
             .map_err(|e| e.to_string())?;
-        let clock: Arc<dyn Clock> = if options.fixed_clock {
+        let skew = Arc::new(AtomicI64::new(0));
+        let base: Arc<dyn Clock> = if options.fixed_clock {
             Arc::new(Fixed(w.now))
         } else {
             Arc::new(SystemClock)
         };
+        let clock: Arc<dyn Clock> = Arc::new(Skewed(base, skew.clone()));
         // Boot and seeding go through the core's commands; a window's snapshot already holds their
         // result, so their events stay off the wire (`seeding` is cleared before `Ok`).
         let seeding = Arc::new(AtomicBool::new(true));
@@ -372,6 +377,8 @@ impl Harness {
             secrets,
             account_cli,
             mcp,
+            clock: clock.clone(),
+            skew,
             panel,
             world: Mutex::new(w.clone()),
             dir,
@@ -1520,6 +1527,18 @@ impl Controls for Harness {
                     self.mcp.set(&s.server, s.script);
                     Ok(json!({}))
                 }
+                // `{ ms }` → `{ now }`: the core's clock jumps ahead (a sign-in left past its five
+                // minutes); timers stay on real time.
+                "advance_clock" => {
+                    let ms = args["ms"].as_i64().filter(|ms| *ms >= 0).ok_or_else(|| {
+                        CoreError::new(
+                            ErrorCode::InvalidInput,
+                            "harness.advance_clock needs { ms >= 0 }",
+                        )
+                    })?;
+                    self.skew.fetch_add(ms, Ordering::SeqCst);
+                    Ok(json!({ "now": self.clock.now().0 }))
+                }
                 // `{ locked }`: the Keychain stand-in fails every access while locked.
                 "keychain" => {
                     self.secrets
@@ -1562,6 +1581,15 @@ fn nanos() -> u128 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos())
+}
+
+/// The scenario's clock plus what `harness.advance_clock` added.
+struct Skewed(Arc<dyn Clock>, Arc<AtomicI64>);
+
+impl Clock for Skewed {
+    fn now(&self) -> TimestampMs {
+        TimestampMs(self.0.now().0 + self.1.load(Ordering::SeqCst))
+    }
 }
 
 struct Fixed(TimestampMs);
