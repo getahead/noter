@@ -547,10 +547,9 @@ async fn update_guards_the_rev_and_applies_only_present_fields() {
         done.person.display_name, "Dmitri Orlov",
         "absent fields stay"
     );
-    assert_eq!(
-        done.person.aliases,
-        vec!["Dima".to_string(), "Дима".to_string()]
-    );
+    let mut aliases = done.person.aliases.clone();
+    aliases.sort();
+    assert_eq!(aliases, vec!["Dima".to_string(), "Дима".to_string()]);
     assert_eq!(events.named(event_names::ENTITY_CHANGED).len(), 1);
     let stale = update(&core, "per_dima", 1, patch).await.unwrap_err();
     assert_eq!(stale.code, ErrorCode::Conflict);
@@ -898,4 +897,66 @@ async fn an_item_owner_chip_reads_the_person_row_and_you_own_by_you() {
     let mine = item_of(&core, "itm_you").await;
     assert!(mine.owner.unwrap().is_you);
     assert_eq!(mine.owed, Owed::ByYou);
+}
+
+#[tokio::test]
+async fn a_person_page_lists_topics_of_their_calls_once_retrieval_has_made_the_table() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    world(&core);
+    exec(
+        dir.path(),
+        "CREATE TABLE topics (id TEXT PRIMARY KEY, rev INTEGER NOT NULL, name TEXT NOT NULL,
+           centroid BLOB, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL);
+         INSERT INTO topics VALUES ('top_drawer', 1, 'Drawer redesign', NULL, 1, 5);
+         UPDATE items SET topic_id = 'top_drawer' WHERE id IN ('itm_dima', 'itm_q');",
+    )
+    .unwrap();
+    let topics = get(&core, "per_dima").await.unwrap().topics;
+    assert_eq!(topics.len(), 1);
+    assert_eq!(topics[0].name, "Drawer redesign");
+    assert_eq!((topics[0].calls, topics[0].open_items), (1, 2));
+    assert_eq!(topics[0].last_seen, TimestampMs(5));
+}
+
+#[tokio::test]
+async fn a_rename_reaches_the_speakers_of_a_call_without_rewriting_text() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    world(&core);
+    exec(
+        dir.path(),
+        "UPDATE people SET short_name = 'Dmitri O.' WHERE id = 'per_dima'",
+    )
+    .unwrap();
+    let patch = PersonPatch {
+        display_name: Some("Dmitri Orlov-Smith".into()),
+        ..PersonPatch::default()
+    };
+    let renamed = update(&core, "per_dima", 1, patch).await.unwrap();
+    assert_eq!(
+        renamed.person.short_name, "Dmitri O.",
+        "a derived short name follows"
+    );
+    let detail = core
+        .call_get(
+            &ctx(),
+            CallIdArgs {
+                call_id: CallId::new("call_a"),
+            },
+        )
+        .await
+        .unwrap();
+    let names: Vec<String> = detail
+        .speakers
+        .iter()
+        .filter_map(|s| match &s.label {
+            SpeakerLabel::Person { person } => Some(person.display_name.clone()),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        names.contains(&"Dmitri Orlov-Smith".to_string()),
+        "{names:?}"
+    );
 }

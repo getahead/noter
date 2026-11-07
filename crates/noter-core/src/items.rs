@@ -110,33 +110,18 @@ fn sql_of(v: &Value) -> Sql {
     }
 }
 
-/// A named speaker's chip: shortcut, no `people` table before library-people, so the name is
-/// the label the person's speaker row carries and nobody is the user yet.
+/// An item owner's chip, read from the person row; a person deleted since has no owner left,
+/// so a missing row only reads as the bare id.
 pub(crate) fn owner_chip(c: &Connection, person_id: &str) -> Db<PersonChip> {
-    let label: Option<String> = c
-        .query_row(
-            "SELECT COALESCE(name, label) FROM speakers WHERE person_id = ?1 ORDER BY rowid DESC LIMIT 1",
-            [person_id],
-            |r| r.get(0),
-        )
-        .optional()?;
-    let display = label.unwrap_or_else(|| person_id.to_string());
-    let words: Vec<&str> = display.split_whitespace().collect();
-    Ok(PersonChip {
-        id: PersonId::new(person_id),
-        short_name: match words.as_slice() {
-            [first, .., last] => format!("{first} {}.", last.chars().next().unwrap_or_default()),
-            _ => display.clone(),
-        },
-        initials: words
-            .iter()
-            .filter_map(|w| w.chars().next())
-            .take(2)
-            .collect::<String>()
-            .to_uppercase(),
-        display_name: display,
-        is_you: false,
-    })
+    Ok(
+        crate::people::chip_of(c, person_id)?.unwrap_or_else(|| PersonChip {
+            id: PersonId::new(person_id),
+            display_name: person_id.to_string(),
+            short_name: person_id.to_string(),
+            initials: String::new(),
+            is_you: false,
+        }),
+    )
 }
 
 fn spans_of(c: &Connection, item_id: &str) -> Db<Vec<TimeSpan>> {
@@ -178,8 +163,6 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
         })
         .transpose()?
         .flatten();
-    // shortcut: nobody is "you" before library-people, so an owned action item reads as owed
-    // to you and everything else as Other.
     let owed = match (&owner, kind) {
         (Some(o), ItemKind::ActionItem) if o.is_you => Owed::ByYou,
         (Some(_), ItemKind::ActionItem) => Owed::ToYou,
@@ -772,8 +755,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-review:p1:inst-review-edit
     }
 
-    /// The person an item may be owned by: shortcut, one a speaker row names, until
-    /// library-people; a new person cannot be made from here yet.
+    /// The person an item may be owned by: one in `people`; a new person cannot be made from here.
     fn known_person(&self, person: &PersonRef) -> Result<String, CoreError> {
         let PersonRef::Existing { person_id } = person else {
             return Err(invalid("owner", ValidationRule::InvalidFormat));
@@ -783,7 +765,7 @@ impl Core {
             let id = id.clone();
             self.store().read(move |c| {
                 c.query_row(
-                    "SELECT EXISTS (SELECT 1 FROM speakers WHERE person_id = ?1)",
+                    "SELECT EXISTS (SELECT 1 FROM people WHERE id = ?1)",
                     [id],
                     |r| r.get(0),
                 )
