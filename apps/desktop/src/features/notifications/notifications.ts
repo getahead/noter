@@ -12,10 +12,12 @@ export type Notification =
 /** NT-1, NT-2 and NT-3: a title and one line, no quote and no name of what was said. */
 export function notificationContent(n: Notification): { title: string; body: string } {
   switch (n.kind) {
+    // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-send
     case "summary_ready":
       return { title: t("notif.summary_ready"), body: t("notif.summary_ready_body", { call: n.call, items: t("notif.action_items", { count: n.actionItems }), decisions: t("notif.decisions", { count: n.decisions }) }) };
     case "summary_failed":
       return { title: t("notif.summary_failed"), body: t("notif.summary_failed_body", { call: n.call }) };
+    // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-send
     case "capture_problem":
       return n.problem === "system_audio_silent"
         ? { title: t("notif.system_audio_silent"), body: t("notif.system_audio_silent_body") }
