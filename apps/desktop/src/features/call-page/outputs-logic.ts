@@ -53,8 +53,14 @@ export function applyProgress(sections: OutputSection[], callId: string, e: Outp
 
 /** The section the page draws: the whole one the core sent last, else the read one, with the state progress reported since. */
 export function mergeSection(read: OutputSection | undefined, sent: OutputSection | undefined, progress: OutputsProgress | undefined): OutputSection | undefined {
+  // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-start
+  // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-ready
+  // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-failed
   const base = sent ?? read;
-  return base && progress && progress.state.type !== base.state.type ? { ...base, state: progress.state } : base;
+  return base && progress && progress.state.type !== base.state.type ? { ...base, state: progress.state } : base; // the text it had stays
+  // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-failed
+  // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-ready
+  // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-start
 }
 
 const RUNTIME: Record<RuntimeChoice, MsgKey> = {

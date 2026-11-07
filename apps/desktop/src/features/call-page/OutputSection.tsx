@@ -62,10 +62,12 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-cancel
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-cancel
   const save = async () => {
+    // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-save
     if (!draft || saving) return;
     setSaving(true);
     const r = await commitDraft(bridge, call.id, draft);
     setSaving(false);
+    // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-save
     setError(r === "ok" ? null : r);
     if (r !== "ok") return; // the draft stays; only a new save replaces it
     // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-saved
@@ -183,8 +185,12 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
           {t("outputs.regenerated", { n: edits })} · <button type="button" className="np-link" onClick={() => void compare()}>{comparing ? t("outputs.hide_diff") : t("outputs.show_diff")}</button>
         </div>
       )}
+      {/* @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-regen */}
       {state === "writing" && (section.body_md || section.items.length > 0) && <div className="pc-sec__meta" role="status">{t("outputs.regenerating")}</div>}
+      {/* @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-regen */}
+      {/* @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-stream */}
       <div className="pc-sec__body">{body()}</div>
+      {/* @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-stream */}
     </section>
   );
 }
