@@ -163,14 +163,17 @@ async fn post_call_items_join_topics_and_the_threads_group_them_by_call() {
     let (core, events) = open(dir.path()).await;
     written_call(&core, "call_old", NOW - 48 * HOUR).await;
     written_call(&core, "call_new", NOW - 2 * HOUR).await;
-    // The scripted items have no topic hint: each new topic is named from its item's text, and
-    // the same text in the next call is the same vector, so it joins that topic.
+    // The scripted items have no topic hint: the first one names the new topic from its text.
+    // The scripted engine's vectors are all positive (their cosines are about 0.8), so every
+    // later item joins it, the same text in the next call included.
     let list = topics(&core).await;
-    assert_eq!(list.len(), 2, "{list:?}");
+    assert_eq!(list.len(), 1, "{list:?}");
     let decided = named(&list, "Scripted decision");
-    assert_eq!((decided.calls, decided.decisions), (2, 2));
+    assert_eq!(
+        (decided.calls, decided.decisions, decided.open_items),
+        (2, 2, 4)
+    );
     assert_eq!(decided.last_seen, TimestampMs(NOW - 2 * HOUR));
-    assert_eq!(named(&list, "Scripted action item").calls, 2);
     assert!(!events.topics().is_empty());
     // Their items have vectors now, and their chips name the topic.
     assert_eq!(
@@ -178,8 +181,12 @@ async fn post_call_items_join_topics_and_the_threads_group_them_by_call() {
         count(&core, "SELECT count(*) FROM items")
     );
     let t = thread(&core, &decided.id).await.unwrap();
-    let calls: Vec<&str> = t.groups.iter().map(|g| g.call.id.as_str()).collect();
-    assert_eq!(calls, ["call_new", "call_old"]);
+    let calls: Vec<(&str, usize)> = t
+        .groups
+        .iter()
+        .map(|g| (g.call.id.as_str(), g.items.len()))
+        .collect();
+    assert_eq!(calls, [("call_new", 2), ("call_old", 2)]);
     let chip = t.groups[0].items[0].topic.clone().unwrap();
     assert_eq!(chip.name, "Scripted decision");
     assert_eq!(
@@ -197,9 +204,38 @@ async fn rename_merge_undo_and_keep_separate_through_the_core() {
     let (core, events) = open(dir.path()).await;
     written_call(&core, "call_old", NOW - 48 * HOUR).await;
     written_call(&core, "call_new", NOW - 2 * HOUR).await;
+    // A second topic for the action items, as attachment would start one for other words.
+    let meta = noter_db::ChangeMeta {
+        actor: Actor::You,
+        summary: "test".into(),
+        reason: "test".into(),
+        evidence_ids: vec![],
+        batch_id: None,
+        undoable: false,
+        surface: None,
+    };
+    core.store()
+        .write_with(meta, |tx| {
+            tx.execute_batch(
+                "INSERT INTO topics (id, rev, name, first_seen, last_seen)
+                   VALUES ('top_rollout', 1, 'Rollout', 0, 0);
+                 UPDATE items SET topic_id = 'top_rollout' WHERE kind = 'action_item';",
+            )
+            .unwrap();
+            let row = noter_db::Logged {
+                entity_type: "topic",
+                entity_id: "top_rollout".into(),
+                field: Some("name".into()),
+                before: None,
+                after: Some("Rollout".into()),
+                delta: None,
+            };
+            Ok(((), vec![row]))
+        })
+        .unwrap();
     let list = topics(&core).await;
     let decided = named(&list, "Scripted decision").clone();
-    let acted = named(&list, "Scripted action item").clone();
+    let acted = named(&list, "Rollout").clone();
     events.topics();
 
     // Rename: the name and its chips change together; a stale rev changes nothing.
@@ -259,7 +295,7 @@ async fn rename_merge_undo_and_keep_separate_through_the_core() {
         .topics_merge(&main_window(), merge(&acted.id, &decided.id))
         .await
         .unwrap();
-    assert_eq!(merged.topic.aliases, ["Scripted action item"]);
+    assert_eq!(merged.topic.aliases, ["Rollout"]);
     assert_eq!(merged.topic.calls, 2);
     assert_eq!(topics(&core).await.len(), 1);
     let mut published = events.topics();
@@ -284,7 +320,7 @@ async fn rename_merge_undo_and_keep_separate_through_the_core() {
     let list = topics(&core).await;
     assert_eq!(list.len(), 2);
     assert!(named(&list, "Decisions").aliases.is_empty());
-    assert_eq!(named(&list, "Scripted action item").calls, 2);
+    assert_eq!(named(&list, "Rollout").calls, 2);
     let mut published = events.topics();
     published.sort();
     published.dedup();

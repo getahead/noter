@@ -113,7 +113,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Ask a question or follow-up
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-answer`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-answer`
 
 **Actor**: Primary user (main window › Ask)
 
@@ -132,7 +132,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 3. [x] - `p1` - DB: create a thread if needed, with the first question as title, and record the turn through the writer and change log - `inst-ask-create`
 4. [x] - `p1` - Register the subscription and **RETURN** `AskHandle` with thread, turn and subscription ids before sending Channel messages - `inst-ask-handle`
 5. [x] - `p1` - Resolve the search-answer runtime and effective privacy; retrieve the top 30 permitted hits with `cpt-noter-algo-core-retrieval-ask-retrieve` - `inst-ask-context`
-6. [ ] - `p1` - Emit `started`; run `ask-answer` through the router and gate, including prior thread context subject to the current privacy rules; refinements use noter-mcp (M3, 2.26 core-mcp: the run through the router and gate is in, the noter-mcp half ticks with core-mcp, TL-36) - `inst-ask-run`
+6. [x] - `p1` - Emit `started`; run `ask-answer` through the router and gate, including prior thread context subject to the current privacy rules; refinements use noter-mcp (M3: the run asks for the read tools get_transcript_span, get_person, get_decisions and get_open_items, and the router registers it with the tool host, TL-36) - `inst-ask-run`
 7. [x] - `p1` - Run `cpt-noter-algo-core-retrieval-ask-citations`; stream answer `delta` and `citation` messages without claiming unvalidated evidence - `inst-ask-validate-answer`
 8. [x] - `p1` - DB: store the completed answer, citations, runtime and run id with the updated thread time; emit terminal `done` through the stream hub and release runtime and subscription resources - `inst-ask-finish`
 9. [x] - `p1` - **IF** execution fails, emit terminal `failed` with `CoreError`; release the runtime and subscription; use `ended` only for a declared `StreamEndReason` - `inst-ask-failure`
@@ -160,7 +160,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Read and edit topic threads
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-topics`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-topics`
 
 **Actor**: Primary user (main window › Topics)
 
@@ -172,11 +172,11 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 - Stale rename: `conflict` with `detail.current_rev`; missing topic: `not_found`; self-merge: `invalid_input`.
 
 **Steps**:
-1. [ ] - `p1` - API: `topics_list` and `topic_get { topic_id }` read topic counts, aliases and merge suggestion, then items grouped by their call; return an empty thread when no calls remain - `inst-topic-read`
-2. [ ] - `p1` - API: `topic_rename { topic_id, rev, name }` validates a non-empty name and guards `rev`; write the name and change row in one transaction - `inst-topic-rename`
-3. [ ] - `p1` - API: `topics_merge { source, target }` validates both ids; in one change batch move item links, preserve source names and aliases on target, update its centroid and date range, and remove source - `inst-topic-merge`
-4. [ ] - `p1` - API: `topics_keep_separate { a, b }` stores the canonical unordered pair as a `topic_merge` suppression through the writer - `inst-topic-separate`
-5. [ ] - `p1` - Emit `entity:changed` only after commit; return `TopicMutation` with `change_id` for rename or merge, and `Ack` for Keep Separate - `inst-topic-return`
+1. [x] - `p1` - API: `topics_list` and `topic_get { topic_id }` read topic counts, aliases and merge suggestion, then items grouped by their call; return an empty thread when no calls remain - `inst-topic-read`
+2. [x] - `p1` - API: `topic_rename { topic_id, rev, name }` validates a non-empty name and guards `rev`; write the name and change row in one transaction - `inst-topic-rename`
+3. [x] - `p1` - API: `topics_merge { source, target }` validates both ids; in one change batch move item links, preserve source names and aliases on target, update its centroid and date range, and remove source - `inst-topic-merge`
+4. [x] - `p1` - API: `topics_keep_separate { a, b }` stores the canonical unordered pair as a `topic_merge` suppression through the writer - `inst-topic-separate`
+5. [x] - `p1` - Emit `entity:changed` only after commit; return `TopicMutation` with `change_id` for rename or merge, and `Ack` for Keep Separate - `inst-topic-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -217,19 +217,19 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Attach items to topics
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-attach-topic`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-attach-topic`
 
 **Input**: A new item, its local embedding and existing topic centroids.
 
 **Output**: Logged topic attachment or a new named topic; computed merge suggestions.
 
 **Steps**:
-1. [ ] - `p1` - Find the nearest topic centroid - `inst-attach-nearest`
-2. [ ] - `p1` - **IF** cosine similarity is above 0.8, attach the item to that topic - `inst-attach-existing`
-3. [ ] - `p1` - **ELSE** ask the router to name a new topic from the item under its privacy context - `inst-attach-new`
-4. [ ] - `p1` - DB: commit the topic, item link, updated centroid and first/last-seen values with their change rows - `inst-attach-commit`
-5. [ ] - `p1` - Suggest pairs whose centroids are above 0.9 similarity, excluding canonical pairs in `suppressions`; never merge automatically - `inst-attach-suggest`
-6. [ ] - `p1` - **RETURN** the topic and suggestions - `inst-attach-return`
+1. [x] - `p1` - Find the nearest topic centroid - `inst-attach-nearest`
+2. [x] - `p1` - **IF** cosine similarity is above 0.8, attach the item to that topic - `inst-attach-existing`
+3. [x] - `p1` - **ELSE** ask the router to name a new topic from the item under its privacy context (M3, TL-37: named locally from the item's topic_hint, else its first clause in at most six words; no model run) - `inst-attach-new`
+4. [x] - `p1` - DB: commit the topic, item link, updated centroid and first/last-seen values with their change rows - `inst-attach-commit`
+5. [x] - `p1` - Suggest pairs whose centroids are above 0.9 similarity, excluding canonical pairs in `suppressions`; never merge automatically - `inst-attach-suggest`
+6. [x] - `p1` - **RETURN** the topic and suggestions - `inst-attach-return`
 
 ### Rebuild derived indexes
 
@@ -297,7 +297,7 @@ The system **MUST** use the same privacy-filtered hybrid function for search, As
 
 ### Cited and cancellable Ask
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-answers`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-answers`
 
 The system **MUST** return handles before Channel messages, enforce the 60 s task timeout, stream through the acknowledged stream hub, persist threads and validated answers, and cancel runtime work on Stop. Uncited answers are not found; old deleted citations remain marked as deleted. No source text goes to logs or bypasses the gate. Channel lag follows the shared 2,000-message rule.
 
@@ -314,7 +314,7 @@ The system **MUST** return handles before Channel messages, enforce the 60 s tas
 
 ### Topics and undoable edits
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-topics`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-topics`
 
 The system **MUST** attach and name topics by the PRD thresholds, expose their threads, guard rename revisions, merge as one undoable batch with source aliases retained, and persist Keep Separate. Failed writes publish no entity event; undo restores links and aliases through the M2 history service.
 

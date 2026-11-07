@@ -1445,7 +1445,9 @@ impl Library {
                 .unwrap();
             self.db
                 .execute(
-                    "INSERT INTO item_vec (item_id, embedding) VALUES (?1, ?2)",
+                    "INSERT INTO item_vec (item_id, embedding, call_id, started_at)
+                     SELECT i.id, ?2, i.call_id, c.started_at FROM items i
+                     JOIN calls c ON c.id = i.call_id WHERE i.id = ?1",
                     params![item, blob(v)],
                 )
                 .unwrap();

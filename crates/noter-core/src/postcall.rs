@@ -1012,6 +1012,10 @@ impl Core {
         ctx.checkpoint().await?;
         let meta = ctx.change_meta("suggested items").ok_or(Stop::Cancelled)?;
         let call_id = call.as_str().to_owned();
+        let named: Vec<(String, Option<String>)> = fresh
+            .iter()
+            .map(|i| (i.text.clone(), i.topic_hint.clone()))
+            .collect();
         let written = self.store().write_with(meta, move |tx| {
             let internal =
                 |e: noter_db::rusqlite::Error| CoreError::new(ErrorCode::Internal, e.to_string());
@@ -1041,8 +1045,8 @@ impl Core {
             for item in &fresh {
                 let id = format!("itm_{}", ulid::Ulid::generate());
                 // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-items
-                // Suggested, never accepted here; owners stay unresolved and topics wait for
-                // the people and topics tables.
+                // Suggested, never accepted here; owners stay unresolved, and topics are
+                // attached right after this write.
                 tx.execute(
                     "INSERT INTO items (id, rev, call_id, kind, text, lang, generated_text, due_date,
                          status, review_state, created_by, is_engineering, linked_issue_key)
@@ -1091,6 +1095,15 @@ impl Core {
                 id,
             });
         }
+        // @cpt-begin:cpt-noter-algo-core-retrieval-ask-attach-topic:p1:inst-attach-commit
+        let new = ids
+            .iter()
+            .cloned()
+            .zip(named)
+            .map(|(id, (text, hint))| (id, text, hint))
+            .collect();
+        self.attach_items(ctx, call, new).await;
+        // @cpt-end:cpt-noter-algo-core-retrieval-ask-attach-topic:p1:inst-attach-commit
         let views: Vec<ItemView> = ids
             .iter()
             .filter_map(|id| self.item_view(id).ok().flatten())

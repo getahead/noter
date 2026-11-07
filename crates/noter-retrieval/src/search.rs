@@ -1,7 +1,7 @@
 //! `search`: the library's sectioned results over the one retrieval function
 //! (`cpt-noter-flow-core-retrieval-ask-search`).
 
-use noter_db::rusqlite::{params, Connection};
+use noter_db::rusqlite::Connection;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -137,44 +137,11 @@ fn topics_matching(
                 .any(|(s, e)| terms.iter().any(|t| text[s..e].starts_with(t.as_str())))
         };
         if matches(&name) || aliases.as_deref().is_some_and(matches) {
-            out.push(topic_row(conn, &id)?);
+            out.extend(crate::topics::topic_row(conn, &id)?);
         }
         if out.len() == limit {
             break;
         }
     }
     Ok(out)
-}
-
-/// A topic as lists show it: its aliases and the counts of its items.
-// shortcut: no merge suggestion until topic attachment computes them (2.22 slice 3).
-pub(crate) fn topic_row(conn: &Connection, id: &str) -> noter_db::rusqlite::Result<TopicRow> {
-    conn.query_row(
-        "SELECT t.id, t.rev, t.name, t.last_seen,
-                (SELECT group_concat(alias, char(31)) FROM topic_aliases WHERE topic_id = t.id),
-                (SELECT count(DISTINCT call_id) FROM items WHERE topic_id = t.id
-                   AND review_state != 'rejected'),
-                (SELECT count(*) FROM items WHERE topic_id = t.id AND kind = 'decision'
-                   AND review_state != 'rejected'),
-                (SELECT count(*) FROM items WHERE topic_id = t.id AND status = 'open'
-                   AND review_state != 'rejected')
-         FROM topics t WHERE t.id = ?1",
-        params![id],
-        |r| {
-            let aliases: Option<String> = r.get(4)?;
-            Ok(TopicRow {
-                id: TopicId::new(r.get::<_, String>(0)?),
-                rev: Rev(r.get(1)?),
-                name: r.get(2)?,
-                last_seen: TimestampMs(r.get(3)?),
-                aliases: aliases
-                    .map(|a| a.split('\u{1f}').map(String::from).collect())
-                    .unwrap_or_default(),
-                calls: r.get(5)?,
-                decisions: r.get(6)?,
-                open_items: r.get(7)?,
-                merge_suggestion: None,
-            })
-        },
-    )
 }

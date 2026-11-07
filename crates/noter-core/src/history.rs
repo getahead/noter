@@ -159,6 +159,7 @@ impl Core {
         let mut glossary = false;
         let mut transcripts = BTreeSet::new();
         let mut speakers = BTreeSet::new();
+        let mut topics = vec![];
         for (kind, id) in touched {
             match kind.as_str() {
                 "call" => {
@@ -188,6 +189,7 @@ impl Core {
                         id: id.clone(),
                     }),
                 },
+                "topic" => topics.push(id.clone()),
                 "summary" => self.publish_section(id)?,
                 "segment" | "speaker" => {
                     let table = if kind == "segment" {
@@ -214,6 +216,10 @@ impl Core {
                 }
                 _ => {}
             }
+        }
+        // A merge undone moves links back: centroids follow, then the topics go out whole.
+        if !topics.is_empty() {
+            self.topics_reversed(&topics)?;
         }
         if accounts {
             self.accounts.reload();

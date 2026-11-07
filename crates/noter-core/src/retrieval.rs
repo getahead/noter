@@ -7,10 +7,11 @@ use std::sync::{Arc, Weak};
 
 use noter_db::rusqlite::{self, Connection};
 use noter_jobs::{BoxFuture, JobHandler, Request, RunCtx, Stop, Trigger};
+use noter_protocol::ipc::CommandCtx;
 use noter_protocol::model::*;
 use noter_protocol::*;
 use noter_retrieval::{DocHits, DocQuery, DocumentSource, Evidence, Hit, Privacy};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::{object, Core};
 
@@ -179,5 +180,251 @@ impl Core {
         let types = self.call_types_now().call_types;
         self.store()
             .read(|c| noter_retrieval::scope_presets(c, now, &types))
+    }
+}
+
+fn no_topic() -> CoreError {
+    CoreError::new(ErrorCode::NotFound, "no such topic")
+}
+
+/// Topic threads and their edits (`cpt-noter-flow-core-retrieval-ask-topics`), and the
+/// post-call attachment of new items to topics (TL-37).
+impl Core {
+    /// The topic's row as lists show it, sent through `entity:changed` (or its removal).
+    fn publish_topic(&self, id: &str) -> Result<Option<TopicRow>, CoreError> {
+        let row = self.store().read(|c| noter_retrieval::topic_row(c, id))?;
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+        match &row {
+            Some(topic) => self.emit_entity_changed(&EntityChanged::Topic {
+                topic: topic.clone(),
+            }),
+            None => self.emit_entity_changed(&EntityChanged::Removed {
+                kind: EntityKind::Topic,
+                id: id.to_owned(),
+            }),
+        }
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+        Ok(row)
+    }
+
+    /// Items whose chips changed, sent whole.
+    fn publish_items(&self, ids: &[String]) -> Result<(), CoreError> {
+        for id in ids {
+            if let Some(item) = self.item_view(id)? {
+                self.emit_entity_changed(&EntityChanged::Item { item });
+            }
+        }
+        Ok(())
+    }
+
+    /// `topics_list`.
+    pub(crate) fn list_topics(&self) -> Result<TopicList, CoreError> {
+        self.ready()?;
+        let topics = self.store().read(noter_retrieval::topic_list)?;
+        Ok(TopicList { topics })
+    }
+
+    /// `topic_get`: the topic and its items grouped by call, newest call first.
+    pub(crate) fn get_topic(&self, args: TopicIdArgs) -> Result<TopicThread, CoreError> {
+        self.ready()?;
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-read
+        let id = args.topic_id.as_str();
+        let (topic, items) = self.store().read(|c| {
+            let topic = noter_retrieval::topic_row(c, id)?;
+            Ok((topic, noter_retrieval::thread_items(c, id)?))
+        })?;
+        let topic = topic.ok_or_else(no_topic)?;
+        let mut groups: Vec<TopicThreadGroup> = vec![];
+        for item in items {
+            let Some(item) = self.item_view(&item)? else {
+                continue;
+            };
+            match groups.last_mut() {
+                Some(g) if g.call.id == item.call.id => g.items.push(item),
+                _ => groups.push(TopicThreadGroup {
+                    call: item.call.clone(),
+                    items: vec![item],
+                }),
+            }
+        }
+        Ok(TopicThread { topic, groups })
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-read
+    }
+
+    /// `topic_rename`.
+    pub(crate) fn rename_topic(
+        &self,
+        ctx: &CommandCtx,
+        args: TopicRenameArgs,
+    ) -> Result<TopicMutation, CoreError> {
+        self.ready()?;
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-rename
+        let mutation = noter_retrieval::rename(&args.topic_id, args.rev, &args.name)?;
+        let id = args.topic_id.as_str();
+        if self
+            .store()
+            .read(|c| noter_retrieval::topic_row(c, id))?
+            .is_none()
+        {
+            return Err(no_topic());
+        }
+        let meta = self.change_meta(ctx, "Renamed a topic".into(), "topic_rename");
+        let written = self.store().write(mutation, meta)?;
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-rename
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+        let topic = self.publish_topic(id)?.ok_or_else(no_topic)?;
+        Ok(TopicMutation {
+            topic,
+            change_id: written.change_id,
+        })
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+    }
+
+    /// `topics_merge`: one change batch; its `change_id` undoes the whole batch.
+    pub(crate) fn merge_topics(
+        &self,
+        ctx: &CommandCtx,
+        args: TopicMergeArgs,
+    ) -> Result<TopicMutation, CoreError> {
+        self.ready()?;
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-merge
+        let (source, target) = (
+            args.source.as_str().to_owned(),
+            args.target.as_str().to_owned(),
+        );
+        let meta = self.change_meta(ctx, "Merged topics".into(), "topics_merge");
+        let (s, t) = (source.clone(), target.clone());
+        let done = self
+            .store()
+            .write_with(meta, move |tx| noter_retrieval::merge(tx, &s, &t))?;
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-merge
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+        self.publish_topic(&source)?;
+        let topic = self.publish_topic(&target)?.ok_or_else(no_topic)?;
+        self.publish_items(&done.value)?;
+        Ok(TopicMutation {
+            topic,
+            change_id: done.change_ids[0].clone(),
+        })
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+    }
+
+    /// `topics_keep_separate`.
+    pub(crate) fn keep_topics_separate(
+        &self,
+        ctx: &CommandCtx,
+        args: TopicPairArgs,
+    ) -> Result<Ack, CoreError> {
+        self.ready()?;
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-separate
+        let (a, b) = (args.a.as_str().to_owned(), args.b.as_str().to_owned());
+        let mut meta = self.change_meta(ctx, "Kept topics separate".into(), "topics_keep_separate");
+        meta.undoable = false;
+        let now = self.deps.clock.now();
+        let (x, y) = (a.clone(), b.clone());
+        self.store().write_with(meta, move |tx| {
+            noter_retrieval::keep_separate(tx, &x, &y, now)
+        })?;
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-separate
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+        // Their merge suggestions changed.
+        self.publish_topic(&a)?;
+        self.publish_topic(&b)?;
+        Ok(Ack {})
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-return
+    }
+
+    /// After an undo or redo moved topic rows or links: their centroids from their items'
+    /// vectors again, then each topic through `entity:changed`.
+    pub(crate) fn topics_reversed(&self, ids: &[String]) -> Result<(), CoreError> {
+        let meta = noter_db::ChangeMeta {
+            actor: Actor::You,
+            summary: "topic centroids".into(),
+            reason: "change_undo".into(),
+            evidence_ids: vec![],
+            batch_id: None,
+            undoable: false,
+            surface: None,
+        };
+        let ids_now = ids.to_vec();
+        self.store().write_with(meta, move |tx| {
+            noter_retrieval::refresh_centroids(tx, &ids_now).map_err(crate::internal)?;
+            Ok(((), vec![centroids_logged(ids_now.len())]))
+        })?;
+        for id in ids {
+            self.publish_topic(id)?;
+        }
+        Ok(())
+    }
+
+    /// Attaches a call's new items to topics right after the items step (TL-37): their texts
+    /// embedded locally, then one logged write that also stores their vectors. The outputs are
+    /// committed already, so a failure is logged and leaves the items without a topic.
+    /// Answers the items it linked.
+    pub(crate) async fn attach_items(
+        &self,
+        ctx: &RunCtx,
+        call: &CallId,
+        items: Vec<(String, String, Option<String>)>,
+    ) -> Vec<String> {
+        if items.is_empty() {
+            return vec![];
+        }
+        let fail = |error: Value| {
+            self.log(object(json!({
+                "level": "error", "module": "retrieval", "code": "attach_topics", "error": error
+            })));
+        };
+        let texts = items.iter().map(|(_, text, _)| text.clone()).collect();
+        // The engine's error stays out of the log: only that the embedding failed.
+        let Ok(vectors) = noter_retrieval::Embedder::embed(&self.engine, texts).await else {
+            // shortcut: items the engine could not embed stay without a topic; a later
+            // attachment pass over unattached items is for when this shows up in practice.
+            fail(json!("not_embedded"));
+            return vec![];
+        };
+        let new: Vec<noter_retrieval::NewItem> = items
+            .into_iter()
+            .zip(vectors)
+            .map(|((id, text, hint), vector)| noter_retrieval::NewItem {
+                id,
+                text,
+                hint,
+                vector,
+            })
+            .collect();
+        let Some(meta) = ctx.change_meta("topics") else {
+            return vec![];
+        };
+        let call_id = call.as_str().to_owned();
+        let done = self.store().write_with(meta, move |tx| {
+            noter_retrieval::attach_topics(tx, &call_id, &new)
+        });
+        match done {
+            Ok(done) => {
+                for id in &done.value.topics {
+                    if let Err(e) = self.publish_topic(id) {
+                        fail(json!(e.code));
+                    }
+                }
+                done.value.items
+            }
+            Err(e) => {
+                fail(json!(e.code));
+                vec![]
+            }
+        }
+    }
+}
+
+/// The change row of a centroid refresh: how many topics, no content.
+fn centroids_logged(n: usize) -> noter_db::Logged {
+    noter_db::Logged {
+        entity_type: "index",
+        entity_id: "topic_centroid".into(),
+        field: Some("rows".into()),
+        before: None,
+        after: Some(n.to_string()),
+        delta: None,
     }
 }
