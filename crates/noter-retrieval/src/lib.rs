@@ -56,7 +56,7 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration {
         owner: "noter-retrieval",
         version: 3,
-        name: "topic alias ids",
+        name: "topic alias ids and the item topic index",
         sql: include_str!("../migrations/0003_topic_alias_ids.sql"),
     },
 ];

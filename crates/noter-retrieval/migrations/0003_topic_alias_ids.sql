@@ -10,3 +10,6 @@ CREATE TABLE topic_aliases_new (
 INSERT INTO topic_aliases_new (topic_id, alias) SELECT topic_id, alias FROM topic_aliases;
 DROP TABLE topic_aliases;
 ALTER TABLE topic_aliases_new RENAME TO topic_aliases;
+
+-- Topic lists, threads and centroids read a topic's items.
+CREATE INDEX items_topic ON items (topic_id);
