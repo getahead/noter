@@ -11,6 +11,7 @@ import { SearchField } from "../../ui/primitives/search-field";
 import { loadSettings } from "./actions";
 import { AudioPane } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
+import { RepositoriesPane } from "./RepositoriesPane";
 import { GeneralPane } from "./GeneralPane";
 import { HotkeysPane } from "./HotkeysPane";
 import { ModelsRuntimesPane } from "./ModelsRuntimesPane";
@@ -27,6 +28,7 @@ const ICONS: Record<SettingsPane, IconName> = {
 };
 
 export const PANES: Partial<Record<SettingsPane, (p: PaneProps) => React.ReactNode>> = {
+  repositories: (p) => <RepositoriesPane bridge={p.bridge} />,
   general: (p) => <GeneralPane {...p} />,
   audio_and_transcription: (p) => <AudioPane {...p} />,
   models_and_runtimes: (p) => <ModelsRuntimesPane {...p} />,
@@ -38,7 +40,7 @@ export const PANES: Partial<Record<SettingsPane, (p: PaneProps) => React.ReactNo
 };
 
 /** The panes a later feature fills show their frame and the milestone, never a blank area. */
-const LATER = new Set<SettingsPane>(["repositories", "knowledge_sources", "maintenance"]);
+const LATER = new Set<SettingsPane>(["knowledge_sources", "maintenance"]);
 
 // @cpt-component:cpt-noter-component-screen-settings:p1
 // @cpt-dod:cpt-noter-dod-ui-settings-window:p1

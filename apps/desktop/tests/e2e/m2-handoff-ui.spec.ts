@@ -3,6 +3,9 @@
 // Assumptions: the fixture's itm_replay stands for both the user's own item (made so with world_set) and Dmitri's; the VSTOR mapping
 // is made with repo_upsert on a temp folder; launch results come from harness.launch_world and harness.native_log; the folder
 // picker of Add Mapping is typed into its Folder field when the harness has no open panel. Copy and labels are DESIGN's.
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { openWindow } from "./support/app";
@@ -92,6 +95,31 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(region(page, "HD-R3")).toContainText("No repository mapped for VSTOR");
     await expect(region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" })).toBeDisabled();
     await expect(region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" })).toBeEnabled();
+  });
+
+  test("UI — error path: Add Mapping from the unmapped drawer persists the folder and enables Open", async ({ page }) => {
+    await open(page, { mapped: false });
+    await region(page, "HD-R3").getByRole("button", { name: "Add Mapping…" }).click();
+    const sheet = page.getByRole("dialog", { name: "Add Mapping", exact: true });
+    await expect(sheet).toContainText("From the Handoff drawer");
+    await expect(sheet.getByRole("textbox", { name: "Jira project or component" })).toHaveValue("VSTOR");
+    const folder = mkdtempSync(join(tmpdir(), "noter-mapping-ui-"));
+    await sheet.getByRole("textbox", { name: "Folder", exact: true }).fill(folder);
+    await sheet.getByRole("button", { name: "Add Mapping", exact: true }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(region(page, "HD-R3")).toContainText(folder);
+    await expect(region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" })).toBeEnabled();
+    expect(await sent(page, "repo_upsert")).toContainEqual({ key: "VSTOR", local_path: folder, default_tool: "claude_code" });
+  });
+
+  test("UI — other path: Compare uses the current edit and generated text without historical-body requests", async ({ page }) => {
+    await open(page);
+    await region(page, "HD-R4").getByRole("textbox").fill("A current edited prompt.");
+    await region(page, "HD-R4").getByRole("button", { name: /Version/ }).click();
+    await page.getByRole("menuitem", { name: "Compare…" }).click();
+    await expect(region(page, "HD-R4")).toContainText("Showing changes");
+    await expect(region(page, "HD-R4").locator("ins")).toHaveText(["A", "current", "edited", "prompt."]);
+    expect(await sent(page, "output_version_get")).toEqual([]);
   });
 
   test("UI — empty path: Item owned by someone else — Copy Prompt is the default (⌘Return) with Open in Claude Code to its left, Copied, the item stays open and owned by Dmitri S.", async ({ page }) => {

@@ -204,3 +204,24 @@ describe("PromptEditor (cpt-noter-component-ui-prompt-editor)", () => {
     expect(html).not.toContain(">Diff<");
   });
 });
+
+describe("S2 prompt state corrections", () => {
+  it("cancelled empty generation offers an explicit retry without claiming it is writing", async () => {
+    await ready((v) => ({ ...v, state: { type: "not_generated" }, prompt_md: null, generated_md: null }));
+    const html = draw();
+    expect(html).not.toContain("Writing the handoff prompt");
+    expect(html).toContain("Write Prompt");
+  });
+
+  it("uses the live accepted item when hiding the suggested-item notice", async () => {
+    await ready((v) => ({ item: { ...v.item, review: "suggested" } }));
+    const view = bridge.store.getState().entities.handoff[ID]!;
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { ...s.entities.item, [ID]: { ...view.item, review: "accepted" } } } }));
+    expect(draw()).not.toContain("Opening or copying accepts this suggested item.");
+  });
+
+  it("checks only the current edit when several saved edits exist", () => {
+    const versions = [1, 2, 3].map((n) => ({ id: `v${n}`, n, kind: n === 1 ? "generated" as const : "user_edit" as const, writer: null, created_at: n }));
+    expect(versionEntries(versions, true, prefs).map((e) => e.checked)).toEqual([false, false, true]);
+  });
+});

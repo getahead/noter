@@ -5,12 +5,10 @@ import { useState } from "react";
 import type { UiPrefs, VersionMeta } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
-import { Menu } from "../../ui/primitives/menu";
-import { Popover } from "../../ui/primitives/popover";
-import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
 import { DiffView } from "../../ui/diff/DiffView";
+import { VersionMenu } from "../call-page/VersionSwitcher";
 import { clock } from "../call-page/logic";
 import "./handoff.css";
 
@@ -34,9 +32,9 @@ const elementId = (kind: string, id: string) => [kind, id].join("-");
 /** The versions the core lists, then **Your Edit** while one is held and the core has not listed it. */
 export function versionEntries(versions: VersionMeta[], edited: boolean, prefs: UiPrefs): Array<{ label: string; checked: boolean }> {
   const listed = versions.map((v) => ({ v, label: v.kind === "user_edit" ? t("outputs.your_edit", { time: clock(v.created_at, prefs) }) : t("handoff.generated", { n: v.n, time: clock(v.created_at, prefs) }) }));
-  const held = listed.some((e) => e.v.kind === "user_edit");
+  const held = listed.at(-1)?.v.kind === "user_edit";
   const last = listed.length - 1;
-  return [...listed.map((e, i) => ({ label: e.label, checked: !edited ? i === last : e.v.kind === "user_edit" })), ...(edited && !held ? [{ label: t("outputs.your_edit_short"), checked: true }] : [])];
+  return [...listed.map((e, i) => ({ label: e.label, checked: i === last && (!edited || held) })), ...(edited && !held ? [{ label: t("outputs.your_edit_short"), checked: true }] : [])];
 }
 
 // @cpt-component:cpt-noter-component-ui-prompt-editor:p1
@@ -51,16 +49,12 @@ export function PromptEditor({ itemId, value, edited, generating, generated, ver
       <div className="pc-prompt__head">
         <span className="np-mono pc-prompt__cap">{t("handoff.file", { item: itemId })}</span>
         {edited && <Badge kind="status" text={t("handoff.edited")} />}
-        {(entries.length > 0 || edited) && (
-          <span className="pc-ver">
-            <PullDownButton id={id} label={versionLabel} ariaLabel={`${t("outputs.version")}: ${versionLabel}`} buttonVariant="quiet" size="inline" open={open} onAction={() => setOpen(!open)} />
-            {open && (
-              <Popover variant="item-menu" anchor={globalThis.document?.getElementById(id) ?? null} align="end" label={t("outputs.version")} onClose={() => setOpen(false)}>
-                {/* older bodies have no command: the menu lists them, only the current text is shown */}
-                <Menu items={entries.map((e) => ({ label: e.label, ...(e.checked ? { checked: true } : {}), onSelect: () => setOpen(false) }))} onClose={() => setOpen(false)} />
-              </Popover>
-            )}
-          </span>
+        {(entries.length > 1 || edited) && (
+          <VersionMenu caption id={id} label={versionLabel} ariaLabel={`${t("outputs.version")}: ${versionLabel}`} open={open} onToggle={() => setOpen(!open)} onClose={() => setOpen(false)} items={[
+            ...entries.map((entry) => ({ label: entry.label, checked: entry.checked, disabled: !entry.checked })),
+            ...(versions.length > 1 ? [{ header: t("handoff.version_unavailable") }] : []),
+            ...(generated !== null ? [{ divider: true as const }, { label: t(diffOn ? "outputs.hide_diff" : "outputs.compare"), onSelect: onDiff }] : []),
+          ]} />
         )}
         <span className="np-tb__spacer" />
         {generated !== null && !generating && <PushButton label={t(diffOn ? "handoff.hide_diff" : "handoff.diff")} size="small" variant="quiet" attrs={{ "aria-pressed": String(diffOn) }} onAction={onDiff} />}
@@ -72,9 +66,11 @@ export function PromptEditor({ itemId, value, edited, generating, generated, ver
           <span style={{ width: "52%" }} />
         </div>
       ) : diffOn ? (
+        // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-diff
         <div className="pc-prompt__area is-diff">
           <div className="pc-prompt__diffnote">{t("handoff.showing_changes")}</div>
           <DiffView before={generated!} after={value} />
+          {/* @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-diff */}
         </div>
       ) : (
         <div className="pc-prompt__area">
