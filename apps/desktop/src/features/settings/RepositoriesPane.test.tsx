@@ -42,7 +42,7 @@ describe("Repositories pane", () => {
   it("offers a retry when the repository read fails", async () => {
     fake.failNext("repos_list", "internal");
     await readRepos(bridge);
-    expect(draw()).toContain("Couldn't read repository mappings");
+    expect(draw()).toContain("read repository mappings");
     const { content } = tree();
     await (find(content, (p) => p.label === "Try Again").props.onAction as () => Promise<void>)();
   });
@@ -50,7 +50,8 @@ describe("Repositories pane", () => {
   it("opens new and existing mappings through the shared sheet host", async () => {
     await readRepos(bridge);
     const { content, sheets } = tree();
-    (find(content, (p) => p.label === "Add Mapping…").props.onAction as () => void)();
+    const foot = find(content, (p) => p.foot !== undefined).props.foot as ReactNode;
+    (find(foot, (p) => p.label === "Add Mapping…").props.onAction as () => void)();
     expect(sheets.current()?.id).toBe("add-mapping");
     expect(sheets.current()?.props.mapping).toBeUndefined();
     const row = find(content, (p) => typeof p.onDoubleClick === "function");
@@ -68,6 +69,7 @@ describe("Repositories pane", () => {
     (control.props.onAction as (v: string) => void)("codex");
     await vi.waitFor(() => expect(fake.world.repos.mappings[0]!.default_tool).toBe("codex"));
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ id: fake.world.repos.mappings[0]!.id, default_tool: "codex" }));
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the first change releases its busy guard after the save settles
     fake.failNext("repo_upsert", "repo_path_missing");
     (control.props.onAction as (v: string) => void)("claude_code");
     await vi.waitFor(() => expect(upsert).toHaveBeenCalledTimes(2));
