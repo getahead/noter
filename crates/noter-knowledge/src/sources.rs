@@ -277,7 +277,8 @@ pub async fn add_mcp(
             // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-oauth
             let unaudited: Mutex<Option<CoreError>> = Mutex::new(None);
             let audit = |destination: &str, request: &[u8]| {
-                let row = noter_llm::audit_lookup(store, meta.clone(), now(), destination, request);
+                let row =
+                    noter_llm::audit_lookup(store, meta.clone(), now(), destination, request, None);
                 let Err(e) = row else {
                     return true;
                 };

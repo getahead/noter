@@ -954,23 +954,26 @@ impl Core {
         };
         let server = tool.source.server.clone();
         // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-audit
-        let sent = json!({ "tool": tool.action.word(), "request": request }).to_string();
+        // The source commits this row for every request it sends (`Remote::audit`), before the
+        // request leaves; a row that does not commit means nothing is sent.
         let meta = self.staged_by(t, "Looked up a live source".into(), "live lookup", &[]);
         let run = LlmRunId::new(&t.run_id);
-        noter_llm::audit_lookup(
-            &self.store,
-            meta,
-            self.deps.clock.now(),
-            &server,
-            sent.as_bytes(),
-            Some((&run, t.call.as_ref())),
-        )
-        .map_err(|_| INTERNAL)?;
+        let audit = |destination: &str, bytes: &[u8]| {
+            noter_llm::audit_lookup(
+                &self.store,
+                meta.clone(),
+                self.deps.clock.now(),
+                destination,
+                bytes,
+                Some((&run, t.call.as_ref())),
+            )
+            .is_ok()
+        };
         // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-audit
         // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
         let mut cancel = t.cancel.clone();
         let answer = tokio::select! {
-            a = self.forward_live(&server, tool.action, &request) => a,
+            a = self.forward_live(&server, tool.action, &request, &audit) => a,
             _ = cancel.wait_for(|c| *c) => Err(FORBIDDEN),
         }?;
         // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
@@ -1000,14 +1003,20 @@ impl Core {
         server: &str,
         action: Live,
         request: &Value,
+        audit: noter_knowledge::Audit<'_>,
     ) -> Result<Value, Rpc> {
         let mcp = &self.deps.mcp_source;
-        let token = mcp.oauth(server).await.map_err(|_| INTERNAL)?;
+        // Nothing is kept of the sign-in: a renewed token is dropped.
+        let remote = noter_knowledge::Remote {
+            audit,
+            renewed: &|_| {},
+        };
+        let token = mcp.oauth(server, audit).await.map_err(|_| INTERNAL)?;
         Ok(match action {
             Live::Search => {
                 let query = request["query"].as_str().unwrap_or_default();
                 let found = mcp
-                    .seed_query(server, &token, query)
+                    .seed_query(server, &token, query, &remote)
                     .await
                     .map_err(|_| INTERNAL)?;
                 let results: Vec<Value> = found
@@ -1021,9 +1030,12 @@ impl Core {
             Live::Read => {
                 let uri = request["uri"].as_str().unwrap_or_default();
                 let page = mcp
-                    .read_resource(server, &token, uri)
+                    .read_resource(server, &token, uri, &remote)
                     .await
-                    .map_err(|_| MISSING)?;
+                    .map_err(|e| match e {
+                        noter_knowledge::McpError::Invalid => MISSING,
+                        _ => INTERNAL,
+                    })?;
                 json!({ "uri": uri, "title": page.title, "text": page.text })
             }
         })

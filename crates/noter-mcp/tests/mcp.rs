@@ -1329,6 +1329,16 @@ struct Spy {
 }
 
 impl Spy {
+    /// The source's audit call, passed on; once the row has committed the request is as good as
+    /// sent, so that is when the rows are counted (and a held request waits).
+    fn audited(&self, remote: &noter_core::McpRemote<'_>, destination: &str, bytes: &[u8]) -> bool {
+        let committed = (remote.audit)(destination, bytes);
+        if committed {
+            self.note();
+        }
+        committed
+    }
+
     fn note(&self) {
         let rows = noter_db::rusqlite::Connection::open(&self.db)
             .unwrap()
@@ -1343,16 +1353,21 @@ impl Spy {
 }
 
 impl McpSource for Spy {
-    fn oauth<'a>(&'a self, server: &'a str) -> BoxFuture<'a, Result<String, McpError>> {
-        self.inner.oauth(server)
+    fn oauth<'a>(
+        &'a self,
+        server: &'a str,
+        audit: noter_core::McpAudit<'a>,
+    ) -> BoxFuture<'a, Result<String, McpError>> {
+        self.inner.oauth(server, audit)
     }
 
     fn list_resources<'a>(
         &'a self,
         server: &'a str,
         token: &'a str,
+        remote: &'a noter_core::McpRemote<'a>,
     ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
-        self.inner.list_resources(server, token)
+        self.inner.list_resources(server, token, remote)
     }
 
     fn read_resource<'a>(
@@ -1360,10 +1375,15 @@ impl McpSource for Spy {
         server: &'a str,
         token: &'a str,
         uri: &'a str,
+        remote: &'a noter_core::McpRemote<'a>,
     ) -> BoxFuture<'a, Result<Page, McpError>> {
         Box::pin(async move {
-            self.note();
-            let page = self.inner.read_resource(server, token, uri).await;
+            let audit = |d: &str, b: &[u8]| self.audited(remote, d, b);
+            let seen = noter_core::McpRemote {
+                audit: &audit,
+                renewed: remote.renewed,
+            };
+            let page = self.inner.read_resource(server, token, uri, &seen).await;
             self.answered.fetch_add(1, Ordering::SeqCst);
             page
         })
@@ -1374,13 +1394,19 @@ impl McpSource for Spy {
         server: &'a str,
         token: &'a str,
         query: &'a str,
+        remote: &'a noter_core::McpRemote<'a>,
     ) -> BoxFuture<'a, Result<Listing, McpError>> {
         Box::pin(async move {
-            self.note();
+            let audit = |d: &str, b: &[u8]| self.audited(remote, d, b);
+            let seen = noter_core::McpRemote {
+                audit: &audit,
+                renewed: remote.renewed,
+            };
+            let found = self.inner.seed_query(server, token, query, &seen).await;
+            // The request is out (its row committed); the server is slow to answer.
             if self.hold.load(Ordering::SeqCst) {
                 tokio::time::sleep(std::time::Duration::from_secs(30)).await;
             }
-            let found = self.inner.seed_query(server, token, query).await;
             self.answered.fetch_add(1, Ordering::SeqCst);
             found
         })
