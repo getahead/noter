@@ -19,6 +19,9 @@ use reqwest::{StatusCode, Url};
 mod account_cli;
 mod adapters;
 mod gate;
+mod mcp_client;
+#[cfg(any(test, feature = "local-tests"))]
+pub mod mcp_stub;
 mod route;
 mod runtime;
 mod secrets;
@@ -33,6 +36,7 @@ pub use adapters::cli::{CliAccounts, CliConfig};
 pub use adapters::ollama::OllamaConfig;
 pub use adapters::scripted::{Received, Scripted};
 pub use gate::{audit_lookup, Adapters};
+pub use mcp_client::{Audit, Call, Contents, McpClient, McpClientError, Resource, Resources};
 pub use runtime::{
     Availability, Budget, Cancel, Failure, Llm, LlmRuntime, Packet, PacketContext, PacketItem,
     Privacy, Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind,
@@ -44,6 +48,8 @@ pub use validate::raw_html;
 
 #[cfg(test)]
 mod fetch_tests;
+#[cfg(test)]
+mod mcp_client_tests;
 #[cfg(test)]
 mod runtime_tests;
 
