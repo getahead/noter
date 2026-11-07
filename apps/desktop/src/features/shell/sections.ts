@@ -55,7 +55,7 @@ export function navRoute(target: NavTarget): Route | null {
     case "performance":
       return { section: target.type, key: "root" };
     case "call_page":
-      return { section: "library", key: ["call", target.call_id, target.tab].join(":") };
+      return { section: "library", key: ["call", target.call_id, target.tab, ...(target.span ? [target.span.t0_ms, target.span.t1_ms] : [])].join(":") };
     case "item":
       return { section: "activity", key: ["item", target.item_id].join(":") };
     case "person":

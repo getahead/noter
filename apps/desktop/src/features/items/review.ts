@@ -52,7 +52,17 @@ export function completion(item: Pick<ItemView, "status">, asking: boolean): Com
   // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-ask
   if (item.status === "handed_off" && asking) return "HANDOFF_QUESTION";
   // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-ask
-  return item.status.toUpperCase() as Completion;
+  // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-done
+  // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-handoff
+  // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-evidence
+  // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-answered
+  // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-returned
+  return item.status.toUpperCase() as Completion; // the core reports each of these statuses; the UI never infers them
+  // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-returned
+  // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-answered
+  // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-evidence
+  // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-handoff
+  // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-done
 }
 
 /** The field values of an inline edit (`owner` is a person id, `""` for none). */
@@ -90,3 +100,6 @@ export const isOverdue = (due: string | null, done: boolean, today: string): boo
 
 /** Items the checkbox shows as ticked: done, or closed by the core's evidence or an answer in a call. */
 export const isDone = (status: ItemView["status"]): boolean => status === "done" || status === "closed_by_evidence" || status === "answered_in_call";
+
+/** The output section an item kind is listed in (Share's row scope names it). */
+export const SECTION_OF = { decision: "decisions", action_item: "action_items", open_question: "open_questions", risk: "risks" } as const;

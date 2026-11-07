@@ -146,7 +146,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - Sensitive call: **Sensitive call · copying puts the text on your clipboard**; Slack/Jira success reads **Copied**.
 
 **Steps**:
-1. [ ] - `p1` - User opens Share or invokes ⌘⇧C, ⌥⌘C, ⌥⇧⌘C or ⌘E; resolve scope from the invoking control and current row selection - `inst-scope`
+1. [x] - `p1` - User opens Share or invokes ⌘⇧C, ⌥⌘C, ⌥⇧⌘C or ⌘E; resolve scope from the invoking control and current row selection - `inst-scope`
 2. [x] - `p1` - Show the scope first, then unreviewed/sensitive notices, three copy formats and Export; keep normal ⌘C as standard text copy - `inst-menu`
 3. [x] - `p1` - User copies; API: `share_copy` with call id, scope and format; set include_unreviewed only when the shown scope notice makes their inclusion explicit - `inst-copy`
 4. [x] - `p1` - **IF** `unreviewed_in_scope`: keep the scope, show its notice and offer Start Review through Items; never silently change the requested inclusion - `inst-review`
@@ -217,12 +217,14 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 2. [x] - `p1` - Apply progress only to its call and section; hydrate bodies with outputs_get and ignore reads superseded by navigation or newer state - `inst-progress`
 3. [x] - `p1` - Count only visible non-rejected rows; review counts include suggestions only; hide review controls while still writing or when none remain - `inst-count`
 4. [x] - `p1` - Resolve invocation scope: section means its SectionKind; row means its id or the selection containing it; toolbar means selected ids or Whole call - `inst-scope`
-5. [ ] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
+5. [x] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
 6. [ ] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
 
-Owner decision (6 Nov): M2 selection means one row. This step remains open until row-scope Share is delivered with Items (2.17); removing an unavailable row must never broaden its scope to Whole call.
+Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered with Items (2.17 S2); removing an unavailable row must never broaden its scope to Whole call.
 
 ## 4. States (CDSL)
+
+**Selection decision (D-34, 6 Nov 2026).** Selection is one row, delivered by row-scope Share in 2.17 S2. The UI retains that explicit row id in the scope while the core filters stale, deleted and rejected items; it never substitutes an empty id list that would broaden sharing to the section or call.
 
 ### Output section
 

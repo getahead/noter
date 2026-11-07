@@ -112,7 +112,13 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
           }}
         />
       );
-    if (state === "empty") return <p className="np-dim">{t(EMPTY[section.kind] ?? "outputs.empty")}</p>;
+    if (state === "empty")
+      return (
+        <>
+          <p className="np-dim">{t(EMPTY[section.kind] ?? "outputs.empty")}</p>
+          {section.kind === "action_items" && slots.addItem && <slots.addItem bridge={bridge} callId={call.id} />}
+        </>
+      );
     if (draft)
       return (
         <div onKeyDown={(e) => (e.key === "Escape" ? (e.stopPropagation(), cancel()) : e.key === "Enter" && e.metaKey && (e.preventDefault(), void save()))}>
@@ -131,6 +137,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
     }
     return <>
       <ul className="pc-items">{section.items.filter((i) => Row || i.review !== "rejected").map((i) => (Row ? <li key={i.id}><Row bridge={bridge} item={i} /></li> : <OutputItemRow key={i.id} bridge={bridge} item={i} />))}</ul>
+      {section.kind === "action_items" && slots.addItem && <slots.addItem bridge={bridge} callId={call.id} />}
       {RejectedList && <RejectedList bridge={bridge} items={section.items} />}
     </>;
   };

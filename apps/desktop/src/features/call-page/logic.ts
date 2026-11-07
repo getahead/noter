@@ -1,16 +1,18 @@
 // Pure rules of the call page frame: the route key, the views delivered so far, the page's state, the
 // subtitle and the Call info rows. Nothing here reads the store or draws.
 import type { CommandState } from "../../app/store/window-store";
-import type { CallPageTab, CallRow, UiPrefs } from "../../core/bindings";
+import type { CallPageTab, CallRow, TimeSpan, UiPrefs } from "../../core/bindings";
 import { duration, formatDateTime, t } from "../../i18n/format";
 import type { MsgKey } from "../../i18n/en";
 
 /** The page's route key in the Library section, as `navRoute` builds it for a `call_page` target. */
 export const callKey = (callId: string, tab: CallPageTab): string => ["call", callId, tab].join(":");
 
-export function parseCallKey(key: string): { callId: string; tab: CallPageTab } | null {
-  const [kind, callId, tab] = key.split(":");
-  return kind === "call" && callId && tab ? { callId, tab: tab as CallPageTab } : null;
+/** `call:<id>:<tab>`, plus `:<t0>:<t1>` when evidence opened it on a span (the Transcript highlights it). */
+export function parseCallKey(key: string): { callId: string; tab: CallPageTab; span?: TimeSpan } | null {
+  const [kind, callId, tab, t0, t1] = key.split(":");
+  if (kind !== "call" || !callId || !tab) return null;
+  return { callId, tab: tab as CallPageTab, ...(t0 && t1 ? { span: { call_id: callId, channel: null, t0_ms: Number(t0), t1_ms: Number(t1) } } : {}) };
 }
 
 /** DESIGN's order of the view control. */

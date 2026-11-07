@@ -20,7 +20,7 @@ export const exportOpener: { open: ((origin: ShareOrigin) => void) | null } = { 
 
 /** Suggested rows the scope would carry, for the notice that makes their inclusion explicit. */
 export function unreviewedIn(callId: string, origin: ShareOrigin): number {
-  return (getOutputs(callId)?.sections ?? []).filter((s) => origin.type === "toolbar" || s.kind === origin.kind).flatMap((s) => s.items).filter((i) => i.review === "suggested").length;
+  return (getOutputs(callId)?.sections ?? []).filter((s) => origin.type === "toolbar" || s.kind === origin.kind).flatMap((s) => s.items).filter((i) => i.review === "suggested" && (origin.type !== "row" || i.id === origin.id)).length;
 }
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-share:p1

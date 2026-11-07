@@ -38,7 +38,7 @@ export function shareItems(o: { origin: ShareOrigin; ready: boolean; sensitive: 
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-menu
 }
 
-const sameOrigin = (a: ShareOrigin, b: ShareOrigin) => a.type === b.type && (a.type !== "section" || a.kind === (b as typeof a).kind);
+const sameOrigin = (a: ShareOrigin, b: ShareOrigin) => a.type === b.type && (a.type === "toolbar" || (a.kind === (b as typeof a).kind && (a.type !== "row" || a.id === (b as typeof a).id)));
 
 /** One Share control: a labelled pull-down on the toolbar, an icon button on a section. */
 // @cpt-component:cpt-noter-component-ui-share-menu:p1
@@ -50,10 +50,10 @@ export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; call
   const privacy = useWindow(bridge, (s) => s.entities.call[callId]?.privacy);
   const { ready, sensitive } = shareState(outputs, privacy);
   const toggle = () => setAnchor(anchor ? null : globalThis.document?.getElementById(id) ?? null);
-  const label = origin.type === "section" ? t("share.section", { section: t(SECTION_LABEL[origin.kind as SectionKind]) }) : t("callpage.share");
+  const label = origin.type === "toolbar" ? t("callpage.share") : origin.type === "row" ? t("share.item") : t("share.section", { section: t(SECTION_LABEL[origin.kind]) });
   return (
     <span data-component="cpt-noter-component-ui-share-menu" style={{ display: "contents" }}>
-      {origin.type === "section" ? <IconButton id={id} icon="export" label={label} size="inline" onAction={toggle} /> : <PullDownButton id={id} icon="export" label={mine?.kind === "copied" ? mine.text : label} ariaLabel={label} variant="toolbar" open={anchor !== null} onAction={toggle} />}
+      {origin.type !== "toolbar" ? <IconButton id={id} icon="export" label={label} size="inline" onAction={toggle} /> : <PullDownButton id={id} icon="export" label={mine?.kind === "copied" ? mine.text : label} ariaLabel={label} variant="toolbar" open={anchor !== null} onAction={toggle} />}
       {mine?.kind === "copied" && <InlineStatus text={mine.text} variant="on-label" onExpire={() => setShareStatus(null)} />}
       {(mine?.kind === "nothing" || mine?.kind === "failed") && <span role="status" className="np-dim">{t(mine.kind === "nothing" ? "share.nothing" : "share.failed")}</span>}
       {anchor && (
