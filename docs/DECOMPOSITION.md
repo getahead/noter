@@ -1012,11 +1012,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.16 History, change log and undo — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-history-undo`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-history-undo`
 
 - **Purpose**: Make every user change undoable from where it happened and from History: the undo strip, change rows, the History timeline per call, person and item, and **Export Log…**.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/history-undo.md`](features/ui/history-undo.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/history-undo.md`](features/ui/history-undo.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1042,9 +1042,9 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-undo-strip`
-  - [ ] `p3` - `cpt-noter-component-ui-change-row`
-  - [ ] `p3` - `cpt-noter-component-ui-history-timeline`
+  - [x] `p3` - `cpt-noter-component-ui-undo-strip`
+  - [x] `p3` - `cpt-noter-component-ui-change-row`
+  - [x] `p3` - `cpt-noter-component-ui-history-timeline`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `history_list`
