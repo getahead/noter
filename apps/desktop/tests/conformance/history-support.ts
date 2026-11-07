@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { Scenario } from "../support/scenario";
 
 type Wire = { invoke(window: string, cmd: string, args: unknown): Promise<unknown> };
-const wire = (s: Scenario) => (s as unknown as { process: Wire }).process;
+export const wire = (s: Scenario) => (s as unknown as { process: Wire }).process;
 
 /** The next save panel answers cancelled, once. On the fake the next `command` (an export) fails `cancelled`. */
 export async function cancelNextSavePanel(s: Scenario, command: "history_export" | "calls_export" = "history_export"): Promise<void> {
