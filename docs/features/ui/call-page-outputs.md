@@ -157,7 +157,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 
 ### Maintain tags and stored audio
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-tags-audio`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-tags-audio`
 
 **Actor**: Primary user
 
@@ -176,9 +176,9 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 4. [x] - `p1` - **IF** Delete Audio is confirmed: `audio_delete` with the call id; use core audio state to stop playback and remove play, sample and export-audio controls - `inst-delete`
 5. [x] - `p1` - User opens **Delete Old Audio…** from the capture/disk warning; main-window dialog host shows the 30-day choice and **Recording goes on while this runs.** - `inst-old`
 6. [x] - `p1` - **IF** Delete Audio is confirmed: `audio_delete_older` with older_than_days 30; show returned call count and freed MB, never prototype fixture totals - `inst-delete-old`
-7. [ ] - `p1` - User fills the sheet and presses the primary button; the dialogs host keeps the button busy with its label while the command runs (from `cpt-noter-flow-ui-dialogs-host-sheet`, owner decision A, 28 Oct 2026) - `inst-sheet-submit`
+7. [x] - `p1` - User fills the sheet and presses the primary button; the dialogs host keeps the button busy with its label while the command runs (from `cpt-noter-flow-ui-dialogs-host-sheet`, owner decision A, 28 Oct 2026) - `inst-sheet-submit`
 8. [x] - `p1` - **RETURN** the sheet closed on success with the result shown where it applies; other errors show as a sheet banner - `inst-sheet-return`
-9. [ ] - `p1` - **RETURN** refreshed audio retention/deletion text with transcripts and outputs still usable; cancelled alerts send no deletion command - `inst-return`
+9. [x] - `p1` - **RETURN** refreshed audio retention/deletion text with transcripts and outputs still usable; cancelled alerts send no deletion command - `inst-return`
 
 Owner decision (6 Nov): the former step "invalid input focuses the first invalid field" is dropped: the Delete Old Audio sheet has no field, `invalid_input` cannot occur.
 

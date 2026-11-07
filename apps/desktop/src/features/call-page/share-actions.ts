@@ -55,11 +55,15 @@ export async function setTags(bridge: Bridge, callId: string, add: string[], rem
 export async function deleteAudio(bridge: Bridge, callId: string, ask: typeof askAlert = askAlert): Promise<"cancelled" | "deleted" | "failed"> {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-alert
   const yes = await ask({ title: t("audio.alert.title"), message: t("audio.alert.message"), cancel: t("outputs.cancel"), confirm: t("audio.alert.confirm"), destructive: true });
-  if (!yes) return "cancelled";
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-return
+  if (!yes) return "cancelled"; // a cancelled alert sends nothing
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-return
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-alert
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete
   const r = await bridge.act(`audio:delete:${callId}`, "audio_delete", () => bridge.core.audioDelete({ call_ids: [callId] }));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete
   if (r.status !== "ok") return "failed";
-  return "deleted"; // `entity:changed call` carries `audio_deleted`
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-return
+  return "deleted"; // `entity:changed call` carries `audio_deleted`: Call info and the transcript read it, outputs stay usable
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-return
 }
