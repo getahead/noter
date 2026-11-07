@@ -1,6 +1,6 @@
 //! Retrieval in the composition root: `noter-retrieval` on the core's store, engine and jobs
-//! (FEATURE `cpt-noter-feature-core-retrieval-ask`, slice 1: search, scope presets, the index
-//! rebuild at start), with knowledge sources' chunks as its documents (2.24).
+//! (FEATURE `cpt-noter-feature-core-retrieval-ask`: search, scope presets, the index rebuild at
+//! start, topics), with knowledge sources' chunks as the documents of search and Ask (2.24).
 
 use std::collections::HashSet;
 use std::sync::{Arc, Weak};
@@ -17,7 +17,7 @@ use crate::{object, Core};
 
 /// Retrieval's documents: knowledge chunks by keyword and by vector, each ranking through the
 /// sources' policy as it stands now (`noter_knowledge::permitted_chunks`).
-struct Documents;
+pub(crate) struct Documents;
 
 impl DocumentSource for Documents {
     fn permitted_chunks(&self, conn: &Connection, q: &DocQuery<'_>) -> rusqlite::Result<DocHits> {

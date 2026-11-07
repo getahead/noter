@@ -245,7 +245,7 @@ impl Core {
         let request = request.with_vector(vector);
         let found = self
             .store()
-            .read(|c| noter_retrieval::retrieve(c, &request, &noter_retrieval::NoDocuments))?;
+            .read(|c| noter_retrieval::retrieve(c, &request, &crate::retrieval::Documents))?;
         let hits: Vec<Hit> = (found.ranked(noter_retrieval::ASK_HITS).into_iter())
             .cloned()
             .collect();
