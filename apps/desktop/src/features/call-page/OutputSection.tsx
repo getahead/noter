@@ -186,6 +186,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
         </div>
       )}
       {/* @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-regen */}
+      {state === "ready" && (section.suppressed_count ?? 0) > 0 && <div className="pc-sec__notice">{t("outputs.suppressed", { count: section.suppressed_count ?? 0 })}</div>}
       {state === "writing" && (section.body_md || section.items.length > 0) && <div className="pc-sec__meta" role="status">{t("outputs.regenerating")}</div>}
       {/* @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-regen */}
       {/* @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-stream */}

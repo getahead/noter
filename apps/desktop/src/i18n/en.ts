@@ -890,6 +890,7 @@ export const en = {
   "outputs.failed_timeout": "Couldn't write the {section} (Claude Code timed out)",
   "outputs.try_again": "Try Again",
   "outputs.use_local": "Use Local Model",
+  "outputs.suppressed": { one: "{count} item not suggested again because you rejected it", other: "{count} items not suggested again because you rejected them" },
   "outputs.regenerate": "Regenerate",
   "outputs.regenerating": "Regenerating…",
   "outputs.version": "Version",
