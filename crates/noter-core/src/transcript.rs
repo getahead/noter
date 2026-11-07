@@ -962,11 +962,10 @@ fn segment_row(seg: &EngineSegment, view: &SegmentView) -> Insert {
     }
 }
 
-/// The shadow text for the keyword index: lower-cased, ё folded to е, ß to ss.
-// shortcut: no NFKC and no stemming (PRD › Retrieval function); retrieval adds both when it
-// rebuilds the shadow column from `text`.
+/// The shadow text for the keyword index, normalised as queries are (NFKC, lower case, ё → е,
+/// ß → ss); queries stem, so the shadow keeps whole words.
 pub(crate) fn shadow(text: &str) -> String {
-    text.to_lowercase().replace('ё', "е").replace('ß', "ss")
+    noter_retrieval::normalize(text)
 }
 
 /// 0..1 from the average log-probability.
@@ -1015,5 +1014,16 @@ fn chip(person_id: String, name: &str) -> PersonChip {
             .to_uppercase(),
         display_name: name.to_string(),
         is_you: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_shadow_is_normalised_as_queries_are() {
+        assert_eq!(
+            super::shadow("ﬁle Ｗｅｂ Ёлка Straße"),
+            "file web елка strasse"
+        );
     }
 }

@@ -127,19 +127,19 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 - Sensitive sources skipped or only weak evidence: the answer carries the corresponding counts and flags.
 
 **Steps**:
-1. [ ] - `p1` - API: `ask_scope_presets` returns readable presets; API: `ask_start { thread_id, question, scope }` with a Channel starts a turn - `inst-ask-request`
-2. [ ] - `p1` - Validate a non-empty question, scope references and dates; an unknown thread returns `not_found` before opening the stream - `inst-ask-validate`
-3. [ ] - `p1` - DB: create a thread if needed, with the first question as title, and record the turn through the writer and change log - `inst-ask-create`
-4. [ ] - `p1` - Register the subscription and **RETURN** `AskHandle` with thread, turn and subscription ids before sending Channel messages - `inst-ask-handle`
-5. [ ] - `p1` - Resolve the search-answer runtime and effective privacy; retrieve the top 30 permitted hits with `cpt-noter-algo-core-retrieval-ask-retrieve` - `inst-ask-context`
-6. [ ] - `p1` - Emit `started`; run `ask-answer` through the router and gate, including prior thread context subject to the current privacy rules; refinements use noter-mcp - `inst-ask-run`
-7. [ ] - `p1` - Run `cpt-noter-algo-core-retrieval-ask-citations`; stream answer `delta` and `citation` messages without claiming unvalidated evidence - `inst-ask-validate-answer`
-8. [ ] - `p1` - DB: store the completed answer, citations, runtime and run id with the updated thread time; emit terminal `done` through the stream hub and release runtime and subscription resources - `inst-ask-finish`
-9. [ ] - `p1` - **IF** execution fails, emit terminal `failed` with `CoreError`; release the runtime and subscription; use `ended` only for a declared `StreamEndReason` - `inst-ask-failure`
+1. [x] - `p1` - API: `ask_scope_presets` returns readable presets; API: `ask_start { thread_id, question, scope }` with a Channel starts a turn - `inst-ask-request`
+2. [x] - `p1` - Validate a non-empty question, scope references and dates; an unknown thread returns `not_found` before opening the stream - `inst-ask-validate`
+3. [x] - `p1` - DB: create a thread if needed, with the first question as title, and record the turn through the writer and change log - `inst-ask-create`
+4. [x] - `p1` - Register the subscription and **RETURN** `AskHandle` with thread, turn and subscription ids before sending Channel messages - `inst-ask-handle`
+5. [x] - `p1` - Resolve the search-answer runtime and effective privacy; retrieve the top 30 permitted hits with `cpt-noter-algo-core-retrieval-ask-retrieve` - `inst-ask-context`
+6. [ ] - `p1` - Emit `started`; run `ask-answer` through the router and gate, including prior thread context subject to the current privacy rules; refinements use noter-mcp (M3, 2.26 core-mcp: the run through the router and gate is in, the noter-mcp half ticks with core-mcp, TL-36) - `inst-ask-run`
+7. [x] - `p1` - Run `cpt-noter-algo-core-retrieval-ask-citations`; stream answer `delta` and `citation` messages without claiming unvalidated evidence - `inst-ask-validate-answer`
+8. [x] - `p1` - DB: store the completed answer, citations, runtime and run id with the updated thread time; emit terminal `done` through the stream hub and release runtime and subscription resources - `inst-ask-finish`
+9. [x] - `p1` - **IF** execution fails, emit terminal `failed` with `CoreError`; release the runtime and subscription; use `ended` only for a declared `StreamEndReason` - `inst-ask-failure`
 
 ### Stop or reopen an Ask thread
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-threads`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-threads`
 
 **Actor**: Primary user (main window › Ask)
 
@@ -151,12 +151,12 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 - Unknown thread or turn: `not_found`; late runtime output cannot recreate a deleted thread.
 
 **Steps**:
-1. [ ] - `p1` - API: `ask_stop { turn_id }` cancels that turn and its runtime; preserve the displayed partial answer as stopped, emit `failed` with `answer_stopped`, release its Channel and **RETURN** `Ack` - `inst-thread-stop`
-2. [ ] - `p1` - API: `ask_threads_list` reads recent thread titles, counts and update times newest first - `inst-thread-list`
-3. [ ] - `p1` - API: `ask_thread_get { thread_id }` reads its scope and turns; resolve every citation target and set `deleted` when its source is gone - `inst-thread-get`
-4. [ ] - `p1` - **IF** the user deletes a thread with `ask_thread_delete`, cancel its active turns before deleting the thread and turns together through the change-log writer - `inst-thread-delete`
-   1. [ ] - `p1` - Discard late results for the deleted thread; **RETURN** `Ack` - `inst-thread-deleted`
-5. [ ] - `p1` - **RETURN** typed thread read models, including complete citation metadata for Markdown copy in the UI - `inst-thread-return`
+1. [x] - `p1` - API: `ask_stop { turn_id }` cancels that turn and its runtime; preserve the displayed partial answer as stopped, emit `failed` with `answer_stopped`, release its Channel and **RETURN** `Ack` - `inst-thread-stop`
+2. [x] - `p1` - API: `ask_threads_list` reads recent thread titles, counts and update times newest first - `inst-thread-list`
+3. [x] - `p1` - API: `ask_thread_get { thread_id }` reads its scope and turns; resolve every citation target and set `deleted` when its source is gone - `inst-thread-get`
+4. [x] - `p1` - **IF** the user deletes a thread with `ask_thread_delete`, cancel its active turns before deleting the thread and turns together through the change-log writer - `inst-thread-delete`
+   1. [x] - `p1` - Discard late results for the deleted thread; **RETURN** `Ack` - `inst-thread-deleted`
+5. [x] - `p1` - **RETURN** typed thread read models, including complete citation metadata for Markdown copy in the UI - `inst-thread-return`
 
 ### Read and edit topic threads
 
@@ -201,19 +201,19 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Validate citations and answer provenance
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-citations`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-citations`
 
 **Input**: Router-validated `AskAnswerOutput`, permitted evidence supplied initially or by tools, current source rows and the run's pseudonym map.
 
 **Output**: An `AskAnswer` with valid citations, or a typed validation failure.
 
 **Steps**:
-1. [ ] - `p1` - Resolve cited segment and chunk ids against evidence available to this run; reject unknown or out-of-scope ids through the router's validation and retry policy - `inst-cite-resolve`
-2. [ ] - `p1` - Recheck source existence and privacy before publishing; build quotes and speaker, call, time or document section from stored evidence - `inst-cite-build`
-3. [ ] - `p1` - Map pseudonyms back locally and number citations to match the Markdown references - `inst-cite-map`
-4. [ ] - `p1` - **IF** no valid citations remain, discard the unsupported answer and set `found: false` with the not-found response - `inst-cite-not-found`
-5. [ ] - `p1` - Carry runtime, local-answer flag, keyword-only flag, sensitive-skip count and only-weak-evidence flag into the answer - `inst-cite-flags`
-6. [ ] - `p1` - **RETURN** the answer; raw HTML is not part of answer Markdown - `inst-cite-return`
+1. [x] - `p1` - Resolve cited segment and chunk ids against evidence available to this run; reject unknown or out-of-scope ids through the router's validation and retry policy - `inst-cite-resolve`
+2. [x] - `p1` - Recheck source existence and privacy before publishing; build quotes and speaker, call, time or document section from stored evidence - `inst-cite-build`
+3. [x] - `p1` - Map pseudonyms back locally and number citations to match the Markdown references - `inst-cite-map`
+4. [x] - `p1` - **IF** no valid citations remain, discard the unsupported answer and set `found: false` with the not-found response - `inst-cite-not-found`
+5. [x] - `p1` - Carry runtime, local-answer flag, keyword-only flag, sensitive-skip count and only-weak-evidence flag into the answer - `inst-cite-flags`
+6. [x] - `p1` - **RETURN** the answer; raw HTML is not part of answer Markdown - `inst-cite-return`
 
 ### Attach items to topics
 
@@ -251,18 +251,18 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Ask turn lifecycle
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-retrieval-ask-turn`
+- [x] `p4` - **ID**: `cpt-noter-state-core-retrieval-ask-turn`
 
 **States**: accepted, retrieving, answering, done, failed, cancelled
 
 **Initial State**: accepted
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** accepted **TO** retrieving **WHEN** the returned handle's worker starts - `inst-turn-retrieve`
-2. [ ] - `p1` - **FROM** retrieving **TO** answering **WHEN** permitted evidence is ready and the runtime starts - `inst-turn-answer`
-3. [ ] - `p1` - **FROM** answering **TO** done **WHEN** a validated answer or cited not-found result is persisted - `inst-turn-done`
-4. [ ] - `p1` - **FROM** retrieving **TO** failed **WHEN** retrieval fails; also from answering on runtime, citation or persistence failure - `inst-turn-failed`
-5. [ ] - `p1` - **FROM** accepted **TO** cancelled **WHEN** Stop, thread deletion, unsubscribe or shutdown cancels work; also from retrieving or answering - `inst-turn-cancelled`
+1. [x] - `p1` - **FROM** accepted **TO** retrieving **WHEN** the returned handle's worker starts - `inst-turn-retrieve`
+2. [x] - `p1` - **FROM** retrieving **TO** answering **WHEN** permitted evidence is ready and the runtime starts - `inst-turn-answer`
+3. [x] - `p1` - **FROM** answering **TO** done **WHEN** a validated answer or cited not-found result is persisted - `inst-turn-done`
+4. [x] - `p1` - **FROM** retrieving **TO** failed **WHEN** retrieval fails; also from answering on runtime, citation or persistence failure - `inst-turn-failed`
+5. [x] - `p1` - **FROM** accepted **TO** cancelled **WHEN** Stop, thread deletion, unsubscribe or shutdown cancels work; also from retrieving or answering - `inst-turn-cancelled`
 
 ### Retrieval index readiness
 

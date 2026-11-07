@@ -66,11 +66,7 @@ impl Core {
     ) -> Result<SearchResults, CoreError> {
         self.ready()?;
         let request = noter_retrieval::search_request(&args)?;
-        let mode = self.index.mode();
-        let vector = match mode {
-            SearchMode::Hybrid => noter_retrieval::embed_query(&self.engine, request.text()).await,
-            SearchMode::KeywordOnly { .. } => None,
-        };
+        let (vector, mode) = self.query_vector(request.text()).await;
         let request = request.with_vector(vector);
         self.store().read(|c| {
             noter_retrieval::search(
@@ -81,6 +77,25 @@ impl Core {
                 &noter_retrieval::NoDocuments,
             )
         })
+    }
+
+    /// A query's local embedding when the vector indexes are ready, and the mode the request
+    /// runs in: keyword-only while they rebuild, or when this embedding failed.
+    pub(crate) async fn query_vector(&self, text: &str) -> (Option<Vec<f32>>, SearchMode) {
+        let mode = self.index.mode();
+        if mode != SearchMode::Hybrid || text.trim().is_empty() {
+            return (None, mode);
+        }
+        match noter_retrieval::embed_query(&self.engine, text).await {
+            Some(vector) => (Some(vector), mode),
+            // The indexes are complete; only this request ran without vectors.
+            None => (
+                None,
+                SearchMode::KeywordOnly {
+                    rebuild_progress: 1.0,
+                },
+            ),
+        }
     }
 
     /// `ask_scope_presets`: readable scopes from the current library.
