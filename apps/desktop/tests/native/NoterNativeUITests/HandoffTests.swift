@@ -91,6 +91,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(copy.waitForExistence(timeout: 10))
         copy.click()
         XCTAssertTrue(anyElement("title == 'Copied' OR label == 'Copied' OR value == 'Copied'").waitForExistence(timeout: 5), "Copy Prompt says Copied")
-        XCTAssertTrue(anyElement("title CONTAINS 'Handed off' OR label CONTAINS 'Handed off' OR value CONTAINS 'Handed off'").waitForExistence(timeout: 5), "copying hands the item off without launching")
+        // static texts only: CONTAINS throws on an element whose value is a number (the sidebar's resize handle)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value CONTAINS 'Handed off' OR label CONTAINS 'Handed off'")).firstMatch.waitForExistence(timeout: 5), "copying hands the item off without launching")
     }
 }
