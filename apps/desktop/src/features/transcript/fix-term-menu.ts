@@ -20,3 +20,11 @@ export function watchFixTermMenu(
     set(false);
   };
 }
+
+/** The menu item was chosen (`chosen` counts the choices): opens the term fix on what `pick` finds selected, once per choice. */
+export function followFixTermChoice<T>(handled: { current: number }, chosen: number, pick: () => T | null, open: (picked: T) => void): void {
+  if (chosen === handled.current) return;
+  handled.current = chosen;
+  const picked = pick();
+  if (picked) open(picked);
+}

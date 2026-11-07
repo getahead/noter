@@ -19,7 +19,7 @@ import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
 import { playControl, REFUSED } from "./play-control";
 import { ArchiveNotice, type ArchiveNote } from "./ArchiveNotice";
-import { watchFixTermMenu } from "./fix-term-menu";
+import { followFixTermChoice, watchFixTermMenu } from "./fix-term-menu";
 import { selectedFixTerm } from "./segment-row";
 import { TranscriptView } from "./transcript-view";
 
@@ -251,18 +251,10 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   const segments = tr.data?.segments;
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
-  useEffect(() => {
-    if (variant !== "stored") return;
-    return watchFixTermMenu(document, () => globalThis.getSelection(), () => segmentsRef.current ?? [], (enabled) => void tr.bridge.core.windowSetFixTermEnabled({ enabled }));
-  }, [variant, tr.bridge]);
+  useEffect(() => (variant === "stored" ? watchFixTermMenu(document, () => globalThis.getSelection(), () => segmentsRef.current ?? [], (enabled) => void tr.bridge.core.windowSetFixTermEnabled({ enabled })) : undefined), [variant, tr.bridge]);
   const chosen = useWindow(tr.bridge, (s) => s.fixTerm);
   const handled = useRef(chosen);
-  useEffect(() => {
-    if (chosen === handled.current) return;
-    handled.current = chosen;
-    const picked = variant === "stored" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null;
-    if (picked) setFixing({ ...picked, menu: false });
-  }, [chosen, variant]);
+  useEffect(() => followFixTermChoice(handled, chosen, () => (variant === "stored" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null), (picked) => setFixing({ ...picked, menu: false })), [chosen, variant]);
   const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
   const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
   return (

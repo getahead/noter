@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { watchFixTermMenu } from "./fix-term-menu";
+import { followFixTermChoice, watchFixTermMenu } from "./fix-term-menu";
 import { seg } from "./testing";
 
 const segment = seg("seg_1", 0, { text: "the notification service" });
@@ -48,5 +48,20 @@ describe("watchFixTermMenu", () => {
     listener();
     expect(setEnabled).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("followFixTermChoice", () => {
+  it("opens on the selection once per choice, and nothing without a selection", () => {
+    const handled = { current: 0 };
+    const open = vi.fn();
+    followFixTermChoice(handled, 0, () => "words", open);
+    expect(open).not.toHaveBeenCalled();
+    followFixTermChoice(handled, 1, () => "words", open);
+    followFixTermChoice(handled, 1, () => "words", open);
+    expect(open.mock.calls).toEqual([["words"]]);
+    followFixTermChoice(handled, 2, () => null, open);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(handled.current).toBe(2);
   });
 });
