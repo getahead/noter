@@ -20,6 +20,7 @@ final class HandoffTests: NoterTestCase {
     /// The saved call page's engineering item: its Handoff button opens the drawer.
     private func openDrawer(file: StaticString = #filePath, line: UInt = #line) {
         openCall("Backend sync")
+        app.typeKey(.return, modifierFlags: []) // Return opens the selected call's page
         let handoff = app.buttons["Handoff"].firstMatch
         XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button", file: file, line: line)
         handoff.click()
