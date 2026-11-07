@@ -987,14 +987,9 @@ async fn removing_an_mcp_source_removes_its_token_and_index() {
 async fn the_hourly_pass_syncs_an_indexed_source_once_its_schedule_has_passed() {
     let rig = open().await;
     let row = rig.add_mcp().await;
-    let runs = || count(&rig.core, "SELECT COUNT(*) FROM sync_runs");
-    let before = runs();
-    // Two hours on: the pass runs, but a daily source is not due.
-    rig.clock.0.store(T0 + 2 * 3_600_000, Ordering::SeqCst);
-    noter_core::testing::jobs_tick(&rig.core);
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    assert_eq!(runs(), before);
-    // A day on, it is.
+    // A day on, the pass queues the daily source. Whether a source is due is `due()`'s, tested
+    // without a scheduler in noter-knowledge; counting runs here would race the scheduler's own
+    // ticks, which may sync once more while the first sync is still open.
     let later = T0 + 25 * 3_600_000;
     rig.clock.0.store(later, Ordering::SeqCst);
     noter_core::testing::jobs_tick(&rig.core);
@@ -1014,4 +1009,92 @@ async fn a_live_source_is_removed_even_with_the_keychain_locked() {
     let args = SourceIdArgs { source_id: row.id };
     rig.core.source_remove(&ctx(), args).await.unwrap();
     assert!(rig.source().await.is_none());
+}
+
+// ── document hits in search (`permitted_chunks` behind retrieval's document seam) ──
+
+fn search_args(query: &str, call_types: Vec<CallTypeId>) -> SearchArgs {
+    SearchArgs {
+        query: query.into(),
+        filter: CallFilter {
+            call_types,
+            ..CallFilter::default()
+        },
+        limit: None,
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_indexed_heading_is_document_evidence_in_search_until_the_source_goes() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    // A stem at a word start finds "ships"; the hit names its source, title and section.
+    let found = rig
+        .core
+        .search(&main, search_args("shipping", vec![]))
+        .await
+        .unwrap();
+    assert!(!found.documents.is_empty(), "{found:?}");
+    let first = &found.documents[0];
+    assert_eq!(first.strength, MatchStrength::Strong);
+    assert!(
+        first.snippet.starts_with("The rollout for page"),
+        "{}",
+        first.snippet
+    );
+    assert!(matches!(first.target, HitTarget::Document { .. }));
+    let Provenance::Document {
+        source_id,
+        title,
+        section,
+        source_name,
+        ..
+    } = &first.provenance
+    else {
+        panic!("{:?}", first.provenance);
+    };
+    assert_eq!(
+        (
+            source_id,
+            title.starts_with("Page "),
+            section.as_deref(),
+            source_name.as_str()
+        ),
+        (&row.id, true, Some("Rollout"), "notion")
+    );
+    // A source limited to other call types is not evidence for a request about one type.
+    let limited = SourceUpdateArgs {
+        source_id: row.id.clone(),
+        rev: rig.source().await.unwrap().rev,
+        name: None,
+        schedule: None,
+        privacy: None,
+        scope: Some(SourceScope::Limited {
+            call_types: vec![],
+            people: vec![PersonId::new("per_nobody")],
+        }),
+    };
+    rig.core.source_update(&ctx(), limited).await.unwrap();
+    let types = rig.core.call_types_list(&main, NoArgs {}).await.unwrap();
+    let one = vec![types.call_types[0].id.clone()];
+    let scoped = rig
+        .core
+        .search(&main, search_args("rollout", one))
+        .await
+        .unwrap();
+    assert!(scoped.documents.is_empty());
+    // Removed: no hits.
+    let args = SourceIdArgs { source_id: row.id };
+    rig.core.source_remove(&ctx(), args).await.unwrap();
+    let gone = rig
+        .core
+        .search(&main, search_args("rollout", vec![]))
+        .await
+        .unwrap();
+    assert!(gone.documents.is_empty());
 }
