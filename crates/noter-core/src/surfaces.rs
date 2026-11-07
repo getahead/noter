@@ -174,7 +174,6 @@ impl Core {
     }
 
     /// Native focus can leave the panel between explicit editing requests.
-    // @cpt-state:cpt-noter-state-core-native-surfaces-call-window:p1
     pub fn call_window_focus_changed(&self, focused: bool) {
         let mut w = lock(&self.windows);
         let key = focused && w.call.visible;
