@@ -72,10 +72,15 @@ describe("cpt-noter-seq-library-filter-calls", () => {
   it("happy path: people and open items narrow the calls, and the export writes the selection", async () => {
     open();
     const all = await calls({});
+    const theirs = await calls({ people: ["per_dmitri"] });
+    expect(theirs).toEqual(expect.arrayContaining([LIVE_CALL, PAST_CALL]));
+    // The live call still has open items; the past call's only item is closed by evidence.
     const narrowed = await calls({ people: ["per_dmitri"], has_open_items: true });
-    expect(narrowed.length).toBeGreaterThan(0);
+    expect(narrowed).toContain(LIVE_CALL);
     expect(narrowed.length).toBeLessThanOrEqual(all.length);
-    const exported = ok(await main.callsExport({ call_ids: narrowed.slice(0, 3), include: { summary_and_items: true, transcript: false, audio: false } }));
+    if (s.target === "stdio") expect(narrowed).toEqual([LIVE_CALL]);
+    // The selection: Dmitri's finished call (the live one has no outputs to export yet).
+    const exported = ok(await main.callsExport({ call_ids: [PAST_CALL], include: { summary_and_items: true, transcript: false, audio: false } }));
     expect(exported.files).toBeGreaterThan(0);
   });
 
