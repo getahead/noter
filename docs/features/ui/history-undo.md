@@ -35,11 +35,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-history-undo`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-history-undo`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-history-undo`
+- [x] `p3` - `cpt-noter-feature-ui-history-undo`
 
 ### 1.1 Overview
 
@@ -203,7 +203,7 @@ Read changes, undo or redo them, and export a call’s log.
 
 ### Timeline, diff and export
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-timeline`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-timeline`
 
 The system **MUST** render all three timeline variants, actor and job filters, empty/error states, 50-row disclosures where the contract supplies members, and the call Export Log sheet.
 
@@ -220,7 +220,7 @@ The system **MUST** render all three timeline variants, actor and job filters, e
 
 ### Shared reversible actions
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-undo`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-history-undo-undo`
 
 The system **MUST** bind row, strip and app-menu actions to core targets, show partial counts, preserve actions after expiry, pause timers on hover/focus and keep standard editor undo.
 
