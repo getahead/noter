@@ -274,9 +274,7 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
         }
         setRenaming({ speakerId, segmentId: seg.id, anchor });
       }}
-      // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
       onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
-      // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
     />
     {fixing?.menu && (
       <Popover variant="context-menu" anchor={fixing.anchor} label={t("speakers.fix.menu")} onClose={() => setFixing(null)}>

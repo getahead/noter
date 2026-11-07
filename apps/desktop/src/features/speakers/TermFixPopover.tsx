@@ -96,12 +96,10 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
     // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
   };
 
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-open
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-cancel
   return (
     <Popover variant="term-fix" anchor={anchor} width={320} label={t("speakers.fix.title")} onClose={onClose}>
-      {/* @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-open */}
-      {/* @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-cancel */}
-      {/* @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-cancel */}
-      {/* @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-open */}
       <div className="cw-pr" data-component="cpt-noter-component-ui-term-fix-popover" data-state={busy ? "applying" : error ? "error" : valid ? "editing" : "invalid"}>
         <h3 className="cw-pr__title">{t("speakers.fix.title")}</h3>
         <div className="cw-pp__lbl">
@@ -130,4 +128,6 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
       </div>
     </Popover>
   );
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-cancel
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-open
 }
