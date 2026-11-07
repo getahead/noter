@@ -24,21 +24,22 @@ final class HandoffTests: NoterTestCase {
         app.typeKey(.return, modifierFlags: []) // Return opens the selected call's page
         let handoff = app.buttons["Handoff"].firstMatch
         XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button — \(screen())", file: file, line: line)
-        // the page is still settling right after it loads: click once the button has stopped moving
-        var last = CGRect.zero
-        let end = Date().addingTimeInterval(5)
-        while Date() < end {
-            let frame = handoff.frame
-            if frame == last && frame.height > 0 { break }
-            last = frame
-            Thread.sleep(forTimeInterval: 0.2)
-        }
-        handoff.click()
+        // A click on a web button can land on its neighbour in the native window (the Item inspector opened for another
+        // item on CI): reach the button with the keyboard instead, Tab until it has focus and Space runs it.
+        func focused(_ element: XCUIElement) -> Bool { (element.value(forKey: "hasKeyboardFocus") as? Bool) ?? false }
+        for _ in 0..<80 where !focused(handoff) { app.typeKey(.tab, modifierFlags: []) }
+        XCTAssertTrue(focused(handoff), "Tab never reached the Handoff button — \(screen())", file: file, line: line)
+        app.typeKey(" ", modifierFlags: [])
         XCTAssertTrue(app.buttons["Copy Prompt"].firstMatch.waitForExistence(timeout: 10), "the Handoff drawer did not open — \(screen())", file: file, line: line)
     }
 
     /// What the window shows, for a failure message: the CI log is the only screen a native failure leaves.
-    private func screen() -> String { String(app.windows.firstMatch.debugDescription.prefix(7000)) }
+    private func screen() -> String {
+        // the page's part of the tree comes late in a long dump: keep the lines that name what these tests look for
+        let wanted = ["Handoff", "Inspector", "Copy Prompt", "Add Mapping", "Choose", "Open in", "Keyboard Focused", "repository"]
+        let lines = app.windows.firstMatch.debugDescription.split(separator: "\n").map(String.init).filter { line in wanted.contains { line.contains($0) } }
+        return lines.prefix(40).map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: " ¦ ")
+    }
 
     private var addMapping: XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Add Mapping'")).firstMatch
