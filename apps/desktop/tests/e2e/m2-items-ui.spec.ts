@@ -309,6 +309,42 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     await expect(page.getByRole("button", { name: /^Play/ })).toHaveCount(0);
   });
 
+  /** The evidence span's words as the live pass wrote them and, once the archive pass is `done`, as it rewrote them. */
+  const archiveWorld = (archive: "done" | "pending") => (w: World) => {
+    three(w);
+    const line = { call_id: W.PAST_CALL, channel: "sys" as const, speaker: { speaker_id: "spk_pavel", label: { type: "person" as const, person: { id: "per_pavel", display_name: "Pavel Romanov", short_name: "Pavel", initials: "PR", is_you: false } } }, crosstalk_with: [], t0_ms: 12_000, t1_ms: 20_000, lang: "en", lang_p: 0.93, confidence: 0.95, state: "confirmed" as const, corrections: [] };
+    const segments = [
+      { ...line, id: "seg_live", pass: "live" as const, text: "ship it friday" },
+      ...(archive === "done" ? [{ ...line, id: "seg_arch", pass: "archive" as const, text: "ship it on Friday" }] : []),
+    ];
+    w.transcripts = w.transcripts.filter((x) => x.call_id !== W.PAST_CALL);
+    const tr = { subscription_id: null, call_id: W.PAST_CALL, live: false, pass: archive === "done" ? ("archive" as const) : ("live" as const), archive, segments, hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: segments.length, audio_available: true };
+    w.transcripts.push(tr as never);
+    for (const c of [w.calls.find((x) => x.id === W.PAST_CALL)!, w.call_details.find((d) => d.call.id === W.PAST_CALL)!.call]) c.archive = archive;
+  };
+
+  test("UI — error path — Transcript upgraded by the archive pass: the notice names it and Show/Hide Archive Changes shows the words before and after", async ({ page }) => {
+    await openCall(page, archiveWorld("done"));
+    await button(rowOf(page, DECISION), "Edit").click();
+    await button(page.locator(INSPECTOR), TIME).click();
+    await expect(page.getByText("Words changed by the archive pass")).toBeVisible();
+    await page.getByRole("button", { name: "Show Archive Changes" }).click();
+    const diff = page.locator('[data-component="cpt-noter-component-ui-diff-view"]');
+    await expect(diff).toContainText("friday");
+    await expect(diff).toContainText("on Friday");
+    await page.getByRole("button", { name: "Hide Archive Changes" }).click();
+    await expect(diff).toHaveCount(0);
+  });
+
+  test("UI — error path — Archive transcript pending: the evidence opens the live span, with no archive notice", async ({ page }) => {
+    await openCall(page, archiveWorld("pending"));
+    await button(rowOf(page, DECISION), "Edit").click();
+    await button(page.locator(INSPECTOR), TIME).click();
+    await expect(page.getByRole("tab", { name: "Transcript", selected: true })).toBeVisible();
+    await expect(page.getByText("Words changed by the archive pass")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Show Archive Changes" })).toHaveCount(0);
+  });
+
   test("UI — Other — Edit an item in the Item inspector: Details, Due, Save shows Saved and sends item_edit with only the changed field", async ({ page }) => {
     await openCall(page, suggest());
     await button(rowOf(page, SPEC), "Show in Item inspector").click();
