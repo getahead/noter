@@ -575,7 +575,8 @@ impl OAuthWorld {
                 let _ = stream.read_to_string(&mut answer);
             });
         };
-        McpClient::new(Arc::new(open)).sign_in_deadline(Duration::from_millis(500))
+        // Long enough for a loaded runner to come back; the wrong-state test waits it out.
+        McpClient::new(Arc::new(open)).sign_in_deadline(Duration::from_secs(2))
     }
 
     fn opened(&self) -> Vec<String> {
@@ -726,4 +727,28 @@ async fn an_authorization_server_without_registration_or_s256_is_refused() {
         assert_eq!(*lock(&opened), 0);
         assert!(stub.requests().iter().all(|r| r.path != "/register"));
     }
+}
+
+#[tokio::test]
+async fn an_answer_larger_than_a_page_may_be_is_refused() {
+    let stub = mcp(true, |method, _, r| {
+        let text = "x".repeat(33 * 1024 * 1024);
+        (method == "resources/read").then(|| {
+            rpc(
+                id(r),
+                json!({"contents": [{"uri": "doc://big", "text": text}]}),
+            )
+        })
+    });
+    let audit = |_: &str, _: &[u8]| true;
+    let renewed = no_renewal();
+    let server = stub.url("/mcp");
+    let call = Call {
+        server: &server,
+        token: "t",
+        audit: &audit,
+        renewed: &renewed,
+    };
+    let e = client().read(&call, "doc://big").await.err();
+    assert_eq!(e, Some(McpClientError::Invalid));
 }

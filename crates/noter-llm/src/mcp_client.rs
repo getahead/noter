@@ -33,6 +33,8 @@ const PROTOCOL: &str = "2025-06-18";
 /// `resources/list` pages read before a listing counts as partial.
 const PAGES: usize = 100;
 const METHOD_NOT_FOUND: i64 = -32601;
+/// The largest answer read, as for a folder file; a larger one is refused, never held.
+const MAX_BODY: usize = 32 * 1024 * 1024;
 const SESSION: HeaderName = HeaderName::from_static("mcp-session-id");
 const VERSION: HeaderName = HeaderName::from_static("mcp-protocol-version");
 
@@ -454,7 +456,7 @@ impl McpClient {
         if !status.is_success() {
             return Err(failure(status));
         }
-        let bytes = response.bytes().await.map_err(|_| Offline)?;
+        let bytes = capped(response).await?;
         serde_json::from_slice(&bytes).map_err(|_| Invalid)
     }
 
@@ -481,7 +483,7 @@ impl McpClient {
         if !response.status().is_success() {
             return Err(failure(response.status()));
         }
-        let bytes = response.bytes().await.map_err(|_| Offline)?;
+        let bytes = capped(response).await?;
         let registered: Value = serde_json::from_slice(&bytes).map_err(|_| Invalid)?;
         registered["client_id"]
             .as_str()
@@ -540,7 +542,7 @@ impl McpClient {
         if !response.status().is_success() {
             return Ok(None);
         }
-        let bytes = response.bytes().await.map_err(|_| Offline)?;
+        let bytes = capped(response).await?;
         Ok(serde_json::from_slice(&bytes).ok())
     }
 
@@ -572,7 +574,7 @@ impl McpClient {
         let body = message.to_string().into_bytes();
         let response = self.send(audit, Method::POST, url, headers, body).await?;
         let (status, headers) = (response.status(), response.headers().clone());
-        let bytes = response.bytes().await.map_err(|_| Offline)?;
+        let bytes = capped(response).await?;
         Ok((status, headers, bytes.to_vec()))
     }
 
@@ -596,6 +598,18 @@ impl McpClient {
         let request = self.http.request(method, url.clone()).headers(headers);
         request.body(body).send().await.map_err(|_| Offline)
     }
+}
+
+/// The answer's body, up to [`MAX_BODY`].
+async fn capped(mut response: reqwest::Response) -> Result<Vec<u8>, McpClientError> {
+    let mut out = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| Offline)? {
+        if out.len() + chunk.len() > MAX_BODY {
+            return Err(Invalid);
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(out)
 }
 
 fn initialize(id: u64) -> Value {
