@@ -1160,8 +1160,6 @@ export const en = {
   "items.add_confirm": "Add",
   "items.audio_gone": "Audio deleted · transcript kept",
   "items.archive_changed": "Words changed by the archive pass",
-  "items.archive_show": "Show Archive Changes",
-  "items.archive_hide": "Hide Archive Changes",
   "items.kind.decision": "Decision",
   "items.kind.action_item": "Action item",
   "items.kind.open_question": "Open question",
