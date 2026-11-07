@@ -53,8 +53,15 @@ final class MenuBarTests: NoterTestCase {
     func test_cpt_noter_seq_today_review_before_call__menu_next_is_disabled() {
         app.launchEnvironment["NOTER_TEST_CLOCK"] = "fixed"
         launch("idle")
-        let next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
-        XCTAssertTrue(next.waitForExistence(timeout: 5))
+        // The calendar is read a few seconds after launch; an open menu does not follow a rebuild,
+        // so reopen it until the line is there.
+        var next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
+        for _ in 0..<10 where !next.exists {
+            closeMenu()
+            Thread.sleep(forTimeInterval: 1)
+            next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
+        }
+        XCTAssertTrue(next.exists)
         XCTAssertFalse(next.isEnabled, "Next is calendar information, not a recording action")
     }
 
