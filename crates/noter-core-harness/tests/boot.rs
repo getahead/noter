@@ -302,6 +302,21 @@ async fn the_fixture_calls_are_rows_the_library_serves_and_world_set_owns_them()
 }
 
 #[tokio::test]
+async fn an_item_the_fixture_user_owns_is_yours() {
+    let mut r = start().await;
+    let mine = r
+        .ok("main", "item_get", json!({ "item_id": "itm_token" }))
+        .await;
+    assert_eq!(mine["item"]["owner"]["is_you"], json!(true));
+    assert_eq!(mine["item"]["owed"], json!("by_you"));
+    let anna = r
+        .ok("main", "item_get", json!({ "item_id": "itm_spec" }))
+        .await;
+    assert_eq!(anna["item"]["owner"]["is_you"], json!(false));
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn world_set_rereads_the_models_folder_for_the_bundles_it_changes() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
