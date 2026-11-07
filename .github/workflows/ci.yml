@@ -191,7 +191,7 @@ jobs:
           cargo build --locked -p noter-core-harness
           echo "NOTER_CORE_CMD=$PWD/target/debug/noter-core-harness --fixture world" >> "$GITHUB_ENV"
       - name: Browsers for the UI flows
-        run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
+        uses: ./.github/actions/playwright
       - run: just e2e-core
         env:
           NOTER_E2E_SPECS: ${{ needs.changes.outputs.e2e_specs }}
@@ -230,7 +230,7 @@ jobs:
           echo "NOTER_CORE_CMD=$PWD/target/debug/noter-core-harness --fixture world" >> "$GITHUB_ENV"
           echo "NOTER_E2E_REAL=1" >> "$GITHUB_ENV"
       - name: Browsers for the UI flows
-        run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
+        uses: ./.github/actions/playwright
       - run: just e2e-ui
         env:
           NOTER_E2E_SPECS: ${{ needs.changes.outputs.e2e_specs }}
