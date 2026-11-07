@@ -64,6 +64,9 @@ pub use mcp::{McpRegistration, McpSession};
 pub use models::PinnedModels;
 pub use native_ops::{ClipboardText, LaunchRequest, NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
+pub use noter_knowledge::{
+    McpError, McpSource, ScriptedListing, ScriptedMcp, ScriptedOauth, ScriptedPage, ScriptedServer,
+};
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
 pub use noter_llm::{
@@ -139,6 +142,9 @@ pub struct CoreDeps {
     pub power: Arc<dyn noter_jobs::PowerSource>,
     /// Save panel and the native asks to come (`NativeOps`); every panel cancels until set.
     pub native_ops: Arc<dyn NativeOps>,
+    /// Indexed MCP servers (TL-42; scripted in the harness and tests); no server is valid until
+    /// set.
+    pub mcp_source: Arc<dyn noter_knowledge::McpSource>,
 }
 
 impl CoreDeps {
@@ -161,7 +167,13 @@ impl CoreDeps {
             account_cli: Arc::new(NoAccountCli),
             power: Arc::new(jobs::AcPower),
             native_ops: Arc::new(native_ops::NoNativeOps),
+            mcp_source: Arc::new(ScriptedMcp::default()),
         }
+    }
+
+    pub fn with_mcp_source(mut self, mcp: Arc<dyn noter_knowledge::McpSource>) -> Self {
+        self.mcp_source = mcp;
+        self
     }
 
     pub fn with_power(mut self, power: Arc<dyn noter_jobs::PowerSource>) -> Self {
@@ -1190,6 +1202,22 @@ impl CoreApi for Core {
         args: SourceIdArgs,
     ) -> Result<DeleteResult, CoreError> {
         self.remove_source(ctx, args)
+    }
+
+    async fn source_add_mcp(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceAddMcpArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.add_mcp_source(ctx, args).await
+    }
+
+    async fn source_revoke_token(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceIdArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.revoke_source_token(ctx, args)
     }
 
     async fn repos_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<RepoList, CoreError> {

@@ -685,7 +685,8 @@ async fn a_cancelled_or_offline_sign_in_an_unknown_server_or_a_locked_keychain_w
     let add = |server: &str| {
         let mut args = mcp_args(SourceMode::Indexed);
         args.server = server.into();
-        rig.core.source_add_mcp(&ctx(), args)
+        let core = rig.core.clone();
+        async move { core.source_add_mcp(&ctx(), args).await }
     };
     for (name, oauth) in [
         ("cancelled", noter_core::ScriptedOauth::Cancelled),
@@ -980,4 +981,23 @@ async fn removing_an_mcp_source_removes_its_token_and_index() {
     assert!(rig.token(&row.id).is_none());
     assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM doc_chunks"), 0);
     assert!(rig.source().await.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_hourly_pass_syncs_an_indexed_source_once_its_schedule_has_passed() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let runs = || count(&rig.core, "SELECT COUNT(*) FROM sync_runs");
+    let before = runs();
+    // Two hours on: the pass runs, but a daily source is not due.
+    rig.clock.0.store(T0 + 2 * 3_600_000, Ordering::SeqCst);
+    noter_core::testing::jobs_tick(&rig.core);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(runs(), before);
+    // A day on, it is.
+    let later = T0 + 25 * 3_600_000;
+    rig.clock.0.store(later, Ordering::SeqCst);
+    noter_core::testing::jobs_tick(&rig.core);
+    let done = rig.synced_at(later).await;
+    assert_eq!(done.id, row.id);
 }

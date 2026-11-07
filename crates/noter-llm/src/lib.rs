@@ -31,7 +31,7 @@ pub use account_cli::{
 pub use adapters::cli::{CliAccounts, CliConfig};
 pub use adapters::ollama::OllamaConfig;
 pub use adapters::scripted::{Received, Scripted};
-pub use gate::Adapters;
+pub use gate::{audit_lookup, Adapters};
 pub use runtime::{
     Availability, Budget, Cancel, Failure, Llm, LlmRuntime, Packet, PacketContext, PacketItem,
     Privacy, Provenance, RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind,

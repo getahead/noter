@@ -75,6 +75,11 @@ pub fn capture_event(core: &Core, event: crate::capture::CaptureEvent) {
     core.capture_event(event);
 }
 
+/// One pass of the scheduler's loop now, as its minute tick would (scheduled triggers).
+pub fn jobs_tick(core: &Core) {
+    core.jobs.tick();
+}
+
 /// The next transcript commit "crashes" before it publishes (D-27: never in a release build).
 pub fn fail_transcript_after_commit_once(core: &Core) {
     core.transcript.fail_after_commit_once();

@@ -108,7 +108,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 ### Add an MCP source
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-knowledge-mcp`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-knowledge-mcp`
 
 **Actor**: Primary user (Settings › Knowledge Sources)
 
@@ -120,12 +120,12 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 - OAuth cancelled, offline server or invalid server configuration: typed failure, no leaked token or half-enabled sync.
 
 **Steps**:
-1. [ ] - `p1` - API: `source_add_mcp { server, mode, schedule, privacy, scope }`; validate the server and an indexed source's schedule - `inst-mcp-request`
-2. [ ] - `p1` - **IF** mode is indexed, complete the server's OAuth through the credentials seam and place the token in the Keychain; persist only its reference - `inst-mcp-oauth`
-3. [ ] - `p1` - **ELSE** retain live-server configuration without copying its credentials or adding it to a runtime's own MCP config - `inst-mcp-live`
-4. [ ] - `p1` - DB: INSERT the source with privacy, scope and mode through the change-log writer; compensate an orphaned newly created Keychain item if the transaction fails - `inst-mcp-store`
-5. [ ] - `p1` - For indexed mode, enqueue sync and register its schedule; for live mode, leave indexing disabled - `inst-mcp-schedule`
-6. [ ] - `p1` - Emit `entity:changed`; **RETURN** `SourceRow` with `has_token`, never the token - `inst-mcp-return`
+1. [x] - `p1` - API: `source_add_mcp { server, mode, schedule, privacy, scope }`; validate the server and an indexed source's schedule - `inst-mcp-request`
+2. [x] - `p1` - **IF** mode is indexed, complete the server's OAuth through the credentials seam and place the token in the Keychain; persist only its reference - `inst-mcp-oauth`
+3. [x] - `p1` - **ELSE** retain live-server configuration without copying its credentials or adding it to a runtime's own MCP config - `inst-mcp-live`
+4. [x] - `p1` - DB: INSERT the source with privacy, scope and mode through the change-log writer; compensate an orphaned newly created Keychain item if the transaction fails - `inst-mcp-store`
+5. [x] - `p1` - For indexed mode, enqueue sync and register its schedule (the hourly `source_sync` pass queues each source its `hourly`, `daily` or `weekly` schedule makes due); for live mode, leave indexing disabled - `inst-mcp-schedule`
+6. [x] - `p1` - Emit `entity:changed`; **RETURN** `SourceRow` with `has_token`, never the token - `inst-mcp-return`
 
 ### Read, edit and retry sources
 
@@ -150,7 +150,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 ### Revoke or remove a source
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-knowledge-remove`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-knowledge-remove`
 
 **Actor**: Primary user (Settings › source details)
 
@@ -162,17 +162,17 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 - Keychain failure is reported without claiming the token was removed; a database failure leaves the source's local index intact.
 
 **Steps**:
-1. [ ] - `p1` - API: `source_revoke_token { source_id }`; stop authenticated work before deleting the indexed source's Keychain token - `inst-remove-revoke`
-2. [ ] - `p1` - DB: clear token reference and mark authentication unavailable through the writer; emit a source change and **RETURN** `SourceRow` with `has_token: false` - `inst-remove-revoked`
+1. [x] - `p1` - API: `source_revoke_token { source_id }`; stop authenticated work before deleting the indexed source's Keychain token - `inst-remove-revoke`
+2. [x] - `p1` - DB: clear token reference and mark authentication unavailable through the writer; emit a source change and **RETURN** `SourceRow` with `has_token: false` - `inst-remove-revoked`
 3. [x] - `p1` - API: `source_remove { source_id }` after the removal alert; cancel jobs and unregister watchers or schedules - `inst-remove-request`
-4. [x] - `p1` - Run `cpt-noter-algo-core-knowledge-remove-index`; remove the source's token and release bookmark access without touching original files or remote pages (no bookmark to release, TL-29; MCP tokens arrive in slice 2) - `inst-remove-index`
+4. [x] - `p1` - Run `cpt-noter-algo-core-knowledge-remove-index`; remove the source's token and release bookmark access without touching original files or remote pages (no bookmark to release, TL-29; an MCP source's Keychain token goes first, and a locked Keychain keeps the source) - `inst-remove-index`
 5. [x] - `p1` - Emit the removed source id after commit; **RETURN** `DeleteResult`; old Ask citations resolve as deleted through the retrieval service - `inst-remove-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Sync an indexed source
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-knowledge-sync`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-knowledge-sync`
 
 **Input**: Existing indexed source, job id, stored bookmark or Keychain token reference, local engine and current policy.
 
@@ -181,7 +181,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 **Steps**:
 1. [x] - `p1` - Read the current source; refuse a removed or live source; record the sync run and indexing status through the writer - `inst-sync-start`
 2. [x] - `p1` - **IF** it is a folder, resolve and enter its bookmark scope, enumerate supported files and coalesce FSEvents by changed file (TL-29: read by path; `notify` events mark the source changed and the run looks again) - `inst-sync-folder`
-3. [ ] - `p1` - **ELSE** read the token through Keychain, list server resources or crawl seed queries when resources are unavailable; each remote lookup passes the egress gate and is audited before forwarding - `inst-sync-remote`
+3. [x] - `p1` - **ELSE** read the token through Keychain, list server resources or crawl seed queries when resources are unavailable; each remote lookup passes the egress gate and is audited before forwarding - `inst-sync-remote`
 4. [x] - `p1` - **FOR EACH** file or page in bounded batches - `inst-sync-each`
    1. [x] - `p1` - Read its identity, URI, metadata and content hash; skip unchanged content unless a full reindex is required - `inst-sync-hash`
    2. [x] - `p1` - Extract Markdown, text, PDF, Word, HTML or code text; chunk by heading into 200–400 tokens with title and heading path prepended - `inst-sync-extract`
@@ -226,7 +226,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 ### Indexed source status
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-knowledge-source`
+- [x] `p4` - **ID**: `cpt-noter-state-core-knowledge-source`
 
 **States**: idle, indexing, failed, sign_in_expired
 
@@ -236,8 +236,8 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 1. [x] - `p1` - **FROM** idle **TO** indexing **WHEN** an initial, scheduled, watched or requested sync starts - `inst-status-start`
 2. [x] - `p1` - **FROM** indexing **TO** idle **WHEN** sync succeeds and counts and last-sync time commit - `inst-status-done`
 3. [x] - `p1` - **FROM** indexing **TO** failed **WHEN** extraction, folder access, embedding or transport fails; keep error code and time - `inst-status-failed`
-4. [ ] - `p1` - **FROM** indexing **TO** sign_in_expired **WHEN** the server rejects an expired or revoked token - `inst-status-expired`
-5. [ ] - `p1` - **FROM** idle **TO** sign_in_expired **WHEN** the user revokes the indexed token; also from failed or indexing - `inst-status-revoked`
+4. [x] - `p1` - **FROM** indexing **TO** sign_in_expired **WHEN** the server rejects an expired or revoked token - `inst-status-expired`
+5. [x] - `p1` - **FROM** idle **TO** sign_in_expired **WHEN** the user revokes the indexed token; also from failed or indexing - `inst-status-revoked`
 6. [x] - `p1` - **FROM** failed **TO** indexing **WHEN** the cause is resolved and retry starts - `inst-status-retry`
 7. [x] - `p1` - **FROM** indexing **TO** idle **WHEN** a job is cancelled without an error; record cancellation in the scheduler and keep the previous last-sync time - `inst-status-cancel`
 
@@ -247,7 +247,7 @@ Removal ends this lifecycle and deletes the row. OAuth renewal for an existing r
 
 ### Folder and indexed MCP ingestion
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-knowledge-ingestion`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-knowledge-ingestion`
 
 The system **MUST** add watched folders with bookmarks and indexed MCP sources with Keychain-only OAuth tokens, extract the six supported text formats, chunk by heading, embed locally and skip unchanged hashes. Jobs report counts, errors, progress and last successful sync. Reads use the pool; batch writes use the single writer and log; network and engine work hold no SQLite transaction.
 
@@ -279,7 +279,7 @@ The system **MUST** expose complete source rows, revision-guarded edits and retr
 
 ### Revoke and remove without leftovers
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-knowledge-removal`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-knowledge-removal`
 
 The system **MUST** revoke indexed tokens, stop authenticated work, and remove a source's documents, chunks and vectors atomically without touching originals. Watchers, schedules, bookmark access and pending results are released. Removed chunks cannot appear in new answers; existing citations resolve as deleted. No token is returned or included in log or export data.
 
@@ -295,8 +295,8 @@ The system **MUST** revoke indexed tokens, stop authenticated work, and remove a
 ## 6. Acceptance Criteria
 
 - [ ] E2E against the real core, `cpt-noter-seq-settings-add-knowledge-source`: a picked folder reports progress, count and last sync, and its heading appears as document evidence in search and Ask; removal stops those hits.
-- [ ] Fixtures for Markdown, text, PDF, Word, HTML and code preserve title and heading provenance; changing one file re-embeds only that file, and unchanged remote hashes produce no duplicate chunks.
-- [ ] Scripted MCP covers resource listing, seed-query fallback, initial OAuth, expiry, offline retry and revoke; an incomplete listing never deletes previously indexed pages.
+- [x] Fixtures for Markdown, text, PDF, Word, HTML and code preserve title and heading provenance; changing one file re-embeds only that file, and unchanged remote hashes produce no duplicate chunks.
+- [x] Scripted MCP covers resource listing, seed-query fallback, initial OAuth, expiry, offline retry and revoke; an incomplete listing never deletes previously indexed pages.
 - [ ] A sensitive source and an out-of-scope source are excluded before cloud packet creation; edits during a sync or answer cannot publish old-policy chunks.
 - [ ] A cancelled picker writes nothing; inaccessible bookmarks and failed jobs retain typed errors and previous last-sync time; reconnect and retry succeed.
 - [ ] Removal rolls back on a forced writer failure; after successful removal, no index row remains and late jobs cannot restore the source.

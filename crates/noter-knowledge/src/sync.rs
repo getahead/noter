@@ -1,7 +1,8 @@
-//! The sync job of an indexed folder source (`cpt-noter-algo-core-knowledge-sync`): enumerate,
-//! skip what did not change, extract, chunk, embed outside any transaction, then replace each
-//! changed document in one writer transaction. The source's status follows
-//! `cpt-noter-state-core-knowledge-source`; progress never carries document text.
+//! The sync job of an indexed source (`cpt-noter-algo-core-knowledge-sync`): enumerate a folder
+//! or list an MCP server, skip what did not change, extract, chunk, embed outside any
+//! transaction, then replace each changed document in one writer transaction. The source's
+//! status follows `cpt-noter-state-core-knowledge-source`; progress never carries document text
+//! and nothing here logs a token.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -11,14 +12,17 @@ use noter_db::rusqlite::{params, Transaction};
 use noter_db::{ChangeMeta, Logged, Store};
 use noter_engine_client::{EngineClient, EngineLauncher};
 use noter_jobs::{RunCtx, Stop};
+use noter_llm::SecretStore;
 use noter_protocol::model::{CountEntry, SourceKind, SourceMode, SourceRow, SourceStatus};
 use noter_protocol::{CoreError, ErrorCode, SourceId, TimestampMs};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::chunk::{self, Chunk};
 use crate::extract::{self, Extracted, Format};
 use crate::internal;
-use crate::sources::{get, not_found, text};
+use crate::mcp::{Listing, McpError, McpSource, RemoteDoc};
+use crate::sources::{get, not_found, text, token_account};
 
 /// Texts per `embed_texts` request.
 const EMBED_BATCH: usize = 32;
@@ -26,6 +30,9 @@ const EMBED_BATCH: usize = 32;
 const MAX_BYTES: u64 = 32 * 1024 * 1024;
 /// How often one run looks again when the folder changed while it ran.
 const PASSES: usize = 3;
+/// What a crawl asks a server without resources: its search with no terms.
+// shortcut: one empty seed query; seed queries from the user's call topics come with real servers.
+const SEED_QUERIES: &[&str] = &[""];
 
 /// What a sync needs from the core.
 pub struct SyncEnv<'a, L> {
@@ -38,6 +45,10 @@ pub struct SyncEnv<'a, L> {
     pub changed: &'a (dyn Fn() -> bool + Send + Sync),
     /// Called with the source row after each committed status or progress change.
     pub published: &'a (dyn Fn(SourceRow) + Send + Sync),
+    /// The indexed MCP servers.
+    pub mcp: &'a dyn McpSource,
+    /// Where an indexed MCP source's token is (TL-33).
+    pub secrets: &'a dyn SecretStore,
 }
 
 #[derive(Default)]
@@ -121,10 +132,18 @@ impl<L: EngineLauncher> SyncEnv<'_, L> {
         let (added, changed, removed) = (end.counts.added, end.counts.changed, end.counts.removed);
         let written = self.store.write_with(meta, move |tx| {
             get(tx, &id).map_err(internal)?.ok_or_else(not_found)?;
+            // A source whose token was revoked meanwhile stays sign-in-expired.
             tx.execute(
-                "UPDATE sources SET status = ?1,
+                "UPDATE sources SET
+                     status = CASE WHEN kind = 'mcp' AND token_ref IS NULL THEN ?5 ELSE ?1 END,
                      last_sync_at = CASE WHEN ?2 THEN ?3 ELSE last_sync_at END WHERE id = ?4",
-                params![text(&status), synced, now, id.as_str()],
+                params![
+                    text(&status),
+                    synced,
+                    now,
+                    id.as_str(),
+                    text(&SourceStatus::SignInExpired)
+                ],
             )
             .map_err(internal)?;
             tx.execute(
@@ -148,9 +167,10 @@ impl<L: EngineLauncher> SyncEnv<'_, L> {
     }
 }
 
+// @cpt-dod:cpt-noter-dod-core-knowledge-ingestion:p1
 // @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
 // @cpt-state:cpt-noter-state-core-knowledge-source:p1
-/// Syncs the folder source `id` within the job run `ctx`. A removed source ends the run as
+/// Syncs the indexed source `id` within the job run `ctx`. A removed source ends the run as
 /// cancelled with nothing written; a live source is refused.
 pub async fn sync<L: EngineLauncher>(
     env: &SyncEnv<'_, L>,
@@ -165,10 +185,10 @@ pub async fn sync<L: EngineLauncher>(
     let Some(source) = source else {
         return Err(Stop::Cancelled);
     };
-    if source.mode == SourceMode::Live || source.kind != SourceKind::Folder {
+    if source.mode == SourceMode::Live {
         return Err(failed(
             ErrorCode::InvalidInput,
-            "only indexed folder sources sync here",
+            "a live source is not indexed",
         ));
     }
     let run = format!("syn_{}", ulid::Ulid::generate());
@@ -211,7 +231,10 @@ pub async fn sync<L: EngineLauncher>(
     // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-start
     // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-start
     let mut counts = Counts::default();
-    let outcome = passes(env, ctx, id, Path::new(&source.location), &mut counts).await;
+    let outcome = match source.kind {
+        SourceKind::Folder => passes(env, ctx, id, Path::new(&source.location), &mut counts).await,
+        SourceKind::Mcp => remote(env, ctx, id, &source.location, &mut counts).await,
+    };
     let end = |error: Option<String>, synced| End {
         run: &run,
         counts: &counts,
@@ -245,10 +268,15 @@ pub async fn sync<L: EngineLauncher>(
         Err(Stop::Failed(e)) => {
             // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-failure
             // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-failed
-            let status = SourceStatus::Failed {
-                code: e.code,
-                at: (env.now)(),
+            // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-expired
+            let status = match e.code {
+                ErrorCode::SourceSignInExpired => SourceStatus::SignInExpired,
+                code => SourceStatus::Failed {
+                    code,
+                    at: (env.now)(),
+                },
             };
+            // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-expired
             let meta = ctx.change_meta("sync failed");
             env.finish(meta, id, status, end(Some(text(&e.code)), false))?;
             Err(Stop::Failed(e))
@@ -324,25 +352,7 @@ async fn pass<L: EngineLauncher>(
     // TL-29: no bookmark to enter; the folder is read by path.
     let files = enumerate(dir)
         .map_err(|_| failed(ErrorCode::SourceSyncFailed, "the folder could not be read"))?;
-    let known: HashMap<String, Known> = {
-        let id = id.clone();
-        env.store.read(move |c| {
-            let mut st = c.prepare(
-                "SELECT uri, id, content_hash, modified_at FROM documents WHERE source_id = ?1",
-            )?;
-            let rows = st.query_map([id.as_str()], |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    Known {
-                        id: r.get(1)?,
-                        hash: r.get(2)?,
-                        modified: r.get(3)?,
-                    },
-                ))
-            })?;
-            rows.collect()
-        })?
-    };
+    let known = known(env, id)?;
     // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-folder
     let total = files.len() as u32;
     // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-each
@@ -366,11 +376,6 @@ async fn pass<L: EngineLauncher>(
             continue;
         };
         // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-hash
-        // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
-        let vectors = embed(env, &chunks).await?;
-        // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
-        ctx.checkpoint().await?;
-        // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-persist
         let replace = Replace {
             source: id.clone(),
             document: before.map(|k| k.id.clone()),
@@ -379,41 +384,104 @@ async fn pass<L: EngineLauncher>(
             mime: file.format.mime(),
             hash,
             modified: file.modified,
-            indexed: (env.now)().0,
-            chunks: chunks.into_iter().zip(vectors).collect(),
+            indexed: 0,
+            chunks: vec![],
             status: SourceStatus::Indexing {
                 done: n as u32 + 1,
                 total: Some(total),
             },
         };
-        let meta = ctx.change_meta("document indexed").ok_or(Stop::Cancelled)?;
-        let row = env
-            .store
-            .write_with(meta, move |tx| replace.apply(tx))
-            .map_err(|e| match e.code {
-                // The source went while this file was embedded: nothing of it is published.
-                ErrorCode::NotFound => Stop::Cancelled,
-                _ => Stop::Failed(e),
-            })?;
-        if before.is_some() {
-            counts.changed += 1;
-        } else {
-            counts.added += 1;
-        }
-        // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-persist
-        // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-progress
-        (env.published)(row.value);
-        let progress = (n + 1) as f32 / total.max(1) as f32;
-        ctx.commit_batch(vec![], counts.entries(), Some(progress))
-            .await?;
-        // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-progress
+        persist(env, ctx, replace, chunks, counts).await?;
     }
     // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-each
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-deleted
     let present: HashSet<String> = files
         .iter()
         .map(|f| f.path.to_string_lossy().into_owned())
         .collect();
+    prune(env, ctx, id, known, &present, counts)
+}
+
+/// The documents the index has for the source, by URI.
+fn known<L: EngineLauncher>(
+    env: &SyncEnv<'_, L>,
+    id: &SourceId,
+) -> Result<HashMap<String, Known>, Stop> {
+    let id = id.clone();
+    Ok(env.store.read(move |c| {
+        let mut st = c.prepare(
+            "SELECT uri, id, content_hash, modified_at FROM documents WHERE source_id = ?1",
+        )?;
+        let rows = st.query_map([id.as_str()], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                Known {
+                    id: r.get(1)?,
+                    hash: r.get(2)?,
+                    modified: r.get(3)?,
+                },
+            ))
+        })?;
+        rows.collect()
+    })?)
+}
+
+/// Embeds a changed document's chunks, then replaces it in one transaction and publishes the
+/// progress `replace.status` carries.
+async fn persist<L: EngineLauncher>(
+    env: &SyncEnv<'_, L>,
+    ctx: &mut RunCtx,
+    mut replace: Replace,
+    chunks: Vec<Chunk>,
+    counts: &mut Counts,
+) -> Result<(), Stop> {
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
+    let vectors = embed(env, &chunks).await?;
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
+    ctx.checkpoint().await?;
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-persist
+    replace.chunks = chunks.into_iter().zip(vectors).collect();
+    replace.indexed = (env.now)().0;
+    let progress = match replace.status {
+        SourceStatus::Indexing {
+            done,
+            total: Some(total),
+        } => done as f32 / total.max(1) as f32,
+        _ => 0.0,
+    };
+    let existed = replace.document.is_some();
+    let meta = ctx.change_meta("document indexed").ok_or(Stop::Cancelled)?;
+    let row = env
+        .store
+        .write_with(meta, move |tx| replace.apply(tx))
+        .map_err(|e| match e.code {
+            // The source went while this file was embedded: nothing of it is published.
+            ErrorCode::NotFound => Stop::Cancelled,
+            _ => Stop::Failed(e),
+        })?;
+    if existed {
+        counts.changed += 1;
+    } else {
+        counts.added += 1;
+    }
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-persist
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-progress
+    (env.published)(row.value);
+    ctx.commit_batch(vec![], counts.entries(), Some(progress))
+        .await?;
+    Ok(())
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-progress
+}
+
+/// Deletes the documents of a complete enumeration that are no longer `present`.
+fn prune<L: EngineLauncher>(
+    env: &SyncEnv<'_, L>,
+    ctx: &mut RunCtx,
+    id: &SourceId,
+    known: HashMap<String, Known>,
+    present: &HashSet<String>,
+    counts: &mut Counts,
+) -> Result<(), Stop> {
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-deleted
     let vanished: Vec<String> = known
         .into_iter()
         .filter(|(uri, _)| !present.contains(uri))
@@ -448,6 +516,142 @@ async fn pass<L: EngineLauncher>(
     Ok(())
 }
 
+fn remote_failed(e: McpError) -> Stop {
+    Stop::Failed(e.into())
+}
+
+/// Commits the `lookup` audit row of a request to `server`; the request leaves only after it.
+fn lookup<L: EngineLauncher>(
+    env: &SyncEnv<'_, L>,
+    ctx: &RunCtx,
+    server: &str,
+    request: serde_json::Value,
+) -> Result<(), Stop> {
+    let meta = ctx.change_meta("server lookup").ok_or(Stop::Cancelled)?;
+    let bytes = request.to_string();
+    noter_llm::audit_lookup(env.store, meta, (env.now)(), server, bytes.as_bytes())?;
+    Ok(())
+}
+
+/// One pass over an indexed MCP server: its resources, or a seed-query crawl when it offers
+/// none. Only a complete listing deletes pages; a rejected token ends the run sign-in-expired.
+async fn remote<L: EngineLauncher>(
+    env: &SyncEnv<'_, L>,
+    ctx: &mut RunCtx,
+    id: &SourceId,
+    server: &str,
+    counts: &mut Counts,
+) -> Result<(), Stop> {
+    // A request made while the run is open is answered by the run after it, not by a mark.
+    (env.changed)();
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-remote
+    let token = env
+        .secrets
+        .get(&token_account(id))
+        .map_err(|_| failed(ErrorCode::KeychainLocked, "the Keychain is locked"))?
+        .ok_or_else(|| failed(ErrorCode::SourceSignInExpired, "the source is signed out"))?;
+    let token = token.expose();
+    let known = known(env, id)?;
+    lookup(env, ctx, server, json!({ "method": "resources/list" }))?;
+    let listing = match env.mcp.list_resources(server, token).await {
+        Ok(Some(listing)) => listing,
+        Ok(None) => crawl(env, ctx, server, token).await?,
+        Err(e) => return Err(remote_failed(e)),
+    };
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-remote
+    let total = listing.items.len() as u32;
+    for (n, item) in listing.items.iter().enumerate() {
+        ctx.checkpoint().await?;
+        let before = known.get(&item.uri);
+        if before.is_some_and(|k| item.hash.as_ref() == Some(&k.hash)) {
+            continue;
+        }
+        let request = json!({ "method": "resources/read", "params": { "uri": item.uri } });
+        lookup(env, ctx, server, request)?;
+        let page = env
+            .mcp
+            .read_resource(server, token, &item.uri)
+            .await
+            .map_err(remote_failed)?;
+        let hash = item
+            .hash
+            .clone()
+            .unwrap_or_else(|| sha256(page.text.as_bytes()));
+        if before.is_some_and(|k| k.hash == hash) {
+            continue;
+        }
+        let format = Format::of_mime(&page.mime);
+        let mut doc =
+            extract::extract(Path::new(""), page.text.as_bytes(), format).map_err(|_| {
+                failed(
+                    ErrorCode::SourceSyncFailed,
+                    "a page could not be read as text",
+                )
+            })?;
+        doc.title = [page.title, item.title.clone()]
+            .into_iter()
+            .find(|t| !t.trim().is_empty())
+            .unwrap_or(doc.title);
+        let chunks = chunk::chunks(&doc);
+        let replace = Replace {
+            source: id.clone(),
+            document: before.map(|k| k.id.clone()),
+            uri: item.uri.clone(),
+            title: doc.title,
+            mime: format.mime(),
+            hash,
+            modified: None,
+            indexed: 0,
+            chunks: vec![],
+            status: SourceStatus::Indexing {
+                done: n as u32 + 1,
+                total: Some(total),
+            },
+        };
+        persist(env, ctx, replace, chunks, counts).await?;
+    }
+    if !listing.complete {
+        return Ok(());
+    }
+    let present = listing.items.into_iter().map(|i| i.uri).collect();
+    prune(env, ctx, id, known, &present, counts)
+}
+
+/// The server's documents through its search, never complete.
+async fn crawl<L: EngineLauncher>(
+    env: &SyncEnv<'_, L>,
+    ctx: &RunCtx,
+    server: &str,
+    token: &str,
+) -> Result<Listing, Stop> {
+    let mut items: Vec<RemoteDoc> = vec![];
+    for query in SEED_QUERIES {
+        let request = json!({ "method": "seed_query", "params": { "query": query } });
+        lookup(env, ctx, server, request)?;
+        let found = env
+            .mcp
+            .seed_query(server, token, query)
+            .await
+            .map_err(remote_failed)?;
+        for item in found.items {
+            if !items.iter().any(|i| i.uri == item.uri) {
+                items.push(item);
+            }
+        }
+    }
+    Ok(Listing {
+        items,
+        complete: false,
+    })
+}
+
+fn sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 /// The file's content hash, text and chunks, or `None` when the content is `stored`.
 fn read_file(
     path: &Path,
@@ -456,10 +660,7 @@ fn read_file(
 ) -> Result<Option<(String, Extracted, Vec<Chunk>)>, Stop> {
     let bytes = std::fs::read(path)
         .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))?;
-    let hash: String = Sha256::digest(&bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect();
+    let hash = sha256(&bytes);
     if stored.as_deref() == Some(hash.as_str()) {
         return Ok(None);
     }

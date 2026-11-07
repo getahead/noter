@@ -38,6 +38,15 @@ impl Format {
         })
     }
 
+    /// The format of a server's page by its MIME type: HTML, Markdown, or else plain text.
+    pub(crate) fn of_mime(mime: &str) -> Format {
+        match mime.split(';').next().unwrap_or_default().trim() {
+            "text/html" => Format::Html,
+            "text/markdown" => Format::Markdown,
+            _ => Format::Text,
+        }
+    }
+
     pub(crate) fn mime(self) -> &'static str {
         match self {
             Format::Markdown => "text/markdown",

@@ -109,6 +109,8 @@ pub(crate) fn default_def(kind: JobKind) -> (Trigger, bool) {
         JobKind::PostCall => (Trigger::AfterCall, true),
         JobKind::ArchivePass => (Trigger::AfterCall, false),
         JobKind::ModelDownload | JobKind::CliInstall => (Trigger::OnDemand, true),
+        // Hourly: the pass that queues each indexed MCP source its own schedule makes due.
+        JobKind::SourceSync => (Trigger::Hourly, false),
         _ => (Trigger::OnDemand, false),
     }
 }

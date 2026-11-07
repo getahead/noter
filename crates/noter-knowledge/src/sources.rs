@@ -6,15 +6,17 @@ use std::path::{Path, PathBuf};
 use noter_db::rusqlite::types::Type;
 use noter_db::rusqlite::{self, params, Connection, OptionalExtension, Row, Transaction};
 use noter_db::{ChangeMeta, Logged, Store};
+use noter_llm::{Secret, SecretStore};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::{
-    DeleteResult, SourceKind, SourceList, SourceMode, SourceRow, SourceScope, SourceStatus,
-    SourceUpdateArgs,
+    DeleteResult, SourceAddMcpArgs, SourceKind, SourceList, SourceMode, SourceRow, SourceScope,
+    SourceStatus, SourceUpdateArgs,
 };
 use noter_protocol::{CoreError, ErrorCode, ErrorDetail, PrivacyClass, Rev, SourceId, TimestampMs};
 use serde_json::{json, Value};
 
 use crate::internal;
+use crate::mcp::{interval, McpSource, DEFAULT_SCHEDULE};
 
 const COLUMNS: &str = "s.id, s.rev, s.kind, s.mode, s.name, s.location, s.schedule, \
      s.privacy_class, s.scope, s.status, s.last_sync_at, s.token_ref IS NOT NULL, \
@@ -117,57 +119,250 @@ pub fn validate_folder(path: &str) -> Result<PathBuf, CoreError> {
 /// Inserts an indexed folder source (idle, never synced) and returns its row.
 pub fn add_folder(
     store: &Store,
-    mut meta: ChangeMeta,
+    meta: ChangeMeta,
     dir: &Path,
     privacy: PrivacyClass,
     scope: SourceScope,
 ) -> Result<SourceRow, CoreError> {
     let location = dir.to_string_lossy().into_owned();
-    let taken = {
-        let location = location.clone();
-        store.read(move |c| {
-            c.query_row(
-                "SELECT 1 FROM sources WHERE kind = 'folder' AND location = ?1",
-                [&location],
-                |_| Ok(()),
-            )
-            .optional()
-        })?
-    };
-    if taken.is_some() {
+    if taken(store, SourceKind::Folder, &location)? {
         return Err(invalid(
             "path",
             ValidationRule::Duplicate,
             "this folder is already a source",
         ));
     }
-    let id = SourceId::new(format!("src_{}", ulid::Ulid::generate()));
+    let id = new_id();
     let name = dir
         .file_name()
         .map_or_else(|| location.clone(), |n| n.to_string_lossy().into_owned());
-    meta.undoable = false;
     // @cpt-begin:cpt-noter-flow-core-knowledge-folder:p1:inst-folder-store
-    store.write(
-        noter_db::Mutation {
+    let source = Insert {
+        kind: SourceKind::Folder,
+        mode: SourceMode::Indexed,
+        name,
+        location,
+        schedule: None,
+        privacy,
+        scope,
+        token_ref: None,
+    };
+    source.write(store, meta, &id)?;
+    // @cpt-end:cpt-noter-flow-core-knowledge-folder:p1:inst-folder-store
+    store.read(move |c| get(c, &id))?.ok_or_else(not_found)
+}
+
+fn new_id() -> SourceId {
+    SourceId::new(format!("src_{}", ulid::Ulid::generate()))
+}
+
+/// Whether a source of `kind` already reads `location`.
+fn taken(store: &Store, kind: SourceKind, location: &str) -> Result<bool, CoreError> {
+    let (kind, location) = (text(&kind), location.to_string());
+    let found = store.read(move |c| {
+        c.query_row(
+            "SELECT 1 FROM sources WHERE kind = ?1 AND location = ?2",
+            [&kind, &location],
+            |_| Ok(()),
+        )
+        .optional()
+    })?;
+    Ok(found.is_some())
+}
+
+/// A new source row: idle, never synced.
+struct Insert {
+    kind: SourceKind,
+    mode: SourceMode,
+    name: String,
+    location: String,
+    schedule: Option<String>,
+    privacy: PrivacyClass,
+    scope: SourceScope,
+    token_ref: Option<String>,
+}
+
+impl Insert {
+    fn write(self, store: &Store, mut meta: ChangeMeta, id: &SourceId) -> Result<(), CoreError> {
+        meta.undoable = false;
+        let mutation = noter_db::Mutation {
             entity_type: "source",
             table: "sources",
             id: id.as_str().into(),
             base_rev: None,
             bump_rev: true,
             values: vec![
-                ("kind", json!(text(&SourceKind::Folder))),
-                ("mode", json!(text(&SourceMode::Indexed))),
-                ("name", json!(name)),
-                ("location", json!(location)),
-                ("privacy_class", json!(text(&privacy))),
-                ("scope", json!(text(&scope))),
+                ("kind", json!(text(&self.kind))),
+                ("mode", json!(text(&self.mode))),
+                ("name", json!(self.name)),
+                ("location", json!(self.location)),
+                ("schedule", json!(self.schedule)),
+                ("privacy_class", json!(text(&self.privacy))),
+                ("scope", json!(text(&self.scope))),
+                ("token_ref", json!(self.token_ref)),
                 ("status", json!(text(&SourceStatus::Idle))),
             ],
-        },
-        meta,
-    )?;
-    // @cpt-end:cpt-noter-flow-core-knowledge-folder:p1:inst-folder-store
+        };
+        store.write(mutation, meta).map(|_| ())
+    }
+}
+
+/// The Keychain account of an indexed MCP source's token (TL-33); the row keeps only this name.
+pub fn token_account(id: &SourceId) -> String {
+    format!("source:{}", id.as_str())
+}
+
+fn keychain_locked() -> CoreError {
+    CoreError::new(ErrorCode::KeychainLocked, "the Keychain is locked")
+}
+
+/// A schedule an indexed MCP source can sync on.
+fn checked_schedule(schedule: &str) -> Result<String, CoreError> {
+    match interval(schedule) {
+        Some(_) => Ok(schedule.to_string()),
+        None => Err(invalid(
+            "schedule",
+            ValidationRule::InvalidFormat,
+            "an unknown schedule",
+        )),
+    }
+}
+
+// @cpt-flow:cpt-noter-flow-core-knowledge-mcp:p1
+/// Adds an MCP source and returns its row. Indexed: the server's own sign-in through `mcp`, the
+/// token into `secrets` under [`token_account`] and only that name in the row; a failed insert
+/// deletes the new Keychain item. Live: the configuration alone, with no token and no index. A
+/// failed or cancelled sign-in writes nothing.
+pub async fn add_mcp(
+    store: &Store,
+    meta: ChangeMeta,
+    mcp: &dyn McpSource,
+    secrets: &dyn SecretStore,
+    args: SourceAddMcpArgs,
+) -> Result<SourceRow, CoreError> {
+    // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-request
+    let server = args.server.trim().to_string();
+    if server.is_empty() {
+        return Err(invalid(
+            "server",
+            ValidationRule::Required,
+            "a source needs a server",
+        ));
+    }
+    let schedule = match (args.mode, args.schedule.as_deref()) {
+        (SourceMode::Live, None) => None,
+        (SourceMode::Live, Some(_)) => {
+            return Err(invalid(
+                "schedule",
+                ValidationRule::InvalidFormat,
+                "a live source is not scheduled",
+            ))
+        }
+        (SourceMode::Indexed, s) => Some(checked_schedule(s.unwrap_or(DEFAULT_SCHEDULE))?),
+    };
+    if taken(store, SourceKind::Mcp, &server)? {
+        return Err(invalid(
+            "server",
+            ValidationRule::Duplicate,
+            "this server is already a source",
+        ));
+    }
+    // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-request
+    let id = new_id();
+    let token_ref = match args.mode {
+        SourceMode::Indexed => {
+            // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-oauth
+            let token = Secret::new(mcp.oauth(&server).await?);
+            let account = token_account(&id);
+            secrets
+                .set(&account, &token)
+                .map_err(|_| keychain_locked())?;
+            Some(account)
+            // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-oauth
+        }
+        // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-live
+        // The relay (D1) reads this row; no credential is copied and no runtime's own MCP
+        // config is touched.
+        SourceMode::Live => None,
+        // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-live
+    };
+    // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-store
+    let source = Insert {
+        kind: SourceKind::Mcp,
+        mode: args.mode,
+        name: server.clone(),
+        location: server,
+        schedule,
+        privacy: args.privacy,
+        scope: args.scope,
+        token_ref: token_ref.clone(),
+    };
+    if let Err(e) = source.write(store, meta, &id) {
+        if let Some(account) = &token_ref {
+            let _ = secrets.remove(account);
+        }
+        return Err(e);
+    }
+    // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-store
     store.read(move |c| get(c, &id))?.ok_or_else(not_found)
+}
+
+/// Stops the source's authenticated work (`stop`), deletes its token from the Keychain, then
+/// clears the row's reference and marks it sign-in-expired. A Keychain failure leaves the token
+/// and the row as they were and says so.
+pub fn revoke(
+    store: &Store,
+    mut meta: ChangeMeta,
+    secrets: &dyn SecretStore,
+    id: &SourceId,
+    stop: impl FnOnce(),
+) -> Result<SourceRow, CoreError> {
+    let current = {
+        let id = id.clone();
+        store.read(move |c| get(c, &id))?.ok_or_else(not_found)?
+    };
+    if current.kind != SourceKind::Mcp || current.mode != SourceMode::Indexed {
+        return Err(invalid(
+            "source_id",
+            ValidationRule::InvalidFormat,
+            "only an indexed MCP source holds a token",
+        ));
+    }
+    // @cpt-begin:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoke
+    stop();
+    let account = token_account(id);
+    secrets.remove(&account).map_err(|_| keychain_locked())?;
+    // @cpt-end:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoke
+    // @cpt-begin:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoked
+    // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-revoked
+    meta.undoable = false;
+    let id = id.clone();
+    let written = store.write_with(meta, move |tx| {
+        let current = get(tx, &id).map_err(internal)?.ok_or_else(not_found)?;
+        tx.execute(
+            "UPDATE sources SET token_ref = NULL, status = ?1, rev = ?2 WHERE id = ?3",
+            params![
+                text(&SourceStatus::SignInExpired),
+                current.rev.0 + 1,
+                id.as_str()
+            ],
+        )
+        .map_err(internal)?;
+        let row = get(tx, &id).map_err(internal)?.ok_or_else(not_found)?;
+        // The account name only, never the token.
+        let logged = Logged {
+            entity_type: "source",
+            entity_id: id.as_str().into(),
+            field: Some("token_ref".into()),
+            before: current.has_token.then_some(account),
+            after: None,
+            delta: None,
+        };
+        Ok((row, vec![logged]))
+    })?;
+    Ok(written.value)
+    // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-revoked
+    // @cpt-end:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoked
 }
 
 /// The columns an edit changes: `(column, stored, wanted)` for each present field that differs.
@@ -210,12 +405,15 @@ fn guarded(conn: &Connection, args: &SourceUpdateArgs) -> Result<SourceRow, Core
             ),
         );
     }
-    if args.schedule.is_some() && current.kind == SourceKind::Folder {
-        return Err(invalid(
-            "schedule",
-            ValidationRule::InvalidFormat,
-            "a folder is watched, not scheduled",
-        ));
+    if let Some(schedule) = &args.schedule {
+        if current.kind == SourceKind::Folder || current.mode == SourceMode::Live {
+            return Err(invalid(
+                "schedule",
+                ValidationRule::InvalidFormat,
+                "only an indexed MCP source is scheduled",
+            ));
+        }
+        checked_schedule(schedule)?;
     }
     Ok(current)
 }
@@ -324,6 +522,7 @@ fn repartition(tx: &Transaction<'_>, id: &SourceId, privacy: &str) -> rusqlite::
     Ok(())
 }
 
+// @cpt-dod:cpt-noter-dod-core-knowledge-removal:p1
 // @cpt-algo:cpt-noter-algo-core-knowledge-remove-index:p1
 /// Deletes the source with its documents, chunks, keyword and vector entries and sync runs in
 /// one transaction; a failure rolls everything back and answers `internal`. Files in the folder
