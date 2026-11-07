@@ -25,7 +25,6 @@ export interface TermFixPopoverProps {
   onFixed: (text: string, change_id: string) => void;
 }
 
-// @cpt-component:cpt-noter-component-ui-term-fix-popover:p1
 // @cpt-flow:cpt-noter-flow-ui-speakers-fix-term:p1
 // @cpt-state:cpt-noter-state-ui-speakers-correction:p1
 /** Fix the term: the segment replaces the line in the transcript Channel; an error text keeps the replacement. */
@@ -52,6 +51,7 @@ export async function applyFix(bridge: Bridge, segment: SegmentView, range: Text
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
 }
 
+// @cpt-component:cpt-noter-component-ui-term-fix-popover:p1
 export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixed }: TermFixPopoverProps) {
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-range
   const selected = segment.text.slice(range.start, range.end);

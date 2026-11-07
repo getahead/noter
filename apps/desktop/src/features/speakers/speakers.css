@@ -1,4 +1,13 @@
 /* Person picker and speaker rename popover (prototype 20-b.css .cw-pp*), on the shared tokens. */
+/* D320-4: WebKit can expose the blur token without compositing the backdrop.
+   Use the approved opaque material for Rename speaker so transcript ink cannot
+   compete with its fields. Keep Increase Contrast's shared material treatment. */
+@media (prefers-contrast: no-preference) {
+  .np-pop[data-variant="speaker-rename"] {
+    background: var(--card-bg);
+  }
+}
+
 .cw-pp {
   display: grid;
   gap: 6px;
