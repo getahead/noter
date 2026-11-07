@@ -33,9 +33,9 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   const env = useWindow(bridge, (s) => s.whole.environment);
   const items = useWindow(bridge, (s) => s.entities.item);
   const calls = useWindow(bridge, (s) => s.entities.call);
-  // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-regions
+  // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-refresh
   useEffect(() => void (ready && loadToday(bridge)), [bridge, ready, capture, env, items, calls]);
-  // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-regions
+  // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-refresh
   const state = calendarState(read, view, ask?.state === "WAITING");
   const skeleton = useAfter(300, state === "LOADING" || (state === "ERROR" && read.state === "WAITING"));
   // the user's own open/closed choice by event id; the next call is the first card that is not live
@@ -62,7 +62,8 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
         {state === "NO_CALLS" && <h2 className="td-h">{t("today.no_calls")}</h2>}
         {state === "READY" && view && <h2 className="td-h">{t("today.calls", { count: day.length })}</h2>}
         {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-cards */}
-        {state === "READY" && day.map((c, i) => (
+        {/* the live call card comes from live_call, so it shows whatever the calendar says */}
+        {(state === "READY" ? day : day.filter((c) => c.variant === "live" || c.variant === "unmatched")).map((c, i) => (
           <UpcomingCallCard key={c.event?.event_id ?? "live"} bridge={bridge} card={c} expanded={isExpanded(c.event?.event_id ?? "", user, i === next)} next={i === next} onToggle={() => c.event && toggle(c.event.event_id, isExpanded(c.event.event_id, user, i === next))} />
         ))}
         {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-cards */}

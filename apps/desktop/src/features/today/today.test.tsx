@@ -80,6 +80,15 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     expect(html).toMatch(/Record|Recording/);
     expect(clockOf(754)).toBe("12:34");
   });
+  it("says why a refused Record was refused", async () => {
+    await open();
+    await loadToday(bridge);
+    fake.failNext("capture_start", "disk_full");
+    await record(bridge);
+    const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
+    const html = renderToString(<TodayToolbar route={{ section: "today", key: "root" }} bridge={bridge} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
+    expect(html).toContain("less than 500 MB");
+  });
 });
 
 describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {

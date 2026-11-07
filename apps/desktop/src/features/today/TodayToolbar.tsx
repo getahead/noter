@@ -47,5 +47,14 @@ export function TodayToolbar({ bridge, base }: PageToolbarProps) {
       />
     );
   // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-live
-  return <MainToolbar {...base} region="TD-R1" title={t("today.title")} subtitle={view ? longDate(view.date) : undefined} trailing={indicator} />;
+  // a refused Record names why; the next attempt clears it (the command's slot starts over)
+  const refused = recording?.state === "ERROR" ? recording.error : undefined;
+  const refusal = refused && t(refused.state === "model_missing" ? "today.record_model_missing" : refused.state === "disk_full" ? "today.record_disk_full" : refused.state === "already_recording" ? "today.record_already" : "today.record_failed");
+  const trailing = (
+    <>
+      {refusal && <span role="status" className="td-refused">{refusal}</span>}
+      {indicator}
+    </>
+  );
+  return <MainToolbar {...base} region="TD-R1" title={t("today.title")} subtitle={view ? longDate(view.date) : undefined} trailing={trailing} />;
 }
