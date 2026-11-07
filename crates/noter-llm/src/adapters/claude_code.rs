@@ -16,7 +16,7 @@ use crate::runtime::{Availability, BoxFuture, Tested};
 
 /// Tested with 2.1.296. Widen only after the network-monitor runbook
 /// (`.plans/backend/m2-network-monitor-runbook.md`) passes on the new version.
-const TESTED: Tested = Tested {
+pub(crate) const TESTED: Tested = Tested {
     min: [2, 1, 0],
     below: [2, 2, 0],
 };

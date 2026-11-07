@@ -13,11 +13,13 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
 use noter_protocol::error::RuntimeUnavailableReason;
+use noter_protocol::model::{AccountIdentity, AccountProvider, CliTool};
 use noter_protocol::{Effort, RuntimeChoice};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use super::{Invocation, Reply};
+use crate::account_cli::{AccountCli, CliError, CliStatus, LoginStart};
 use crate::runtime::{lock, Availability, BoxFuture, Tested};
 
 /// How Noter runs one CLI. A missing sign-in makes the own-account runtime unavailable; the
@@ -228,5 +230,189 @@ pub(crate) fn effort(effort: Effort) -> &'static str {
         Effort::Medium => "medium",
         Effort::High => "high",
         Effort::Max => "max",
+    }
+}
+
+// ── the account seam over the pinned CLIs (TL-32) ──
+// shortcut: status and install only; browser sign-in and sign-out run the CLIs' own login
+// flows on the owner's Mac (account sign-in sessions, slice 2), until then they report `Failed`.
+
+/// The official install command of each tool and the hosts it reaches, all in the
+/// `cli_install` group of the egress allow-list.
+pub(crate) const INSTALLERS: [(CliTool, &str, &[&str]); 3] = [
+    (
+        CliTool::ClaudeCode,
+        "curl -fsSL https://claude.ai/install.sh | bash",
+        &["claude.ai", "storage.googleapis.com"],
+    ),
+    (
+        CliTool::Codex,
+        "npm install -g @openai/codex",
+        &["registry.npmjs.org"],
+    ),
+    (
+        CliTool::Ollama,
+        "curl -fsSL https://ollama.com/install.sh | sh",
+        &["ollama.com", "github.com", "objects.githubusercontent.com"],
+    ),
+];
+
+/// Claude Code, Codex and Ollama as installed on this Mac.
+pub struct CliAccounts {
+    pub claude: PathBuf,
+    pub codex: PathBuf,
+    pub ollama: PathBuf,
+}
+
+impl CliAccounts {
+    fn program(&self, tool: CliTool) -> &Path {
+        match tool {
+            CliTool::ClaudeCode => &self.claude,
+            CliTool::Codex => &self.codex,
+            CliTool::Ollama => &self.ollama,
+        }
+    }
+}
+
+async fn run_text(program: &Path, args: &[&str]) -> Option<String> {
+    let out = Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .output()
+        .await
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+/// The identity `claude auth status` prints (JSON with `email` and `subscriptionType`).
+pub(crate) fn claude_identity(text: &str) -> Option<AccountIdentity> {
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    if v["loggedIn"] != true {
+        return None;
+    }
+    Some(AccountIdentity {
+        email: v["email"].as_str()?.to_owned(),
+        plan: v["subscriptionType"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned(),
+    })
+}
+
+impl AccountCli for CliAccounts {
+    fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus> {
+        Box::pin(async move {
+            let program = self.program(tool);
+            let Some(text) = run_text(program, &["--version"]).await else {
+                return CliStatus::missing();
+            };
+            let version = text
+                .split_whitespace()
+                .find(|w| Tested::parse(w).is_some())
+                .map_or(text.clone(), String::from);
+            let tested = match tool {
+                CliTool::ClaudeCode => Some(super::claude_code::TESTED),
+                CliTool::Codex => Some(super::codex::TESTED),
+                CliTool::Ollama => None,
+            };
+            // shortcut: `codex login status` prints no email, so a signed-in Codex shows no
+            // identity until the owner-Mac check reads it from the CLI's own files.
+            let identity = match tool {
+                CliTool::ClaudeCode => run_text(program, &["auth", "status"])
+                    .await
+                    .and_then(|t| claude_identity(&t)),
+                CliTool::Codex | CliTool::Ollama => None,
+            };
+            CliStatus {
+                installed: true,
+                path: Some(program.display().to_string()),
+                supported: tested.map_or(true, |t| t.admits(&version)),
+                version: Some(version),
+                identity,
+            }
+        })
+    }
+
+    fn login(&self, _: AccountProvider) -> BoxFuture<'_, Result<LoginStart, CliError>> {
+        Box::pin(async {
+            Err(CliError::Failed(
+                "sign-in sessions arrive with slice 2".into(),
+            ))
+        })
+    }
+
+    fn cancel(&self, _: AccountProvider) {}
+
+    fn logout(&self, _: AccountProvider) -> BoxFuture<'_, Result<(), CliError>> {
+        Box::pin(async { Err(CliError::Failed("sign-out arrives with slice 2".into())) })
+    }
+
+    fn install(&self, tool: CliTool) -> BoxFuture<'_, Result<CliStatus, CliError>> {
+        Box::pin(async move {
+            let (_, command, _) = INSTALLERS
+                .iter()
+                .find(|(t, _, _)| *t == tool)
+                .ok_or(CliError::Failed("no installer".into()))?;
+            let done = Command::new("/bin/sh")
+                .args(["-c", command])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .kill_on_drop(true)
+                .status()
+                .await
+                .map_err(|_| CliError::Failed("sh".into()))?;
+            if !done.success() {
+                return Err(CliError::Failed(format!(
+                    "installer exit {:?}",
+                    done.code()
+                )));
+            }
+            Ok(self.status(tool).await)
+        })
+    }
+}
+
+#[cfg(test)]
+mod account_tests {
+    use super::*;
+
+    #[test]
+    fn every_installer_reaches_only_cli_install_hosts() {
+        let group = noter_protocol::egress::ALLOW_WITHOUT_AUDIT
+            .iter()
+            .find(|g| g.name == "cli_install")
+            .expect("the allow-list has a cli_install group");
+        for (tool, command, hosts) in INSTALLERS {
+            assert!(hosts.iter().all(|h| group.hosts.contains(h)), "{tool:?}");
+            for url in command
+                .split_whitespace()
+                .filter(|w| w.starts_with("https://"))
+            {
+                let host = url
+                    .trim_start_matches("https://")
+                    .split('/')
+                    .next()
+                    .unwrap();
+                assert!(hosts.contains(&host), "{tool:?} {host}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_claude_identity_comes_only_from_a_signed_in_status() {
+        let who = claude_identity(
+            r#"{"loggedIn":true,"email":"ann@example.com","subscriptionType":"max"}"#,
+        );
+        assert_eq!(
+            who.map(|i| (i.email, i.plan)),
+            Some(("ann@example.com".into(), "max".into()))
+        );
+        assert_eq!(claude_identity(r#"{"loggedIn":false}"#), None);
+        assert_eq!(claude_identity("not json"), None);
     }
 }

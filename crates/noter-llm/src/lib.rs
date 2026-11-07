@@ -16,6 +16,7 @@ use reqwest::header::{CONTENT_RANGE, RANGE};
 use reqwest::redirect::Policy;
 use reqwest::{StatusCode, Url};
 
+mod account_cli;
 mod adapters;
 mod gate;
 mod route;
@@ -23,7 +24,11 @@ mod runtime;
 mod secrets;
 mod validate;
 
-pub use adapters::cli::CliConfig;
+pub use account_cli::{
+    tool_of, AccountCli, CliError, CliStatus, InstallScript, LoginOutcome, LoginScript, LoginStart,
+    NoAccountCli, ScriptedAccountCli, ToolScript,
+};
+pub use adapters::cli::{CliAccounts, CliConfig};
 pub use adapters::ollama::OllamaConfig;
 pub use adapters::scripted::{Received, Scripted};
 pub use gate::Adapters;

@@ -16,7 +16,7 @@ pub mod updater;
 use std::sync::{Arc, OnceLock};
 
 use noter_core::{
-    Adapters, CliConfig, Core, CoreDeps, EventEmitter, OllamaConfig, PinnedModels,
+    Adapters, CliAccounts, CliConfig, Core, CoreDeps, EventEmitter, OllamaConfig, PinnedModels,
     ShortcutRegistrar, ShortcutTaken, SystemClock,
 };
 use noter_engine_client::ProcessLauncher;
@@ -162,7 +162,8 @@ fn boot<R: Runtime>(
         .with_updater(updater)
         .with_surfaces(surfaces.clone())
         .with_llm(runtimes(&dir))
-        .with_secrets(Arc::new(keychain::Keychain));
+        .with_secrets(Arc::new(keychain::Keychain))
+        .with_account_cli(account_cli());
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
@@ -194,6 +195,16 @@ fn runtimes(data: &std::path::Path) -> Adapters {
         models: Vec::new(),
     };
     Adapters::real(cli("claude"), cli("codex"), ollama)
+}
+
+/// The pinned CLIs as accounts and installs, found where `runtimes` finds them.
+fn account_cli() -> Arc<CliAccounts> {
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    Arc::new(CliAccounts {
+        claude: find_cli(&home, "claude"),
+        codex: find_cli(&home, "codex"),
+        ollama: find_cli(&home, "ollama"),
+    })
 }
 
 /// shortcut: an app started from Finder has no shell PATH, so the usual install folders are

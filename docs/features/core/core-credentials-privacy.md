@@ -98,7 +98,7 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 
 ### Read availability and store or remove a key
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-keys`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-keys`
 
 **Actor**: Primary user (First run or Settings › Models & Runtimes)
 
@@ -115,11 +115,11 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 3. [x] - `p1` - Publish verifying status; verify the candidate using the router and egress gate, without replacing the saved key until verification succeeds (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-verify`
 4. [x] - `p1` - Store the verified key in Keychain; store only status and verification time in settings through the change-log writer, never secret before/after values (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-store`
 5. [x] - `p1` - Recompute availability and emit `accounts:changed` with a new version; **RETURN** `AccountsView` with status only (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-return`
-6. [ ] - `p1` - API: `api_key_remove { provider }` only from Settings removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` (M3) - `inst-key-remove`
+6. [x] - `p1` - API: `api_key_remove { provider }` only from Settings removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` (M3) - `inst-key-remove`
 
 ### Prepare and install an account runtime
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-prepare`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-prepare`
 
 **Actor**: Primary user (sign-in sheet or local-runtime row)
 
@@ -130,11 +130,11 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Missing or unsupported CLI: `cli_missing` or `cli_version_unsupported`, with a one-step fix; install failure leaves the old install intact.
 
 **Steps**:
-1. [ ] - `p1` - API: `account_signin_prepare { provider }` from main, Settings or First run checks the provider's CLI path, version and auth status - `inst-prepare-check`
-2. [ ] - `p1` - Ask the CLI only for account identity and plan; **RETURN** `SignInPrepare` with existing identity if present and `needs_personal_use_confirmation` for Claude - `inst-prepare-return`
-3. [ ] - `p1` - API: `cli_install { tool }` accepts only the contract's Claude Code, Codex or Ollama choices and enqueues an install job; **RETURN** `JobAccepted` - `inst-install-request`
-4. [ ] - `p1` - Install through the fixed egress-host allow-list without user transcript or document text; report `jobs:progress`, then check the resulting version - `inst-install-run`
-5. [ ] - `p1` - Recompute account and local-runtime availability and emit `accounts:changed`; no sign-in or agent switch occurs merely because installation succeeded - `inst-install-complete`
+1. [x] - `p1` - API: `account_signin_prepare { provider }` from main, Settings or First run checks the provider's CLI path, version and auth status - `inst-prepare-check`
+2. [x] - `p1` - Ask the CLI only for account identity and plan; **RETURN** `SignInPrepare` with existing identity if present and `needs_personal_use_confirmation` for Claude - `inst-prepare-return`
+3. [x] - `p1` - API: `cli_install { tool }` accepts only the contract's Claude Code, Codex or Ollama choices and enqueues an install job; **RETURN** `JobAccepted` - `inst-install-request`
+4. [x] - `p1` - Install through the fixed egress-host allow-list without user transcript or document text; report `jobs:progress`, then check the resulting version - `inst-install-run`
+5. [x] - `p1` - Recompute account and local-runtime availability and emit `accounts:changed`; no sign-in or agent switch occurs merely because installation succeeded - `inst-install-complete`
 
 ### Sign in or reuse an existing account
 
@@ -184,7 +184,7 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 
 ### Read and export the egress audit
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-audit`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-credentials-privacy-audit`
 
 **Actor**: Primary user (Settings › Privacy)
 
@@ -196,11 +196,11 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Invalid date range or page cursor: `invalid_input`; cancelled save panel: `cancelled`; file failure: typed error without a success result.
 
 **Steps**:
-1. [ ] - `p1` - API: `audit_list { from, to, page }` from Settings validates dates and cursor and reads append-only rows from the pool in stable time/id order - `inst-audit-read`
-2. [ ] - `p1` - Assemble `AuditEntry` with kind, run linkage, optional call/runtime, destination, what, bytes and redaction flag; **RETURN** a cursor page - `inst-audit-return`
-3. [ ] - `p1` - API: `audit_export { from, to, format }` from Settings uses the same date predicate; the core opens the native save panel - `inst-audit-export`
-4. [ ] - `p1` - Stream matching metadata rows to Markdown or JSON in bounded batches; export no packet body, original redaction mapping, key or audio - `inst-audit-write`
-5. [ ] - `p1` - Complete the file and **RETURN** `ExportResult`; do not change or erase audit rows as a side effect - `inst-audit-complete`
+1. [x] - `p1` - API: `audit_list { from, to, page }` from Settings validates dates and cursor and reads append-only rows from the pool in stable time/id order - `inst-audit-read`
+2. [x] - `p1` - Assemble `AuditEntry` with kind, run linkage, optional call/runtime, destination, what, bytes and redaction flag; **RETURN** a cursor page - `inst-audit-return`
+3. [x] - `p1` - API: `audit_export { from, to, format }` from Settings uses the same date predicate; the core opens the native save panel - `inst-audit-export`
+4. [x] - `p1` - Stream matching metadata rows to Markdown or JSON in bounded batches; export no packet body, original redaction mapping, key or audio - `inst-audit-write`
+5. [x] - `p1` - Complete the file and **RETURN** `ExportResult`; do not change or erase audit rows as a side effect - `inst-audit-complete`
 
 ### Move storage when Q4 permits it
 
@@ -217,7 +217,7 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 - Sandboxed build: `not_implemented`, no move; cloud-synced destination: `storage_in_cloud_folder`; cancelled panel: `cancelled`; insufficient disk: `disk_full`.
 
 **Steps**:
-1. [ ] - `p1` - API: draft `storage_move { path }` from Settings; **IF** Q4 has not enabled an unsandboxed build, **RETURN** `not_implemented` - `inst-storage-guard`
+1. [x] - `p1` - API: draft `storage_move { path }` from Settings; **IF** Q4 has not enabled an unsandboxed build, **RETURN** `not_implemented` - `inst-storage-guard`
 2. [ ] - `p1` - Resolve the supplied local path or native open-panel choice and reject iCloud Drive, Dropbox, invalid or inaccessible destinations - `inst-storage-path`
 3. [ ] - `p1` - Wait for capture and engine file users to be idle before moving audio, models and engine I/O; keep the effective source location until work completes - `inst-storage-idle`
 4. [ ] - `p1` - Enqueue the move job and **RETURN** `JobAccepted`; copy and verify into the destination without deleting the only valid source copy - `inst-storage-job`
@@ -295,7 +295,7 @@ Within signing_in, `SignInStep` progresses through waiting_for_browser, signed_i
 
 ### API key verification
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-credentials-privacy-key`
+- [x] `p4` - **ID**: `cpt-noter-state-core-credentials-privacy-key`
 
 **States**: not_set, verifying, configured, rejected, keychain_locked
 
@@ -308,7 +308,7 @@ Within signing_in, `SignInStep` progresses through waiting_for_browser, signed_i
 4. [x] - `p1` - **FROM** configured **TO** rejected **WHEN** the provider rejects the saved key - `inst-key-state-revoked`
 5. [x] - `p1` - **FROM** configured **TO** keychain_locked **WHEN** Keychain access fails; also from verifying or not_set - `inst-key-state-locked`
 6. [x] - `p1` - **FROM** keychain_locked **TO** configured **WHEN** access returns and the saved key is verified; otherwise recompute not_set or rejected - `inst-key-state-unlocked`
-7. [ ] - `p1` - **FROM** configured **TO** not_set **WHEN** removal succeeds; also from rejected or keychain_locked after a successful Keychain delete (M3; the other transitions are M2 with `cpt-noter-feature-core-llm-gate`) - `inst-key-state-remove`
+7. [x] - `p1` - **FROM** configured **TO** not_set **WHEN** removal succeeds; also from rejected or keychain_locked after a successful Keychain delete (M3; the other transitions are M2 with `cpt-noter-feature-core-llm-gate`) - `inst-key-state-remove`
 
 ## 5. Definitions of Done
 

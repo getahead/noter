@@ -289,20 +289,49 @@ impl Accounts {
         }
     }
 
+    /// Deletes the key's Keychain item and forgets its saved status: configured, rejected and
+    /// keychain_locked (once the Keychain opens) all become not_set. A locked Keychain keeps
+    /// everything as it was.
+    pub(crate) fn remove(&self, meta: ChangeMeta, provider: KeyProvider) -> Result<(), CoreError> {
+        // @cpt-begin:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-remove
+        self.secrets
+            .remove(account_of(provider))
+            .map_err(|KeychainLocked| {
+                CoreError::new(ErrorCode::KeychainLocked, "the Keychain is locked")
+            })?;
+        if lock(&self.state).saved.contains_key(&provider) {
+            self.write_saved(meta, provider, None)?;
+        }
+        // @cpt-end:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-remove
+        Ok(())
+    }
+
     /// Writes one key's status through the change-log writer; the before and after values are
     /// statuses, never the key.
     fn save(
         &self,
-        mut meta: ChangeMeta,
+        meta: ChangeMeta,
         provider: KeyProvider,
         status: KeyStatus,
+    ) -> Result<(), CoreError> {
+        self.write_saved(meta, provider, Some(status))
+    }
+
+    fn write_saved(
+        &self,
+        mut meta: ChangeMeta,
+        provider: KeyProvider,
+        status: Option<KeyStatus>,
     ) -> Result<(), CoreError> {
         // A Keychain write cannot be undone from History.
         meta.undoable = false;
         let mut state = lock(&self.state);
         let before = to_value(&state.saved)?;
         let mut saved = state.saved.clone();
-        saved.insert(provider, status);
+        match status {
+            Some(status) => saved.insert(provider, status),
+            None => saved.remove(&provider),
+        };
         let after = to_value(&saved)?;
         self.store.write_with(meta, move |tx| {
             let logged = crate::settings::put(tx, KEYS_ROW, &before, &after, None)?;

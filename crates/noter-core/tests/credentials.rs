@@ -208,7 +208,7 @@ async fn a_rejected_key_state_is_cleared_by_removal_and_other_windows_cannot_rem
     ));
     for label in [WindowLabel::Main, WindowLabel::FirstRun] {
         let args = json!({"provider": "codex"});
-        let err = dispatch_json(&w.core, &from(label), "api_key_remove", args, None)
+        let err = dispatch_json(&*w.core, &from(label), "api_key_remove", args, None)
             .await
             .unwrap_err();
         assert_eq!(err.code, ErrorCode::WindowNotAllowed);
@@ -286,7 +286,7 @@ async fn the_audit_pages_in_time_order_inside_the_date_range() {
     let first = &page.rows[0];
     assert_eq!(first.kind, AuditKind::Run);
     assert!(first.llm_run_id.is_some());
-    assert_eq!(first.runtime, Some(RuntimeChoice::ClaudeApiKey));
+    assert_eq!(first.runtime, Some(RuntimeChoice::ClaudeAccount));
     assert_eq!(
         first.what,
         noter_protocol::model::settings::AuditWhat::FullTranscript
@@ -333,7 +333,7 @@ async fn bad_dates_and_cursors_are_invalid_input_and_only_settings_reads() {
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::InvalidInput);
     let args = json!({"page": {}});
-    let err = dispatch_json(&w.core, &from(WindowLabel::Main), "audit_list", args, None)
+    let err = dispatch_json(&*w.core, &from(WindowLabel::Main), "audit_list", args, None)
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::WindowNotAllowed);
@@ -392,7 +392,7 @@ async fn an_export_holds_metadata_only_and_leaves_the_rows_alone() {
         .unwrap();
     let text = std::fs::read_to_string(&md).unwrap();
     assert!(text.starts_with("# "));
-    assert_eq!(text.matches("claude_api_key").count(), 3);
+    assert_eq!(text.matches("claude_account").count(), 3);
     assert!(!text.contains(SECRET_TEXT));
 }
 
@@ -433,7 +433,7 @@ async fn storage_move_does_not_ship() {
         .storage_move(
             &settings(),
             StorageMoveArgs {
-                path: "/Volumes/Big/noter".into(),
+                path: Some("/Volumes/Big/noter".into()),
             },
         )
         .await
@@ -480,7 +480,7 @@ async fn prepare_reports_the_cli_and_an_existing_identity() {
     assert!(!chatgpt.needs_personal_use_confirmation);
     let args = json!({"provider": "claude"});
     let err = dispatch_json(
-        &w.core,
+        &*w.core,
         &from(WindowLabel::CallScreen),
         "account_signin_prepare",
         args,
@@ -630,7 +630,7 @@ async fn an_install_of_a_tool_the_contract_does_not_name_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let w = open(dir.path(), None);
     let err = dispatch_json(
-        &w.core,
+        &*w.core,
         &settings(),
         "cli_install",
         json!({"tool": "curl"}),

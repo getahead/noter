@@ -16,7 +16,7 @@ use crate::runtime::{Availability, BoxFuture, Tested};
 
 /// Tested with 0.163.0; a 0.x minor may change flags. Widen only after the network-monitor
 /// runbook (`.plans/backend/m2-network-monitor-runbook.md`) passes on the new version.
-const TESTED: Tested = Tested {
+pub(crate) const TESTED: Tested = Tested {
     min: [0, 163, 0],
     below: [0, 164, 0],
 };
