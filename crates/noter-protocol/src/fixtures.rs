@@ -1239,6 +1239,7 @@ pub fn world() -> FakeWorld {
                 regenerated_with_edits: false,
                 names_updated: false,
                 version_count: 2,
+                suppressed_count: 0,
             },
             OutputSection {
                 kind: SectionKind::ActionItems,
@@ -1253,6 +1254,7 @@ pub fn world() -> FakeWorld {
                 regenerated_with_edits: false,
                 names_updated: false,
                 version_count: 1,
+                suppressed_count: 0,
             },
             OutputSection {
                 kind: SectionKind::RoleReviews,
@@ -1267,6 +1269,7 @@ pub fn world() -> FakeWorld {
                 regenerated_with_edits: false,
                 names_updated: false,
                 version_count: 0,
+                suppressed_count: 0,
             },
         ],
         archive: ArchiveStatus::Done,

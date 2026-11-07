@@ -2322,6 +2322,11 @@ export type OutputSection = {
 	/**  Speaker labels changed since generation; regeneration can improve wording. */
 	names_updated: boolean,
 	version_count: number,
+	/**
+	 *  Item sections: suggestions of this kind the user rejected, which a regeneration does not
+	 *  suggest again ("1 item not suggested again because you rejected it").
+	 */
+	suppressed_count?: number,
 };
 
 /**  Event `outputs:progress`. */
@@ -3606,7 +3611,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.4";
+export const CONTRACT_VERSION = "2.5";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
