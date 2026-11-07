@@ -82,6 +82,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   };
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-version
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-diff
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-return
   // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-compare
   // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-hide
   const compare = async () => {
@@ -95,6 +96,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   };
   // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-hide
   // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-compare
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-return
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-diff
   const shown = showing && section.summary_id ? bodyOf(section.summary_id, showing) : undefined;
 
@@ -102,6 +104,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
     if (state === "pending") return <p className="np-dim">{t("outputs.waiting")}</p>;
     if (state === "writing" && !section.body_md && !section.items.length) return <p className="np-dim">{prose ? t("outputs.writing_summary") : t("outputs.writing_items", { section: heading.toLowerCase() })}</p>;
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-failed
+    // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-section
     if (state === "failed")
       return (
         <InlineBanner
@@ -113,6 +116,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
           }}
         />
       );
+    // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-section
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-failed
     if (state === "empty")
       return (
@@ -172,17 +176,27 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
           {t("outputs.showing", { n: versions?.versions.find((v) => v.id === showing)?.n ?? 0 })} · <button type="button" className="np-link" onClick={() => setShowing(null)}>{t("outputs.back_to_current")}</button>
         </div>
       )}
+      {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-error */}
       {versionError && (
         <div role="alert" className="pc-sec__error">
           {t("outputs.version_error")} <button type="button" className="np-link" onClick={() => void show(versionError)}>{t("outputs.try_again")}</button>
         </div>
       )}
+      {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-error */}
       {state === "ready" && section.kind === "summary" && section.writer && <div className="pc-sec__meta">{metaLine(section, call, heading)}</div>}
+      {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-preserve */}
       {section.regenerated_with_edits && state === "ready" && !draft && (
         <div className="pc-sec__notice">
           {t("outputs.regenerated", { n: edits })} · <button type="button" className="np-link" onClick={() => void compare()}>{comparing ? t("outputs.hide_diff") : t("outputs.show_diff")}</button>
         </div>
       )}
+      {state === "ready" && section.kind !== "summary" && section.writer?.runtime === "local" && <div className="pc-sec__notice">{t("outputs.written_local_after_timeout")}</div>}
+      {state === "ready" && section.names_updated && (
+        <div className="pc-sec__notice">
+          {t("outputs.names_updated")} · <button type="button" className="np-link" onClick={() => onRegenerate(false)}>{t("outputs.names_regenerate")}</button>
+        </div>
+      )}
+      {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-preserve */}
       {state === "writing" && (section.body_md || section.items.length > 0) && <div className="pc-sec__meta" role="status">{t("outputs.regenerating")}</div>}
       <div className="pc-sec__body">{body()}</div>
     </section>
