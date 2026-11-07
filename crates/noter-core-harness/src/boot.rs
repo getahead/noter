@@ -163,7 +163,7 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
     let at = |ms: i64| TimestampMs(now.0 + ms);
     match name {
         "idle" => w.app.capture = idle,
-        // @cpt-dod:cpt-noter-dod-core-handoff-tests:p1
+        // @cpt-seq:cpt-noter-seq-call-page-hand-off-item:p1
         "handoff" => {
             w.app.capture = idle;
             // Put the engineering item on the saved call's page, where native tests can open it.
@@ -1817,7 +1817,7 @@ impl NativeOps for ScriptedPanel {
             if self.cancel_next.swap(false, Ordering::SeqCst) {
                 return None;
             }
-            // @cpt-dod:cpt-noter-dod-core-handoff-tests:p1
+            // @cpt-flow:cpt-noter-flow-core-handoff-repositories:p1
             if kind == SaveKind::Folder {
                 if let Some(answers) = lock(&self.folder_panels).as_mut() {
                     return answers.pop_front().flatten();
