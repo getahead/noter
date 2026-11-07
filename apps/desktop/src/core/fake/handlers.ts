@@ -1296,12 +1296,13 @@ export const defaultHandlers: Handlers = {
   }),
   person_get: (a, { world }) => {
     const p = person(world, a.person_id);
+    const calls = world.calls.filter((c) => c.participants.some((x) => x.id === p.id));
     return {
       person: p,
-      calls: world.calls.filter((c) => c.participants.some((x) => x.id === p.id)),
+      calls,
       owns_open: world.items.filter((i) => i.owner?.id === p.id && i.status === "open"),
       you_owe: p.is_you ? [] : world.items.filter((i) => i.owner?.is_you && i.status === "open" && i.call.id && i.owed === "by_you"),
-      open_questions: world.items.filter((i) => i.kind === "open_question" && i.status === "open"),
+      open_questions: world.items.filter((i) => i.kind === "open_question" && i.status === "open" && calls.some((c) => c.id === i.call.id)),
       topics: world.topics.slice(0, 2),
       talk_share: world.settings.privacy.behaviour_metrics ? 0.31 : null,
     };
