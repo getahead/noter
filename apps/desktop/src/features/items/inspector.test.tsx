@@ -11,7 +11,7 @@ import { find, rendered } from "../../ui/testing";
 import { closeInspector, inspectorOverride, openInspector } from "../shell/inspector-override";
 import { addItem, applyPatch, create, loadDetail, saveFields } from "./actions";
 import { AddItem } from "./AddItem";
-import { openEvidence, resolveSpan, spanTime } from "./evidence";
+import { evidenceNotes, openEvidence, resolveSpan, spanTime } from "./evidence";
 import { ItemInspector } from "./ItemInspector";
 import { ItemTail } from "./ItemTail";
 import { resetLocal } from "./local";
@@ -231,5 +231,15 @@ describe("inspector and add-item commands", () => {
     (tree.props.onKeyDown as (e: unknown) => void)({ key: "a" });
     outputSlots.itemKeys = was;
     expect(keys).toEqual(["itm_notifa"]);
+  });
+});
+
+describe("evidence notes (inst-audio, inst-archive)", () => {
+  it("names the deleted audio and the archive upgrade; keeps the quote usable", async () => {
+    await ready();
+    const r = await resolveSpan(bridge, span());
+    if (r.status !== "ok") throw new Error("span");
+    expect(evidenceNotes(r.preview)).toEqual({ audioGone: false, archiveChanged: false });
+    expect(evidenceNotes({ ...r.preview, audio_available: false, upgraded_by_archive: true })).toEqual({ audioGone: true, archiveChanged: true });
   });
 });

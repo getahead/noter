@@ -129,7 +129,7 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 ### Inspect details and check evidence
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-items-evidence`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-items-evidence`
 
 **Actor**: Primary user
 
@@ -148,8 +148,8 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 4. [x] - `p1` - User changes Owner, Status or Engineering; apply supported commands immediately; text, Due and Linked issue wait for Save - `inst-edit`
 5. [x] - `p1` - User chooses History; mount the item variant of the history timeline with actor pop-up, no job filter and no export - `inst-history`
 6. [x] - `p1` - User opens a provenance time; `transcript_span` with its TimeSpan resolves current segments rather than a cached row index; navigate to Transcript and focus the first resolved line - `inst-resolve`
-7. [ ] - `p1` - **IF** audio is unavailable: show the deletion or never-stored line and omit play; **ELSE** Space uses the existing playback flow and safety rules - `inst-audio`
-8. [ ] - `p1` - **IF** the archive upgraded the transcript: resolve against the current pass and offer the archive diff; pending archive keeps the live evidence usable - `inst-archive`
+7. [x] - `p1` - **IF** audio is unavailable: show the deletion or never-stored line and omit play; **ELSE** Space uses the existing playback flow and safety rules - `inst-audio`
+8. [x] - `p1` - **IF** the archive upgraded the transcript: resolve against the current pass and offer the archive diff; pending archive keeps the live evidence usable - `inst-archive`
 9. [x] - `p1` - **IF** the source is deleted: render **Source deleted** without a dead link; unresolved reads show **Finding the source…**, then a retryable error - `inst-source`
 10. [x] - `p1` - **RETURN** the evidence or inspector; Esc closes the inspector and returns focus to its row; back navigation restores the origin and scroll - `inst-return`
 
