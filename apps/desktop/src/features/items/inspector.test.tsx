@@ -262,3 +262,18 @@ describe("evidence over the archive pass (inst-archive)", () => {
   });
 });
 
+describe("ProvenanceChip click (cpt-noter-component-ui-provenance-chip)", () => {
+  it("resolves the span and opens the Transcript on it when the time is pressed", async () => {
+    await ready();
+    const seen: string[] = [];
+    const invoke = fake.invoke.bind(fake);
+    fake.invoke = ((cmd: string, args: unknown) => (seen.push(cmd), (invoke as (...a: unknown[]) => unknown)(cmd, args))) as typeof fake.invoke;
+    const tree = rendered(ProvenanceChip, { bridge, span: span() });
+    const press = find(tree, (p, type) => type === "button" && typeof p.onClick === "function").props.onClick as () => void;
+    press();
+    await settle();
+    await settle();
+    expect(seen).toEqual(expect.arrayContaining(["transcript_span", "window_navigate"]));
+  });
+});
+
