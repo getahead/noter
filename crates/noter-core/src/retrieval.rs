@@ -1,15 +1,91 @@
 //! Retrieval in the composition root: `noter-retrieval` on the core's store, engine and jobs
 //! (FEATURE `cpt-noter-feature-core-retrieval-ask`, slice 1: search, scope presets, the index
-//! rebuild at start).
+//! rebuild at start), with knowledge sources' chunks as its documents (2.24).
 
+use std::collections::HashSet;
 use std::sync::{Arc, Weak};
 
+use noter_db::rusqlite::{self, Connection};
 use noter_jobs::{BoxFuture, JobHandler, Request, RunCtx, Stop, Trigger};
 use noter_protocol::model::*;
 use noter_protocol::*;
+use noter_retrieval::{DocHits, DocQuery, DocumentSource, Evidence, Hit, Privacy};
 use serde_json::json;
 
 use crate::{object, Core};
+
+/// Retrieval's documents: knowledge chunks by keyword and by vector, each ranking through the
+/// sources' policy as it stands now (`noter_knowledge::permitted_chunks`).
+struct Documents;
+
+impl DocumentSource for Documents {
+    fn permitted_chunks(&self, conn: &Connection, q: &DocQuery<'_>) -> rusqlite::Result<DocHits> {
+        let scope = AskScope {
+            call_types: q.call_types.to_vec(),
+            include_documents: true,
+            ..AskScope::default()
+        };
+        let cloud = q.privacy == Privacy::Cloud;
+        let keyword = noter_knowledge::keyword_chunks(conn, q.fts, q.fetch)?;
+        let semantic = match q.vector {
+            Some(v) => {
+                let far = 1.0 - noter_retrieval::MIN_SIMILARITY;
+                noter_knowledge::nearest_chunks(conn, v, q.fetch, far)?
+            }
+            None => vec![],
+        };
+        // The chunks a cloud request lost only because their source is sensitive.
+        let mut skipped: HashSet<ChunkId> = HashSet::new();
+        let mut permit = |ids: Vec<ChunkId>| -> rusqlite::Result<Vec<Hit>> {
+            let allowed = noter_knowledge::permitted_chunks(conn, &ids, &scope, cloud)?;
+            if cloud {
+                for p in noter_knowledge::permitted_chunks(conn, &ids, &scope, false)? {
+                    if !allowed.iter().any(|a| a.chunk_id == p.chunk_id) {
+                        skipped.insert(p.chunk_id);
+                    }
+                }
+            }
+            Ok(allowed.into_iter().map(document_hit).collect())
+        };
+        let keyword = permit(keyword)?;
+        let semantic = permit(semantic)?;
+        Ok(DocHits {
+            keyword,
+            semantic,
+            sensitive_skipped: skipped.len() as u32,
+        })
+    }
+}
+
+/// A permitted chunk as retrieval ranks it: its heading path is the section.
+fn document_hit(p: noter_knowledge::Permitted) -> Hit {
+    let section = (!p.heading_path.is_empty()).then(|| p.heading_path.join(" › "));
+    Hit {
+        evidence: Evidence::Document {
+            document_id: p.document_id.clone(),
+            chunk_id: p.chunk_id.clone(),
+        },
+        target: HitTarget::Document {
+            document_id: p.document_id.clone(),
+            chunk_id: p.chunk_id.clone(),
+        },
+        title: p.title.clone(),
+        text: p.text,
+        lang: None,
+        call: None,
+        provenance: Provenance::Document {
+            source_id: p.source_id,
+            document_id: p.document_id,
+            chunk_id: p.chunk_id,
+            title: p.title,
+            section,
+            source_name: p.source_name,
+        },
+        keyword: false,
+        semantic: false,
+        score: 0.0,
+    }
+}
 
 /// The `IndexRebuild` job: fills the vector indexes, keyword-only meanwhile.
 struct RebuildJob(Weak<Core>);
@@ -72,15 +148,8 @@ impl Core {
             SearchMode::KeywordOnly { .. } => None,
         };
         let request = request.with_vector(vector);
-        self.store().read(|c| {
-            noter_retrieval::search(
-                c,
-                &args.query,
-                &request,
-                mode,
-                &noter_retrieval::NoDocuments,
-            )
-        })
+        self.store()
+            .read(|c| noter_retrieval::search(c, &args.query, &request, mode, &Documents))
     }
 
     /// `ask_scope_presets`: readable scopes from the current library.

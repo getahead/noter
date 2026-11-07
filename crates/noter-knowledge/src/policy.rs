@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use noter_db::rusqlite::{self, Connection, OptionalExtension};
+use noter_db::rusqlite::{self, params, Connection, OptionalExtension};
 use noter_protocol::model::{AskScope, SourceScope};
 use noter_protocol::{ChunkId, DocumentId, SourceId};
 
@@ -139,4 +139,39 @@ pub fn permitted_chunks(
         // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-return
     }
     Ok(out)
+}
+
+/// Indexed chunks whose text matches `fts`, retrieval's word-start expression (`" term" OR …`),
+/// best first. Candidates only: [`permitted_chunks`] decides what a request may use.
+pub fn keyword_chunks(
+    conn: &Connection,
+    fts: &str,
+    fetch: usize,
+) -> rusqlite::Result<Vec<ChunkId>> {
+    let mut st = conn.prepare(
+        "SELECT c.id FROM doc_chunks_fts f JOIN doc_chunks c ON c.rowid = f.rowid
+         WHERE doc_chunks_fts MATCH ?1 ORDER BY bm25(doc_chunks_fts) LIMIT ?2",
+    )?;
+    let rows = st.query_map(params![fts, fetch as i64], |r| r.get::<_, String>(0))?;
+    rows.map(|id| id.map(ChunkId::new)).collect()
+}
+
+/// The `fetch` indexed chunks nearest `vector` within the cosine `max_distance`, best first;
+/// candidates for [`permitted_chunks`] like [`keyword_chunks`].
+pub fn nearest_chunks(
+    conn: &Connection,
+    vector: &[f32],
+    fetch: usize,
+    max_distance: f64,
+) -> rusqlite::Result<Vec<ChunkId>> {
+    let blob: Vec<u8> = vector.iter().flat_map(|x| x.to_le_bytes()).collect();
+    let mut st = conn.prepare(
+        "SELECT chunk_id FROM (SELECT chunk_id, distance FROM doc_vec
+             WHERE embedding MATCH ?1 AND k = ?2)
+         WHERE distance <= ?3 ORDER BY distance",
+    )?;
+    let rows = st.query_map(params![blob, fetch as i64, max_distance], |r| {
+        r.get::<_, String>(0)
+    })?;
+    rows.map(|id| id.map(ChunkId::new)).collect()
 }
