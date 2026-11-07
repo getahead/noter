@@ -55,7 +55,7 @@ export async function generate(bridge: Bridge, itemId: string, regenerate: boole
 
 async function write(bridge: Bridge, itemId: string, regenerate: boolean) {
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-regenerate
-  patchLocal(itemId, { restored: undefined, genFailed: undefined, loadFailed: undefined, ...(regenerate ? { draft: undefined, showDiff: undefined, opened: undefined, openFailed: undefined, error: undefined } : {}) });
+  patchLocal(itemId, { restored: undefined, genFailed: undefined, loadFailed: undefined, ...(regenerate ? { draft: undefined, draftRev: undefined, showDiff: undefined, opened: undefined, openFailed: undefined, error: undefined } : {}) });
   const res = await bridge.act(`handoff:gen:${itemId}`, "handoff_generate", () => bridge.core.handoffGenerate({ item_id: itemId, regenerate }), { entity: "handoff" });
   // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-regenerate
   if (res.status !== "ok") patchLocal(itemId, { genFailed: res.error.code });
@@ -76,12 +76,19 @@ export async function flushDraft(bridge: Bridge, itemId: string): Promise<boolea
   const draft = localOf(itemId).draft;
   if (!view || draft === undefined || !isDirty(view, localOf(itemId))) return true;
   patchLocal(itemId, { pending: "save", error: undefined });
-  const res = await bridge.act(`handoff:edit:${itemId}`, "handoff_edit", () => bridge.core.handoffEdit({ item_id: itemId, rev: view.rev ?? 0, prompt_md: draft }), { entity: "handoff" });
-  if (res.status === "ok") return patchLocal(itemId, { pending: undefined, draft: undefined, restored: undefined }), true;
+  const res = await bridge.act(`handoff:edit:${itemId}`, "handoff_edit", () => bridge.core.handoffEdit({ item_id: itemId, rev: localOf(itemId).draftRev ?? view.rev ?? 0, prompt_md: draft }), { entity: "handoff" });
+  if (res.status === "ok") {
+    const changedWhileSaving = localOf(itemId).draft !== draft;
+    patchLocal(itemId, { pending: undefined, restored: undefined, draft: changedWhileSaving ? localOf(itemId).draft : undefined, draftRev: changedWhileSaving ? res.data.rev ?? 0 : undefined });
+    return !changedWhileSaving;
+  }
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-conflict
   // the draft stays; a conflict reads the prompt again and waits for an explicit new save
   patchLocal(itemId, { pending: undefined, error: errorText(res.error.code) });
-  if (res.error.code === "conflict") await get(bridge, itemId);
+  if (res.error.code === "conflict") {
+    const latest = await get(bridge, itemId);
+    if (latest.status === "ok") patchLocal(itemId, { draftRev: latest.data.rev ?? 0 });
+  }
   // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-conflict
   return false;
 }

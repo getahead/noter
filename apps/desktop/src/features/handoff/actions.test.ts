@@ -92,6 +92,23 @@ describe("load and generate (cpt-noter-flow-ui-handoff-prepare)", () => {
 });
 
 describe("edit, target, copy and open (cpt-noter-flow-ui-handoff-deliver)", () => {
+  it("keeps text typed during a save and does not launch the older saved prompt", async () => {
+    await ready();
+    map();
+    await A.load(bridge, ID);
+    L.patchLocal(ID, { draft: "First draft" });
+    const edit = bridge.core.handoffEdit.bind(bridge.core);
+    vi.spyOn(bridge.core, "handoffEdit").mockImplementation(async (args) => {
+      const result = await edit(args);
+      L.patchLocal(ID, { draft: "Newer draft" });
+      return result;
+    });
+    const seen = sent();
+    await A.open(bridge, ID);
+    expect(L.localOf(ID).draft).toBe("Newer draft");
+    expect(seen.map((s) => s[0])).toEqual(["handoff_edit"]);
+  });
+
   it("saves the draft with the rev it was based on before the action, and only then acts", async () => {
     await ready();
     map();

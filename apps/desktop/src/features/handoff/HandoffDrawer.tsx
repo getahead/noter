@@ -125,7 +125,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
           prefs={prefs!}
           showDiff={!!local.showDiff}
           onDiff={() => patchLocal(itemId, { showDiff: !local.showDiff })}
-          onChange={(draft) => patchLocal(itemId, { draft, error: undefined, openFailed: undefined, opened: undefined })}
+          onChange={(draft) => patchLocal(itemId, { draft, draftRev: local.draftRev ?? view?.rev ?? 0, error: undefined, openFailed: undefined, opened: undefined })}
         />
       </>
     );

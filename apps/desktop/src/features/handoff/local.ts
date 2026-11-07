@@ -8,6 +8,7 @@ import type { ErrorCode, HandoffView, LaunchPath } from "../../core/bindings";
 export interface Local {
   /** The prompt as the user typed it, not yet saved with `handoff_edit`. */
   draft?: string;
+  draftRev?: number;
   showDiff?: boolean;
   pending?: "save" | "copy" | "open";
   /** `handoff_get` failed with this code. */

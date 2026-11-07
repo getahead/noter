@@ -12,6 +12,7 @@ import { handoffButtonId, slots } from "../items/slots";
 import { HandoffDrawer, recordLine } from "./HandoffDrawer";
 import { patchLocal, resetLocal } from "./local";
 import { PromptEditor, versionEntries } from "./PromptEditor";
+import { flushDraft } from "./actions";
 import "./register";
 
 const ID = "itm_replay";
@@ -34,6 +35,17 @@ const prefs = { time_format: "h23", time_zone: "UTC" } as unknown as UiPrefs;
 const own = (v: HandoffView) => ({ item: { ...v.item, owner: { ...v.item.owner!, is_you: true }, review: "accepted" as const }, default_action: "open" as const });
 
 describe("HandoffDrawer (cpt-noter-component-ui-handoff-drawer)", () => {
+  it("keeps the draft's base revision when another prompt arrives before saving", async () => {
+    await ready(own);
+    const before = bridge.store.getState().entities.handoff[ID]!;
+    const editor = find(tree(), (p) => p.itemId === ID && typeof p.onChange === "function");
+    (editor.props.onChange as (text: string) => void)("My draft");
+    hold({ ...before, rev: (before.rev ?? 0) + 1, prompt_md: "Someone else's edit" });
+    const edit = vi.spyOn(bridge.core, "handoffEdit");
+    await flushDraft(bridge, ID);
+    expect(edit).toHaveBeenCalledWith({ item_id: ID, rev: before.rev ?? 0, prompt_md: "My draft" });
+  });
+
   it("draws HD-R1 to HD-R7 for a ready prompt of the user's own item", async () => {
     await ready(own);
     const html = draw();
