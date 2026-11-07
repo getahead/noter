@@ -1541,7 +1541,10 @@ async fn live_tools_follow_the_policy_matrix_of_task_privacy_and_sensitive_conte
         "wiki.example",
         token.as_str(),
     ] {
-        assert!(!body.contains(secret), "{secret} in the run config");
+        assert!(
+            !body.contains(secret),
+            "a source address or the token is in the run config"
+        );
     }
     // Unbound to a call, a source limited to stand-ups is the run's too.
     assert!(live_of(&config).contains(&"live_standup_notes_search".to_owned()));
