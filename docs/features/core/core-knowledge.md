@@ -38,9 +38,9 @@ design: docs/DESIGN-core.md
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-core-knowledge`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-core-knowledge`
 
-- [ ] `p4` - `cpt-noter-feature-core-knowledge`
+- [x] `p4` - `cpt-noter-feature-core-knowledge`
 
 ## 1. Feature Context
 
@@ -49,6 +49,8 @@ design: docs/DESIGN-core.md
 `noter-knowledge` indexes folders and remote MCP sources into the same local retrieval store as calls. It extracts text, chunks by heading, embeds locally and schedules sync jobs. Every source has privacy and scope rules that retrieval applies before a model sees its chunks. Live MCP sources are configured here but relayed by noter-mcp, never indexed.
 
 > **M3 decisions (Backend Teamlead, 7 Nov 2026).** `noter-knowledge` is a new crate with its own migration list (`sources`, `documents`, `doc_chunks`, `doc_chunks_fts`, `doc_vec`, `sync_runs`) (TL-28, TL-34). The app is unsandboxed (Q4, TL-29), so a folder source needs no security-scoped bookmark: `sources.bookmark` stays NULL, access is by path and changes arrive through the `notify` watcher; read every "bookmark" step below that way. Indexed MCP tokens live in `SecretStore` accounts `source:<src_id>` (TL-33). Extraction (TL-41): Markdown, text and code are read directly, HTML through a tag-stripping crate (`html2text` or `scraper`), PDF through `pdf-extract`, `.docx` through `zip` and `quick-xml` on `word/document.xml`; every new dependency needs its licence in `deny.toml`'s allow-list and `apps/desktop/src-tauri/Cargo.lock` updated in the same PR; chunks are 200–400 tokens by heading with title and heading path prepended. The `noter_knowledge::McpSource` seam (list resources, read resource, seed query, OAuth start/finish) is answered scripted by the harness through `harness.world_set`; the real streamable-HTTP transport with OAuth 2.1 PKCE (`noter-llm` `mcp_client.rs`) is slice 3 and ships only if it fits M3, otherwise it is an owner-batch open part and the box ticks on the scripted stories; live sources are stored, never indexed (D1) (TL-42). `SourceScope::Limited { call_types, people }` (TL-45): an unscoped request sees Limited sources; a scoped request sees one when any of its call types is in `call_types` or any of its people is in `people`; a request that names a call counts that call's type and participants as its own; sensitive sources are excluded for cloud runs regardless; `include_documents = false` returns none. `noter_knowledge::permitted_chunks` is the policy function core-retrieval-ask calls for documents.
+
+> **Delivered (#331 #351 #362 #371).** The box ticks on the scripted `McpSource` (TL-47): every step is implemented and tested against the seam; the real streamable-HTTP transport with OAuth (slice 3, `noter-llm` `mcp_client.rs`) is a separate PR or an owner-batch item. Notes: (1) TL-29: no bookmark (`sources.bookmark` stays NULL), the app is unsandboxed and changes arrive through the `notify` watcher, so the bookmark wording of AC 5 is met by typed errors on an unreadable path. (2) TL-33: indexed MCP tokens are `SecretStore` account `source:<src_id>`; the row keeps only that name. (3) TL-41: extraction crates as landed: `html2text`, `pdf-extract`, `zip` + `quick-xml`. (4) TL-45: the Limited scope rule above. (5) `doc_chunks_fts` was rebuilt by migration `0002_doc_keywords.sql` in retrieval's trigram word-start form (the first version never matched word-start stems). (6) Delta: the frozen `AuditWhat` has no value for an indexed-sync request, so those `lookup` audit rows use `live_mcp_query` (DESIGN-core / contract delta, owner batch). (7) The seed crawl is one empty query. (8) No contract field carries the OAuth URL to the UI (UI M3 contract gap, owner batch). (9) The 1.4 "Locate / Sign In Again" gap stays.
 
 ### 1.2 Purpose
 
@@ -294,11 +296,11 @@ The system **MUST** revoke indexed tokens, stop authenticated work, and remove a
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core, `cpt-noter-seq-settings-add-knowledge-source`: a picked folder reports progress, count and last sync, and its heading appears as document evidence in search and Ask; removal stops those hits.
+- [ ] E2E against the real core, `cpt-noter-seq-settings-add-knowledge-source`: a picked folder reports progress, count and last sync, and its heading appears as document evidence in search and Ask; removal stops those hits. Open: the story proves the search half (`apps/desktop/tests/conformance/m3-stories-knowledge.test.ts`, #371); Ask still retrieves with `NoDocuments` (`crates/noter-core/src/ask.rs`), so document evidence in Ask arrives with a later 2.22 change.
 - [x] Fixtures for Markdown, text, PDF, Word, HTML and code preserve title and heading provenance; changing one file re-embeds only that file, and unchanged remote hashes produce no duplicate chunks.
 - [x] Scripted MCP covers resource listing, seed-query fallback, initial OAuth, expiry, offline retry and revoke; an incomplete listing never deletes previously indexed pages.
-- [ ] A sensitive source and an out-of-scope source are excluded before cloud packet creation; edits during a sync or answer cannot publish old-policy chunks.
-- [ ] A cancelled picker writes nothing; inaccessible bookmarks and failed jobs retain typed errors and previous last-sync time; reconnect and retry succeed.
-- [ ] Removal rolls back on a forced writer failure; after successful removal, no index row remains and late jobs cannot restore the source.
-- [ ] Each of the seven commands succeeds at least once in real-core E2E runs; stale `source_update` returns `conflict` without a write or event.
-- [ ] `just gate-fast` and `just gate` pass.
+- [x] A sensitive source and an out-of-scope source are excluded before cloud packet creation; edits during a sync or answer cannot publish old-policy chunks.
+- [x] A cancelled picker writes nothing; inaccessible bookmarks and failed jobs retain typed errors and previous last-sync time; reconnect and retry succeed.
+- [x] Removal rolls back on a forced writer failure; after successful removal, no index row remains and late jobs cannot restore the source.
+- [x] Each of the seven commands succeeds at least once in real-core E2E runs; stale `source_update` returns `conflict` without a write or event.
+- [x] `just gate-fast` and `just gate` pass.

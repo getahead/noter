@@ -1338,9 +1338,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.24 Knowledge sources - MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-core-knowledge`
+- [x] `p4` - **ID**: `cpt-noter-feature-core-knowledge`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-knowledge.md](features/core/core-knowledge.md)
+- **Milestone**: M3 · **Lane**: core · **Status**: IMPLEMENTED (#331 #351 #362 #371). FEATURE spec: [features/core/core-knowledge.md](features/core/core-knowledge.md)
 
 - **Purpose**: Index folder and MCP sources into the same store with privacy class and scope applied before any model sees a chunk.
 
@@ -1371,7 +1371,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-core-knowledge`
+  - `cpt-noter-component-core-knowledge`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `sources_list`, `source_add_folder`, `source_add_mcp`, `source_update`, `source_reindex`, `source_remove`, `source_revoke_token`
