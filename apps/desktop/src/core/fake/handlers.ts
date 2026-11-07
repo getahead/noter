@@ -1239,6 +1239,7 @@ export const defaultHandlers: Handlers = {
     t.aliases = [...new Set([...t.aliases, before])];
     t.name = a.name;
     t.rev += 1;
+    world.items.forEach((i) => i.topic?.id === t.id && (i.topic = { id: t.id, name: t.name }));
     emit("entity:changed", { type: "topic", topic: t });
     return { topic: t, change_id: logChange(world, { entity: { kind: "topic", id: t.id, label: t.name }, field: "name", before, after: t.name, summary: `Renamed topic to ${t.name}` }) };
   },
@@ -1262,6 +1263,7 @@ export const defaultHandlers: Handlers = {
   topics_keep_separate: (a, { world }) => {
     const x = topic(world, a.a);
     const y = topic(world, a.b);
+    if (x === y) throw coreError("invalid_input", "same topic", { type: "validation", field: "b", rule: "out_of_range" });
     if (x.merge_suggestion?.id === y.id) x.merge_suggestion = null;
     if (y.merge_suggestion?.id === x.id) y.merge_suggestion = null;
     return ack;
