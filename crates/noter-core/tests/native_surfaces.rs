@@ -188,6 +188,45 @@ async fn the_call_window_shows_without_focus_then_takes_it_and_hides() {
     );
 }
 
+// cpt-noter-seq-call-screen-name-speaker: each rename can reclaim native focus.
+#[tokio::test]
+async fn repeated_live_rename_reclaims_focus_without_moving_the_panel() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events, rec) = open(dir.path());
+    let call = window(WindowLabel::CallScreen);
+    core.window_show_call(&call, NoArgs {}).await.unwrap();
+    let first = core.window_show_call(&call, NoArgs {}).await.unwrap();
+    assert!(first.key);
+    rec.take();
+    events.of(event_names::WINDOW_CALL);
+
+    core.call_window_focus_changed(false);
+    let inactive = core.window_call_state(&call, NoArgs {}).await.unwrap();
+    assert!(inactive.visible && !inactive.key);
+    assert_eq!(events.of(event_names::WINDOW_CALL)[0]["key"], false);
+    core.call_window_focus_changed(false);
+    assert!(events.of(event_names::WINDOW_CALL).is_empty());
+    assert!(rec.take().is_empty());
+
+    let again = core.window_show_call(&call, NoArgs {}).await.unwrap();
+    assert!(again.key);
+    assert_eq!(again.layout, first.layout);
+    assert_eq!(again.display_id, first.display_id);
+    assert_eq!(rec.take(), ["make_call_window_key"]);
+    events.of(event_names::WINDOW_CALL);
+    core.call_window_focus_changed(true);
+    assert!(events.of(event_names::WINDOW_CALL).is_empty());
+
+    core.call_window_focus_changed(false);
+    core.call_window_focus_changed(true);
+    assert!(core.window_call_state(&call, NoArgs {}).await.unwrap().key);
+    core.window_hide_call(&call, NoArgs {}).await.unwrap();
+    events.of(event_names::WINDOW_CALL);
+    core.call_window_focus_changed(true);
+    assert!(!core.window_call_state(&call, NoArgs {}).await.unwrap().key);
+    assert!(events.of(event_names::WINDOW_CALL).is_empty());
+}
+
 #[tokio::test]
 async fn a_missing_call_display_falls_back_to_the_main_display_floating() {
     let dir = tempfile::tempdir().unwrap();

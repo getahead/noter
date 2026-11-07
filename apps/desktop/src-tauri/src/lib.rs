@@ -64,10 +64,16 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                     surfaces.call_window_changed(window);
                 }
             }
-            // Noter became active: the core re-checks what macOS cannot report (D-19).
-            WindowEvent::Focused(true) => {
+            // @cpt-state:cpt-noter-state-core-native-surfaces-call-window:p1
+            WindowEvent::Focused(focused) => {
                 if let Some(Ok(core)) = window.try_state::<Booted>().map(|b| b.0.clone()) {
-                    core.app_activated();
+                    if window.label() == WindowLabel::CallScreen.as_str() {
+                        core.call_window_focus_changed(*focused);
+                    }
+                    // Noter became active: re-check what macOS cannot report (D-19).
+                    if *focused {
+                        core.app_activated();
+                    }
                 }
             }
             _ => {}
