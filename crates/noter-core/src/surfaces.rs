@@ -173,6 +173,16 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-emit-window
     }
 
+    /// Native focus can leave the panel between explicit editing requests.
+    pub fn call_window_focus_changed(&self, focused: bool) {
+        let mut w = lock(&self.windows);
+        let key = focused && w.call.visible;
+        if w.call.key != key {
+            w.call.key = key;
+            self.publish_call(&mut w);
+        }
+    }
+
     pub(crate) fn hide_call(&self) -> CallWindowState {
         let mut w = lock(&self.windows);
         if !w.call.visible {
