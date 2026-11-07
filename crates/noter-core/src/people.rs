@@ -186,7 +186,6 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
             n: r.get(1)?,
             segment_count: r.get(6)?,
-            // Voice profiles suggest names from slice 2.
             suggestion: None,
         })
     })?
@@ -417,7 +416,7 @@ impl Core {
         let query = args.query.as_deref().map(norm).filter(|q| !q.is_empty());
         // @cpt-end:cpt-noter-flow-core-people-read:p1:inst-read-list
         // @cpt-begin:cpt-noter-flow-core-people-read:p1:inst-read-people
-        self.store().read(move |c| {
+        let mut list = self.store().read(move |c| {
             let mut people = rows_of(c, None)?;
             if let Some(q) = &query {
                 people.retain(|p| {
@@ -432,7 +431,11 @@ impl Core {
                 people,
                 unnamed: unnamed_of(c)?,
             })
-        })
+        })?;
+        for u in &mut list.unnamed {
+            u.suggestion = self.suggest_for(u.speaker_id.as_str());
+        }
+        Ok(list)
         // @cpt-end:cpt-noter-flow-core-people-read:p1:inst-read-people
     }
 

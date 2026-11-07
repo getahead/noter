@@ -102,7 +102,7 @@ impl Core {
     /// The call's named speakers (not You) join its participation.
     pub(crate) fn sync_participants(&self, call: &CallId) -> Result<(), CoreError> {
         let id = call.as_str().to_string();
-        let named: Vec<String> = self.store().read(move |c| {
+        let named: Vec<String> = crate::profiles::rd(self.store(), move |c| {
             c.prepare(
                 "SELECT DISTINCT s.person_id FROM speakers s JOIN people p ON p.id = s.person_id
                  WHERE s.call_id = ?1 AND p.is_you = 0",
@@ -130,7 +130,7 @@ impl Core {
             })
             .map(|e| e.attendees)
             .unwrap_or_default();
-        let people = self.store().read(move |c| attendee_people(c, &attendees))?;
+        let people = crate::profiles::rd(self.store(), move |c| attendee_people(c, &attendees))?;
         self.add_participants(call, people)?;
         self.sync_participants(call)
     }
@@ -196,7 +196,7 @@ impl Core {
     }
 
     fn carried_now(&self) -> Result<Vec<(String, u32)>, CoreError> {
-        self.store().read(|c| {
+        crate::profiles::rd(self.store(), |c| {
             c.prepare("SELECT id, rev FROM items WHERE status = 'carried'")
                 .and_then(|mut q| q.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect())
                 .map_err(internal)
@@ -212,7 +212,7 @@ impl Core {
         self.carry_end(call)?;
         // @cpt-begin:cpt-noter-flow-core-people-carry:p1:inst-carry-start
         let id = call.as_str().to_string();
-        let items: Vec<(String, u32)> = self.store().read(move |c| {
+        let items: Vec<(String, u32)> = crate::profiles::rd(self.store(), move |c| {
             let people: Vec<String> = c
                 .prepare("SELECT person_id FROM call_participants WHERE call_id = ?1")
                 .and_then(|mut q| q.query_map([&id], |r| r.get(0))?.collect())
@@ -264,7 +264,7 @@ impl Core {
 
     /// The call's stop: carried items go back to open unless they were closed or answered
     /// meanwhile, and talk time is kept for the call's people while behaviour metrics are on.
-    pub(crate) fn carry_end(&self, call: &CallId) -> Result<(), CoreError> {
+    pub(crate) fn carry_end(&self, _call: &CallId) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-flow-core-people-carry:p1:inst-carry-end
         // @cpt-begin:cpt-noter-flow-core-people-carry:p1:inst-st-return-open
         // Review state and the source call stay: only the status moves back.

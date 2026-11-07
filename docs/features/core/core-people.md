@@ -150,7 +150,7 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 
 ### Opt into or delete a voice profile
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-people-profile`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-people-profile`
 
 **Actor**: Primary user (main › Person page)
 
@@ -162,16 +162,16 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - Person or seed speaker missing: `not_found`; seed belongs to someone else or has no usable voice samples: `invalid_input`; Keychain unavailable: no plaintext fallback.
 
 **Steps**:
-1. [ ] - `p1` - API: `voice_profile_create { person_id, from_speaker }` only after the profile explanation and Create Profile action - `inst-profile-request`
-2. [ ] - `p1` - Validate the person and optional seed; when no seed is given, select usable speaker embeddings from lines already named as this person - `inst-profile-samples`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-people-profile-match`; store opt-in date and encrypted profile centroids through the change-log writer - `inst-profile-create`
-4. [ ] - `p1` - **RETURN** `VoiceProfileView` containing enabled state and centroid count, never embeddings; emit `entity:changed` after commit - `inst-profile-created`
-5. [ ] - `p1` - API: `voice_profile_delete { person_id }` after the delete alert; atomically clear opt-in and remove every centroid, with a non-undoable change that contains no biometric blobs - `inst-profile-delete`
-6. [ ] - `p1` - Invalidate matching caches and pending writes for the profile; **RETURN** disabled `VoiceProfileView` and emit the person change without renaming any speaker - `inst-profile-deleted`
+1. [x] - `p1` - API: `voice_profile_create { person_id, from_speaker }` only after the profile explanation and Create Profile action - `inst-profile-request`
+2. [x] - `p1` - Validate the person and optional seed; when no seed is given, select usable speaker embeddings from lines already named as this person - `inst-profile-samples`
+3. [x] - `p1` - Run `cpt-noter-algo-core-people-profile-match`; store opt-in date and encrypted profile centroids through the change-log writer - `inst-profile-create`
+4. [x] - `p1` - **RETURN** `VoiceProfileView` containing enabled state and centroid count, never embeddings; emit `entity:changed` after commit - `inst-profile-created`
+5. [x] - `p1` - API: `voice_profile_delete { person_id }` after the delete alert; atomically clear opt-in and remove every centroid, with a non-undoable change that contains no biometric blobs - `inst-profile-delete`
+6. [x] - `p1` - Invalidate matching caches and pending writes for the profile; **RETURN** disabled `VoiceProfileView` and emit the person change without renaming any speaker - `inst-profile-deleted`
 
 ### Carry open items into a live call
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-people-carry`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-people-carry`
 
 **Actor**: Job scheduler and session manager, on a live call with known people (moved from `core-items-today`, 2.18)
 
@@ -182,10 +182,10 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - Unknown attendees alone never imply a match; reading Today alone never changes item status.
 
 **Steps**:
-1. [ ] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status (moved from `core-items-today`, 2.18) - `inst-carry-start`
-2. [ ] - `p1` - **FROM** open **TO** carried **WHEN** offered in a live call with the same people (moved from `core-items-today`, 2.18) - `inst-st-carried`
-3. [ ] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity (moved from `core-items-today`, 2.18) - `inst-carry-end`
-4. [ ] - `p1` - **FROM** carried **TO** open **WHEN** the call ends without closure (moved from `core-items-today`, 2.18) - `inst-st-return-open`
+1. [x] - `p1` - On actual call start, log offered open items as carried; reading Today alone does not mutate status (moved from `core-items-today`, 2.18) - `inst-carry-start`
+2. [x] - `p1` - **FROM** open **TO** carried **WHEN** offered in a live call with the same people (moved from `core-items-today`, 2.18) - `inst-st-carried`
+3. [x] - `p1` - On that call's end, return carried items to open unless they were closed or answered during it; preserve review and source-call identity (moved from `core-items-today`, 2.18) - `inst-carry-end`
+4. [x] - `p1` - **FROM** carried **TO** open **WHEN** the call ends without closure (moved from `core-items-today`, 2.18) - `inst-st-return-open`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -224,38 +224,38 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 
 ### Build and match local profiles
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-people-profile-match`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-people-profile-match`
 
 **Input**: Named speaker embeddings or a later call's speaker centroid, opted-in profile rows, injected clock and Keychain encryption key.
 
 **Output**: Encrypted centroids or a local identity suggestion; no exported biometric data.
 
 **Steps**:
-1. [ ] - `p1` - Read current person opt-in; **IF** it is absent during matching, exclude that person's profile - `inst-match-optin`
-2. [ ] - `p1` - For creation, cluster usable 256-dimensional voice samples into several centroids per person, retaining device hint and sample count - `inst-match-build`
-3. [ ] - `p1` - Encrypt every stored centroid with the Keychain-held key; never place plaintext centroids in logs, exports, MCP or cloud context - `inst-match-encrypt`
-4. [ ] - `p1` - During matching, decrypt only locally; assign only above 0.75 cosine with a margin over the runner-up, narrow candidates to attendees when known, and exclude profiles decayed after 90 days unused - `inst-match-score`
-5. [ ] - `p1` - Keep ambiguous matches as unnamed with a suggestion; update `last_used_at` only for a profile actually used, through the writer - `inst-match-used`
-6. [ ] - `p1` - Recheck opt-in and person existence before committing any match or updated profile; deletion wins over pending inference - `inst-match-recheck`
-7. [ ] - `p1` - **RETURN** the encrypted profile view or local match; release decrypted buffers after use - `inst-match-return`
+1. [x] - `p1` - Read current person opt-in; **IF** it is absent during matching, exclude that person's profile - `inst-match-optin`
+2. [x] - `p1` - For creation, cluster usable 256-dimensional voice samples into several centroids per person, retaining device hint and sample count - `inst-match-build`
+3. [x] - `p1` - Encrypt every stored centroid with the Keychain-held key; never place plaintext centroids in logs, exports, MCP or cloud context - `inst-match-encrypt`
+4. [x] - `p1` - During matching, decrypt only locally; assign only above 0.75 cosine with a margin over the runner-up, narrow candidates to attendees when known, and exclude profiles decayed after 90 days unused - `inst-match-score`
+5. [x] - `p1` - Keep ambiguous matches as unnamed with a suggestion; update `last_used_at` only for a profile actually used, through the writer - `inst-match-used`
+6. [x] - `p1` - Recheck opt-in and person existence before committing any match or updated profile; deletion wins over pending inference - `inst-match-recheck`
+7. [x] - `p1` - **RETURN** the encrypted profile view or local match; release decrypted buffers after use - `inst-match-return`
 
 ## 4. States (CDSL)
 
 ### Voice profile lifecycle
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-people-profile`
+- [x] `p4` - **ID**: `cpt-noter-state-core-people-profile`
 
 **States**: absent, building, enabled, decayed
 
 **Initial State**: absent
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** absent **TO** building **WHEN** Create Profile explicitly opts the person in - `inst-state-build`
-2. [ ] - `p1` - **FROM** building **TO** enabled **WHEN** encrypted centroids and opt-in commit - `inst-state-enabled`
-3. [ ] - `p1` - **FROM** building **TO** absent **WHEN** creation fails; no partial profile is enabled - `inst-state-failed`
-4. [ ] - `p1` - **FROM** enabled **TO** decayed **WHEN** the profile has been unused for 90 days and no longer contributes to matching - `inst-state-decayed`
-5. [ ] - `p1` - **FROM** decayed **TO** enabled **WHEN** an opted-in profile is refreshed from named samples - `inst-state-refreshed`
-6. [ ] - `p1` - **FROM** enabled **TO** absent **WHEN** profile or person deletion commits; also from building or decayed; existing speaker names remain on profile-only deletion - `inst-state-deleted`
+1. [x] - `p1` - **FROM** absent **TO** building **WHEN** Create Profile explicitly opts the person in - `inst-state-build`
+2. [x] - `p1` - **FROM** building **TO** enabled **WHEN** encrypted centroids and opt-in commit - `inst-state-enabled`
+3. [x] - `p1` - **FROM** building **TO** absent **WHEN** creation fails; no partial profile is enabled - `inst-state-failed`
+4. [x] - `p1` - **FROM** enabled **TO** decayed **WHEN** the profile has been unused for 90 days and no longer contributes to matching - `inst-state-decayed`
+5. [x] - `p1` - **FROM** decayed **TO** enabled **WHEN** an opted-in profile is refreshed from named samples - `inst-state-refreshed`
+6. [x] - `p1` - **FROM** enabled **TO** absent **WHEN** profile or person deletion commits; also from building or decayed; existing speaker names remain on profile-only deletion - `inst-state-deleted`
 
 ## 5. Definitions of Done
 
@@ -292,7 +292,7 @@ The system **MUST** merge every source reference as one undoable batch, retain a
 
 ### Local opt-in profiles
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-people-profiles`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-people-profiles`
 
 The system **MUST** create profiles only on explicit opt-in, encrypt their several centroids with a Keychain-held key, decay unused profiles after 90 days, and delete all of a person's profile data in one action. Profile-only deletion keeps names. Neither profiles nor plaintext centroid blobs enter an export, model packet, tool result or change-log payload.
 

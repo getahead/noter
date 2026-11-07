@@ -189,6 +189,14 @@ fn live_profiles(c: &Connection, now: i64) -> noter_db::rusqlite::Result<Vec<Row
     // @cpt-end:cpt-noter-algo-core-people-profile-match:p1:inst-match-optin
 }
 
+/// A read whose closure fails with a `CoreError` of its own (the closure's `?` on `db(..)`).
+pub(crate) fn rd<T>(
+    s: &noter_db::Store,
+    f: impl FnOnce(&Connection) -> Result<T, CoreError>,
+) -> Result<T, CoreError> {
+    s.read(|c| Ok(f(c)))?
+}
+
 /// The columns of a person a profile write reads.
 fn optin_of(c: &Connection, person: &str) -> Result<(u32, bool, Option<i64>), CoreError> {
     db(c.query_row(
@@ -318,16 +326,14 @@ impl Core {
     }
 
     /// The embedding the engine reads from a speaker's longest archive spans.
-    async fn embed(&self, voice: &Voice) -> Option<Vec<f32>> {
+    async fn embed_voice(&self, voice: &Voice) -> Option<Vec<f32>> {
         let id = voice.id.clone();
         let mut spans: Vec<(i64, i64)> = self
             .store()
             .read(move |c| {
-                Ok(
-                    c.prepare("SELECT t0_ms, t1_ms FROM segments WHERE speaker_id = ?1")?
-                        .query_map([id], |r| Ok((r.get(0)?, r.get(1)?)))?
-                        .collect::<Result<_, _>>()?,
-                )
+                c.prepare("SELECT t0_ms, t1_ms FROM segments WHERE speaker_id = ?1")?
+                    .query_map([id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                    .collect::<Result<_, _>>()
             })
             .ok()?;
         spans.sort_by_key(|(a, b)| std::cmp::Reverse(b - a));
@@ -370,7 +376,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-people-profile:p1:inst-profile-samples
         // @cpt-begin:cpt-noter-state-core-people-profile:p1:inst-state-build
         let who = person.clone();
-        let voices: Vec<Voice> = self.store().read(move |c| {
+        let voices: Vec<Voice> = rd(self.store(), move |c| {
             optin_of(c, &who)?;
             let sql = "SELECT s.id, s.call_id, s.channel, s.centroid, s.person_id FROM speakers s";
             let map = |r: &noter_db::rusqlite::Row<'_>| {
@@ -413,7 +419,7 @@ impl Core {
             let stored = voice.blob.as_deref().and_then(|b| Self::open_blob(&key, b));
             let vector = match stored {
                 Some(v) => Some(v),
-                None => self.embed(voice).await,
+                None => self.embed_voice(voice).await,
             };
             if let Some(v) = vector {
                 samples.push((device_of(voice.channel).to_string(), v));
@@ -489,7 +495,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-people-profile:p1:inst-profile-create
         // @cpt-begin:cpt-noter-flow-core-people-profile:p1:inst-profile-created
         self.publish_person(&person)?;
-        self.store().read(move |c| view_of(c, &person, now))
+        rd(self.store(), move |c| view_of(c, &person, now))
         // @cpt-end:cpt-noter-flow-core-people-profile:p1:inst-profile-created
     }
 
@@ -536,7 +542,7 @@ impl Core {
         // deletion wins; no cache outlives the rows.
         self.publish_person(&person)?;
         let now = self.deps.clock.now().0;
-        self.store().read(move |c| view_of(c, &person, now))
+        rd(self.store(), move |c| view_of(c, &person, now))
         // @cpt-end:cpt-noter-flow-core-people-profile:p1:inst-profile-deleted
     }
 
@@ -544,7 +550,7 @@ impl Core {
     /// person has opted in: before that nothing biometric is derived.
     pub(crate) async fn embed_archive_speakers(&self, call: &CallId) -> Result<(), CoreError> {
         let id = call.as_str().to_string();
-        let voices: Vec<Voice> = self.store().read(move |c| {
+        let voices: Vec<Voice> = rd(self.store(), move |c| {
             let any: bool = db(c.query_row(
                 "SELECT EXISTS (SELECT 1 FROM people WHERE voice_profile_optin = 1)",
                 [],
@@ -574,7 +580,7 @@ impl Core {
             return Ok(());
         };
         for voice in &voices {
-            let Some(mut vector) = self.embed(voice).await else {
+            let Some(mut vector) = self.embed_voice(voice).await else {
                 continue;
             };
             let blob = Self::seal(&key, &vector)?;
@@ -606,7 +612,7 @@ impl Core {
     pub(crate) fn match_profiles(&self, call: &CallId) -> Result<usize, CoreError> {
         let now = self.deps.clock.now().0;
         let id = call.as_str().to_string();
-        let (speakers, profiles, attendees) = self.store().read(move |c| {
+        let (speakers, profiles, attendees) = rd(self.store(), move |c| {
             let speakers: Vec<(String, Vec<u8>)> = c
                 .prepare(
                     "SELECT id, centroid FROM speakers WHERE call_id = ?1 AND pass = 'archive'
@@ -649,7 +655,7 @@ impl Core {
             let mut best: HashMap<&str, Score> = HashMap::new();
             for (v, (person, profile)) in vectors.0.iter().zip(&owners) {
                 let c = cosine(&mine, v);
-                if best.get(person).is_none_or(|s| c > s.cosine) {
+                if best.get(person).map_or(true, |s| c > s.cosine) {
                     best.insert(
                         person,
                         Score {
@@ -684,19 +690,17 @@ impl Core {
     pub(crate) fn suggest_for(&self, speaker: &str) -> Option<PersonChip> {
         let now = self.deps.clock.now().0;
         let id = speaker.to_string();
-        let (blob, profiles) = self
-            .store()
-            .read(move |c| {
-                let blob: Option<Vec<u8>> = c
-                    .query_row("SELECT centroid FROM speakers WHERE id = ?1", [&id], |r| {
-                        r.get(0)
-                    })
-                    .optional()
-                    .map_err(internal)?
-                    .flatten();
-                Ok((blob, live_profiles(c, now).map_err(internal)?))
-            })
-            .ok()?;
+        let (blob, profiles) = rd(self.store(), move |c| {
+            let blob: Option<Vec<u8>> = c
+                .query_row("SELECT centroid FROM speakers WHERE id = ?1", [&id], |r| {
+                    r.get(0)
+                })
+                .optional()
+                .map_err(internal)?
+                .flatten();
+            Ok((blob, live_profiles(c, now).map_err(internal)?))
+        })
+        .ok()?;
         let blob = blob?;
         if profiles.is_empty() {
             return None;
@@ -721,7 +725,7 @@ impl Core {
         mine.fill(0.0);
         let person = best?.1.clone();
         self.store()
-            .read(move |c| crate::people::chip_of(c, &person).map_err(internal))
+            .read(move |c| crate::people::chip_of(c, &person))
             .ok()
             .flatten()
     }
