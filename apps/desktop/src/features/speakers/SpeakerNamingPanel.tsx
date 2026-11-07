@@ -117,9 +117,9 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
         }),
       { named: NAMED },
     );
-    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-hide
+    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-skip
     if (res.status === "ok") setSkipped((x) => new Set(x).add(s.id));
-    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-hide
+    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-skip
   };
   const unskip = (id: string) =>
     setSkipped((x) => new Set([...x].filter((k) => k !== id)));
@@ -148,12 +148,14 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
             ? t("speakers.panel.hidden", { count: rows.open.length })
             : t("speakers.panel.title", { count: rows.open.length })}
         </h3>
+        {/* @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-hide */}
         <PushButton
           variant="quiet"
           size="small"
           label={hidden ? t("speakers.panel.show") : t("speakers.panel.hide")}
           onAction={() => setHidden(!hidden)}
         />
+        {/* @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-hide */}
       </header>
       {!hidden && rows.open.map(row)}
       {!hidden && rows.skipped.length > 0 && (

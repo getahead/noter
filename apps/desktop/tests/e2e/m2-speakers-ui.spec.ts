@@ -196,3 +196,61 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await expect.poll(async () => (await sent(page, "transcript_name_speakers")).length).toBe(2);
   });
 });
+
+
+test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy and keyboard Fix Term", async ({ page }) => {
+  await openWindow(page, "main");
+  await navigate(page, "transcript", S.CALL);
+  const line = page.locator('[data-region="PC-R5"] .cw-seg').filter({ has: page.locator('.cw-seg__text') }).first();
+  const text = line.locator('.cw-seg__text');
+  await text.dblclick();
+  const selected = await page.evaluate(() => getSelection()?.toString());
+  expect(selected).toBeTruthy();
+  await text.click({ button: "right" });
+  const menu = page.getByRole("menu", { name: "Fix Term…" });
+  await expect(menu.getByRole("menuitem", { name: "Copy", exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Fix Term…", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Fix term", exact: true })).toHaveCount(0);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => { document.body.dataset.copied = text; } } });
+  });
+  await menu.getByRole("menuitem", { name: "Copy", exact: true }).click();
+  await expect(menu).toHaveCount(0);
+  expect(await page.locator("body").getAttribute("data-copied")).toBe(selected);
+  await line.focus();
+  await text.dblclick();
+  await line.focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Fix Term…", exact: true }).click();
+  const fix = page.getByRole("dialog", { name: "Fix term", exact: true });
+  await expect(fix).toBeVisible();
+  await expect(fix).toContainText(selected!);
+  await fix.getByRole("textbox", { name: "Correct term" }).fill("corrected");
+  await fix.getByRole("button", { name: "Fix", exact: true }).click();
+  await expect(fix).toHaveCount(0);
+  await expect(text).toContainText("corrected");
+  expect(await sent(page, "transcript_fix_term")).toEqual([expect.objectContaining({ replacement: "corrected" })]);
+});
+
+test("cpt-noter-seq-call-page-name-speakers — stale Fix Term refreshes the span and requires reselection", async ({ page }) => {
+  const steer = await openWindow(page, "main");
+  await navigate(page, "transcript", S.CALL);
+  const text = page.locator('[data-region="PC-R5"] .cw-seg__text').first();
+  await text.dblclick();
+  await text.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Fix Term…", exact: true }).click();
+  const fix = page.getByRole("dialog", { name: "Fix term", exact: true });
+  const draft = fix.getByRole("textbox", { name: "Correct term" });
+  await draft.fill("corrected");
+  await steer.failNext("transcript_fix_term", "invalid_input");
+  await fix.getByRole("button", { name: "Fix", exact: true }).click();
+  await expect(fix).toContainText("Select the words again");
+  await expect(draft).toHaveValue("corrected");
+  await expect(fix.getByRole("button", { name: "Fix", exact: true })).toBeDisabled();
+  expect(await sent(page, "transcript_span")).toHaveLength(1);
+  await draft.fill("another correction");
+  await draft.press("Enter");
+  await expect(fix).toContainText("Select the words again");
+  expect(await sent(page, "transcript_fix_term")).toHaveLength(1);
+});

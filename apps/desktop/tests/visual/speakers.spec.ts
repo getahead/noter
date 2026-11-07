@@ -64,6 +64,7 @@ test.describe("cpt-noter-dod-ui-speakers-corrections fix term popover", () => {
     const text = page.locator('[data-component="cpt-noter-component-ui-transcript-segment-row"] .cw-seg__text').first();
     await text.dblclick();
     await text.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Fix Term…", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Fix term" })).toBeVisible();
     await shot(page, "fix-term-popover");
   });

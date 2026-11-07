@@ -27,13 +27,22 @@ export interface TermFixPopoverProps {
 // @cpt-flow:cpt-noter-flow-ui-speakers-fix-term:p1
 // @cpt-state:cpt-noter-state-ui-speakers-correction:p1
 /** Fix the term: the segment replaces the line in the transcript Channel; an error text keeps the replacement. */
-export async function applyFix(bridge: Bridge, segment: SegmentView, range: TextRange, text: string, glossary: boolean): Promise<{ error: string } | { message: string; change_id: string }> {
+export async function applyFix(bridge: Bridge, segment: SegmentView, range: TextRange, text: string, glossary: boolean): Promise<{ error: string; reselect?: boolean } | { message: string; change_id: string }> {
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-call
   const res = await bridge.act(fixKey(segment.id), "transcript_fix_term", () => bridge.core.transcriptFixTerm({ call_id: segment.call_id, segment_id: segment.id, range, replacement: text, add_to_glossary: glossary }), {});
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-call
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-error
   // the replacement stays; a stale range is never retried by offset: the person selects the words again
-  if (res.status === "error") return { error: t(staleFix(res.error.code) ? "speakers.fix.stale" : "speakers.fix.err") };
+  if (res.status === "error") {
+    const reselect = staleFix(res.error.code);
+    if (reselect) {
+      const fresh = await bridge.core.transcriptSpan({ span: { call_id: segment.call_id, t0_ms: segment.t0_ms, t1_ms: segment.t1_ms } });
+      if (fresh.status === "ok") {
+        for (const updated of fresh.data.segments) bridge.store.setState((s) => withStreamSegment(s, updated));
+      }
+    }
+    return { error: t(reselect ? "speakers.fix.stale" : "speakers.fix.err"), reselect };
+  }
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-error
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
   bridge.store.setState((s) => withStreamSegment(s, res.data.segment));
@@ -53,7 +62,8 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-draft
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const valid = text.trim().length > 0;
+  const [reselect, setReselect] = useState(false);
+  const valid = text.trim().length > 0 && !reselect;
 
   const fix = async () => {
     if (!valid || busy) return;
@@ -61,7 +71,10 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
     setError(null);
     const out = await applyFix(bridge, segment, range, text.trim(), glossary);
     setBusy(false);
-    if ("error" in out) return setError(out.error);
+    if ("error" in out) {
+      setReselect(!!out.reselect);
+      return setError(out.error);
+    }
     onFixed(out.message, out.change_id);
     // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
     onClose();
@@ -76,7 +89,7 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
           {t("speakers.fix.selected")}
           <q>{selected}</q>
         </div>
-        <TextField label={t("speakers.fix.correct")} showLabel value={text} invalid={!!error} message={error ?? undefined} disabled={busy} onChange={(v) => (setText(v), setError(null))} onEnter={() => void fix()} />
+        <TextField label={t("speakers.fix.correct")} showLabel value={text} invalid={!!error} message={error ?? undefined} disabled={busy} onChange={(v) => (setText(v), !reselect && setError(null))} onEnter={() => void fix()} />
         {terms.length > 0 && (
           <div className="pc-name__chips" role="group" aria-label={t("speakers.fix.correct")}>
             {terms.slice(0, 5).map((x) => (

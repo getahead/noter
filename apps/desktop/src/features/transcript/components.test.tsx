@@ -36,7 +36,7 @@ describe("speaker label and language tag", () => {
 });
 
 describe("SegmentRow (cpt-noter-component-ui-transcript-segment-row)", () => {
-  it("Fix Term… opens from the context menu on selected words, and the label click opens Rename", () => {
+  it("selected words open the Copy / Fix Term menu by pointer or keyboard, and the label opens Rename", () => {
     const r = rowOf();
     const onFixTerm = vi.fn();
     const onRename = vi.fn();
@@ -49,9 +49,21 @@ describe("SegmentRow (cpt-noter-component-ui-transcript-segment-row)", () => {
     text.onContextMenu(event);
     expect(onFixTerm).toHaveBeenCalledWith(expect.anything(), { start: 2, end: 4 }, el);
     expect(event.preventDefault).toHaveBeenCalled();
+    const keyboard = find(tree, (p) => "onKeyDown" in p).props as { onKeyDown: (e: unknown) => void };
+    const keyEvent = { currentTarget: { querySelector: () => el }, preventDefault: vi.fn(), key: "F10", shiftKey: true };
+    keyboard.onKeyDown(keyEvent);
+    expect(keyEvent.preventDefault).toHaveBeenCalledOnce();
+    keyboard.onKeyDown({ ...keyEvent, key: "ContextMenu", shiftKey: false });
+    expect(onFixTerm).toHaveBeenCalledTimes(3);
+    keyboard.onKeyDown({ ...keyEvent, shiftKey: false });
+    keyboard.onKeyDown({ ...keyEvent, currentTarget: { querySelector: () => null } });
+    expect(onFixTerm).toHaveBeenCalledTimes(3);
     vi.stubGlobal("getSelection", () => null);
+    event.preventDefault.mockClear();
     text.onContextMenu(event);
-    expect(onFixTerm).toHaveBeenCalledTimes(1);
+    keyboard.onKeyDown({ ...keyEvent, preventDefault: event.preventDefault });
+    expect(onFixTerm).toHaveBeenCalledTimes(3);
+    expect(event.preventDefault).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
     const label = find(tree, (p) => "onRename" in p && "text" in p).props as { onRename: (a: unknown) => void };
     label.onRename(el);

@@ -10,7 +10,7 @@ const segment = { id: "seg1", call_id: "c1", text: "send the notification surfac
 const speaker = { id: "s3", label: { type: "unnamed", n: 3 }, segment_count: 4 } as unknown as SpeakerView;
 const bridge = (res: unknown) => {
   const setState = vi.fn();
-  return { b: { act: async (_k: string, _c: string, run: () => unknown) => (run(), res), core: { transcriptFixTerm: () => 0, transcriptNameSpeakers: () => 0 }, store: { setState } } as unknown as Bridge, setState };
+  return { b: { act: async (_k: string, _c: string, run: () => unknown) => (run(), res), core: { transcriptFixTerm: () => 0, transcriptNameSpeakers: () => 0, transcriptSpan: async () => ({ status: "ok", data: { segments: [] } }) }, store: { setState } } as unknown as Bridge, setState };
 };
 
 describe("applyFix", () => {
@@ -18,6 +18,15 @@ describe("applyFix", () => {
     const { b, setState } = bridge({ status: "ok", data: { segment, glossary_term_id: "g1", change_id: "ch1" } });
     expect(await applyFix(b, segment, { start: 9, end: 21 }, "alert service", true)).toEqual({ message: expect.stringContaining("alert service"), change_id: "ch1" });
     expect(setState).toHaveBeenCalled();
+  });
+  it("refreshes the stale segment and requires a new selection before another correction", async () => {
+    const { b, setState } = bridge({ status: "error", error: { code: "invalid_input" } });
+    const fresh = { ...segment, text: "new wording" };
+    const read = vi.spyOn(b.core, "transcriptSpan").mockResolvedValue({ status: "ok", data: { segments: [fresh] } } as never);
+    const out = await applyFix(b, { ...segment, t0_ms: 100, t1_ms: 200 }, { start: 0, end: 4 }, "word", false);
+    expect(read).toHaveBeenCalledWith({ span: { call_id: "c1", t0_ms: 100, t1_ms: 200 } });
+    expect(setState).toHaveBeenCalledOnce();
+    expect(out).toEqual({ error: expect.any(String), reselect: true });
   });
   it("a stale range asks to select again, any other failure says it failed", async () => {
     const stale = await applyFix(bridge({ status: "error", error: { code: "not_found" } }).b, segment, { start: 0, end: 1 }, "x", false);
