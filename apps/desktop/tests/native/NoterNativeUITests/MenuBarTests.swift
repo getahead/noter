@@ -56,12 +56,11 @@ final class MenuBarTests: NoterTestCase {
         // The calendar is read a few seconds after launch; an open menu does not follow a rebuild,
         // so reopen it until the line is there.
         var next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
-        for _ in 0..<10 where !next.exists {
+        for _ in 0..<10 where !next.waitForExistence(timeout: 1) {
             closeMenu()
-            Thread.sleep(forTimeInterval: 1)
             next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
         }
-        XCTAssertTrue(next.exists)
+        XCTAssertTrue(next.waitForExistence(timeout: 2))
         XCTAssertFalse(next.isEnabled, "Next is calendar information, not a recording action")
     }
 

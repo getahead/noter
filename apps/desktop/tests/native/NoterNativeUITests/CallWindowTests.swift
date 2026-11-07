@@ -24,7 +24,7 @@ final class CallWindowTests: NoterTestCase {
         launch()
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
-        XCTAssertTrue(window("Noter").exists)
+        XCTAssertTrue(window("Noter").waitForExistence(timeout: 5)) // an immediate .exists can time out on a busy runner
         hotkey("0")
         XCTAssertTrue(callWindow.waitForNonExistence(timeout: 5))
         XCTAssertTrue(window("Noter").waitForNonExistence(timeout: 5))

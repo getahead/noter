@@ -54,7 +54,7 @@ for (const state of ["ready", "others", "no-mapping", "sensitive", "edited", "di
     }
     if (state === "generating") {
       await page.clock.install();
-      await page.clock.pauseAt(new Date());
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000)); // from the page: the runner's own time can be behind it
       await drawer.getByRole("button", { name: "Regenerate" }).click();
       await expect(drawer).toContainText("Writing the handoff prompt…");
     }

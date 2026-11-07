@@ -56,10 +56,26 @@ class NoterTestCase: XCTestCase {
     func openMenu(file: StaticString = #filePath, line: UInt = #line) -> XCUIElement {
         XCTAssertTrue(statusItem.waitForExistence(timeout: 10), "the menu bar extra is not in the menu bar", file: file, line: line)
         let menu = statusItem.menus.firstMatch
-        if !isOpen(menu) { statusItem.click() }
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), "the menu did not open", file: file, line: line)
+        // A click can be lost while the menu bar settles, and a closed menu can stay in the tree with an empty
+        // frame: click again (only while it is not drawn) and wait for it to be open, not merely present.
+        for _ in 0..<3 {
+            if !isOpen(menu) { statusItem.click() }
+            if waitUntil(5, { isOpen(menu) }) { break }
+        }
+        XCTAssertTrue(isOpen(menu), "the menu did not open", file: file, line: line)
         return menu
     }
+
+    /// Polls `condition` until it holds or `timeout` seconds pass: a bounded wait that issues no UI query of its own.
+    func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if condition() { return true }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        return condition()
+    }
+
 
     /// Closes the menu with a second click: Escape does not reach a status menu.
     func closeMenu() {
@@ -79,6 +95,17 @@ class NoterTestCase: XCTestCase {
     /// The state line while recording: **Recording · <title> · 23:14** (not **Recording stopped**).
     func recordingLine(in menu: XCUIElement) -> XCUIElement {
         menu.menuItems.matching(NSPredicate(format: "title == 'Recording' OR title BEGINSWITH 'Recording · '")).firstMatch
+    }
+
+    /// The menu's Recording line, reopening the menu a bounded number of times: it is built when the menu opens and a
+    /// menu that opened just before the recording started does not follow the change.
+    func expectRecordingLine(file: StaticString = #filePath, line: UInt = #line) {
+        var recording = recordingLine(in: openMenu())
+        for _ in 0..<5 where !recording.waitForExistence(timeout: 2) {
+            closeMenu()
+            recording = recordingLine(in: openMenu())
+        }
+        XCTAssertTrue(recording.waitForExistence(timeout: 2), "the menu shows no Recording line", file: file, line: line)
     }
 
     func assertItems(_ titles: [String], in menu: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
