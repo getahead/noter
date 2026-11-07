@@ -577,8 +577,11 @@ async fn a_cloud_run_cannot_widen_its_context_or_read_a_sensitive_call() {
         ]
     );
     let text = serde_json::to_string(&replies).unwrap();
-    for secret in ["Hidden words", "Secret thing", "Boris", "person_boris"] {
-        assert!(!text.contains(secret), "{secret} reached a cloud run");
+    for hidden in ["Hidden words", "Secret thing", "Boris", "person_boris"] {
+        assert!(
+            !text.contains(hidden),
+            "a sensitive record reached a cloud run"
+        );
     }
 
     // The same read on a local run works, for the sensitive call too, whatever it claims.
