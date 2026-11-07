@@ -7240,7 +7240,7 @@ Single keys match the physical key, so they work on Russian and German layouts (
 
 #### Component — Undo strip
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-undo-strip`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-undo-strip`
 
 ##### Why this component exists
 
@@ -7330,7 +7330,7 @@ Undo is shown inline and never as a modal: "Undone 37 changes · Redo" for ten s
 
 #### Component — Change row
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-change-row`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-change-row`
 
 ##### Why this component exists
 
@@ -7426,7 +7426,7 @@ Every change by the user, a job or a model run is logged with who did it, what c
 
 #### Component — History timeline
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-history-timeline`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-history-timeline`
 
 ##### Why this component exists
 
