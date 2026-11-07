@@ -138,6 +138,9 @@ fn retention_days(c: &Connection) -> noter_db::rusqlite::Result<u32> {
     })
 }
 
+/// An item a call still has open: not done or handed off, and not rejected in review.
+const OPEN_ITEM: &str = "i.status = 'open' AND i.review_state != 'rejected'";
+
 fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<CallRow> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     let mut languages = c.prepare(
@@ -159,6 +162,11 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
     let tags = tags
         .query_map([&s.id], |r| r.get::<_, String>(0))?
         .collect::<Result<Vec<_>, _>>()?;
+    let open_items: u32 = c.query_row(
+        &format!("SELECT count(*) FROM items i WHERE i.call_id = ?1 AND {OPEN_ITEM}"),
+        [&s.id],
+        |r| r.get(0),
+    )?;
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-fields
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
@@ -185,7 +193,7 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         audio_deleted: s.audio_deleted,
         audio_deleted_at: s.audio_deleted_at.map(TimestampMs),
         audio_retention_days: retention_days(c)?,
-        open_items: 0,
+        open_items,
         review_waiting: 0,
     };
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
@@ -327,9 +335,11 @@ impl Core {
             let mark = w.bind((to + 1) * DAY_MS);
             clauses.push(format!("c.started_at < {mark}"));
         }
-        // Items arrive in M2: no call has open ones yet.
-        if f.has_open_items == Some(true) {
-            clauses.push("0".into());
+        if let Some(open) = f.has_open_items {
+            let not = if open { "" } else { "NOT " };
+            clauses.push(format!(
+                "{not}EXISTS (SELECT 1 FROM items i WHERE i.call_id = c.id AND {OPEN_ITEM})"
+            ));
         }
         w.sql = clauses.join(" AND ");
         let limit = args.page.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE) as usize;
