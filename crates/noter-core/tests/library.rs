@@ -324,6 +324,55 @@ async fn filters_narrow_the_list_in_sql() {
 }
 
 #[tokio::test]
+async fn open_items_count_on_the_row_and_filter_the_list() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let item = |id: &str, call: &str, status: &str, review: &str| {
+        row(
+            "items",
+            &[
+                ("id", json!(id)),
+                ("rev", json!(1)),
+                ("call_id", json!(call)),
+                ("kind", json!("action_item")),
+                ("text", json!(id)),
+                ("lang", json!("en")),
+                ("status", json!(status)),
+                ("review_state", json!(review)),
+                ("created_by", json!("llm")),
+            ],
+        )
+    };
+    // call_a: two open items; call_b: one done and one rejected; call_c: none.
+    core.store()
+        .insert_batch(vec![
+            item("itm_1", "call_a", "open", "accepted"),
+            item("itm_2", "call_a", "open", "suggested"),
+            item("itm_3", "call_b", "done", "accepted"),
+            item("itm_4", "call_b", "open", "rejected"),
+        ])
+        .unwrap();
+    let only = |f: CallFilter| ids(&core, f, CallSort::Newest);
+    let open_items = |v: bool| CallFilter {
+        has_open_items: Some(v),
+        ..CallFilter::default()
+    };
+    assert_eq!(only(open_items(true)).await, ["call_a"]);
+    assert_eq!(only(open_items(false)).await, ["call_c", "call_b"]);
+    let rows = core
+        .calls_list(
+            &main_window(),
+            list_args(CallFilter::default(), CallSort::Newest, None, None),
+        )
+        .await
+        .unwrap()
+        .rows;
+    let counts: Vec<(&str, u32)> = rows.iter().map(|r| (r.id.as_str(), r.open_items)).collect();
+    assert_eq!(counts, [("call_c", 0), ("call_a", 2), ("call_b", 0)]);
+}
+
+#[tokio::test]
 async fn a_bad_filter_or_cursor_is_invalid_input() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open(dir.path());
