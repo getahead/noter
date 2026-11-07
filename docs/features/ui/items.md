@@ -34,11 +34,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-items`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-items`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-items`
+- [x] `p3` - `cpt-noter-feature-ui-items`
 
 ### 1.1 Overview
 
@@ -63,7 +63,7 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 - **PRD**: [PRD.md](../../PRD.md) › Feature specification › 4 and 10
 - **Design**: [DESIGN.md](../../DESIGN.md) › Action item row; Item inspector; Provenance chip; Call page States and stories
-- **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.17, M2, NOT_STARTED
+- **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.17, M2, IMPLEMENTED
 - **Design elements**: `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-item-inspector`, `cpt-noter-component-ui-provenance-chip`; uses `cpt-noter-component-ui-output-item-row` from outputs
 - **Stories**: `cpt-noter-seq-call-page-review-suggested-items`, `cpt-noter-seq-call-page-check-evidence` (M2, every path); serves `cpt-noter-seq-today-tick-item`
 - **Frozen commands it delivers (M2)**: `items_list`, `item_get`, `item_set_done`, `item_review`, `items_review_all`, `item_edit`, `item_reopen`, `item_create`, `item_answer_handoff_landed`
@@ -236,7 +236,7 @@ The system **MUST** render full, compact, done and read-only action rows; bind r
 
 ### Inspector and evidence
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-items-inspector`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-items-inspector`
 
 The system **MUST** show Details and History, persist fields at the designed point, resolve evidence against the current transcript, preserve back navigation and keep deleted-audio evidence readable. Diff changes use underline and strike-through as well as colour.
 
@@ -253,12 +253,12 @@ The system **MUST** show Details and History, persist fields at the designed poi
 
 ## 6. Acceptance Criteria
 
-- [ ] A, E, R and ⇧A work only in row context, with no action during text composition
-- [ ] Saved inline edits accept with the new revision; inspector Save alone leaves review unchanged
-- [ ] Rejected items restore as Suggested, and batch Undo targets the returned batch
-- [ ] Ticking an open handoff asks all three choices; Keep Open and Esc do not complete it
-- [ ] Evidence opens in one action with focus and a 3-second highlight; audio loss never hides the quote
-- [ ] Inspector fields match the item kind, and closing it returns focus to the row
+- [x] A, E, R and ⇧A work only in row context, with no action during text composition
+- [x] Saved inline edits accept with the new revision; inspector Save alone leaves review unchanged
+- [x] Rejected items restore as Suggested, and batch Undo targets the returned batch
+- [x] Ticking an open handoff asks all three choices; Keep Open and Esc do not complete it
+- [x] Evidence opens in one action with focus and a 3-second highlight; audio loss never hides the quote
+- [x] Inspector fields match the item kind, and closing it returns focus to the row
 
 ## 7. Additional Context
 

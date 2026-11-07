@@ -35,6 +35,7 @@ function EvidenceRow({ bridge, e }: { bridge: Bridge; e: EvidenceView }) {
 }
 
 // @cpt-component:cpt-noter-component-ui-item-inspector:p1
+// @cpt-dod:cpt-noter-dod-ui-items-inspector:p1
 export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: string }) {
   const it = useWindow(bridge, (s) => s.entities.item[itemId]);
   const people = useWindow(bridge, (s) => (it ? s.entities.call[it.call.id]?.participants : undefined)) ?? [];
