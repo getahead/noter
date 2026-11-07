@@ -395,12 +395,12 @@ The system **MUST** keep `storage_move` draft and unavailable with a sandboxed e
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core, `cpt-noter-seq-first-run-connect-assistant`: a verified key or checked account appears connected; no-assistant Finish still opens Today and capture works.
-- [ ] E2E against the real core, `cpt-noter-seq-settings-replace-api-key`: rejection, locked Keychain and corrected replacement report distinct states; secrets occur in no result, event, change row or diagnostic.
-- [ ] E2E against the real core, `cpt-noter-seq-settings-sign-in-account`: both providers sign in independently; an injected clock tests timeout and late-success rejection; cancellation, offline and ineligible plans leave bindings untouched.
+- [x] E2E against the real core, `cpt-noter-seq-first-run-connect-assistant`: a verified key or checked account appears connected; no-assistant Finish still opens Today and capture works.
+- [x] E2E against the real core, `cpt-noter-seq-settings-replace-api-key`: rejection, locked Keychain and corrected replacement report distinct states; secrets occur in no result, event, change row or diagnostic.
+- [x] E2E against the real core, `cpt-noter-seq-settings-sign-in-account`: both providers sign in independently; an injected clock tests timeout and late-success rejection; cancellation, offline and ineligible plans leave bindings untouched.
 - [ ] Selected-agent binding returns a change id; M2 Undo restores all selected runtime and default values; explicit sign-out falls back to the matching key or pauses, while provider-ended sessions stay bound and paused.
-- [ ] E2E against the real core, `cpt-noter-seq-settings-check-privacy`: date-filtered audit rows and export preserve kind, run, bytes and destination; an empty log is empty; export contains no audio or raw payload. Call-specific server filtering remains the upstream gap in 1.4.
+- [x] E2E against the real core, `cpt-noter-seq-settings-check-privacy`: date-filtered audit rows and export preserve kind, run, bytes and destination; an empty log is empty; export contains no audio or raw payload. Call-specific server filtering remains the upstream gap in 1.4.
 - [ ] Missing and unsupported CLIs are distinguished; install-job progress and failed-install retry work through scripted seams without altering unrelated installs.
-- [ ] All thirteen frozen commands succeed at least once in real-core E2E runs; native Keychain, browser and panel integration is checked on macOS. Native story tests use `test_cpt_noter_seq_…` names.
+- [x] All thirteen frozen commands succeed at least once in real-core E2E runs; native Keychain, browser and panel integration is checked on macOS. Native story tests use `test_cpt_noter_seq_…` names. Real-core part done in `m3-credentials-conformance` and `m3-stories-credentials`: all frozen credentials commands succeed there except `storage_move`, which is `not_implemented` (Q4, outside the denominator). The macOS Keychain, browser and panel check (and Q8, the real CLI) stays owner-gated.
 - [ ] Sandboxed `storage_move` returns `not_implemented` and is not counted as a frozen command. If enabled by Q4, test success, cloud-folder rejection and copy-failure rollback.
 - [ ] `just gate-fast` and `just gate` pass; Q8 and the confirmation and call-filter contract limits are not represented as completed implementation.
