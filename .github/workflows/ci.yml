@@ -395,6 +395,10 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           tools: just,cargo-llvm-cov
+          # src-tauri is its own cargo package: its target/ serves the host tests and `tauri build`
+          workspaces: |
+            . -> target
+            apps/desktop/src-tauri -> target
       - name: Engine tests (WAV fixtures through the pipeline)
         if: needs.changes.outputs.engine == 'true'
         run: swift test --package-path engine --enable-code-coverage
