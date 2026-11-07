@@ -286,9 +286,10 @@ impl ScriptedEngine {
     }
 
     /// The next self-test acknowledges the command but waits for injected events.
-    // @cpt-algo:cpt-noter-algo-core-harness-scripted-engine:p1
     pub fn hold_next_self_test(&self) {
+        // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
         self.lock().hold_next_self_test = true;
+        // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
