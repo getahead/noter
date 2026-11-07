@@ -116,6 +116,8 @@ pub(crate) struct Session {
     pub(crate) app: Option<(String, String)>,
     /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
     pub(crate) released: u64,
+    /// Whether the call's open items were carried in already (its first segment did it).
+    pub(crate) carried: bool,
     /// When something was last heard (tokio time, for the timer) and at what wall time.
     pub(crate) heard: Option<tokio::time::Instant>,
     pub(crate) heard_since: i64,
@@ -577,6 +579,20 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-return-started
     }
 
+    /// The first segment of a live call: its people are known, so open items are carried in.
+    async fn first_segment(&self, call_id: &CallId) {
+        let mut session = self.capture.lock().await;
+        if session.carried || self.capture_now().call_id.as_ref() != Some(call_id) {
+            return;
+        }
+        session.carried = true;
+        if let Err(e) = self.carry_start(call_id) {
+            self.log(crate::object(json!({
+                "level": "error", "module": "people", "code": e.code
+            })));
+        }
+    }
+
     /// An engine fact for the capture machine.
     async fn engine_fact(&self, event: EngineEvent) {
         match event {
@@ -615,7 +631,10 @@ impl Core {
                 bundle_id,
                 app_name,
             } => self.source_added(call_id, bundle_id, app_name).await,
-            EngineEvent::Segment { segment } => self.heard(&segment.call_id).await,
+            EngineEvent::Segment { segment } => {
+                self.heard(&segment.call_id).await;
+                self.first_segment(&segment.call_id).await;
+            }
             _ => {}
         }
     }
@@ -820,6 +839,15 @@ impl Core {
             c.continue_until = Some(until);
             c.notice = notice;
         });
+        // @cpt-begin:cpt-noter-flow-core-people-carry:p1:inst-carry-end
+        for done in [self.carry_end(call_id), self.keep_talk_time(call_id)] {
+            if let Err(e) = done {
+                self.log(crate::object(json!({
+                    "level": "error", "module": "people", "code": e.code
+                })));
+            }
+        }
+        // @cpt-end:cpt-noter-flow-core-people-carry:p1:inst-carry-end
         self.drop_sources_of(call_id);
         self.clear_engine_states();
         self.release_held();

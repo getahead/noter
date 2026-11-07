@@ -173,3 +173,23 @@ pub async fn mcp_run(
     })?;
     Ok(serde_json::json!({ "run_id": run_id, "token": token, "socket": socket, "config": config }))
 }
+
+/// A centroid as the core stores one: encrypted with the voice profile key.
+pub fn seal_centroid(core: &Core, vector: &[f32]) -> Result<Vec<u8>, CoreError> {
+    core.seal_centroid(vector)
+}
+
+/// Runs the speaker matching the archive install runs; returns how many speakers it named.
+pub fn match_profiles(core: &Core, call: &noter_protocol::CallId) -> Result<usize, CoreError> {
+    core.match_profiles(call)
+}
+
+/// The first segment of a live call and the stop of one, as the capture machine runs them.
+pub fn carry_start(core: &Core, call: &noter_protocol::CallId) -> Result<usize, CoreError> {
+    core.carry_start(call)
+}
+
+pub fn carry_end(core: &Core, call: &noter_protocol::CallId) -> Result<(), CoreError> {
+    core.carry_end(call)?;
+    core.keep_talk_time(call)
+}

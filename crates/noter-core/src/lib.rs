@@ -8,6 +8,7 @@ mod archive;
 mod audio;
 mod audit;
 mod capture;
+mod carry;
 mod chunks;
 mod credentials;
 mod first_run;
@@ -30,6 +31,7 @@ mod notify;
 mod people;
 mod playback;
 mod postcall;
+mod profiles;
 mod recovery;
 mod self_test;
 mod settings;
@@ -1002,6 +1004,22 @@ impl CoreApi for Core {
         args: PersonIdArgs,
     ) -> Result<DeleteResult, CoreError> {
         self.delete_person(ctx, args)
+    }
+
+    async fn voice_profile_create(
+        &self,
+        ctx: &CommandCtx,
+        args: VoiceProfileArgs,
+    ) -> Result<VoiceProfileView, CoreError> {
+        self.create_voice_profile(ctx, args).await
+    }
+
+    async fn voice_profile_delete(
+        &self,
+        ctx: &CommandCtx,
+        args: PersonIdArgs,
+    ) -> Result<VoiceProfileView, CoreError> {
+        self.delete_voice_profile(ctx, args)
     }
 
     async fn today_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TodayView, CoreError> {

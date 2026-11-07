@@ -12,6 +12,7 @@ publish = false
 harness = []
 
 [dependencies]
+chacha20poly1305 = "0.10"
 noter-db = { path = "../noter-db" }
 noter-engine-client = { path = "../noter-engine-client" }
 noter-handoff = { path = "../noter-handoff" }
