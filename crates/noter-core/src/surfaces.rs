@@ -33,9 +33,9 @@ pub(crate) struct Windows {
     tray: Option<TrayModel>,
     /// The capture state's version and when the tray first saw it: the clock runs from there.
     clock: (StateVersion, i64),
-    /// The calendar's next event as of the last read (when, title, start): read at most every 3 s
+    /// The calendar's next event as of the last read (read at, title, start): read at most every 3 s
     /// (a calendar changes without an event), as the tray refreshes every second.
-    next: Option<(i64, Option<(String, i64)>)>,
+    next: Option<(std::time::Instant, Option<(String, i64)>)>,
 }
 
 impl Default for Windows {
@@ -445,7 +445,8 @@ impl Core {
             return None;
         }
         if let Some((at, found)) = &lock(&self.windows).next {
-            if (0..3_000).contains(&(now - at)) {
+            // Real time, not the injected clock: a fixed test clock never ages the cache.
+            if at.elapsed() < std::time::Duration::from_secs(3) {
                 return found.clone();
             }
         }
@@ -463,7 +464,7 @@ impl Core {
                     .min_by_key(|e| e.starts_at.0)
             })
             .map(|e| (e.title, e.starts_at.0));
-        lock(&self.windows).next = Some((now, found.clone()));
+        lock(&self.windows).next = Some((std::time::Instant::now(), found.clone()));
         found
     }
 
