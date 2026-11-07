@@ -148,6 +148,7 @@ impl Core {
     }
 
     // @cpt-flow:cpt-noter-flow-core-credentials-privacy-audit:p1
+    // @cpt-dod:cpt-noter-dod-core-credentials-privacy-audit:p1
     pub(crate) fn audit_page(&self, args: AuditListArgs) -> Result<Page<AuditEntry>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-read
         self.ready()?;
