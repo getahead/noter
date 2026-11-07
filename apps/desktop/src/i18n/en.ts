@@ -665,6 +665,7 @@ export const en = {
   "speakers.fix.info": "Older calls get a proposal in Activity",
   "speakers.fix.apply": "Fix",
   "speakers.fix.menu": "Fix Term…",
+  "speakers.fix.copy": "Copy",
   "speakers.fix.done": "Fixed “{to}”",
   "speakers.fix.done_glossary": "Fixed “{to}” · added to the glossary",
   "speakers.fix.stale": "The selection changed. Select the words again to fix them.",

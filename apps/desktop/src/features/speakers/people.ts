@@ -24,9 +24,6 @@ export function readPeople(
   return read;
 }
 
-/** A person was created from a picker: the next read is a new one. */
-export const forgetPeople = (bridge: Bridge) => void reads.delete(bridge);
-
 /** `skip` leaves the read to a host that passes the rows down; `undefined` while it loads. */
 export function usePeople(
   bridge: Bridge,

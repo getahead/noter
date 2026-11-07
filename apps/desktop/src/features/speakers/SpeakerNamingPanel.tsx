@@ -107,7 +107,6 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
     ) : null;
 
   const skip = async (s: SpeakerView) => {
-    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-hide
     const res = await p.bridge.act(
       nameKey(s.id),
       "transcript_name_speakers",
@@ -118,8 +117,9 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
         }),
       { named: NAMED },
     );
-    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-hide
+    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-hide
     if (res.status === "ok") setSkipped((x) => new Set(x).add(s.id));
+    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-hide
   };
   const unskip = (id: string) =>
     setSkipped((x) => new Set([...x].filter((k) => k !== id)));
@@ -260,7 +260,6 @@ export function NameRow({
     <div
       role="group"
       aria-label={label}
-      data-component="cpt-noter-component-ui-speaker-naming-panel"
       data-state={error ? "error" : pick ? "selected" : "unnamed"}
       className="pc-name__row"
     >

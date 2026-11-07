@@ -103,6 +103,13 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
       </div>
     );
   }
+  // a selection in the line opens the Copy / Fix Term… menu; without one the native menu stays
+  const openFixMenu = (e: { preventDefault: () => void }, el: HTMLElement) => {
+    const range = selectedRange(el, globalThis.getSelection());
+    if (!range) return;
+    e.preventDefault();
+    onFixTerm?.(seg, range, el);
+  };
   const v = rowVariant(seg, variant, speakers);
   const low = seg.confidence != null && seg.confidence < LOW_CONFIDENCE;
   const shown = control && control.state !== "hidden" && !tail ? control : null;
@@ -116,6 +123,15 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
       className={cx("cw-seg", tail && "cw-seg--tail", highlighted && "np-hl-evidence", playing && "is-playing", current && "is-current")}
       lang={langAttr(seg.lang)}
       tabIndex={tail ? undefined : 0}
+      // the keyboard path of the context menu: Shift+F10 or the Menu key on the focused line
+      onKeyDown={
+        onFixTerm && !tail
+          ? (e) => {
+              const text = e.currentTarget.querySelector<HTMLElement>(".cw-seg__text");
+              if (text && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) openFixMenu(e, text);
+            }
+          : undefined
+      }
     >
       <span className="cw-seg__time np-tnum" title={timeHelp}>
         {tail ? "" : clock(seg.t0_ms)}
@@ -132,16 +148,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
       <span
         className={cx("cw-seg__text", low && "is-lowconf")}
         title={low ? t("transcript.low_confidence") : undefined}
-        onContextMenu={
-          onFixTerm && !tail
-            ? (e) => {
-                const range = selectedRange(e.currentTarget, globalThis.getSelection());
-                if (!range) return;
-                e.preventDefault();
-                onFixTerm(seg, range, e.currentTarget);
-              }
-            : undefined
-        }
+        onContextMenu={onFixTerm && !tail ? (e) => openFixMenu(e, e.currentTarget) : undefined}
       >
         <Text text={seg.text} find={find} />
       </span>
