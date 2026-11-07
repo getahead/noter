@@ -1,7 +1,8 @@
 //! FEATURE cpt-noter-feature-core-knowledge: folder sources through the five commands, the native
 //! folder panel, the `source_sync` job on the scheduler and the scripted engine's bge-m3 vectors
 //! (slice 1); indexed and live MCP sources over the scripted `McpSource`, Keychain token
-//! references and revocation (slice 2).
+//! references and revocation (slice 2); the real streamable-HTTP transport against a local
+//! server (slice 3).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -10,10 +11,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use noter_core::{
-    BoxFuture, Clock, Core, CoreDeps, EventEmitter, MemorySecrets, NativeOps, SaveKind,
-    ScriptedMcp, ScriptedPage, ScriptedServer, SecretStore,
+    BoxFuture, Clock, Core, CoreDeps, EventEmitter, HttpMcp, McpSource, MemorySecrets, NativeOps,
+    SaveKind, ScriptedMcp, ScriptedPage, ScriptedServer, SecretStore,
 };
 use noter_engine_client::scripted::ScriptedEngine;
+use noter_llm::mcp_stub::{StubRequest, StubResponse, StubServer};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -84,6 +86,11 @@ fn ctx() -> CommandCtx {
 /// A core with a scripted engine, and a folder holding the six fixture formats plus files the
 /// index leaves out (hidden, unsupported).
 async fn open() -> Rig {
+    open_over(None).await
+}
+
+/// [`open`] with `transport` in place of the scripted MCP servers.
+async fn open_over(transport: Option<Arc<dyn McpSource>>) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let folder = dir.path().join("Specs");
     std::fs::create_dir(&folder).unwrap();
@@ -108,7 +115,7 @@ async fn open() -> Rig {
     let deps = CoreDeps::new(clock.clone(), events.clone())
         .with_engine(Arc::new(ScriptedEngine::new().with_container(&data)))
         .with_native_ops(panel.clone())
-        .with_mcp_source(mcp.clone())
+        .with_mcp_source(transport.unwrap_or_else(|| mcp.clone()))
         .with_secrets(secrets.clone());
     let core = Arc::new(Core::open(&data, deps).unwrap());
     core.start_first_run();
@@ -1097,4 +1104,93 @@ async fn an_indexed_heading_is_document_evidence_in_search_until_the_source_goes
         .await
         .unwrap();
     assert!(gone.documents.is_empty());
+}
+
+// ── slice 3: the real transport ──────────────────────────────
+
+/// An MCP server on this Mac that needs no sign-in and lists two Markdown pages; once
+/// `reject_after` requests have arrived it answers 401 to everything.
+fn http_server(reject_after: usize) -> StubServer {
+    let seen = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    StubServer::start(move |r: &StubRequest| {
+        if seen.fetch_add(1, Ordering::SeqCst) >= reject_after {
+            return StubResponse::status(401);
+        }
+        let body = r.json();
+        let id = body["id"].clone();
+        let result = match body["method"].as_str().unwrap_or_default() {
+            "notifications/initialized" => return StubResponse::status(202),
+            "initialize" => serde_json::json!({"protocolVersion": "2025-06-18",
+                "capabilities": {"resources": {}}, "serverInfo": {"name": "wiki"}}),
+            "resources/list" => serde_json::json!({"resources": [
+                {"uri": "wiki://1", "name": "One", "annotations": {"lastModified": "v1"}},
+                {"uri": "wiki://2", "name": "Two", "annotations": {"lastModified": "v1"}}]}),
+            "resources/read" => {
+                let uri = body["params"]["uri"].as_str().unwrap_or_default();
+                serde_json::json!({"contents": [{"uri": uri, "mimeType": "text/markdown",
+                    "text": format!("# {uri}\n\n## Rollout\n\nThe rollout ships on Friday.\n")}]})
+            }
+            _ => return StubResponse::status(400),
+        };
+        StubResponse::json(
+            200,
+            serde_json::json!({"jsonrpc": "2.0", "id": id, "result": result}),
+        )
+    })
+}
+
+fn http_args(stub: &StubServer) -> SourceAddMcpArgs {
+    SourceAddMcpArgs {
+        server: stub.url("/mcp"),
+        ..mcp_args(SourceMode::Indexed)
+    }
+}
+
+fn http_transport() -> Option<Arc<dyn McpSource>> {
+    Some(Arc::new(HttpMcp::new(Arc::new(|_: &str| {}))))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_indexed_server_over_http_is_signed_in_read_and_audited_per_request() {
+    let stub = http_server(usize::MAX);
+    let rig = open_over(http_transport()).await;
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), http_args(&stub))
+        .await
+        .unwrap();
+    assert!(row.has_token);
+    let done = rig.synced_at(T0).await;
+    assert_eq!(done.documents, 2);
+    // Every request that reached the server had its own lookup row, to its host.
+    let destinations: Vec<String> = read(&rig.core, |c| {
+        let mut st = c.prepare("SELECT destination FROM audit_log WHERE kind = 'lookup'")?;
+        let rows = st.query_map([], |r| r.get(0))?;
+        rows.collect()
+    });
+    assert_eq!(destinations.len(), stub.requests().len());
+    assert!(destinations.iter().all(|d| d == "127.0.0.1"));
+    let titles: Vec<String> = read(&rig.core, |c| {
+        let mut st = c.prepare("SELECT title FROM documents ORDER BY title")?;
+        let rows = st.query_map([], |r| r.get(0))?;
+        rows.collect()
+    });
+    assert_eq!(titles, ["One", "Two"]);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_server_that_rejects_the_token_over_http_ends_the_sync_sign_in_expired() {
+    // The sign-in probe is answered; everything after it is refused.
+    let stub = http_server(1);
+    let rig = open_over(http_transport()).await;
+    rig.core
+        .source_add_mcp(&ctx(), http_args(&stub))
+        .await
+        .unwrap();
+    let done = rig.until(|r| r.status == SourceStatus::SignInExpired).await;
+    assert_eq!(done.documents, 0);
+    assert_eq!(
+        last_run(&rig.core).3.as_deref(),
+        Some("source_sign_in_expired")
+    );
 }

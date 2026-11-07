@@ -16,8 +16,8 @@ pub mod updater;
 use std::sync::{Arc, OnceLock};
 
 use noter_core::{
-    Adapters, CliAccounts, CliConfig, Core, CoreDeps, EventEmitter, OllamaConfig, PinnedModels,
-    ShortcutRegistrar, ShortcutTaken, SystemClock,
+    Adapters, CliAccounts, CliConfig, Core, CoreDeps, EventEmitter, HttpMcp, OllamaConfig,
+    PinnedModels, ShortcutRegistrar, ShortcutTaken, Surfaces, SystemClock,
 };
 use noter_engine_client::ProcessLauncher;
 use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
@@ -169,7 +169,8 @@ fn boot<R: Runtime>(
         .with_surfaces(surfaces.clone())
         .with_llm(runtimes(&dir))
         .with_secrets(Arc::new(keychain::Keychain))
-        .with_account_cli(account_cli());
+        .with_account_cli(account_cli())
+        .with_mcp_source(Arc::new(HttpMcp::new(browser(surfaces.clone()))));
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
@@ -183,6 +184,16 @@ fn boot<R: Runtime>(
             Booted(Err(e.to_string()))
         }
     }
+}
+
+/// Opens an indexed MCP server's sign-in page in the user's browser.
+fn browser<R: Runtime>(
+    surfaces: Arc<surfaces::TauriSurfaces<R>>,
+) -> Arc<dyn Fn(&str) + Send + Sync> {
+    Arc::new(move |url: &str| {
+        let target = noter_protocol::model::ExternalTarget::Url { url: url.into() };
+        surfaces.open_external(&target);
+    })
 }
 
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on

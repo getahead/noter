@@ -6,22 +6,22 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
 use noter_db::rusqlite::{params, Transaction};
 use noter_db::{ChangeMeta, Logged, Store};
 use noter_engine_client::{EngineClient, EngineLauncher};
 use noter_jobs::{RunCtx, Stop};
-use noter_llm::SecretStore;
+use noter_llm::{Secret, SecretStore};
 use noter_protocol::model::{CountEntry, SourceKind, SourceMode, SourceRow, SourceStatus};
 use noter_protocol::{CoreError, ErrorCode, SourceId, TimestampMs};
-use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::chunk::{self, Chunk};
 use crate::extract::{self, Extracted, Format};
 use crate::internal;
-use crate::mcp::{Listing, McpError, McpSource, RemoteDoc};
+use crate::mcp::{Listing, McpError, McpSource, Remote, RemoteDoc};
 use crate::sources::{get, not_found, text, token_account};
 
 /// Texts per `embed_texts` request.
@@ -516,21 +516,42 @@ fn prune<L: EngineLauncher>(
     Ok(())
 }
 
-fn remote_failed(e: McpError) -> Stop {
-    Stop::Failed(e.into())
+/// The run's side of requests to the server: each request's `lookup` audit row commits before
+/// it leaves (why one did not is kept for the run's outcome), and a token the server renewed
+/// replaces the stored one.
+struct Lookups<'a, L> {
+    env: &'a SyncEnv<'a, L>,
+    account: String,
+    stopped: Mutex<Option<Stop>>,
 }
 
-/// Commits the `lookup` audit row of a request to `server`; the request leaves only after it.
-fn lookup<L: EngineLauncher>(
-    env: &SyncEnv<'_, L>,
-    ctx: &RunCtx,
-    server: &str,
-    request: serde_json::Value,
-) -> Result<(), Stop> {
-    let meta = ctx.change_meta("server lookup").ok_or(Stop::Cancelled)?;
-    let bytes = request.to_string();
-    noter_llm::audit_lookup(env.store, meta, (env.now)(), server, bytes.as_bytes())?;
-    Ok(())
+impl<L: EngineLauncher> Lookups<'_, L> {
+    fn audit(&self, ctx: &RunCtx, destination: &str, request: &[u8]) -> bool {
+        let meta = ctx.change_meta("server lookup").ok_or(Stop::Cancelled);
+        let row = meta.and_then(|meta| {
+            noter_llm::audit_lookup(self.env.store, meta, (self.env.now)(), destination, request)
+                .map_err(Stop::from)
+        });
+        let Err(stop) = row else {
+            return true;
+        };
+        *self.stopped.lock().unwrap_or_else(|p| p.into_inner()) = Some(stop);
+        false
+    }
+
+    // A Keychain that refuses the renewed token leaves the old one: the next run signs in again.
+    fn renew(&self, token: String) {
+        let _ = self.env.secrets.set(&self.account, &Secret::new(token));
+    }
+
+    fn failed(&self, e: McpError) -> Stop {
+        let stopped = self
+            .stopped
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take();
+        stopped.unwrap_or_else(|| Stop::Failed(e.into()))
+    }
 }
 
 /// One pass over an indexed MCP server: its resources, or a seed-query crawl when it offers
@@ -552,12 +573,26 @@ async fn remote<L: EngineLauncher>(
         .ok_or_else(|| failed(ErrorCode::SourceSignInExpired, "the source is signed out"))?;
     let token = token.expose();
     let known = known(env, id)?;
-    lookup(env, ctx, server, json!({ "method": "resources/list" }))?;
-    let listing = match env.mcp.list_resources(server, token).await {
-        Ok(Some(listing)) => listing,
-        Ok(None) => crawl(env, ctx, server, token).await?,
-        Err(e) => return Err(remote_failed(e)),
+    let lookups = Lookups {
+        env,
+        account: token_account(id),
+        stopped: Mutex::new(None),
     };
+    let renewed = |t: String| lookups.renew(t);
+    let listed = {
+        let ctx = &*ctx;
+        let audit = |d: &str, r: &[u8]| lookups.audit(ctx, d, r);
+        let remote = Remote {
+            audit: &audit,
+            renewed: &renewed,
+        };
+        match env.mcp.list_resources(server, token, &remote).await {
+            Ok(Some(listing)) => Ok(listing),
+            Ok(None) => crawl(env, server, token, &remote).await,
+            Err(e) => Err(e),
+        }
+    };
+    let listing = listed.map_err(|e| lookups.failed(e))?;
     // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-remote
     let total = listing.items.len() as u32;
     for (n, item) in listing.items.iter().enumerate() {
@@ -566,13 +601,16 @@ async fn remote<L: EngineLauncher>(
         if before.is_some_and(|k| item.hash.as_ref() == Some(&k.hash)) {
             continue;
         }
-        let request = json!({ "method": "resources/read", "params": { "uri": item.uri } });
-        lookup(env, ctx, server, request)?;
-        let page = env
-            .mcp
-            .read_resource(server, token, &item.uri)
-            .await
-            .map_err(remote_failed)?;
+        let page = {
+            let ctx = &*ctx;
+            let audit = |d: &str, r: &[u8]| lookups.audit(ctx, d, r);
+            let remote = Remote {
+                audit: &audit,
+                renewed: &renewed,
+            };
+            let read = env.mcp.read_resource(server, token, &item.uri, &remote);
+            read.await.map_err(|e| lookups.failed(e))?
+        };
         let hash = item
             .hash
             .clone()
@@ -620,19 +658,13 @@ async fn remote<L: EngineLauncher>(
 /// The server's documents through its search, never complete.
 async fn crawl<L: EngineLauncher>(
     env: &SyncEnv<'_, L>,
-    ctx: &RunCtx,
     server: &str,
     token: &str,
-) -> Result<Listing, Stop> {
+    remote: &Remote<'_>,
+) -> Result<Listing, McpError> {
     let mut items: Vec<RemoteDoc> = vec![];
     for query in SEED_QUERIES {
-        let request = json!({ "method": "seed_query", "params": { "query": query } });
-        lookup(env, ctx, server, request)?;
-        let found = env
-            .mcp
-            .seed_query(server, token, query)
-            .await
-            .map_err(remote_failed)?;
+        let found = env.mcp.seed_query(server, token, query, remote).await?;
         for item in found.items {
             if !items.iter().any(|i| i.uri == item.uri) {
                 items.push(item);

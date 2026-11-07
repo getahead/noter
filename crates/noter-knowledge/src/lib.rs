@@ -20,8 +20,8 @@ use noter_db::Migration;
 
 pub use chunk::{normalize, Chunk};
 pub use mcp::{
-    due, Listing, McpError, McpSource, Page, RemoteDoc, ScriptedListing, ScriptedMcp,
-    ScriptedOauth, ScriptedPage, ScriptedServer,
+    due, Audit, Listing, McpError, McpSource, Page, Remote, RemoteDoc, ScriptedListing,
+    ScriptedMcp, ScriptedOauth, ScriptedPage, ScriptedServer,
 };
 pub use policy::{keyword_chunks, nearest_chunks, permitted_chunks, Permitted};
 pub use sources::{
