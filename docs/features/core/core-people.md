@@ -310,11 +310,11 @@ The system **MUST** create profiles only on explicit opt-in, encrypt their sever
 
 ## 6. Acceptance Criteria
 
-- [ ] E2E against the real core, `cpt-noter-seq-people-prepare-one-on-one`: a Person page shows commitments, what is owed, shared topics and calls; a new person has empty sections.
-- [ ] E2E against the real core, `cpt-noter-seq-people-name-unnamed-speaker`: alias search for Дима finds Dmitri's identity, the existing naming command updates established linked speakers with Undo, and Create and Name creates no profile.
-- [ ] E2E against the real core, `cpt-noter-seq-dialogs-set-up-voice-profile`: Create produces an encrypted profile; Delete Profile stops matching and keeps names.
+- [x] E2E against the real core, `cpt-noter-seq-people-prepare-one-on-one`: a Person page shows commitments, what is owed, shared topics and calls; a new person has empty sections.
+- [x] E2E against the real core, `cpt-noter-seq-people-name-unnamed-speaker`: alias search for Дима finds Dmitri's identity, the existing naming command updates established linked speakers with Undo, and Create and Name creates no profile.
+- [x] E2E against the real core, `cpt-noter-seq-dialogs-set-up-voice-profile`: Create produces an encrypted profile; Delete Profile stops matching and keeps names.
 - [ ] Merge with overlapping calls deduplicates participation and moves item owners, aliases and opted-in profiles; Undo restores the original links and revisions; forced transaction failure moves nothing.
-- [ ] Person deletion leaves transcript words unnamed and removes every profile and participation link; pending matching cannot restore them.
-- [ ] An injected clock proves 90-day decay; locked Keychain never results in plaintext storage; no export or tool result contains a profile blob.
-- [ ] Stale `person_update` returns `conflict`; disabled talk share stays absent and enablement never computes older calls.
-- [ ] Each of the eight commands succeeds at least once in real-core E2E runs; `just gate-fast` and `just gate` pass.
+- [x] Person deletion leaves transcript words unnamed and removes every profile and participation link; pending matching cannot restore them.
+- [x] An injected clock proves 90-day decay; locked Keychain never results in plaintext storage; no export or tool result contains a profile blob.
+- [x] Stale `person_update` returns `conflict`; disabled talk share stays absent and enablement never computes older calls.
+- [x] Each of the eight commands succeeds at least once in real-core E2E runs; `just gate-fast` and `just gate` pass.
