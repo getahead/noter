@@ -288,6 +288,27 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     await expect(page.getByRole("button", { name: /^Play/ })).toHaveCount(0);
   });
 
+  test("UI — happy path: the inspector's evidence time resolves the span, opens Transcript on it and the inspector keeps the quote", async ({ page }) => {
+    await openCall(page, suggest("itm_d1"));
+    await button(rowOf(page, DECISION), "Edit").click();
+    const inspector = page.locator(INSPECTOR);
+    await expect(inspector.getByText("Evidence")).toBeVisible();
+    await button(inspector, TIME).click();
+    await expect(page.getByRole("tab", { name: "Transcript", selected: true })).toBeVisible();
+    expect(await sent(page, "transcript_span")).toEqual([expect.objectContaining({ span: expect.objectContaining({ call_id: W.PAST_CALL }) })]);
+  });
+
+  test("UI — error path — Audio deleted by retention, from the inspector: the quote stays readable and no play control is offered", async ({ page }) => {
+    await openCall(page, (w) => {
+      suggest("itm_d1")(w);
+      for (const c of [w.calls.find((x) => x.id === W.PAST_CALL)!, w.call_details.find((d) => d.call.id === W.PAST_CALL)!.call]) Object.assign(c, { audio_deleted: true, audio_deleted_at: 1_790_000_000_000 });
+    });
+    await button(rowOf(page, DECISION), "Edit").click();
+    await button(page.locator(INSPECTOR), TIME).click();
+    await expect(page.getByText(/Audio deleted · transcript kept/).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Play/ })).toHaveCount(0);
+  });
+
   test("UI — Other — Edit an item in the Item inspector: Details, Due, Save shows Saved and sends item_edit with only the changed field", async ({ page }) => {
     await openCall(page, suggest());
     await button(rowOf(page, SPEC), "Show in Item inspector").click();

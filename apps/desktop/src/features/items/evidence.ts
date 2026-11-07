@@ -25,3 +25,14 @@ export async function openEvidence(bridge: Bridge, span: TimeSpan): Promise<Reso
 }
 
 export const spanTime = (s: TimeSpan) => clock(s.t0_ms);
+
+/** What the opened span says about its audio and the archive pass; the quote itself always stays readable. */
+export function evidenceNotes(p: SpanPreview) {
+  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-audio
+  const audioGone = !p.audio_available;
+  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-audio
+  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-archive
+  const archiveChanged = p.upgraded_by_archive;
+  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-archive
+  return { audioGone, archiveChanged };
+}
