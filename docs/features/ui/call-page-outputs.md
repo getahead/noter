@@ -217,12 +217,14 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 2. [x] - `p1` - Apply progress only to its call and section; hydrate bodies with outputs_get and ignore reads superseded by navigation or newer state - `inst-progress`
 3. [x] - `p1` - Count only visible non-rejected rows; review counts include suggestions only; hide review controls while still writing or when none remain - `inst-count`
 4. [x] - `p1` - Resolve invocation scope: section means its SectionKind; row means its id or the selection containing it; toolbar means selected ids or Whole call - `inst-scope`
-5. [ ] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
+5. [x] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
 6. [ ] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
 
 Owner decision (6 Nov): M2 selection means one row. This step remains open until row-scope Share is delivered with Items (2.17); removing an unavailable row must never broaden its scope to Whole call.
 
 ## 4. States (CDSL)
+
+**Selection decision (D-34, 6 Nov 2026).** Selection is one row, delivered by row-scope Share in 2.17 S2. The UI retains that explicit row id in the scope while the core filters stale, deleted and rejected items; it never substitutes an empty id list that would broaden sharing to the section or call.
 
 ### Output section
 

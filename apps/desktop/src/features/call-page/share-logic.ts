@@ -12,7 +12,10 @@ export type ShareOrigin = { type: "toolbar" } | { type: "section"; kind: Section
 export function scopeOf(origin: ShareOrigin, includeUnreviewed: boolean): ShareScope {
   // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
+  // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-selection
+  // D-34: selection is one row. Keep its explicit id even if core filtering removes it; [] would broaden the scope.
   return { sections: origin.type === "toolbar" ? [] : [origin.kind], item_ids: origin.type === "row" ? [origin.id] : [], include_unreviewed: includeUnreviewed };
+  // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-selection
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
   // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
 }
