@@ -42,6 +42,11 @@ final class HandoffTests: NoterTestCase {
     }
 
     // the web button exposes a title, not a label: the buttons subscript matches either
+    /// Any element of the window matching the predicate: the web content exposes a title, a label or a value by element.
+    private func anyElement(_ predicate: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: predicate)).firstMatch
+    }
+
     private var addMapping: XCUIElement { app.buttons["Add Mapping…"].firstMatch }
     private var choose: XCUIElement { app.buttons["Choose…"].firstMatch }
     private var openButton: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
@@ -85,7 +90,7 @@ final class HandoffTests: NoterTestCase {
         let copy = app.buttons["Copy Prompt"].firstMatch
         XCTAssertTrue(copy.waitForExistence(timeout: 10))
         copy.click()
-        XCTAssertTrue(app.staticTexts["Copied"].firstMatch.waitForExistence(timeout: 5), "Copy Prompt says Copied")
-        XCTAssertTrue(app.staticTexts["Handed off"].firstMatch.waitForExistence(timeout: 5), "copying hands the item off without launching")
+        XCTAssertTrue(anyElement("title == 'Copied' OR label == 'Copied' OR value == 'Copied'").waitForExistence(timeout: 5), "Copy Prompt says Copied")
+        XCTAssertTrue(anyElement("title CONTAINS 'Handed off' OR label CONTAINS 'Handed off' OR value CONTAINS 'Handed off'").waitForExistence(timeout: 5), "copying hands the item off without launching")
     }
 }
