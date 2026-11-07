@@ -101,11 +101,13 @@ impl Core {
         crate::postcall::register(self);
         crate::credentials::register(self);
         crate::knowledge::register(self);
+        crate::retrieval::register(self);
         if let Err(e) = self.jobs.start() {
             self.log(object(json!({
                 "level": "error", "module": "jobs", "message": e.message
             })));
         }
         crate::knowledge::resume(self);
+        self.start_rebuild();
     }
 }

@@ -19,6 +19,7 @@ noter-jobs = { path = "../noter-jobs" }
 noter-knowledge = { path = "../noter-knowledge" }
 noter-llm = { path = "../noter-llm" }
 noter-protocol = { path = "../noter-protocol" }
+noter-retrieval = { path = "../noter-retrieval" }
 serde = "1"
 serde_json = "1"
 sha2 = "0.11"

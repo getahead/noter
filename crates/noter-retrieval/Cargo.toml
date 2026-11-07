@@ -1,0 +1,24 @@
+[package]
+name = "noter-retrieval"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Retrieval and Ask: the keyword and vector indexes, the one retrieval function behind search, Ask and the copilot, and the index rebuild. Touches SQLite only through noter-db."
+publish = false
+
+[dependencies]
+noter-db = { path = "../noter-db" }
+noter-engine-client = { path = "../noter-engine-client" }
+noter-jobs = { path = "../noter-jobs" }
+noter-protocol = { path = "../noter-protocol" }
+rust-stemmers = "1"
+serde_json = "1"
+ulid = "3"
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt"] }
+# The library's own tables, as the core opens them (a dev-only cycle Cargo allows).
+noter-core = { path = "../noter-core" }
