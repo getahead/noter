@@ -149,9 +149,11 @@ native:
     status=0
     result=coverage/native/NoterNativeUITests.xcresult
     # A hung test fails after 3 minutes (a longer one sets executionTimeAllowance) instead of burning the job.
+    # A failed test reruns up to 2 more times (owner, 7 Nov: runner UI-query timeouts while the app is hidden); 3 failures still fail.
     TEST_RUNNER_NOTER_APP_PATH="$app" TEST_RUNNER_NOTER_E2E_LOG_DIR="$PWD/coverage/native" \
       xcodebuild test -project "$project" -scheme NoterNativeUITests -destination 'platform=macOS' \
       -test-timeouts-enabled YES -default-test-execution-time-allowance 180 -maximum-test-execution-time-allowance 420 \
+      -retry-tests-on-failure -test-iterations 3 \
       -resultBundlePath "$result" -quiet || status=$?
     xcrun xcresulttool get test-results tests --path "$result" > coverage/native/xcuitest-results.json \
       || { echo "GATE FAILED: native: could not export the XCUITest results" >&2; status=1; }
