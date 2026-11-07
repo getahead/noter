@@ -146,6 +146,10 @@ describe("OutputSection", () => {
     expect(html).toContain("Regenerate for better wording");
     expect(renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x" }))} />)).not.toContain("Names updated");
     expect(seen.filter(([c]) => c === "outputs_regenerate")).toEqual([]);
+    const asked: boolean[] = [];
+    const tree = rendered(OutputSection, props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x", names_updated: true }), () => void asked.push(false)));
+    find(tree, (p) => p.className === "np-link").props.onClick!(undefined as never); // only the link regenerates
+    expect(asked).toHaveLength(1);
   });
 });
 
