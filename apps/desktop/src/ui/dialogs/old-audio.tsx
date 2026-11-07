@@ -11,7 +11,7 @@ import { useSheetIfAny } from "./host";
 import type { SheetProps } from "./sheets";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1
-function OldAudioSheet({ close, bridge, onFreed }: SheetProps & { bridge: Bridge; onFreed: (text: string) => void }) {
+export function OldAudioSheet({ close, bridge, onFreed }: SheetProps & { bridge: Bridge; onFreed: (text: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const run = async () => {
