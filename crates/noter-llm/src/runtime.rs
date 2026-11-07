@@ -549,6 +549,31 @@ impl Llm {
     }
     // @cpt-end:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-verify
 
+    // @cpt-begin:cpt-noter-algo-core-credentials-privacy-check-account:p1:inst-check-test
+    /// The short test request of an own-account check or `account_test`: the same empty packet,
+    /// gate, isolation and audit as `verify_key`, on the account's own runtime and no candidate.
+    pub async fn verify_account(
+        &self,
+        runtime: RuntimeChoice,
+        privacy: Privacy,
+    ) -> Result<(), Failure> {
+        let packet = Packet {
+            what: AuditWhat::Outputs,
+            items: Vec::new(),
+            people: Vec::new(),
+            context: PacketContext::default(),
+        };
+        let (_privacy, rx) = watch::channel(privacy);
+        let mut req = RunRequest::new(Skill::AskAnswer, "account-check", packet, TaskKind::Ask, rx);
+        req.settings.configured = Some(runtime);
+        req.settings.effort = Effort::Low;
+        match self.0.run(req, None, None).await {
+            Ok(_) | Err(Failure::Invalid { .. }) => Ok(()),
+            Err(failure) => Err(failure),
+        }
+    }
+    // @cpt-end:cpt-noter-algo-core-credentials-privacy-check-account:p1:inst-check-test
+
     /// Asks every runtime again what it has (CLI versions, Ollama's pulled models) and answers
     /// the availability that follows. The CLI probes block, so they run off the async workers.
     pub async fn refresh(&self) -> Vec<Availability> {

@@ -237,6 +237,22 @@ impl Core {
     }
 }
 
+/// A call title as plain text in a Markdown list item: one line, no formatting or links.
+fn escape_markdown(title: &str) -> String {
+    let mut out = String::with_capacity(title.len());
+    for c in title.chars() {
+        match c {
+            '\n' | '\r' => out.push(' '),
+            '\\' | '`' | '*' | '_' | '[' | ']' | '(' | ')' | '<' | '>' | '#' | '|' | '!' | '~' => {
+                out.push('\\');
+                out.push(c);
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 fn markdown_row(r: &AuditEntry) -> String {
     let ms = r.at.0;
     let (h, m) = (
@@ -262,7 +278,20 @@ fn markdown_row(r: &AuditEntry) -> String {
         line.push_str(" · redacted");
     }
     if let Some(call) = &r.call {
-        line.push_str(&format!(" · {}", call.title));
+        line.push_str(&format!(" · {}", escape_markdown(&call.title)));
     }
     line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_markdown;
+
+    #[test]
+    fn a_title_cannot_add_formatting_links_or_lines() {
+        assert_eq!(
+            escape_markdown("Q3 [plan](http://x)\n# *big* <b>"),
+            "Q3 \\[plan\\]\\(http://x\\) \\# \\*big\\* \\<b\\>"
+        );
+    }
 }

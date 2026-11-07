@@ -205,7 +205,8 @@ struct State {
 #[derive(Clone, Default)]
 pub struct ScriptedAccountCli {
     state: Arc<Mutex<State>>,
-    cancel: Arc<Notify>,
+    /// One per provider: cancelling Claude's sign-in never touches ChatGPT's.
+    cancel: Arc<[Notify; 2]>,
 }
 
 impl ScriptedAccountCli {
@@ -220,6 +221,10 @@ impl ScriptedAccountCli {
 
     pub fn log(&self) -> Vec<String> {
         lock(&self.state).log.clone()
+    }
+
+    fn cancel_of(&self, provider: AccountProvider) -> &Notify {
+        &self.cancel[usize::from(provider == AccountProvider::Chatgpt)]
     }
 
     fn script(&self, tool: CliTool) -> Option<ToolScript> {
@@ -252,7 +257,7 @@ impl AccountCli for ScriptedAccountCli {
             let done: BoxFuture<'static, LoginOutcome> = Box::pin(async move {
                 let wait = tokio::time::sleep(Duration::from_millis(outcome.delay_ms));
                 tokio::select! {
-                    () = this.cancel.notified() => LoginOutcome::Cancelled,
+                    () = this.cancel_of(provider).notified() => LoginOutcome::Cancelled,
                     () = wait => match (outcome.outcome.as_str(), identity) {
                         ("signed_in", Some(identity)) => {
                             if let Some(s) = lock(&this.state).tools.get_mut(&tool) {
@@ -273,8 +278,8 @@ impl AccountCli for ScriptedAccountCli {
         })
     }
 
-    fn cancel(&self, _: AccountProvider) {
-        self.cancel.notify_waiters();
+    fn cancel(&self, provider: AccountProvider) {
+        self.cancel_of(provider).notify_waiters();
     }
 
     fn logout(&self, provider: AccountProvider) -> BoxFuture<'_, Result<(), CliError>> {

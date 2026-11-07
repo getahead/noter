@@ -33,6 +33,7 @@ mod recovery;
 mod self_test;
 mod settings;
 mod share;
+mod signin;
 mod speakers;
 mod surfaces;
 #[cfg(feature = "harness")]
@@ -1515,8 +1516,7 @@ impl CoreApi for Core {
         _args: NoArgs,
     ) -> Result<AccountsView, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-read
-        let availability = self.llm.refresh().await;
-        Ok(self.accounts.observe(Some(availability)))
+        Ok(self.refresh_accounts().await)
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-read
     }
 
@@ -1592,6 +1592,56 @@ impl CoreApi for Core {
         args: AccountProviderArgs,
     ) -> Result<SignInPrepare, CoreError> {
         self.signin_prepare(args.provider).await
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-signin:p1
+    async fn account_signin_start(
+        &self,
+        ctx: &CommandCtx,
+        args: SignInStartArgs,
+    ) -> Result<SignInSession, CoreError> {
+        self.signin_start(ctx, args).await
+    }
+
+    async fn account_signin_cancel(
+        &self,
+        _ctx: &CommandCtx,
+        args: SignInSessionArgs,
+    ) -> Result<AccountsView, CoreError> {
+        self.signin_cancel(&args.session_id).await
+    }
+
+    async fn account_use_existing(
+        &self,
+        ctx: &CommandCtx,
+        args: AccountProviderArgs,
+    ) -> Result<AccountsView, CoreError> {
+        self.use_existing(ctx, args.provider).await
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-bind-signout:p1
+    async fn account_bind_agents(
+        &self,
+        ctx: &CommandCtx,
+        args: AccountBindArgs,
+    ) -> Result<AccountBindResult, CoreError> {
+        self.bind_agents(ctx, args).await
+    }
+
+    async fn account_test(
+        &self,
+        _ctx: &CommandCtx,
+        args: AccountProviderArgs,
+    ) -> Result<AccountTestResult, CoreError> {
+        self.account_test_now(args.provider).await
+    }
+
+    async fn account_sign_out(
+        &self,
+        ctx: &CommandCtx,
+        args: SignOutArgs,
+    ) -> Result<AccountsView, CoreError> {
+        self.sign_out(ctx, args).await
     }
 
     async fn cli_install(
