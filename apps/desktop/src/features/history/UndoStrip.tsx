@@ -13,6 +13,7 @@ import { dismissUndo, holdPointer, runUndo, undoLast, undoMode, useUndo } from "
 export const undoKey = (e: { code: string; metaKey: boolean; shiftKey: boolean; altKey: boolean; ctrlKey: boolean }, mode: "undo" | "redo" | null) =>
   !!mode && e.code === "KeyZ" && e.metaKey && !e.altKey && !e.ctrlKey && e.shiftKey === (mode === "redo");
 
+// @cpt-dod:cpt-noter-dod-ui-history-undo-undo:p1
 // @cpt-component:cpt-noter-component-ui-undo-strip:p1
 export function UndoStrip({ bridge }: { bridge: Bridge }) {
   const entry = useUndo();
