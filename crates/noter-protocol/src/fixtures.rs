@@ -1237,6 +1237,7 @@ pub fn world() -> FakeWorld {
                 writer: Some(writer(RuntimeChoice::ClaudeApiKey, "claude-sonnet")),
                 user_edited: false,
                 regenerated_with_edits: false,
+                names_updated: false,
                 version_count: 2,
             },
             OutputSection {
@@ -1250,6 +1251,7 @@ pub fn world() -> FakeWorld {
                 writer: Some(writer(RuntimeChoice::ClaudeApiKey, "claude-sonnet")),
                 user_edited: false,
                 regenerated_with_edits: false,
+                names_updated: false,
                 version_count: 1,
             },
             OutputSection {
@@ -1263,6 +1265,7 @@ pub fn world() -> FakeWorld {
                 writer: None,
                 user_edited: false,
                 regenerated_with_edits: false,
+                names_updated: false,
                 version_count: 0,
             },
         ],

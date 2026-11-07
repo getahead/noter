@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.3",
+    "contract_version": "2.4",
     "copilot": {
       "agents": [
         {
@@ -2069,6 +2069,7 @@
           "body_md": "Backend and QA aligned on the websocket notifications. Drawer events will go through the notification service; the reconnect owner is still open.",
           "items": [],
           "kind": "summary",
+          "names_updated": false,
           "regenerated_with_edits": false,
           "rev": 2,
           "reviews": [],
@@ -2147,6 +2148,7 @@
             }
           ],
           "kind": "action_items",
+          "names_updated": false,
           "regenerated_with_edits": false,
           "rev": null,
           "reviews": [],
@@ -2169,6 +2171,7 @@
           "body_md": null,
           "items": [],
           "kind": "role_reviews",
+          "names_updated": false,
           "regenerated_with_edits": false,
           "rev": null,
           "reviews": [],

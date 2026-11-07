@@ -2313,6 +2313,8 @@ export type OutputSection = {
 	user_edited: boolean,
 	/**  Regenerated while the user's edit was kept: a diff is available. */
 	regenerated_with_edits: boolean,
+	/**  Speaker labels changed since generation; regeneration can improve wording. */
+	names_updated: boolean,
 	version_count: number,
 };
 
@@ -3586,7 +3588,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.3";
+export const CONTRACT_VERSION = "2.4";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

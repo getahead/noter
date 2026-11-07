@@ -623,3 +623,13 @@ fn offline_constraints_examples_round_trip() {
     assert_eq!(v["must_link"][0]["b"]["t0_ms"], 5_000);
     assert_eq!(v["languages"][1]["code"], "fr");
 }
+
+#[test]
+fn output_sections_expose_names_updated_on_the_wire() {
+    for output in fixtures::world().outputs {
+        for section in output.sections {
+            let wire = serde_json::to_value(section).unwrap();
+            assert_eq!(wire.get("names_updated"), Some(&serde_json::json!(false)));
+        }
+    }
+}

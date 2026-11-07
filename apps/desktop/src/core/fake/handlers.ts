@@ -22,10 +22,11 @@ import type {
   Rev,
   SectionKind,
   SourceRow,
+  SpeakerLabel,
   TimestampMs,
   TopicRow,
 } from "../bindings";
-import { coreError, type FakeCore, type Handlers, type World } from "./fake-core";
+import { coreError, type FakeCore, type Handlers, type HandlerCtx, type World } from "./fake-core";
 
 let counter = 0;
 const newId = (prefix: string) => `${prefix}_fake_${++counter}`;
@@ -34,6 +35,29 @@ const ack = {};
 const MIN = 60_000;
 
 // ── helpers ──────────────────────────────────────────────────────────────
+
+const speakerName = (label: SpeakerLabel): string => label.type === "person" ? label.person.display_name : label.type === "you" ? "You" : label.type === "unnamed" ? `Speaker ${label.n}` : "Guest";
+
+// @cpt-algo:cpt-noter-algo-core-speakers-audio-correct:p1
+function namedSections(world: World, callId: string, names: [string, string][]): OutputSection[] {
+  const replacements = new Map(names.filter(([old, name]) => old && old !== name));
+  if (!replacements.size) return [];
+  const escaped = [...replacements.keys()].map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${escaped.join("|")})(?![\\p{L}\\p{N}_])`, "gu");
+  const changed: OutputSection[] = [];
+  for (const section of world.outputs.find((o) => o.call_id === callId)?.sections ?? []) {
+    if (!section.body_md || !section.writer || section.writer.generated_at > now()) continue;
+    const body = section.body_md.replace(pattern, (old) => replacements.get(old)!.replaceAll("<", "&lt;"));
+    if (body === section.body_md) continue;
+    versionsOf(section).push({ body_md: body, kind: "user_edit" });
+    section.body_md = body;
+    section.names_updated = true;
+    section.rev = (section.rev ?? 0) + 1;
+    section.version_count += 1;
+    changed.push(section);
+  }
+  return changed;
+}
 
 function findItem(world: World, id: string): ItemView {
   const item = world.items.find((i) => i.id === id);
@@ -82,9 +106,33 @@ function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
   return rows.map((r) => r.batch_id ? { ...r, batch_size: Math.max(r.batch_size, world.changes.filter((c) => c.batch_id === r.batch_id).length) } : r);
 }
 
+function namingState(world: World, callId: string) {
+  const speakers = (world.transcripts.find((t) => t.call_id === callId) ?? world.call_details.find((d) => d.call.id === callId))?.speakers ?? [];
+  const sections = (world.outputs.find((o) => o.call_id === callId)?.sections ?? []).map((section) => ({ section: { ...section, rev: null }, versions: versionsOf(section) }));
+  return { callId, speakers, sections };
+}
+
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
-function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after"): void {
+function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"]): void {
   rows.forEach((r) => {
+    if (r.field === "naming" && r[value]) {
+      const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
+      for (const speakers of [world.transcripts.find((t) => t.call_id === state.callId)?.speakers, world.call_details.find((d) => d.call.id === state.callId)?.speakers]) {
+        for (const restored of state.speakers) {
+          const speaker = speakers?.find((s) => s.id === restored.id);
+          if (speaker) Object.assign(speaker, restored);
+        }
+      }
+      emit("entity:changed", { type: "speakers", call_id: state.callId, speakers: state.speakers });
+      for (const restored of state.sections) {
+        const section = world.outputs.find((o) => o.call_id === state.callId)?.sections.find((s) => s.kind === restored.section.kind);
+        if (section) {
+          Object.assign(section, restored.section, { rev: section.rev === null ? null : section.rev + 1 });
+          sectionVersions.set(section, restored.versions);
+          emit("entity:changed", { type: "section", call_id: state.callId, section });
+        }
+      }
+    }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
@@ -94,6 +142,10 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
 
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
 function editedLater(world: World, r: ChangeRow): boolean {
+  if (r.field === "naming" && r.after) {
+    const state = JSON.parse(r.after) as ReturnType<typeof namingState>;
+    return JSON.stringify(namingState(world, state.callId)) !== r.after;
+  }
   const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
   if (tagged) return JSON.stringify(tagged.tags) !== r.after;
   const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
@@ -470,10 +522,15 @@ export const defaultHandlers: Handlers = {
     const p = a.person.type === "existing" ? person(world, a.person.person_id) : undefined;
     const name = p?.display_name ?? (a.person.type === "new" ? a.person.display_name : "Unknown");
     if (!name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "person", rule: "required" });
+    const before = JSON.stringify(namingState(world, a.call_id));
+    const oldName = speakerName(spk.label);
     spk.label = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
     spk.named_by = "you";
     emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
-    const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, field: "person", after: name, summary: `Named a speaker as ${name}` });
+    if (a.scope.type === "whole_call") {
+      for (const section of namedSections(world, a.call_id, [[oldName, name]])) emit("entity:changed", { type: "section", call_id: a.call_id, section });
+    }
+    const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, field: "naming", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
     return { speakers: [spk], change_id };
   },
   transcript_fix_term: (a, { world, fake }) => {
@@ -490,18 +547,22 @@ export const defaultHandlers: Handlers = {
   transcript_name_speakers: (a, { world, emit }) => {
     const t = world.transcripts.find((x) => x.call_id === a.call_id) ?? world.call_details.find((d) => d.call.id === a.call_id);
     if (!t) throw coreError("not_found", `call ${a.call_id}`);
+    const before = JSON.stringify(namingState(world, a.call_id));
+    const names: [string, string][] = [];
     const named = a.assignments.flatMap((as) => {
       const spk = t.speakers.find((s) => s.id === as.speaker_id);
       if (!spk) throw coreError("not_found", `speaker ${as.speaker_id}`);
       if (!as.person) return [];
       const p = as.person.type === "existing" ? person(world, as.person.person_id) : null;
       const name = p?.display_name ?? (as.person.type === "new" ? as.person.display_name : "Unknown");
+      names.push([speakerName(spk.label), name]);
       spk.label = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: false } };
       spk.named_by = "you";
       return [spk];
     });
     emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
-    return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, field: "speakers", summary: `Named ${named.length} speakers` }) };
+    for (const section of namedSections(world, a.call_id, names)) emit("entity:changed", { type: "section", call_id: a.call_id, section });
+    return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, field: "naming", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named ${named.length} speakers` }) };
   },
   transcript_span: (a, { world }) => {
     const t = world.transcripts.find((x) => x.call_id === a.span.call_id);
@@ -822,7 +883,14 @@ export const defaultHandlers: Handlers = {
     const sections = a.sections.length ? a.sections : (world.outputs.find((o) => o.call_id === a.call_id)?.sections.map((x) => x.kind) ?? []);
     sections.forEach((kind, i) => {
       fake.later(300 * (i + 1), () => emit("outputs:progress", { call_id: a.call_id, status: "writing", section: kind, state: { type: "writing" } }));
-      fake.later(300 * (i + 2), () => emit("outputs:progress", { call_id: a.call_id, status: "ready", section: kind, state: { type: "ready" } }));
+      fake.later(300 * (i + 2), () => {
+        const section = world.outputs.find((o) => o.call_id === a.call_id)?.sections.find((s) => s.kind === kind);
+        if (section) {
+          section.names_updated = false;
+          emit("entity:changed", { type: "section", call_id: a.call_id, section });
+        }
+        emit("outputs:progress", { call_id: a.call_id, status: "ready", section: kind, state: { type: "ready" } });
+      });
     });
     return { job_run_id: run };
   },
@@ -1143,7 +1211,7 @@ export const defaultHandlers: Handlers = {
     );
     return { rows: historyRows(world, rows), next_cursor: null, total: rows.length };
   },
-  change_undo: (a, { world }) => {
+  change_undo: (a, { world, emit }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
@@ -1154,11 +1222,11 @@ export const defaultHandlers: Handlers = {
     const undo = open.filter((r) => !editedLater(world, r));
     if (!undo.length) throw coreError("edited_later");
     undo.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
-    replayChanges(world, undo, "before");
+    replayChanges(world, undo, "before", emit);
     return { undone: undo.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: open.length - undo.length };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
-  change_redo: (a, { world }) => {
+  change_redo: (a, { world, emit }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
@@ -1168,7 +1236,7 @@ export const defaultHandlers: Handlers = {
     const redoable = undone.filter((r) => r.redoable);
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
-    replayChanges(world, redoable, "after");
+    replayChanges(world, redoable, "after", emit);
     redoable.forEach((r) => logChange(world, { entity: r.entity, summary: `Redid: ${r.summary}`, field: r.field, before: r.before, after: r.after }));
     return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: undone.length - redoable.length };
   },

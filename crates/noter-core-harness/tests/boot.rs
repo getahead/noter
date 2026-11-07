@@ -1350,7 +1350,7 @@ async fn world_set_seeds_output_sections_their_items_and_running_states() {
     let section = |kind: &str, state: Value| {
         json!({ "kind": kind, "state": state, "summary_id": null, "rev": null, "body_md": null,
                 "items": [], "reviews": [], "writer": null, "user_edited": false,
-                "regenerated_with_edits": false, "version_count": 0 })
+                "regenerated_with_edits": false, "names_updated": false, "version_count": 0 })
     };
     let sections = outputs["sections"].as_array_mut().unwrap();
     sections.retain(|s| s["kind"] == "summary");

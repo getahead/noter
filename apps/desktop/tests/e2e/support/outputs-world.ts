@@ -20,11 +20,11 @@ function item(w: World, id: string, kind: ItemView["kind"], text: string, review
 }
 
 function textSection(kind: SectionKind, id: string, body: string, rev = 2, versions = 2): OutputSection {
-  return { kind, state: { type: "ready" }, summary_id: id, rev, body_md: body, items: [], reviews: [], writer: structuredClone(WRITER), user_edited: false, regenerated_with_edits: false, version_count: versions } as OutputSection;
+  return { kind, state: { type: "ready" }, summary_id: id, rev, body_md: body, items: [], reviews: [], writer: structuredClone(WRITER), user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: versions } as OutputSection;
 }
 
 function itemSection(kind: SectionKind, items: ItemView[]): OutputSection {
-  return { kind, state: { type: items.length ? "ready" : "empty" }, summary_id: null, rev: null, body_md: null, items, reviews: [], writer: structuredClone(WRITER), user_edited: false, regenerated_with_edits: false, version_count: 1 } as OutputSection;
+  return { kind, state: { type: items.length ? "ready" : "empty" }, summary_id: null, rev: null, body_md: null, items, reviews: [], writer: structuredClone(WRITER), user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: 1 } as OutputSection;
 }
 
 /** The call's outputs written and reviewed: Summary, Decisions 2, Action items 4, Open questions 2, Per participant. */

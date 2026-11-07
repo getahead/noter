@@ -28,7 +28,7 @@ beforeEach(() => (resetCache(), resetOutputsCache()));
 afterEach(() => bridge.close());
 
 const sec = (kind: SectionKind, o: Partial<Section> = {}): Section =>
-  ({ kind, state: { type: "ready" }, summary_id: null, rev: null, body_md: null, items: [], reviews: [], writer: null, user_edited: false, regenerated_with_edits: false, version_count: 1, ...o }) as Section;
+  ({ kind, state: { type: "ready" }, summary_id: null, rev: null, body_md: null, items: [], reviews: [], writer: null, user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: 1, ...o }) as Section;
 const row = (text: string, review: ItemView["review"] = "accepted") => ({ id: `i_${text}`, text, review, lang: "en", spans: [], owner: null, topic: null }) as unknown as ItemView;
 
 async function open(sections: Section[], status: CallOutputs["status"] = "ready", more: Partial<CallOutputs> = {}) {
