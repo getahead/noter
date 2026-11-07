@@ -393,6 +393,8 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-no-audio
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-correct
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-publish
+        // A speaker named as a person takes part in the call.
+        self.sync_participants(call_id)?;
         let speakers = self.publish_corrected(call_id, &plan.segments)?;
         for row in &written {
             if row.entity_type == "summary" {

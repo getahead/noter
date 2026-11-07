@@ -55,11 +55,11 @@ fn initials_of(name: &str) -> String {
         .to_uppercase()
 }
 
-fn not_found() -> CoreError {
+pub(crate) fn not_found() -> CoreError {
     CoreError::new(ErrorCode::NotFound, "this person no longer exists")
 }
 
-fn db<T>(r: Db<T>) -> Result<T, CoreError> {
+pub(crate) fn db<T>(r: Db<T>) -> Result<T, CoreError> {
     r.map_err(internal)
 }
 
@@ -186,7 +186,6 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
             n: r.get(1)?,
             segment_count: r.get(6)?,
-            // Voice profiles suggest names from slice 2.
             suggestion: None,
         })
     })?
@@ -279,10 +278,10 @@ fn detail_of(text: &str) -> Option<String> {
     Some(text.trim().to_string()).filter(|t| !t.is_empty())
 }
 
-type Pairs<'a> = Vec<(&'a str, Value, Value)>;
+pub(crate) type Pairs<'a> = Vec<(&'a str, Value, Value)>;
 
 /// A change row's reversible delta: `{"column": [before, after]}`, no `id` (replay keys by it).
-fn logged(entity_type: &'static str, id: &str, pairs: Pairs<'_>) -> Logged {
+pub(crate) fn logged(entity_type: &'static str, id: &str, pairs: Pairs<'_>) -> Logged {
     let columns: Map<String, Value> = pairs
         .into_iter()
         .map(|(column, before, after)| (column.to_string(), json!([before, after])))
@@ -350,7 +349,7 @@ struct Touched {
     items: Vec<String>,
 }
 
-fn new_id(prefix: &str) -> String {
+pub(crate) fn new_id(prefix: &str) -> String {
     format!("{prefix}_{}", ulid::Ulid::generate())
 }
 
@@ -383,7 +382,7 @@ impl Core {
             .read(|c| Ok(rows_of(c, Some(id))?.into_iter().next()))
     }
 
-    fn publish_person(&self, id: &str) -> Result<(), CoreError> {
+    pub(crate) fn publish_person(&self, id: &str) -> Result<(), CoreError> {
         match self.person_row(id)? {
             Some(person) => self.emit_entity_changed(&EntityChanged::Person { person }),
             None => self.emit_entity_changed(&EntityChanged::Removed {
@@ -417,7 +416,7 @@ impl Core {
         let query = args.query.as_deref().map(norm).filter(|q| !q.is_empty());
         // @cpt-end:cpt-noter-flow-core-people-read:p1:inst-read-list
         // @cpt-begin:cpt-noter-flow-core-people-read:p1:inst-read-people
-        self.store().read(move |c| {
+        let mut list = self.store().read(move |c| {
             let mut people = rows_of(c, None)?;
             if let Some(q) = &query {
                 people.retain(|p| {
@@ -432,7 +431,11 @@ impl Core {
                 people,
                 unnamed: unnamed_of(c)?,
             })
-        })
+        })?;
+        for u in &mut list.unnamed {
+            u.suggestion = self.suggest_for(u.speaker_id.as_str());
+        }
+        Ok(list)
         // @cpt-end:cpt-noter-flow-core-people-read:p1:inst-read-people
     }
 

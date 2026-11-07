@@ -544,6 +544,17 @@ impl Core {
             .insert_batch(install_rows(call, &result, &speakers, &live))?;
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-install
         self.set_archive(ctx, call, "done")?;
+        // Voices that match an opted-in profile are named before the transcript file and the
+        // chunks read the names; a locked Keychain or a missing engine leaves them unnamed.
+        let named = match self.embed_archive_speakers(call).await {
+            Ok(()) => self.match_profiles(call),
+            Err(e) => Err(e),
+        };
+        if let Err(e) = named {
+            self.log(object(json!({
+                "level": "warn", "module": "people", "code": e.code
+            })));
+        }
         // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-rechunk
         if let Err(e) = self.write_transcript_file(call) {
             self.log(object(json!({

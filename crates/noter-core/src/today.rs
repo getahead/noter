@@ -21,7 +21,7 @@ const MAX_TAG: usize = 32;
 const DAY_MS: i64 = 86_400_000;
 const WEEK_DAYS: i64 = 7;
 /// Calls of the same people that Today carries work from.
-const CARRY_CALLS: usize = 2;
+pub(crate) const CARRY_CALLS: usize = 2;
 const NO_DUE: &str = "9999-99-99";
 
 type Db<T> = noter_db::rusqlite::Result<T>;
