@@ -164,7 +164,6 @@ fn meta_of(ctx: &RunCtx, summary: &str) -> ChangeMeta {
 
 // @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
 // @cpt-state:cpt-noter-state-core-knowledge-source:p1
-// @cpt-dod:cpt-noter-dod-core-knowledge-ingestion:p1
 /// Syncs the folder source `id` within the job run `ctx`. A removed source ends the run as
 /// cancelled with nothing written; a live source is refused.
 pub async fn sync<L: EngineLauncher>(

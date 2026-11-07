@@ -170,7 +170,6 @@ impl Core {
     }
 
     // @cpt-flow:cpt-noter-flow-core-knowledge-remove:p1
-    // @cpt-dod:cpt-noter-dod-core-knowledge-removal:p1
     /// Stops the source's sync and watcher, then removes it with its whole local index; a
     /// failed removal keeps the source and watches it again.
     pub(crate) fn remove_source(
