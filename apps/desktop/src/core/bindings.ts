@@ -4787,9 +4787,12 @@ export function createCore(transport: Transport) {
     windowSetCollapsed: (args: CollapseArgs) => call("window_set_collapsed", args),
     windowShareWarningSeen: (args: NoArgs) => call("window_share_warning_seen", args),
     /**
-     * Hide for Presenting (wanted state).
+     * The Edit menu's **Fix Term…** is enabled while confirmed words are selected.
      */
     windowSetFixTermEnabled: (args: FixTermEnabledArgs) => call("window_set_fix_term_enabled", args),
+    /**
+     * Hide for Presenting (wanted state).
+     */
     appSetHiddenForPresenting: (args: HiddenArgs) => call("app_set_hidden_for_presenting", args),
     /**
      * Show Noter / Open in Noter at a place (main window or Settings window).
