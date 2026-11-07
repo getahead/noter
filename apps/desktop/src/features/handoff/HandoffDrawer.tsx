@@ -165,7 +165,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
               <span className="hd__lab">{t("handoff.target")}</span>
               <SegmentedControl variant="option" label={t("handoff.target")} items={TARGETS.map((value) => ({ value, label: toolLabel(value), disabled: !!local.pending }))} value={view.target} onAction={(v) => void setTarget(bridge, itemId, v as HandoffTarget)} />
             </div>
-            <div className="hd__row" data-region="HD-R3">
+            <div className={view.repo ? "hd__row" : "hd__row hd__row--top"} data-region="HD-R3">
               <span className="hd__lab">{t("handoff.repository")}</span>
               {view.repo ? (
                 <PopupButton label={t("handoff.repository")} options={[
@@ -176,7 +176,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
               ) : (
                 <span className="hd__warn hd__warn--line">
                   <Icon name="warning" size={12} />
-                  <span className="hd__warn-text">{noMapping(view)} <span className="hd__nowrap">· <PushButton label={t("mapping.add_more")} size="small" variant="quiet" onAction={addMapping} /></span></span>
+                  <span className="hd__warn-text">{noMapping(view)} <PushButton label={t("mapping.add_more")} size="small" variant="quiet" onAction={addMapping} /></span>
                 </span>
               )}
             </div>

@@ -30,8 +30,7 @@
 .hd__warn { color: var(--warning); }
 .hd__warn--line { flex-wrap: nowrap; }
 .hd__warn-text { min-width: 0; }
-.hd__nowrap { white-space: nowrap; }
-[data-region="HD-R3"] { align-items: flex-start; }
+.hd__row--top { align-items: flex-start; } /* only the wrapped no-mapping warning; the pop-up and generating rows stay centred */
 .hd__err { color: var(--error); }
 .hd__rec { color: var(--success); }
 .hd__accept { margin: 0; font-size: 12px; color: var(--label-2); background: var(--sel-unemph); padding: 6px 8px; border-radius: var(--r-control); }
