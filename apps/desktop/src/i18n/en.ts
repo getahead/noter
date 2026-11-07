@@ -1077,6 +1077,8 @@ export const en = {
   "items.err.partial": "Saved, but it could not be accepted. Try Accept again.",
   "items.err.other": "Couldn't finish that. Try again.",
   "today.title": "Today",
+  "today.to_review": "To review:",
+  "today.show_all_activity": "Show All in Activity",
   "today.record": "Record",
   "today.record_help": "Start recording (⌃⌥⌘R)",
   "today.record_model_missing": "Record is off until the speech model is downloaded.",

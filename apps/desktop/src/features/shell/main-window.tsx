@@ -247,12 +247,12 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-empty */}
         <OldAudio bridge={bridge} nav={nav} />
-        <BannerSlot banners={bannerList} region="MW-R5" onDismiss={(id) => (isBannerKind(id) ? dismissBanner(id) : undefined)} />
+        {!page.banners?.includesAppBanners && <BannerSlot banners={bannerList} region="MW-R5" onDismiss={(id) => (isBannerKind(id) ? dismissBanner(id) : undefined)} />}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-empty */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-several-one */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}
         {/* @cpt-end:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-empty-one */}
-        {page.banners && <page.banners route={route} bridge={bridge} appBanners={bannerList.length} />}
+        {page.banners && <page.banners route={route} bridge={bridge} appBanners={bannerList.length} appBannerList={bannerList} onDismiss={(id) => (isBannerKind(id) ? dismissBanner(id) : undefined)} />}
         <UndoStrip bridge={bridge} />
         <div className="np-body">
           <div ref={contentRef} className="np-content" data-region="MW-R3" role="main" tabIndex={0} aria-label={page.title(route)} data-width={layout.widthClass} data-grid={layout.grid} data-columns={layout.columns} onScroll={scrollSaver(scrolls.current, routeId)}>

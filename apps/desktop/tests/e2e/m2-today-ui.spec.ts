@@ -17,9 +17,13 @@ const sent = async (page: Page, name: string): Promise<Array<Record<string, unkn
   (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args as Record<string, unknown>);
 const calendar = (state: "not_asked" | "denied") => (w: Parameters<typeof W.idle>[0]) => {
   W.idle(w);
+  // today_get reads live calls from call records, independently of the capture toolbar state.
+  for (const call of [...w.calls, ...w.call_details.map((detail) => detail.call)]) {
+    if (call.status === "recording" || call.status === "paused") call.status = "ready";
+  }
   W.permission(w, "calendar", state);
   // the real core derives these from the permission (and refuses a changed `today`); the fake world serves them as given
-  if (process.env.NOTER_CORE !== "stdio") Object.assign(w.today, { calendar: state, today: [], this_week: [] });
+  if (process.env.NOTER_CORE !== "stdio") Object.assign(w.today, { calendar: state, today: [], this_week: [], live_call: null });
 };
 
 /** The window opens on Today, the first section (⌘1). */
@@ -36,7 +40,8 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
   test("UI — Other — Return to a live call: the recording's card is first with the recording indicator and Open Call Screen", async ({ page }) => {
     await openToday(page, () => {}); // the fixture world records the planning call and no calendar event matches it
     const live = cards(page).first();
-    await expect(live).toContainText(W.LIVE_TITLE);
+    await expect(live).toHaveAttribute("aria-label", W.LIVE_TITLE);
+    await expect(live.locator(".td-card__elapsed")).toHaveText(/ · \d+:\d{2}/);
     await expect(live.locator('[data-component="cpt-noter-component-ui-recording-indicator"]')).toBeVisible();
     await button(live, "Open Call Screen").click();
     await expect.poll(() => sent(page, "window_show_call")).toHaveLength(1);

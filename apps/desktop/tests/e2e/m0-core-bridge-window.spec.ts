@@ -37,7 +37,8 @@ test.describe("cpt-noter-seq-core-window-open", () => {
   test("other path — reload: the window comes back ready from the core and keeps nothing in browser storage", async ({ page }) => {
     await openWindow(page, "main");
     await expect(frame(page)).toHaveAttribute("data-state", "ready");
-    const records = async () => (await frame(page).innerText()).replace(/\d\d:\d\d:\d\d/g, "--:--:--"); // the live call's timer runs
+    await expect(page.locator('[data-region="TD-R6"]')).toBeVisible(); // Today finishes its own read after the window snapshot.
+    const records = async () => (await frame(page).innerText()).replace(/\b\d+:\d{2}(?::\d{2})?\b/g, "--:--"); // live timers use both mm:ss and hh:mm:ss
     const before = await records();
     await page.reload();
     await expect(frame(page)).toHaveAttribute("data-state", "ready");

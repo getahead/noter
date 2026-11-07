@@ -10,7 +10,8 @@ import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showP
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
 import { TodayPage } from "./TodayPage";
-import { TodayToolbar, clockOf } from "./TodayToolbar";
+import { TodayToolbar } from "./TodayToolbar";
+import { clockOf } from "./clock";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 
 let bridge: Bridge;
@@ -58,12 +59,23 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     await open();
     setCalendar("denied")();
     await loadToday(bridge);
-    // TD-R2: the banner slot after the app's, only while no app banner shows
+    // TD-R2: the Calendar warning joins the app's shared banner slot.
     expect(renderToString(<TodayBanners route={{ section: "today", key: "root" }} bridge={bridge} appBanners={0} />)).toContain("Calendar access is off");
-    expect(renderToString(<TodayBanners route={{ section: "today", key: "root" }} bridge={bridge} appBanners={1} />)).toBe("");
+    const combined = renderToString(<TodayBanners route={{ section: "today", key: "root" }} bridge={bridge} appBanners={1} appBannerList={[{ id: "app-error", severity: "error", text: "Engine stopped" }]} />);
+    expect(combined).toContain("Engine stopped");
+    expect(combined).toContain("+1 More");
     setCalendar("read_failed")();
     await loadToday(bridge);
     expect(renderToString(<TodayPage bridge={bridge} />)).toContain("Couldn&#x27;t read today&#x27;s calendar.");
+  });
+  it("keeps the Today section heading in not-asked and no-calls states", async () => {
+    await open();
+    Object.assign(fake.world.today, { today: [], live_call: null });
+    for (const calendar of ["not_asked", "granted"]) {
+      setCalendar(calendar)();
+      await loadToday(bridge);
+      expect(renderToString(<TodayPage bridge={bridge} />)).toContain('<h2 class="td-h">Today</h2>');
+    }
   });
   it("sends Open System Settings, Record and show-call with the core's arguments", async () => {
     await open();
@@ -83,6 +95,7 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     expect(html).toContain('data-region="TD-R1"');
     expect(html).toMatch(/Record|Recording/);
     expect(clockOf(754)).toBe("12:34");
+    expect(clockOf(754.9)).toBe("12:34");
   });
   it("says why a refused Record was refused", async () => {
     await open();
@@ -96,6 +109,20 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
 });
 
 describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
+  it("hides collapsed metadata and gives week cards one weekday/count summary", async () => {
+    await open();
+    const event = { ...fake.world.today.today[0]!, platform: "Microsoft Teams", sensitive: true, open_count: 2 };
+    const card = { variant: "this-week" as const, event, live: null };
+    const html = renderToString(<UpcomingCallCard bridge={bridge} card={card} expanded={false} onToggle={() => {}} />);
+    expect(html).not.toContain("td-card__meta");
+    expect(html).not.toContain("td-card__last");
+    expect(html).not.toContain("2 open items");
+    expect(html).toContain(new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(event.starts_at));
+    const expanded = renderToString(<UpcomingCallCard bridge={bridge} card={card} expanded onToggle={() => {}} />);
+    expect(expanded).toContain("Microsoft Teams");
+    expect(expanded).toContain('data-component="cpt-noter-component-ui-person-chip"');
+    expect(expanded).toContain("Local only");
+  });
   it("loads Call Type choices when More opens before any Call page has been visited", async () => {
     await open();
     const out = seen();
@@ -133,6 +160,13 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
     expect(html).toContain("This week");
     expect(html.indexOf('data-variant="unmatched"')).toBeLessThan(html.indexOf('data-variant="today"'));
     expect(html).toContain("Open Call Screen");
+  });
+  it("shows the unmatched recording app and elapsed time", async () => {
+    await open();
+    const live = { ...fake.world.calls[0]!, platform: "Microsoft Teams" };
+    const html = renderToString(<UpcomingCallCard bridge={bridge} card={{ variant: "unmatched", event: null, live }} expanded onToggle={() => {}} />);
+    expect(html).toContain("Microsoft Teams");
+    expect(html).toContain("td-card__elapsed");
   });
   it("opens the previous call's Summary", async () => {
     await open();

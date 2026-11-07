@@ -1,15 +1,23 @@
-.td { display: flex; flex-direction: column; gap: var(--np-space-4, 16px); padding: 16px 24px; }
-.td-h { margin: 0; font: var(--np-font-headline, 600 15px/20px system-ui); }
-.td-review, .td-empty { color: var(--np-text-secondary, inherit); margin: 0; }
-.td-skel { height: 96px; border-radius: 8px; background: var(--np-fill-quaternary); }
-.td-live { background: none; border: 0; padding: 0 8px; cursor: default; font: inherit; color: inherit; }
-.td-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border: 1px solid var(--np-separator); border-radius: 8px; background: var(--np-bg-elevated, transparent); }
+.td { display: flex; flex-direction: column; gap: var(--space-6); padding: 16px 24px; max-width: 1180px; }
+.td-h { margin: 0; font: 600 15px/20px var(--font); }
+.td-empty { color: var(--label-2); margin: 0; }
+.td-review { padding: 10px 14px; border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--info-tint); }
+.td-calendar, .td-proposals { display: grid; gap: 10px; }
+.td-skel { height: 96px; border-radius: 8px; background: var(--sel-unemph); }
+.td-live, .td-recbtn { border-radius: var(--r-capsule); }
+.td-recbtn > .np-ic { color: var(--rec); }
+.td-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); min-width: 0; }
+.td-card[data-state="collapsed"] { padding-block: 6px; }
+.td-card[data-state="live"] { border-color: var(--rec); box-shadow: inset 3px 0 0 var(--rec); }
 .td-card__head { display: flex; align-items: center; gap: 8px; }
-.td-card__time { color: var(--np-text-secondary, inherit); min-width: 64px; font-variant-numeric: tabular-nums; }
-.td-card__title { flex: 1; margin: 0; font: var(--np-font-headline, 600 15px/20px system-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.td-card__meta { display: flex; flex-wrap: wrap; gap: 6px; color: var(--np-text-secondary, inherit); }
-.td-card__local { font-weight: 600; }
-.td-card__last { margin: 0; color: var(--np-text-secondary, inherit); }
-.td-card__link { background: none; border: 0; padding: 0; font: inherit; color: var(--np-accent, inherit); cursor: pointer; }
+.td-card__time { display: inline-flex; align-items: center; gap: 6px; color: var(--label-2); min-width: 64px; font-variant-numeric: tabular-nums; }
+.td-card__title { flex: 1; margin: 0; font: 600 15px/20px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-card__recording { display: flex; align-items: center; gap: 4px; }
+.td-card__elapsed { font-variant-numeric: tabular-nums; }
+.td-card__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--label-2); padding-left: 72px; font-size: 12px; }
+.td-card__local { display: inline-flex; align-items: center; gap: 3px; font: 600 11px/16px var(--font); color: var(--label-2); border: 1px solid var(--ctrl-border-soft); border-radius: var(--r-tag); padding: 0 5px; }
+.td-card__last { margin: 0; color: var(--label-2); padding-left: 72px; font-size: 12px; }
+.td-card__link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-text); cursor: pointer; }
 .td-week { display: flex; flex-direction: column; gap: 8px; }
-.td-refused { color: var(--np-text-secondary, inherit); padding: 0 8px; }
+.td-refused { color: var(--label-2); padding: 0 8px; }
+@media (max-width: 900px) { .td-card__att .np-person__ini { display: none; } }

@@ -1,20 +1,17 @@
 // TD-R1: Today's toolbar. The shell's toolbar with the long date, **Record**, and while a call is captured the
 // recording indicator, which opens the call window.
-import { useEffect, useMemo, useState } from "react";
-
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RecordingIndicator } from "../call-window/strip";
-import { elapsedSeconds, isLive } from "../shell/live-row";
+import { isLive } from "../shell/live-row";
 import type { PageToolbarProps } from "../shell/pages";
-import { tickWhile } from "../shell/shell-effects";
 import { MainToolbar } from "../shell/toolbar";
 import { record, showCall } from "./actions";
 import { useToday } from "./cache";
+import { useRecordingClock } from "./clock";
 import { recordBlock } from "./model";
 
-export const clockOf = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 const longDate = (d: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date(`${d}T12:00:00`));
 
 // @cpt-component:cpt-noter-component-screen-today:p1
@@ -24,22 +21,20 @@ export function TodayToolbar({ bridge, base }: PageToolbarProps) {
   const setup = useWindow(bridge, (s) => s.whole.setup);
   const env = useWindow(bridge, (s) => s.whole.environment);
   const recording = useWindow(bridge, (s) => s.commands["today:record"]);
-  const receivedAt = useMemo(() => Date.now(), [capture?.version]);
-  const [now, setNow] = useState(() => Date.now());
-  const ticking = capture?.phase === "recording";
-  useEffect(() => tickWhile(ticking, setNow), [ticking]);
+  const clock = useRecordingClock(capture);
   const block = recordBlock(setup, env);
   const live = capture && isLive(capture);
   // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-live
   const indicator =
     live && capture ? (
-      <button type="button" className="td-live" title={t("today.recording_help")} aria-label={t("today.recording_help")} onClick={() => void showCall(bridge)}>
-        <RecordingIndicator variant="dot-text" status={capture.phase === "paused" ? "paused" : "recording"} clock={clockOf(elapsedSeconds(capture, receivedAt, Math.max(now, receivedAt)))} />
+      <button type="button" className="np-btn np-btn--secondary np-btn--regular td-live" title={t("today.recording_help")} aria-label={t("today.recording_help")} onClick={() => void showCall(bridge)}>
+        <RecordingIndicator variant="dot-text" status={capture.phase === "paused" ? "paused" : "recording"} clock={clock} />
       </button>
     ) : (
       <PushButton
         label={t("today.record")}
-        variant="primary"
+        icon="record"
+        cls="td-recbtn"
         help={block ? t(block === "model_missing" ? "today.record_model_missing" : "today.record_disk_full") : t("today.record_help")}
         disabled={block !== null}
         loading={recording?.state === "WAITING"}

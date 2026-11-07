@@ -8,6 +8,7 @@ import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { PushButton } from "../../ui/primitives/push-button";
 import { afterTimer } from "../call-page/logic";
 import { allowCalendar, loadToday, READ_KEY } from "./actions";
 import { useToday } from "./cache";
@@ -52,14 +53,15 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
     <div className="td" data-component="cpt-noter-component-screen-today">
       {review && (
         <section data-region="TD-R8" className="td-review">
-          {t("today.review", { count: review.count })}
+          <strong>{t("today.to_review")}</strong> {t("today.review", { count: review.count })}
         </section>
       )}
       <section data-region="TD-R3" className="td-calendar" aria-label={t("today.title")}>
+        {(state === "NOT_ASKED" || state === "NO_CALLS") && <h2 className="td-h">{t("today.title")}</h2>}
         {state === "LOADING" && skeleton && <div className="td-skel" role="status" aria-label={t("today.loading")} />}
         {state === "NOT_ASKED" && <EmptyState variant="first-use" icon="calendar" title={t("today.not_asked_title")} body={t("today.not_asked_body")} actionLabel={t("today.allow_calendar")} onAction={() => void allowCalendar(bridge)} />}
         {state === "ERROR" && <InlineBanner banner={{ id: "today-error", severity: "error", text: t("today.read_failed"), actions: [{ label: t("action.try_again"), onAction: tryAgain }] }} />}
-        {state === "NO_CALLS" && <h2 className="td-h">{t("today.no_calls")}</h2>}
+        {state === "NO_CALLS" && <p className="td-empty">{t("today.no_calls")}</p>}
         {state === "READY" && view && <h2 className="td-h">{t("today.calls", { count: day.length })}</h2>}
         {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-cards */}
         {/* the live call card comes from live_call, so it shows whatever the calendar says */}
@@ -88,6 +90,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
               ))}
             </ul>
           )}
+          <PushButton label={t("today.show_all_activity")} variant="quiet" disabled />
         </section>
       )}
     </div>

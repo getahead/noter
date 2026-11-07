@@ -47,10 +47,15 @@ test.describe("cpt-noter-dod-ui-today-dashboard today", () => {
   test("the day's calls, the next expanded and Local only on the later one", async ({ page }) => {
     await open(page, day());
     await expect(page.getByText("Today · 2 calls")).toBeVisible();
+    await expect(page.locator(".td-card").first()).toHaveCSS("border-top-style", "solid");
     await shot(page, "today-calls");
   });
   test("a live call no event matches is the first card", async ({ page }) => {
-    await open(page, day((w) => Object.assign(w.today, { live_call: w.calls.find((c) => c.id === W.LIVE_CALL)! })));
+    await open(page, day((w) => {
+      const live = w.calls.find((c) => c.id === W.LIVE_CALL)!;
+      Object.assign(w.today, { live_call: live });
+      Object.assign(w.app.capture, { phase: "recording", call_id: live.id, title: live.title, started_at: w.now - 754_000, recorded_ms: 754_000 });
+    }));
     await expect(page.locator('[data-variant="unmatched"]')).toBeVisible();
     await shot(page, "today-live");
   });

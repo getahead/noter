@@ -4,6 +4,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
+import type { BannerSlotProps } from "../../ui/feedback/inline-banner";
 import type { CollapseInput } from "./collapse";
 import type { Route, SectionKey } from "./history";
 import { sectionOf } from "./sections";
@@ -21,12 +22,20 @@ export interface PageDef {
   inspector?: { width: 280 | 320 | 400; label: MsgKey; render: (route: Route, bridge: Bridge) => ReactNode; /** Docked open on arrival at Wide width (Call info). */ openByDefault?: boolean };
   /** The page's own toolbar (PC-R1): it draws the shell's `MainToolbar` with the page's pieces in it. */
   toolbar?: ComponentType<PageToolbarProps>;
-  /** The page's own banners (PC-R2), shown after the app's banners; `appBanners` is how many of those there are. */
-  banners?: ComponentType<{ route: Route; bridge: Bridge; appBanners: number }>;
+  /** Page banners normally follow the app slot; an opted-in component combines both in one slot. */
+  banners?: ComponentType<PageBannerProps> & { includesAppBanners?: boolean };
   /** The page's own toolbar actions; at Narrow all but the primary one overflow into » from the trailing side. */
   actions?: Array<{ label: string; onAction: () => void; primary?: boolean }>;
   /** The page has no search field (the prototype's `search: false`). */
   search?: false;
+}
+
+export interface PageBannerProps {
+  route: Route;
+  bridge: Bridge;
+  appBanners: number;
+  appBannerList?: BannerSlotProps["banners"];
+  onDismiss?: BannerSlotProps["onDismiss"];
 }
 
 /** What the shell hands a page's own toolbar: the shell's toolbar props, and the inspector's state. */
