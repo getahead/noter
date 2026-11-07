@@ -16,7 +16,7 @@ import { SplitDivider } from "../../ui/primitives/split-divider";
 import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
 import { frameState } from "./frame";
 import { InspectorSlot } from "./inspector";
-import { closeInspector, useInspectorOverride } from "./inspector-override";
+import { closeInspector, inspectorOverride, useInspectorOverride } from "./inspector-override";
 import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
 import { elapsedSeconds, isLive, shortTitle } from "./live-row";
 import { modeIndicator } from "./mode-indicator";
@@ -137,7 +137,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     [overlay, navigate],
   );
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-user-nav
-  const shortcuts = useMemo(() => ({ ...shellShortcuts(act), Escape: () => dispatch(escapeEvent(shellRef.current.history)) }), [act]);
+  const shortcuts = useMemo(() => ({ ...shellShortcuts(act), Escape: () => inspectorOverride() ? closeInspector() : dispatch(escapeEvent(shellRef.current.history)) }), [act]);
   useWindowShortcuts(shortcuts);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-user-nav
 

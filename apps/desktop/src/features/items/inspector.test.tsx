@@ -58,6 +58,17 @@ describe("ItemInspector (cpt-noter-component-ui-item-inspector)", () => {
     await ready();
     expect(renderToString(<ItemInspector bridge={bridge} itemId="itm_none" />)).toBe("");
   });
+
+  it("Escape closes only the item inspector and consumes the key", async () => {
+    await ready();
+    store(item("itm_a11y"));
+    slots.inspect!(bridge, "itm_a11y");
+    let consumed = 0;
+    const tree = rendered(ItemInspector, { bridge, itemId: "itm_a11y" });
+    (tree.props.onKeyDown as (e: unknown) => void)({ key: "Escape", defaultPrevented: false, preventDefault: () => consumed++, stopPropagation: () => consumed++ });
+    expect(inspectorOverride()).toBeNull();
+    expect(consumed).toBe(2);
+  });
 });
 
 describe("inspector seam (features/shell/inspector-override.ts)", () => {

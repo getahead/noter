@@ -149,7 +149,12 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-history
 
   return (
-    <div data-component="cpt-noter-component-ui-item-inspector" data-kind={it.kind} className="ii" onKeyDown={(e) => e.key === "Escape" && !e.defaultPrevented && closeInspector()}>
+    <div data-component="cpt-noter-component-ui-item-inspector" data-kind={it.kind} className="ii" onKeyDown={(e) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeInspector();
+    }}>
       <div className="ii-head">
         <Badge kind="kind" text={t(KIND[it.kind])} />
         <SegmentedControl items={[{ value: "details", label: t("items.details") }, { value: "history", label: t("items.history") }]} value={tab} label={t("items.inspector")} onAction={(v) => setTab(v as Tab)} />

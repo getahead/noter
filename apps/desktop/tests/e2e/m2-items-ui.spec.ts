@@ -192,6 +192,20 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
 });
 
 test.describe("cpt-noter-seq-call-page-check-evidence", () => {
+  for (const colorScheme of ["light", "dark"] as const) test(`UI — Escape closes the inspector after invalid Save (${colorScheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await openCall(page, suggest());
+    await button(rowOf(page, SPEC), "Show in Item inspector").click();
+    const inspector = page.locator(INSPECTOR);
+    await inspector.getByRole("textbox", { name: "Item text" }).fill("");
+    await button(inspector, "Save").click();
+    await expect(inspector.getByRole("alert")).toBeVisible();
+    expect(await sent(page, "item_edit")).toHaveLength(0);
+    await page.keyboard.press("Escape");
+    await expect(inspector).toHaveCount(0);
+    await expect(rowOf(page, SPEC)).toBeFocused();
+  });
+
   for (const submit of ["button", "keyboard"] as const) test(`UI — inspector locks its draft while Save is pending and unlocks after success (${submit})`, async ({ page }) => {
     await openCall(page, suggest());
     await button(rowOf(page, SPEC), "Show in Item inspector").click();
