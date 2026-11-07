@@ -22,11 +22,20 @@ final class HandoffTests: NoterTestCase {
         openCall("Backend sync")
         app.typeKey(.return, modifierFlags: []) // Return opens the selected call's page
         let handoff = app.buttons["Handoff"].firstMatch
-        XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button", file: file, line: line)
+        XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button — \(screen())", file: file, line: line)
         handoff.click()
     }
 
-    private var addMapping: XCUIElement { app.buttons["Add Mapping…"].firstMatch }
+    /// What the window shows, for a failure message: the CI log is the only screen a native failure leaves.
+    private func screen() -> String {
+        let buttons = app.buttons.allElementsBoundByIndex.prefix(40).map(\.label)
+        let texts = app.staticTexts.allElementsBoundByIndex.prefix(40).map(\.label)
+        return "buttons \(buttons) texts \(texts)"
+    }
+
+    private var addMapping: XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Add Mapping'")).firstMatch
+    }
     private var choose: XCUIElement { app.buttons["Choose…"].firstMatch }
     private var open: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
 
@@ -34,7 +43,7 @@ final class HandoffTests: NoterTestCase {
         answers([makeRepo()])
         launch("handoff")
         openDrawer()
-        XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "an unmapped project shows Add Mapping…")
+        XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "an unmapped project shows Add Mapping… — \(screen())")
         XCTAssertFalse(open.isEnabled, "Open waits for a repository")
         addMapping.click()
         XCTAssertTrue(choose.waitForExistence(timeout: 5), "Add Mapping… opens the sheet")
@@ -48,9 +57,9 @@ final class HandoffTests: NoterTestCase {
         answers([nil, makeRepo()])
         launch("handoff")
         openDrawer()
-        XCTAssertTrue(addMapping.waitForExistence(timeout: 10))
+        XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "Add Mapping… — \(screen())")
         addMapping.click()
-        XCTAssertTrue(choose.waitForExistence(timeout: 5))
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "Choose… — \(screen())")
         choose.click()
         XCTAssertFalse(choose.waitForNonExistence(timeout: 3), "a cancelled panel keeps the sheet and its draft")
         choose.click()
@@ -61,9 +70,9 @@ final class HandoffTests: NoterTestCase {
         answers([makeRepo()])
         launch("handoff")
         openDrawer()
-        XCTAssertTrue(addMapping.waitForExistence(timeout: 10))
+        XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "Add Mapping… — \(screen())")
         addMapping.click()
-        XCTAssertTrue(choose.waitForExistence(timeout: 5))
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "Choose… — \(screen())")
         choose.click()
         XCTAssertTrue(choose.waitForNonExistence(timeout: 10))
         let copy = app.buttons["Copy Prompt"].firstMatch
