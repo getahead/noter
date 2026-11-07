@@ -545,15 +545,16 @@ impl Harness {
         self.core.store().insert_batch(rows)
     }
 
-    /// Removes every call (and with it its segments, speakers, marks, gaps and tags), leaving no
-    /// change row behind: a seed is not something the user did, and the store logs every write
-    /// it is given (the log is append-only), so the harness deletes on a connection of its own.
+    /// Removes every call (and with it its segments, speakers, marks, gaps and tags) and every
+    /// topic its items named, leaving no change row behind: a seed is not something the user
+    /// did, and the store logs every write it is given (the log is append-only), so the harness
+    /// deletes on a connection of its own.
     fn clear_calls(&self) -> Result<(), CoreError> {
         let db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
             .map_err(crate::internal)?;
         db.busy_timeout(std::time::Duration::from_secs(10))
             .map_err(crate::internal)?;
-        db.execute_batch("PRAGMA foreign_keys = ON; DELETE FROM calls;")
+        db.execute_batch("PRAGMA foreign_keys = ON; DELETE FROM calls; DELETE FROM topics;")
             .map_err(crate::internal)
     }
 
@@ -711,6 +712,25 @@ impl Harness {
                         ("lang_p", seg["lang_p"].clone()),
                         ("pass", seg["pass"].clone()),
                     ],
+                ));
+            }
+        }
+        // The topics the items name, with their aliases; a centroid comes from item vectors.
+        for topic in wanted["topics"].as_array().unwrap_or(&empty) {
+            rows.push(ins(
+                "topics",
+                vec![
+                    ("id", topic["id"].clone()),
+                    ("rev", topic["rev"].clone()),
+                    ("name", topic["name"].clone()),
+                    ("first_seen", topic["last_seen"].clone()),
+                    ("last_seen", topic["last_seen"].clone()),
+                ],
+            ));
+            for alias in topic["aliases"].as_array().unwrap_or(&empty) {
+                rows.push(ins(
+                    "topic_aliases",
+                    vec![("topic_id", topic["id"].clone()), ("alias", alias.clone())],
                 ));
             }
         }

@@ -19,9 +19,9 @@ use crate::settings::invalid;
 use crate::transcript::segments_of;
 use crate::{internal, object, Core};
 
-/// Change rows with these reasons (a people merge too) are one action: the `change_id` the commands return undoes
-/// every row of their batch.
-const ACTION_REASONS: [&str; 3] = ["speaker_name", "term_fix", "people_merge"];
+/// Change rows with these reasons (people and topic merges too) are one action: the `change_id`
+/// the commands return undoes every row of their batch.
+const ACTION_REASONS: [&str; 4] = ["speaker_name", "term_fix", "people_merge", "topics_merge"];
 
 /// One speaker to name, with the lines it covers.
 struct Assignment {

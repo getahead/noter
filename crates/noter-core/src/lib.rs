@@ -910,6 +910,42 @@ impl CoreApi for Core {
         self.search_library(args).await
     }
 
+    async fn topics_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TopicList, CoreError> {
+        self.list_topics()
+    }
+
+    async fn topic_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: TopicIdArgs,
+    ) -> Result<TopicThread, CoreError> {
+        self.get_topic(args)
+    }
+
+    async fn topic_rename(
+        &self,
+        ctx: &CommandCtx,
+        args: TopicRenameArgs,
+    ) -> Result<TopicMutation, CoreError> {
+        self.rename_topic(ctx, args)
+    }
+
+    async fn topics_merge(
+        &self,
+        ctx: &CommandCtx,
+        args: TopicMergeArgs,
+    ) -> Result<TopicMutation, CoreError> {
+        self.merge_topics(ctx, args)
+    }
+
+    async fn topics_keep_separate(
+        &self,
+        ctx: &CommandCtx,
+        args: TopicPairArgs,
+    ) -> Result<Ack, CoreError> {
+        self.keep_topics_separate(ctx, args)
+    }
+
     async fn ask_scope_presets(
         &self,
         _ctx: &CommandCtx,

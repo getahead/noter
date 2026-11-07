@@ -282,6 +282,25 @@ async fn the_handle_comes_first_then_started_deltas_citations_and_done() {
     assert_eq!(w.thread(&handle.thread_id).await.unwrap().turns.len(), 2);
 }
 
+// The refinements: the router registers the run with the tool host for noter-mcp's read tools.
+#[tokio::test(start_paused = true)]
+async fn the_answer_run_may_use_the_read_tools() {
+    let w = world("").await;
+    let (_handle, got) = w.ask(None, "What did we decide about websockets?").await;
+    w.settle().await;
+    assert!(matches!(terminal(&got), AskEvent::Done { .. }));
+    let received = w.llm.received();
+    assert_eq!(
+        received[0].tools,
+        [
+            "get_transcript_span",
+            "get_person",
+            "get_decisions",
+            "get_open_items"
+        ]
+    );
+}
+
 #[tokio::test(start_paused = true)]
 async fn start_rejects_before_any_stream() {
     let w = world("").await;
@@ -519,6 +538,126 @@ async fn a_sensitive_call_is_cited_only_by_a_local_answer() {
         answer.citations[0].quote,
         "The WebSockets budget is confidential."
     );
+}
+
+/// A normal and a sensitive knowledge source, one indexed chunk each, as a sync writes them.
+fn documents(w: &World) {
+    let mut rows = vec![];
+    for (source, privacy, chunk, text) in [
+        (
+            "src_ops",
+            "normal",
+            "dch_ops",
+            "WebSockets ship behind a flag.",
+        ),
+        (
+            "src_hr",
+            "sensitive",
+            "dch_hr",
+            "WebSockets budget sits in the HR plan.",
+        ),
+    ] {
+        rows.push(ins(
+            "sources",
+            vec![
+                ("id", json!(source)),
+                ("rev", json!(1)),
+                ("kind", json!("folder")),
+                ("mode", json!("indexed")),
+                ("name", json!(source)),
+                ("location", json!("/notes")),
+                ("privacy_class", json!(privacy)),
+                ("scope", json!(r#"{"type":"all_calls"}"#)),
+                ("status", json!(r#"{"type":"ready"}"#)),
+            ],
+        ));
+        let doc = format!("doc_{source}");
+        rows.push(ins(
+            "documents",
+            vec![
+                ("id", json!(doc)),
+                ("source_id", json!(source)),
+                ("uri", json!(format!("{source}.md"))),
+                ("title", json!("Rollout")),
+                ("mime", json!("text/markdown")),
+                ("content_hash", json!(source)),
+                ("indexed_at", json!(NOW)),
+            ],
+        ));
+        let body = format!("Rollout\n\n{text}");
+        rows.push(ins(
+            "doc_chunks",
+            vec![
+                ("id", json!(chunk)),
+                ("document_id", json!(doc)),
+                ("heading_path", json!("[]")),
+                ("text", json!(body)),
+                ("text_norm", json!(body.to_lowercase())),
+                ("token_count", json!(12)),
+            ],
+        ));
+    }
+    w.core.store().insert_batch(rows).unwrap();
+}
+
+const DOC_OPS: &str = r#"{"on": "ask-answer", "output": {"answer_md": "Behind a flag [1].", "citations": [{"n": 1, "segment_ids": [], "chunk_ids": ["dch_ops"], "quote": "q"}], "found": true}}"#;
+const DOC_HR: &str = r#"{"on": "ask-answer", "output": {"answer_md": "In the HR plan [1].", "citations": [{"n": 1, "segment_ids": [], "chunk_ids": ["dch_hr"], "quote": "q"}], "found": true}}"#;
+
+impl World {
+    async fn ask_documents(&self, question: &str, include_documents: bool) -> AskAnswer {
+        let (sink, got) = sink();
+        let args = AskStartArgs {
+            thread_id: None,
+            question: question.into(),
+            scope: AskScope {
+                include_documents,
+                ..AskScope::default()
+            },
+        };
+        self.core
+            .ask_start(&main_window(), args, sink)
+            .await
+            .unwrap();
+        self.settle().await;
+        let AskEvent::Done { answer } = terminal(&got) else {
+            panic!("not done: {:?}", kinds(&got))
+        };
+        answer
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn documents_are_evidence_when_the_scope_includes_them_and_sensitive_ones_only_locally() {
+    // A calls-only scope never sends a document.
+    let w = world("").await;
+    documents(&w);
+    w.ask_documents("websockets flag", false).await;
+    assert!(w.packets().iter().all(|p| !p.contains("behind a flag")));
+
+    // Cloud: the normal source is cited; the sensitive one is skipped and counted.
+    let w = world(DOC_OPS).await;
+    documents(&w);
+    let answer = w.ask_documents("websockets", true).await;
+    assert!(answer.found, "{answer:?}");
+    assert!(matches!(
+        answer.citations[0].provenance,
+        Provenance::Document { .. }
+    ));
+    assert!(w.packets()[0].contains("behind a flag"));
+    assert!(w.packets().iter().all(|p| !p.contains("HR plan")));
+    // The sensitive call's line and the sensitive source's chunk.
+    assert_eq!(answer.sensitive_sources_skipped, 2);
+    let w = world(&[DOC_HR, DOC_HR, DOC_HR].join("\n")).await;
+    documents(&w);
+    assert!(!w.ask_documents("websockets budget", true).await.found);
+
+    // Local: the sensitive source may be cited.
+    let w = world(DOC_HR).await;
+    documents(&w);
+    w.set_search_runtime(RuntimeChoice::Local).await;
+    let answer = w.ask_documents("websockets budget", true).await;
+    assert!(answer.found, "{answer:?}");
+    assert_eq!(answer.sensitive_sources_skipped, 0);
 }
 
 #[tokio::test(start_paused = true)]

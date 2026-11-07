@@ -26,6 +26,13 @@ pub(crate) const DEADLINE: Duration = Duration::from_secs(60);
 const SKILL_VERSION: &str = "1.0.0";
 /// Earlier turns a follow-up carries as context.
 const PRIOR_TURNS: usize = 5;
+/// The noter-mcp tools an answer run may refine its evidence with: reads only (TL-36).
+const ASK_TOOLS: [&str; 4] = [
+    "get_transcript_span",
+    "get_person",
+    "get_decisions",
+    "get_open_items",
+];
 
 impl StreamMsg for AskMsg {
     fn set_seq(&mut self, seq: Seq) {
@@ -126,6 +133,7 @@ impl Core {
     }
 
     // @cpt-flow:cpt-noter-flow-core-retrieval-ask-answer:p1
+    // @cpt-dod:cpt-noter-dod-core-retrieval-ask-answers:p1
     /// `ask_start`: checked, recorded and subscribed, then answered by a worker; the handle
     /// returns before any Channel message.
     pub(crate) fn start_ask(
@@ -237,7 +245,7 @@ impl Core {
         let request = request.with_vector(vector);
         let found = self
             .store()
-            .read(|c| noter_retrieval::retrieve(c, &request, &noter_retrieval::NoDocuments))?;
+            .read(|c| noter_retrieval::retrieve(c, &request, &crate::retrieval::Documents))?;
         let hits: Vec<Hit> = (found.ranked(noter_retrieval::ASK_HITS).into_iter())
             .cloned()
             .collect();
@@ -247,6 +255,7 @@ impl Core {
             return Err(Ended::Cancelled);
         }
         self.enter(&job.turn, TurnState::Answering)?;
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-run
         let effective = self.app().privacy.effective;
         let started = AskEvent::Started {
             runtime: route.runtime,
@@ -264,6 +273,8 @@ impl Core {
             req.cancel = cancel;
             req.settings.configured = Some(route.runtime);
             req.settings.pseudonyms = route.pseudonyms;
+            // The router registers the run with the tool host: noter-mcp serves it these reads.
+            req.settings.tools = ASK_TOOLS.map(String::from).to_vec();
             match self.llm().run_once(req).await {
                 Ok(done) => {
                     let out: AskAnswerOutput = serde_json::from_value(done.output)
@@ -278,6 +289,7 @@ impl Core {
                 Err(other) => return Err(Ended::Failed(failure(other))),
             }
         };
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-run
         // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-validate-answer
         let runtime = run.as_ref().map_or(route.runtime, |p| p.runtime);
         let cite_privacy = if runtime == RuntimeChoice::Local {
@@ -405,7 +417,6 @@ impl Core {
                 text: format!("{}: {}", hit.title, hit.text),
             });
         }
-        // Refinements through noter-mcp come with core-mcp (TL-36): the packet is all it gets.
         let prior = self
             .store()
             .read(|c| noter_retrieval::prior_turns(c, &job.thread, &job.turn))?;

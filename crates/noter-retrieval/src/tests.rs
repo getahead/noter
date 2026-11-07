@@ -1390,3 +1390,483 @@ fn ask_start_checks_the_question_thread_and_scope() {
     assert!(!only_weak([MatchStrength::Weak, MatchStrength::Strong]));
     assert!(!only_weak([]));
 }
+
+// ── Topics (slice 3): threads, edits, merge and undo, Keep Separate, attachment ───────
+
+/// An independent direction in [-0.5, 0.5] per seed (xorshift), so cosines between seeds are
+/// near 0 and `v + k·noise` has a cosine to `v` of about `1 / sqrt(1 + k²)`.
+fn noise(seed: u32) -> Vec<f32> {
+    let mut x = seed.wrapping_mul(2_654_435_761) | 1;
+    (0..DIMS)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            (x % 10_000) as f32 / 10_000.0 - 0.5
+        })
+        .collect()
+}
+
+fn plus(v: &[f32], seed: u32, k: f32) -> Vec<f32> {
+    v.iter().zip(noise(seed)).map(|(a, b)| a + k * b).collect()
+}
+
+fn cos(a: &[f32], b: &[f32]) -> f32 {
+    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+    let n = |v: &[f32]| v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    dot / (n(a) * n(b))
+}
+
+fn writer(summary: &str) -> ChangeMeta {
+    ChangeMeta {
+        undoable: true,
+        ..you(summary)
+    }
+}
+
+impl Library {
+    fn topic(&self, id: &str, name: &str, centroid: Option<&[f32]>, first: i64, last: i64) {
+        self.db
+            .execute(
+                "INSERT INTO topics (id, rev, name, centroid, first_seen, last_seen)
+                 VALUES (?1, 1, ?2, ?3, ?4, ?5)",
+                params![id, name, centroid.map(blob), first, last],
+            )
+            .unwrap();
+    }
+
+    fn link(&self, topic: &str, items: &[&str], vectors: &[&[f32]]) {
+        for (item, v) in items.iter().zip(vectors) {
+            self.db
+                .execute(
+                    "UPDATE items SET topic_id = ?1 WHERE id = ?2",
+                    params![topic, item],
+                )
+                .unwrap();
+            self.db
+                .execute(
+                    "INSERT INTO item_vec (item_id, embedding, call_id, started_at)
+                     SELECT i.id, ?2, i.call_id, c.started_at FROM items i
+                     JOIN calls c ON c.id = i.call_id WHERE i.id = ?1",
+                    params![item, blob(v)],
+                )
+                .unwrap();
+        }
+    }
+
+    fn text(&self, sql: &str) -> String {
+        self.db.query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+
+    fn centroid(&self, topic: &str) -> Option<Vec<f32>> {
+        let b: Option<Vec<u8>> = self
+            .db
+            .query_row("SELECT centroid FROM topics WHERE id = ?1", [topic], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        b.map(|b| {
+            b.chunks_exact(4)
+                .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+                .collect()
+        })
+    }
+
+    fn aliases(&self, topic: &str) -> Vec<String> {
+        self.db
+            .prepare("SELECT alias FROM topic_aliases WHERE topic_id = ?1 ORDER BY alias")
+            .unwrap()
+            .query_map([topic], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+}
+
+#[test]
+fn topics_read_counts_aliases_threads_and_merge_suggestions() {
+    let lib = library();
+    let ws = noise(1);
+    let twin = plus(&ws, 2, 0.2);
+    assert!(cos(&ws, &twin) > SUGGEST_SIMILARITY);
+    assert!(cos(&ws, &noise(3)) < 0.5);
+    lib.topic(
+        "top_ws",
+        "Drawer notifications",
+        Some(&ws),
+        OCT_1,
+        OCT_1 + 9 * DAY,
+    );
+    lib.topic(
+        "top_notif",
+        "Notification service",
+        Some(&twin),
+        0,
+        OCT_1 + 30 * DAY,
+    );
+    lib.topic(
+        "top_road",
+        "Street decision",
+        Some(&noise(3)),
+        0,
+        OCT_1 + DAY,
+    );
+    lib.topic("top_empty", "Nothing left", None, 0, 0);
+    lib.db
+        .execute_batch(
+            "INSERT INTO topic_aliases (topic_id, alias) VALUES ('top_ws', 'Вебсокеты');
+             UPDATE items SET topic_id = 'top_ws' WHERE id IN ('itm_ws', 'itm_plan', 'itm_no');
+             UPDATE items SET topic_id = 'top_road' WHERE id = 'itm_done';",
+        )
+        .unwrap();
+    let list = topic_list(&lib.db).unwrap();
+    let ids: Vec<&str> = list.iter().map(|t| t.id.as_str()).collect();
+    assert_eq!(ids, ["top_notif", "top_ws", "top_road", "top_empty"]);
+    let ws_row = &list[1];
+    // The rejected item counts nowhere.
+    assert_eq!(
+        (ws_row.calls, ws_row.decisions, ws_row.open_items),
+        (2, 1, 2)
+    );
+    assert_eq!(ws_row.aliases, ["Вебсокеты"]);
+    let chip = |t: &TopicRow| {
+        t.merge_suggestion
+            .as_ref()
+            .map(|c| c.id.as_str().to_owned())
+    };
+    assert_eq!(chip(ws_row).as_deref(), Some("top_notif"));
+    assert_eq!(chip(&list[0]).as_deref(), Some("top_ws"));
+    assert_eq!(chip(&list[2]), None);
+    assert_eq!(
+        topic_row(&lib.db, "top_ws")
+            .unwrap()
+            .unwrap()
+            .merge_suggestion,
+        ws_row.merge_suggestion
+    );
+    assert!(topic_row(&lib.db, "top_none").unwrap().is_none());
+    // The thread: newest call first, items in their order; an empty topic has none.
+    assert_eq!(
+        thread_items(&lib.db, "top_ws").unwrap(),
+        ["itm_plan", "itm_ws"]
+    );
+    assert!(thread_items(&lib.db, "top_empty").unwrap().is_empty());
+
+    // Keep Separate: one canonical pair whichever way round, and no suggestion after it.
+    let keep = |a: &str, b: &str| {
+        let (a, b) = (a.to_owned(), b.to_owned());
+        let now = TimestampMs(OCT_1);
+        lib.store
+            .write_with(you("keep"), move |tx| keep_separate(tx, &a, &b, now))
+    };
+    keep("top_ws", "top_notif").unwrap();
+    keep("top_notif", "top_ws").unwrap();
+    assert_eq!(
+        lib.text("SELECT key FROM suppressions WHERE kind = 'topic_merge'"),
+        "top_notif|top_ws"
+    );
+    assert_eq!(lib.count("SELECT count(*) FROM suppressions"), 1);
+    let list = topic_list(&lib.db).unwrap();
+    assert!(list.iter().all(|t| t.merge_suggestion.is_none()));
+    let changes = lib.count("SELECT count(*) FROM changes");
+    assert_eq!(
+        keep("top_ws", "top_ws").unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        keep("top_ws", "top_none").unwrap_err().code,
+        ErrorCode::NotFound
+    );
+    // An unknown topic is not_found even paired with itself, as the fake answers it.
+    assert_eq!(
+        keep("top_none", "top_none").unwrap_err().code,
+        ErrorCode::NotFound
+    );
+    assert_eq!(lib.count("SELECT count(*) FROM changes"), changes);
+}
+
+#[test]
+fn topic_rename_checks_the_name_and_the_revision() {
+    let lib = library();
+    lib.topic("top_ws", "Drawer notifications", None, 0, 5);
+    let id = TopicId::new("top_ws");
+    assert_eq!(
+        rename(&id, Rev(1), "   ").unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
+    let done = lib
+        .store
+        .write(
+            rename(&id, Rev(1), " Websockets ").unwrap(),
+            writer("rename"),
+        )
+        .unwrap();
+    assert_eq!(done.rev, Rev(2));
+    assert_eq!(lib.text("SELECT name FROM topics"), "Websockets");
+    let stale = lib
+        .store
+        .write(rename(&id, Rev(1), "Again").unwrap(), writer("rename"))
+        .unwrap_err();
+    assert_eq!(stale.code, ErrorCode::Conflict);
+    assert_eq!(
+        stale.detail,
+        Some(ErrorDetail::Conflict {
+            current_rev: Rev(2)
+        })
+    );
+    assert_eq!(lib.text("SELECT name FROM topics"), "Websockets");
+    assert_eq!(
+        lib.text("SELECT field FROM changes WHERE entity_type = 'topic'"),
+        "name"
+    );
+}
+
+#[test]
+fn topics_merge_is_one_undoable_batch_that_keeps_the_source_names() {
+    let lib = library();
+    let (a, b, c) = (noise(1), noise(2), noise(3));
+    lib.topic("top_ws", "Websockets", Some(&a), OCT_1, OCT_1 + 9 * DAY);
+    lib.topic(
+        "top_notif",
+        "Notification service",
+        Some(&c),
+        OCT_1 + 19 * DAY,
+        OCT_1 + 25 * DAY,
+    );
+    lib.link("top_ws", &["itm_ws", "itm_plan"], &[&a, &b]);
+    lib.link("top_notif", &["itm_done"], &[&c]);
+    lib.db
+        .execute_batch(
+            "INSERT INTO topic_aliases (topic_id, alias) VALUES ('top_ws', 'Вебсокеты');
+             INSERT INTO topic_aliases (topic_id, alias) VALUES ('top_ws', 'Notifications');
+             INSERT INTO topic_aliases (topic_id, alias) VALUES ('top_notif', 'notifications');
+             INSERT INTO topic_aliases (topic_id, alias) VALUES ('top_notif', 'Push');",
+        )
+        .unwrap();
+    let merge_of = |s: &str, t: &str| {
+        let (s, t) = (s.to_owned(), t.to_owned());
+        lib.store
+            .write_with(writer("merge"), move |tx| merge(tx, &s, &t))
+    };
+    let changes = lib.count("SELECT count(*) FROM changes");
+    assert_eq!(
+        merge_of("top_ws", "top_ws").unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(
+        merge_of("top_none", "top_ws").unwrap_err().code,
+        ErrorCode::NotFound
+    );
+    assert_eq!(
+        merge_of("top_ws", "top_none").unwrap_err().code,
+        ErrorCode::NotFound
+    );
+    assert_eq!(lib.count("SELECT count(*) FROM changes"), changes);
+
+    let done = merge_of("top_notif", "top_ws").unwrap();
+    assert_eq!(done.value, ["itm_done"]);
+    assert_eq!(
+        lib.count("SELECT count(*) FROM topics WHERE id = 'top_notif'"),
+        0
+    );
+    assert_eq!(
+        lib.count("SELECT count(*) FROM items WHERE topic_id = 'top_ws'"),
+        3
+    );
+    // The source's name and its aliases stay findable on the target, once each.
+    assert_eq!(
+        lib.aliases("top_ws"),
+        ["Notification service", "Notifications", "Push", "Вебсокеты"]
+    );
+    let row = topic_row(&lib.db, "top_ws").unwrap().unwrap();
+    assert_eq!(
+        (row.rev, row.last_seen),
+        (Rev(2), TimestampMs(OCT_1 + 25 * DAY))
+    );
+    assert_eq!(
+        lib.count("SELECT first_seen FROM topics WHERE id = 'top_ws'"),
+        OCT_1
+    );
+    let mean: Vec<f32> = (0..DIMS).map(|i| (a[i] + b[i] + c[i]) / 3.0).collect();
+    assert!(cos(&lib.centroid("top_ws").unwrap(), &mean) > 0.999);
+    // One batch: undo puts every link, alias and row back.
+    let batch = done.batch_id.expect("a merge is one batch");
+    let undone = lib
+        .store
+        .reverse(
+            noter_db::Direction::Undo,
+            noter_db::Handle::Batch(batch),
+            OCT_1,
+        )
+        .unwrap();
+    assert_eq!(undone.skipped, 0);
+    assert_eq!(
+        lib.text("SELECT name FROM topics WHERE id = 'top_notif'"),
+        "Notification service"
+    );
+    assert_eq!(lib.aliases("top_notif"), ["Push", "notifications"]);
+    assert_eq!(lib.aliases("top_ws"), ["Notifications", "Вебсокеты"]);
+    assert_eq!(
+        lib.text("SELECT topic_id FROM items WHERE id = 'itm_done'"),
+        "top_notif"
+    );
+    let row = topic_row(&lib.db, "top_ws").unwrap().unwrap();
+    assert_eq!(
+        (row.rev, row.last_seen),
+        (Rev(1), TimestampMs(OCT_1 + 9 * DAY))
+    );
+    // Centroids are derived from the items' vectors: refreshed after the undo.
+    refresh_centroids(&lib.db, &["top_notif".into(), "top_ws".into()]).unwrap();
+    assert!(cos(&lib.centroid("top_notif").unwrap(), &c) > 0.999);
+    let pair: Vec<f32> = (0..DIMS).map(|i| (a[i] + b[i]) / 2.0).collect();
+    assert!(cos(&lib.centroid("top_ws").unwrap(), &pair) > 0.999);
+}
+
+fn new_item(id: &str, text: &str, hint: Option<&str>, vector: Vec<f32>) -> NewItem {
+    NewItem {
+        id: id.into(),
+        text: text.into(),
+        hint: hint.map(String::from),
+        vector,
+    }
+}
+
+#[test]
+fn attachment_joins_the_nearest_topic_above_the_threshold_or_names_a_new_one() {
+    let lib = library();
+    let started = OCT_1 + 30 * DAY;
+    lib.call("call_e", "Weekly", "planning", "normal", started);
+    let ws = noise(1);
+    let twin = plus(&ws, 2, 0.3);
+    lib.topic("top_ws", "Websockets", Some(&ws), OCT_1, OCT_1 + 9 * DAY);
+    lib.topic(
+        "top_twin",
+        "Socket push",
+        Some(&twin),
+        OCT_1,
+        OCT_1 + 2 * DAY,
+    );
+    lib.link("top_ws", &["itm_ws"], &[&ws]);
+    lib.link("top_twin", &["itm_plan"], &[&twin]);
+    let texts = [
+        ("itm_e1", "Ship the drawer over websockets"),
+        ("itm_e2", "Budget review"),
+        ("itm_e3", "Move the release to Friday, after QA signs off"),
+        ("itm_e4", "Budget numbers by Monday"),
+        ("itm_e5", "Something loosely related"),
+    ];
+    for (id, text) in texts {
+        lib.item(
+            id,
+            "call_e",
+            "action_item",
+            text,
+            "en",
+            "open",
+            "suggested",
+            None,
+        );
+    }
+    let near = plus(&ws, 5, 0.6);
+    let far = plus(&ws, 6, 1.0);
+    assert!(cos(&near, &ws) >= ATTACH_SIMILARITY && cos(&near, &ws) > cos(&near, &twin));
+    assert!(cos(&far, &ws) < ATTACH_SIMILARITY && cos(&far, &twin) < ATTACH_SIMILARITY);
+    let budget = noise(7);
+    let items = vec![
+        new_item(
+            "itm_e1",
+            texts[0].1,
+            Some("Ignored: it joins a topic"),
+            near.clone(),
+        ),
+        new_item("itm_e2", texts[1].1, Some(" Budget "), budget.clone()),
+        new_item("itm_e3", texts[2].1, None, noise(9)),
+        // Joins the topic the item before it started in this same call.
+        new_item("itm_e4", texts[3].1, None, plus(&budget, 11, 0.1)),
+        new_item("itm_e5", texts[4].1, Some("  "), far),
+    ];
+    let done = lib
+        .store
+        .write_with(writer("topics"), move |tx| {
+            attach_topics(tx, "call_e", &items)
+        })
+        .unwrap();
+    let topic_of = |item: &str| {
+        lib.text(&format!(
+            "SELECT t.name FROM items i JOIN topics t ON t.id = i.topic_id WHERE i.id = '{item}'"
+        ))
+    };
+    assert_eq!(topic_of("itm_e1"), "Websockets");
+    assert_eq!(topic_of("itm_e2"), "Budget");
+    assert_eq!(topic_of("itm_e3"), "Move the release to Friday");
+    assert_eq!(topic_of("itm_e4"), "Budget");
+    assert_eq!(topic_of("itm_e5"), "Something loosely related");
+    assert_eq!(done.value.items.len(), 5);
+    assert_eq!(done.value.topics.len(), 4);
+    // Every new item has its vector now, without waiting for a rebuild.
+    assert_eq!(
+        lib.count("SELECT count(*) FROM item_vec WHERE item_id LIKE 'itm_e%'"),
+        5
+    );
+    // Seen dates follow the call; the joined topic's centroid moved towards the item.
+    let seen = |t: &str| {
+        lib.db
+            .query_row(
+                "SELECT first_seen, last_seen FROM topics WHERE name = ?1",
+                [t],
+                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
+            )
+            .unwrap()
+    };
+    assert_eq!(seen("Websockets"), (OCT_1, started));
+    assert_eq!(seen("Budget"), (started, started));
+    let joined: Vec<f32> = (0..DIMS).map(|i| (ws[i] + near[i]) / 2.0).collect();
+    assert!(cos(&lib.centroid("top_ws").unwrap(), &joined) > 0.999);
+    // Suggested, never merged: the twin pair is above 0.9, until it is kept separate.
+    assert!(cos(&joined, &twin) > SUGGEST_SIMILARITY);
+    assert_eq!(
+        done.value.suggestions,
+        [("top_twin".to_owned(), "top_ws".to_owned())]
+    );
+    assert_eq!(lib.count("SELECT count(*) FROM topics"), 5);
+    lib.store
+        .write_with(you("keep"), |tx| {
+            keep_separate(tx, "top_ws", "top_twin", TimestampMs(OCT_1))
+        })
+        .unwrap();
+    lib.call("call_f", "Weekly", "planning", "normal", started + DAY);
+    lib.item(
+        "itm_f1",
+        "call_f",
+        "decision",
+        "Ship it",
+        "en",
+        "open",
+        "suggested",
+        None,
+    );
+    let again = vec![new_item("itm_f1", "Ship it", None, near)];
+    let done = lib
+        .store
+        .write_with(writer("topics"), move |tx| {
+            attach_topics(tx, "call_f", &again)
+        })
+        .unwrap();
+    assert!(done.value.suggestions.is_empty());
+    assert_eq!(topic_of("itm_f1"), "Websockets");
+}
+
+#[test]
+fn new_topic_names_are_the_first_clause_in_six_words() {
+    assert_eq!(
+        topic_name("Move the release to Friday, after QA signs off"),
+        "Move the release to Friday"
+    );
+    assert_eq!(
+        topic_name("We will migrate every single service to websockets next quarter"),
+        "We will migrate every single service"
+    );
+    assert_eq!(topic_name("  Бюджет: утвердить до пятницы"), "Бюджет");
+    assert_eq!(topic_name("Ship it."), "Ship it");
+    assert_eq!(topic_name(" … "), "Untitled topic");
+}

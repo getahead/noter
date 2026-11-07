@@ -45,12 +45,13 @@ struct Stored {
     handed_off_at: Option<i64>,
     done_at: Option<i64>,
     carried_from: Option<String>,
+    topic: Option<(String, String)>,
 }
 
 const COLUMNS: &str = "i.id, i.rev, i.call_id, c.title, c.started_at, c.call_type, i.kind, i.text, i.lang,
     i.generated_text, i.owner_person_id, i.due_date, i.status, i.review_state, i.created_by,
     i.is_engineering, i.linked_issue_key, i.handoff_target, i.handoff_cwd, i.handed_off_at, i.done_at,
-    i.carried_from_call_id";
+    i.carried_from_call_id, i.topic_id, (SELECT name FROM topics WHERE id = i.topic_id)";
 
 fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
     Ok(Stored {
@@ -78,6 +79,13 @@ fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
         handed_off_at: r.get(19)?,
         done_at: r.get(20)?,
         carried_from: r.get(21)?,
+        topic: match (
+            r.get::<_, Option<String>>(22)?,
+            r.get::<_, Option<String>>(23)?,
+        ) {
+            (Some(id), Some(name)) => Some((id, name)),
+            _ => None,
+        },
     })
 }
 
@@ -191,8 +199,10 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
         status,
         review: word(s.review)?,
         created_by: word(s.created_by)?,
-        // Topics arrive with M3; the join keeps its shape.
-        topic: None,
+        topic: s.topic.map(|(id, name)| TopicChip {
+            id: TopicId::new(id),
+            name,
+        }),
         is_engineering: s.engineering,
         linked_issue: s.issue,
         handoff,
