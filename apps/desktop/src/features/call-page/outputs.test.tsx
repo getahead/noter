@@ -12,7 +12,7 @@ import { CallBanners } from "./CallBanners";
 import { loadCall } from "./actions";
 import { OutputSection } from "./OutputSection";
 import { OutputsView } from "./OutputsView";
-import { commitDraft, loadOutputs, loadVersion, loadVersions, readVersion, regenerate, saveEdit } from "./outputs-actions";
+import { announceSummaryOnce, commitDraft, loadOutputs, loadVersion, loadVersions, readVersion, regenerate, saveEdit } from "./outputs-actions";
 import { bodyOf, holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { RegenerateSheet } from "./RegenerateSheet";
 import { VersionSwitcher } from "./VersionSwitcher";
@@ -270,5 +270,20 @@ describe("the action item row slot", () => {
     expect(html).toContain("review:Send it");
     expect(html).not.toContain("review:Ship it");
     expect(html).toContain("Ship it");
+  });
+});
+
+describe("announceSummaryOnce (inst-visible)", () => {
+  it("announces Summary ready politely once per call, and only when the Summary itself settled", async () => {
+    await open([sec("summary")]);
+    const seen = sent();
+    const done = { current: null as string | null };
+    expect(announceSummaryOnce(bridge, id, "decisions:ready", done)).toBe(false);
+    expect(announceSummaryOnce(bridge, id, "summary:failed", done)).toBe(false);
+    expect(announceSummaryOnce(bridge, id, "summary:ready", done)).toBe(true);
+    expect(announceSummaryOnce(bridge, id, "decisions:ready,summary:ready", done)).toBe(false);
+    await settle();
+    expect(seen.filter(([cmd]) => cmd === "window_announce")).toEqual([["window_announce", { text: "Summary ready", politeness: "polite" }]]);
+    expect(announceSummaryOnce(bridge, "another-call", "summary:ready", done)).toBe(true);
   });
 });

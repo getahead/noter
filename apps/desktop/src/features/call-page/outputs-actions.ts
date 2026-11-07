@@ -2,6 +2,9 @@
 // busy and error state; results are held in `outputs-cache.ts`.
 import type { Bridge } from "../../app/bridge/bridge";
 import type { RegenerateArgs } from "../../core/bindings";
+import { t } from "../../i18n/format";
+import { announce } from "../record-prompt/actions";
+import { summaryReadyNow } from "./outputs-logic";
 import { bodyOf, holdBody, holdOutputs, holdVersions } from "./outputs-cache";
 
 export const outputsKey = (callId: string) => `outputs:get:${callId}`;
@@ -73,4 +76,14 @@ export async function commitDraft(bridge: Bridge, callId: string, draft: { summa
 /** A version's body is held (read once); false when the core could not give it. */
 export async function readVersion(bridge: Bridge, summaryId: string, versionId: string): Promise<boolean> {
   return !!bodyOf(summaryId, versionId) || (await loadVersion(bridge, summaryId, versionId)).status === "ok";
+}
+
+/** Announce **Summary ready** (polite) when `settled` says the Summary finished; `done` holds the call already announced, so once per call. */
+export function announceSummaryOnce(bridge: Bridge, callId: string, settled: string, done: { current: string | null }) {
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
+  if (!summaryReadyNow(settled) || done.current === callId) return false;
+  done.current = callId;
+  void announce(bridge, t("outputs.summary_ready"), "polite");
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
+  return true;
 }
