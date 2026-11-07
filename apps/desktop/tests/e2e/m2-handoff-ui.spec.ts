@@ -100,6 +100,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     const names = await footer.getByRole("button").allInnerTexts();
     expect(names.findIndex((n) => /Open in Claude Code/.test(n))).toBeLessThan(names.findIndex((n) => /Copy Prompt/.test(n)));
     await expect(drawer(page)).toContainText("Opening or copying accepts this suggested item.");
+    await expect(footer.getByRole("button", { name: "Copy Prompt", exact: true })).toBeEnabled();
     await page.keyboard.press("Meta+Enter");
     await expect.poll(() => sent(page, "handoff_copy")).toHaveLength(1);
     expect(await sent(page, "handoff_open")).toEqual([]);
