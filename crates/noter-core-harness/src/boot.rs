@@ -271,6 +271,8 @@ pub struct Harness {
     account_cli: ScriptedAccountCli,
     /// The indexed MCP servers (TL-42); none until `harness.mcp_server` adds one.
     mcp: Arc<ScriptedMcp>,
+    /// The scripted runtime, for `harness.llm_next`.
+    llm: Scripted,
     /// The core's clock and the milliseconds `harness.advance_clock` added to it.
     clock: Arc<dyn Clock>,
     skew: Arc<AtomicI64>,
@@ -344,7 +346,8 @@ impl Harness {
         };
         engine.set_system_audio(system_audio(&w.app.setup.permissions));
         let surfaces = Arc::new(ScriptedSurfaces::default());
-        let llm = Adapters::scripted(&options.llm_script.clone().unwrap_or_default());
+        let scripted = options.llm_script.clone().unwrap_or_default();
+        let llm = Adapters::scripted(&scripted);
         let secrets = Arc::new(MemorySecrets::default());
         let account_cli = ScriptedAccountCli::new();
         let now = clock.clone();
@@ -394,6 +397,7 @@ impl Harness {
             secrets,
             account_cli,
             mcp,
+            llm: scripted,
             clock: clock.clone(),
             skew,
             panel,
@@ -1511,6 +1515,31 @@ impl Controls for Harness {
                         None => vec![("seg_1".into(), "Ann agreed to ship the importer.".into())],
                     };
                     noter_core::testing::llm_run(&self.core, skill, items).await
+                }
+                // `{ skill, output? | fail?, after_ms?, cost_usd? }`: a `--llm-script` line (`on`
+                // named `skill`) that answers the next run of `skill`, once, ahead of the script.
+                "llm_next" => {
+                    let mut line = args;
+                    let skill = line.as_object_mut().and_then(|l| l.remove("skill"));
+                    let usage = |e: String| {
+                        CoreError::new(
+                            ErrorCode::InvalidInput,
+                            format!("harness.llm_next needs {{ skill, output? | fail?, after_ms? }}: {e}"),
+                        )
+                    };
+                    let skill = skill.ok_or_else(|| usage("no skill".into()))?;
+                    line["on"] = skill;
+                    self.llm.answer_next(line).map_err(usage)?;
+                    Ok(json!({}))
+                }
+                // `{ on }`: while on, search and Ask run keyword-only at rebuild progress 0; off,
+                // the indexes are checked and rebuilt as at open, then hybrid.
+                "hold_rebuild" => {
+                    let on = args["on"].as_bool().ok_or_else(|| {
+                        CoreError::new(ErrorCode::InvalidInput, "harness.hold_rebuild needs { on }")
+                    })?;
+                    noter_core::testing::hold_rebuild(&self.core, on);
+                    Ok(json!({}))
                 }
                 // `{ tool, installed?, path?, version?, supported?, identity?, login_identity?,
                 // install?: { fail?, delay_ms?, version? }, login?: { url?, code?, outcome?,
