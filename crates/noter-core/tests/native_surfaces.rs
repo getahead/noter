@@ -554,3 +554,79 @@ async fn microphone_off_is_announced_once_when_no_surface_is_visible() {
         .collect();
     assert_eq!(said, ["announce Microphone off"]);
 }
+
+#[tokio::test]
+async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
+    use noter_core::{BoxFuture, CalendarEvent, NativeServices};
+    struct Calendar {
+        access: PermissionState,
+        failed: bool,
+    }
+    impl NativeServices for Calendar {
+        fn permission(&self, _: PermissionKind) -> PermissionState {
+            self.access
+        }
+        fn request_permission(&self, _: PermissionKind) -> BoxFuture<'_, PermissionState> {
+            panic!("building a menu must never request permission")
+        }
+        fn environment(&self) -> EnvironmentReading {
+            EnvironmentReading::default()
+        }
+        fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
+            Ok(())
+        }
+        fn calendar_events(
+            &self,
+            _: TimestampMs,
+            _: TimestampMs,
+        ) -> Result<Vec<CalendarEvent>, CoreError> {
+            assert_eq!(self.access, PermissionState::Granted);
+            if self.failed {
+                return Err(CoreError::new(
+                    ErrorCode::CalendarUnavailable,
+                    "read failed",
+                ));
+            }
+            let now = FixedClock.now().0;
+            Ok([(2, "Later"), (-1, "Past"), (1, "Next meeting")]
+                .into_iter()
+                .map(|(hours, title)| CalendarEvent {
+                    event: CalendarEventRef {
+                        id: CalendarEventId(title.into()),
+                        title: title.into(),
+                        starts_at: TimestampMs(now + hours * 3_600_000),
+                        ends_at: TimestampMs(now + (hours + 1) * 3_600_000),
+                    },
+                    platform: None,
+                    attendees: vec![],
+                })
+                .collect())
+        }
+    }
+    for (access, failed, expected) in [
+        (
+            PermissionState::Granted,
+            false,
+            Some("Next: Next meeting 09:00"),
+        ),
+        (PermissionState::Granted, true, None),
+        (PermissionState::Denied, false, None),
+        (PermissionState::NotAsked, false, None),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let rec = Arc::new(Rec::default());
+        let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+            .with_surfaces(rec.clone())
+            .with_native(Arc::new(Calendar { access, failed }));
+        let core = Core::open(dir.path(), deps).unwrap();
+        core.refresh_tray();
+        let model = rec.tray.lock().unwrap();
+        let next = model
+            .as_ref()
+            .unwrap()
+            .lines()
+            .into_iter()
+            .find(|line| line.starts_with("Next:"));
+        assert_eq!(next, expected);
+    }
+}
