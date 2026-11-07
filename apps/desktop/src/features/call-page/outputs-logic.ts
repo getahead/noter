@@ -88,3 +88,6 @@ export function versionLabel(v: VersionMeta, prefs: UiPrefs): string {
 
 /** Whether the outputs still wait for the model: the banner, and the sections that say so. */
 export const isWriting = (o: Pick<CallOutputs, "status"> | undefined): boolean => o?.status === "writing";
+
+/** Whether `settled` (the view's "kind:state" list of sections that finished since the last read) says the Summary is ready. */
+export const summaryReadyNow = (settled: string): boolean => settled.split(",").includes("summary:ready");

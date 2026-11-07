@@ -132,7 +132,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 
 ### Copy or export a visible scope
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-share`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-share`
 
 **Actor**: Primary user
 
@@ -153,7 +153,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 5. [x] - `p1` - **IF** copy succeeds: core writes rich and plain clipboard formats; show **Copied for Slack**, **Copied for Jira** or **Copied as Markdown** on the invoking control for 2 s, announced politely - `inst-copied`
 6. [x] - `p1` - User exports; open Export with its scope, require at least one content checkbox; call `calls_export` with call_ids, include options and scope, or null scope for whole call - `inst-export`
 7. [x] - `p1` - **IF** save panel is cancelled: **RETURN** no exported status; **IF** export fails: retain options and show retry - `inst-cancel`
-8. [ ] - `p1` - **RETURN** **Exported to** the returned Finder-style path with **Show in Finder** for 8 s; `open_external` reveals that path - `inst-return`
+8. [x] - `p1` - **RETURN** **Exported to** the returned Finder-style path with **Show in Finder** for 8 s; `open_external` reveals that path - `inst-return`
 
 ### Maintain tags and stored audio
 
@@ -199,7 +199,7 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 1. [ ] - `p1` - Core applies the existing notification send rules and posts NT-1 or NT-2 after outputs settle - `inst-send`
 2. [ ] - `p1` - User clicks it; consume `nav:request` for call_page and Summary through the shell; `outputs_get` loads that call - `inst-route`
 3. [ ] - `p1` - **IF** failed: show the failed section and invoke the section retry flow only when the user clicks Try Again - `inst-failed`
-4. [ ] - `p1` - **IF** the page is already visible when outputs finish: announce Summary ready once, without duplicate toast or notification - `inst-visible`
+4. [x] - `p1` - **IF** the page is already visible when outputs finish: announce Summary ready once, without duplicate toast or notification - `inst-visible`
 5. [ ] - `p1` - **RETURN** the requested outputs, or the frame's not-found state if the call was deleted - `inst-return`
 
 ## 3. Processes / Business Logic (CDSL)

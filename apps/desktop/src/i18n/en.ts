@@ -860,6 +860,7 @@ export const en = {
   "outputs.section.risks": "Risks",
   "outputs.section.call_type_extras": "Extras",
   "outputs.section.role_reviews": "Role reviews",
+  "outputs.summary_ready": "Summary ready",
   "outputs.writing_summary": "Writing summary… ",
   "outputs.waiting": "Waiting for the summary",
   "outputs.empty": "Nothing in this call",

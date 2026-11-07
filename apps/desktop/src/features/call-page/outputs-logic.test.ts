@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemView, OutputSection, SectionKind } from "../../core/bindings";
-import { applyProgress, mergeSection, metaLine, orderSections, sectionCounts, versionLabel } from "./outputs-logic";
+import { applyProgress, mergeSection, metaLine, orderSections, sectionCounts, summaryReadyNow, versionLabel } from "./outputs-logic";
 
 const item = (review: ItemView["review"]) => ({ id: `i_${review}_${Math.random()}`, review }) as unknown as ItemView;
 const sec = (kind: SectionKind, o: Partial<OutputSection> = {}): OutputSection =>
@@ -76,5 +76,15 @@ describe("metaLine and versionLabel", () => {
     const prefs = { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never;
     expect(versionLabel({ id: "v", n: 3, kind: "user_edit", writer: null, created_at: Date.UTC(2026, 10, 5, 10, 42) }, prefs)).toBe("Your Edit · 10:42");
     expect(versionLabel({ id: "v", n: 1, kind: "generated", writer, created_at: 0 }, prefs)).toBe("v1 · Claude Code · 00:00");
+  });
+});
+
+describe("summaryReadyNow", () => {
+  it("is true only when the Summary section itself settled as ready", () => {
+    expect(summaryReadyNow("summary:ready")).toBe(true);
+    expect(summaryReadyNow("decisions:ready,summary:ready")).toBe(true);
+    expect(summaryReadyNow("decisions:ready")).toBe(false);
+    expect(summaryReadyNow("summary:failed")).toBe(false);
+    expect(summaryReadyNow("")).toBe(false);
   });
 });

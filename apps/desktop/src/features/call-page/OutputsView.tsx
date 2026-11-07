@@ -7,10 +7,11 @@ import { useWindow } from "../../app/use-window";
 import type { OutputSection as Section, SectionKind } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { announce } from "../record-prompt/actions";
 import { OutputSection } from "./OutputSection";
 import { loadOutputs, outputsKey, regenerate } from "./outputs-actions";
 import { useOutputs } from "./outputs-cache";
-import { isWriting, mergeSection, orderSections } from "./outputs-logic";
+import { isWriting, mergeSection, orderSections, summaryReadyNow } from "./outputs-logic";
 import { useRegenerate } from "./RegenerateSheet";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-read-edit:p1
@@ -36,11 +37,18 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
     return p && p !== s.state.type && p !== "pending" && p !== "writing" ? [`${s.kind}:${p}`] : [];
   }).join();
   const lastSettled = useRef("");
+  const announced = useRef<string | null>(null);
   useEffect(() => {
     if (!settled) return void (lastSettled.current = "");
     if (lastSettled.current === settled) return;
     lastSettled.current = settled;
     void loadOutputs(bridge, callId);
+    // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
+    if (summaryReadyNow(settled) && announced.current !== callId) {
+      announced.current = callId; // once per call: a later section settling never repeats it
+      void announce(bridge, t("outputs.summary_ready"), "polite");
+    }
+    // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
   }, [bridge, callId, settled]);
 
   if (!call || !prefs) return null;
