@@ -954,6 +954,11 @@ export const defaultHandlers: Handlers = {
         const section = world.outputs.find((o) => o.call_id === a.call_id)?.sections.find((s) => s.kind === kind);
         if (section) {
           section.names_updated = false;
+          // Use Local Model: the local runtime writes the section, as in the real core.
+          if (a.local && section.writer) {
+            section.writer = { ...section.writer, runtime: "local", model: "local", generated_at: now() };
+            world.outputs.find((o) => o.call_id === a.call_id)!.written_locally = true;
+          }
           emit("entity:changed", { type: "section", call_id: a.call_id, section });
         }
         emit("outputs:progress", { call_id: a.call_id, status: "ready", section: kind, state: { type: "ready" } });
