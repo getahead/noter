@@ -159,6 +159,48 @@ async fn each_scenario_boots_the_fixture_in_its_state() {
     }
 }
 
+// @cpt-seq:cpt-noter-seq-menu-bar-control-recording:p1
+#[tokio::test]
+async fn paused_reminder_scenario_keeps_the_live_call_at_its_five_minute_deadline() {
+    let fixture = noter_protocol::fixtures::world();
+    let options = Options::from_env(env(&[
+        ("NOTER_TEST_FIXTURE", "world"),
+        ("NOTER_TEST_CLOCK", "fixed"),
+        ("NOTER_TEST_SCENARIO", "paused-5-min"),
+    ]))
+    .unwrap()
+    .unwrap();
+    let harness = Harness::start_with(options, Arc::new(Seen::default()), |deps| deps)
+        .await
+        .expect("the paused reminder fixture boots");
+    let app = snapshot(&harness).await;
+    assert_eq!(app["capture"]["phase"], "paused");
+    assert_eq!(
+        app["capture"]["call_id"],
+        json!(fixture.app.capture.call_id)
+    );
+    assert_eq!(
+        app["capture"]["pause"],
+        json!({ "since": fixture.now.0 - 300_000, "remind_at": fixture.now.0 })
+    );
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let call = dispatch_json(
+        &*harness.core(),
+        &main,
+        "call_get",
+        json!({ "call_id": fixture.app.capture.call_id }),
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(call["call"]["status"], "paused");
+    harness.shutdown().await;
+}
+
 #[tokio::test]
 async fn on_the_macs_own_displays_the_live_call_window_floats_on_the_main_one() {
     // The app draws its real windows on the Mac it runs on: a single display, without the

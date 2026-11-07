@@ -41,6 +41,7 @@ pub fn audit_lookup(
     at: TimestampMs,
     destination: &str,
     request: &[u8],
+    run: Option<(&LlmRunId, Option<&CallId>)>,
 ) -> Result<AuditId, CoreError> {
     let id = AuditId::new(format!("aud_{}", ulid::Ulid::generate()));
     let row = Mutation {
@@ -56,7 +57,15 @@ pub fn audit_lookup(
             ("destination", json!(destination)),
             ("bytes_out", json!(request.len())),
             ("payload_hash", json!(hex(&Sha256::digest(request)))),
-        ],
+        ]
+        .into_iter()
+        .chain(run.into_iter().flat_map(|(run, call)| {
+            [
+                ("llm_run_id", json!(run.as_str())),
+                ("call_id", json!(call.map(CallId::as_str))),
+            ]
+        }))
+        .collect(),
     };
     store.write(row, meta)?;
     Ok(id)

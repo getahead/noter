@@ -164,6 +164,23 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
     let at = |ms: i64| TimestampMs(now.0 + ms);
     match name {
         "idle" => w.app.capture = idle,
+        // @cpt-seq:cpt-noter-seq-menu-bar-control-recording:p1
+        "paused-5-min" => {
+            w.app.capture.phase = CapturePhase::Paused;
+            w.app.capture.pause = Some(PauseInfo {
+                since: at(-300_000),
+                remind_at: Some(now),
+            });
+            for call in w
+                .calls
+                .iter_mut()
+                .chain(w.call_details.iter_mut().map(|detail| &mut detail.call))
+            {
+                if Some(&call.id) == w.app.capture.call_id.as_ref() {
+                    call.status = CallStatus::Paused;
+                }
+            }
+        }
         // @cpt-seq:cpt-noter-seq-call-page-hand-off-item:p1
         "handoff" => {
             w.app.capture = idle;
@@ -226,7 +243,7 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
             w.call_details.retain(|d| first(&d.call.id));
             w.transcripts.retain(|t| first(&t.call_id));
         }
-        _ => return Err(format!("unknown scenario {name}; known: idle, handoff, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
+        _ => return Err(format!("unknown scenario {name}; known: idle, paused-5-min, handoff, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
     }
     Ok(())
 }

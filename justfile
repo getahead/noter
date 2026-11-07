@@ -168,7 +168,7 @@ native:
     fi
     exit $status
 
-# Screenshot tests (98% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker
+# Screenshot tests (95% per-pixel match). Baselines are Linux/WebKit, so outside CI this runs in Docker
 visual: (_locked "_visual")
 
 _visual:

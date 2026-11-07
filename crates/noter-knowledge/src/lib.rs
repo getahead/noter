@@ -23,7 +23,9 @@ pub use mcp::{
     due, Audit, Listing, McpError, McpSource, Page, Remote, RemoteDoc, ScriptedListing,
     ScriptedMcp, ScriptedOauth, ScriptedPage, ScriptedServer,
 };
-pub use policy::{keyword_chunks, nearest_chunks, permitted_chunks, Permitted};
+pub use policy::{
+    keyword_chunks, live_sources, nearest_chunks, permitted_chunks, LiveSource, Permitted,
+};
 pub use sources::{
     add_folder, add_mcp, get, list, remove, revoke, token_account, update, validate_folder,
 };

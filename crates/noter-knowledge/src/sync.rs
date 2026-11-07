@@ -529,8 +529,15 @@ impl<L: EngineLauncher> Lookups<'_, L> {
     fn audit(&self, ctx: &RunCtx, destination: &str, request: &[u8]) -> bool {
         let meta = ctx.change_meta("server lookup").ok_or(Stop::Cancelled);
         let row = meta.and_then(|meta| {
-            noter_llm::audit_lookup(self.env.store, meta, (self.env.now)(), destination, request)
-                .map_err(Stop::from)
+            noter_llm::audit_lookup(
+                self.env.store,
+                meta,
+                (self.env.now)(),
+                destination,
+                request,
+                None,
+            )
+            .map_err(Stop::from)
         });
         let Err(stop) = row else {
             return true;

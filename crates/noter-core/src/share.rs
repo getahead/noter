@@ -669,6 +669,7 @@ mod tests {
             regenerated_with_edits: false,
             names_updated: false,
             version_count: 1,
+            suppressed_count: 0,
         }
     }
 

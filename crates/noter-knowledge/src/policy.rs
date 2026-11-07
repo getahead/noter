@@ -114,16 +114,8 @@ pub fn permitted_chunks(
         }
         // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-sensitive
         // @cpt-begin:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-scope
-        if let SourceScope::Limited {
-            call_types,
-            people: allowed,
-        } = &policy
-        {
-            let matches = call_types.iter().any(|t| types.contains(&t.0))
-                || allowed.iter().any(|p| people.contains(&p.0));
-            if scoped && !matches {
-                continue;
-            }
+        if !in_scope(&policy, scoped, &types, &people) {
+            continue;
         }
         // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-scope
         // @cpt-begin:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-return
@@ -137,6 +129,64 @@ pub fn permitted_chunks(
             text: c.text,
         });
         // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-return
+    }
+    Ok(out)
+}
+
+/// Whether a source's scope admits a request: an unscoped request sees limited sources, a scoped
+/// one a limited source when any of its call types or people is the source's (TL-45).
+fn in_scope(policy: &SourceScope, scoped: bool, types: &[String], people: &[String]) -> bool {
+    match policy {
+        SourceScope::AllCalls => true,
+        SourceScope::Limited {
+            call_types,
+            people: allowed,
+        } => {
+            !scoped
+                || call_types.iter().any(|t| types.contains(&t.0))
+                || allowed.iter().any(|p| people.contains(&p.0))
+        }
+    }
+}
+
+/// A live MCP source a cloud run may query.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LiveSource {
+    pub id: SourceId,
+    pub name: String,
+    pub server: String,
+}
+
+/// The live sources (`mode = live`) a cloud run over `scope` may query now: never a sensitive
+/// source, and a limited one only where the run's call type or people are the source's. Oldest
+/// first, so a source keeps its place (and its tool names) while the others change.
+pub fn live_sources(conn: &Connection, scope: &AskScope) -> rusqlite::Result<Vec<LiveSource>> {
+    let (types, people) = requested(conn, scope)?;
+    let scoped = !types.is_empty() || !people.is_empty();
+    let mut st = conn.prepare(
+        "SELECT id, name, location, scope FROM sources
+         WHERE mode = 'live' AND privacy_class = 'normal' ORDER BY rowid",
+    )?;
+    let rows = st.query_map([], |r| {
+        Ok((
+            LiveSource {
+                id: SourceId::new(r.get::<_, String>(0)?),
+                name: r.get(1)?,
+                server: r.get(2)?,
+            },
+            r.get::<_, String>(3)?,
+        ))
+    })?;
+    let mut out = vec![];
+    for row in rows {
+        let (source, scope_json) = row?;
+        let policy = serde_json::from_str(&scope_json).unwrap_or(SourceScope::Limited {
+            call_types: vec![],
+            people: vec![],
+        });
+        if in_scope(&policy, scoped, &types, &people) {
+            out.push(source);
+        }
     }
     Ok(out)
 }

@@ -17,12 +17,9 @@ final class MenuBarTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__paused_for_5_min() {
-        // Waits out the 5 minutes, past `just native`'s 3-minute default.
-        executionTimeAllowance = 420
-        launch("idle")
-        startRecording()
-        item("Pause", in: openMenu()).click()
-        XCTAssertTrue(infoLine("Paused for 5 min", in: openMenu()).waitForExistence(timeout: 330))
+        // Core tests prove the deadline; the native test proves the real menu at that deadline.
+        launch("paused-5-min")
+        XCTAssertTrue(infoLine("Paused for 5 min", in: openMenu()).waitForExistence(timeout: 5))
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording_alert() {

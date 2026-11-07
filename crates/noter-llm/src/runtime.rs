@@ -154,6 +154,14 @@ pub struct Privacy {
     pub offline: bool,
 }
 
+impl Privacy {
+    /// Whether D1 lets a run under this privacy query the user's live MCP sources: Cloud
+    /// allowed, with no sensitive context, and online.
+    pub fn allows_live(&self) -> bool {
+        self.mode == PrivacyMode::CloudAllowed && !self.sensitive && !self.offline
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Budget {
     /// Cost cap for API-key runs; own accounts and local runs have no cost.
@@ -548,6 +556,13 @@ impl Llm {
         if let Some(tool) = lock(&self.0.tool_runs).get(run) {
             tool.map.map_back(params);
         }
+    }
+
+    /// The privacy a run with a tool server runs under now (`None`: no such run).
+    pub fn tool_privacy(&self, run: &LlmRunId) -> Option<Privacy> {
+        lock(&self.0.tool_runs)
+            .get(run)
+            .map(|t| *t.privacy.borrow())
     }
 
     /// One tool result of a running run through the egress gate
@@ -1072,6 +1087,8 @@ impl Inner {
             call_id: req.call_id.clone(),
             cloud: route::is_cloud(tally.choice.runtime),
             tools: tools.clone(),
+            live_ok: matches!(req.task, TaskKind::Ask | TaskKind::PostCall)
+                && req.privacy.borrow().allows_live(),
         };
         let Ok(launch) = host.start(start) else {
             self.log(json!({"module": "llm", "event": "tools_unavailable",

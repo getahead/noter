@@ -10,20 +10,21 @@
 //                     this test starts, as the Tauri host would (docs/HARNESS.md).
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import fixture from "../../../../../contracts/fixtures/world.json" with { type: "json" };
 import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type WindowLabel } from "../../../src/core/bindings";
 import type { ChannelBody } from "../../../src/core/fake/fake-core";
 import type { World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
 
 export interface CorePlan {
-  /** Use the fixture clock for calendar scenarios instead of the host time (real core only). */
-  fixedClock?: boolean;
   /** The window's next calls of `cmd` fail with `code`, in order (FakeCore.failNext). */
   fail?: Array<{ cmd: CommandName; code: ErrorCode }>;
   /** The snapshot reports this contract version instead of the fixture's. */
   contractVersion?: string;
   /** Artificial latency per command, in ms. */
   latency?: number;
+  /** Page Date and the real core use the fixture's clock; browser timers still run. */
+  fixedClock?: boolean;
   /** The story's starting state (tests/support/world-presets.ts), applied before the window's first command. */
   world?: (world: World) => void;
   /** The window's first bundle download ends in `checksum_failed` once (harness.corrupt_next_download), set before the page loads. */
@@ -215,6 +216,7 @@ function fakeSteer(page: Page): Steer {
  * return the controls a story uses while the window is open.
  */
 export async function openWindow(page: Page, label: WindowLabel | string, plan: CorePlan = {}): Promise<Steer> {
+  if (plan.fixedClock) await page.clock.setFixedTime(fixture.now);
   let steer: Steer;
   if (process.env.NOTER_CORE === "stdio") {
     steer = await connectRealCore(page, label, plan);

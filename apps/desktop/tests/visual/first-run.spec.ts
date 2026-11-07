@@ -80,6 +80,8 @@ for (const scheme of ["light", "dark"] as const) {
       test(`renders ${s.id}`, async ({ page }) => {
         await openWindow(page, "first-run", { world: s.world });
         await expect(win(page)).toBeVisible();
+        // The first microphone tick adds a row and moves Run Test; let it settle before clicking.
+        await settled(page);
         await s.ready?.(page);
         // the window is the frame: 760 x 560, the footer at its bottom edge, and only the step scrolls
         const box = (await win(page).boundingBox())!;
@@ -99,6 +101,7 @@ test.describe("first-run window states that need a step on the way", () => {
 
   test("renders one stream silent", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), at("permissions")(w), granted(w)) });
+    await settled(page);
     await startSelfTest(page, { manual: steer });
     await steer.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
     await steer.push("self_test_run", { event: { type: "ended", reason: "call_stopped" } });
@@ -110,6 +113,7 @@ test.describe("first-run window states that need a step on the way", () => {
 
   test("renders Back from System Settings (Checking…)", async ({ page }) => {
     await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), at("permissions")(w), W.permission(w, "microphone", "granted")) });
+    await settled(page);
     await page.locator('[data-component="cpt-noter-component-ui-permission-check-row"]').filter({ hasText: "System audio recording" }).getByRole("button", { name: "Open System Settings…" }).click();
     // the core is slow to answer: the row shows Checking… until it does
     await page.evaluate(() => {
