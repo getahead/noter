@@ -4,7 +4,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { SpanPreview, TimeSpan } from "../../core/bindings";
 import { clock } from "../transcript/model";
 
-export type Resolved = { status: "ok"; preview: SpanPreview } | { status: "gone" } | { status: "error" };
+export type Resolved = { status: "ok"; preview: SpanPreview } | { status: "gone" } | { status: "upgraded" } | { status: "error" };
 
 /** The span's segments now; a source that no longer exists is `gone` (no dead link), any other failure is retryable. */
 export async function resolveSpan(bridge: Bridge, span: TimeSpan): Promise<Resolved> {
@@ -13,6 +13,7 @@ export async function resolveSpan(bridge: Bridge, span: TimeSpan): Promise<Resol
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-resolve
   if (res.status === "ok") return { status: "ok", preview: res.data };
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-source
+  if (res.error.code === "transcript_upgraded") return { status: "upgraded" };
   return res.error.code === "not_found" ? { status: "gone" } : { status: "error" };
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-source
 }
@@ -20,7 +21,7 @@ export async function resolveSpan(bridge: Bridge, span: TimeSpan): Promise<Resol
 /** Resolve the span, then open the Transcript on it (the page focuses the first resolved line and highlights it). */
 export async function openEvidence(bridge: Bridge, span: TimeSpan): Promise<Resolved> {
   const r = await resolveSpan(bridge, span);
-  if (r.status === "ok") await bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }));
+  if (r.status === "ok" || r.status === "upgraded") await bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }));
   return r;
 }
 

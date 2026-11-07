@@ -17,7 +17,7 @@ export function ProvenanceChip({ bridge, span, variant = "timestamp", unverified
     setPhase("loading");
     const r = await openEvidence(bridge, span);
     if (r.status === "ok") setNotes(evidenceNotes(r.preview));
-    setPhase(r.status === "ok" ? "idle" : r.status);
+    setPhase(r.status === "ok" || r.status === "upgraded" ? "idle" : r.status); // upgraded: the Transcript opens and says so
   };
   const common = { "data-component": "cpt-noter-component-ui-provenance-chip", "data-variant": unverified ? "unverified" : variant, "data-state": phase } as const;
   if (phase === "gone") return <span {...common} className="np-prov is-gone">{t("items.source_deleted")}</span>;

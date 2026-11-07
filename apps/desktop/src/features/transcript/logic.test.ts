@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CaptureState, PlaybackState } from "../../core/bindings";
 import { atEnd, LogScroller, measure, newLines, onScroll, viewState, windowOf } from "./follow";
-import { after, holdChannel, showSpan } from "./hosts";
+import { after, holdChannel, showSpan, spanArchiveNote } from "./hosts";
 import { buildRows } from "./model";
 import { barState, scrubRange, type Replay } from "./playback";
 import { capturing, playControl, REFUSED } from "./play-control";
@@ -214,5 +214,19 @@ describe("host effects", () => {
     await Promise.resolve();
     expect(transcriptSpan).toHaveBeenCalledOnce();
     expect(set).toHaveBeenLastCalledWith(["z"]);
+  });
+
+  it("reads the span's archive note: the before/after words, upgraded when the lines were replaced, nothing otherwise", async () => {
+    const span = { call_id: "call_1", t0_ms: 0, t1_ms: 1000 };
+    const note = async (answer: unknown) => {
+      const got = vi.fn();
+      await spanArchiveNote({ core: { transcriptSpan: async () => answer } } as never, span, got);
+      return got.mock.calls.map((c) => c[0]);
+    };
+    const change = { before: "ship it friday", after: "ship it on Friday" };
+    expect(await note({ status: "ok", data: { archive_change: change } })).toEqual([{ change }]);
+    expect(await note({ status: "ok", data: { archive_change: null } })).toEqual([null]);
+    expect(await note({ status: "error", error: { code: "transcript_upgraded", message: "" } })).toEqual([{ change: null }]);
+    expect(await note({ status: "error", error: { code: "not_found", message: "" } })).toEqual([null]);
   });
 });
