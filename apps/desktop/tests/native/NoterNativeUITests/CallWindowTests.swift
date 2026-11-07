@@ -22,15 +22,15 @@ final class CallWindowTests: NoterTestCase {
 
     func test_cpt_noter_seq_call_screen_hide_for_presenting__hotkey_hides_and_restores_every_surface() {
         launch()
-        hotkey("n")
-        XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
-        XCTAssertTrue(window("Noter").waitForExistence(timeout: 5)) // an immediate .exists can time out on a busy runner
-        hotkey("0")
-        XCTAssertTrue(callWindow.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(window("Noter").waitForNonExistence(timeout: 5))
-        hotkey("0")
-        XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
-        XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
+        step("open the call window") { hotkey("n") }
+        step("call window appears") { XCTAssertTrue(callWindow.waitForExistence(timeout: 5)) }
+        step("main window exists") { XCTAssertTrue(window("Noter").waitForExistence(timeout: 5)) } // an immediate .exists can time out on a busy runner
+        step("hide hotkey") { hotkey("0") }
+        step("call window gone") { XCTAssertTrue(callWindow.waitForNonExistence(timeout: 5)) }
+        step("main window gone") { XCTAssertTrue(window("Noter").waitForNonExistence(timeout: 5)) }
+        step("show hotkey") { hotkey("0") }
+        step("main window back") { XCTAssertTrue(window("Noter").waitForExistence(timeout: 5)) }
+        step("call window back") { XCTAssertTrue(callWindow.waitForExistence(timeout: 5)) }
     }
 
     func test_cpt_noter_seq_call_screen_stop_at_call_end__hidden_for_presenting_menu_carries_notice() {
