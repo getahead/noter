@@ -1,7 +1,7 @@
 // Screenshot specs of History and the undo strip (docs/features/ui/history-undo.md › Definitions of Done): the call
 // History ready (single, batch, model run, undone rows), empty, filtered empty and error, the diff view (changes, none,
-// folded) and the strip working and switched, rendered against the fake world. Baselines come from the
-// update-screenshots workflow only. A partial strip needs a fake `change_undo` that skips edited-later rows (contract lane).
+// folded) and the strip working, switched and partial, rendered against the fake world. Baselines come from the
+// update-screenshots workflow only.
 import { expect, test, type Page } from "@playwright/test";
 
 import type { ChangeRow } from "../../src/core/bindings";
@@ -122,5 +122,22 @@ test.describe("cpt-noter-dod-ui-history-undo-undo undo strip", () => {
     await expect(page.locator('[data-component="cpt-noter-component-ui-undo-strip"]')).toHaveAttribute("data-state", "switched");
     await expect(page.getByRole("button", { name: "Redo" }).first()).toBeVisible();
     await shot(page, "strip-switched");
+  });
+
+  test("partial: Undone 1 of 2 with the edited-later row kept", async ({ page }) => {
+    const tags = (id: string, after: string) => change(id, { field: "tags", before: "[]", after, batch_id: "bat_tags", batch_size: 1, summary: "Tagged the call" });
+    await openWindow(page, "main", {
+      world: (w) => {
+        quiet([tags("chg_tag_a", '["release"]'), tags("chg_tag_b", '["planning"]')])(w);
+        w.calls.find((c) => c.id === W.PAST_CALL)!.tags = ["release"]; // "planning" was edited away later
+      },
+    });
+    await ready(page);
+    await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: Fake }).__noterFake);
+    await page.evaluate((id) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "history" } }), W.PAST_CALL);
+    await page.locator('[data-component="cpt-noter-component-ui-change-row"]').first().getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator('[data-component="cpt-noter-component-ui-undo-strip"]')).toHaveAttribute("data-state", "partial");
+    await expect(page.getByText(/Undone 1 of 2/)).toBeVisible();
+    await shot(page, "strip-partial");
   });
 });
