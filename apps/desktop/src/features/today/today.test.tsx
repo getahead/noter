@@ -3,18 +3,22 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
+import { find, rendered } from "../../ui/testing";
+import { resetCache, useTypes } from "../call-page/cache";
 import type { World } from "../../../tests/support/scenario";
 import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showPreviousCall } from "./actions";
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
 import { TodayPage } from "./TodayPage";
 import { TodayToolbar, clockOf } from "./TodayToolbar";
+import { UpcomingCallCard } from "./UpcomingCallCard";
 
 let bridge: Bridge;
 let fake: FakeCore;
 afterEach(async () => {
   await bridge?.close();
   holdToday(undefined);
+  resetCache();
 });
 async function open(mutate: (w: World["app"]) => void = () => {}) {
   fake = new FakeCore({ window: "main" });
@@ -92,6 +96,17 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
 });
 
 describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
+  it("loads Call Type choices when More opens before any Call page has been visited", async () => {
+    await open();
+    const out = seen();
+    const card = { variant: "today" as const, event: fake.world.today.today[0]!, live: null };
+    const tree = rendered(UpcomingCallCard, { bridge, card, expanded: true, onToggle() {} });
+    await (find(tree, (p) => p.icon === "ellipsis").props.onAction as () => Promise<void>)();
+    expect(out).toContainEqual(["call_types_list", {}]);
+    const Types = () => <span>{useTypes().map((type) => type.label).join(", ")}</span>;
+    const html = renderToString(<Types />);
+    for (const type of fake.world.call_types.call_types) expect(html).toContain(type.label);
+  });
   const event = (id: string, over: Record<string, unknown> = {}) => ({ event_id: id, title: `Call ${id}`, starts_at: 1_700_000_000_000, ends_at: 1_700_003_600_000, platform: null, attendees: [{ person: null, name: "Anna", email: null }], sensitive: false, call_id: null, last_time: null, items: [], questions: [], handed_off: [], open_count: 2, ...over });
   const put = (today: unknown[], week: unknown[] = [], live: unknown = null) => () => {
     Object.assign((fake.world as unknown as { today: object }).today, { today, this_week: week, live_call: live });

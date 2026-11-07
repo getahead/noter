@@ -35,7 +35,8 @@ const day = (more: (w: World) => void = () => {}) => (w: World) => {
 async function open(page: Page, world: (w: World) => void) {
   await openWindow(page, "main", { world });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
-  await expect(page.locator('[data-region="TD-R3"]')).toBeVisible();
+  // Proposals remain visible after Today loads even when Calendar is denied and its region is empty.
+  await expect(page.locator('[data-region="TD-R6"]')).toBeVisible();
 }
 const shot = async (page: Page, name: string) => {
   await page.evaluate(() => ((document.activeElement as HTMLElement | null)?.blur(), scrollTo(0, 0)));

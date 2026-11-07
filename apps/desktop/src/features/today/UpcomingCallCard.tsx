@@ -10,8 +10,8 @@ import { Menu } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
-import { setCallType, setSensitive } from "../call-page/actions";
-import { useTypes } from "../call-page/cache";
+import { loadTypes, setCallType, setSensitive } from "../call-page/actions";
+import { holdTypes, useTypes } from "../call-page/cache";
 import { RecordingIndicator } from "../call-window/strip";
 import { showCall, showPreviousCall } from "./actions";
 import type { Card } from "./model";
@@ -28,6 +28,13 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   const title = e?.title ?? card.live?.title ?? "";
   const open = e ? e.open_count : 0;
   const id = e?.event_id ?? "live"; // the opaque event id is unique on the page, so it is the opener's DOM id
+  const toggleMenu = async () => {
+    setMenu(menu ? null : globalThis.document?.getElementById(id) ?? null);
+    if (!menu) {
+      const result = await loadTypes(bridge);
+      if (result.status === "ok") holdTypes(result.data.call_types);
+    }
+  };
   // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-menu
   const menuItems = e && [
     // only a call that exists has a type and a sensitivity to change; a calendar-only event has no event-targeted command
@@ -53,7 +60,7 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
         {live && <PushButton label={t("today.open_call_screen")} variant="secondary" size="small" onAction={() => void showCall(bridge)} />}
         {menuItems && (
           <>
-            <PullDownButton id={id} iconOnly icon="ellipsis" label={t("callpage.more")} ariaLabel={t("callpage.more")} variant="item-menu" size="small" open={menu !== null} onAction={() => setMenu(menu ? null : globalThis.document?.getElementById(id) ?? null)} />
+            <PullDownButton id={id} iconOnly icon="ellipsis" label={t("callpage.more")} ariaLabel={t("callpage.more")} variant="item-menu" size="small" open={menu !== null} onAction={() => toggleMenu()} />
             {menu && (
               <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
                 <Menu items={menuItems} onClose={() => setMenu(null)} />
