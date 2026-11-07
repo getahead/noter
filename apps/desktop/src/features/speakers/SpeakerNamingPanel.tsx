@@ -18,7 +18,8 @@ import { Disclosure } from "../../ui/primitives/disclosure";
 import { PushButton } from "../../ui/primitives/push-button";
 import { holdUndo, type HoldUndo } from "../history/undo";
 import { REFUSED } from "../transcript/play-control";
-import { speakerName } from "../transcript/model";
+import { PersonChip as PersonChipView } from "../call-window/strip";
+import { langAttr, speakerName } from "../transcript/model";
 import {
   chipsFor,
   firstLine,
@@ -79,6 +80,7 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
   const [hidden, setHidden] = useState(false);
   const [done, setDone] = useState(false);
   const [showSkipped, setShowSkipped] = useState(false);
+  const [activeSample, setActiveSample] = useState<string | null>(null);
   const people = usePeople(p.bridge);
   const rows = panelRows(p.speakers, skipped);
   const had = useRef(false);
@@ -130,6 +132,8 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
       speaker={s}
       people={people === undefined ? null : people}
       line={firstLine(p.segments, s.id)}
+      sampleActive={activeSample === s.id}
+      onSample={() => setActiveSample(s.id)}
       onSkip={() => void skip(s)}
     />
   );
@@ -139,13 +143,13 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
       data-region="PC-R9"
       data-component="cpt-noter-component-ui-speaker-naming-panel"
       data-state={hidden ? "hidden" : "unnamed"}
-      className="pc-name"
+      className={hidden ? "pc-name pc-name--compact" : "pc-name"}
       aria-label={t("speakers.panel")}
     >
       <header className="pc-name__head">
         <h3 className="pc-name__title">
           {hidden
-            ? t("speakers.panel.hidden", { count: rows.open.length })
+            ? t("speakers.panel.hidden", { count: rows.unnamed })
             : t("speakers.panel.title", { count: rows.open.length })}
         </h3>
         {/* @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-hide */}
@@ -194,12 +198,16 @@ export function NameRow({
   people,
   line,
   onSkip,
+  sampleActive = true,
+  onSample,
 }: {
   p: SpeakerNamingPanelProps;
   speaker: SpeakerView;
   people: readonly PersonRow[] | null;
-  line: string | null;
+  line: SegmentView | null;
   onSkip: () => void;
+  sampleActive?: boolean;
+  onSample?: () => void;
 }) {
   const [pick, setPick] = useState<{ ref: PersonRef; name: string } | null>(
     null,
@@ -210,6 +218,7 @@ export function NameRow({
   const [sample, setSample] = useState<{
     callId: string;
     since: number;
+    toMs: number;
   } | null>(null);
   const playback = useWindow(p.bridge, (s) => s.whole.playback);
   const label = speakerName(speaker.label);
@@ -218,7 +227,8 @@ export function NameRow({
   // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-sample
   const play = async () => {
     if (!speaker.sample) return;
-    setSample({ callId: p.callId, since: playback?.version ?? 0 });
+    onSample?.();
+    setSample({ callId: p.callId, since: playback?.version ?? 0, toMs: speaker.sample.t1_ms });
     const { call_id, t0_ms, t1_ms } = speaker.sample;
     const res = await p.bridge.act(
       "audio_play",
@@ -245,7 +255,8 @@ export function NameRow({
       key={c.id}
       type="button"
       className="pc-name__chip"
-      aria-pressed={pick?.name === c.display_name}
+      aria-label={c.display_name}
+      aria-pressed={pick?.ref.type === "existing" && pick.ref.person_id === c.id}
       onClick={() => (
         setPick({
           ref: { type: "existing", person_id: c.id },
@@ -255,7 +266,7 @@ export function NameRow({
         setError(null)
       )}
     >
-      {c.display_name}
+      <PersonChipView speaker={{ ...speaker, label: { type: "person", person: c } }} />
     </button>
   );
   return (
@@ -265,61 +276,60 @@ export function NameRow({
       data-state={error ? "error" : pick ? "selected" : "unnamed"}
       className="pc-name__row"
     >
-      <div className="pc-name__who">
+      <div className="pc-name__label">
         <strong>{label}</strong>
         <span className="pc-name__lines">
           {t("speakers.row.lines", { count: speaker.segment_count })}
         </span>
-        {p.audio && speaker.sample && (
-          <PushButton
-            size="small"
-            icon="play"
-            label={
-              samplePlaying(sample, playback)
-                ? t("speakers.row.playing")
-                : t("speakers.row.sample")
-            }
-            onAction={() => void play()}
-          />
-        )}
       </div>
-      {line && <p className="pc-name__line">{line}</p>}
-      {chips.length > 0 && (
-        <div
-          className="pc-name__chips"
-          role="group"
-          aria-label={t("speakers.row.suggest")}
-        >
-          <span className="pc-name__hint">{t("speakers.row.suggest")}</span>
-          {chips.map(chip)}
-        </div>
-      )}
-      <div className="pc-name__act">
-        <PersonPicker
-          bridge={p.bridge}
-          variant="inline"
-          people={people}
-          participants={p.participants}
-          speakers={p.speakers}
-          confirmLabel={t("speakers.create_name")}
-          value={text}
-          error={error}
-          disabled={busy}
-          onPick={(ref, to) => (
-            setText(to),
-            setError(null),
-            setPick(ref ? { ref, name: to } : null)
+      <div className="pc-name__body">
+        {line && <q className="pc-name__quote" lang={langAttr(line.lang)}>{line.text}</q>}
+        <div className="pc-name__pick">
+          {p.audio && speaker.sample && (
+            <PushButton
+              size="small"
+              icon="play"
+              label={samplePlaying(sample, playback, sampleActive) ? t("speakers.row.playing") : t("speakers.row.sample")}
+              onAction={() => void play()}
+            />
           )}
-          onConfirm={(ref, to) => void name(ref, to)}
-        />
+          <PersonPicker
+            bridge={p.bridge}
+            variant="inline"
+            people={people}
+            participants={p.participants}
+            speakers={p.speakers}
+            confirmLabel={t("speakers.create_name")}
+            value={text}
+            error={error}
+            disabled={busy}
+            onPick={(ref, to) => (
+              setText(to),
+              setError(null),
+              setPick(ref ? { ref, name: to } : null)
+            )}
+            onConfirm={(ref, to) => void name(ref, to)}
+          />
+          {chips.length > 0 && (
+            <div className="pc-name__chips" role="group" aria-label={t("speakers.row.suggest")}>
+              <span className="pc-name__hint">{t("speakers.row.suggest")}</span>
+              {chips.map(chip)}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="pc-name__acts">
         <PushButton
           variant="primary"
+          size="small"
           label={t("speakers.row.name")}
           disabled={!pick || busy}
           loading={busy}
           onAction={() => pick && void name(pick.ref, pick.name)}
         />
         <PushButton
+          size="small"
+          variant="quiet"
           label={t("speakers.row.skip")}
           disabled={busy}
           onAction={onSkip}

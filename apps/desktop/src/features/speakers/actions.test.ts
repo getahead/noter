@@ -16,8 +16,10 @@ const bridge = (res: unknown) => {
 describe("applyFix", () => {
   it("applies the returned segment and says what was fixed", async () => {
     const { b, setState } = bridge({ status: "ok", data: { segment, glossary_term_id: "g1", change_id: "ch1" } });
+    const command = vi.spyOn(b.core, "transcriptFixTerm");
     expect(await applyFix(b, segment, { start: 9, end: 21 }, "alert service", true)).toEqual({ message: expect.stringContaining("alert service"), change_id: "ch1" });
     expect(setState).toHaveBeenCalled();
+    expect(command).toHaveBeenCalledWith({ call_id: "c1", segment_id: "seg1", range: { start: 9, end: 21 }, replacement: "alert service", add_to_glossary: true });
   });
   it("refreshes the stale segment and requires a new selection before another correction", async () => {
     const { b, setState } = bridge({ status: "error", error: { code: "invalid_input" } });

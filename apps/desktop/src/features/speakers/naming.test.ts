@@ -47,7 +47,7 @@ const seg = (
   text: string,
   t0_ms: number,
 ): SegmentView =>
-  ({ id, text, t0_ms, speaker: { speaker_id } }) as unknown as SegmentView;
+  ({ id, text, t0_ms, state: "confirmed", lang: "ru", speaker: { speaker_id } }) as unknown as SegmentView;
 
 describe("panelRows", () => {
   const speakers = [
@@ -100,7 +100,8 @@ describe("firstLine", () => {
       seg("3", "a", "later", 9),
       seg("2", "a", "first", 4),
     ];
-    expect(firstLine(segs, "a")).toBe("first");
+    expect(firstLine(segs, "a")).toEqual(segs[2]);
+    expect(firstLine([{ ...segs[0], speaker: { ...segs[0].speaker, speaker_id: "a" }, state: "hypothesis" }, ...segs], "a")).toEqual(segs[2]);
     expect(firstLine(segs, "zzz")).toBeNull();
   });
 });
@@ -117,6 +118,13 @@ describe("samplePlaying", () => {
       stopped_reason: null,
       ...over,
     }) as PlaybackState;
+  it("stops showing the previous sample when playback switches ranges or calls", () => {
+    const sample = { callId: "c1", since: 4, toMs: 6000 };
+    expect(samplePlaying(sample, pb({ playing: true, to_ms: 12000 }))).toBe(false);
+    expect(samplePlaying(sample, pb({ playing: true, to_ms: 6000 }))).toBe(true);
+    expect(samplePlaying(sample, pb({ playing: true, to_ms: 6000 }), false)).toBe(false);
+    expect(samplePlaying(sample, pb({ playing: true, call_id: "c2", to_ms: 6000 }))).toBe(false);
+  });
   it("shows Playing… until the core reports the sample ended", () => {
     expect(samplePlaying({ callId: "c1", since: 4 }, undefined)).toBe(true);
     expect(samplePlaying({ callId: "c1", since: 4 }, pb({ version: 4 }))).toBe(

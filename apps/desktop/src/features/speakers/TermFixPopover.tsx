@@ -8,8 +8,10 @@ import type { GlossaryTerm, SegmentView, TextRange } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { Popover } from "../../ui/primitives/popover";
+import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
+import { langAttr, langName } from "../transcript/model";
 import { fixKey, fixMessage, staleFix } from "./naming";
 import "./speakers.css";
 
@@ -53,11 +55,14 @@ export async function applyFix(bridge: Bridge, segment: SegmentView, range: Text
 export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixed }: TermFixPopoverProps) {
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-range
   const selected = segment.text.slice(range.start, range.end);
+  const language = langAttr(segment.lang);
+  const languages = ["en", "ru", "de"].map((value) => ({ value, label: langName({ code: value }) }));
+  if (!languages.some((x) => x.value === language)) languages.push({ value: language, label: langName(segment.lang) });
   const [terms, setTerms] = useState<readonly GlossaryTerm[]>([]);
   useEffect(() => void bridge.act("glossary:list", "glossary_list", () => bridge.core.glossaryList({}), {}).then((r) => r.status === "ok" && setTerms(r.data.terms)), [bridge]);
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-range
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-draft
-  const [text, setText] = useState("");
+  const [text, setText] = useState(selected);
   const [glossary, setGlossary] = useState(true);
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-draft
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +92,7 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
         <h3 className="cw-pr__title">{t("speakers.fix.title")}</h3>
         <div className="cw-pp__lbl">
           {t("speakers.fix.selected")}
-          <q>{selected}</q>
+          <q lang={langAttr(segment.lang)}>{selected}</q>
         </div>
         <TextField label={t("speakers.fix.correct")} showLabel value={text} invalid={!!error} message={error ?? undefined} disabled={busy} onChange={(v) => (setText(v), !reselect && setError(null))} onEnter={() => void fix()} />
         {terms.length > 0 && (
@@ -99,6 +104,10 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
             ))}
           </div>
         )}
+        <label className="cw-pp__lbl" title={t("speakers.fix.lang_readonly")}>
+          {t("speakers.fix.lang")}
+          <PopupButton label={t("speakers.fix.lang")} options={languages} value={language} disabled />
+        </label>
         <Checkbox label={t("speakers.fix.glossary")} checked={glossary} onAction={setGlossary} />
         <span className="pc-name__hint">{t("speakers.fix.info")}</span>
         <div className="cw-pr__foot">

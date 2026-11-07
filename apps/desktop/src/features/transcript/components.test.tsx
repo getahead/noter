@@ -233,6 +233,19 @@ async function open(label: WindowLabel, mutate: (w: World) => void = () => {}) {
 }
 
 describe("useTranscript and TranscriptPanel (hosts)", () => {
+  it("requests the native call window key before live rename, but never for stored rename", async () => {
+    const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
+    await b.subscribe("transcript_subscribe", { call_id: LIVE });
+    const focus = vi.spyOn(b.core, "windowShowCall");
+    const tr = hookOf(b, LIVE);
+    const rename = (variant: "live" | "stored") => find(rendered(TranscriptLog, { tr, variant }), (p) => "onRename" in p).props.onRename as (...args: unknown[]) => Promise<void>;
+    await rename("live")("spk_3", tr.data!.segments[0], {});
+    expect(focus).toHaveBeenCalledWith({});
+    focus.mockClear();
+    await rename("stored")("spk_3", tr.data!.segments[0], {});
+    expect(focus).not.toHaveBeenCalled();
+  });
+
   it("draws the live call in CS-R2 from the Channel, and the call screen mounts it", async () => {
     const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
     await b.subscribe("transcript_subscribe", { call_id: LIVE });

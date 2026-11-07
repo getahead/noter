@@ -48,20 +48,22 @@ export function chipsFor(
 export function firstLine(
   segments: readonly SegmentView[],
   speakerId: string,
-): string | null {
-  const own = segments.filter((s) => s.speaker.speaker_id === speakerId);
+): SegmentView | null {
+  const own = segments.filter((s) => s.speaker.speaker_id === speakerId && s.state === "confirmed");
   return own.length
-    ? own.reduce((a, b) => (b.t0_ms < a.t0_ms ? b : a)).text
+    ? own.reduce((a, b) => (b.t0_ms < a.t0_ms ? b : a))
     : null;
 }
 
 /** Play Sample reads **Playing…** from the request until a newer report says playback stopped. */
 export function samplePlaying(
-  sample: { callId: string; since: number } | null,
+  sample: { callId: string; since: number; toMs?: number } | null,
   pb: PlaybackState | undefined,
+  active = true,
 ): boolean {
-  if (!sample) return false;
-  const fresh = pb && pb.version > sample.since && pb.call_id === sample.callId;
+  if (!sample || !active) return false;
+  const fresh = pb && pb.version > sample.since;
+  if (fresh && (pb.call_id !== sample.callId || (sample.toMs !== undefined && pb.to_ms !== sample.toMs))) return false;
   return !fresh || pb.playing || !pb.stopped_reason;
 }
 

@@ -24,9 +24,11 @@ const LINES = /\d+ lines?/;
 test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
   test("UI — happy path: click Speaker 3, Rename Speaker 3 with Name…, In this call and Whole call, ↓ + Return renames every line, the strip says Named Speaker 3 as Pavel · N lines, Esc closes", async ({ page }) => {
     await live(page);
+    const focusRequests = (await sent(page, "window_show_call")).length;
     await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
     const rename = popover(page, "Rename Speaker 3");
     await expect(rename.getByRole("combobox", { name: "Name…" })).toBeFocused();
+    expect(await sent(page, "window_show_call")).toHaveLength(focusRequests + 1);
     await expect(rename).toContainText("In this call");
     await expect(rename.getByRole("radio", { name: "Whole call" })).toBeChecked();
 
@@ -226,6 +228,10 @@ test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy a
   const fix = page.getByRole("dialog", { name: "Fix term", exact: true });
   await expect(fix).toBeVisible();
   await expect(fix).toContainText(selected!);
+  await expect(fix.getByRole("combobox", { name: "Language", exact: true })).toBeDisabled();
+  await expect(fix.getByRole("textbox", { name: "Correct term" })).toHaveValue(selected!);
+  await fix.getByRole("textbox", { name: "Correct term" }).fill("");
+  await expect(fix.getByRole("button", { name: "Fix", exact: true })).toBeDisabled();
   await fix.getByRole("textbox", { name: "Correct term" }).fill("corrected");
   await fix.getByRole("button", { name: "Fix", exact: true }).click();
   await expect(fix).toHaveCount(0);

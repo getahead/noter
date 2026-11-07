@@ -141,11 +141,25 @@
 .pc-name {
   display: grid;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   margin-bottom: 10px;
   border: 1px solid var(--sep);
-  border-radius: var(--r-row);
+  border-radius: var(--r-card);
   background: var(--card-bg);
+}
+.pc-name--compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  color: var(--label-2);
+  justify-self: start;
+}
+.pc-name--compact .pc-name__head {
+  display: contents;
+}
+.pc-name--compact .pc-name__title {
+  font: inherit;
 }
 .pc-name__head {
   display: flex;
@@ -158,25 +172,34 @@
 }
 .pc-name__row {
   display: grid;
-  gap: 6px;
-  padding-top: 8px;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px 12px;
+  padding: 10px 0;
   border-top: 1px solid var(--sep);
 }
-.pc-name__who {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.pc-name__label {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
 }
 .pc-name__lines {
   color: var(--label-3);
   font-size: 12px;
-  margin-right: auto;
 }
-.pc-name__line {
+.pc-name__body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.pc-name__quote {
+  overflow-wrap: anywhere;
+  font-style: italic;
   margin: 0;
   color: var(--label-2);
   font-size: 12px;
 }
+.pc-name__pick,
 .pc-name__chips {
   display: flex;
   flex-wrap: wrap;
@@ -188,27 +211,37 @@
   color: var(--label-3);
 }
 .pc-name__chip {
-  border: 1px solid var(--sep);
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--ctrl-border-soft);
+  background: var(--ctrl-bg);
   color: var(--label);
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: var(--r-capsule);
+  padding: 2px 8px 2px 3px;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
 }
-.pc-name__chip[aria-pressed="true"] {
-  background: var(--accent-fill);
-  color: var(--on-accent);
-  border-color: transparent;
+.pc-name__chip:hover {
+  background: var(--sel-unemph);
 }
-.pc-name__act {
+.pc-name__chip[aria-pressed="true"] {
+  background: var(--sel-accent);
+  border-color: var(--accent);
+}
+.pc-name__acts {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
 }
-.pc-name__act .cw-pp--field {
-  flex: 1;
+.pc-name__pick .cw-pp--field {
+  flex: 0 1 180px;
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 1180px) {
+  .pc-name__row { grid-template-columns: minmax(0, 1fr); }
 }
 .pc-name__skip {
   display: flex;

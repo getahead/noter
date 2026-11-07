@@ -253,7 +253,13 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
       onRefusedDone={tr.clearRefused}
       timeHelp={gone ? (tr.detail!.audio_not_stored ? t("transcript.audio.not_stored") : t("transcript.audio.deleted_help")) : undefined}
       onPlay={(seg) => void tr.play(seg)}
-      onRename={variant === "tail" ? undefined : (speakerId, seg, anchor) => setRenaming({ speakerId, segmentId: seg.id, anchor })}
+      onRename={variant === "tail" ? undefined : async (speakerId, seg, anchor) => {
+        if (variant === "live") {
+          const focused = await tr.bridge.act("window_show_call", "window_show_call", () => tr.bridge.core.windowShowCall({}), {});
+          if (focused.status === "error") return;
+        }
+        setRenaming({ speakerId, segmentId: seg.id, anchor });
+      }}
       onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
     />
     {fixing?.menu && (

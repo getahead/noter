@@ -661,6 +661,7 @@ export const en = {
   "speakers.fix.selected": "Selected",
   "speakers.fix.correct": "Correct term",
   "speakers.fix.lang": "Language",
+  "speakers.fix.lang_readonly": "Changing the language isn’t available yet.",
   "speakers.fix.glossary": "Add to glossary",
   "speakers.fix.info": "Older calls get a proposal in Activity",
   "speakers.fix.apply": "Fix",

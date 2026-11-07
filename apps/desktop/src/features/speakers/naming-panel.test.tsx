@@ -31,7 +31,7 @@ const spk = (
     ...over,
   }) as SpeakerView;
 const seg = (id: string, speaker_id: string, text: string): SegmentView =>
-  ({ id, text, t0_ms: 10, speaker: { speaker_id } }) as unknown as SegmentView;
+  ({ id, text, t0_ms: 10, state: "confirmed", lang: "ru", speaker: { speaker_id } }) as unknown as SegmentView;
 
 const bridge = (over: Record<string, unknown> = {}) =>
   ({
@@ -70,6 +70,20 @@ describe("SpeakerNamingPanel", () => {
     expect(html).toContain("Play Sample");
     expect(html).toContain("Pavel Romanov");
     expect(html).toContain('data-region="PC-R9"');
+  });
+  it("keeps the count with the label and quote, sample, picker and person chips in the body", () => {
+    const tree = rendered(NameRow, { p: props(), speaker: spk("s3", 3), people: null, line: seg("g1", "s3", "Обсудим план"), onSkip: () => {} });
+    const label = find(tree, (p) => p.className === "pc-name__label");
+    expect(renderToString(label)).toContain("4 lines");
+    const body = find(tree, (p) => p.className === "pc-name__body");
+    const html = renderToString(body);
+    expect(html).toContain('<q class="pc-name__quote" lang="ru">Обсудим план</q>');
+    expect(html).toContain("Play Sample");
+    expect(html).toContain('data-component="cpt-noter-component-ui-person-chip"');
+    expect(find(body, (p) => "onConfirm" in p)).toBeTruthy();
+    const actions = find(tree, (p) => p.className === "pc-name__acts");
+    expect(find(actions, (p) => p.label === "Name").props.size).toBe("small");
+    expect(find(actions, (p) => p.label === "Skip").props.variant).toBe("quiet");
   });
   it("hides Play Sample when the audio is gone", () => {
     expect(
@@ -116,13 +130,21 @@ describe("SpeakerNamingPanel", () => {
     }
     await vi.waitFor(() => expect(played).toEqual([{ call_id: "c1", from_ms: 1000, to_ms: 6000 }, { call_id: "c1", from_ms: 1000, to_ms: 6000 }]));
   });
+  it("claims the active sample row when requesting playback", () => {
+    const tree = rendered(NameRow, { p: props(), speaker: spk("s3", 3), people: null, line: null, onSkip: () => {}, sampleActive: false, onSample: vi.fn() });
+    expect(find(tree, (p) => p.label === "Play Sample")).toBeTruthy();
+    const claim = vi.fn();
+    const active = rendered(NameRow, { p: props(), speaker: spk("s4", 4), people: null, line: null, onSkip: () => {}, sampleActive: true, onSample: claim });
+    (find(active, (p) => p.label === "Play Sample").props as { onAction: () => void }).onAction();
+    expect(claim).toHaveBeenCalledOnce();
+  });
   it("Name, a picked chip, the picker and Hide reach the core and the row's state", async () => {
     const sent: unknown[] = [];
     const b = bridge({
       transcriptNameSpeakers: async (a: unknown) => (sent.push(a), { status: "error", error: { code: "not_found" } }),
     });
     const sp = spk("s3", 3, { suggestion: { type: "existing", person_id: "p1" } } as never);
-    const tree = rendered(NameRow, { p: props({ bridge: b, speakers: [sp] }), speaker: sp, people: null, line: "hi", onSkip: () => {} });
+    const tree = rendered(NameRow, { p: props({ bridge: b, speakers: [sp] }), speaker: sp, people: null, line: seg("g1", "s3", "hi"), onSkip: () => {} });
     const picker = find(tree, (pr) => "onConfirm" in pr).props as {
       onPick: (r: unknown, to: string) => void;
       onConfirm: (r: unknown, to: string) => void;
