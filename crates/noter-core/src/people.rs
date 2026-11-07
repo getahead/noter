@@ -409,6 +409,7 @@ impl Core {
         }
     }
 
+    // @cpt-dod:cpt-noter-dod-core-people-pages:p4
     // @cpt-flow:cpt-noter-flow-core-people-read:p1
     pub(crate) fn list_people(&self, args: PeopleListArgs) -> Result<PeopleList, CoreError> {
         self.ready()?;
@@ -704,6 +705,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-people-edit:p1:inst-edit-return
     }
 
+    // @cpt-dod:cpt-noter-dod-core-people-identity:p4
     // @cpt-flow:cpt-noter-flow-core-people-merge-delete:p1
     pub(crate) fn merge_people(
         &self,
