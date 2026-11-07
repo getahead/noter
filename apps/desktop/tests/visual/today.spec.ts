@@ -62,7 +62,7 @@ test.describe("cpt-noter-dod-ui-today-dashboard today", () => {
   });
   test("no calls today with This week", async ({ page }) => {
     await open(page, day((w) => Object.assign(w.today, { today: [], this_week: [call(w, "qa", "Cross-team QA sync", w.now + 24 * HOUR, { open_count: 2 })] })));
-    await expect(page.getByText("This week")).toBeVisible();
+    await expect(page.getByText("This week", { exact: true })).toBeVisible();
     await shot(page, "today-no-calls-week");
   });
   test("Calendar not asked", async ({ page }) => {
