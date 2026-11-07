@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.20.0](https://github.com/getahead/noter/compare/v0.19.0...v0.20.0) (2026-11-07)
+
+
+### Features
+
+* **core:** own-account sign-in sessions, agent binding, account test and sign-out ([#354](https://github.com/getahead/noter/issues/354)) ([136b0d2](https://github.com/getahead/noter/commit/136b0d29071c92788a9f6b4ddeb45a2a0fd40a0c))
+* **core:** voice profiles with Keychain-encrypted centroids, speaker matching at archive install, and carry-forward ([#355](https://github.com/getahead/noter/issues/355)) ([d1805b8](https://github.com/getahead/noter/commit/d1805b8f53a272c7210386b951ce40ea1dd902d8))
+* **knowledge:** indexed and live MCP sources over the McpSource seam and token revocation ([#351](https://github.com/getahead/noter/issues/351)) ([97fda4d](https://github.com/getahead/noter/commit/97fda4d70afcd3d9891a9a727e8f59a6d25575e3))
+* **knowledge:** noter-knowledge crate, folder sources, extraction and sync jobs ([#331](https://github.com/getahead/noter/issues/331)) ([f9611dc](https://github.com/getahead/noter/commit/f9611dcfd96bd8ded66bab5a6393618deb092e7b))
+* **mcp:** noter-mcp binary, core socket, per-run tokens and entity read tools ([#336](https://github.com/getahead/noter/issues/336)) ([d717c7f](https://github.com/getahead/noter/commit/d717c7fc8b8c9811b03417d842223d0eafd22139))
+* **retrieval:** noter-retrieval crate, FTS5 and vector indexes, search and rebuild ([#332](https://github.com/getahead/noter/issues/332)) ([33d9c07](https://github.com/getahead/noter/commit/33d9c0769502d58b721adf17911c2a2c8e01516e))
+* **ui:** add Mapping sheet, Repositories pane and Compare (2.21 S2) ([#350](https://github.com/getahead/noter/issues/350)) ([436fa2f](https://github.com/getahead/noter/commit/436fa2f4b403b59af6c96196fc73b19304acc609))
+* **ui:** announce Summary ready once and mark the export return (2.18 gaps) ([#349](https://github.com/getahead/noter/issues/349)) ([2685bf0](https://github.com/getahead/noter/commit/2685bf09b9726f498adc6fc198eb850c1d91565b))
+* **ui:** handoff drawer, prompt editor and launch controls (2.21 S1) ([#328](https://github.com/getahead/noter/issues/328)) ([554a25c](https://github.com/getahead/noter/commit/554a25c6b08ea589dd634677f1da4452e0dc1de9))
+* **ui:** item evidence notes and inspector evidence E2E (2.17 gaps) ([#339](https://github.com/getahead/noter/issues/339)) ([395e78e](https://github.com/getahead/noter/commit/395e78ec3ab3f6473307a58a5f95b3e194e4118c))
+* **ui:** show the next calendar event in the menu bar ([#334](https://github.com/getahead/noter/issues/334)) ([76cb1f9](https://github.com/getahead/noter/commit/76cb1f9017a30a3685d1209fc4a15b8e80be496f))
+* **ui:** today item regions, card rows and review links (2.20 S2) ([#348](https://github.com/getahead/noter/issues/348)) ([6787b86](https://github.com/getahead/noter/commit/6787b869d9f805dcda4645a790710c703331c899))
+
+
+### Bug fixes
+
+* **core:** synchronize call panel native focus ([#337](https://github.com/getahead/noter/issues/337)) ([7538f50](https://github.com/getahead/noter/commit/7538f50a1adde404fdc2bd682898fa3a55563d6b))
+* **ui:** show the next event time in the local time zone ([#352](https://github.com/getahead/noter/issues/352)) ([366c4a4](https://github.com/getahead/noter/commit/366c4a4e82ce91ae415f99039cfd82a84064d1cb))
+
 ## [0.19.0](https://github.com/getahead/noter/compare/v0.18.0...v0.19.0) (2026-11-07)
 
 
