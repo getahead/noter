@@ -184,7 +184,7 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 
 ### Open ready or failed outputs from a notification
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-notification`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-notification`
 
 **Actor**: Primary user
 
@@ -196,11 +196,11 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 - Next call recording: ready/failed notifications wait until stop, one thread per call; presenting rules remain with Notifications.
 
 **Steps**:
-1. [ ] - `p1` - Core applies the existing notification send rules and posts NT-1 or NT-2 after outputs settle - `inst-send`
-2. [ ] - `p1` - User clicks it; consume `nav:request` for call_page and Summary through the shell; `outputs_get` loads that call - `inst-route`
-3. [ ] - `p1` - **IF** failed: show the failed section and invoke the section retry flow only when the user clicks Try Again - `inst-failed`
+1. [x] - `p1` - Core applies the existing notification send rules and posts NT-1 or NT-2 after outputs settle - `inst-send`
+2. [x] - `p1` - User clicks it; consume `nav:request` for call_page and Summary through the shell; `outputs_get` loads that call - `inst-route`
+3. [x] - `p1` - **IF** failed: show the failed section and invoke the section retry flow only when the user clicks Try Again - `inst-failed`
 4. [x] - `p1` - **IF** the page is already visible when outputs finish: announce Summary ready once, without duplicate toast or notification - `inst-visible`
-5. [ ] - `p1` - **RETURN** the requested outputs, or the frame's not-found state if the call was deleted - `inst-return`
+5. [x] - `p1` - **RETURN** the requested outputs, or the frame's not-found state if the call was deleted - `inst-return`
 
 ## 3. Processes / Business Logic (CDSL)
 

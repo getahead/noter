@@ -57,7 +57,9 @@ export function CallPage({ bridge, callId, span, tab = "transcript" }: { bridge:
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-gone
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-gone
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-return
   if (state === "NOT_FOUND") return <EmptyState variant="large" heading icon="inbox" title={t("callpage.gone_title")} body={t("callpage.gone_body")} />;
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-return
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-gone
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-if-gone
   if (state === "ERROR") return <InlineBanner banner={{ id: "call-error", severity: "error", text: t("callpage.error"), actions: [{ label: t("action.try_again"), onAction: tryAgain }] }} />;

@@ -159,6 +159,17 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"] })]);
   });
 
+  test("UI — error path: the call was deleted — a notification click for it opens the frame's not-found state, not a dead Summary", async ({ page }) => {
+    await openWindow(page, "main", { world: O.written });
+    await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+    await page.evaluate(async () => {
+      const args = { target: { type: "call_page", call_id: "call_deleted", tab: "summary" } };
+      const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
+      await (g.__noterFake ? g.__noterFake.invoke("window_navigate", args) : g.__TAURI_INTERNALS__!.invoke("window_navigate", { args }));
+    });
+    await expect(page.getByText("This call is no longer here")).toBeVisible();
+  });
+
   test("UI — happy path: the page is already visible when the Summary finishes — Summary ready is announced once, without a second announcement", async ({ page }) => {
     await openWindow(page, "main", {
       world: (w) => {
@@ -206,7 +217,8 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await openSummary(page, call);
     await page.keyboard.press("Meta+Shift+KeyC");
     await expect(menu(page)).toHaveCount(0);
-    expect(await sent(page, "share_copy")).toEqual([expect.objectContaining({ call_id: call, format: "slack" })]);
+    // the menu never opens, so nothing above waits for the invoke: poll until the core has been asked
+    await expect.poll(() => sent(page, "share_copy")).toEqual([expect.objectContaining({ call_id: call, format: "slack" })]);
     await expect(share(page)).toContainText("Copied for Slack");
   });
 
