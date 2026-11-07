@@ -2471,7 +2471,8 @@ async fn a_scripted_mcp_server_signs_in_and_its_pages_are_indexed() {
 #[tokio::test]
 async fn hold_rebuild_keeps_search_keyword_only_until_the_release_rebuilds() {
     let mut r = start().await;
-    let search = json!({"query": "Ann agreed to ship the importer", "filter": {}, "limit": null});
+    // An item's own text: hybrid finds it by meaning too once the rebuild gave it a vector.
+    let search = json!({"query": "Rotate the staging Jira token", "filter": {}, "limit": null});
     r.ok("main", "harness.hold_rebuild", json!({"on": true}))
         .await;
     let held = r.ok("main", "search", search.clone()).await;
@@ -2485,6 +2486,10 @@ async fn hold_rebuild_keeps_search_keyword_only_until_the_release_rebuilds() {
     for _ in 0..250 {
         let found = r.ok("main", "search", search.clone()).await;
         if found["mode"]["type"] == "hybrid" {
+            assert!(
+                found["explain"]["semantic_hits"].as_u64() > Some(0),
+                "{found}"
+            );
             return r.finish().await;
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
@@ -2501,20 +2506,20 @@ async fn hold_rebuild_needs_on() {
     );
 }
 
-// The next answer of one skill, once; then the script (here: the built-in output) again.
+// The next answers of one skill, once each in order; then the script (here: the built-in output).
 #[tokio::test]
 async fn llm_next_answers_the_next_run_of_its_skill_once() {
     let mut r = start().await;
-    let summary = json!({"lang": "en", "summary_md": "From llm_next.", "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": [], "extras_md": null});
+    let summary = |md: &str| json!({"lang": "en", "summary_md": md, "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": [], "extras_md": null});
     let run = json!({"skill": "post-call"});
-    r.ok(
-        "main",
-        "harness.llm_next",
-        json!({"skill": "post-call", "output": summary}),
-    )
-    .await;
-    let ran = r.ok("main", "harness.llm_run", run.clone()).await;
-    assert_eq!(ran["output"]["summary_md"], "From llm_next.");
+    for md in ["First.", "Second."] {
+        let next = json!({"skill": "post-call", "output": summary(md)});
+        r.ok("main", "harness.llm_next", next).await;
+    }
+    for md in ["First.", "Second."] {
+        let ran = r.ok("main", "harness.llm_run", run.clone()).await;
+        assert_eq!(ran["output"]["summary_md"], md, "in the order given");
+    }
     let ran = r.ok("main", "harness.llm_run", run.clone()).await;
     assert_eq!(ran["output"]["summary_md"], "Scripted summary.");
     r.ok(
