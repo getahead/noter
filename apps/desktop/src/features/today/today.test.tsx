@@ -183,14 +183,21 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
   const today = () => (fake.world as unknown as { today: Record<string, unknown> }).today;
   it("lists the due items and Done today with their counts, and the empty lines", async () => {
     await open();
-    Object.assign(today(), { due_without_call: [items()[0]], done_today: [items()[1]], first_use: false });
+    // the fake derives both regions from the items: add one due item and one ticked today
+    const date = String(today().date);
+    const extra = [
+      { ...items()[0]!, id: "itm_due_nocall", review: "accepted", status: "open", due: date },
+      { ...items()[1]!, id: "itm_done_today", review: "accepted", status: "done", done_at: Date.parse(date) + 1000 },
+    ];
+    items().push(...extra);
+    Object.assign(today(), { first_use: false });
     await loadToday(bridge);
     let html = renderToString(<TodayPage bridge={bridge} />);
     expect(html).toContain('data-region="TD-R5"');
     expect(html).toContain("Due this week, no call");
     expect(html).toContain("Done today · 1");
     expect(html).toContain('data-variant="compact"');
-    Object.assign(today(), { due_without_call: [], done_today: [] });
+    items().splice(items().length - extra.length, extra.length);
     await loadToday(bridge);
     html = renderToString(<TodayPage bridge={bridge} />);
     expect(html).toContain("Nothing due without a call");
