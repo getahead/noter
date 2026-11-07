@@ -54,11 +54,12 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
   useEffect(() => void load(bridge, itemId), [bridge, itemId]);
   useEffect(() => { if (callId) void loadContext(bridge, callId); }, [bridge, callId]);
   useEffect(() => { if (repos) void refreshHandoff(bridge, itemId); }, [bridge, itemId, repos]);
+  const focusRepository = () => root.current?.querySelector<HTMLElement>('[data-region="HD-R3"] select, [data-region="HD-R3"] button')?.focus();
   const addMapping = () => sheets?.open("add-mapping", {
-    bridge, sourceKey: view?.unmapped_key ?? "", fromHandoff: true,
+    bridge, sourceKey: view?.unmapped_key ?? "", fromHandoff: true, returnFocus: focusRepository,
     onSaved: async () => {
       await refreshHandoff(bridge, itemId);
-      requestAnimationFrame(() => root.current?.querySelector<HTMLElement>('[data-region="HD-R3"] select, [data-region="HD-R3"] button')?.focus());
+      requestAnimationFrame(focusRepository);
     },
   });
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-open
@@ -173,9 +174,9 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
                   { value: "add", label: t("mapping.add_more") },
                 ]} value={view.repo.id} onAction={(value) => { if (value === "add") addMapping(); }} />
               ) : (
-                <span className="hd__warn">
+                <span className="hd__warn hd__warn--line">
                   <Icon name="warning" size={12} />
-                  {noMapping(view)} · <PushButton label={t("mapping.add_more")} size="small" variant="quiet" onAction={addMapping} />
+                  <span className="hd__warn-text">{noMapping(view)} <span className="hd__nowrap">· <PushButton label={t("mapping.add_more")} size="small" variant="quiet" onAction={addMapping} /></span></span>
                 </span>
               )}
             </div>

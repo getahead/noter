@@ -69,6 +69,8 @@ describe("HandoffDrawer (cpt-noter-component-ui-handoff-drawer)", () => {
     await ready((v) => ({ ...own(v), repo: null, unmapped_key: "VSTOR", launch: { path: "none", needs_automation: false, automation_denied: false } }));
     const t = tree();
     expect(renderToString(t)).toContain("No repository mapped for VSTOR");
+    expect(renderToString(t)).toContain("hd__warn-text"); // the separator travels with the link (D350-3)
+    (find(t, (p) => p.label === "Add Mapping…").props.onAction as () => void)(); // no sheet host in this probe: a no-op, not a throw
     expect(find(t, (p) => p.label === "Open in Claude Code").props).toMatchObject({ disabled: true, help: "No repository mapped for VSTOR" });
     expect(find(t, (p) => p.label === "Copy Prompt").props.disabled).toBe(false);
   });

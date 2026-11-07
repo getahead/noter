@@ -6,7 +6,6 @@ import { t } from "../../i18n/format";
 import { useAlert, useSheet } from "../../ui/dialogs/host";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { Icon } from "../../ui/icons";
-import { IconButton } from "../../ui/primitives/icon-button";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Table, Th } from "../../ui/primitives/table";
@@ -51,12 +50,12 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
   return (
     <>
       {failed && <p className="hd__err" role="alert">{t("mapping.error.read")} <PushButton label={t("action.try_again")} size="small" onAction={() => void readRepos(bridge)} /></p>}
-      <Group foot={<>
+      {list?.mappings.length === 0 ? <EmptyState title={t("mapping.empty_title")} body={t("mapping.empty")} icon="branch" actionLabel={t("mapping.add_more")} onAction={() => edit()} /> : <Group foot={<>
         <PushButton label={t("mapping.add_more")} size="small" disabled={busy} onAction={() => edit()} />
         <PushButton label={t("mapping.edit_more")} size="small" disabled={busy || !mapping} onAction={() => edit(mapping)} />
-        <IconButton icon="minus" label={t("mapping.remove")} size="inline" disabled={busy || !mapping} onAction={() => void remove()} />
+        <PushButton label={t("mapping.remove")} size="small" icon="minus" disabled={busy || !mapping} onAction={() => void remove()} />
       </>}>
-        {list?.mappings.length === 0 ? <EmptyState variant="section" title={t("mapping.empty")} /> : (
+        {(
           <Table label={t("settings.pane.repositories")} cls="hd-repositories">
             <thead><tr><Th label={t("mapping.project")} /><Th label={t("mapping.local_path")} /><Th label={t("mapping.tool")} /></tr></thead>
             <tbody>{list?.mappings.map((repo, i) => (
@@ -68,7 +67,7 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
             ))}</tbody>
           </Table>
         )}
-      </Group>
+      </Group>}
       {error && <p className="hd__err" role="alert">{error}</p>}
     </>
   );

@@ -11,10 +11,10 @@ import { toolLabel } from "./controls";
 import { initialMapping, mappingArgs, mappingError, saveRepo } from "./mappings";
 import "./handoff.css";
 
-export interface AddMappingProps { bridge: Bridge; sourceKey?: string; mapping?: RepoMapping; fromHandoff?: boolean; close: () => void; onSaved?: () => Promise<void> | void }
+export interface AddMappingProps { bridge: Bridge; sourceKey?: string; mapping?: RepoMapping; fromHandoff?: boolean; returnFocus?: () => void; close: () => void; onSaved?: () => Promise<void> | void }
 
 // @cpt-begin:cpt-noter-flow-ui-handoff-mapping:p1:inst-sheet
-export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, close, onSaved }: AddMappingProps) {
+export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, returnFocus, close, onSaved }: AddMappingProps) {
   const [draft, setDraft] = useState(() => initialMapping(sourceKey, mapping));
   const [error, setError] = useState<ReturnType<typeof mappingError>>(null);
   const [busy, setBusy] = useState(false);
@@ -36,7 +36,8 @@ export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, close
       setBusy(false);
     }
   };
-  const cancel = () => { if (!saving.current) close(); };
+  // the Sheet primitive refocuses what was focused before it opened, so the opener takes focus after that (DESIGN › Focus order)
+  const cancel = () => { if (saving.current) return; close(); if (returnFocus) requestAnimationFrame(returnFocus); };
   return (
     <Sheet title={title} width={520} busy={busy} onCancel={cancel} onDefault={() => void save(false)}>
       <div className="np-sheet__head">
@@ -44,9 +45,9 @@ export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, close
         {fromHandoff && <div className="np-sheet__sub">{t("mapping.from_handoff")}</div>}
       </div>
       <div className="np-sheet__body hd-mapping">
-        <TextField label={t("mapping.key")} showLabel value={draft.key} disabled={busy} invalid={error?.field === "key"} message={error?.message} onChange={(key) => { setDraft({ ...draft, key }); setError(null); }} />
+        <TextField label={t("mapping.key")} showLabel placeholder={t("mapping.key_placeholder")} value={draft.key} disabled={busy} invalid={error?.field === "key"} message={error?.message} onChange={(key) => { setDraft({ ...draft, key }); setError(null); }} />
         <div className="hd-mapping__folder">
-          <TextField label={t("mapping.folder")} showLabel value={draft.path} disabled={busy} invalid={error?.field === "path"} message={error?.message} onChange={(path) => { setDraft({ ...draft, path }); setError(null); }} />
+          <TextField label={t("mapping.folder")} showLabel mono value={draft.path} disabled={busy} invalid={error?.field === "path"} message={error?.message} onChange={(path) => { setDraft({ ...draft, path }); setError(null); }} />
           <PushButton label={t("mapping.choose")} disabled={busy || !mappingArgs(draft, true)} onAction={() => save(true)} />
         </div>
         <div className="hd-mapping__tool">

@@ -97,6 +97,17 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" })).toBeEnabled();
   });
 
+  test("UI — other path: Escape on the Add Mapping sheet returns focus to the Add Mapping… button", async ({ page }) => {
+    await open(page, { mapped: false });
+    const opener = region(page, "HD-R3").getByRole("button", { name: "Add Mapping…" });
+    await opener.click();
+    const sheet = page.getByRole("dialog", { name: "Add Mapping", exact: true });
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+
   test("UI — error path: Add Mapping from the unmapped drawer persists the folder and enables Open", async ({ page }) => {
     await open(page, { mapped: false });
     await region(page, "HD-R3").getByRole("button", { name: "Add Mapping…" }).click();

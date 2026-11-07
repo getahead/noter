@@ -25,6 +25,27 @@ describe("Add Mapping sheet", () => {
     expect(primary(tree).disabled).toBe(true);
   });
 
+  it("typing edits the draft, and Return with no folder yet sends nothing", async () => {
+    const upsert = vi.spyOn(bridge.core, "repoUpsert");
+    const tree = rendered(AddMappingSheet, { bridge, sourceKey: "OTHER", close() {} });
+    (find(tree, (p) => p.label === "Jira project or component").props.onChange as (v: string) => void)("NEW");
+    (find(tree, (p) => p.label === "Folder").props.onChange as (v: string) => void)("/work/new");
+    (find(tree, (p) => typeof p.onDefault === "function").props.onDefault as () => void)();
+    await Promise.resolve();
+    expect(upsert).not.toHaveBeenCalled(); // the render this probe holds still has the blank folder
+  });
+
+  it("Cancel closes the sheet, then hands focus back to the opener", () => {
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => cb());
+    const close = vi.fn();
+    const returnFocus = vi.fn();
+    const tree = rendered(AddMappingSheet, { bridge, sourceKey: "OTHER", close, returnFocus });
+    (find(tree, (p) => typeof p.onCancel === "function").props.onCancel as () => void)();
+    vi.unstubAllGlobals();
+    expect(close).toHaveBeenCalledOnce();
+    expect(returnFocus).toHaveBeenCalledOnce();
+  });
+
   it("Choose sends null path to the core and closes only after success", async () => {
     const close = vi.fn();
     const upsert = vi.spyOn(bridge.core, "repoUpsert");

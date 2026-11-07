@@ -1229,6 +1229,8 @@ export const en = {
   "mapping.project": "Project or component",
   "mapping.local_path": "Local path",
   "mapping.missing": "Folder missing",
+  "mapping.empty_title": "No repositories mapped",
+  "mapping.key_placeholder": "VSTOR · frontend",
   "mapping.empty": "Map a Jira project or component to a folder so handoffs open in the right place.",
   "mapping.error.key": "Enter a unique Jira project or component.",
   "mapping.error.path": "That folder is missing. Choose an existing folder.",

@@ -28,6 +28,10 @@
 .hd__launch .np-ic { margin-top: 2px; flex: none; }
 .hd__warn, .hd__err, .hd__rec { margin: 0; font-size: 12px; display: flex; gap: 5px; align-items: flex-start; flex-wrap: wrap; }
 .hd__warn { color: var(--warning); }
+.hd__warn--line { flex-wrap: nowrap; }
+.hd__warn-text { min-width: 0; }
+.hd__nowrap { white-space: nowrap; }
+[data-region="HD-R3"] { align-items: flex-start; }
 .hd__err { color: var(--error); }
 .hd__rec { color: var(--success); }
 .hd__accept { margin: 0; font-size: 12px; color: var(--label-2); background: var(--sel-unemph); padding: 6px 8px; border-radius: var(--r-control); }

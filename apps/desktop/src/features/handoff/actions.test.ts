@@ -145,6 +145,17 @@ describe("edit, target, copy and open (cpt-noter-flow-ui-handoff-deliver)", () =
     expect(bridge.store.getState().entities.item[ID]?.status).toBe("handed_off");
   });
 
+  it("refreshHandoff reads the view again after a mapping change and keeps the draft (cpt-noter-flow-ui-handoff-mapping)", async () => {
+    await ready();
+    await A.load(bridge, ID);
+    L.patchLocal(ID, { draft: "Mine" });
+    map();
+    const seen = sent();
+    await A.refreshHandoff(bridge, ID);
+    expect(seen.map((s) => s[0])).toEqual(["handoff_get"]);
+    expect(L.localOf(ID).draft).toBe("Mine");
+  });
+
   it("a conflict keeps the draft, reads the prompt again and runs no action", async () => {
     await ready();
     map();
