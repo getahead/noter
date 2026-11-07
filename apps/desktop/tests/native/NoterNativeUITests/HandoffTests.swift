@@ -28,9 +28,15 @@ final class HandoffTests: NoterTestCase {
 
     /// What the window shows, for a failure message: the CI log is the only screen a native failure leaves.
     private func screen() -> String {
-        let buttons = app.buttons.allElementsBoundByIndex.prefix(40).map(\.label)
-        let texts = app.staticTexts.allElementsBoundByIndex.prefix(40).map(\.label)
-        return "buttons \(buttons) texts \(texts)"
+        // one snapshot, walked once: indexing live queries races elements that come and go
+        guard let root = try? app.snapshot() else { return "no snapshot" }
+        var labels: [String] = []
+        func walk(_ element: XCUIElementSnapshot) {
+            if [.button, .staticText, .popUpButton].contains(element.elementType), !element.label.isEmpty { labels.append("\(element.elementType.rawValue):\(element.label)") }
+            element.children.forEach(walk)
+        }
+        walk(root)
+        return labels.prefix(80).joined(separator: " | ")
     }
 
     private var addMapping: XCUIElement {
