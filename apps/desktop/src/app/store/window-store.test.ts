@@ -244,6 +244,14 @@ describe("window store", () => {
     expect(s.signin.x).toBeDefined();
     expect(s.nav).toEqual({ type: "today" });
   });
+
+  it("menu:fix_term counts each choice of the native Fix Term… item", () => {
+    let s = initialState("main");
+    expect(s.fixTerm).toBe(0);
+    s = applyEvent(s, { event: "menu:fix_term", payload: {} });
+    s = applyEvent(s, { event: "menu:fix_term", payload: {} });
+    expect(s.fixTerm).toBe(2);
+  });
 });
 
 describe("stream flush", () => {

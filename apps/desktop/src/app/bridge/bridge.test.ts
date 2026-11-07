@@ -37,15 +37,15 @@ afterEach(async () => {
 });
 
 describe("open a window (snapshot, then stream)", () => {
-  it("cpt-noter-flow-ui-core-bridge-open-window: subscribes to all 20 events before asking for the snapshot, then is READY", async () => {
+  it("cpt-noter-flow-ui-core-bridge-open-window: subscribes to all 21 events before asking for the snapshot, then is READY", async () => {
     const { b, calls, fake, state } = setup();
     const opening = b.open();
     expect(state().status).toBe("LOADING");
     await opening;
     const events = Object.keys(EVENTS);
-    expect(events).toHaveLength(20);
-    expect(calls.slice(0, 20).map((c) => c.cmd)).toEqual(events.map((e) => `listen:${e}`));
-    expect(calls[20]?.cmd).toBe("app_snapshot");
+    expect(events).toHaveLength(21);
+    expect(calls.slice(0, 21).map((c) => c.cmd)).toEqual(events.map((e) => `listen:${e}`));
+    expect(calls[21]?.cmd).toBe("app_snapshot");
     expect(state().status).toBe("READY");
     expect(state().whole.capture).toEqual(fake.world.app.capture);
     expect(state().app?.window).toBe("main");

@@ -1953,6 +1953,8 @@ export const defaultHandlers: Handlers = {
     fake.viewedCall = a.call_id ?? null;
     return ack;
   },
+  // The Edit menu's Fix Term… is native: the fake has no menu to enable.
+  window_set_fix_term_enabled: () => ({}),
   window_announce: (a) => {
     if (!a.text.trim()) throw coreError("invalid_input", "text", { type: "validation", field: "text", rule: "required" });
     return ack;

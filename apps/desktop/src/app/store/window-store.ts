@@ -148,6 +148,8 @@ export interface WindowState {
   signin: Record<string, SignInProgress>;
   /** The core's last navigation request (`nav:request`). */
   nav: NavTarget | null;
+  /** How many times the native Edit menu's Fix Term… was chosen (`menu:fix_term`). */
+  fixTerm: number;
   streams: { [K in ChannelCommand]?: Stream<K> };
   /** Controls waiting for a response, by the key the screen chose. */
   commands: Record<string, CommandState>;
@@ -183,6 +185,7 @@ export function initialState(
     jobs: {},
     signin: {},
     nav: null,
+    fixTerm: 0,
     streams: {},
     commands: {},
   };
@@ -336,6 +339,8 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
       };
     case "nav:request":
       return { ...s, nav: e.payload };
+    case "menu:fix_term":
+      return { ...s, fixTerm: s.fixTerm + 1 };
     default:
       return applyWhole(s, WHOLE_STATE[e.event], e.payload as never);
   }

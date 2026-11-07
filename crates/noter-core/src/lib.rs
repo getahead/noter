@@ -1477,6 +1477,15 @@ impl CoreApi for Core {
         Ok(Ack {})
     }
 
+    async fn window_set_fix_term_enabled(
+        &self,
+        _ctx: &CommandCtx,
+        args: FixTermEnabledArgs,
+    ) -> Result<Ack, CoreError> {
+        self.deps.surfaces.set_fix_term_enabled(args.enabled);
+        Ok(Ack {})
+    }
+
     async fn open_external(
         &self,
         _ctx: &CommandCtx,

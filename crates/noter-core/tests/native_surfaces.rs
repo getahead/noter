@@ -99,6 +99,9 @@ impl Surfaces for Rec {
     fn fit_record_prompt(&self, width: u32, height: u32) {
         self.note(format!("fit_record_prompt {width}x{height}"));
     }
+    fn set_fix_term_enabled(&self, enabled: bool) {
+        self.note(format!("set_fix_term_enabled {enabled}"));
+    }
 }
 
 fn open(dir: &Path) -> (Core, Arc<Events>, Arc<Rec>) {
@@ -470,6 +473,22 @@ async fn without_a_native_layer_the_fit_is_accepted_and_shows_nothing() {
         height: 127,
     };
     core.window_fit(&prompt, fit).await.unwrap();
+}
+
+#[tokio::test]
+async fn the_fix_term_menu_item_follows_the_selection_the_window_reports() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _events, rec) = open(dir.path());
+    rec.take();
+    for enabled in [true, false] {
+        core.window_set_fix_term_enabled(
+            &window(WindowLabel::Main),
+            FixTermEnabledArgs { enabled },
+        )
+        .await
+        .unwrap();
+        assert_eq!(rec.take(), [format!("set_fix_term_enabled {enabled}")]);
+    }
 }
 
 #[tokio::test]
