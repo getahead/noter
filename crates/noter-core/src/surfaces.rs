@@ -33,6 +33,9 @@ pub(crate) struct Windows {
     tray: Option<TrayModel>,
     /// The capture state's version and when the tray first saw it: the clock runs from there.
     clock: (StateVersion, i64),
+    /// The calendar's next event as of the last read (when, title, start): read at most once a
+    /// minute, as the tray refreshes every second.
+    next: Option<(i64, Option<(String, i64)>)>,
 }
 
 impl Default for Windows {
@@ -53,6 +56,7 @@ impl Default for Windows {
             warned: false,
             tray: None,
             clock: (StateVersion(0), 0),
+            next: None,
         }
     }
 }
@@ -397,6 +401,7 @@ impl Core {
             _ => 0,
         };
         let elapsed_ms = i64::from(capture.recorded_ms.0) + running;
+        let next_event = self.next_calendar_event(now);
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         let model = tray_model(&TrayInputs {
@@ -412,6 +417,7 @@ impl Core {
             speakers,
             elapsed_ms,
             now,
+            next_event: next_event.as_ref().map(|(t, at)| (t.as_str(), *at)),
         });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
@@ -430,6 +436,35 @@ impl Core {
             self.deps.surfaces.announce(MIC_OFF, Politeness::Assertive);
         }
         // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-degraded
+    }
+
+    /// The earliest event starting within a day, when calendar access is granted; never prompts, and
+    /// a failed read shows no line.
+    fn next_calendar_event(&self, now: i64) -> Option<(String, i64)> {
+        if self.deps.native.permission(PermissionKind::Calendar) != PermissionState::Granted {
+            return None;
+        }
+        if let Some((at, found)) = &lock(&self.windows).next {
+            if (0..60_000).contains(&(now - at)) {
+                return found.clone();
+            }
+        }
+        let day = 24 * 3_600_000;
+        let found = self
+            .deps
+            .native
+            .calendar_events(TimestampMs(now), TimestampMs(now + day))
+            .ok()
+            .and_then(|events| {
+                events
+                    .into_iter()
+                    .map(|e| e.event)
+                    .filter(|e| e.starts_at.0 > now)
+                    .min_by_key(|e| e.starts_at.0)
+            })
+            .map(|e| (e.title, e.starts_at.0));
+        lock(&self.windows).next = Some((now, found.clone()));
+        found
     }
 
     // @cpt-flow:cpt-noter-flow-core-native-surfaces-navigation:p2

@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
-    BoxFuture, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps, NativeServices,
+    BoxFuture, CalendarEvent, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps, NativeServices,
     SaveKind,
 };
 use noter_native::{PanelRequest, ParentWindow};
@@ -232,6 +232,27 @@ impl NativeServices for Mac {
             None
         })
         // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-fail
+    }
+
+    /// The events starting in `from..to` (EventKit through noter-native; never asks for access).
+    fn calendar_events(
+        &self,
+        from: TimestampMs,
+        to: TimestampMs,
+    ) -> Result<Vec<CalendarEvent>, CoreError> {
+        std::panic::catch_unwind(|| noter_native::calendar_events(from.0, to.0))
+            .map(|events| {
+                events
+                    .into_iter()
+                    .filter(|e| (from.0..to.0).contains(&e.starts_at.0))
+                    .map(|event| CalendarEvent {
+                        event,
+                        platform: None,
+                        attendees: vec![],
+                    })
+                    .collect()
+            })
+            .map_err(|_| CoreError::new(ErrorCode::CalendarUnavailable, "the calendar read failed"))
     }
 
     // @cpt-dod:cpt-noter-dod-core-first-run-login-update:p2

@@ -382,6 +382,20 @@ pub fn calendar_event_near(at_ms: i64) -> Option<CalendarEventRef> {
     // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
 }
 
+/// The events overlapping `from_ms..to_ms` (epoch ms). Never asks for access: none without it.
+pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEventRef> {
+    if permission(PermissionKind::Calendar) != PermissionState::Granted {
+        return Vec::new();
+    }
+    #[cfg(target_os = "macos")]
+    return mac::calendar_events(from_ms, to_ms);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (from_ms, to_ms);
+        Vec::new()
+    }
+}
+
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 /// How far ahead an event still counts as the call about to start.
 const CALENDAR_LOOKAHEAD_MS: i64 = 10 * 60 * 1000;
