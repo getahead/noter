@@ -89,11 +89,11 @@ impl RawEntry {
 }
 
 /// The date range both reads share: inclusive, `from` not after `to`.
-fn range(from: Option<TimestampMs>, to: Option<TimestampMs>) -> Result<String, CoreError> {
+fn check_range(from: Option<TimestampMs>, to: Option<TimestampMs>) -> Result<(), CoreError> {
     if from.zip(to).is_some_and(|(from, to)| from > to) {
         return Err(invalid("to", ValidationRule::OutOfRange));
     }
-    Ok(String::new())
+    Ok(())
 }
 
 /// A cursor is the `(ts, id)` of the last row served.
@@ -151,7 +151,7 @@ impl Core {
     pub(crate) fn audit_page(&self, args: AuditListArgs) -> Result<Page<AuditEntry>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-read
         self.ready()?;
-        range(args.from, args.to)?;
+        check_range(args.from, args.to)?;
         let limit = args.page.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
         let cursor = args.page.cursor.as_ref().map(after).transpose()?;
         let mut rows = self.audit_rows(args.from, args.to, cursor, limit + 1)?;
@@ -171,7 +171,7 @@ impl Core {
         args: AuditExportArgs,
     ) -> Result<ExportResult, CoreError> {
         self.ready()?;
-        range(args.from, args.to)?;
+        check_range(args.from, args.to)?;
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-export
         let (ext, kind) = match args.format {
             LogFormat::Markdown => ("md", SaveKind::Markdown),
