@@ -185,11 +185,15 @@ describe("PromptEditor (cpt-noter-component-ui-prompt-editor)", () => {
 
   it("draws the caption, Edited, Diff and the text area; Diff mode shows Showing changes read-only", () => {
     let html = renderToString(<PromptEditor {...props} edited versions={[v(1, "generated")]} />);
-    for (const text of ["handoffs/itm_replay.md", "Edited", "Version", ">Diff<", "<textarea"]) expect(html).toContain(text);
+    for (const text of ["handoffs/itm_replay.md", "Edited", ">Your Edit<", ">Diff<", "<textarea"]) expect(html).toContain(text);
     html = renderToString(<PromptEditor {...props} showDiff value="Do it better" />);
     expect(html).toContain("Showing changes");
     expect(html).toContain("Hide Diff");
     expect(html).not.toContain("<textarea");
+  });
+
+  it("names the current generated version in the closed menu", () => {
+    expect(renderToString(<PromptEditor {...props} versions={[v(1, "generated"), v(2, "generated")]} />)).toContain(">v2<");
   });
 
   it("generating shows the skeleton and no Diff; no generated text, no Diff", () => {

@@ -37,6 +37,6 @@ for (const state of ["ready", "others", "no-mapping", "sensitive", "edited", "di
       await expect(drawer).toContainText("Couldn't write the prompt");
     }
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await expect(drawer).toHaveScreenshot(`handoff-${state}.png`);
+    await expect(page.locator('[data-region="MW-R4"]')).toHaveScreenshot(`handoff-${state}.png`);
   });
 }

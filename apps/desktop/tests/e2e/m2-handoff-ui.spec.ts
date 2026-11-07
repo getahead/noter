@@ -49,6 +49,8 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(region(page, "HD-R5")).toContainText(PROMPT_LINE);
 
     const prompt = region(page, "HD-R4").getByRole("textbox");
+    const promptWidth = (await prompt.boundingBox())!.width;
+    expect(promptWidth).toBeGreaterThan((await region(page, "HD-R4").boundingBox())!.width * 0.85);
     await prompt.fill("Fix the replay buffer overflow in the virtualised table.");
     await expect(drawer(page)).toContainText("Edited");
     await region(page, "HD-R4").getByRole("button", { name: /Version/ }).click();
@@ -122,6 +124,9 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(prompt).toContainText("Showing changes");
     await expect(prompt.locator("ins").first()).toBeVisible();
     await expect(prompt.locator("del").first()).toBeVisible();
+    await expect(prompt.locator(".pc-diff__text")).toHaveCSS("font-size", "12px");
+    await expect(prompt.locator(".pc-diff__text")).toHaveCSS("line-height", "18px");
+    await expect(prompt.locator(".pc-diff__text")).toHaveCSS("font-family", /monospace/);
     await prompt.getByRole("button", { name: "Hide Diff" }).click();
     await expect(prompt.getByRole("textbox")).toHaveValue("A different prompt entirely.");
   });
@@ -140,6 +145,13 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
   test("UI — empty path: Sensitive call — the drawer says This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal., nothing is sent by Noter", async ({ page }) => {
     await open(page, { sensitive: true });
     await expect(drawer(page)).toContainText("This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal.");
+  });
+
+  test("UI — other path: the header close control closes the drawer and restores focus", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: "Close Inspector", exact: true }).click({ timeout: 3000 });
+    await expect(drawer(page)).toHaveCount(0);
+    await expect(row(page).getByRole("button", { name: "Handoff" })).toBeFocused();
   });
 
   test("UI — other path: Esc closes the drawer and returns focus to the item's Handoff row", async ({ page }) => {

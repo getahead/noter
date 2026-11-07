@@ -43,6 +43,7 @@ export function versionEntries(versions: VersionMeta[], edited: boolean, prefs: 
 export function PromptEditor({ itemId, value, edited, generating, generated, versions, prefs, showDiff, onDiff, onChange }: PromptEditorProps) {
   const [open, setOpen] = useState(false);
   const entries = versionEntries(versions, edited, prefs);
+  const versionLabel = edited ? t("outputs.your_edit_short") : `v${versions.at(-1)?.n ?? 1}`;
   const id = elementId("hv", itemId);
   const diffOn = showDiff && generated !== null && !generating;
   return (
@@ -50,9 +51,9 @@ export function PromptEditor({ itemId, value, edited, generating, generated, ver
       <div className="pc-prompt__head">
         <span className="np-mono pc-prompt__cap">{t("handoff.file", { item: itemId })}</span>
         {edited && <Badge kind="status" text={t("handoff.edited")} />}
-        {(entries.length > 1 || edited) && (
+        {(entries.length > 0 || edited) && (
           <span className="pc-ver">
-            <PullDownButton id={id} label={t("outputs.version")} buttonVariant="quiet" size="inline" open={open} onAction={() => setOpen(!open)} />
+            <PullDownButton id={id} label={versionLabel} ariaLabel={`${t("outputs.version")}: ${versionLabel}`} buttonVariant="quiet" size="inline" open={open} onAction={() => setOpen(!open)} />
             {open && (
               <Popover variant="item-menu" anchor={globalThis.document?.getElementById(id) ?? null} align="end" label={t("outputs.version")} onClose={() => setOpen(false)}>
                 {/* older bodies have no command: the menu lists them, only the current text is shown */}
