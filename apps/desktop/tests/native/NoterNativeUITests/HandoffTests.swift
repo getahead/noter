@@ -41,9 +41,8 @@ final class HandoffTests: NoterTestCase {
         return lines.prefix(40).map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: " ¦ ")
     }
 
-    private var addMapping: XCUIElement {
-        app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Add Mapping'")).firstMatch
-    }
+    // the web button exposes a title, not a label: the buttons subscript matches either
+    private var addMapping: XCUIElement { app.buttons["Add Mapping…"].firstMatch }
     private var choose: XCUIElement { app.buttons["Choose…"].firstMatch }
     private var openButton: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
 
