@@ -16,7 +16,7 @@ use noter_protocol::{CoreError, ErrorCode, SourceId, TimestampMs};
 use sha2::{Digest, Sha256};
 
 use crate::chunk::{self, Chunk};
-use crate::extract::{self, Format};
+use crate::extract::{self, Extracted, Format};
 use crate::internal;
 use crate::sources::{get, not_found, text};
 
@@ -104,13 +104,17 @@ struct End<'a> {
 impl<L: EngineLauncher> SyncEnv<'_, L> {
     /// Writes the source's status and the run's end if the source still exists, then publishes
     /// the row.
+    /// `meta` is `None` once the scheduler has closed the run: nothing is written then.
     fn finish(
         &self,
-        meta: ChangeMeta,
+        meta: Option<ChangeMeta>,
         id: &SourceId,
         status: SourceStatus,
         end: End<'_>,
     ) -> Result<(), CoreError> {
+        let Some(meta) = meta else {
+            return Ok(());
+        };
         let id = id.clone();
         let now = (self.now)().0;
         let (run, error, synced) = (end.run.to_string(), end.error, end.synced);
@@ -142,24 +146,6 @@ impl<L: EngineLauncher> SyncEnv<'_, L> {
             Err(e) => Err(e),
         }
     }
-}
-
-/// The change metadata once the run has closed under the handler (it was cancelled).
-fn closed_meta(summary: &str) -> ChangeMeta {
-    ChangeMeta {
-        actor: noter_protocol::model::Actor::You,
-        summary: format!("Source sync: {summary}"),
-        reason: "job".into(),
-        evidence_ids: vec![],
-        batch_id: None,
-        undoable: false,
-        surface: None,
-    }
-}
-
-fn meta_of(ctx: &RunCtx, summary: &str) -> ChangeMeta {
-    ctx.change_meta(summary)
-        .unwrap_or_else(|| closed_meta(summary))
 }
 
 // @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
@@ -194,9 +180,10 @@ pub async fn sync<L: EngineLauncher>(
         total: None,
     };
     let (source_id, run_id) = (id.clone(), run.clone());
+    let start_meta = ctx.change_meta("sync started").ok_or(Stop::Cancelled)?;
     let row = env
         .store
-        .write_with(meta_of(ctx, "sync started"), move |tx| {
+        .write_with(start_meta, move |tx| {
             get(tx, &source_id)
                 .map_err(internal)?
                 .ok_or_else(not_found)?;
@@ -235,7 +222,7 @@ pub async fn sync<L: EngineLauncher>(
         Ok(()) => {
             // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-return
             // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-done
-            let meta = meta_of(ctx, "sync finished");
+            let meta = ctx.change_meta("sync finished");
             env.finish(meta, id, SourceStatus::Idle, end(None, true))?;
             ctx.commit_batch(vec![], counts.entries(), Some(1.0))
                 .await?;
@@ -245,7 +232,7 @@ pub async fn sync<L: EngineLauncher>(
         }
         Err(Stop::Cancelled) => {
             // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-cancel
-            let meta = meta_of(ctx, "sync cancelled");
+            let meta = ctx.change_meta("sync cancelled");
             env.finish(
                 meta,
                 id,
@@ -262,7 +249,7 @@ pub async fn sync<L: EngineLauncher>(
                 code: e.code,
                 at: (env.now)(),
             };
-            let meta = meta_of(ctx, "sync failed");
+            let meta = ctx.change_meta("sync failed");
             env.finish(meta, id, status, end(Some(text(&e.code)), false))?;
             Err(Stop::Failed(e))
             // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-failed
@@ -364,28 +351,21 @@ async fn pass<L: EngineLauncher>(
         let uri = file.path.to_string_lossy().into_owned();
         let before = known.get(&uri);
         // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-hash
+        // shortcut: an unchanged modification time skips the file unhashed; a file replaced
+        // under the same time (`cp -p`, `rsync -t`) keeps its chunks until a full reindex.
         if before.is_some_and(|k| k.modified.is_some() && k.modified == file.modified) {
             continue;
         }
-        let bytes = std::fs::read(&file.path)
-            .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))?;
-        let hash: String = Sha256::digest(&bytes)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
-        if before.is_some_and(|k| k.hash == hash) {
+        let (path, format) = (file.path.clone(), file.format);
+        let stored = before.map(|k| k.hash.clone());
+        // Reading and parsing can take seconds (a large PDF): off the async workers.
+        let read = tokio::task::spawn_blocking(move || read_file(&path, format, stored))
+            .await
+            .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))??;
+        let Some((hash, doc, chunks)) = read else {
             continue;
-        }
+        };
         // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-hash
-        // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
-        let doc = extract::extract(&file.path, &bytes, file.format).map_err(|_| {
-            failed(
-                ErrorCode::SourceSyncFailed,
-                "a file could not be read as text",
-            )
-        })?;
-        let chunks = chunk::chunks(&doc);
-        // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
         // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
         let vectors = embed(env, &chunks).await?;
         // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
@@ -466,6 +446,33 @@ async fn pass<L: EngineLauncher>(
     }
     // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-deleted
     Ok(())
+}
+
+/// The file's content hash, text and chunks, or `None` when the content is `stored`.
+fn read_file(
+    path: &Path,
+    format: Format,
+    stored: Option<String>,
+) -> Result<Option<(String, Extracted, Vec<Chunk>)>, Stop> {
+    let bytes = std::fs::read(path)
+        .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))?;
+    let hash: String = Sha256::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    if stored.as_deref() == Some(hash.as_str()) {
+        return Ok(None);
+    }
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
+    let doc = extract::extract(path, &bytes, format).map_err(|_| {
+        failed(
+            ErrorCode::SourceSyncFailed,
+            "a file could not be read as text",
+        )
+    })?;
+    let chunks = chunk::chunks(&doc);
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
+    Ok(Some((hash, doc, chunks)))
 }
 
 /// One finite 1024-value vector per chunk, in order, through the engine in batches.
