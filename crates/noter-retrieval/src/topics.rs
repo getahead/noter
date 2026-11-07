@@ -392,11 +392,12 @@ pub fn keep_separate(
     now: TimestampMs,
 ) -> Result<((), Vec<Logged>), CoreError> {
     // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-separate
+    // Unknown topics first, as the contract's fake answers them.
+    stored(tx, a)?;
+    stored(tx, b)?;
     if a == b {
         return Err(invalid("b", ValidationRule::OutOfRange));
     }
-    stored(tx, a)?;
-    stored(tx, b)?;
     let key = pair_key(a, b);
     tx.execute(
         "INSERT OR IGNORE INTO suppressions (kind, key, created_at) VALUES (?1, ?2, ?3)",

@@ -1577,6 +1577,11 @@ fn topics_read_counts_aliases_threads_and_merge_suggestions() {
         keep("top_ws", "top_none").unwrap_err().code,
         ErrorCode::NotFound
     );
+    // An unknown topic is not_found even paired with itself, as the fake answers it.
+    assert_eq!(
+        keep("top_none", "top_none").unwrap_err().code,
+        ErrorCode::NotFound
+    );
     assert_eq!(lib.count("SELECT count(*) FROM changes"), changes);
 }
 
