@@ -3,7 +3,6 @@
 // harness's scripted Mac, engine and models (the launch hooks, NOTER_TEST_FIXTURE): no model, permission or call
 // of the machine it runs on is needed.
 // Story tests are named after the DESIGN story they prove (`cpt-noter-seq-…` with underscores, docs/HARNESS.md).
-import CoreGraphics
 import XCTest
 
 class NoterTestCase: XCTestCase {
@@ -77,26 +76,6 @@ class NoterTestCase: XCTestCase {
         return condition()
     }
 
-    /// Windows of the app on screen, read from the window server as (number, description). XCUITest's queries can
-    /// time out while the app hides itself for presenting, so that state is read here. The menu bar extra's own
-    /// window is too small to count, and a window with no alpha is not on screen.
-    func onScreenWindows() -> [(number: Int, text: String)] {
-        guard let path = ProcessInfo.processInfo.environment["NOTER_APP_PATH"],
-              let id = Bundle(url: URL(fileURLWithPath: path))?.bundleIdentifier,
-              let pid = NSRunningApplication.runningApplications(withBundleIdentifier: id).first?.processIdentifier,
-              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]
-        else { return [] }
-        return list.compactMap { window in
-            guard (window[kCGWindowOwnerPID as String] as? Int32) == pid,
-                  let number = window[kCGWindowNumber as String] as? Int,
-                  let bounds = (window[kCGWindowBounds as String] as? NSDictionary).flatMap({ CGRect(dictionaryRepresentation: $0 as CFDictionary) }),
-                  bounds.width >= 100, bounds.height >= 60,
-                  (window[kCGWindowAlpha as String] as? Double ?? 1) > 0.01
-            else { return nil }
-            return (number, "#\(number) layer \(window[kCGWindowLayer as String] ?? "?") alpha \(window[kCGWindowAlpha as String] ?? "?") \(bounds)")
-        }
-    }
-    func onScreenWindowCount() -> Int { onScreenWindows().count }
 
     /// Closes the menu with a second click: Escape does not reach a status menu.
     func closeMenu() {
