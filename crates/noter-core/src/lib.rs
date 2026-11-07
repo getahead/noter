@@ -175,13 +175,13 @@ impl CoreDeps {
             power: Arc::new(jobs::AcPower),
             native_ops: Arc::new(native_ops::NoNativeOps),
             mcp_source: Arc::new(ScriptedMcp::default()),
+            mcp_binary: None,
         }
     }
 
     pub fn with_mcp_source(mut self, mcp: Arc<dyn noter_knowledge::McpSource>) -> Self {
         self.mcp_source = mcp;
-            mcp_binary: None,
-        }
+        self
     }
 
     pub fn with_mcp_binary(mut self, binary: std::path::PathBuf) -> Self {
