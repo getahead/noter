@@ -33,8 +33,8 @@ pub(crate) struct Windows {
     tray: Option<TrayModel>,
     /// The capture state's version and when the tray first saw it: the clock runs from there.
     clock: (StateVersion, i64),
-    /// The calendar's next event as of the last read (when, title, start): read at most once a
-    /// minute, as the tray refreshes every second.
+    /// The calendar's next event as of the last read (when, title, start): read at most every 3 s
+    /// (a calendar changes without an event), as the tray refreshes every second.
     next: Option<(i64, Option<(String, i64)>)>,
 }
 
@@ -445,7 +445,7 @@ impl Core {
             return None;
         }
         if let Some((at, found)) = &lock(&self.windows).next {
-            if (0..60_000).contains(&(now - at)) {
+            if (0..3_000).contains(&(now - at)) {
                 return found.clone();
             }
         }
