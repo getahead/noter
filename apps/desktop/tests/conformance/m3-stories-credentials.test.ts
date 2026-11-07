@@ -10,7 +10,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AccountProvider, AccountsView, AuditEntry, ExportResult, JobProgress, KeyProvider, Page, RuntimeChoice, SignInProgress } from "../../src/core/bindings";
+import type { AccountProvider, AccountsView, AuditEntry, ExportResult, KeyProvider, Page, RuntimeChoice, SignInProgress } from "../../src/core/bindings";
 import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
@@ -91,7 +91,6 @@ async function signIn(provider: AccountProvider, window: "settings" | "first-run
 }
 const ended = (steps: () => SignInProgress[]) => until(() => steps().find((p) => p.step === "done" || p.error !== null), "the sign-in to end");
 
-const idleWorld = (w: Parameters<typeof idle>[0]) => idle(w);
 /** First run, the Assistants step still open. */
 const firstRun = (w: Parameters<typeof idle>[0]) => {
   idle(w);
