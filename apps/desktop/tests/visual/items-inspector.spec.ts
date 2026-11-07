@@ -60,7 +60,7 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
       for (const d of w.call_details.filter((x) => x.call.id === W.PAST_CALL)) Object.assign(d.call, { audio_deleted: true, audio_deleted_at: 1_790_000_000_000 });
     });
     await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
-    await expect(page.getByText("Audio deleted · transcript kept").first()).toBeVisible();
+    await expect(page.getByText(/Audio deleted on .+ · transcript kept/).first()).toBeVisible();
     await shot(page, "item-inspector-evidence-audio-deleted");
   });
 });
