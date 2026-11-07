@@ -906,9 +906,8 @@ async fn a_person_page_lists_topics_of_their_calls_once_retrieval_has_made_the_t
     world(&core);
     exec(
         dir.path(),
-        "CREATE TABLE topics (id TEXT PRIMARY KEY, rev INTEGER NOT NULL, name TEXT NOT NULL,
-           centroid BLOB, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL);
-         INSERT INTO topics VALUES ('top_drawer', 1, 'Drawer redesign', NULL, 1, 5);
+        // `topics` comes from noter-retrieval's migration.
+        "INSERT INTO topics VALUES ('top_drawer', 1, 'Drawer redesign', NULL, 1, 5);
          UPDATE items SET topic_id = 'top_drawer' WHERE id IN ('itm_dima', 'itm_q');",
     )
     .unwrap();
