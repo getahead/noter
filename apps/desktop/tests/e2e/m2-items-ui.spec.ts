@@ -121,13 +121,18 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
   });
 
   test("UI — error path — Rejected by mistake: R shows Rejected · Undo, folds into Rejected (1) after 10 s, Restore brings it back as Suggested", async ({ page }) => {
+    await page.clock.install();
     await openCall(page, three);
     await rowOf(page, A0).focus();
     await page.keyboard.press("r");
     expect(await sent(page, "item_review")).toEqual([expect.objectContaining({ item_id: "itm_a0", decision: "reject" })]);
     await expect(rowOf(page, A0)).toContainText("Rejected");
     await expect(rowOf(page, A0).getByRole("link", { name: "Undo" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Rejected \(1\)/ })).toBeVisible({ timeout: 14_000 }); // the outcome expires after 10 s
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000)); // from here the page's clock moves only when told
+    await page.clock.fastForward(7000);
+    await expect(rowOf(page, A0).getByRole("link", { name: "Undo" })).toBeVisible(); // still inside the 10 s
+    await page.clock.fastForward(3000);
+    await expect(page.getByRole("button", { name: /Rejected \(1\)/ })).toBeVisible(); // the outcome expired after 10 s
     await page.getByRole("button", { name: /Rejected \(1\)/ }).click();
     await button(page, "Restore").click();
     expect((await sent(page, "item_review")).at(-1)).toMatchObject({ item_id: "itm_a0", decision: "restore" });
