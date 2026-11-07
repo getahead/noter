@@ -109,7 +109,7 @@ pub(crate) struct TrayInputs<'a> {
     /// Recorded time so far, pauses excluded (as the call window counts it).
     pub elapsed_ms: i64,
     pub now: i64,
-    /// The next calendar event: its title and start.
+    /// The next calendar event: its title and start as a local wall clock (ms).
     pub next_event: Option<(&'a str, i64)>,
 }
 
@@ -294,7 +294,6 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
         let second = format!("{speakers}{}", privacy_text(i.privacy));
         entries.push(TrayEntry::Line(second));
     }
-    // The clock is UTC, as everywhere in the core (no time zone is known here).
     if let (true, Some((title, at))) = (idle, i.next_event) {
         let m = at.div_euclid(60_000);
         entries.push(TrayEntry::Line(format!(
