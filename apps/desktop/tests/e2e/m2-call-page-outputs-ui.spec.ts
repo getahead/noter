@@ -217,7 +217,8 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await openSummary(page, call);
     await page.keyboard.press("Meta+Shift+KeyC");
     await expect(menu(page)).toHaveCount(0);
-    expect(await sent(page, "share_copy")).toEqual([expect.objectContaining({ call_id: call, format: "slack" })]);
+    // the menu never opens, so nothing above waits for the invoke: poll until the core has been asked
+    await expect.poll(() => sent(page, "share_copy")).toEqual([expect.objectContaining({ call_id: call, format: "slack" })]);
     await expect(share(page)).toContainText("Copied for Slack");
   });
 
