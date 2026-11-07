@@ -295,10 +295,37 @@ fn the_triggers_keep_keyword_shadows_and_vectors_current() {
             params![blob(&vector(9))],
         )
         .unwrap();
+    // A write that leaves the text as it was keeps the vector.
+    lib.db
+        .execute(
+            "UPDATE items SET text = text, status = 'done' WHERE id = 'itm_ws'",
+            [],
+        )
+        .unwrap();
+    assert_eq!(lib.count("SELECT count(*) FROM item_vec"), 1);
     lib.db
         .execute("UPDATE items SET text = 'Use SSE' WHERE id = 'itm_ws'", [])
         .unwrap();
     assert_eq!(lib.count("SELECT count(*) FROM item_vec"), 0);
+    assert_eq!(ids(&lib.find(query("sse")).items), ["itm_ws"]);
+    // A word that starts a line (a chunk's later speaker lines) is a word start too.
+    lib.chunk(
+        "chk_lines",
+        "call_d",
+        9_000,
+        12_000,
+        "Jonas: eins\nLena: zwei",
+        None,
+    );
+    assert_eq!(ids(&lib.find(query("lena")).calls), ["chk_lines"]);
+    // An item with two spans at the same earliest time is still one hit.
+    lib.db
+        .execute(
+            "INSERT INTO item_spans (item_id, call_id, channel, t0_ms, t1_ms)
+             VALUES ('itm_ws', 'call_b', 'mic', 1000, 2000)",
+            [],
+        )
+        .unwrap();
     assert_eq!(ids(&lib.find(query("sse")).items), ["itm_ws"]);
 }
 
