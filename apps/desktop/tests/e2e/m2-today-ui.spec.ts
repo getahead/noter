@@ -122,7 +122,8 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     await openWindow(page, "main", { world: dueWorld, fail: [{ cmd: "today_get", code: "calendar_unavailable" }], latency: 500 });
     await expect(page.getByText("Couldn't read today's calendar.")).toBeVisible();
     await button(page, "Try Again").click();
-    await expect(page.locator(".td-skel")).toHaveCount(2);
+    // the skeletons show only between 300 ms and the 500 ms latency, so poll finer than the default
+    await expect.poll(() => page.locator(".td-skel").count(), { intervals: [50] }).toBe(2);
     await expect(due(page).getByText("Drawer redesign spec by Friday")).toBeVisible();
     await expect(page.getByText("No calls today")).toBeVisible();
   });
