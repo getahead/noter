@@ -36,7 +36,6 @@ export function recordLine(item: ItemView, view: HandoffView, local: Local, pref
 }
 
 // @cpt-component:cpt-noter-component-ui-handoff-drawer:p1
-// @cpt-dod:cpt-noter-dod-ui-handoff-drawer:p3
 export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: string }) {
   const stored = useWindow(bridge, (s) => s.entities.handoff[itemId]);
   const local = useLocal(itemId);
