@@ -399,12 +399,31 @@ jobs:
           workspaces: |
             . -> target
             apps/desktop/src-tauri -> target
+      # SwiftPM state (WhisperKit checkout and its compiled products, debug and release); rebuilt only
+      # on a new key. Saved from main only (below), like rust-cache.
+      - name: Swift version
+        if: needs.changes.outputs.engine == 'true'
+        id: swift
+        run: echo "v=$(swift --version 2>&1 | head -1 | tr -c 'A-Za-z0-9.\n' '_')" >> "$GITHUB_OUTPUT"
+      - name: Engine build cache
+        if: needs.changes.outputs.engine == 'true'
+        id: swiftcache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: engine/.build
+          key: swift-${{ runner.os }}-${{ runner.arch }}-${{ steps.swift.outputs.v }}-${{ hashFiles('engine/Package.swift', 'engine/Package.resolved') }}
       - name: Engine tests (WAV fixtures through the pipeline)
         if: needs.changes.outputs.engine == 'true'
         run: swift test --package-path engine --enable-code-coverage
       - name: Built engine signature (sandbox, audio input, no network entitlement)
         if: needs.changes.outputs.engine == 'true'
         run: scripts/ci/check-engine-signature.sh
+      - name: Save the engine build cache
+        if: github.ref == 'refs/heads/main' && steps.swiftcache.outputs.cache-hit != 'true' && needs.changes.outputs.engine == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: engine/.build
+          key: ${{ steps.swiftcache.outputs.cache-primary-key }}
       - name: Tauri host tests (handler parity, window capabilities)
         if: needs.changes.outputs.tauri == 'true'
         run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
