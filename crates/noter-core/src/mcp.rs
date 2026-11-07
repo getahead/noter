@@ -1322,4 +1322,51 @@ mod tests {
         );
         assert!(read(false, "get_person", json!({ "name": "Sam" })).contains("p_s"));
     }
+
+    /// The release step rechecks what the read assembled: a call marked sensitive in between,
+    /// and any field that names audio, voice profiles, credentials or a redaction map.
+    #[test]
+    fn release_refuses_a_result_that_names_a_sensitive_call_or_a_secret_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let clock = Arc::new(crate::SystemClock);
+        let core = Core::open(dir.path(), crate::CoreDeps::new(clock, Arc::new(Quiet))).unwrap();
+        noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO calls (id, rev, started_at, title, call_type, status, mode_used, privacy_class) VALUES
+                   ('c_n', 1, 1, 'N', 'planning', 'ready', 'cloud', 'normal'),
+                   ('c_s', 1, 2, 'S', 'planning', 'ready', 'local_only', 'sensitive');",
+            )
+            .unwrap();
+        let trusted = |cloud| Trusted {
+            run_id: "r".into(),
+            cloud,
+            cancel: watch::channel(false).1,
+        };
+        // The run is not registered, so a cloud release is refused at the liveness check first:
+        // register it, then the sensitive call is what stops the result.
+        core.register_mcp_run(McpRegistration {
+            llm_run_id: "r".into(),
+            call_id: None,
+            cloud: true,
+            tools: vec![],
+        })
+        .unwrap();
+        let named = |call: &str| json!({ "items": [{ "call_id": call }], "recent_calls": [call] });
+        assert_eq!(core.release(&trusted(true), named("c_s")), Err(FORBIDDEN));
+        assert!(core.names_sensitive_call(&named("c_s")));
+        assert!(!core.names_sensitive_call(&named("c_n")));
+        // A local run may read a sensitive call; no run may carry a secret field.
+        assert!(core.release(&trusted(false), named("c_s")).is_ok());
+        for key in [
+            "audio_path",
+            "voice_profile",
+            "api_key",
+            "redaction_map",
+            "credential",
+        ] {
+            let leaky = json!({ "lines": [{ key: "x" }] });
+            assert_eq!(core.release(&trusted(false), leaky), Err(INTERNAL), "{key}");
+        }
+    }
 }
