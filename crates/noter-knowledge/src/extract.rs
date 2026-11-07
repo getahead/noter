@@ -77,8 +77,10 @@ pub(crate) fn extract(path: &Path, bytes: &[u8], format: Format) -> Result<Extra
         }
         Format::Docx => Ok(markdown(&stem, &docx(bytes)?)),
         Format::Pdf => {
-            let text =
-                pdf_extract::extract_text_from_mem(bytes).map_err(|e| format!("pdf: {e}"))?;
+            // pdf-extract panics on some malformed files: a broken PDF is an error, not a dead job.
+            let text = std::panic::catch_unwind(|| pdf_extract::extract_text_from_mem(bytes))
+                .map_err(|_| "pdf: unreadable".to_string())?
+                .map_err(|e| format!("pdf: {e}"))?;
             Ok(plain(stem, text))
         }
         Format::Text | Format::Code => Ok(plain(stem, String::from_utf8_lossy(bytes).into_owned())),
@@ -143,16 +145,24 @@ fn markdown(stem: &str, text: &str) -> Extracted {
     }
 }
 
+/// The most `word/document.xml` text a `.docx` may inflate to.
+const MAX_XML: u64 = 64 * 1024 * 1024;
+
 /// `word/document.xml` as Markdown: a paragraph styled `Title` is the title, `HeadingN` a heading
 /// one level below it.
 fn docx(bytes: &[u8]) -> Result<String, String> {
     let bad = |e: &dyn std::fmt::Display| format!("docx: {e}");
     let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e| bad(&e))?;
     let mut xml = String::new();
+    // A crafted archive can inflate far past its size: read at most `MAX_XML`.
     zip.by_name("word/document.xml")
         .map_err(|e| bad(&e))?
+        .take(MAX_XML + 1)
         .read_to_string(&mut xml)
         .map_err(|e| bad(&e))?;
+    if xml.len() as u64 > MAX_XML {
+        return Err(bad(&"document.xml is too large"));
+    }
     let mut reader = quick_xml::Reader::from_str(&xml);
     let mut out = String::new();
     let mut text = String::new();
@@ -299,6 +309,25 @@ mod tests {
         let (title, sections) = fixture("retry.rs");
         assert_eq!(title, "retry");
         assert!(sections[0].1.contains("pub fn backoff"));
+    }
+
+    #[test]
+    fn a_docx_inflating_past_the_limit_is_refused() {
+        use std::io::Write;
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        zip.start_file(
+            "word/document.xml",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+        let block = vec![b' '; 1 << 20];
+        for _ in 0..=MAX_XML >> 20 {
+            zip.write_all(&block).unwrap();
+        }
+        let bytes = zip.finish().unwrap().into_inner();
+        assert!(bytes.len() < 1 << 20, "{}", bytes.len());
+        let e = extract(Path::new("x.docx"), &bytes, Format::Docx).unwrap_err();
+        assert!(e.contains("too large"), "{e}");
     }
 
     #[test]

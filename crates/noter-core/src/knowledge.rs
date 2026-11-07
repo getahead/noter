@@ -186,6 +186,7 @@ impl Core {
             let _ = self.jobs.cancel(&run);
         }
         self.sources.watchers.unwatch(&id);
+        lock(&self.sources.closing).remove(&id);
         // @cpt-end:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-request
         // @cpt-begin:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-index
         let meta = self.change_meta(ctx, "Removed a source".into(), "source_remove");
