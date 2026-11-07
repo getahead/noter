@@ -105,6 +105,8 @@ def check_entitlements(root: Path) -> list[Violation]:
     if not engine.exists():
         return v
     for path in engine.rglob("*.entitlements"):
+        if path.is_relative_to(engine / ".build"):
+            continue  # SwiftPM's dependency examples are not the engine's entitlements.
         text = path.read_text(encoding="utf-8", errors="ignore")
         for key in NETWORK_ENTITLEMENTS:
             if key in text:
@@ -135,6 +137,8 @@ def check_opt_outs(root: Path) -> list[Violation]:
         if not base.exists():
             continue
         for path in base.rglob("*"):
+            if path.is_relative_to(root / "engine/.build"):
+                continue  # SwiftPM's downloaded tests are not project test sources.
             if not path.is_file() or path.suffix not in OPT_OUT_SUFFIXES or {"node_modules", "target"} & set(path.parts):
                 continue
             for n, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):

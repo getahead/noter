@@ -34,7 +34,7 @@ class NoterTestCase: XCTestCase {
     }
 
     /// Launches the app on the fixture world (a live call recording, the call “Backend sync” in the library) in
-    /// `scenario` (`idle`, `low-disk`, `detected`, `new-meeting`, `call-seems-ended`, `switched-to-local`, `first-call`), or with
+    /// `scenario` (`idle`, `paused-5-min`, `low-disk`, `detected`, `new-meeting`, `call-seems-ended`, `switched-to-local`, `first-call`), or with
     /// `fixture: "none"` as a fresh install.
     func launch(_ scenario: String? = nil, fixture: String = "world") {
         app.launchEnvironment["NOTER_TEST_FIXTURE"] = fixture

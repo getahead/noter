@@ -587,6 +587,10 @@ async fn pause_and_resume_record_a_paused_gap_and_wanted_state_is_idempotent() {
         paused.pause.as_ref().map(|p| p.since),
         Some(TimestampMs(T0 + 60_000))
     );
+    assert_eq!(
+        paused.pause.as_ref().and_then(|p| p.remind_at),
+        Some(TimestampMs(T0 + 60_000 + 300_000))
+    );
     assert_eq!(paused.recorded_ms, DurationMs(60_000));
     assert_eq!(r.query::<String>("SELECT status FROM calls"), "paused");
     r.sent(|c| matches!(c, EngineCommand::Pause { .. })).await;
