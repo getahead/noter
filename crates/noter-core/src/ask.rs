@@ -24,6 +24,8 @@ use crate::{lock, Core, StreamHub, StreamMsg};
 /// The whole turn, retrieval to the stored answer (DESIGN-core: Ask's task timeout).
 pub(crate) const DEADLINE: Duration = Duration::from_secs(60);
 const SKILL_VERSION: &str = "1.0.0";
+/// Earlier turns a follow-up carries as context.
+const PRIOR_TURNS: usize = 5;
 
 impl StreamMsg for AskMsg {
     fn set_seq(&mut self, seq: Seq) {
@@ -407,7 +409,10 @@ impl Core {
         let prior = self
             .store()
             .read(|c| noter_retrieval::prior_turns(c, &job.thread, &job.turn))?;
-        items.extend(prior.into_iter().map(|p| PacketItem {
+        // shortcut: the last 5 turns only, so a long thread stays within the deadline and the
+        // model's context; a summary of older turns is for when threads grow long.
+        let recent = prior.len().saturating_sub(PRIOR_TURNS);
+        items.extend(prior.into_iter().skip(recent).map(|p| PacketItem {
             id: p.turn_id.as_str().to_owned(),
             source: class(p.sensitive),
             text: format!(

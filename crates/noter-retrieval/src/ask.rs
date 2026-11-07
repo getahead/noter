@@ -81,7 +81,10 @@ pub fn check_start(c: &Connection, args: &AskStartArgs) -> Result<(), CoreError>
         }
     }
     for person in &scope.people {
-        if !exists("SELECT 1 FROM people WHERE id = ?1", person.as_str())? {
+        // Presets name people by their speaker rows, which have no foreign key to `people`.
+        let sql = "SELECT 1 FROM people WHERE id = ?1
+                   UNION ALL SELECT 1 FROM speakers WHERE person_id = ?1 LIMIT 1";
+        if !exists(sql, person.as_str())? {
             return Err(not_found("person"));
         }
     }

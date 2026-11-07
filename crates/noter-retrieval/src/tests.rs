@@ -1371,7 +1371,8 @@ fn ask_start_checks_the_question_thread_and_scope() {
     assert_eq!(code(args(None, "Q", person)), Some(ErrorCode::NotFound));
     let fine = AskScope {
         call_id: Some(CallId::new("call_a")),
-        people: vec![PersonId::new("per_you")],
+        // `per_anna` has speaker rows but no `people` row, as presets name people.
+        people: vec![PersonId::new("per_you"), PersonId::new("per_anna")],
         ..AskScope::default()
     };
     assert_eq!(code(args(None, "Q", fine.clone())), None);

@@ -537,3 +537,19 @@ async fn an_unwatched_turn_is_cancelled_before_the_runtime_runs() {
     let thread = w.thread(&handle.thread_id).await.unwrap();
     assert!(!thread.turns[0].found);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_follow_up_carries_only_the_last_five_turns() {
+    let w = world("").await;
+    let (first, _) = w.ask(None, "websockets 0").await;
+    w.settle().await;
+    for n in 1..7 {
+        w.ask(Some(&first.thread_id), &format!("websockets {n}"))
+            .await;
+        w.settle().await;
+    }
+    let last = w.packets().pop().unwrap();
+    assert_eq!(last.matches("Earlier question:").count(), 5);
+    assert!(!last.contains("Earlier question: websockets 0"));
+    assert!(last.contains("Earlier question: websockets 5"));
+}
