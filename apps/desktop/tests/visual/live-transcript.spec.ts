@@ -5,6 +5,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { openWindow, wheelUpTo, type Steer } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { freeze, settled } from "./freeze";
+
+test.beforeEach(({ page }) => freeze(page));
 
 const ANNA_LINE = "drawer redesign до пятницы";
 const log = (page: Page) => page.getByRole("log", { name: "Transcript" });
@@ -23,7 +26,10 @@ async function live(page: Page, world: (w: World) => void): Promise<Steer> {
   await expect(page.locator('[data-component="cpt-noter-component-ui-transcript-view"]')).toBeVisible();
   return steer;
 }
-const shot = (page: Page, name: string) => expect(page).toHaveScreenshot(`${name}.png`);
+async function shot(page: Page, name: string) {
+  await settled(page);
+  await expect(page).toHaveScreenshot(`${name}.png`);
+}
 
 test.describe("cpt-noter-dod-ui-live-transcript-view transcript view", () => {
   test("following: the live log at its end with the hypothesis last", async ({ page }) => {
@@ -57,6 +63,7 @@ test.describe("cpt-noter-dod-ui-live-transcript-view transcript view", () => {
     });
     await expect(page.getByText("Waiting for speech…")).toBeVisible();
     // the meters move with the fake's random levels
+    await settled(page);
     await expect(page).toHaveScreenshot("nothing-heard.png", { mask: [page.locator('[data-primitive="level-meter"]')] });
   });
 
@@ -75,6 +82,7 @@ test.describe("cpt-noter-dod-ui-live-transcript-replay replay", () => {
     await row(page, ANNA_LINE).getByRole("button", { name: "Play this line" }).click();
     await expect(page.locator('[data-region="CS-R2b"]')).toContainText("Replaying while recording · headphones");
     await page.mouse.move(0, 0);
+    await settled(page);
     await expect(page).toHaveScreenshot("replay.png", { mask: [page.locator(".cw-pb__time, .cw-pb__scrub")] });
   });
 

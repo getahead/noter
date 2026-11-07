@@ -7,6 +7,9 @@ import { expect, test } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { openWindow } from "../e2e/support/app";
+import { freeze, settled } from "./freeze";
+
+test.beforeEach(({ page }) => freeze(page));
 
 const STEPS = ["welcome", "models", "permissions", "call_display", "audio_storage", "assistants"];
 /** Setup stopped at `step`: the steps before it are done. */
@@ -83,6 +86,7 @@ for (const scheme of ["light", "dark"] as const) {
         const footer = (await page.locator('[data-region="FR-R3"]').boundingBox())!;
         expect(footer.y + footer.height).toBeCloseTo(560, 0);
         await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        await settled(page);
         await expect(win(page)).toHaveScreenshot(`first-run-${s.id}-${scheme}.png`);
       });
     }
@@ -99,6 +103,7 @@ test.describe("first-run window states that need a step on the way", () => {
     await steer.push("self_test_run", { event: { type: "ended", reason: "call_stopped" } });
     await expect(page.getByText("We hear your microphone but not system audio.")).toBeVisible();
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await settled(page);
     await expect(win(page)).toHaveScreenshot("first-run-one-silent-light.png");
   });
 
@@ -112,6 +117,7 @@ test.describe("first-run window states that need a step on the way", () => {
       dispatchEvent(new Event("focus"));
     });
     await expect(page.getByText("Checking…").first()).toBeVisible();
+    await settled(page);
     await expect(win(page)).toHaveScreenshot("first-run-checking-light.png");
   });
 });
