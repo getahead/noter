@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0](https://github.com/getahead/noter/compare/v0.17.0...v0.18.0) (2026-11-07)
+
+
+### Features
+
+* **ui:** item inspector, evidence navigation and add item (2.17 S2) ([#322](https://github.com/getahead/noter/issues/322)) ([86c8e52](https://github.com/getahead/noter/commit/86c8e52dc8ca804ebe53414dea461dec4e9b914c))
+
+
+### Bug fixes
+
+* **core:** track speaker name updates in output sections ([#325](https://github.com/getahead/noter/issues/325)) ([31895da](https://github.com/getahead/noter/commit/31895dafa6f66eeb55b1e3a28d68555ae7e055c1))
+
 ## [0.17.0](https://github.com/getahead/noter/compare/v0.16.1...v0.17.0) (2026-11-07)
 
 
