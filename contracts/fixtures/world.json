@@ -2678,6 +2678,14 @@
     ],
     "proposals_total": 2,
     "ranking": "owed_to_todays_people",
+    "review_calls": [
+      {
+        "call_type": "planning",
+        "id": "call_live",
+        "started_at": 1792137600000,
+        "title": "Planning: VHI 8.0 drawer redesign"
+      }
+    ],
     "review_waiting": 3,
     "this_week": [],
     "today": [
@@ -2805,7 +2813,8 @@
         "starts_at": 1792153800000,
         "title": "1:1 with Anna K."
       }
-    ]
+    ],
+    "unnamed_speakers": 1
   },
   "topics": [
     {

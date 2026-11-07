@@ -45,6 +45,30 @@ describe("cpt-noter-seq-today-review-before-call", () => {
     }
   });
 
+  it("review links and unnamed totals follow item review and speaker naming", async () => {
+    s = openScenario({ alsoRecord: exercised, world: (w) => {
+      w.items.find((i) => i.call.id === PAST_CALL)!.review = "suggested";
+    } });
+    const main = s.core("main");
+    const initial = ok(await main.todayGet({}));
+    expect(initial.review_calls.map((c) => c.id)).toEqual([LIVE_CALL, PAST_CALL]);
+    expect(initial.unnamed_speakers).toBe(1);
+    for (const call_id of [LIVE_CALL, PAST_CALL]) ok(await main.itemsReviewAll({ call_id, kinds: [] }));
+    const speakersOnly = ok(await main.todayGet({}));
+    expect(speakersOnly.review_waiting).toBe(0);
+    expect(speakersOnly.review_calls.map((c) => c.id)).toEqual([LIVE_CALL]);
+    for (const call_id of [LIVE_CALL, PAST_CALL]) {
+      const transcript = ok(await main.callGet({ call_id }));
+      const assignments = transcript.speakers.filter((sp) => sp.label.type === "unnamed")
+        .map((sp) => ({ speaker_id: sp.id, person: { type: "new" as const, display_name: "Named speaker" } }));
+      if (assignments.length) ok(await main.transcriptNameSpeakers({ call_id, assignments }));
+    }
+    const reviewed = ok(await main.todayGet({}));
+    expect(reviewed.review_waiting).toBe(0);
+    expect(reviewed.unnamed_speakers).toBe(0);
+    expect(reviewed.review_calls).toEqual([]);
+  });
+
   it("empty path: with the calendar denied Today still lists items, with no protected events", async () => {
     s = openScenario({ alsoRecord: exercised });
     if (s.target === "fake") return; // the fake has no calendar permission to deny
@@ -69,11 +93,43 @@ describe("cpt-noter-seq-today-tick-item", () => {
     const done = ok(await main.itemSetDone({ item_id: "itm_spec", rev: before.rev, done: true }));
     expect(done.item.status).toBe("done");
     if (s.target === "stdio") await until(() => changed.all.some((e) => e.type === "item" && e.item.id === "itm_spec" && e.item.status === "done"), "entity:changed with the ticked item");
-    if (s.target === "stdio") expect(ok(await main.todayGet({})).done_today.some((i: ItemView) => i.id === "itm_spec")).toBe(true);
+    expect(ok(await main.todayGet({})).done_today.some((i: ItemView) => i.id === "itm_spec")).toBe(true);
 
     expect(ok(await main.changeUndo({ target: { type: "change", change_id: done.change_id } })).undone).toBe(1);
-    if (s.target === "stdio") expect(ok(await main.itemGet({ item_id: "itm_spec" })).item.status).toBe("open"); // the fake's undo leaves items alone
+    expect(ok(await main.itemGet({ item_id: "itm_spec" })).item.status).toBe("open");
     if (s.target === "stdio") await until(() => changed.all.some((e) => e.type === "item" && e.item.id === "itm_spec" && e.item.status === "open"), "entity:changed with the untouched item");
+  });
+
+  it("suggested tick and Undo regroup every Today card and restore review state", async () => {
+    s = openScenario({ alsoRecord: exercised, world: (w) => {
+      const item = w.items.find((i) => i.id === "itm_replay")!;
+      w.calls.find((c) => c.id === LIVE_CALL)!.status = "ready";
+      w.app.capture.phase = "idle";
+      w.app.capture.call_id = null;
+      w.today.date = new Date().toISOString().slice(0, 10);
+      w.today.today[0].starts_at = Date.parse(w.today.date) + 12 * 3_600_000;
+      w.today.today[0].ends_at = w.today.today[0].starts_at + 3_600_000;
+      w.today.today[0].items.push(structuredClone(item));
+      w.today.today.push({ ...structuredClone(w.today.today[0]), event_id: "second_event" });
+    } });
+    const main = s.core("main");
+    const before = ok(await main.itemGet({ item_id: "itm_replay" })).item;
+    const initial = ok(await main.todayGet({}));
+    expect(initial.today.filter((c) => c.items.some((i) => i.id === before.id))).toHaveLength(2);
+    const done = ok(await main.itemSetDone({ item_id: before.id, rev: before.rev, done: true }));
+    const ticked = ok(await main.todayGet({}));
+    expect(ticked.done_today.some((i) => i.id === before.id)).toBe(true);
+    for (const card of [...ticked.today, ...ticked.this_week]) {
+      expect([...card.items, ...card.questions, ...card.handed_off].some((i) => i.id === before.id)).toBe(false);
+      expect(card.open_count).toBe(card.items.length + card.questions.length + card.handed_off.length);
+    }
+    ok(await main.changeUndo({ target: { type: "change", change_id: done.change_id } }));
+    expect(ok(await main.itemGet({ item_id: before.id })).item).toMatchObject({ status: before.status, review: before.review, done_at: before.done_at });
+    const restored = ok(await main.todayGet({}));
+    expect(restored.done_today.some((i) => i.id === before.id)).toBe(false);
+    expect(restored.today.filter((c) => c.items.some((i) => i.id === before.id))).toHaveLength(2);
+    ok(await main.changeRedo({ target: { type: "change", change_id: done.change_id } }));
+    expect(ok(await main.todayGet({})).done_today.some((i) => i.id === before.id)).toBe(true);
   });
 
   it("other path: a tick accepts a suggestion, and the handoff answers close or keep the item", async () => {
@@ -89,8 +145,10 @@ describe("cpt-noter-seq-today-tick-item", () => {
     expect(kept.item.status).toBe("handed_off");
     const landed = ok(await main.itemAnswerHandoffLanded({ item_id: "itm_virt", rev: kept.item.rev, answer: "landed" }));
     expect(landed.item.status).toBe("done");
+    expect(ok(await main.todayGet({})).done_today.some((i) => i.id === handed.id)).toBe(true);
     const reopened = ok(await main.itemReopen({ item_id: "itm_virt", rev: landed.item.rev }));
     expect(reopened.item.status).toBe("open");
+    expect(ok(await main.todayGet({})).done_today.some((i) => i.id === handed.id)).toBe(false);
   });
 });
 

@@ -1548,6 +1548,8 @@ pub fn world() -> FakeWorld {
         due_without_call: vec![],
         done_today: vec![items[6].clone()],
         review_waiting: 3,
+        review_calls: vec![live.clone()],
+        unnamed_speakers: 1,
         proposals: proposals.clone(),
         proposals_total: 2,
         banners: vec![],

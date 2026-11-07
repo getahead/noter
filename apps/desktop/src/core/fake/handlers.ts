@@ -25,6 +25,8 @@ import type {
   SpeakerLabel,
   TimestampMs,
   TopicRow,
+  TodayView,
+  UpcomingCall,
 } from "../bindings";
 import { coreError, type FakeCore, type Handlers, type HandlerCtx, type World } from "./fake-core";
 
@@ -136,7 +138,8 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
-    if (item) bump(Object.assign(item, { [r.field as string]: r[value] }));
+    if (item) bump(Object.assign(item, r.field === "status" && r[value]?.startsWith("{")
+      ? JSON.parse(r[value]!) : { [r.field as string]: r[value] }));
   });
 }
 
@@ -149,7 +152,9 @@ function editedLater(world: World, r: ChangeRow): boolean {
   const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
   if (tagged) return JSON.stringify(tagged.tags) !== r.after;
   const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
-  return !!item && String((item as Record<string, unknown>)[r.field as string] ?? "") !== (r.after ?? "");
+  return !!item && (r.field === "status" && r.after?.startsWith("{")
+    ? Object.entries(JSON.parse(r.after)).some(([key, value]) => item[key as keyof ItemView] !== value)
+    : String((item as Record<string, unknown>)[r.field as string] ?? "") !== (r.after ?? ""));
 }
 
 function call(world: World, id: string): CallRow {
@@ -162,10 +167,56 @@ function callRef(c: CallRow): CallRef {
   return { id: c.id, title: c.title, started_at: c.started_at, call_type: c.call_type };
 }
 
+function itemStatus(item: ItemView, includeReview = false): string {
+  return JSON.stringify({ status: item.status, done_at: item.done_at, ...(includeReview ? { review: item.review } : {}) });
+}
+
+function todayNow(world: World): number {
+  return Date.parse(world.today.date) + now() % 86_400_000;
+}
+
 function itemChanged(world: World, item: ItemView, emit: (e: "entity:changed", p: { type: "item"; item: ItemView }) => void, summary: string, field: string | null, before: string | null) {
   bump(item);
   emit("entity:changed", { type: "item", item });
-  return { item, change_id: logChange(world, { entity: { kind: "item", id: item.id, label: item.text }, field, before, after: field ? String((item as Record<string, unknown>)[field] ?? "") : null, summary }) };
+  return { item, change_id: logChange(world, { entity: { kind: "item", id: item.id, label: item.text }, field, before, after: field === "status" && before?.startsWith("{") ? itemStatus(item, "review" in JSON.parse(before)) : field ? String((item as Record<string, unknown>)[field] ?? "") : null, summary }) };
+}
+
+// @cpt-flow:cpt-noter-flow-core-items-today-dashboard:p1
+function todayView(world: World): TodayView {
+  const shown = new Set<string>();
+  const open = (i: ItemView) => (["open", "carried"].includes(i.status) && i.review !== "rejected")
+    || (i.status === "handed_off" && i.review === "accepted");
+  const card = (c: UpcomingCall): UpcomingCall => {
+    const rows = [...c.items, ...c.questions, ...c.handed_off]
+      .map((i) => world.items.find((current) => current.id === i.id) ?? i).filter(open);
+    rows.forEach((i) => shown.add(i.id));
+    return { ...c, items: rows.filter((i) => i.status !== "handed_off" && i.kind !== "open_question"),
+      questions: rows.filter((i) => i.status !== "handed_off" && i.kind === "open_question"),
+      handed_off: rows.filter((i) => i.status === "handed_off"), open_count: rows.length };
+  };
+  const today = world.today.today.map(card);
+  const this_week = world.today.this_week.map(card);
+  const suggested = world.items.filter((i) => i.review === "suggested");
+  const reviewIds = new Set(suggested.map((i) => i.call.id));
+  let unnamed_speakers = 0;
+  for (const c of world.calls) {
+    const transcripts = world.transcripts.filter((t) => t.call_id === c.id);
+    const speakers = (transcripts.find((t) => t.pass === "archive") ?? transcripts[0])?.speakers
+      ?? world.call_details.find((d) => d.call.id === c.id)?.speakers ?? [];
+    const count = speakers.filter((sp) => sp.label.type === "unnamed").length;
+    unnamed_speakers += count;
+    if (count) reviewIds.add(c.id);
+  }
+  const dayStart = Date.parse(world.today.date);
+  return { ...world.today, ranking: world.settings.today.ranking, today, this_week,
+    due_without_call: world.items.filter((i) => open(i) && i.status !== "handed_off" && i.review === "accepted"
+      && i.due !== null && i.due <= world.today.date && !shown.has(i.id)),
+    done_today: world.items.filter((i) => i.status === "done" && i.done_at !== null
+      && i.done_at >= dayStart && i.done_at < dayStart + 86_400_000),
+    review_waiting: suggested.length, unnamed_speakers,
+    review_calls: world.calls.filter((c) => reviewIds.has(c.id))
+      .sort((a, b) => b.started_at - a.started_at || a.id.localeCompare(b.id)).map(callRef),
+  };
 }
 
 /** A capture is live: recording, paused or still starting. */
@@ -760,9 +811,9 @@ export const defaultHandlers: Handlers = {
   item_set_done: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
     checkRev(item.rev, a.rev);
-    const before = item.status;
+    const before = itemStatus(item, a.done);
     item.status = a.done ? "done" : "open";
-    item.done_at = a.done ? now() : null;
+    item.done_at = a.done ? todayNow(world) : null;
     if (item.review === "suggested" && a.done) item.review = "accepted";
     return itemChanged(world, item, emit, a.done ? "Ticked an item" : "Unticked an item", "status", before);
   },
@@ -806,7 +857,7 @@ export const defaultHandlers: Handlers = {
     const item = findItem(world, a.item_id);
     checkRev(item.rev, a.rev);
     if (item.status === "open") throw coreError("invalid_input", "already open", { type: "validation", field: "item_id", rule: "invalid_format" });
-    const before = item.status;
+    const before = itemStatus(item);
     item.status = "open";
     item.closed_by = null;
     item.done_at = null;
@@ -844,15 +895,16 @@ export const defaultHandlers: Handlers = {
     const item = findItem(world, a.item_id);
     checkRev(item.rev, a.rev);
     if (item.status !== "handed_off") throw coreError("invalid_input", "item is not handed off", { type: "validation", field: "item_id", rule: "invalid_format" });
+    const before = itemStatus(item);
     if (a.answer === "landed" || a.answer === "done_another_way") {
       item.status = "done";
-      item.done_at = now();
+      item.done_at = todayNow(world);
     }
-    return itemChanged(world, item, emit, `Handoff: ${a.answer.replace(/_/g, " ")}`, "status", "handed_off");
+    return itemChanged(world, item, emit, `Handoff: ${a.answer.replace(/_/g, " ")}`, "status", before);
   },
 
   // ── Today ────────────────────────────────────────────────────────────
-  today_get: (_a, { world }) => ({ ...world.today, ranking: world.settings.today.ranking }),
+  today_get: (_a, { world }) => todayView(world),
 
   // ── Outputs and sharing ──────────────────────────────────────────────
   outputs_get: (a, { world }) => {

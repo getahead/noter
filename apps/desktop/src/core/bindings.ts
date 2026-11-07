@@ -3314,6 +3314,13 @@ export type TodayView = {
 	done_today: ItemView[],
 	/**  Suggested items not reviewed yet (the review line). */
 	review_waiting: number,
+	/**
+	 *  Calls with suggested items or unnamed speakers, newest first (id breaks ties).
+	 *  Open each call's Summary with Start Review applied.
+	 */
+	review_calls: CallRef[],
+	/**  Unnamed speakers in the displayed transcript pass, across all calls. */
+	unnamed_speakers: number,
 	proposals: ProposalRow[],
 	proposals_total: number,
 	banners: TodayBanner[],

@@ -693,3 +693,36 @@ async fn tags_across_calls_return_their_batch_and_one_undo_reverses_them_all() {
         "a request that changed nothing has no batch"
     );
 }
+
+#[tokio::test]
+async fn review_links_include_suggestions_and_only_visible_unnamed_speakers() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    people_world(&core);
+    exec(
+        dir.path(),
+        "UPDATE speakers SET person_id = NULL, n = 1, named_by = NULL WHERE id = 's4';
+        INSERT INTO speakers (id, call_id, label, channel, person_id, pass)
+        VALUES ('archive_named', 'bob', 'Bob Ray', 'sys', 'per_bob', 'archive');
+        UPDATE speakers SET person_id = NULL, n = 1, named_by = NULL WHERE id = 's2';",
+    );
+    let view = serde_json::to_value(today(&core).await.unwrap()).unwrap();
+    assert_eq!(view["unnamed_speakers"], 1);
+    let calls = view["review_calls"].as_array().unwrap();
+    assert_eq!(
+        calls
+            .iter()
+            .map(|c| c["id"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        ["new", "mid"]
+    );
+    assert_eq!(view["review_waiting"], 1);
+    exec(
+        dir.path(),
+        "UPDATE items SET review_state = 'accepted' WHERE id = 'i_sugg';
+        UPDATE speakers SET person_id = 'per_anna', n = NULL WHERE id = 's2';",
+    );
+    let view = serde_json::to_value(today(&core).await.unwrap()).unwrap();
+    assert_eq!(view["review_calls"], json!([]));
+    assert_eq!(view["unnamed_speakers"], 0);
+}
