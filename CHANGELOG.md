@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/getahead/noter/compare/v0.16.1...v0.17.0) (2026-11-07)
+
+
+### Features
+
+* **ui:** add Today call cards, This week and calendar states (2.20 S1) ([#318](https://github.com/getahead/noter/issues/318)) ([6fad394](https://github.com/getahead/noter/commit/6fad394c80a4293c031399783c843fac02748587))
+* **ui:** speaker naming panel, Fix Term and rename scopes (2.19 S2) ([#320](https://github.com/getahead/noter/issues/320)) ([b260606](https://github.com/getahead/noter/commit/b260606fe1749f89155225545e4de69d67097007))
+
 ## [0.16.1](https://github.com/getahead/noter/compare/v0.16.0...v0.16.1) (2026-11-06)
 
 
