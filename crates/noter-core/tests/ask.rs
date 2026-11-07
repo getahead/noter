@@ -282,6 +282,25 @@ async fn the_handle_comes_first_then_started_deltas_citations_and_done() {
     assert_eq!(w.thread(&handle.thread_id).await.unwrap().turns.len(), 2);
 }
 
+// The refinements: the router registers the run with the tool host for noter-mcp's read tools.
+#[tokio::test(start_paused = true)]
+async fn the_answer_run_may_use_the_read_tools() {
+    let w = world("").await;
+    let (_handle, got) = w.ask(None, "What did we decide about websockets?").await;
+    w.settle().await;
+    assert!(matches!(terminal(&got), AskEvent::Done { .. }));
+    let received = w.llm.received();
+    assert_eq!(
+        received[0].tools,
+        [
+            "get_transcript_span",
+            "get_person",
+            "get_decisions",
+            "get_open_items"
+        ]
+    );
+}
+
 #[tokio::test(start_paused = true)]
 async fn start_rejects_before_any_stream() {
     let w = world("").await;
