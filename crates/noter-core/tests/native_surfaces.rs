@@ -614,6 +614,10 @@ async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
         fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
             Ok(())
         }
+        // A Mac three hours ahead of UTC: the line shows its local time.
+        fn utc_offset_minutes(&self, _: TimestampMs) -> i32 {
+            180
+        }
         fn calendar_events(
             &self,
             _: TimestampMs,
@@ -646,7 +650,7 @@ async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
         (
             PermissionState::Granted,
             false,
-            Some("Next: Next meeting 09:00"),
+            Some("Next: Next meeting 12:00"),
         ),
         (PermissionState::Granted, true, None),
         (PermissionState::Denied, false, None),

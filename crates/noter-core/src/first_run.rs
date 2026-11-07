@@ -78,6 +78,11 @@ pub trait NativeServices: Send + Sync {
         let _ = at;
         None
     }
+    /// The Mac's local offset from UTC at `at`, in minutes (the menu shows local times).
+    fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
+        let _ = at;
+        0
+    }
     /// The events starting in `from..to` of the visible calendars, without prompting; an error
     /// is a failed read of a permitted calendar (none until noter-native reads ranges).
     fn calendar_events(

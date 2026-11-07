@@ -473,7 +473,11 @@ impl Core {
                     .filter(|e| e.starts_at.0 > now)
                     .min_by_key(|e| e.starts_at.0)
             })
-            .map(|e| (e.title, e.starts_at.0));
+            // The start as a local wall clock, which is what the menu shows.
+            .map(|e| {
+                let offset = self.deps.native.utc_offset_minutes(e.starts_at);
+                (e.title, e.starts_at.0 + i64::from(offset) * 60_000)
+            });
         lock(&self.windows).next = Some((std::time::Instant::now(), found.clone()));
         found
     }

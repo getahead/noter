@@ -234,6 +234,10 @@ impl NativeServices for Mac {
         // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-fail
     }
 
+    fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
+        noter_native::utc_offset_minutes(at.0)
+    }
+
     /// The events starting in `from..to` (EventKit through noter-native; never asks for access).
     fn calendar_events(
         &self,

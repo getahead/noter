@@ -294,3 +294,12 @@ fn off_macos_the_surfaces_do_nothing() {
     announce("hello", Politeness::Polite);
     assert_eq!(calendar_event_near(0), None);
 }
+
+#[test]
+fn the_local_offset_follows_the_time_zone_of_the_process() {
+    // The only test that touches TZ in this binary.
+    std::env::set_var("TZ", "Asia/Kolkata");
+    assert_eq!(utc_offset_minutes(1_792_137_600_000), 330);
+    std::env::set_var("TZ", "UTC");
+    assert_eq!(utc_offset_minutes(1_792_137_600_000), 0);
+}

@@ -396,6 +396,23 @@ pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEventRef> {
     }
 }
 
+extern "C" {
+    /// POSIX; the `libc` crate does not export it on every target.
+    fn tzset();
+}
+
+/// The local offset from UTC at `at_ms` (epoch ms), in minutes; 0 when the system cannot say.
+pub fn utc_offset_minutes(at_ms: i64) -> i32 {
+    let secs: libc::time_t = (at_ms / 1000) as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: tzset takes no pointers; both pointers are valid for the call; localtime_r writes only into `tm`.
+    unsafe { tzset() };
+    if unsafe { libc::localtime_r(&secs, &mut tm) }.is_null() {
+        return 0;
+    }
+    (tm.tm_gmtoff / 60) as i32
+}
+
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 /// How far ahead an event still counts as the call about to start.
 const CALENDAR_LOOKAHEAD_MS: i64 = 10 * 60 * 1000;
