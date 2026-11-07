@@ -8,6 +8,8 @@
 //! and `runs/<id>/` (one run's MCP config, schema, instructions and `TMPDIR`).
 
 use std::collections::HashMap;
+use std::io::Write;
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -171,12 +173,21 @@ impl RunDir {
     pub fn create(cli: &Cli) -> Result<Self, String> {
         let dir = cli.dir("runs")?.join(ulid::Ulid::generate().to_string());
         std::fs::create_dir(&dir).map_err(|_| "run_dir".to_owned())?;
+        // The run's config may carry its tool token: the user's eyes only.
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))
+            .map_err(|_| "run_dir".to_owned())?;
         Ok(Self(dir))
     }
 
     pub fn write(&self, name: &str, content: &[u8]) -> Result<PathBuf, String> {
         let path = self.0.join(name);
-        std::fs::write(&path, content).map_err(|_| "run_dir".to_owned())?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+            .and_then(|mut f| f.write_all(content))
+            .map_err(|_| "run_dir".to_owned())?;
         Ok(path)
     }
 }
@@ -197,8 +208,9 @@ pub(crate) fn command(cli: &Cli, cwd: &Path, run: &RunDir) -> Command {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        // shortcut: kills the CLI itself, not processes it spawned; M2 runs start no MCP server
-        // or tool process. Kill the process group when noter-mcp (M3) runs under the CLI.
+        // shortcut: kills the CLI itself, not processes it spawned; noter-mcp under it ends on its
+        // stdio EOF and its socket token is revoked when the run ends. Kill the process group if
+        // a CLI ever keeps its MCP child alive.
         .kill_on_drop(true);
     if let Some(path) = std::env::var_os("PATH") {
         command.env("PATH", path);

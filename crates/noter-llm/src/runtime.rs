@@ -7,6 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -28,9 +29,10 @@ use tokio::sync::watch;
 use tokio::time::Instant;
 
 use crate::adapters::Reply;
-use crate::gate::{Adapters, Gate, Release};
+use crate::gate::{Adapters, Approved, Gate, Release, RunMap, SendExtras, ToolRelease};
 use crate::route::{self, Choice, Route};
 use crate::secrets::{key_account, MemorySecrets, Secret, SecretStore};
+use crate::tools::{McpLaunch, ToolHost, ToolStart};
 use crate::validate;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -469,6 +471,43 @@ struct Inner {
     failures: Mutex<HashMap<CallId, u32>>,
     switched: Mutex<HashSet<CallId>>,
     sessions: Mutex<HashMap<SessionId, Session>>,
+    /// noter-mcp's host (the core) and binary, when the app has one.
+    tools: Option<(Arc<dyn ToolHost>, PathBuf)>,
+    /// The runs whose tool server is up: their redaction state and live privacy.
+    tool_runs: Mutex<HashMap<LlmRunId, ToolRun>>,
+}
+
+/// What a run with a tool server keeps for its tool results.
+struct ToolRun {
+    runtime: RuntimeChoice,
+    call_id: Option<CallId>,
+    map: RunMap,
+    privacy: watch::Receiver<Privacy>,
+}
+
+/// A run's tool server, up until the attempt that started it ends (done, failed, cancelled or
+/// dropped): the host revokes the token and the run's result gate goes with it.
+struct ToolGuard<'a> {
+    inner: &'a Inner,
+    run: LlmRunId,
+}
+
+impl ToolGuard<'_> {
+    /// Names the run's tool results introduced, back to the originals.
+    fn map_back(&self, output: &mut Value) {
+        if let Some(tool) = lock(&self.inner.tool_runs).get(&self.run) {
+            tool.map.map_back(output);
+        }
+    }
+}
+
+impl Drop for ToolGuard<'_> {
+    fn drop(&mut self) {
+        lock(&self.inner.tool_runs).remove(&self.run);
+        if let Some((host, _)) = &self.inner.tools {
+            host.stop(&self.run);
+        }
+    }
 }
 
 /// The runtime router: the one `LlmRuntime` implementation. Cloning shares it.
@@ -491,7 +530,52 @@ impl Llm {
             failures: Mutex::default(),
             switched: Mutex::default(),
             sessions: Mutex::default(),
+            tools: None,
+            tool_runs: Mutex::default(),
         }))
+    }
+
+    /// noter-mcp for runs that ask for tools: the host registers each run and revokes it, the
+    /// adapters start `binary` under the run's lockdown config. Without it runs have no tools.
+    pub fn with_tool_host(self, host: Arc<dyn ToolHost>, binary: PathBuf) -> Self {
+        self.configure(|i| i.tools = Some((host, binary)))
+    }
+
+    /// A cloud run's tool call as the core sees it: the pseudonyms the model read in its packet
+    /// and earlier results name the real people again. Nothing happens for a run with no tool
+    /// server.
+    pub fn restore_tool_input(&self, run: &LlmRunId, params: &mut Value) {
+        if let Some(tool) = lock(&self.0.tool_runs).get(run) {
+            tool.map.map_back(params);
+        }
+    }
+
+    /// One tool result of a running run through the egress gate
+    /// (`cpt-noter-algo-core-mcp-release-result`). `people` are the names the result holds; a
+    /// cloud run gets them as its pseudonyms, the packet's where it has them. An error means no
+    /// body may be released (`Unavailable`: privacy no longer allows the run, or it is over).
+    pub fn release_tool_result(
+        &self,
+        run: &LlmRunId,
+        people: &[String],
+        result: Value,
+    ) -> Result<Value, Failure> {
+        let mut runs = lock(&self.0.tool_runs);
+        let Some(tool) = runs.get_mut(run) else {
+            return Err(Failure::Unavailable(CoreError::new(
+                noter_protocol::ErrorCode::NotFound,
+                "no tool run",
+            )));
+        };
+        let privacy = *tool.privacy.borrow();
+        let release = ToolRelease {
+            llm_run_id: run,
+            call_id: tool.call_id.as_ref(),
+            runtime: tool.runtime,
+        };
+        self.0
+            .gate
+            .release_result(&release, &mut tool.map, privacy, people, result)
     }
 
     /// Operational log lines (ids, states, codes, timings; never packet, model text or keys).
@@ -861,6 +945,9 @@ impl Inner {
                 }
             };
             tally.audit_ids.extend(approved.audit_id().cloned());
+            // The tool server starts only after the packet is released and audited, and ends
+            // with this attempt.
+            let (tools, launch) = self.start_tools(req, tally, &approved, &map_id);
             self.enter(state, RequestState::Gated, run);
             // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-gate
             self.enter(state, RequestState::Running, run);
@@ -876,8 +963,11 @@ impl Inner {
                 &tally.choice,
                 tally.skill,
                 session,
-                budget_usd,
-                key,
+                SendExtras {
+                    budget_usd,
+                    key,
+                    mcp: launch,
+                },
             );
             // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-adapter
             // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-cancel
@@ -927,6 +1017,9 @@ impl Inner {
                     let mut output = reply.output;
                     // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-validate
                     approved.map_back(&mut output);
+                    if let Some(tools) = &tools {
+                        tools.map_back(&mut output);
+                    }
                     // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-validate
                     tally.schema_ok = true;
                     self.enter(state, RequestState::Succeeded, run);
@@ -959,6 +1052,54 @@ impl Inner {
             attempt += 1;
         }
     }
+
+    /// Registers the run's tool server with the host when the run may use tools and the app has
+    /// noter-mcp; a host that cannot start it leaves the run without tools.
+    // @cpt-begin:cpt-noter-flow-core-mcp-start:p1:inst-start-child
+    fn start_tools(
+        &self,
+        req: &RunRequest,
+        tally: &Tally,
+        approved: &Approved,
+        map_id: &str,
+    ) -> (Option<ToolGuard<'_>>, Option<McpLaunch>) {
+        let tools = &tally.choice.tools;
+        let Some((host, binary)) = self.tools.as_ref().filter(|_| !tools.is_empty()) else {
+            return (None, None);
+        };
+        let start = ToolStart {
+            llm_run_id: tally.run_id.clone(),
+            call_id: req.call_id.clone(),
+            cloud: route::is_cloud(tally.choice.runtime),
+            tools: tools.clone(),
+        };
+        let Ok(launch) = host.start(start) else {
+            self.log(json!({"module": "llm", "event": "tools_unavailable",
+                "llm_run_id": tally.run_id.as_str()}));
+            return (None, None);
+        };
+        lock(&self.tool_runs).insert(
+            tally.run_id.clone(),
+            ToolRun {
+                runtime: tally.choice.runtime,
+                call_id: req.call_id.clone(),
+                map: approved.run_map(map_id, req.settings.pseudonyms),
+                privacy: req.privacy.clone(),
+            },
+        );
+        let mcp = McpLaunch {
+            binary: binary.clone(),
+            config: launch.config,
+            token: Secret::new(launch.token),
+            tools: tools.clone(),
+        };
+        let guard = ToolGuard {
+            inner: self,
+            run: tally.run_id.clone(),
+        };
+        (Some(guard), Some(mcp))
+    }
+    // @cpt-end:cpt-noter-flow-core-mcp-start:p1:inst-start-child
 
     fn record_start(
         &self,

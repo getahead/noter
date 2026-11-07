@@ -93,7 +93,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 ### Start a local tool server for one run
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-mcp-start`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-mcp-start`
 
 **Actor**: Router and the runtime CLI
 
@@ -106,7 +106,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 **Steps**:
 1. [x] - `p1` - Router registers trusted run id, optional call, effective privacy, cloud status, allowed tools and a fresh token in the core - `inst-start-register`
 2. [x] - `p1` - Write the Noter-owned `run/mcp/<run_id>.json` and provide `NOTER_MCP_TOKEN` to the child; restrict config and socket files to the user - `inst-start-config`
-3. [ ] - `p1` - CLI starts the signed `noter-mcp` binary as a stdio child under its existing isolated run policy; no user hooks, plugins or unrelated MCP servers are loaded (slice 2: the CLI adapters start it under the lockdown config) - `inst-start-child`
+3. [x] - `p1` - CLI starts the signed `noter-mcp` binary as a stdio child under its existing isolated run policy; no user hooks, plugins or unrelated MCP servers are loaded (the router starts it through `noter_llm::ToolHost` under the CLI adapters' lockdown config; the binary's signing and bundling as a Tauri sidecar is the owner's release item) - `inst-start-child`
 4. [x] - `p1` - Serve MCP initialization and `tools/list` from exported protocol schemas; stdout contains only MCP messages and diagnostics use scrubbed stderr - `inst-start-tools`
 5. [x] - `p1` - Connect to `$APP_SUPPORT/run/core.sock` (0600); **RETURN** readiness to the CLI without opening a TCP port - `inst-start-return`
 
@@ -129,12 +129,12 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 3. [ ] - `p1` - Dispatch `search_calls` or `search_documents` to shared retrieval; call search defaults to eight hits and caps at 30 (slice 2) - `inst-read-search`
 4. [x] - `p1` - Dispatch `get_transcript_span`, `get_person`, `get_decisions` or `get_open_items` to the core's existing read services; resolve person id or normalized name/alias and apply the run's filters to all related rows - `inst-read-entities`
 5. [x] - `p1` - For `get_screen_context`, return empty v1 chips; never capture a screen as a tool side effect - `inst-read-screen`
-6. [ ] - `p1` - Run `cpt-noter-algo-core-mcp-release-result` for the entire assembled result, including person recent-call and open-item fields (slice 2: until it lands a cloud run gets −32603 and no result) - `inst-read-gate`
+6. [x] - `p1` - Run `cpt-noter-algo-core-mcp-release-result` for the entire assembled result, including person recent-call and open-item fields - `inst-read-gate`
 7. [x] - `p1` - **RETURN** `CoreSocketResponse` with the original request id and exactly one result or error; map it back to MCP without changing evidence ids - `inst-read-return`
 
 ### Stage a pin or correction
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-mcp-stage`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-mcp-stage`
 
 **Actor**: Runtime CLI agent
 
@@ -145,11 +145,11 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 - Unknown, out-of-scope or invented evidence is rejected; a staged correction cannot silently overwrite a newer record.
 
 **Steps**:
-1. [ ] - `p1` - Receive `pin_item` or `propose_correction` and authorize its token, tool and referenced call/entity - `inst-stage-request`
-2. [ ] - `p1` - Validate item kind or correction entity/field, current before value and evidence segment ids against rows permitted to this run - `inst-stage-validate`
-3. [ ] - `p1` - Run `cpt-noter-algo-core-mcp-stage-write`; do not mark a primary item accepted or edit a segment, speaker or glossary - `inst-stage-store`
-4. [ ] - `p1` - Pass `StagedOutput` through the same result gate; **RETURN** staged true and reference only after successful staging - `inst-stage-return`
-5. [ ] - `p1` - Leave user application and Undo to the owning feature; stage replay must not act as approval - `inst-stage-review`
+1. [x] - `p1` - Receive `pin_item` or `propose_correction` and authorize its token, tool and referenced call/entity - `inst-stage-request`
+2. [x] - `p1` - Validate item kind or correction entity/field, current before value and evidence segment ids against rows permitted to this run - `inst-stage-validate`
+3. [x] - `p1` - Run `cpt-noter-algo-core-mcp-stage-write`; do not mark a primary item accepted or edit a segment, speaker or glossary - `inst-stage-store`
+4. [x] - `p1` - Pass `StagedOutput` through the same result gate; **RETURN** staged true and reference only after successful staging - `inst-stage-return`
+5. [x] - `p1` - Leave user application and Undo to the owning feature; stage replay must not act as approval - `inst-stage-review`
 
 ### Relay a live source lookup
 
@@ -191,35 +191,35 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 ### Release a result through the egress gate
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-mcp-release-result`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-mcp-release-result`
 
 **Input**: Complete tool result, trusted run context, existing run redaction map and current source/privacy rows.
 
 **Output**: Allowed local result, redacted and audited cloud result, or an error with no released data.
 
 **Steps**:
-1. [ ] - `p1` - Recheck run liveness and current privacy; remove sensitive and out-of-scope evidence before returning any nested text or metadata to a cloud run - `inst-release-recheck`
-2. [ ] - `p1` - **IF** the run is cloud - `inst-release-cloud`
-   1. [ ] - `p1` - Apply the run's existing redaction map and stable pseudonyms under the gate's effective privacy policy; never create inconsistent identities between initial packet and tool result - `inst-release-redact`
-   2. [ ] - `p1` - DB: append one `audit_log` row of kind tool_result with `llm_run_id`, destination, byte size, hash and redaction-map reference before releasing the result - `inst-release-audit`
-   3. [ ] - `p1` - **IF** redaction or audit persistence fails, **RETURN** −32603 and release no result body - `inst-release-failed`
-3. [ ] - `p1` - Keep audio, voice profiles, credential values and raw redaction maps out of every response, including local runs - `inst-release-secrets`
-4. [ ] - `p1` - **RETURN** the permitted result; diagnostics contain only ids, timing, sizes and scrubbed errors - `inst-release-return`
+1. [x] - `p1` - Recheck run liveness and current privacy; remove sensitive and out-of-scope evidence before returning any nested text or metadata to a cloud run - `inst-release-recheck`
+2. [x] - `p1` - **IF** the run is cloud - `inst-release-cloud`
+   1. [x] - `p1` - Apply the run's existing redaction map and stable pseudonyms under the gate's effective privacy policy; never create inconsistent identities between initial packet and tool result - `inst-release-redact`
+   2. [x] - `p1` - DB: append one `audit_log` row of kind tool_result with `llm_run_id`, destination, byte size, hash and redaction-map reference before releasing the result - `inst-release-audit`
+   3. [x] - `p1` - **IF** redaction or audit persistence fails, **RETURN** −32603 and release no result body - `inst-release-failed`
+3. [x] - `p1` - Keep audio, voice profiles, credential values and raw redaction maps out of every response, including local runs - `inst-release-secrets`
+4. [x] - `p1` - **RETURN** the permitted result; diagnostics contain only ids, timing, sizes and scrubbed errors - `inst-release-return`
 
 ### Stage without applying primary changes
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-mcp-stage-write`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-mcp-stage-write`
 
 **Input**: Authorized `PinItemInput` or `ProposeCorrectionInput`, run id and validated evidence.
 
 **Output**: `StagedOutput` referring to reviewable staged work.
 
 **Steps**:
-1. [ ] - `p1` - Recheck target existence, allowed field and current before value inside the writer boundary - `inst-staging-recheck`
-2. [ ] - `p1` - Record the proposed pin or correction through the owning item/change service with actor llm_run, reason, evidence ids and a stable reference; retain proposed state - `inst-staging-write`
-3. [ ] - `p1` - Commit staging and its change record together; rollback means no staged success result - `inst-staging-commit`
-4. [ ] - `p1` - Publish only the owning service's staging notification after commit, never an applied primary edit - `inst-staging-publish`
-5. [ ] - `p1` - **RETURN** staged true and reference; later user action must revalidate target state before applying - `inst-staging-return`
+1. [x] - `p1` - Recheck target existence, allowed field and current before value inside the writer boundary - `inst-staging-recheck`
+2. [x] - `p1` - Record the proposed pin or correction through the owning item/change service with actor llm_run, reason, evidence ids and a stable reference; retain proposed state - `inst-staging-write`
+3. [x] - `p1` - Commit staging and its change record together; rollback means no staged success result - `inst-staging-commit`
+4. [x] - `p1` - Publish only the owning service's staging notification after commit, never an applied primary edit - `inst-staging-publish`
+5. [x] - `p1` - **RETURN** staged true and reference; later user action must revalidate target state before applying - `inst-staging-return`
 
 ### Close a run and revoke access
 
@@ -231,7 +231,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 **Steps**:
 1. [x] - `p1` - Revoke the run token before accepting further work and cancel outstanding tool and relay tasks - `inst-close-revoke`
-2. [x] - `p1` - Close sockets and stdio, stop the child and relay transports, and release per-call caches and in-memory redaction references; the child and relay transports stop with slice 2 - `inst-close-resources`
+2. [x] - `p1` - Close sockets and stdio, stop the child and relay transports, and release per-call caches and in-memory redaction references; the child ends on its stdio EOF and the relay transports stop with the run (slice 3 of the relay) - `inst-close-resources`
 3. [x] - `p1` - Remove secret-bearing per-run config files; do not erase committed audit or staged review records - `inst-close-files`
 4. [x] - `p1` - Reject late results and replayed token requests without returning evidence - `inst-close-late`
 5. [x] - `p1` - **RETURN** closed; startup cleanup discards stale configs whose runs no longer exist - `inst-close-return`
@@ -260,7 +260,7 @@ Closed sessions cannot be reopened with their old token. Another run gets a new 
 
 - [ ] `p4` - **ID**: `cpt-noter-dod-core-mcp-transport`
 
-The system **MUST** ship the signed Rust binary as a stdio child, serve protocol-derived tool schemas, use the 0600 Unix socket and bind every request to a live per-run token. It opens no TCP listener or database connection. Caller-supplied cloud and call fields cannot weaken trusted policy; JSON-RPC errors use exactly the four contract codes and retain the request id.
+The system **MUST** ship the signed Rust binary as a stdio child, serve protocol-derived tool schemas, use the 0600 Unix socket and bind every request to a live per-run token. It opens no TCP listener or database connection. Caller-supplied cloud and call fields cannot weaken trusted policy; JSON-RPC errors use exactly the four contract codes and retain the request id. Owner-gated, so this box stays `[ ]`: signing the binary and bundling it as a Tauri sidecar (`externalBin`) in the release build.
 
 **Implements**:
 - `cpt-noter-flow-core-mcp-start`
@@ -289,7 +289,7 @@ The system **MUST** answer reads from shared retrieval and item/person services,
 
 ### Staged writes only
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-mcp-staging`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-mcp-staging`
 
 The system **MUST** validate pin and correction evidence and record reviewable proposed work through the existing writer and change-log services. A tool cannot accept its own proposal or apply a primary correction. `emit_card` remains unstable and is not implemented as the M3 staging path.
 

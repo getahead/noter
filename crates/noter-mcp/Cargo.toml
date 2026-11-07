@@ -16,5 +16,6 @@ tokio = { version = "1", features = ["rt", "macros", "io-std", "io-util", "net"]
 [dev-dependencies]
 noter-core = { path = "../noter-core", features = ["harness"] }
 noter-db = { path = "../noter-db" }
+noter-llm = { path = "../noter-llm" }
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util", "time", "process", "io-util", "net"] }

@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use crate::runtime::{Availability, BoxFuture, Skill};
 use crate::secrets::Secret;
+use crate::tools::McpLaunch;
 
 /// One adapter call: the packet exactly as the gate released (and audited) it.
 pub(crate) struct Invocation {
@@ -30,6 +31,8 @@ pub(crate) struct Invocation {
     pub budget_usd: Option<f64>,
     /// The API key of an API-key run (the stored one, or the candidate a verification checks).
     pub key: Option<Secret>,
+    /// noter-mcp as the run's only MCP server, when the run may use tools.
+    pub mcp: Option<McpLaunch>,
 }
 
 /// What a runtime answered, before validation.

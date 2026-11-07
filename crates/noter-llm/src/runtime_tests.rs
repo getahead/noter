@@ -21,7 +21,7 @@ use crate::validate::validate;
 use crate::{
     Availability, Budget, Failure, Llm, LlmRuntime, MemorySecrets, Packet, PacketContext,
     PacketItem, Privacy, RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind,
-    TaskSettings, Tested,
+    TaskSettings, Tested, ToolHost, ToolLaunch, ToolStart,
 };
 
 const NORMAL_TEXT: &str =
@@ -53,6 +53,11 @@ fn cloud() -> Privacy {
 }
 
 fn fixture(script: Option<&str>) -> Fixture {
+    fixture_with(script, |llm| llm)
+}
+
+/// `fixture` with the router tuned before it is shared (a tool host, say).
+fn fixture_with(script: Option<&str>, tune: impl FnOnce(Llm) -> Llm) -> Fixture {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("noter.db");
     let store = Arc::new(Store::open(&path, &[noter_db::MIGRATIONS]).unwrap());
@@ -75,6 +80,7 @@ fn fixture(script: Option<&str>) -> Fixture {
     .on_log(move |v| l.lock().unwrap().push(v.clone()))
     .on_switch_to_local(move |call| s.lock().unwrap().push(call.clone()))
     .on_key_rejected(move |runtime, _| r.lock().unwrap().push(runtime));
+    let llm = tune(llm);
     let (privacy, _) = watch::channel(cloud());
     Fixture {
         _dir: dir,
@@ -1040,4 +1046,408 @@ async fn the_provider_rejecting_the_stored_key_is_reported_once_per_run() {
     let failure = f.llm.run_once(f.post_call()).await.unwrap_err();
     assert!(matches!(failure, Failure::Runtime { .. }));
     assert_eq!(*f.rejected.lock().unwrap(), [RuntimeChoice::ClaudeApiKey]);
+}
+
+// ── noter-mcp wiring: the tool host and the result gate (slice 2) ─
+
+/// A host that records what the router asks of it.
+#[derive(Default)]
+struct Host {
+    started: Mutex<Vec<ToolStart>>,
+    stopped: Mutex<Vec<String>>,
+    refuse: bool,
+}
+
+impl ToolHost for Host {
+    fn start(&self, run: ToolStart) -> Result<ToolLaunch, String> {
+        if self.refuse {
+            return Err("no socket".into());
+        }
+        let config = format!("/run/mcp/{}.json", run.llm_run_id.as_str());
+        self.started.lock().unwrap().push(run);
+        Ok(ToolLaunch {
+            token: "tok-secret".into(),
+            config: config.into(),
+        })
+    }
+
+    fn stop(&self, run: &noter_protocol::LlmRunId) {
+        self.stopped.lock().unwrap().push(run.as_str().to_owned());
+    }
+}
+
+const BINARY: &str = "/app/noter-mcp";
+
+fn with_host(script: Option<&str>, host: &Arc<Host>) -> Fixture {
+    let host = host.clone();
+    fixture_with(script, move |llm| llm.with_tool_host(host, BINARY.into()))
+}
+
+/// A cloud post-call run that may use `get_person`, pseudonyms on.
+fn tool_request(f: &Fixture) -> RunRequest {
+    let mut req = f.request(Skill::RoleReview, TaskKind::PostCall);
+    req.settings.tools = vec!["get_person".into()];
+    req.settings.pseudonyms = true;
+    req
+}
+
+/// Runs `req` slowly in the background; returns the run's id once the adapter has it.
+async fn running(
+    f: &Fixture,
+    host: &Host,
+    req: RunRequest,
+) -> (String, tokio::task::JoinHandle<crate::RunOutcome>) {
+    let llm = f.llm.clone();
+    let run = tokio::spawn(async move { llm.run_once(req).await });
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+        if !f.scripted.received().is_empty() {
+            break;
+        }
+    }
+    let id = host.started.lock().unwrap()[0]
+        .llm_run_id
+        .as_str()
+        .to_owned();
+    (id, run)
+}
+
+const SLOW: &str = r#"{"on": "role-review", "after_ms": 5000, "output": {"agent": "pm", "review_md": "Person 2 owes Person 1.", "evidence_segment_ids": ["seg_1"]}}"#;
+
+#[tokio::test(start_paused = true)]
+async fn a_run_with_tools_starts_noter_mcp_through_the_host_and_stops_it_on_every_outcome() {
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    let (id, run) = running(&f, &host, tool_request(&f)).await;
+    {
+        let started = host.started.lock().unwrap();
+        assert_eq!(started.len(), 1);
+        assert!(started[0].cloud, "a Claude run is a cloud run");
+        assert_eq!(started[0].tools, ["get_person"]);
+        assert_eq!(started[0].call_id, Some(CallId::new("call_1")));
+    }
+    // The adapter gets the binary, the config and the token; nothing else names the run's door.
+    let launch = f.scripted.received()[0].mcp.clone().expect("a launch");
+    assert_eq!(launch.binary, std::path::Path::new(BINARY));
+    assert_eq!(
+        launch.config.to_string_lossy(),
+        format!("/run/mcp/{id}.json")
+    );
+    assert_eq!(launch.token.expose(), "tok-secret");
+    assert!(!format!("{launch:?}").contains("tok-secret"));
+    assert!(host.stopped.lock().unwrap().is_empty());
+    run.await.unwrap().unwrap();
+    assert_eq!(*host.stopped.lock().unwrap(), std::slice::from_ref(&id));
+    // The run is over: its result gate is gone with it.
+    let late = f
+        .llm
+        .release_tool_result(&noter_protocol::LlmRunId::new(&id), &[], json!({}));
+    assert!(late.is_err());
+
+    // A failed run stops it too.
+    let host = Arc::new(Host::default());
+    let f = with_host(
+        Some(r#"{"on": "role-review", "fail": "rate_limited"}"#),
+        &host,
+    );
+    f.llm.run_once(tool_request(&f)).await.unwrap_err();
+    assert_eq!(host.stopped.lock().unwrap().len(), 1);
+
+    // A cancelled run stops it, and the late output never lands.
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    let req = tool_request(&f);
+    let cancel = req.cancel.clone();
+    let (_, run) = running(&f, &host, req).await;
+    cancel.cancel();
+    assert!(matches!(run.await.unwrap(), Err(Failure::Cancelled)));
+    assert_eq!(host.stopped.lock().unwrap().len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn no_tools_no_host_or_a_host_that_refuses_start_no_tool_server() {
+    // No tools requested: the host is never asked and the adapter gets no launch.
+    let host = Arc::new(Host::default());
+    let f = with_host(None, &host);
+    f.llm.run_once(f.post_call()).await.unwrap();
+    assert!(host.started.lock().unwrap().is_empty());
+    assert!(f.scripted.received()[0].mcp.is_none());
+
+    // No host set: tools are requested but there is nobody to start them; the run goes on without.
+    let f = fixture(None);
+    f.llm.run_once(tool_request(&f)).await.unwrap();
+    assert!(f.scripted.received()[0].mcp.is_none());
+
+    // A host that cannot start the tool server: the run goes on without tools, nothing is left open.
+    let host = Arc::new(Host {
+        refuse: true,
+        ..Host::default()
+    });
+    let f = with_host(None, &host);
+    f.llm.run_once(tool_request(&f)).await.unwrap();
+    assert!(f.scripted.received()[0].mcp.is_none());
+    assert!(host.stopped.lock().unwrap().is_empty());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_cloud_tool_result_uses_the_runs_pseudonyms_and_its_audit_row_commits_first() {
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    f.privacy.send_replace(Privacy {
+        mode: PrivacyMode::CloudRedacted,
+        ..cloud()
+    });
+    let (id, run) = running(&f, &host, tool_request(&f)).await;
+    let run_id = noter_protocol::LlmRunId::new(&id);
+    let result = json!({
+        "display_name": "Ann Lee",
+        "aliases": ["Annie"],
+        "open_items": [{"text": "Bob Stone mails ann@example.com", "owner": "Bob Stone", "item_id": "it_1"}],
+    });
+    let people = ["Ann Lee".to_owned(), "Bob Stone".to_owned()];
+    let released = f.llm.release_tool_result(&run_id, &people, result).unwrap();
+    // Ann Lee is the packet's "Person 1" again; Bob Stone is the next pseudonym; ids stay.
+    assert_eq!(released["display_name"], "Person 1");
+    assert_eq!(released["open_items"][0]["owner"], "Person 2");
+    // The initial packet already holds ann@example.com as [EMAIL_1]: same placeholder again.
+    assert_eq!(
+        released["open_items"][0]["text"],
+        "Person 2 mails [EMAIL_1]"
+    );
+    assert_eq!(released["open_items"][0]["item_id"], "it_1");
+    let audit = f.row("SELECT * FROM audit_log WHERE kind = 'tool_result'");
+    assert_eq!(audit["llm_run_id"], id.as_str());
+    assert_eq!(audit["what"], "evidence_lookup");
+    assert_eq!(audit["destination"], "api.anthropic.com");
+    assert_eq!(audit["call_id"], "call_1");
+    let bytes = serde_json::to_vec(&released).unwrap();
+    assert_eq!(audit["bytes_out"], bytes.len() as i64);
+    assert_eq!(audit["payload_hash"], sha256(&bytes));
+    assert!(audit["redaction_map_id"]
+        .as_str()
+        .unwrap()
+        .starts_with("rmap_"));
+    // The run's own row and its tool_result row share the map.
+    let run_row = f.row("SELECT redaction_map_id FROM audit_log WHERE kind = 'run'");
+    assert_eq!(run_row["redaction_map_id"], audit["redaction_map_id"]);
+    // What the model asks for in its pseudonyms names the real people again.
+    let mut asked = json!({"owner_name": "Person 2", "text": "Person 1 and Person 2"});
+    f.llm.restore_tool_input(&run_id, &mut asked);
+    assert_eq!(
+        asked,
+        json!({"owner_name": "Bob Stone", "text": "Ann Lee and Bob Stone"})
+    );
+    // The model answered with the pseudonyms of both; both come back inside the core.
+    let done = run.await.unwrap().unwrap();
+    assert_eq!(done.output["review_md"], "Bob Stone owes Ann Lee.");
+    assert!(!f.log_text().contains("Ann Lee") && !f.log_text().contains("Bob Stone"));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_cloud_tool_result_is_refused_when_its_audit_row_cannot_commit_or_privacy_changed() {
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    let (id, run) = running(&f, &host, tool_request(&f)).await;
+    let run_id = noter_protocol::LlmRunId::new(&id);
+    rusqlite::Connection::open(&f.path)
+        .unwrap()
+        .execute_batch("CREATE TRIGGER tool_down BEFORE INSERT ON audit_log WHEN NEW.kind = 'tool_result' BEGIN SELECT RAISE(ABORT, 'disk'); END;")
+        .unwrap();
+    let failed = f
+        .llm
+        .release_tool_result(&run_id, &[], json!({"text": "TOOL-TEXT"}));
+    assert!(matches!(failed, Err(Failure::Storage(_))), "{failed:?}");
+    assert_eq!(
+        f.count("SELECT count(*) FROM audit_log WHERE kind = 'tool_result'"),
+        0
+    );
+    rusqlite::Connection::open(&f.path)
+        .unwrap()
+        .execute_batch("DROP TRIGGER tool_down;")
+        .unwrap();
+
+    // Privacy went local-only mid-run: the gate refuses and writes nothing.
+    f.privacy.send_replace(Privacy {
+        mode: PrivacyMode::LocalOnly,
+        ..cloud()
+    });
+    let refused = f
+        .llm
+        .release_tool_result(&run_id, &[], json!({"text": "TOOL-TEXT"}));
+    assert!(
+        matches!(refused, Err(Failure::Unavailable(_))),
+        "{refused:?}"
+    );
+    assert_eq!(
+        f.count("SELECT count(*) FROM audit_log WHERE kind = 'tool_result'"),
+        0
+    );
+    run.abort();
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_local_runs_tool_result_passes_without_an_audit_row() {
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    f.privacy.send_replace(Privacy {
+        mode: PrivacyMode::LocalOnly,
+        ..cloud()
+    });
+    let mut req = tool_request(&f);
+    req.settings.configured = Some(RuntimeChoice::Local);
+    let (id, run) = running(&f, &host, req).await;
+    assert!(!host.started.lock().unwrap()[0].cloud);
+    let result = json!({"display_name": "Ann Lee"});
+    let released = f
+        .llm
+        .release_tool_result(
+            &noter_protocol::LlmRunId::new(&id),
+            &["Ann Lee".to_owned()],
+            result.clone(),
+        )
+        .unwrap();
+    assert_eq!(released, result);
+    assert_eq!(f.count("SELECT count(*) FROM audit_log"), 0);
+    run.abort();
+}
+
+/// The CLI adapters' lockdown with noter-mcp: a fake CLI records its command line, environment
+/// and MCP config; no real Claude Code or Codex runs.
+mod launch_tests {
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    use crate::adapters::claude_code::ClaudeCode;
+    use crate::adapters::cli::CliConfig;
+    use crate::adapters::codex::Codex;
+    use crate::adapters::{Invocation, RuntimeAdapter};
+    use crate::secrets::Secret;
+    use crate::tools::McpLaunch;
+    use crate::Skill;
+    use noter_protocol::{Effort, RuntimeChoice};
+
+    /// A CLI that dumps `argv`, `$NOTER_MCP_TOKEN` and the file after `--mcp-config` into `out`,
+    /// then answers a valid result for either CLI.
+    fn fake_cli(dir: &Path) -> (CliConfig, PathBuf) {
+        let out = dir.join("out");
+        std::fs::create_dir(&out).unwrap();
+        let script = dir.join("cli");
+        let body = format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > {o}/args\nprintf '%s' \"$NOTER_MCP_TOKEN\" > {o}/token\n\
+             while [ $# -gt 0 ]; do [ \"$1\" = --mcp-config ] && cp \"$2\" {o}/mcp.json; shift; done\n\
+             cat > /dev/null\n\
+             echo '{{\"is_error\":false,\"structured_output\":{{}},\"usage\":{{}},\"type\":\"turn.completed\"}}'\n",
+            o = out.display()
+        );
+        std::fs::write(&script, body).unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = CliConfig {
+            program: script,
+            home: dir.join("home"),
+            run_root: dir.join("runs"),
+            signed_in: true,
+            models: vec![],
+        };
+        (config, out)
+    }
+
+    fn call(runtime: RuntimeChoice, mcp: Option<McpLaunch>) -> Invocation {
+        Invocation {
+            runtime,
+            skill: Skill::AskAnswer,
+            schema: serde_json::json!({}),
+            model: String::new(),
+            effort: Effort::Medium,
+            tools: vec!["get_person".into(), "Bash".into(), "pin_item".into()],
+            packet: b"{}".to_vec(),
+            session: None,
+            budget_usd: None,
+            key: None::<Secret>,
+            mcp,
+        }
+    }
+
+    fn launch() -> McpLaunch {
+        McpLaunch {
+            binary: "/app/noter-mcp".into(),
+            config: "/data/run/mcp/llm_1.json".into(),
+            token: Secret::new("tok-secret".into()),
+            tools: vec!["get_person".into(), "pin_item".into()],
+        }
+    }
+
+    #[tokio::test]
+    async fn claude_code_runs_noter_mcp_as_its_only_server_with_the_token_in_a_private_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let (config, out) = fake_cli(dir.path());
+        std::fs::create_dir(&config.home).unwrap();
+        let adapter = ClaudeCode::new(config);
+        let _ = adapter
+            .invoke(call(RuntimeChoice::ClaudeAccount, Some(launch())))
+            .await;
+        let args = std::fs::read_to_string(out.join("args")).unwrap();
+        assert!(args.contains("--strict-mcp-config"));
+        // The built-in tools exclude Bash and noter's tools; those are allowed by their MCP names.
+        assert!(args.contains("--tools\n\n--allowedTools"), "{args}");
+        assert!(
+            args.contains("--allowedTools\nmcp__noter__get_person,mcp__noter__pin_item"),
+            "{args}"
+        );
+        let mcp: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(out.join("mcp.json")).unwrap()).unwrap();
+        let servers = mcp["mcpServers"].as_object().unwrap();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers["noter"]["command"], "/app/noter-mcp");
+        assert_eq!(servers["noter"]["args"][0], "/data/run/mcp/llm_1.json");
+        assert_eq!(servers["noter"]["env"]["NOTER_MCP_TOKEN"], "tok-secret");
+        // No token on the command line, and no run directory left behind.
+        assert!(!args.contains("tok-secret"));
+        assert_eq!(
+            std::fs::read_dir(dir.path().join("runs/runs"))
+                .unwrap()
+                .count(),
+            0
+        );
+
+        // Without tools the config is the M2 one: no server at all.
+        let _ = adapter
+            .invoke(call(RuntimeChoice::ClaudeAccount, None))
+            .await;
+        let mcp: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(out.join("mcp.json")).unwrap()).unwrap();
+        assert_eq!(mcp, serde_json::json!({"mcpServers": {}}));
+    }
+
+    #[tokio::test]
+    async fn codex_gets_noter_mcp_through_its_environment_never_the_command_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let (config, out) = fake_cli(dir.path());
+        std::fs::create_dir(&config.home).unwrap();
+        let adapter = Codex::new(config);
+        let _ = adapter
+            .invoke(call(RuntimeChoice::ChatgptAccount, Some(launch())))
+            .await;
+        let args = std::fs::read_to_string(out.join("args")).unwrap();
+        assert!(
+            args.contains("mcp_servers.noter.command=\"/app/noter-mcp\""),
+            "{args}"
+        );
+        assert!(
+            args.contains("mcp_servers.noter.args=[\"/data/run/mcp/llm_1.json\"]"),
+            "{args}"
+        );
+        assert!(
+            args.contains("mcp_servers.noter.env_vars=[\"NOTER_MCP_TOKEN\"]"),
+            "{args}"
+        );
+        assert!(
+            args.contains("mcp_servers.noter.enabled_tools=[\"get_person\",\"pin_item\"]"),
+            "{args}"
+        );
+        assert!(!args.contains("tok-secret"));
+        assert_eq!(
+            std::fs::read_to_string(out.join("token")).unwrap(),
+            "tok-secret"
+        );
+    }
 }

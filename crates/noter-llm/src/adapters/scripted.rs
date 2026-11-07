@@ -17,6 +17,7 @@ use serde_json::Value;
 use super::{Invocation, Reply, RuntimeAdapter};
 use crate::runtime::{lock, Availability, BoxFuture, Skill, Tested};
 use crate::secrets::Secret;
+use crate::tools::McpLaunch;
 
 const RUNTIMES: [RuntimeChoice; 5] = [
     RuntimeChoice::ClaudeApiKey,
@@ -50,6 +51,8 @@ pub struct Received {
     pub model: String,
     pub effort: Effort,
     pub tools: Vec<String>,
+    /// The noter-mcp launch the run was given, if it may use tools.
+    pub mcp: Option<McpLaunch>,
 }
 
 #[derive(Debug, Default)]
@@ -141,6 +144,7 @@ impl RuntimeAdapter for Scripted {
                 model: call.model.clone(),
                 effort: call.effort,
                 tools: call.tools.clone(),
+                mcp: call.mcp.clone(),
             });
             let next = state
                 .lines

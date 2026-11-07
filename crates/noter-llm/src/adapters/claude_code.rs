@@ -7,7 +7,7 @@
 //! user's home, where Claude Code keeps its sign-in. Structured output against the app schema.
 
 use noter_protocol::RuntimeChoice;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::process::Command;
 
 use super::cli::{self, Cli, CliConfig, RunDir};
@@ -33,15 +33,28 @@ impl ClaudeCode {
         let api_key = call.runtime == RuntimeChoice::ClaudeApiKey;
         let resume = self.0.resume(call.session.as_deref())?;
         let run = RunDir::create(&self.0)?;
-        let mcp = run.write("mcp.json", br#"{"mcpServers":{}}"#)?;
+        // noter-mcp is the only server a run may have, with its token in the 0600 config the
+        // run directory holds and removes.
+        let servers = match &call.mcp {
+            Some(m) => json!({"mcpServers": {"noter": {
+                "command": m.binary,
+                "args": [m.config],
+                "env": {"NOTER_MCP_TOKEN": m.token.expose()},
+            }}}),
+            None => json!({"mcpServers": {}}),
+        };
+        let mcp = run.write("mcp.json", servers.to_string().as_bytes())?;
         let skill = run.write("skill.md", instructions(call.skill).as_bytes())?;
-        // M2 runs have no MCP server, so no `mcp__` tool is available to allow.
+        // The built-in tools, and noter-mcp's tools by their `mcp__noter__` names.
+        let noter: &[String] = call.mcp.as_ref().map_or(&[], |m| &m.tools);
         let tools: Vec<&str> = call
             .tools
             .iter()
             .map(String::as_str)
             .filter(|t| !NEVER.contains(t) && !t.starts_with("mcp__"))
+            .filter(|t| !noter.iter().any(|n| n == t))
             .collect();
+        let allowed: Vec<String> = noter.iter().map(|t| format!("mcp__noter__{t}")).collect();
         let home = match api_key {
             true => self.0.dir("home")?,
             false => self.0.config.home.clone(),
@@ -64,6 +77,7 @@ impl ClaudeCode {
             .arg("--mcp-config")
             .arg(&mcp)
             .args(["--tools", &tools.join(",")])
+            .args(["--allowedTools", &allowed.join(",")])
             .args(["--setting-sources", ""])
             .args(["--permission-mode", "dontAsk"])
             .args(["--max-turns", "8"])
