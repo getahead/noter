@@ -404,7 +404,7 @@ impl Core {
                 }
                 None => {
                     let mut q = db(c.prepare(&format!(
-                        "{sql} WHERE s.person_id = ?1 AND s.pass = 'archive' ORDER BY s.rowid"
+                        "{sql} WHERE s.person_id = ?1 ORDER BY s.pass = 'archive' DESC, s.rowid"
                     )))?;
                     let rows = db(q.query_map([&who], map))?;
                     let all: Vec<(Voice, Option<String>)> = db(rows.collect())?;
