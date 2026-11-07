@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
+import { openReview } from "../items/review-banner";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { Disclosure } from "../../ui/primitives/disclosure";
 import { moveFocus } from "../../ui/primitives/roving";
@@ -10,6 +11,7 @@ import { positionOf, restorePosition } from "./position";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { Link } from "../../ui/primitives/link";
 import { PushButton } from "../../ui/primitives/push-button";
 import { afterTimer } from "../call-page/logic";
 import { allowCalendar, loadToday, READ_KEY } from "./actions";
@@ -102,6 +104,10 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       {review && (
         <section data-region="TD-R8" className="td-review">
           <strong>{t("today.to_review")}</strong> {t("today.review", { count: review.count })}
+          {review.unnamed > 0 && <> · {t("today.unnamed", { count: review.unnamed })}</>}
+          <ul className="td-review__calls">
+            {review.calls.map((c) => <li key={c.id}><Link label={c.title} onAction={() => void openReview(bridge, c.id)} /></li>)}
+          </ul>
         </section>
       )}
       {view?.first_use && <EmptyState variant="first-use" icon="inbox" title={t("today.first_use_title")} body={t("today.first_use_body")} />}

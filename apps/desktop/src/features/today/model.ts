@@ -23,8 +23,9 @@ export function calendarState(read: { state: string }, view: TodayView | undefin
   // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-read
 }
 
-/** TD-R8: the suggested items waiting for review, or no line when none wait. */
-export const reviewLine = (v: TodayView): { count: number } | null => (v.review_waiting > 0 ? { count: v.review_waiting } : null);
+/** TD-R8: the suggested items waiting, the unnamed speakers and one link per call to review; no line when nothing waits. */
+export const reviewLine = (v: TodayView): { count: number; unnamed: number; calls: TodayView["review_calls"] } | null =>
+  v.review_waiting > 0 || v.review_calls.length > 0 ? { count: v.review_waiting, unnamed: v.unnamed_speakers, calls: v.review_calls } : null;
 
 /** TD-R6: up to three read-only proposals, with the core's total for the heading. */
 export const proposalPreview = (v: TodayView): { rows: ProposalRow[]; total: number } => ({ rows: v.proposals.slice(0, 3), total: v.proposals_total });

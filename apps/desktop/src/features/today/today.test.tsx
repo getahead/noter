@@ -6,6 +6,7 @@ import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { resetCache, useTypes } from "../call-page/cache";
 import type { World } from "../../../tests/support/scenario";
+import { openReview } from "../items/review-banner";
 import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showPreviousCall } from "./actions";
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
@@ -202,6 +203,20 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
     html = renderToString(<TodayPage bridge={bridge} />);
     expect(html).toContain("Nothing due without a call");
     expect(html).toContain("Nothing ticked today"); // an empty Done today shows its line open
+  });
+  it("TD-R8 links each call with suggested items or unnamed speakers to its Summary", async () => {
+    await open();
+    const out = seen();
+    Object.assign(today(), { first_use: false });
+    await loadToday(bridge);
+    const html = renderToString(<TodayPage bridge={bridge} />);
+    const res = await bridge.core.todayGet({});
+    const waiting = res.status === "ok" ? res.data.review_calls : [];
+    expect(waiting.length).toBeGreaterThan(0);
+    expect(html).toContain('data-region="TD-R8"');
+    waiting.forEach((c) => expect(html).toContain(c.title.replaceAll("&", "&amp;")));
+    await openReview(bridge, waiting[0]!.id);
+    expect(out).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: waiting[0]!.id, tab: "summary" } }]);
   });
   it("says what will fill the page on first use", async () => {
     await open();

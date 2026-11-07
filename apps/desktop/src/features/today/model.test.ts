@@ -4,7 +4,7 @@ import type { TodayView } from "../../core/bindings";
 import { expandLive, calendarState, cardRows, cards, isExpanded, proposalPreview, recordBlock, reviewLine } from "./model";
 
 const view = (over: Partial<TodayView> = {}): TodayView =>
-  ({ date: "2026-11-05", ranking: "owed_to_todays_people", calendar: "granted", live_call: null, today: [], this_week: [], due_without_call: [], done_today: [], review_waiting: 0, proposals: [], proposals_total: 0, banners: [], first_use: false, ...over }) as TodayView;
+  ({ date: "2026-11-05", ranking: "owed_to_todays_people", calendar: "granted", live_call: null, today: [], this_week: [], due_without_call: [], done_today: [], review_waiting: 0, review_calls: [], unnamed_speakers: 0, proposals: [], proposals_total: 0, banners: [], first_use: false, ...over }) as TodayView;
 
 describe("calendarState (cpt-noter-state-ui-today-calendar)", () => {
   it("is LOADING until the first read and ERROR when the command failed", () => {
@@ -34,7 +34,9 @@ describe("calendarState (cpt-noter-state-ui-today-calendar)", () => {
 describe("reviewLine (TD-R8)", () => {
   it("is absent while nothing waits and counts what the core reports", () => {
     expect(reviewLine(view())).toBeNull();
-    expect(reviewLine(view({ review_waiting: 3 }))).toEqual({ count: 3 });
+    expect(reviewLine(view({ review_waiting: 3 }))).toEqual({ count: 3, unnamed: 0, calls: [] });
+    const calls = [{ id: "call_1" }] as never;
+    expect(reviewLine(view({ review_calls: calls, unnamed_speakers: 2 }))).toEqual({ count: 0, unnamed: 2, calls });
   });
 });
 

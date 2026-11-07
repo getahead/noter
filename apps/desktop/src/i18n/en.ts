@@ -1127,6 +1127,7 @@ export const en = {
   "today.open_settings": "Open System Settings…",
   "today.read_failed": "Couldn't read today's calendar.",
   "today.review": { one: "{count} suggested item waiting for review", other: "{count} suggested items waiting for review" },
+  "today.unnamed": { one: "{count} unnamed speaker", other: "{count} unnamed speakers" },
   "today.open_call_screen": "Open Call Screen",
   "today.local_only": "Local only",
   "today.last_time": "Last time: {line}",
