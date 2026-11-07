@@ -5,6 +5,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { openWindow } from "../e2e/support/app";
+import { hold } from "./hold";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -32,18 +33,12 @@ const patch = (w: World, fn: (c: World["calls"][number]) => void) => {
   fn(w.call_details.find((d) => d.call.id === W.PAST_CALL)!.call);
 };
 
-async function open(page: Page, world: (w: World) => void, latency = 0) {
+async function open(page: Page, world: (w: World) => void, holdCmd?: string) {
   await openWindow(page, "main", { world });
   await ready(page);
+  if (holdCmd) await hold(page, holdCmd);
   await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: Fake }).__noterFake);
-  await page.evaluate(
-    ([id, ms]) => {
-      const fake = (globalThis as unknown as { __noterFake: Fake }).__noterFake;
-      fake.latency = ms as number;
-      return fake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "transcript" } });
-    },
-    [W.PAST_CALL, latency],
-  );
+  await page.evaluate((id) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "transcript" } }), W.PAST_CALL);
 }
 const shot = async (page: Page, name: string, timeout?: number) => {
   await page.evaluate(() => ((document.activeElement as HTMLElement | null)?.blur(), scrollTo(0, 0)));
@@ -72,9 +67,9 @@ test.describe("cpt-noter-dod-ui-call-page-frame-frame call page", () => {
   });
 
   test("loading: skeleton rows after 300 ms", async ({ page }) => {
-    await open(page, quiet(), 4000);
-    // every command waits 4 s, window_navigate included: the skeleton shows ~4.3 s in and holds until call_get answers
-    await expect(page.getByRole("status", { name: "Loading the call" })).toBeVisible({ timeout: 10_000 });
+    await open(page, quiet(), "call_get");
+    // only call_get is parked: the skeleton shows 300 ms after the page asks and holds until it answers
+    await expect(page.getByRole("status", { name: "Loading the call" })).toBeVisible();
     await shot(page, "loading");
   });
 });
