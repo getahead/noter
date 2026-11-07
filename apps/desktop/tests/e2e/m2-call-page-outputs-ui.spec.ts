@@ -146,10 +146,16 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     const failed = section(page, /^Action items/);
     await expect(failed.getByRole("button", { name: "Try Again" })).toBeVisible();
     expect(await sent(page, "outputs_regenerate")).toEqual([]); // opening a failure never retries on its own
+    const real = process.env.NOTER_CORE === "stdio";
+    if (!real) {
+      const now = new Date("2026-11-07T10:00:00Z");
+      await page.clock.install({ time: now });
+      await page.clock.pauseAt(now);
+    }
     await failed.getByRole("button", { name: "Try Again" }).click();
-    // Both cores can finish before the browser observes the transient writing state.
-    await expect(failed).toHaveAttribute("data-state", "ready");
-    if (process.env.NOTER_CORE === "stdio") await expect(failed).toContainText("Scripted action item");
+    // The fake emits writing after 300 ms and ready after 600 ms: hold between them.
+    if (!real) await page.clock.runFor(400);
+    await expect(failed).toContainText(real ? "Scripted action item" : "Writing");
     expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"] })]);
   });
 
