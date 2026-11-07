@@ -924,7 +924,12 @@ export const defaultHandlers: Handlers = {
   // ── Outputs and sharing ──────────────────────────────────────────────
   outputs_get: (a, { world }) => {
     const out = world.outputs.find((o) => o.call_id === a.call_id);
-    if (out) return out;
+    // As the core: a rejected item leaves its section and is never suggested again, so each item section counts its rejected ones.
+    if (out) {
+      const rejected = new Set(world.items.filter((i) => i.call.id === a.call_id && i.review === "rejected").map((i) => i.id));
+      const count = (s: OutputSection) => world.items.filter((i) => rejected.has(i.id) && `${i.kind}s` === s.kind).length;
+      return { ...out, sections: out.sections.map((s) => ({ ...s, items: s.items.filter((i) => !rejected.has(i.id)), suppressed_count: count(s) })) };
+    }
     const c = call(world, a.call_id);
     return { call_id: c.id, status: "not_started", sections: [], archive: c.archive, review_waiting: c.review_waiting, sensitive: c.privacy === "sensitive", written_locally: false };
   },

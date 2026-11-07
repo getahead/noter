@@ -373,6 +373,7 @@ fn section(
         regenerated_with_edits: stored.is_some_and(|s| s.regenerated_with_edits),
         names_updated: stored.is_some_and(|s| s.names_updated),
         version_count: stored.map_or(0, |s| s.versions),
+        suppressed_count: 0,
     }
 }
 
@@ -1416,7 +1417,7 @@ impl Core {
         }
         // Item sections list the call's items of their kind; a rejected suggestion is gone (D75).
         // shortcut: one page (500 items per call), page through if a call can hold more.
-        let items: Vec<ItemView> = self
+        let listed: Vec<ItemView> = self
             .list_items(ItemsListArgs {
                 filter: ItemFilter {
                     call_id: Some(call.clone()),
@@ -1427,10 +1428,10 @@ impl Core {
                     limit: Some(500),
                 },
             })?
-            .rows
+            .rows;
+        let (rejected, items): (Vec<ItemView>, Vec<ItemView>) = listed
             .into_iter()
-            .filter(|i| i.review != ReviewState::Rejected)
-            .collect();
+            .partition(|i| i.review == ReviewState::Rejected);
         let sections: Vec<OutputSection> = kinds
             .into_iter()
             .map(|kind| {
@@ -1441,6 +1442,11 @@ impl Core {
                     .filter(|i| item_section(i.kind) == kind)
                     .cloned()
                     .collect();
+                // Regeneration never suggests a rejected item again (store_items).
+                out.suppressed_count = rejected
+                    .iter()
+                    .filter(|i| item_section(i.kind) == kind)
+                    .count() as u32;
                 out
             })
             .collect();

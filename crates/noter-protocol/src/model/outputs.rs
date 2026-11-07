@@ -72,6 +72,10 @@ pub struct OutputSection {
     /// Speaker labels changed since generation; regeneration can improve wording.
     pub names_updated: bool,
     pub version_count: u32,
+    /// Item sections: suggestions of this kind the user rejected, which a regeneration does not
+    /// suggest again ("1 item not suggested again because you rejected it").
+    #[serde(default)]
+    pub suppressed_count: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
