@@ -10,6 +10,7 @@
 //                     this test starts, as the Tauri host would (docs/HARNESS.md).
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import fixture from "../../../../../contracts/fixtures/world.json" with { type: "json" };
 import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type WindowLabel } from "../../../src/core/bindings";
 import type { ChannelBody } from "../../../src/core/fake/fake-core";
 import type { World } from "../../support/scenario";
@@ -22,6 +23,8 @@ export interface CorePlan {
   contractVersion?: string;
   /** Artificial latency per command, in ms. */
   latency?: number;
+  /** Page Date and the real core use the fixture's clock; browser timers still run. */
+  fixedClock?: boolean;
   /** The story's starting state (tests/support/world-presets.ts), applied before the window's first command. */
   world?: (world: World) => void;
   /** The window's first bundle download ends in `checksum_failed` once (harness.corrupt_next_download), set before the page loads. */
@@ -130,7 +133,7 @@ const WINDOWS = COMMANDS.app_snapshot.windows as readonly string[];
 async function connectRealCore(page: Page, label: string, plan: CorePlan): Promise<Steer> {
   const command = process.env.NOTER_CORE_CMD;
   if (!command) throw new Error("NOTER_CORE=stdio needs NOTER_CORE_CMD (path to noter-core-harness and its flags)");
-  const core = new StdioCore({ command });
+  const core = new StdioCore({ command: plan.fixedClock ? `${command} --clock fixed` : command });
   page.once("close", () => void core.close());
   const win = (WINDOWS.includes(label) ? label : "main") as WindowLabel; // as main.tsx reads it
   // Harness control requests (tests/support/scenario.ts › HARNESS_CONTROLS), not contract commands.
@@ -201,6 +204,7 @@ function fakeSteer(page: Page): Steer {
  * return the controls a story uses while the window is open.
  */
 export async function openWindow(page: Page, label: WindowLabel | string, plan: CorePlan = {}): Promise<Steer> {
+  if (plan.fixedClock) await page.clock.setFixedTime(fixture.now);
   let steer: Steer;
   if (process.env.NOTER_CORE === "stdio") {
     steer = await connectRealCore(page, label, plan);

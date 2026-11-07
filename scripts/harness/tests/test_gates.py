@@ -545,6 +545,38 @@ class ArchCheckTests(unittest.TestCase):
             found = arch_check.check_opt_outs(root)
             self.assertEqual(len(found), 4, [f.detail for f in found])
 
+    def test_swiftpm_build_output_is_not_project_test_source(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            files = [
+                "engine/.build/checkouts/Dependency/Tests/test.swift",
+                "engine/Tests/own.swift",
+                "apps/desktop/tests/.build/own.swift",
+            ]
+            for name in files:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('throw XCTSkip("not supported")\n')
+            found = arch_check.check_opt_outs(root)
+            self.assertEqual(len(found), 2, [f.detail for f in found])
+            self.assertTrue(any("engine/Tests/own.swift" in f.detail for f in found))
+            self.assertTrue(any("apps/desktop/tests/.build/own.swift" in f.detail for f in found))
+
+    def test_swiftpm_dependency_entitlements_do_not_grant_the_engine_network_access(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            files = [
+                "engine/.build/checkouts/Dependency/Example.entitlements",
+                "engine/Resources/Engine.entitlements",
+            ]
+            for name in files:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("<key>com.apple.security.network.client</key>")
+            found = arch_check.check_entitlements(root)
+            self.assertEqual(len(found), 1, [f.detail for f in found])
+            self.assertIn("engine/Resources/Engine.entitlements", found[0].detail)
+
     def test_this_repository_passes(self):
         self.assertEqual(arch_check.run(), [])
 
