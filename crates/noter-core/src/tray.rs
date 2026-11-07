@@ -109,6 +109,8 @@ pub(crate) struct TrayInputs<'a> {
     /// Recorded time so far, pauses excluded (as the call window counts it).
     pub elapsed_ms: i64,
     pub now: i64,
+    /// The next calendar event: its title and start.
+    pub next_event: Option<(&'a str, i64)>,
 }
 
 /// "23:14", or "1:02:03" past an hour.
@@ -291,6 +293,15 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
         };
         let second = format!("{speakers}{}", privacy_text(i.privacy));
         entries.push(TrayEntry::Line(second));
+    }
+    // The clock is UTC, as everywhere in the core (no time zone is known here).
+    if let (true, Some((title, at))) = (idle, i.next_event) {
+        let m = at.div_euclid(60_000);
+        entries.push(TrayEntry::Line(format!(
+            "Next: {title} {:02}:{:02}",
+            m / 60 % 24,
+            m % 60
+        )));
     }
     // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-first
     // @cpt-begin:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-degraded
@@ -536,6 +547,7 @@ mod tests {
             speakers: s.speakers,
             elapsed_ms: s.elapsed_ms,
             now: NOW,
+            next_event: None,
         })
     }
 

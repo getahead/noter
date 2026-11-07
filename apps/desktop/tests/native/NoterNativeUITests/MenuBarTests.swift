@@ -49,6 +49,22 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertEqual(keyOf("Start Recording"), "R", "Start Recording shows its hotkey ⌃⌥⌘R")
     }
 
+    // @cpt-flow:cpt-noter-flow-ui-today-review:p1
+    func test_cpt_noter_seq_today_review_before_call__menu_next_is_disabled() {
+        app.launchEnvironment["NOTER_TEST_CLOCK"] = "fixed"
+        launch("idle")
+        // The calendar is read a few seconds after launch; an open menu does not follow a rebuild,
+        // so reopen it until the line is there.
+        var next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
+        for _ in 0..<10 where !next.exists {
+            closeMenu()
+            Thread.sleep(forTimeInterval: 1)
+            next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
+        }
+        XCTAssertTrue(next.exists)
+        XCTAssertFalse(next.isEnabled, "Next is calendar information, not a recording action")
+    }
+
     func test_cpt_noter_seq_menu_bar_check_state__switched_to_local() {
         launch("switched-to-local")
         XCTAssertTrue(infoLine("Switched to local", in: openMenu()).exists)
