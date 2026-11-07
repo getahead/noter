@@ -20,10 +20,19 @@ pub struct ToolStart {
 }
 
 /// What the host made for the run: the per-run token and the 0600 config noter-mcp reads.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ToolLaunch {
     pub token: String,
     pub config: PathBuf,
+}
+
+impl std::fmt::Debug for ToolLaunch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ToolLaunch")
+            .field("token", &"<redacted>")
+            .field("config", &self.config)
+            .finish()
+    }
 }
 
 /// The core's side of a run's tool server: registers the run (token, socket, config) and
@@ -41,4 +50,20 @@ pub struct McpLaunch {
     /// Passed as `NOTER_MCP_TOKEN`; never printed.
     pub token: Secret,
     pub tools: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_launch_never_prints_its_token() {
+        let launch = ToolLaunch {
+            token: "tok_9f3a77c1d2".into(),
+            config: PathBuf::from("/run/mcp/run_1.json"),
+        };
+        let shown = format!("{launch:?}");
+        assert!(!shown.contains("9f3a77c1d2"), "{shown}");
+        assert!(shown.contains("run_1.json"));
+    }
 }
