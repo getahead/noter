@@ -1015,3 +1015,86 @@ async fn a_live_source_is_removed_even_with_the_keychain_locked() {
     rig.core.source_remove(&ctx(), args).await.unwrap();
     assert!(rig.source().await.is_none());
 }
+
+// ── document hits in search (`permitted_chunks` behind retrieval's document seam) ──
+
+fn search_args(query: &str, call_types: Vec<CallTypeId>) -> SearchArgs {
+    SearchArgs {
+        query: query.into(),
+        filter: CallFilter {
+            call_types,
+            ..CallFilter::default()
+        },
+        limit: None,
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_indexed_heading_is_document_evidence_in_search_until_the_source_goes() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    // A stem at a word start finds "ships"; the hit names its source, title and section.
+    let found = rig
+        .core
+        .search(&main, search_args("shipping", vec![]))
+        .await
+        .unwrap();
+    assert!(!found.documents.is_empty(), "{found:?}");
+    let first = &found.documents[0];
+    assert_eq!(first.strength, MatchStrength::Strong);
+    assert!(matches!(first.target, HitTarget::Document { .. }));
+    let Provenance::Document {
+        source_id,
+        title,
+        section,
+        source_name,
+        ..
+    } = &first.provenance
+    else {
+        panic!("{:?}", first.provenance);
+    };
+    assert_eq!(
+        (
+            source_id,
+            title.starts_with("Page "),
+            section.as_deref(),
+            source_name.as_str()
+        ),
+        (&row.id, true, Some("Rollout"), "notion")
+    );
+    // A source limited to other call types is not evidence for a request about one type.
+    let limited = SourceUpdateArgs {
+        source_id: row.id.clone(),
+        rev: rig.source().await.unwrap().rev,
+        name: None,
+        schedule: None,
+        privacy: None,
+        scope: Some(SourceScope::Limited {
+            call_types: vec![],
+            people: vec![PersonId::new("per_nobody")],
+        }),
+    };
+    rig.core.source_update(&ctx(), limited).await.unwrap();
+    let types = rig.core.call_types_list(&main, NoArgs {}).await.unwrap();
+    let one = vec![types.call_types[0].id.clone()];
+    let scoped = rig
+        .core
+        .search(&main, search_args("rollout", one))
+        .await
+        .unwrap();
+    assert!(scoped.documents.is_empty());
+    // Removed: no hits.
+    let args = SourceIdArgs { source_id: row.id };
+    rig.core.source_remove(&ctx(), args).await.unwrap();
+    let gone = rig
+        .core
+        .search(&main, search_args("rollout", vec![]))
+        .await
+        .unwrap();
+    assert!(gone.documents.is_empty());
+}
