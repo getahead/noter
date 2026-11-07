@@ -2076,6 +2076,44 @@ async fn keys_and_skill_runs_go_through_the_scripted_runtime_and_keychain() {
     );
 }
 
+#[tokio::test]
+async fn advance_clock_moves_the_core_clock_so_a_late_browser_sign_in_is_refused() {
+    let mut r = start().await;
+    let claude = |login: Value| {
+        json!({
+            "tool": "claude_code", "installed": true, "path": "/bin/claude", "version": "2.1.296",
+            "login_identity": {"email": "ann@example.com", "plan": "Max"}, "login": login,
+        })
+    };
+    r.ok(
+        "main",
+        "harness.account_cli",
+        claude(json!({"delay_ms": 300})),
+    )
+    .await;
+    let start = json!({"provider": "claude", "personal_use_confirmed": true});
+    let session = r
+        .ok("settings", "account_signin_start", start.clone())
+        .await;
+    let now = r.ok("main", "harness.world_get", json!({})).await["now"]
+        .as_i64()
+        .unwrap();
+    assert_eq!(session["expires_at"], now + 300_000);
+    let moved = r
+        .ok("main", "harness.advance_clock", json!({"ms": 301_000}))
+        .await;
+    assert_eq!(moved["now"], now + 301_000);
+    for _ in 0..250 {
+        let view = r.ok("main", "accounts_get", json!({})).await;
+        if view["accounts"][0]["status"]["type"] != "signing_in" {
+            assert_eq!(view["accounts"][0]["status"]["type"], "not_signed_in");
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("the late sign-in was never refused");
+}
+
 #[test]
 fn llm_script_flag_reads_the_scripted_runtime_or_names_the_bad_line() {
     let dir = std::env::temp_dir().join(format!("llm-script-{}", std::process::id()));
