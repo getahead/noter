@@ -11,9 +11,7 @@ export type ShareOrigin = { type: "toolbar" } | { type: "section"; kind: Section
 /** The core's scope for the invoking control; `include_unreviewed` only when the notice made it explicit. */
 export function scopeOf(origin: ShareOrigin, includeUnreviewed: boolean): ShareScope {
   // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
-  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
   return { sections: origin.type === "toolbar" ? [] : [origin.kind], item_ids: origin.type === "row" ? [origin.id] : [], include_unreviewed: includeUnreviewed };
-  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-scope
   // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-scope
 }
 
