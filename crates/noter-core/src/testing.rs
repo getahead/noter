@@ -197,6 +197,7 @@ pub fn carry_start(core: &Core, call: &noter_protocol::CallId) -> Result<usize, 
 pub fn carry_end(core: &Core, call: &noter_protocol::CallId) -> Result<(), CoreError> {
     core.carry_end(call)?;
     core.keep_talk_time(call)
+}
 
 /// A cloud run as the router starts it, for tests that speak the socket as `noter-mcp` would:
 /// a Claude run whose packet names `people` (pseudonyms on), started through the router so its
