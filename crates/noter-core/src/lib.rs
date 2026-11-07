@@ -5,6 +5,7 @@
 mod accounts;
 mod app;
 mod archive;
+mod ask;
 mod audio;
 mod audit;
 mod capture;
@@ -347,6 +348,9 @@ pub struct Core {
     mcp: mcp::McpRuns,
     /// Whether searches can use the vector indexes (`noter-retrieval`).
     index: noter_retrieval::Index,
+    /// Ask turns that have not ended, and their Channel messages.
+    ask: ask::Turns,
+    ask_hub: std::sync::OnceLock<Arc<StreamHub<AskMsg>>>,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -525,6 +529,8 @@ impl Core {
             sources: knowledge::Sources::default(),
             mcp,
             index: noter_retrieval::Index::default(),
+            ask: ask::Turns::default(),
+            ask_hub: std::sync::OnceLock::new(),
         };
         Core::discard_stale_mcp_configs(data_dir);
         core.check_index();
@@ -539,6 +545,7 @@ impl Core {
     /// checkpoints. Idempotent.
     pub async fn shutdown(&self) {
         self.close_mcp();
+        self.cancel_asks();
         for hub in self.hubs() {
             hub.end_all(StreamEndReason::Shutdown);
         }
@@ -908,7 +915,46 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         _args: NoArgs,
     ) -> Result<ScopePresetList, CoreError> {
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-request
         self.scope_presets()
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-request
+    }
+
+    async fn ask_start(
+        &self,
+        ctx: &CommandCtx,
+        args: AskStartArgs,
+        channel: Sink<AskMsg>,
+    ) -> Result<AskHandle, CoreError> {
+        self.start_ask(ctx, args, channel)
+    }
+
+    async fn ask_stop(&self, _ctx: &CommandCtx, args: AskTurnArgs) -> Result<Ack, CoreError> {
+        self.stop_ask(args)
+    }
+
+    async fn ask_threads_list(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<AskThreadList, CoreError> {
+        self.ask_threads()
+    }
+
+    async fn ask_thread_get(
+        &self,
+        _ctx: &CommandCtx,
+        args: AskThreadArgs,
+    ) -> Result<AskThread, CoreError> {
+        self.ask_thread(args)
+    }
+
+    async fn ask_thread_delete(
+        &self,
+        ctx: &CommandCtx,
+        args: AskThreadArgs,
+    ) -> Result<Ack, CoreError> {
+        self.delete_ask_thread(ctx, args)
     }
 
     async fn call_types_list(

@@ -6,6 +6,7 @@
 
 // @cpt-component:cpt-noter-component-core-retrieval:p1
 
+mod ask;
 mod index;
 mod normalize;
 mod presets;
@@ -14,6 +15,11 @@ mod search;
 
 use noter_db::Migration;
 
+pub use ask::{
+    ask_query, begin_turn, check_answer, check_start, delete_thread, evidence_id, finish_turn,
+    only_weak, prior_turns, sensitive, thread, threads, Checked, Ending, NewTurn, Prior, ASK_HITS,
+    NOT_FOUND_MD,
+};
 pub use index::{embed_query, missing, rebuild, stale, Embedder, Index, Readiness, Run, DIMS};
 pub use normalize::{normalize, terms};
 pub use presets::scope_presets;
@@ -28,12 +34,20 @@ pub use search::{search, search_request, DEFAULT_LIMIT, MAX_LIMIT};
 // @cpt-dbtable:cpt-noter-dbtable-topics:p1
 // @cpt-dbtable:cpt-noter-dbtable-suppressions:p1
 // @cpt-dbtable:cpt-noter-dbtable-ask-threads:p1
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    owner: "noter-retrieval",
-    version: 1,
-    name: "topics, ask threads, keyword and vector indexes",
-    sql: include_str!("../migrations/0001_retrieval.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        owner: "noter-retrieval",
+        version: 1,
+        name: "topics, ask threads, keyword and vector indexes",
+        sql: include_str!("../migrations/0001_retrieval.sql"),
+    },
+    Migration {
+        owner: "noter-retrieval",
+        version: 2,
+        name: "ask turn flags",
+        sql: include_str!("../migrations/0002_ask_turn_flags.sql"),
+    },
+];
 
 #[cfg(test)]
 mod tests;

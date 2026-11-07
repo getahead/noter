@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use noter_core::{Clock, Core, CoreDeps, EventEmitter};
 use noter_db::Insert;
-use noter_engine_client::scripted::ScriptedEngine;
+use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -278,4 +278,38 @@ async fn a_library_without_vectors_is_rebuilt_at_start() {
         .find(|r| r.kind == JobKind::IndexRebuild)
         .expect("a rebuild run");
     assert_eq!(run.status, JobRunStatus::Succeeded);
+}
+
+#[tokio::test]
+async fn a_failed_query_embedding_reports_keyword_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let down = Behaviour {
+        launch_fails: true,
+        ..Behaviour::default()
+    };
+    let engine = ScriptedEngine::new()
+        .with_container(dir.path())
+        .with_default(down);
+    let deps =
+        CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents)).with_engine(Arc::new(engine));
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    seed(&core);
+    let r = core
+        .search(
+            &main_window(),
+            search_args("websockets", CallFilter::default(), None),
+        )
+        .await
+        .unwrap();
+    // The indexes are complete, but this request ran without its embedding.
+    assert_eq!(
+        r.mode,
+        SearchMode::KeywordOnly {
+            rebuild_progress: 1.0
+        }
+    );
+    assert!(!r.calls.is_empty());
+    assert_eq!(r.explain.semantic_hits, 0);
 }

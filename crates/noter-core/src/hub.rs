@@ -268,6 +268,17 @@ impl<M: StreamMsg> StreamHub<M> {
         self.reset(Reset::Streams(Some(key), reason));
     }
 
+    /// Whether a stream still has a live subscription (Ask stops a turn nobody watches).
+    pub fn watched(&self, key: &str) -> bool {
+        self.lock().get(key).is_some_and(|s| !s.subs.is_empty())
+    }
+
+    /// A stream sent its terminal message (Ask's `done` or `failed`): its subscriptions are
+    /// released and nothing follows.
+    pub fn close(&self, key: &str) {
+        self.lock().remove(key);
+    }
+
     /// Every stream ends (shutdown).
     pub fn end_all(&self, reason: StreamEndReason) {
         self.reset(Reset::Streams(None, reason));

@@ -381,7 +381,7 @@ fn not_found(what: &str) -> CoreError {
 }
 
 /// The router's failure as the section's typed error; `None` when the run was cancelled.
-fn code_of(failure: &Failure) -> Option<ErrorCode> {
+pub(crate) fn code_of(failure: &Failure) -> Option<ErrorCode> {
     Some(match failure {
         Failure::Unavailable(e) | Failure::Storage(e) => e.code,
         Failure::Runtime { code } => word(code).unwrap_or(ErrorCode::RuntimeUnavailable),

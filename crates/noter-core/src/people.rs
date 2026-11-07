@@ -193,20 +193,8 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
     // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-unnamed
 }
 
-fn table_exists(c: &Connection, name: &str) -> Db<bool> {
-    c.query_row(
-        "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
-        [name],
-        |r| r.get(0),
-    )
-}
-
-/// Topics of the items from the person's calls. The topics table belongs to retrieval (2.22):
-/// until it exists the page has none.
+/// Topics of the items from the person's calls (the topics table is retrieval's, 2.22).
 fn topics_of(c: &Connection, person_id: &str) -> Db<Vec<TopicRow>> {
-    if !table_exists(c, "topics")? {
-        return Ok(vec![]);
-    }
     c.prepare(&format!(
         "SELECT t.id, t.rev, t.name, t.last_seen, count(DISTINCT i.call_id),
                 coalesce(sum(i.kind = 'decision'), 0),
