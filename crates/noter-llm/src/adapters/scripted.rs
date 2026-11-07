@@ -61,6 +61,8 @@ struct State {
     received: Vec<Received>,
     opened: u32,
     closed: Vec<String>,
+    /// Lines `answer_next` put ahead of the script: the next one goes after them.
+    pinned: usize,
 }
 
 /// Every runtime choice, available, answered from the script. Cloning shares it.
@@ -92,12 +94,16 @@ impl Scripted {
         Ok(Self(Arc::new(Mutex::new(state))))
     }
 
-    /// `line` (a script line as JSON) answers the next run of its skill, ahead of the script.
+    /// `line` (a script line as JSON) answers the next run of its skill, ahead of the script and
+    /// after the lines given here before it.
     pub fn answer_next(&self, line: Value) -> Result<(), String> {
         let line = serde_json::from_value(line)
             .map_err(|e| e.to_string())
             .and_then(checked)?;
-        lock(&self.0).lines.insert(0, Some(line));
+        let mut state = lock(&self.0);
+        let at = state.pinned;
+        state.lines.insert(at, Some(line));
+        state.pinned += 1;
         Ok(())
     }
 
