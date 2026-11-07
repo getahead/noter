@@ -22,11 +22,17 @@ const shortcutsReady = async (page: Page) => {
   await expect(body(page)).toBeVisible();
 };
 
+/** Summary opened and its controls there: the Share control (shortcuts, copy) and the loaded sections (every edit and action). */
+const openReady = async (page: Page, call?: string) => {
+  await (call === undefined ? openSummary(page) : openSummary(page, call));
+  await shortcutsReady(page);
+};
+
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
   test("UI — happy path: Summary meta line, the four sections, Edit, ⌘Return, Edited badge and Your Edit in the version menu", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
-    await openSummary(page);
-    expect((await sent(page, "outputs_get")).some((a) => a.call_id === W.PAST_CALL)).toBe(true);
+    await openReady(page);
+    await expect.poll(async () => (await sent(page, "outputs_get")).some((a) => a.call_id === W.PAST_CALL)).toBe(true);
 
     const summary = section(page, "Summary");
     await expect(summary).toContainText(/Summary · English · Claude Code · \d+ min \d+ s after the call/);
@@ -43,7 +49,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await editor.fill("Backend and QA aligned on the websocket notifications. The soak run is Oleg's.");
     await page.keyboard.press("Meta+Enter");
 
-    expect(await sent(page, "output_edit")).toEqual([
+    await expect.poll(() => sent(page, "output_edit")).toEqual([
       expect.objectContaining({ call_id: W.PAST_CALL, summary_id: "sum_backend", rev: 2, body_md: "Backend and QA aligned on the websocket notifications. The soak run is Oleg's." }),
     ]);
     await expect(summary).toContainText("The soak run is Oleg's.");
@@ -55,7 +61,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
 
   test("UI — happy path: Esc discards the draft and the saved text stays", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
-    await openSummary(page);
+    await openReady(page);
     const summary = section(page, "Summary");
     await summary.getByRole("button", { name: "Edit" }).click();
     await summary.getByRole("textbox").fill("A correction nobody saves");
@@ -66,7 +72,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
 
   test("UI — error path: a save that conflicts keeps the draft and shows the error until the user saves again", async ({ page }) => {
     const steer = await openWindow(page, "main", { world: O.written });
-    await openSummary(page);
+    await openReady(page);
     const summary = section(page, "Summary");
     await summary.getByRole("button", { name: "Edit" }).click();
     await summary.getByRole("textbox").fill("My correction");
@@ -74,7 +80,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await page.keyboard.press("Meta+Enter");
     await expect(summary.getByRole("textbox")).toHaveValue("My correction");
     await expect(summary.getByRole("alert")).toBeVisible();
-    expect(await sent(page, "output_edit")).toHaveLength(1);
+    await expect.poll(() => sent(page, "output_edit")).toHaveLength(1);
     await page.keyboard.press("Meta+Enter"); // an explicit new save
     await expect.poll(async () => (await sent(page, "output_edit")).length).toBe(2);
   });
@@ -83,13 +89,13 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await openWindow(page, "main", {
       world: O.writingLocally,
     });
-    await openSummary(page);
+    await openReady(page);
     await expect(banner(page)).toContainText("Writing with the local model · up to 10 min · role reviews follow in the background");
   });
 
   test("UI — error path: A section failed — the others stay usable, Try Again writes that section only", async ({ page }) => {
     await openWindow(page, "main", { world: O.actionItemsFailed });
-    await openSummary(page);
+    await openReady(page);
     const failed = section(page, /^Action items/);
     await expect(failed).toContainText("Couldn't write the action items (Claude Code timed out)");
     await expect(failed.getByRole("button", { name: "Try Again" })).toBeVisible();
@@ -98,32 +104,32 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await expect(section(page, /^Decisions/)).toContainText("Decisions · 2");
 
     await failed.getByRole("button", { name: "Try Again" }).click();
-    expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ call_id: W.PAST_CALL, sections: ["action_items"], local: false })]);
+    await expect.poll(() => sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ call_id: W.PAST_CALL, sections: ["action_items"], local: false })]);
     await expect(failed).not.toContainText("Couldn't write the action items");
   });
 
   test("UI — error path: Use Local Model regenerates that section locally and says so", async ({ page }) => {
     await openWindow(page, "main", { world: O.actionItemsFailed });
-    await openSummary(page);
+    await openReady(page);
     await section(page, /^Action items/).getByRole("button", { name: "Use Local Model" }).click();
-    expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"], local: true })]);
+    await expect.poll(() => sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"], local: true })]);
   });
 
   test("UI — other path: a regenerate that is blocked during capture says it waits for the call to end, with no retry", async ({ page }) => {
     const steer = await openWindow(page, "main", { world: O.written });
-    await openSummary(page);
+    await openReady(page);
     await steer.failNext("outputs_regenerate", "job_blocked");
     await toolbar(page).getByRole("button", { name: "More" }).click();
     await menu(page).getByRole("menuitem", { name: "Regenerate Outputs…" }).click();
     await page.getByRole("dialog", { name: "Regenerate Outputs" }).getByRole("button", { name: "Regenerate", exact: true }).click();
     await expect(page.getByText(/waits for the call to end/i)).toBeVisible();
     await page.waitForTimeout(1500);
-    expect(await sent(page, "outputs_regenerate")).toHaveLength(1); // no timer retry
+    await expect.poll(() => sent(page, "outputs_regenerate")).toHaveLength(1); // no timer retry
   });
 
   test("UI — other path: a version that cannot be read keeps the current prose and offers a retry beside the version control", async ({ page }) => {
     const steer = await openWindow(page, "main", { world: (w) => (O.written(w), Object.assign(O.sectionOf(w, "summary"), { version_count: 3, user_edited: true })) });
-    await openSummary(page);
+    await openReady(page);
     const summary = section(page, "Summary");
     await steer.failNext("output_version_get", "not_found");
     await summary.getByRole("button", { name: /Version/ }).click();
@@ -136,13 +142,13 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
 test.describe("cpt-noter-seq-notifications-open-outputs", () => {
   test("UI — happy path: a notification click (nav:request) opens the call's Summary in the main window with its outputs loaded", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
-    await openSummary(page);
+    await openReady(page);
     await page.keyboard.press("Meta+Digit1"); // the user works elsewhere in Noter
     await navigate(page, "summary"); // what a click on NT-1 does: the core's window_navigate → nav:request
     await expect(page.getByRole("heading", { name: new RegExp(O.TITLE) }).first()).toBeVisible();
     await expect(page.getByRole("tab", { name: "Summary", selected: true })).toBeVisible();
     await expect(section(page, "Summary")).toContainText("Drawer events will ship behind a flag.");
-    expect((await sent(page, "outputs_get")).length).toBeGreaterThan(0);
+    await expect.poll(async () => (await sent(page, "outputs_get")).length).toBeGreaterThan(0);
   });
 
   test("UI — error path: Outputs failed — the click opens the failed section with Try Again, Try Again writes it", async ({ page }) => {
@@ -162,7 +168,7 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     // The fake emits writing after 300 ms and ready after 600 ms: hold between them.
     if (!real) await page.clock.runFor(400);
     await expect(failed).toContainText(real ? "Scripted action item" : "Writing");
-    expect(await sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"] })]);
+    await expect.poll(() => sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"] })]);
   });
 
   test("UI — error path: the call was deleted — a notification click for it opens the frame's not-found state, not a dead Summary", async ({ page }) => {
@@ -199,7 +205,7 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
     await navigate(page, "summary");
     await expect(section(page, "Summary")).toContainText("Drawer events will ship behind a flag.");
-    expect(await sent(page, "outputs_get")).toEqual([expect.objectContaining({ call_id: W.PAST_CALL })]);
+    await expect.poll(() => sent(page, "outputs_get")).toEqual([expect.objectContaining({ call_id: W.PAST_CALL })]);
     await expect(body(page)).toBeVisible();
   });
 });
@@ -207,12 +213,12 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
 test.describe("cpt-noter-seq-call-page-share-outputs", () => {
   test("UI — happy path: Share opens on Whole call, Copy for Slack shows Copied for Slack on the button", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
-    await openSummary(page, call);
+    await openReady(page, call);
     await share(page).click();
     await expect(menu(page)).toContainText("Whole call");
     await menu(page).getByRole("menuitem", { name: "Copy for Slack" }).click();
     const first = { call_id: call, scope: { sections: [], item_ids: [], include_unreviewed: false }, format: "slack" };
-    expect(await sent(page, "share_copy")).toEqual([first]);
+    await expect.poll(() => sent(page, "share_copy")).toEqual([first]);
     await expect(share(page)).toContainText("Copied for Slack"); // 2 s, announced politely
     await expect(page.getByRole("status").filter({ hasText: "Copied for Slack" })).toHaveCount(1);
     await expect(share(page)).not.toContainText("Copied for Slack", { timeout: 5000 });
@@ -220,7 +226,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
 
   test("UI — happy path: ⌘⇧C copies for Slack without opening the menu", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
-    await openSummary(page, call);
+    await openReady(page, call);
     await shortcutsReady(page);
     await page.keyboard.press("Meta+Shift+KeyC");
     await expect(menu(page)).toHaveCount(0);
@@ -231,7 +237,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
 
   test("UI — other path: Export to a folder — ⌘E, the sheet with Scope: Whole call, tick Transcript, Export…, Exported to <path> with Show in Finder", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
-    await openSummary(page, call);
+    await openReady(page, call);
     await shortcutsReady(page);
     await page.keyboard.press("Meta+KeyE");
     const sheet = page.getByRole("dialog", { name: /Export/ });
@@ -243,17 +249,17 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await expect(sheet.getByRole("checkbox", { name: "Transcript" })).toBeChecked();
     await sheet.getByRole("button", { name: "Export…" }).click(); // the core shows the macOS save panel; the harness answers it
 
-    expect(await sent(page, "calls_export")).toEqual([
+    await expect.poll(() => sent(page, "calls_export")).toEqual([
       { call_ids: [call], include: { summary_and_items: true, transcript: true, audio: false }, scope: null },
     ].map((a) => expect.objectContaining({ call_ids: a.call_ids, include: expect.objectContaining({ summary_and_items: true, transcript: true }) })));
     await expect(toolbar(page)).toContainText(/Exported to .+/);
     await page.getByRole("button", { name: "Show in Finder" }).click();
-    expect(await sent(page, "open_external")).toEqual([{ target: { type: "reveal_in_finder", path: expect.any(String) } }]);
+    await expect.poll(() => sent(page, "open_external")).toEqual([{ target: { type: "reveal_in_finder", path: expect.any(String) } }]);
   });
 
   test("UI — other path: Export needs one content checkbox, and a cancelled save panel leaves no Exported status", async ({ page }) => {
     const { steer, call } = await O.openOutputs(page, "written");
-    await openSummary(page, call);
+    await openReady(page, call);
     await shortcutsReady(page);
     await page.keyboard.press("Meta+KeyE");
     const sheet = page.getByRole("dialog", { name: /Export/ });
@@ -274,7 +280,7 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
 
 test("cpt-noter-seq-call-page-share-outputs — marking an open call sensitive updates the clipboard warning", async ({ page }) => {
   const { call } = await O.openOutputs(page, "written");
-  await openSummary(page, call);
+  await openReady(page, call);
   await expect(section(page, "Summary")).toBeVisible();
   await toolbar(page).getByRole("button", { name: "More" }).click();
   await menu(page).getByRole("menuitemcheckbox", { name: "Mark as Sensitive" }).click();
