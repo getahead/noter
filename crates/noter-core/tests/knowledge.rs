@@ -269,9 +269,11 @@ async fn a_picked_folder_is_indexed_in_six_formats_with_progress_count_and_last_
         .iter()
         .any(|p| p["run"]["kind"] == "source_sync" && p["run"]["counts"][0]["label"] == "added"));
     let all = format!("{sources:?}{progress:?}");
-    for secret in ["websockets", "Quarterly", "backoff", "system extension"] {
-        assert!(!all.contains(secret), "{secret} leaked into an event");
-    }
+    let file_text = ["websockets", "Quarterly", "backoff", "system extension"];
+    assert!(
+        file_text.iter().all(|phrase| !all.contains(phrase)),
+        "file text leaked into an event"
+    );
     let logged: Vec<String> = read(&rig.core, |c| {
         let mut st = c.prepare(
             "SELECT summary || coalesce(after, '') FROM changes WHERE entity_type = 'source'",

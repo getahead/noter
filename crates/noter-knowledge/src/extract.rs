@@ -170,26 +170,25 @@ fn docx(bytes: &[u8]) -> Result<String, String> {
     let mut in_text = false;
     loop {
         match reader.read_event().map_err(|e| bad(&e))? {
-            Event::Start(e) if e.name().as_ref() == b"w:t" => in_text = true,
-            Event::End(e) if e.name().as_ref() == b"w:t" => in_text = false,
-            Event::Empty(e) | Event::Start(e) if e.name().as_ref() == b"w:pStyle" => {
+            Event::Start(e) if e.name().as_ref() == "w:t" => in_text = true,
+            Event::End(e) if e.name().as_ref() == "w:t" => in_text = false,
+            Event::Empty(e) | Event::Start(e) if e.name().as_ref() == "w:pStyle" => {
                 style = e
                     .try_get_attribute("w:val")
                     .ok()
                     .flatten()
-                    .map(|a| String::from_utf8_lossy(&a.value).into_owned());
+                    .map(|a| a.value.into_owned());
             }
-            Event::Text(t) if in_text => text.push_str(&t.decode().map_err(|e| bad(&e))?),
+            Event::Text(t) if in_text => text.push_str(&t),
             // `&amp;`, `&#38;`: entity references arrive on their own.
             Event::GeneralRef(r) if in_text => {
                 if let Some(c) = r.resolve_char_ref().map_err(|e| bad(&e))? {
                     text.push(c);
                 } else {
-                    let name = r.decode().map_err(|e| bad(&e))?;
-                    text.push_str(quick_xml::escape::resolve_xml_entity(&name).unwrap_or(""));
+                    text.push_str(quick_xml::escape::resolve_xml_entity(&r).unwrap_or(""));
                 }
             }
-            Event::End(e) if e.name().as_ref() == b"w:p" => {
+            Event::End(e) if e.name().as_ref() == "w:p" => {
                 let level = match style.take().as_deref() {
                     Some("Title") => 1,
                     Some(s) => s
