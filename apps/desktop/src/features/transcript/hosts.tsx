@@ -18,6 +18,7 @@ import { buildRows, speakerColumn, spanKeys, type Row, type Variant } from "./mo
 import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
 import { playControl, REFUSED } from "./play-control";
+import { ArchiveNotice, type ArchiveNote } from "./ArchiveNotice";
 import { TranscriptView } from "./transcript-view";
 
 const HIGHLIGHT_MS = 3000;
@@ -74,6 +75,15 @@ export function showSpan(bridge: Pick<Bridge, "core">, span: TimeSpan, rows: rea
   void bridge.core.transcriptSpan({ span }).then((r) => r.status === "ok" && highlight(r.data.segments.map((s) => s.id)));
 }
 
+/** What the archive pass did to an evidence span: its words before and after, `{ change: null }` when it replaced the lines, `null` for nothing to say. */
+export async function spanArchiveNote(bridge: Pick<Bridge, "core">, span: TimeSpan, set: (note: ArchiveNote | null) => void): Promise<void> {
+  // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-archive
+  const r = await bridge.core.transcriptSpan({ span });
+  if (r.status === "ok") set(r.data.archive_change ? { change: r.data.archive_change } : null);
+  else set(r.error.code === "transcript_upgraded" ? { change: null } : null);
+  // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-archive
+}
+
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-replay-line:p1
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-stored:p1
 /**
@@ -116,7 +126,9 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
   const span = o.span;
   const loaded = !!data;
+  const [archive, setArchive] = useState<ArchiveNote | null>(null);
   useEffect(() => void (span && loaded && showSpan(bridge, span, rows, setHighlight)), [span, loaded]);
+  useEffect(() => void (span ? spanArchiveNote(bridge, span, setArchive) : setArchive(null)), [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => (highlight.length ? after(HIGHLIGHT_MS, () => setHighlight([])) : undefined), [highlight]);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
 
@@ -169,6 +181,7 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
     refused,
     clearRefused: () => setRefused(null),
     highlight,
+    archive,
     loading: !!stream?.slow,
     error: stream?.error ?? null,
     retry: subscribe,
@@ -341,6 +354,7 @@ export function StoredTranscript({ bridge, callId, audioKept, span, detail, head
           audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}
         />
       )}
+      {tr.archive && <ArchiveNotice note={tr.archive} />}
       <TranscriptLog tr={tr} variant="stored" header={header} />
       <TranscriptBar tr={tr} variant="stored" />
     </>
