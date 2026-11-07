@@ -46,7 +46,7 @@ impl Drop for Wiped {
     }
 }
 
-struct SecretKey([u8; 32]);
+struct SecretKey(Key);
 
 impl Drop for SecretKey {
     fn drop(&mut self) {
@@ -59,15 +59,14 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn unhex(text: &str) -> Option<[u8; 32]> {
+fn unhex(text: &str) -> Option<Key> {
     if text.len() != 64 || !text.is_ascii() {
         return None;
     }
-    let mut out = [0u8; 32];
-    for (i, byte) in out.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&text[2 * i..2 * i + 2], 16).ok()?;
-    }
-    Some(out)
+    let bytes = (0..32)
+        .map(|i| u8::from_str_radix(&text[2 * i..2 * i + 2], 16).ok())
+        .collect::<Option<Vec<u8>>>()?;
+    Some(*Key::from_slice(&bytes))
 }
 
 fn locked(_: KeychainLocked) -> CoreError {
@@ -285,14 +284,12 @@ impl Core {
             .secrets
             .set(KEY_ACCOUNT, &Secret::new(hex(&fresh)))
             .map_err(locked)?;
-        let mut bytes = [0u8; 32];
-        bytes.copy_from_slice(&fresh);
-        Ok(Some(SecretKey(bytes)))
+        Ok(Some(SecretKey(fresh)))
     }
 
     /// `nonce || ciphertext` of the little-endian floats.
     fn seal(key: &SecretKey, vector: &[f32]) -> Result<Vec<u8>, CoreError> {
-        let cipher = ChaCha20Poly1305::new(Key::from_slice(&key.0));
+        let cipher = ChaCha20Poly1305::new(&key.0);
         let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
         let mut plain: Vec<u8> = vector.iter().flat_map(|x| x.to_le_bytes()).collect();
         let sealed = cipher.encrypt(&nonce, plain.as_slice());
@@ -308,7 +305,7 @@ impl Core {
         if blob.len() != NONCE + DIMS * 4 + TAG {
             return None;
         }
-        let cipher = ChaCha20Poly1305::new(Key::from_slice(&key.0));
+        let cipher = ChaCha20Poly1305::new(&key.0);
         let mut plain = cipher
             .decrypt(Nonce::from_slice(&blob[..NONCE]), &blob[NONCE..])
             .ok()?;
