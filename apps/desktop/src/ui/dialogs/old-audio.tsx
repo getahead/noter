@@ -11,12 +11,14 @@ import { useSheetIfAny } from "./host";
 import type { SheetProps } from "./sheets";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1
-function OldAudioSheet({ close, bridge, onFreed }: SheetProps & { bridge: Bridge; onFreed: (text: string) => void }) {
+export function OldAudioSheet({ close, bridge, onFreed }: SheetProps & { bridge: Bridge; onFreed: (text: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const run = async () => {
-    setBusy(true);
+    // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-sheet-submit
+    setBusy(true); // the sheet keeps its primary button busy, with its label, until the command answers
     setError(false);
+    // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-sheet-submit
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete-old
     const r = await bridge.act("audio:delete_older", "audio_delete_older", () => bridge.core.audioDeleteOlder({ older_than_days: 30 }));
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete-old
