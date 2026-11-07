@@ -23,21 +23,15 @@ final class HandoffTests: NoterTestCase {
         app.typeKey(.return, modifierFlags: []) // Return opens the selected call's page
         let handoff = app.buttons["Handoff"].firstMatch
         XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button — \(screen())", file: file, line: line)
+        // the page is still settling right after it loads: click once the button has stopped moving
+        var last = CGRect.zero
+        _ = waitUntil(5) { let frame = handoff.frame; defer { last = frame }; return frame == last && frame.height > 0 }
         handoff.click()
+        XCTAssertTrue(app.buttons["Copy Prompt"].firstMatch.waitForExistence(timeout: 10), "the Handoff drawer did not open — \(screen())", file: file, line: line)
     }
 
     /// What the window shows, for a failure message: the CI log is the only screen a native failure leaves.
-    private func screen() -> String {
-        // one snapshot, walked once: indexing live queries races elements that come and go
-        guard let root = try? app.snapshot() else { return "no snapshot" }
-        var labels: [String] = []
-        func walk(_ element: XCUIElementSnapshot) {
-            if [.button, .staticText, .popUpButton].contains(element.elementType), !element.label.isEmpty { labels.append("\(element.elementType.rawValue):\(element.label)") }
-            element.children.forEach(walk)
-        }
-        walk(root)
-        return labels.prefix(80).joined(separator: " | ")
-    }
+    private func screen() -> String { String(app.windows.firstMatch.debugDescription.prefix(7000)) }
 
     private var addMapping: XCUIElement {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Add Mapping'")).firstMatch
