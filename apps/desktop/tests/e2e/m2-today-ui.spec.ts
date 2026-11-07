@@ -215,7 +215,7 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
 test("cpt-noter-seq-today-review-before-call — TD-R8 lists a link per call with suggestions and opens its Summary", async ({ page }) => {
   await openToday(page, cardWorld);
   const review = page.locator('[data-region="TD-R8"]');
-  await expect(review).toContainText("waiting for review");
+  await expect(review).toContainText(/\d+ suggested items? from \d+ calls?/);
   const link = review.getByRole("link").first();
   await expect(link).toBeVisible();
   await link.click();

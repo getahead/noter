@@ -17,6 +17,7 @@ import { afterTimer } from "../call-page/logic";
 import { allowCalendar, loadToday, READ_KEY } from "./actions";
 import { useToday } from "./cache";
 import { expandLive, calendarState, cards, isExpanded, proposalPreview, reviewLine, weekCards } from "./model";
+import { ProposalRow } from "./ProposalRow";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 import "./today.css";
 
@@ -104,16 +105,23 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       if (row) {
         position.focused = row.dataset.itemId!;
         position.group = row.closest<HTMLElement>("[data-today-group]")?.dataset.todayGroup;
-        root.current?.querySelectorAll<HTMLElement>("[data-item-id]").forEach((it) => { it.tabIndex = it === row ? 0 : -1; });
+        // only focus on the row itself moves the roving stop; a control inside a row is reached by Tab without making its row one
+        if (event.target === row) {
+          position.stop = { id: row.dataset.itemId!, group: position.group };
+          root.current?.querySelectorAll<HTMLElement>("[data-item-id]").forEach((it) => { it.tabIndex = it === row ? 0 : -1; });
+        }
       }
     }} className="td" data-component="cpt-noter-component-screen-today">
       {review && (
         <section data-region="TD-R8" className="td-review">
-          <strong>{t("today.to_review")}</strong> {t("today.review", { count: review.count })}
-          {review.unnamed > 0 && <> · {t("today.unnamed", { count: review.unnamed })}</>}
-          <ul className="td-review__calls">
-            {review.calls.map((c) => <li key={c.id}><Link label={c.title} onAction={() => void openReview(bridge, c.id)} /></li>)}
-          </ul>
+          <div>
+            <strong>{t("today.to_review")}</strong>
+            {review.count > 0 && <> {t("today.review_items", { count: review.count })} {t("today.review_from", { count: review.calls.length })}</>}
+            {review.unnamed > 0 && <>{review.count > 0 ? " · " : " "}{t("today.unnamed", { count: review.unnamed })}</>}
+          </div>
+          <div className="td-review__links">
+            {review.calls.map((c) => <Link key={c.id} label={`${c.title} ›`} onAction={() => void openReview(bridge, c.id)} />)}
+          </div>
         </section>
       )}
       {view?.first_use && <EmptyState variant="first-use" icon="inbox" title={t("today.first_use_title")} body={t("today.first_use_body")} />}
@@ -151,11 +159,9 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
           {proposals.rows.length === 0 ? (
             <p className="td-empty">{t("today.nothing_waiting")}</p>
           ) : (
-            <ul>
-              {proposals.rows.map((p) => (
-                <li key={p.id}>{p.title}</li>
-              ))}
-            </ul>
+            <div className="td-props">
+              {proposals.rows.map((p) => <ProposalRow key={p.id} proposal={p} />)}
+            </div>
           )}
           <PushButton label={t("today.show_all_activity")} variant="quiet" disabled />
         </section>

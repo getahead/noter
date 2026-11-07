@@ -218,6 +218,30 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
     await openReview(bridge, waiting[0]!.id);
     expect(out).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: waiting[0]!.id, tab: "summary" } }]);
   });
+  it("TD-R8 says what waits and from how many calls, without a zero clause, and links sit in a row", async () => {
+    await open();
+    Object.assign(today(), { first_use: false });
+    await loadToday(bridge);
+    let html = renderToString(<TodayPage bridge={bridge} />);
+    const region = (h: string) => h.replaceAll("<!-- -->", "").slice(h.indexOf('data-region="TD-R8"'), h.indexOf('data-region="TD-R8"') + 900);
+    expect(region(html)).toMatch(/To review:.*\d+ suggested items? from \d+ calls?/);
+    expect(region(html)).toContain("td-review__links");
+    expect(region(html)).not.toContain("<ul");
+    items().forEach((i) => { i.review = "accepted"; });
+    await loadToday(bridge);
+    html = renderToString(<TodayPage bridge={bridge} />);
+    expect(html.replaceAll("<!-- -->", "")).not.toMatch(/\b0 suggested/);
+  });
+  it("TD-R6 shows each proposal as a proposal row in a card, not a bullet list", async () => {
+    await open();
+    Object.assign(today(), { first_use: false });
+    await loadToday(bridge);
+    const html = renderToString(<TodayPage bridge={bridge} />);
+    const r6 = html.slice(html.indexOf('data-region="TD-R6"'), html.indexOf('data-region="TD-R7"'));
+    expect(r6).toContain('data-component="cpt-noter-component-ui-proposal-row"');
+    expect(r6).toContain("td-prop__why");
+    expect(r6).not.toContain("<ul");
+  });
   it("says what will fill the page on first use", async () => {
     await open();
     Object.assign(today(), { first_use: true });

@@ -1,7 +1,14 @@
 .td { display: flex; flex-direction: column; gap: var(--space-6); padding: 16px 24px; max-width: 1180px; }
 .td-h { margin: 0; font: 600 15px/20px var(--font); }
 .td-empty { color: var(--label-2); margin: 0; }
-.td-review { padding: 10px 14px; border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--info-tint); }
+.td-review { display: grid; gap: 6px; padding: 10px 14px; border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--info-tint); }
+.td-review__links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.td-props { padding: 4px 12px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
+.td-prop { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--sep); }
+.td-prop:first-child { border-top: 0; }
+.td-prop__text { flex: 1 1 auto; min-width: 0; }
+.td-prop__title { font-weight: 600; }
+.td-prop__why { color: var(--label-2); font-size: 12px; }
 .td-calendar, .td-proposals { display: grid; gap: 10px; }
 .td-skel { height: 96px; border-radius: 8px; background: var(--sel-unemph); }
 .td-live, .td-recbtn { border-radius: var(--r-capsule); }

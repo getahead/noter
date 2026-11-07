@@ -20,10 +20,13 @@ it("sets one row stop, restores its focus, and falls back to Done when the core 
   const position = positionOf({} as Bridge);
   restorePosition(root as unknown as HTMLElement, position);
   expect(rows.map((r) => r.tabIndex)).toEqual([0, -1]);
-  position.focused = "two";
+  position.focused = "two"; // a control inside the second row took focus: the Tab stop stays on the first row
+  restorePosition(root as unknown as HTMLElement, position);
+  expect(rows.map((r) => r.tabIndex)).toEqual([0, -1]);
+  expect(rows[1]!.focus).toHaveBeenCalledOnce(); // and focus is restored there when it is lost
+  position.stop = { id: "two" }; // the row itself took focus
   restorePosition(root as unknown as HTMLElement, position);
   expect(rows.map((r) => r.tabIndex)).toEqual([-1, 0]);
-  expect(rows[1]!.focus).toHaveBeenCalledOnce();
   position.focused = "moved";
   restorePosition(root as unknown as HTMLElement, position);
   expect(done.focus).toHaveBeenCalledOnce();

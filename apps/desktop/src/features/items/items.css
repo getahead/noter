@@ -19,6 +19,8 @@
 .it-row__line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .it-row--compact .it-row__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .it-row--compact .it-row__due, .it-row--compact .np-badge { flex: none; }
+/* narrow widths: the title gives way first; the evidence link, time code, person, checkbox and controls keep their size on one line */
+.it-row--compact .np-link, .it-row--compact .np-prov, .it-row--compact .np-person, .it-row--compact .np-check, .it-row--compact .np-ibtn { flex: none; white-space: nowrap; }
 .it-row__outcome { padding: 2px 0 0 24px; }
 .it-row.is-outcome { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--sep); }
 .it-row__ghost { color: var(--label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
