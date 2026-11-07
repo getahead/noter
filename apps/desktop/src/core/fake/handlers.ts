@@ -40,7 +40,7 @@ const speakerName = (label: SpeakerLabel): string => label.type === "person" ? l
 
 // @cpt-algo:cpt-noter-algo-core-speakers-audio-correct:p1
 function namedSections(world: World, callId: string, names: [string, string][]): OutputSection[] {
-  const replacements = new Map(names.filter(([old, name]) => old && old !== name));
+  const replacements = new Map(names.filter(([old, name]) => old && old !== name).map(([old, name]) => [old.replaceAll("<", "&lt;"), name]));
   if (!replacements.size) return [];
   const escaped = [...replacements.keys()].map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const pattern = new RegExp(`(?<![\\p{L}\\p{N}_])(?:${escaped.join("|")})(?![\\p{L}\\p{N}_])`, "gu");
@@ -1233,7 +1233,8 @@ export const defaultHandlers: Handlers = {
     // After a partial undo the rows edited later are still applied: redo the undone ones.
     const undone = rows.filter((r) => r.status === "undone");
     if (!undone.length) throw coreError("not_undone");
-    const redoable = undone.filter((r) => r.redoable);
+    const redoable = undone.filter((r) => r.redoable && (r.field !== "naming" ||
+      JSON.stringify(namingState(world, (JSON.parse(r.before!) as ReturnType<typeof namingState>).callId)) === r.before));
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
     replayChanges(world, redoable, "after", emit);

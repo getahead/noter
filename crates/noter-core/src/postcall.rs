@@ -279,6 +279,7 @@ pub(crate) fn named_sections(
     now: i64,
 ) -> noter_db::rusqlite::Result<Vec<Mutation>> {
     let mut changes = vec![];
+    let names: Vec<_> = names.iter().map(|(old, new)| (plain(old), new)).collect();
     for row in stored(c, "call_id", call)? {
         let Some(writer) = &row.writer else { continue };
         if writer.generated_at.0 > now {

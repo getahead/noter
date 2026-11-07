@@ -127,3 +127,34 @@ it.each(["rename", "name"] as const)("speaker %s publishes names_updated and reg
   await until(() => progress.all.find((x) => x.section === "summary" && x.state.type === "ready"), "regenerated summary");
   expect(summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections).names_updated).toBe(false);
 });
+
+it("redoing a speaker name never overwrites an output edited after Undo", async () => {
+  s = openScenario({ alsoRecord: exercised, world: W.idle });
+  const main = s.core("main");
+  const speaker = ok(await main.callGet({ call_id: CALL })).speakers.find((x) => x.label.type === "person")!;
+  const name = speaker.label.type === "person" ? speaker.label.person.display_name : "";
+  const before = summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections);
+  ok(await main.outputEdit({ call_id: CALL, summary_id: SUMMARY, rev: before.rev!, body_md: `${name} owns this.` }));
+  const named = ok(await main.transcriptNameSpeakers({ call_id: CALL, assignments: [{ speaker_id: speaker.id, person: { type: "new", display_name: "Renamed Person" } }] }));
+  const target = { type: "change" as const, change_id: named.change_id };
+  ok(await main.changeUndo({ target }));
+  const undone = summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections);
+  ok(await main.outputEdit({ call_id: CALL, summary_id: SUMMARY, rev: undone.rev!, body_md: "My later edit must survive." }));
+  const redo = await main.changeRedo({ target });
+  if (redo.status === "error") expect(["edited_later", "conflict"]).toContain(redo.error.code);
+  else expect(redo.data.skipped_edited_later).toBeGreaterThan(0);
+  expect(summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections).body_md).toBe("My later edit must survive.");
+});
+
+it("a second rename replaces an escaped speaker name without introducing raw HTML", async () => {
+  s = openScenario({ alsoRecord: exercised, world: W.idle });
+  const main = s.core("main");
+  const speaker = ok(await main.callGet({ call_id: CALL })).speakers.find((x) => x.label.type === "person")!;
+  const name = speaker.label.type === "person" ? speaker.label.person.display_name : "";
+  const before = summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections);
+  ok(await main.outputEdit({ call_id: CALL, summary_id: SUMMARY, rev: before.rev!, body_md: `${name} owns this.` }));
+  for (const [display_name, expected] of [["Anna <QA>", "Anna &lt;QA> owns this."], ["Lena", "Lena owns this."]]) {
+    ok(await main.transcriptRenameSpeaker({ call_id: CALL, speaker_id: speaker.id, person: { type: "new", display_name }, scope: { type: "whole_call" } }));
+    expect(summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections).body_md).toBe(expected);
+  }
+});
