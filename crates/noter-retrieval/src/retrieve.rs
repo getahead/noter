@@ -692,8 +692,9 @@ fn chunk_vectors(
 }
 
 const ITEM_COLUMNS: &str = "i.id, i.text, i.lang, sp.channel, sp.t0_ms, sp.t1_ms";
-const ITEM_SPAN: &str = "LEFT JOIN item_spans sp ON sp.item_id = i.id AND sp.t0_ms =
-    (SELECT min(t0_ms) FROM item_spans WHERE item_id = i.id)";
+/// An item's first span, one row even when several start at the same time.
+const ITEM_SPAN: &str = "LEFT JOIN item_spans sp ON sp.rowid =
+    (SELECT rowid FROM item_spans WHERE item_id = i.id ORDER BY t0_ms, rowid LIMIT 1)";
 
 fn item_row(r: &Row<'_>) -> noter_db::rusqlite::Result<Candidate> {
     let (call, sensitive) = call_of(r, 6)?;

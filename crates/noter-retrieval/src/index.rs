@@ -254,7 +254,11 @@ pub async fn rebuild(
             // The engine runs outside any transaction.
             let texts = batch.iter().map(|b| b.2.clone()).collect();
             // @cpt-begin:cpt-noter-algo-core-retrieval-ask-rebuild:p1:inst-rebuild-failure
-            let vectors = embedder.embed(texts).await.map_err(failed)?;
+            // The engine's error stays out of the run row: only that embedding failed.
+            let vectors = embedder
+                .embed(texts)
+                .await
+                .map_err(|_| failed("the engine could not embed the items"))?;
             // @cpt-end:cpt-noter-algo-core-retrieval-ask-rebuild:p1:inst-rebuild-failure
             let n = batch.len();
             let meta = ctx.change_meta("item vectors").ok_or(Stop::Cancelled)?;
