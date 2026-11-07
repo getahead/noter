@@ -1,0 +1,29 @@
+[package]
+name = "noter-knowledge"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Knowledge sources: folder sources and their watcher, text extraction, heading chunks, the sync job, source policy for retrieval and atomic removal. Never touches SQLite or the network directly."
+publish = false
+
+[dependencies]
+noter-db = { path = "../noter-db" }
+noter-engine-client = { path = "../noter-engine-client" }
+noter-jobs = { path = "../noter-jobs" }
+noter-protocol = { path = "../noter-protocol" }
+html2text = "0.15"
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+pdf-extract = "0.10"
+quick-xml = "0.38"
+serde = "1"
+serde_json = "1"
+sha2 = "0.11"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+ulid = "3"
+unicode-normalization = "0.1"
+zip = { version = "4", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt", "sync", "test-util", "time"] }
