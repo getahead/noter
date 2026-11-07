@@ -240,7 +240,7 @@ impl Core {
             .store()
             .read(move |c| noter_knowledge::get(c, &lookup))?
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this source no longer exists"))?;
-        if row.kind == SourceKind::Mcp {
+        if row.has_token {
             let account = noter_knowledge::token_account(&id);
             self.deps
                 .secrets

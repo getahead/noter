@@ -508,3 +508,49 @@ fn an_indexed_mcp_source_is_due_once_its_schedule_has_passed() {
     live.mode = SourceMode::Live;
     assert!(!due(live));
 }
+
+/// The Keychain stand-in that keeps what was stored and what was deleted, by account.
+#[derive(Default)]
+struct Recording(std::sync::Mutex<Vec<String>>);
+
+impl noter_llm::SecretStore for Recording {
+    fn get(&self, _: &str) -> Result<Option<noter_llm::Secret>, noter_llm::KeychainLocked> {
+        Ok(None)
+    }
+    fn set(&self, account: &str, _: &noter_llm::Secret) -> Result<(), noter_llm::KeychainLocked> {
+        self.0.lock().unwrap().push(format!("set {account}"));
+        Ok(())
+    }
+    fn remove(&self, account: &str) -> Result<(), noter_llm::KeychainLocked> {
+        self.0.lock().unwrap().push(format!("remove {account}"));
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn a_failed_insert_deletes_the_new_keychain_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(dir.path());
+    raw(dir.path())
+        .execute_batch(
+            "CREATE TRIGGER no_sources BEFORE INSERT ON sources
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+        )
+        .unwrap();
+    let mcp = noter_knowledge::ScriptedMcp::default();
+    mcp.set("notion", noter_knowledge::ScriptedServer::default());
+    let secrets = Recording::default();
+    let args = SourceAddMcpArgs {
+        server: "notion".into(),
+        mode: SourceMode::Indexed,
+        schedule: None,
+        privacy: PrivacyClass::Normal,
+        scope: SourceScope::AllCalls,
+    };
+    let added = noter_knowledge::add_mcp(&store, meta(), &mcp, &secrets, args).await;
+    assert!(added.is_err());
+    let calls = secrets.0.lock().unwrap().clone();
+    assert_eq!(calls.len(), 2);
+    assert!(calls[0].starts_with("set source:src_"));
+    assert_eq!(calls[1], calls[0].replacen("set", "remove", 1));
+}

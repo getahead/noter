@@ -1001,3 +1001,17 @@ async fn the_hourly_pass_syncs_an_indexed_source_once_its_schedule_has_passed() 
     let done = rig.synced_at(later).await;
     assert_eq!(done.id, row.id);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_live_source_is_removed_even_with_the_keychain_locked() {
+    let rig = open().await;
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), mcp_args(SourceMode::Live))
+        .await
+        .unwrap();
+    rig.secrets.set_locked(true);
+    let args = SourceIdArgs { source_id: row.id };
+    rig.core.source_remove(&ctx(), args).await.unwrap();
+    assert!(rig.source().await.is_none());
+}
