@@ -108,7 +108,7 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 
 ### Tick an item and take back a mistake
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-today-tick`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-today-tick`
 
 **Actor**: Primary user
 
@@ -121,12 +121,12 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 - First use: **Nothing open yet · Items from your calls appear here. Noter offers to record when a call starts.**
 
 **Steps**:
-1. [ ] - `p1` - User moves between compact rows with ↑/↓; Space delegates to the Items completion flow with item id and current rev - `inst-tick`
-2. [ ] - `p1` - For an open handoff, wait for the explicit answer through `item_answer_handoff_landed`; show no done outcome for Keep Open - `inst-handoff`
-3. [ ] - `p1` - On success show the returned row state and 10-second inline Undo; refresh `today_get` for every card, due list and Done today affected by that item - `inst-refresh`
-4. [ ] - `p1` - User chooses Undo on the outcome, in Done today, or ⌘Z; History sends the corresponding change target and refreshes the lists after success - `inst-undo`
-5. [ ] - `p1` - **IF** the write fails or conflicts: keep the row where it was, show the error and refresh the current item before an explicit retry - `inst-error`
-6. [ ] - `p1` - **RETURN** the item in the core's open or done grouping, with focus on that item or its containing disclosure after it moves - `inst-return`
+1. [x] - `p1` - User moves between compact rows with ↑/↓; Space delegates to the Items completion flow with item id and current rev - `inst-tick`
+2. [x] - `p1` - For an open handoff, wait for the explicit answer through `item_answer_handoff_landed`; show no done outcome for Keep Open - `inst-handoff`
+3. [x] - `p1` - On success show the returned row state and 10-second inline Undo; refresh `today_get` for every card, due list and Done today affected by that item - `inst-refresh`
+4. [x] - `p1` - User chooses Undo on the outcome, in Done today, or ⌘Z; History sends the corresponding change target and refreshes the lists after success - `inst-undo`
+5. [x] - `p1` - **IF** the write fails or conflicts: keep the row where it was, show the error and refresh the current item before an explicit retry - `inst-error`
+6. [x] - `p1` - **RETURN** the item in the core's open or done grouping, with focus on that item or its containing disclosure after it moves - `inst-return`
 
 ### Record or return to interrupted capture
 
@@ -190,18 +190,18 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 
 ### Call card disclosure
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-today-card`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-today-card`
 
 **States**: COLLAPSED, EXPANDED, ALL_ROWS, LIVE
 
 **Initial State**: EXPANDED for next call; COLLAPSED for later/week calls; LIVE for the recording
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** COLLAPSED **TO** EXPANDED **WHEN** its disclosure is invoked - `inst-expand`
-2. [ ] - `p1` - **FROM** EXPANDED **TO** COLLAPSED **WHEN** Collapse is invoked on a later/week card - `inst-collapse`
-3. [ ] - `p1` - **FROM** EXPANDED **TO** ALL_ROWS **WHEN** Show More is invoked - `inst-more`
-4. [ ] - `p1` - **FROM** COLLAPSED, EXPANDED, ALL_ROWS **TO** LIVE **WHEN** capture matches this call; retain disclosure state - `inst-live`
-5. [ ] - `p1` - **FROM** LIVE **TO** EXPANDED **WHEN** capture ends and the refreshed calendar still contains the call - `inst-stop`
+1. [x] - `p1` - **FROM** COLLAPSED **TO** EXPANDED **WHEN** its disclosure is invoked - `inst-expand`
+2. [x] - `p1` - **FROM** EXPANDED **TO** COLLAPSED **WHEN** Collapse is invoked on a later/week card - `inst-collapse`
+3. [x] - `p1` - **FROM** EXPANDED **TO** ALL_ROWS **WHEN** Show More is invoked - `inst-more`
+4. [x] - `p1` - **FROM** COLLAPSED, EXPANDED, ALL_ROWS **TO** LIVE **WHEN** capture matches this call; retain disclosure state - `inst-live`
+5. [x] - `p1` - **FROM** LIVE **TO** EXPANDED **WHEN** capture ends and the refreshed calendar still contains the call - `inst-stop`
 
 ## 5. Definitions of Done
 

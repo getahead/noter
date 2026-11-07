@@ -1,7 +1,7 @@
 // One action item, wherever it is listed: the Call page's output section (full), compact lists, Today's Done list
 // and read-only views. Review, tick, edit and handoff answer all go through `actions.ts`; the row only draws what the
 // core and `local.ts` say. Registers itself in the outputs section's seam (`register.tsx`).
-import { useState, type KeyboardEvent } from "react";
+import { useId, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
 import type { Bridge } from "../../app/bridge/bridge";
@@ -78,7 +78,7 @@ export function ReviewButtons({ it, bridge, retryOnly, edit }: { it: ItemView; b
 
 function CompactReview({ it, bridge }: { it: ItemView; bridge: Bridge }) {
   const [menu, setMenu] = useState<HTMLElement | null>(null);
-  const id = elementId("rv", it.id);
+  const id = useId();
   const close = () => setMenu(null);
   const edit = slots.inspect ? () => slots.inspect!(bridge, it.id) : null;
   return (
@@ -152,6 +152,7 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 // @cpt-component:cpt-noter-component-ui-action-item-row:p1
 // @cpt-dod:cpt-noter-dod-ui-items-actions:p1
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
+  const rowId = useId();
   const it = useItem(bridge, item);
   const heldLocal = useLocal(it.id);
   const local: Local = variant === "read-only" ? {} : heldLocal;
@@ -167,7 +168,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
   if (state === "REJECTED") return null;
   if (local.outcome && (state === "REJECTED_OUTCOME" || !full))
     return (
-      <div data-component="cpt-noter-component-ui-action-item-row" data-variant={variant} data-state="outcome" data-item-id={it.id} data-review={it.review} className={`it-row it-row--${variant} is-outcome`} lang={langOf(it.lang)} id={elementId("row", it.id)}>
+      <div data-component="cpt-noter-component-ui-action-item-row" data-variant={variant} data-state="outcome" data-item-id={it.id} data-review={it.review} className={`it-row it-row--${variant} is-outcome`} lang={langOf(it.lang)} id={rowId}>
         {outcome}
         <span className={`it-row__ghost${it.review === "rejected" ? " is-rej" : ""}`}>{it.text}</span>
         {local.error && <span className="it-row__error" role="alert">{local.error}</span>}
@@ -186,7 +187,8 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     "data-item-id": it.id,
     "data-review": it.review,
     lang: langOf(it.lang),
-    id: elementId("row", it.id),
+    id: rowId,
+    tabIndex: -1,
     onKeyDown: (e: KeyboardEvent) => rowKey(bridge, it, local, e, variant),
   };
   if (state === "EDITING" || state === "SAVING")
@@ -242,10 +244,11 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {owner}
           {text}
           {due}
+          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }), { screen: "main-window-shell" })} />}
           {tags}
           {prov}
           <span className="np-tb__spacer" />
-          {variant === "done" && <PushButton label={t("items.undo")} size="small" variant="quiet" onAction={() => void setDone(bridge, it, false)} />}
+          {variant === "done" && <PushButton label={t(local.doneTarget ? "items.undo" : "items.reopen")} size="small" variant="quiet" onAction={() => void (local.doneTarget ? undoRow(bridge, it.id, local.doneTarget) : setDone(bridge, it, false))} />}
           {handoff}
           {suggested && variant === "compact" && <CompactReview it={it} bridge={bridge} />}
           {info}
@@ -264,6 +267,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
         </div>
         <div className="it-row__line2">
           {due}
+          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }), { screen: "main-window-shell" })} />}
           {tags}
           {prov}
         </div>

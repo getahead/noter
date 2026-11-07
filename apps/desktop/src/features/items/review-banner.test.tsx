@@ -9,7 +9,7 @@ import { loadOutputs } from "../call-page/outputs-actions";
 import { holdOutputs, resetOutputsCache } from "../call-page/outputs-cache";
 import { resetUndo } from "../history/undo";
 import { resetLocal } from "./local";
-import { startReview, useReviewBanner } from "./review-banner";
+import { openReview, watchReview, startReview, useReviewBanner } from "./review-banner";
 import { loadItems, reviewAll } from "./actions";
 import { CallBanners } from "../call-page/CallBanners";
 
@@ -135,4 +135,35 @@ describe("review banner (PC-R2)", () => {
     vi.stubGlobal("document", { querySelector: () => null });
     expect(startReview()).toBe(false);
   });
+});
+
+it("Today review navigation waits for asynchronously rendered suggestions and focuses once", async () => {
+  await ready();
+  const nav = vi.spyOn(bridge.core, "windowNavigate");
+  const focus = vi.fn();
+  let row: { focus: () => void } | null = null;
+  let changed!: () => void;
+  const disconnect = vi.fn();
+  vi.stubGlobal("document", { querySelector: () => row, body: {} });
+  vi.stubGlobal("MutationObserver", class { constructor(callback: () => void) { changed = callback; } observe() {} disconnect = disconnect; });
+  await openReview(bridge, "call_live");
+  expect(nav).toHaveBeenCalledWith({ target: { type: "call_page", call_id: "call_live", tab: "summary" } });
+  const stop = watchReview(bridge, "call_live");
+  expect(focus).not.toHaveBeenCalled();
+  row = { focus };
+  changed();
+  expect(focus).toHaveBeenCalledOnce();
+  expect(disconnect).toHaveBeenCalled();
+  stop();
+});
+
+it("a failed review navigation cancels the pending focus request", async () => {
+  await ready();
+  fake.failNext("window_navigate", "not_found");
+  await openReview(bridge, "call_missing");
+  const observe = vi.fn();
+  vi.stubGlobal("MutationObserver", class { observe = observe; disconnect() {} });
+  watchReview(bridge, "call_missing")();
+  expect(observe).not.toHaveBeenCalled();
+  expect(bridge.store.getState().commands.window_navigate?.state).toBe("ERROR");
 });

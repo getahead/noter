@@ -1,5 +1,5 @@
 // The upcoming call card (DESIGN › Upcoming call card): time, title, attendees, **Local only**, **Last time:** and the
-// open count. The action and question rows inside it join with the Items rows (2.17).
+// open count, shared action rows and evidence links.
 import { useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
@@ -16,7 +16,10 @@ import { holdTypes, useTypes } from "../call-page/cache";
 import { RecordingIndicator } from "../call-window/strip";
 import { showCall, showPreviousCall } from "./actions";
 import { useRecordingClock } from "./clock";
-import type { Card } from "./model";
+import { ActionItemRow } from "../items/ActionItemRow";
+import { OutputItemRow } from "../call-page/OutputItemRow";
+import { positionOf } from "./position";
+import { cardRows, type Card } from "./model";
 
 const clock = (ms: number) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(ms);
 
@@ -29,7 +32,11 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   const live = card.variant === "live" || card.variant === "unmatched";
   const capture = useWindow(bridge, (s) => s.whole.capture);
   const elapsed = useRecordingClock(live ? capture : undefined);
+// @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-live
   const details = expanded || live;
+// @cpt-end:cpt-noter-state-ui-today-card:p1:inst-live
+  const [all, setAll] = useState(positionOf(bridge).all.has(e?.event_id ?? "live"));
+  const rows = e && details ? cardRows(e, all) : null;
   const week = card.variant === "this-week";
   const title = e?.title ?? card.live?.title ?? "";
   const open = e ? e.open_count : 0;
@@ -51,7 +58,7 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   ];
   // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-menu
   return (
-    <article className="td-card" data-component="cpt-noter-component-ui-upcoming-call-card" data-variant={card.variant} data-state={live ? "live" : expanded ? "expanded" : "collapsed"} aria-label={title}>
+    <article data-today-group={id} className="td-card" data-component="cpt-noter-component-ui-upcoming-call-card" data-variant={card.variant} data-state={live ? "live" : expanded ? "expanded" : "collapsed"} aria-label={title}>
       <header className="td-card__head">
         {e && <time className="td-card__time">{live && <RecordingIndicator variant="dot" status={capture?.phase === "paused" ? "paused" : "recording"} />}{week ? new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(e.starts_at) : clock(e.starts_at)}</time>}
         {card.variant === "unmatched" ? (
@@ -92,6 +99,16 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
           ))}
           {e.platform && <span className="td-card__platform">· {e.platform}</span>}
           {e.sensitive && localOnly}
+        </div>
+      )}
+      {rows && rows.rows.length > 0 && (
+        <div className="td-card__rows">
+          {rows.rows.map((it) => (it.kind !== "action_item" ? <ul key={it.id} className="td-card__q"><OutputItemRow bridge={bridge} item={it} /></ul> : <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />))}
+          {rows.more > 0 && <PushButton label={t("today.show_more", { count: rows.more })} variant="quiet" size="small" onAction={() => {
+// @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-more
+positionOf(bridge).all.add(id); setAll(true);
+// @cpt-end:cpt-noter-state-ui-today-card:p1:inst-more
+}} />}
         </div>
       )}
       {e?.last_time && details && (

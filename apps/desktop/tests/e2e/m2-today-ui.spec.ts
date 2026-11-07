@@ -68,3 +68,180 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     expect(await sent(page, "open_external")).toEqual([{ target: { type: "system_settings", permission: "calendar" } }]);
   });
 });
+
+function dueWorld(w: Parameters<typeof W.idle>[0]) {
+  W.idle(w);
+  for (const call of [...w.calls, ...w.call_details.map((detail) => detail.call)]) {
+    if (call.status === "recording" || call.status === "paused") call.status = "ready";
+  }
+  const due = w.items.filter((it) => ["itm_spec", "itm_replay"].includes(it.id));
+  due.forEach((it) => { it.due = "2020-01-01"; });
+  Object.assign(w.today, { today: [], this_week: [], live_call: null, due_without_call: due, done_today: [] });
+}
+const due = (page: Page) => page.locator('[data-region="TD-R5"]');
+const done = (page: Page) => page.locator('[data-region="TD-R7"]');
+
+test.describe("cpt-noter-seq-today-tick-item", () => {
+  test("UI — happy — tick a suggested card item, retain Undo after feedback expires, restore the suggestion", async ({ page }) => {
+    await openToday(page, cardWorld);
+    const row = cards(page).first().locator('[data-item-id="itm_replay"]');
+    await row.getByRole("checkbox").press("Space");
+    await expect(button(done(page), "Done today · 1")).toBeVisible();
+    await button(done(page), "Done today · 1").click();
+    await expect(done(page).getByText("Accepted and done")).toBeVisible();
+    await expect(done(page).getByText("Accepted and done")).toHaveCount(0, { timeout: 15_000 });
+    await button(done(page), "Undo").click();
+    await expect(row.getByText("Suggested", { exact: true })).toBeVisible();
+    expect(await sent(page, "change_undo")).toHaveLength(1);
+    await expect(button(done(page), "Done today · 0")).toBeVisible();
+  });
+  test("UI — Other — keyboard Space completes, focus reaches Done disclosure, Cmd-Z restores", async ({ page }) => {
+    await openToday(page, dueWorld);
+    const row = due(page).locator('[data-item-id="itm_spec"]');
+    await row.focus();
+    await page.keyboard.press("Space");
+    await expect(button(done(page), "Done today · 1")).toBeFocused();
+    await page.keyboard.press("Meta+z");
+    await expect(row.getByRole("checkbox")).not.toBeChecked();
+    expect(await sent(page, "change_undo")).toHaveLength(1);
+  });
+  test("UI — error — failed completion leaves the row open and retry explicit", async ({ page }) => {
+    const steer = await openToday(page, dueWorld);
+    const row = due(page).locator('[data-item-id="itm_spec"]');
+    await expect(row).toBeVisible();
+    await steer.failNext("item_set_done", "internal");
+    await row.getByRole("checkbox").press("Space");
+    await expect(row.getByRole("alert")).toBeVisible();
+    await expect(row.getByRole("checkbox")).not.toBeChecked();
+    expect(await sent(page, "item_set_done")).toHaveLength(1);
+  });
+});
+
+test.describe("cpt-noter-seq-today-review-before-call", () => {
+  test("UI — error — initial calendar failure retains due items and retries with two delayed skeletons", async ({ page }) => {
+    await openWindow(page, "main", { world: dueWorld, fail: [{ cmd: "today_get", code: "calendar_unavailable" }], latency: 500 });
+    await expect(page.getByText("Couldn't read today's calendar.")).toBeVisible();
+    await button(page, "Try Again").click();
+    await expect(page.locator(".td-skel")).toHaveCount(2);
+    await expect(due(page).getByText("Drawer redesign spec by Friday")).toBeVisible();
+    await expect(page.getByText("No calls today")).toBeVisible();
+  });
+  test("UI — Other — wide columns become due, proposals, week, Done in narrow layout", async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 1100 });
+    await openToday(page, dueWorld);
+    const d = await due(page).boundingBox();
+    const p = await page.locator('[data-region="TD-R6"]').boundingBox();
+    expect(p!.x).toBeGreaterThan(d!.x + d!.width - 1);
+    await page.setViewportSize({ width: 800, height: 1000 });
+    await expect(async () => {
+      const dd = await due(page).boundingBox();
+      const pp = await page.locator('[data-region="TD-R6"]').boundingBox();
+      expect(pp!.y).toBeGreaterThan(dd!.y);
+    }).toPass();
+  });
+});
+
+function cardWorld(w: Parameters<typeof W.idle>[0]) {
+  dueWorld(w);
+  const base = { ...w.today.today[0] };
+  // Calendar events are harness input; the real core derives their carried items from participant history.
+  const rows = w.items.filter((it) => it.call.id === W.LIVE_CALL);
+  const now = Date.now();
+  const event = {
+    ...base, event_id: "evt_today_s2", title: "Today preparation", starts_at: now + 60_000, ends_at: now + 3_600_000,
+    platform: "Microsoft Teams", attendees: [{ name: "Anna Kuznetsova", email: null, person: rows[0]!.owner }],
+    call_id: null, sensitive: false, last_time: null,
+    items: rows.filter((it) => it.kind !== "open_question" && it.status !== "handed_off"),
+    questions: rows.filter((it) => it.kind === "open_question"),
+    handed_off: rows.filter((it) => it.status === "handed_off"), open_count: rows.length,
+  };
+  w.today.today = [event, { ...event, event_id: "evt_today_later", title: "Later preparation", starts_at: now + 7_200_000, ends_at: now + 10_800_000 }];
+  w.today.this_week = [{ ...event, event_id: "evt_week", title: "Week preparation", starts_at: now + 86_400_000, ends_at: now + 90_000_000 }];
+  w.today.due_without_call = [];
+}
+
+test.describe("cpt-noter-seq-today-review-before-call", () => {
+  test("UI — happy — core-ranked cards, five rows then Show More, later and week disclosures", async ({ page }) => {
+    await openToday(page, cardWorld);
+    const first = cards(page).filter({ has: page.getByRole("heading", { name: "Today preparation", exact: true }) });
+    await expect(first).toHaveAttribute("data-state", "expanded");
+    await expect(first.locator('[data-item-id]')).toHaveCount(5);
+    await button(first, "Show 1 More").click();
+    await expect(first.locator('[data-item-id]')).toHaveCount(6);
+    const later = cards(page).filter({ has: page.getByRole("heading", { name: "Later preparation", exact: true }) });
+    await expect(later).toHaveAttribute("data-state", "collapsed");
+    await button(later, "Later preparation",).click();
+    await expect(later).toHaveAttribute("data-state", "expanded");
+    await button(later, "Collapse").click();
+    await expect(later).toHaveAttribute("data-state", "collapsed");
+    await button(page, /Week preparation/).click();
+    await expect(page.locator('[data-region="TD-R4"] [data-item-id]')).toHaveCount(5);
+  });
+  test("UI — Other — evidence Return and Back restore row focus and Show More", async ({ page }) => {
+    await openToday(page, cardWorld);
+    const first = cards(page).first();
+    await button(first, "Show 1 More").click();
+    const row = first.locator('[data-item-id="itm_spec"]');
+    await row.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(() => sent(page, "window_navigate")).toContainEqual(expect.objectContaining({ target: expect.objectContaining({ type: "call_page", tab: "transcript" }) }));
+    await expect(page.getByRole("tab", { name: "Transcript", exact: true })).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Meta+BracketLeft");
+    await expect(row).toBeFocused();
+    await expect(first.locator('[data-item-id]')).toHaveCount(6);
+  });
+});
+
+test.describe("cpt-noter-seq-today-tick-item", () => {
+  for (const [label, answer] of [["Keep Open", "keep_open"], ["Yes, Landed", "landed"], ["Done Another Way", "done_another_way"]] as const) {
+    test(`UI — Other — handed-off card item asks explicitly: ${label}`, async ({ page }) => {
+      await openToday(page, cardWorld);
+      const first = cards(page).first();
+      await button(first, "Show 1 More").click();
+      const row = first.locator('[data-item-id="itm_virt"]');
+      await row.getByRole("checkbox").press("Space");
+      await expect(row.getByRole("group", { name: "Did the handoff land?" })).toBeVisible();
+      expect(await sent(page, "item_set_done")).toHaveLength(0);
+      await button(row, label).click();
+      await expect.poll(() => sent(page, "item_answer_handoff_landed")).toContainEqual(expect.objectContaining({ item_id: "itm_virt", answer }));
+      await expect(button(done(page), answer === "keep_open" ? "Done today · 0" : "Done today · 1")).toBeVisible();
+      if (answer === "keep_open") await expect(row.getByRole("checkbox")).not.toBeChecked();
+    });
+  }
+});
+
+
+test("cpt-noter-seq-today-review-before-call — quit recovery opens the saved Transcript", async ({ page }) => {
+  await openToday(page, (w) => {
+    dueWorld(w);
+    w.app.banners.banners = [{ type: "recording_interrupted_by_quit", call: w.items[0]!.call }];
+  });
+  await button(page, "Open Call",).click();
+  await expect.poll(() => sent(page, "window_navigate")).toContainEqual({ target: { type: "call_page", call_id: W.LIVE_CALL, tab: "transcript" } });
+});
+
+test("cpt-noter-seq-today-tick-item — first use explains where items will appear", async ({ page }) => {
+  await openToday(page, (w) => {
+    dueWorld(w);
+    w.calls = [];
+    w.call_details = [];
+    w.items = [];
+    Object.assign(w.today, { first_use: true, due_without_call: [], done_today: [], review_waiting: 0, proposals: [], proposals_total: 0 });
+  });
+  await expect(page.getByText("Nothing open yet", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing due without a call", { exact: true })).toBeVisible();
+  await expect(page.getByText("Nothing ticked today", { exact: true })).toBeVisible();
+});
+
+test("cpt-noter-seq-today-tick-item — Escape keeps a handed-off item open", async ({ page }) => {
+  await openToday(page, cardWorld);
+  const card = cards(page).first();
+  await button(card, "Show 1 More").click();
+  const row = card.locator('[data-item-id="itm_virt"]');
+  await row.getByRole("checkbox").press("Space");
+  await expect(row.getByRole("group", { name: "Did the handoff land?" })).toBeVisible();
+  await row.getByRole("button", { name: "Keep Open" }).focus();
+  await page.keyboard.press("Escape");
+  await expect.poll(() => sent(page, "item_answer_handoff_landed")).toContainEqual(expect.objectContaining({ answer: "keep_open" }));
+  await expect(row.getByRole("checkbox")).not.toBeChecked();
+});

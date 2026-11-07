@@ -62,7 +62,7 @@ export const weekCards = (view: TodayView): Card[] => view.this_week.map((event)
 
 /** At most five combined action and question rows until **Show N More**; the core's order within each kind. */
 export function cardRows(card: UpcomingCall, all: boolean): { rows: ItemView[]; more: number } {
-  const every = [...card.items, ...card.questions];
+  const every = [...card.items, ...card.questions, ...card.handed_off];
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-disclosures
   return all ? { rows: every, more: 0 } : { rows: every.slice(0, 5), more: Math.max(0, every.length - 5) };
   // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-disclosures
@@ -78,3 +78,10 @@ export function isExpanded(eventId: string, user: ReadonlyMap<string, boolean>, 
   // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-expand
 }
 
+
+/** A live card stays expanded after capture ends, without resetting other disclosures. */
+export function expandLive(user: ReadonlyMap<string, boolean>, eventId: string | undefined): ReadonlyMap<string, boolean> {
+  // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-stop
+  return eventId && !user.get(eventId) ? new Map(user).set(eventId, true) : user;
+  // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-stop
+}

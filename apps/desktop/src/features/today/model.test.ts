@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TodayView } from "../../core/bindings";
-import { calendarState, cardRows, cards, isExpanded, proposalPreview, recordBlock, reviewLine } from "./model";
+import { expandLive, calendarState, cardRows, cards, isExpanded, proposalPreview, recordBlock, reviewLine } from "./model";
 
 const view = (over: Partial<TodayView> = {}): TodayView =>
   ({ date: "2026-11-05", ranking: "owed_to_todays_people", calendar: "granted", live_call: null, today: [], this_week: [], due_without_call: [], done_today: [], review_waiting: 0, proposals: [], proposals_total: 0, banners: [], first_use: false, ...over }) as TodayView;
@@ -75,7 +75,7 @@ describe("cards (cpt-noter-algo-ui-today-project)", () => {
 });
 
 describe("cardRows", () => {
-  const card = { items: [1, 2, 3, 4].map(item), questions: [5, 6, 7].map(item) } as never;
+  const card = { items: [1, 2, 3, 4].map(item), questions: [5, 6, 7].map(item), handed_off: [] } as never;
   it("shows five rows and counts the rest", () => {
     const r = cardRows(card, false);
     expect(r.rows).toHaveLength(5);
@@ -93,4 +93,12 @@ describe("isExpanded (cpt-noter-state-ui-today-card)", () => {
     expect(isExpanded("b", new Map([["b", true]]), false)).toBe(true);
     expect(isExpanded("a", new Map([["a", false]]), true)).toBe(false);
   });
+});
+
+it("keeps a formerly live later card expanded when recording ends", () => {
+  const user = new Map([["later", false], ["other", true]]);
+  const next = expandLive(user, "later");
+  expect(isExpanded("later", next, false)).toBe(true);
+  expect(isExpanded("other", next, false)).toBe(true);
+  expect(expandLive(next, undefined)).toBe(next);
 });

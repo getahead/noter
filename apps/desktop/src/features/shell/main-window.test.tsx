@@ -184,3 +184,18 @@ describe("pages", () => {
     expect(pageFor("people").title({ section: "people", key: "root" })).toBe("People!");
   });
 });
+
+it("quit recovery opens the saved Transcript and shows the call window after Resume succeeds", async () => {
+  await open((app) => { app.capture.phase = "idle"; app.capture.call_id = null; app.banners.banners = [{ type: "recording_interrupted_by_quit", call: { id: "call_live", title: "Planning", started_at: 0, call_type: "planning" } }]; });
+  const navigate = vi.spyOn(bridge!.core, "windowNavigate");
+  const resume = vi.spyOn(bridge!.core, "captureResumeInterrupted");
+  const show = vi.spyOn(bridge!.core, "windowShowCall");
+  const tree = rendered(MainWindow, { bridge: bridge! });
+  const slot = find(tree, (_, type) => type === BannerSlot).props as unknown as Parameters<typeof BannerSlot>[0];
+  const quit = slot.banners.find((b) => b.id === "recording_interrupted_by_quit")!;
+  await quit.actions![0]!.onAction!();
+  expect(navigate).toHaveBeenCalledWith({ target: { type: "call_page", call_id: "call_live", tab: "transcript" } });
+  await quit.actions![1]!.onAction!();
+  expect(resume).toHaveBeenCalledWith({ call_id: "call_live" });
+  expect(show).toHaveBeenCalled();
+});

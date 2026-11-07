@@ -20,6 +20,8 @@ export interface Local {
   /** The item when editing began; streamed revisions must not silently replace the draft's base. */
   draftBase?: ItemView;
   outcome?: Outcome;
+  /** The completion change stays available in Done today after inline feedback expires. */
+  doneTarget?: UndoTarget;
   /** **Did the handoff land?** is open. */
   asking?: boolean;
   error?: string;

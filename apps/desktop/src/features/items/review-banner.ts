@@ -15,9 +15,32 @@ export function startReview(): boolean {
   return !!first;
 }
 
+const pendingReview = new WeakMap<Bridge, string>();
+
+/** Today opens Summary and applies Start Review once its asynchronous rows arrive. */
+export async function openReview(bridge: Bridge, callId: string) {
+  pendingReview.set(bridge, callId);
+// @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-links
+  const result = await bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } }), { screen: "main-window-shell" });
+// @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-links
+  if (result.status !== "ok") pendingReview.delete(bridge);
+}
+
+export function watchReview(bridge: Bridge, callId: string): () => void {
+  let observer: MutationObserver | undefined;
+  const stop = () => { observer?.disconnect(); if (pendingReview.get(bridge) === callId) pendingReview.delete(bridge); };
+  if (pendingReview.get(bridge) !== callId) return stop;
+  const focus = () => { if (startReview()) stop(); };
+  observer = new MutationObserver(focus);
+  observer.observe(document.body, { childList: true, subtree: true });
+  focus();
+  return stop;
+}
+
 // @cpt-flow:cpt-noter-flow-ui-items-review:p1
 /** The banner for `callId`, or null with nothing to review; opening a call reads its items. */
 export function useReviewBanner(bridge: Bridge, callId: string): Banner | null {
+  useEffect(() => watchReview(bridge, callId), [bridge, callId]);
   const waiting = useWindow(bridge, (s) => Object.values(s.entities.item).filter((i) => i.call.id === callId && i.review === "suggested").length);
   const list = useWindow(bridge, (s) => s.commands[`items:list:${callId}`]);
   const batch = useWindow(bridge, (s) => s.commands[`items:review_all:${callId}`]);

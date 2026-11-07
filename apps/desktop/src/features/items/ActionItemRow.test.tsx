@@ -235,12 +235,12 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
     expect(html).toContain("Done");
   });
 
-  it("the done variant offers Undo, which unticks with the wanted state", async () => {
+  it("the done variant offers Reopen for a completion from a previous session", async () => {
     await ready();
     const seen = sent();
     const tree = rendered(ActionItemRow, { bridge, item: item("itm_spec", { status: "done" }), variant: "done" });
     expect(renderToString(<ActionItemRow bridge={bridge} item={item("itm_spec", { status: "done" })} variant="done" />)).toContain('data-state="done"');
-    press(tree, "Undo");
+    press(tree, "Reopen");
     await settle();
     expect(seen).toContainEqual(["item_set_done", { item_id: "itm_spec", rev: 1, done: false }]);
   });
@@ -440,4 +440,21 @@ describe("RejectedList", () => {
     await review(bridge, item("itm_replay", { rev: 2, review: "rejected" }), "restore");
     expect(seen.at(-1)).toEqual(["item_review", { item_id: "itm_replay", rev: 2, decision: "restore" }]);
   });
+});
+
+it("gives repeated compact items distinct menu and row ids across Today cards", async () => {
+  await ready();
+  const html = renderToString(<><ActionItemRow bridge={bridge} item={item("itm_replay")} variant="compact" /><ActionItemRow bridge={bridge} item={item("itm_replay")} variant="compact" /></>);
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  expect(new Set(ids).size).toBe(ids.length);
+});
+
+it("compact rows open their source Transcript in one action", async () => {
+  await ready();
+  const seen = sent();
+  const it = item("itm_spec");
+  const tree = rendered(ActionItemRow, { bridge, item: it, variant: "compact" });
+  press(tree, "Show in transcript");
+  await settle();
+  expect(seen).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }]);
 });
