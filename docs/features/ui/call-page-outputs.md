@@ -2,8 +2,8 @@
 title: "Feature — Call page outputs and sharing"
 description: "Read outputs as they arrive, preserve edits across regeneration, compare versions and share a visible scope."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.1"
+date: "2026-11-07"
 feature: cpt-noter-feature-ui-call-page-outputs
 milestone: M2
 ---
@@ -220,6 +220,8 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 5. [ ] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
 6. [ ] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
 
+Owner decision (6 Nov): M2 selection means one row. This step remains open until row-scope Share is delivered with Items (2.17); removing an unavailable row must never broaden its scope to Whole call.
+
 ## 4. States (CDSL)
 
 ### Output section
@@ -305,3 +307,5 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 **Milestone notes.** The Call page frame shipped in M1 for delete/notification-permission stories. M2 completes Summary-ready/failed clicks and old-audio deletion opened by M1 capture errors. `share_test_run` is the remaining M2 command, already specified by `cpt-noter-feature-ui-settings`; its real-core conformance/E2E binding is not a new output-sharing API. Role-review controls remain M4; no draft card command counts here.
 
 **Data.** Core-owned `cpt-noter-dbtable-summaries`, `cpt-noter-dbtable-summary-versions`, `cpt-noter-dbtable-call-tags`; UI reads through core only. No migration, direct filesystem write, network push, Slack/Jira credential or deployment belongs here. Bridge logs contain ids and error codes, never copied text or transcript content.
+
+**Changelog.** v1.1 (7 Nov 2026): record the owner-approved single-row meaning of M2 selection; its delivery checkbox remains open.

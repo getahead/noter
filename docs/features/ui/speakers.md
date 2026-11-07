@@ -2,8 +2,8 @@
 title: "Feature — Speaker naming and transcript corrections"
 description: "Name speakers during or after a call and correct transcript terms without losing focus or evidence."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.1"
+date: "2026-11-07"
 feature: cpt-noter-feature-ui-speakers
 milestone: M2
 ---
@@ -130,7 +130,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 **Actor**: Primary user
 
 **Success Scenarios**:
-- Fix term shows selected words, Correct term, glossary suggestions, Language and Add to glossary checked; applying leaves original wording in the corrected word's help tag.
+- Fix term shows selected words, Correct term, glossary suggestions, Language disabled and showing the transcript language, and Add to glossary checked; applying leaves original wording in the corrected word's help tag.
 
 **Error Scenarios**:
 - Empty replacement disables Fix; stale selection after archive replacement must be resolved again, not applied to a different word.
@@ -258,6 +258,8 @@ The system **MUST** preserve the selected range and original wording, apply only
 
 **DESIGN versus prototype.** README calls out missing Return/arrow selection in the name picker and Fix Term as a row hover button instead of a selection context menu. Add the DESIGN keyboard/context-menu behaviour while retaining the prototype look. Prototype Play Sample flashes for 2 s rather than playing the specified 5-s clip; use real audio state. Prototype skip and rename alter local fixture maps; production uses the typed commands and store events. Its voice-profile checkbox has no backing effect.
 
-**Milestone and contract limits.** Decomposition discrepancy 7 places `people_list`/`person_create` in M3 although the live naming story uses them. M2 builds those controls with the fake; real M2 rename can use existing PersonRef or new PersonRef directly. PersonRef has name/email but no role, and separate person_create plus rename is not an atomic create-and-name with one Undo: Role persistence and atomic undo for that full form need owner contract work. RenameSpeakerArgs and SpeakerAssignment have no update-voice-profile option; FixTermArgs has no language; the complete checkbox and Language controls therefore cannot claim persisted effects yet. SpeakerMutation lacks affected-item counts; SpeakerView supplies segment_count, sample and one suggestion, but not grouped invite/recent suggestions, invite-source captions or the first quote. Use its real sample and count, resolve the first quote from the transcript and request owner contract support for missing suggestion metadata. The fake ignores one_segment scope, does not propagate every derived view, and null assignments do not persist skip: conformance must cover these against real core. No frozen command or generated binding is changed by this spec.
+**Milestone and contract limits.** Decomposition discrepancy 7 places `people_list`/`person_create` in M3 although the live naming story uses them. M2 builds those controls with the fake; real M2 rename can use existing PersonRef or new PersonRef directly. PersonRef has name/email but no role, and separate person_create plus rename is not an atomic create-and-name with one Undo: Role persistence and atomic undo for that full form need owner contract work. RenameSpeakerArgs and SpeakerAssignment have no update-voice-profile option; FixTermArgs has no language. Owner decision (7 Nov): the Fix Term Language popup stays disabled and displays the transcript language until FixTermArgs carries a language; it must not imply that a different language can be selected or persisted. The update-voice-profile checkbox likewise cannot claim a persisted effect yet. SpeakerMutation lacks affected-item counts; SpeakerView supplies segment_count, sample and one suggestion, but not grouped invite/recent suggestions, invite-source captions or the first quote. Use its real sample and count, resolve the first quote from the transcript and request owner contract support for missing suggestion metadata. The fake ignores one_segment scope, does not propagate every derived view, and null assignments do not persist skip: conformance must cover these against real core. No frozen command or generated binding is changed by this spec.
 
 **Data and non-applicability.** The UI owns no tables. Identity, glossary writes and undo are core responsibilities; no voice profile is created here. Network calls, credential handling, migrations, deployment and earlier-call reconciliation are not applicable to this UI feature. Bridge logs omit names, selected text and replacements.
+
+**Changelog.** v1.1 (7 Nov 2026): record the owner-approved disabled Fix Term Language control and its frozen-contract limit.
