@@ -981,3 +981,411 @@ async fn a_failed_batch_keeps_keyword_only_and_a_retry_does_not_duplicate() {
     assert_eq!(lib.count("SELECT count(*) FROM chunk_vec"), 3);
     assert_eq!(lib.count("SELECT count(*) FROM item_vec"), 3);
 }
+
+// ── Ask (slice 2): threads, turns and the citation check ──────────────────────────────
+
+fn you(summary: &str) -> ChangeMeta {
+    ChangeMeta {
+        actor: Actor::You,
+        summary: summary.into(),
+        reason: "test".into(),
+        evidence_ids: vec![],
+        batch_id: None,
+        undoable: false,
+        surface: None,
+    }
+}
+
+/// The speaker's name as a chip, as the core reads it from the person row.
+fn chip(c: &Connection, segment: &SegmentId) -> noter_db::rusqlite::Result<Option<PersonChip>> {
+    use noter_db::rusqlite::OptionalExtension;
+    c.query_row(
+        "SELECT sp.person_id, sp.name FROM segments s JOIN speakers sp ON sp.id = s.speaker_id
+         WHERE s.id = ?1 AND sp.person_id IS NOT NULL",
+        [segment.as_str()],
+        |r| {
+            let name: String = r.get(1)?;
+            Ok(PersonChip {
+                id: PersonId::new(r.get::<_, String>(0)?),
+                short_name: name.clone(),
+                initials: name.chars().take(1).collect(),
+                display_name: name,
+                is_you: false,
+            })
+        },
+    )
+    .optional()
+}
+
+fn cites(n: u16, segments: &[&str], chunks: &[&str]) -> noter_protocol::skills::AnswerCitation {
+    noter_protocol::skills::AnswerCitation {
+        n,
+        segment_ids: segments.iter().map(|s| SegmentId::new(*s)).collect(),
+        chunk_ids: chunks.iter().map(|s| ChunkId::new(*s)).collect(),
+        quote: "model quote".into(),
+    }
+}
+
+fn output(
+    md: &str,
+    citations: Vec<noter_protocol::skills::AnswerCitation>,
+) -> noter_protocol::skills::AskAnswerOutput {
+    noter_protocol::skills::AskAnswerOutput {
+        answer_md: md.into(),
+        citations,
+        found: true,
+    }
+}
+
+#[test]
+fn ask_citations_resolve_against_the_runs_evidence_and_follow_the_text() {
+    let lib = library();
+    let found = lib.find(query("websockets drawer"));
+    let hits = found.ranked(ASK_HITS);
+    let out = output(
+        "Use them [7], as Anna said [2]; maybe [5] too. Again [7].",
+        vec![
+            cites(2, &["seg_a1"], &[]),
+            cites(5, &["seg_nowhere"], &[]),
+            cites(7, &["itm_ws"], &[]),
+            cites(9, &["chk_a"], &[]),
+        ],
+    );
+    let checked = check_answer(&lib.db, &out, &hits, Privacy::Local, &chip).unwrap();
+    assert!(checked.found);
+    // Numbered as the text first references them; the unknown and the unreferenced go.
+    assert_eq!(
+        checked.answer_md,
+        "Use them [1], as Anna said [2]; maybe  too. Again [1]."
+    );
+    let ns: Vec<u16> = checked.citations.iter().map(|c| c.n).collect();
+    assert_eq!(ns, [1, 2]);
+    // Built from the stored evidence, not the model's quote.
+    assert_eq!(
+        checked.citations[0].quote,
+        "Use WebSockets for drawer notifications"
+    );
+    assert_eq!(
+        checked.citations[1].quote,
+        "We decided to use WebSockets for drawer notifications."
+    );
+    assert_eq!(
+        checked.citations[1].speaker.as_ref().map(|s| s.id.as_str()),
+        Some("per_anna")
+    );
+    assert_eq!(checked.citations[1].strength, MatchStrength::Strong);
+    assert!(matches!(
+        &checked.citations[1].provenance,
+        Provenance::PastCall { call, .. } if call.id.as_str() == "call_a"
+    ));
+    assert!(checked.citations.iter().all(|c| !c.deleted));
+}
+
+#[test]
+fn ask_without_valid_citations_is_not_found() {
+    let lib = library();
+    let found = lib.find(query("websockets"));
+    let hits = found.ranked(ASK_HITS);
+    let unknown = output("It was decided [1].", vec![cites(1, &["seg_made_up"], &[])]);
+    let checked = check_answer(&lib.db, &unknown, &hits, Privacy::Local, &chip).unwrap();
+    assert_eq!(
+        (
+            checked.found,
+            checked.answer_md.as_str(),
+            checked.citations.len()
+        ),
+        (false, NOT_FOUND_MD, 0)
+    );
+    // The model's own "not found" never keeps its citations.
+    let mut said_no = output("Nothing [1].", vec![cites(1, &["seg_a1"], &[])]);
+    said_no.found = false;
+    let checked = check_answer(&lib.db, &said_no, &hits, Privacy::Local, &chip).unwrap();
+    assert!(!checked.found);
+}
+
+#[test]
+fn ask_cites_sensitive_calls_only_on_the_mac() {
+    let lib = library();
+    let found = lib.find(query("websocket budget"));
+    let hits = found.ranked(ASK_HITS);
+    assert!(ids(&found.calls).contains(&"seg_c1".to_owned()));
+    let out = output("Confidential [1].", vec![cites(1, &["seg_c1"], &[])]);
+    let cloud = check_answer(&lib.db, &out, &hits, Privacy::Cloud, &chip).unwrap();
+    assert!(
+        !cloud.found,
+        "a sensitive call is never cited to a cloud answer"
+    );
+    let local = check_answer(&lib.db, &out, &hits, Privacy::Local, &chip).unwrap();
+    assert!(local.found);
+    assert_eq!(
+        local.citations[0].speaker, None,
+        "an unnamed speaker has no chip"
+    );
+    // A source gone since retrieval is not cited either.
+    lib.db.execute("PRAGMA foreign_keys = OFF", []).unwrap();
+    lib.db
+        .execute("DELETE FROM segments WHERE id = 'seg_c1'", [])
+        .unwrap();
+    let gone = check_answer(&lib.db, &out, &hits, Privacy::Local, &chip).unwrap();
+    assert!(!gone.found);
+}
+
+fn answer(turn: &str, citations: Vec<Citation>, runtime: RuntimeChoice) -> AskAnswer {
+    AskAnswer {
+        turn_id: AskTurnId::new(turn),
+        question: String::new(),
+        answer_md: "Use WebSockets [1].".into(),
+        citations,
+        found: true,
+        runtime,
+        answered_locally: runtime == RuntimeChoice::Local,
+        sensitive_sources_skipped: 2,
+        keyword_only: true,
+        only_weak_evidence: false,
+        asked_at: TimestampMs(0),
+    }
+}
+
+fn turn(thread: &str, turn: &str, new_thread: bool, question: &str, at: i64) -> NewTurn {
+    NewTurn {
+        thread_id: AskThreadId::new(thread),
+        new_thread,
+        turn_id: AskTurnId::new(turn),
+        question: question.into(),
+        scope: AskScope {
+            call_id: Some(CallId::new("call_a")),
+            ..AskScope::default()
+        },
+        now: TimestampMs(at),
+    }
+}
+
+#[test]
+fn ask_threads_keep_turns_in_order_and_mark_deleted_sources() {
+    let lib = library();
+    let found = lib.find(query("websockets drawer"));
+    let hits = found.ranked(ASK_HITS);
+    let out = output("Yes [1].", vec![cites(1, &["seg_a1"], &[])]);
+    let cited = check_answer(&lib.db, &out, &hits, Privacy::Local, &chip).unwrap();
+
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_1", "turn_1", true, " Websockets? ", OCT_1),
+    )
+    .unwrap();
+    let first = answer(
+        "turn_1",
+        cited.citations.clone(),
+        RuntimeChoice::ClaudeAccount,
+    );
+    let run = LlmRunId::new("llm_1");
+    finish_turn(
+        &lib.store,
+        you("answer"),
+        &AskThreadId::new("ask_1"),
+        &first,
+        Some(&run),
+        Ending::Answered,
+        TimestampMs(OCT_1 + 10),
+    )
+    .unwrap();
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_2", "turn_2", true, "Polling?", OCT_1 + 20),
+    )
+    .unwrap();
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_1", "turn_3", false, "And the admin page?", OCT_1 + 30),
+    )
+    .unwrap();
+
+    let list = threads(&lib.db).unwrap().threads;
+    let rows: Vec<(&str, &str, u32)> = list
+        .iter()
+        .map(|t| (t.id.as_str(), t.title.as_str(), t.turns))
+        .collect();
+    assert_eq!(
+        rows,
+        [("ask_1", "Websockets?", 2), ("ask_2", "Polling?", 1)]
+    );
+    assert_eq!(list[0].updated_at, TimestampMs(OCT_1 + 30));
+
+    let got = thread(&lib.db, &AskThreadId::new("ask_1")).unwrap();
+    assert_eq!(
+        got.scope.call_id.as_ref().map(CallId::as_str),
+        Some("call_a")
+    );
+    let turns: Vec<&str> = got.turns.iter().map(|t| t.turn_id.as_str()).collect();
+    assert_eq!(turns, ["turn_1", "turn_3"]);
+    let t1 = &got.turns[0];
+    assert_eq!(t1.question, " Websockets? ");
+    assert_eq!(
+        (t1.found, t1.runtime, t1.answered_locally),
+        (true, RuntimeChoice::ClaudeAccount, false)
+    );
+    assert_eq!(
+        (
+            t1.sensitive_sources_skipped,
+            t1.keyword_only,
+            t1.only_weak_evidence
+        ),
+        (2, true, false)
+    );
+    assert!(!t1.citations[0].deleted);
+    let llm: String = lib
+        .db
+        .query_row(
+            "SELECT llm_run_id FROM ask_turns WHERE id = 'turn_1'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(llm, "llm_1");
+    // The pending turn has no answer yet.
+    assert_eq!(
+        (got.turns[1].answer_md.as_str(), got.turns[1].found),
+        ("", false)
+    );
+    // Change rows name the rows, never the question or the answer.
+    let leaked = lib.count("SELECT count(*) FROM changes WHERE coalesce(before, '') || coalesce(after, '') || coalesce(delta, '') LIKE '%ebsocket%'");
+    assert_eq!(leaked, 0);
+
+    // A follow-up's context: answered turns before it; a cloud answer of a normal call may go.
+    let prior = prior_turns(
+        &lib.db,
+        &AskThreadId::new("ask_1"),
+        &AskTurnId::new("turn_3"),
+    )
+    .unwrap();
+    assert_eq!(prior.len(), 1);
+    assert!(!prior[0].sensitive);
+
+    lib.db.execute("PRAGMA foreign_keys = OFF", []).unwrap();
+    lib.db
+        .execute("DELETE FROM calls WHERE id = 'call_a'", [])
+        .unwrap();
+    let got = thread(&lib.db, &AskThreadId::new("ask_1")).unwrap();
+    assert!(got.turns[0].citations[0].deleted, "the cited call is gone");
+    let prior = prior_turns(
+        &lib.db,
+        &AskThreadId::new("ask_1"),
+        &AskTurnId::new("turn_3"),
+    )
+    .unwrap();
+    assert!(
+        prior[0].sensitive,
+        "a turn citing a call that is gone stays on the Mac"
+    );
+}
+
+#[test]
+fn ask_a_deleted_thread_takes_no_late_answer() {
+    let lib = library();
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_1", "turn_1", true, "Q", OCT_1),
+    )
+    .unwrap();
+    assert!(delete_thread(&lib.store, you("delete"), &AskThreadId::new("ask_1")).unwrap());
+    assert_eq!(lib.count("SELECT count(*) FROM ask_turns"), 0);
+    let late = finish_turn(
+        &lib.store,
+        you("answer"),
+        &AskThreadId::new("ask_1"),
+        &answer("turn_1", vec![], RuntimeChoice::Local),
+        None,
+        Ending::Answered,
+        TimestampMs(OCT_1),
+    );
+    assert_eq!(late.unwrap_err().code, ErrorCode::NotFound);
+    assert_eq!(lib.count("SELECT count(*) FROM ask_threads"), 0);
+    assert!(!delete_thread(&lib.store, you("delete"), &AskThreadId::new("ask_1")).unwrap());
+    assert_eq!(
+        thread(&lib.db, &AskThreadId::new("ask_1"))
+            .unwrap_err()
+            .code,
+        ErrorCode::NotFound
+    );
+    // A local answer is never cloud context.
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_2", "turn_2", true, "Q", OCT_1),
+    )
+    .unwrap();
+    finish_turn(
+        &lib.store,
+        you("answer"),
+        &AskThreadId::new("ask_2"),
+        &answer("turn_2", vec![], RuntimeChoice::Local),
+        None,
+        Ending::Answered,
+        TimestampMs(OCT_1),
+    )
+    .unwrap();
+    let prior = prior_turns(
+        &lib.db,
+        &AskThreadId::new("ask_2"),
+        &AskTurnId::new("turn_next"),
+    )
+    .unwrap();
+    assert!(prior[0].sensitive);
+}
+
+#[test]
+fn ask_start_checks_the_question_thread_and_scope() {
+    let lib = library();
+    let args = |thread: Option<&str>, question: &str, scope: AskScope| AskStartArgs {
+        thread_id: thread.map(AskThreadId::new),
+        question: question.into(),
+        scope,
+    };
+    let code = |a: AskStartArgs| check_start(&lib.db, &a).err().map(|e| e.code);
+    assert_eq!(
+        code(args(None, "  ", AskScope::default())),
+        Some(ErrorCode::InvalidInput)
+    );
+    assert_eq!(
+        code(args(Some("ask_none"), "Q", AskScope::default())),
+        Some(ErrorCode::NotFound)
+    );
+    let call = AskScope {
+        call_id: Some(CallId::new("call_none")),
+        ..AskScope::default()
+    };
+    assert_eq!(code(args(None, "Q", call)), Some(ErrorCode::NotFound));
+    let topic = AskScope {
+        topic_id: Some(TopicId::new("top_none")),
+        ..AskScope::default()
+    };
+    assert_eq!(code(args(None, "Q", topic)), Some(ErrorCode::NotFound));
+    let person = AskScope {
+        people: vec![PersonId::new("per_none")],
+        ..AskScope::default()
+    };
+    assert_eq!(code(args(None, "Q", person)), Some(ErrorCode::NotFound));
+    let fine = AskScope {
+        call_id: Some(CallId::new("call_a")),
+        people: vec![PersonId::new("per_you")],
+        ..AskScope::default()
+    };
+    assert_eq!(code(args(None, "Q", fine.clone())), None);
+    // The scope's dates are checked where every retrieval checks them.
+    let q = ask_query(
+        "Q",
+        &AskScope {
+            from: Some(LocalDate("2026-13-01".into())),
+            ..fine
+        },
+        Privacy::Cloud,
+    );
+    assert_eq!(prepare(q).unwrap_err().code, ErrorCode::InvalidInput);
+    assert!(only_weak([MatchStrength::Weak, MatchStrength::Weak]));
+    assert!(!only_weak([MatchStrength::Weak, MatchStrength::Strong]));
+    assert!(!only_weak([]));
+}
