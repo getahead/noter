@@ -18,6 +18,7 @@ mod hotkeys;
 mod hub;
 mod items;
 mod jobs;
+mod knowledge;
 mod library;
 mod log;
 mod merge;
@@ -313,6 +314,8 @@ pub struct Core {
     postcall: postcall::Sections,
     /// Handoff prompts being written, and each item's wanted target.
     handoffs: noter_handoff::Generations,
+    /// Knowledge sources: folder watchers and their sync runs.
+    sources: knowledge::Sources,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -404,7 +407,12 @@ impl Core {
         let log = log::Logger::open(data_dir).map_err(BootError::Io)?;
         let store = match Store::open(
             &data_dir.join("noter.db"),
-            &[noter_db::MIGRATIONS, MIGRATIONS, noter_handoff::MIGRATIONS],
+            &[
+                noter_db::MIGRATIONS,
+                MIGRATIONS,
+                noter_handoff::MIGRATIONS,
+                noter_knowledge::MIGRATIONS,
+            ],
         ) {
             Ok(store) => Arc::new(store),
             Err(e) => {
@@ -477,6 +485,7 @@ impl Core {
             transcript: transcript::Transcript::new(data_dir.to_path_buf()),
             postcall: postcall::Sections::default(),
             handoffs: noter_handoff::Generations::default(),
+            sources: knowledge::Sources::default(),
         };
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
@@ -1134,6 +1143,46 @@ impl CoreApi for Core {
         args: ItemIdArgs,
     ) -> Result<HandoffCopyResult, CoreError> {
         self.copy_handoff(ctx, args).await
+    }
+
+    async fn sources_list(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<SourceList, CoreError> {
+        self.list_sources()
+    }
+
+    async fn source_add_folder(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceAddFolderArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.add_folder_source(ctx, args).await
+    }
+
+    async fn source_update(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceUpdateArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.update_source(ctx, args)
+    }
+
+    async fn source_reindex(
+        &self,
+        _ctx: &CommandCtx,
+        args: SourceIdArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.reindex_source(args)
+    }
+
+    async fn source_remove(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceIdArgs,
+    ) -> Result<DeleteResult, CoreError> {
+        self.remove_source(ctx, args)
     }
 
     async fn repos_list(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<RepoList, CoreError> {
