@@ -1047,6 +1047,11 @@ async fn an_indexed_heading_is_document_evidence_in_search_until_the_source_goes
     assert!(!found.documents.is_empty(), "{found:?}");
     let first = &found.documents[0];
     assert_eq!(first.strength, MatchStrength::Strong);
+    assert!(
+        first.snippet.starts_with("The rollout for page"),
+        "{}",
+        first.snippet
+    );
     assert!(matches!(first.target, HitTarget::Document { .. }));
     let Provenance::Document {
         source_id,

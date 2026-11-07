@@ -57,9 +57,14 @@ impl DocumentSource for Documents {
     }
 }
 
-/// A permitted chunk as retrieval ranks it: its heading path is the section.
+/// A permitted chunk as retrieval ranks it: its heading path is the section, and its text is
+/// the body without the "title › headings" line every chunk starts with (the provenance says it).
 fn document_hit(p: noter_knowledge::Permitted) -> Hit {
     let section = (!p.heading_path.is_empty()).then(|| p.heading_path.join(" › "));
+    let body = p
+        .text
+        .split_once("\n\n")
+        .map_or_else(|| p.text.clone(), |(_, body)| body.to_string());
     Hit {
         evidence: Evidence::Document {
             document_id: p.document_id.clone(),
@@ -70,7 +75,7 @@ fn document_hit(p: noter_knowledge::Permitted) -> Hit {
             chunk_id: p.chunk_id.clone(),
         },
         title: p.title.clone(),
-        text: p.text,
+        text: body,
         lang: None,
         call: None,
         provenance: Provenance::Document {
