@@ -125,6 +125,16 @@ describe("setDone, answerHandoff, reopen", () => {
     expect(localOf("itm_spec").outcome?.text).toBe("Done");
   });
 
+  it("keeps a completed suggestion's change whole: Undo restores status, review and done_at, Redo reapplies them", async () => {
+    await ready();
+    await setDone(bridge, item("itm_replay"), true);
+    const target = localOf("itm_replay").outcome!.target!;
+    await undoRow(bridge, "itm_replay", target);
+    expect(item("itm_replay")).toMatchObject({ status: "open", review: "suggested", done_at: null });
+    await bridge.core.changeRedo({ target });
+    expect(fake.world.items.find((i) => i.id === "itm_replay")).toMatchObject({ status: "done", review: "accepted" });
+  });
+
   it("unticking sends done false and shows no outcome", async () => {
     await ready();
     await setDone(bridge, item("itm_spec"), true);

@@ -73,6 +73,11 @@ pub struct TodayView {
     pub done_today: Vec<ItemView>,
     /// Suggested items not reviewed yet (the review line).
     pub review_waiting: u32,
+    /// Calls with suggested items or unnamed speakers, newest first (id breaks ties).
+    /// Open each call's Summary with Start Review applied.
+    pub review_calls: Vec<CallRef>,
+    /// Unnamed speakers in the displayed transcript pass, across all calls.
+    pub unnamed_speakers: u32,
     pub proposals: Vec<ProposalRow>,
     pub proposals_total: u32,
     pub banners: Vec<TodayBanner>,

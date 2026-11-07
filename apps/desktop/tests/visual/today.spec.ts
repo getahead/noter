@@ -19,7 +19,7 @@ const call = (w: World, id: string, title: string, at: number, over: Partial<Upc
   sensitive: false,
   call_id: null,
   last_time: { call: { id: W.PAST_CALL, title: "Backend sync", started_at: at - 7 * 24 * HOUR, call_type: "cross_team" }, line: "estimates parked, empty state has no owner" },
-  items: [],
+  items: w.items.filter((i) => i.status === "open" && i.kind !== "open_question").slice(0, over.open_count ?? 0),
   questions: [],
   handed_off: [],
   open_count: 0,
@@ -27,6 +27,7 @@ const call = (w: World, id: string, title: string, at: number, over: Partial<Upc
 });
 const day = (more: (w: World) => void = () => {}) => (w: World) => {
   W.idle(w);
+  w.items.forEach((i) => { if (i.review === "suggested") i.review = "accepted"; });
   w.app.setup.self_test = { type: "passed", at: 1 };
   Object.assign(w.today, { calendar: "granted", first_use: false, live_call: null, banners: [], done_today: [], due_without_call: [], review_waiting: 0 });
   w.today.today = [call(w, "plan", W.LIVE_TITLE, w.now + HOUR, { open_count: 3 }), call(w, "sync", "Cross-team QA sync", w.now + 3 * HOUR, { sensitive: true, open_count: 1 })];

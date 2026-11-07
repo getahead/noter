@@ -134,7 +134,7 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
     const html = renderToString(<Types />);
     for (const type of fake.world.call_types.call_types) expect(html).toContain(type.label);
   });
-  const event = (id: string, over: Record<string, unknown> = {}) => ({ event_id: id, title: `Call ${id}`, starts_at: 1_700_000_000_000, ends_at: 1_700_003_600_000, platform: null, attendees: [{ person: null, name: "Anna", email: null }], sensitive: false, call_id: null, last_time: null, items: [], questions: [], handed_off: [], open_count: 2, ...over });
+  const event = (id: string, over: Record<string, unknown> = {}) => ({ event_id: id, title: `Call ${id}`, starts_at: 1_700_000_000_000, ends_at: 1_700_003_600_000, platform: null, attendees: [{ person: null, name: "Anna", email: null }], sensitive: false, call_id: null, last_time: null, items: fake.world.items.slice(0, 2), questions: [], handed_off: [], open_count: 2, ...over });
   const put = (today: unknown[], week: unknown[] = [], live: unknown = null) => () => {
     Object.assign((fake.world as unknown as { today: object }).today, { today, this_week: week, live_call: live });
   };

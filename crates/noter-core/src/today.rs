@@ -252,6 +252,8 @@ struct Sections {
     due_without_call: Vec<ItemView>,
     done_today: Vec<ItemView>,
     review_waiting: u32,
+    review_calls: Vec<CallRef>,
+    unnamed_speakers: u32,
     first_use: bool,
 }
 
@@ -295,7 +297,31 @@ fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections
         "i.status = 'done' AND i.done_at >= ? AND i.done_at < ?",
         vec![Sql::Integer(w.day_start), Sql::Integer(day_end)],
     )?;
+    let review_calls = c.prepare(&format!(
+        "SELECT c.id, c.title, c.started_at, c.call_type FROM calls c
+         WHERE EXISTS (SELECT 1 FROM items i WHERE i.call_id = c.id AND i.review_state = 'suggested')
+            OR EXISTS (SELECT 1 FROM speakers s WHERE s.call_id = c.id AND s.person_id IS NULL
+                       AND s.n IS NOT NULL AND s.pass = {})
+         ORDER BY c.started_at DESC, c.id",
+        SHOWN_PASS.replace("?1", "c.id"),
+    ))?.query_map([], |r| Ok(CallRef {
+        id: CallId::new(r.get::<_, String>(0)?),
+        title: r.get(1)?,
+        started_at: TimestampMs(r.get(2)?),
+        call_type: CallTypeId(r.get(3)?),
+    }))?.collect::<Db<Vec<_>>>()?;
+    let unnamed_speakers = c.query_row(
+        &format!(
+            "SELECT count(*) FROM speakers s WHERE s.person_id IS NULL AND s.n IS NOT NULL
+         AND s.pass = {}",
+            SHOWN_PASS.replace("?1", "s.call_id"),
+        ),
+        [],
+        |r| r.get(0),
+    )?;
     Ok(Sections {
+        review_calls,
+        unnamed_speakers,
         today,
         this_week,
         due_without_call,
@@ -526,6 +552,8 @@ impl Core {
             due_without_call: found.due_without_call,
             done_today: found.done_today,
             review_waiting: found.review_waiting,
+            review_calls: found.review_calls,
+            unnamed_speakers: found.unnamed_speakers,
             // shortcut: proposals are produced from M5; Today shows none before.
             proposals: vec![],
             proposals_total: 0,
