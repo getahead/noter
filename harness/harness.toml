@@ -2,7 +2,8 @@
 # checks every pull request must pass (docs/ADR/0003, docs/HARNESS.md).
 #
 # Bars as set by the owner on 17 Oct 2026: realistic goals (unit 80%, E2E 60%,
-# screenshots 98%; performance left the gate on 24 Oct 2026) plus a trace-coverage ratchet.
+# screenshots 98%, lowered to 95% by the owner on 7 Nov 2026;
+# performance left the gate on 24 Oct 2026) plus a trace-coverage ratchet.
 #
 # Lowering a threshold, adding an exclusion, turning off or narrowing the trace
 # ratchet or moving the milestone back is a harness change: CI's config guard
@@ -34,7 +35,7 @@ frontend_commands_min = 60.0
 frontend_stories_min = 60.0
 
 [gates.visual]
-min_pixel_match = 98.0        # per screenshot: at most 2% of pixels may differ from the baseline
+min_pixel_match = 95.0        # per screenshot: at most 5% of pixels may differ from the baseline
 pixel_color_threshold = 0.02  # per-pixel colour distance (0..1) under which two pixels are equal
 
 [gates.perf]
