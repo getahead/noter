@@ -51,6 +51,30 @@ fn describe(tool: &str) -> &'static str {
     }
 }
 
+/// A relayed live-source tool (`live_<source>_search` or `_read`): the core names it in the run's
+/// config only when D1 permits it, and answers it after the audit row; its schema is fixed here
+/// because the source's own tools are never described to the runtime.
+// @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-name
+fn live_tool(name: &str) -> Option<Value> {
+    let (description, field) = if name.starts_with("live_") && name.ends_with("_search") {
+        ("Search one of the user's connected sources live.", "query")
+    } else if name.starts_with("live_") && name.ends_with("_read") {
+        ("Read one page of a connected source by its uri.", "uri")
+    } else {
+        return None;
+    };
+    Some(json!({
+        "name": name,
+        "description": description,
+        "inputSchema": {
+            "type": "object",
+            "properties": { field: { "type": "string" } },
+            "required": [field],
+        },
+    }))
+}
+// @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-name
+
 /// Starts the server: reads the config, connects the core socket, then serves `input`/`output`
 /// until the client closes it. The error is a fixed word for stderr.
 pub async fn run<R, W>(
@@ -144,6 +168,9 @@ impl Server {
             .tools
             .iter()
             .filter_map(|name| {
+                if let Some(live) = live_tool(name) {
+                    return Some(live);
+                }
                 let t = self.schemas.get(name)?;
                 Some(json!({
                     "name": name,

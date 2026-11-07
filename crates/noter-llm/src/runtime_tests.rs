@@ -1451,3 +1451,63 @@ mod launch_tests {
         );
     }
 }
+
+#[tokio::test(start_paused = true)]
+async fn only_an_ask_or_post_call_run_under_cloud_allowed_without_sensitive_context_may_relay() {
+    let cloud_ok = cloud();
+    let rows = [
+        (TaskKind::Ask, cloud_ok, true),
+        (TaskKind::PostCall, cloud_ok, true),
+        (TaskKind::Live, cloud_ok, false),
+        (
+            TaskKind::Handoff {
+                target: noter_protocol::RuntimeChoice::ClaudeAccount,
+            },
+            cloud_ok,
+            false,
+        ),
+        (
+            TaskKind::Ask,
+            Privacy {
+                mode: noter_protocol::PrivacyMode::CloudRedacted,
+                ..cloud_ok
+            },
+            false,
+        ),
+        (
+            TaskKind::Ask,
+            Privacy {
+                mode: noter_protocol::PrivacyMode::LocalOnly,
+                ..cloud_ok
+            },
+            false,
+        ),
+        (
+            TaskKind::PostCall,
+            Privacy {
+                sensitive: true,
+                ..cloud_ok
+            },
+            false,
+        ),
+        (
+            TaskKind::Ask,
+            Privacy {
+                offline: true,
+                ..cloud_ok
+            },
+            false,
+        ),
+    ];
+    for (task, privacy, relay) in rows {
+        let host = Arc::new(Host::default());
+        let f = with_host(None, &host);
+        f.privacy.send_replace(privacy);
+        let mut req = f.request(Skill::RoleReview, task);
+        req.settings.tools = vec!["get_person".into()];
+        let _ = f.llm.run_once(req).await;
+        let started = host.started.lock().unwrap();
+        assert_eq!(started.len(), 1, "{task:?} {privacy:?}");
+        assert_eq!(started[0].live_ok, relay, "{task:?} {privacy:?}");
+    }
+}

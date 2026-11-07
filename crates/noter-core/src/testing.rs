@@ -175,6 +175,7 @@ pub async fn mcp_run(
         call_id,
         cloud,
         tools,
+        live: false,
     })?;
     Ok(serde_json::json!({ "run_id": run_id, "token": token, "socket": socket, "config": config }))
 }
@@ -210,11 +211,36 @@ pub async fn mcp_cloud_run(
     tools: Vec<String>,
     people: Vec<String>,
 ) -> Result<serde_json::Value, CoreError> {
-    use noter_llm::{
-        LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
+    use noter_llm::{Privacy, TaskKind};
+    let privacy = Privacy {
+        mode: noter_protocol::PrivacyMode::CloudAllowed,
+        sensitive: false,
+        offline: false,
     };
+    mcp_run_under(core, call_id, tools, people, TaskKind::Ask, privacy)
+        .await
+        .map(|(run, _)| run)
+}
+
+/// [`mcp_cloud_run`] for a task kind and a privacy of the caller's choosing; the sender changes
+/// the run's privacy while it runs.
+pub async fn mcp_run_under(
+    core: &std::sync::Arc<Core>,
+    call_id: Option<noter_protocol::CallId>,
+    tools: Vec<String>,
+    people: Vec<String>,
+    task: noter_llm::TaskKind,
+    privacy: noter_llm::Privacy,
+) -> Result<
+    (
+        serde_json::Value,
+        std::sync::Arc<tokio::sync::watch::Sender<noter_llm::Privacy>>,
+    ),
+    CoreError,
+> {
+    use noter_llm::{LlmRuntime, Packet, PacketItem, RunRequest, Skill, SourceClass};
     use noter_protocol::model::settings::AuditWhat;
-    use noter_protocol::{ErrorCode, PrivacyMode, RuntimeChoice};
+    use noter_protocol::{ErrorCode, RuntimeChoice};
     let socket = core.serve_socket().await?;
     let known: Vec<String> = core.mcp_launches().into_iter().map(|(id, ..)| id).collect();
     let packet = Packet {
@@ -227,19 +253,17 @@ pub async fn mcp_cloud_run(
         people,
         context: Default::default(),
     };
-    let (privacy, rx) = tokio::sync::watch::channel(Privacy {
-        mode: PrivacyMode::CloudAllowed,
-        sensitive: false,
-        offline: false,
-    });
-    let mut req = RunRequest::new(Skill::RoleReview, "harness", packet, TaskKind::Ask, rx);
+    let (privacy, rx) = tokio::sync::watch::channel(privacy);
+    let privacy = std::sync::Arc::new(privacy);
+    let mut req = RunRequest::new(Skill::RoleReview, "harness", packet, task, rx);
     req.settings.configured = Some(RuntimeChoice::ClaudeAccount);
     req.settings.tools = tools;
     req.settings.pseudonyms = true;
     req.call_id = call_id;
     let llm = core.llm().clone();
+    let keep = privacy.clone();
     tokio::spawn(async move {
-        let _keep = privacy;
+        let _keep = keep;
         let _ = llm.run_once(req).await;
     });
     for _ in 0..200 {
@@ -247,9 +271,10 @@ pub async fn mcp_cloud_run(
         if let Some((run_id, token, config)) =
             launches.into_iter().find(|(id, ..)| !known.contains(id))
         {
-            return Ok(serde_json::json!({
+            let run = serde_json::json!({
                 "run_id": run_id, "token": token, "socket": socket, "config": config
-            }));
+            });
+            return Ok((run, privacy));
         }
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }

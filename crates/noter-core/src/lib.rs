@@ -71,7 +71,8 @@ pub use models::PinnedModels;
 pub use native_ops::{ClipboardText, LaunchRequest, NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
 pub use noter_knowledge::{
-    McpSource, ScriptedListing, ScriptedMcp, ScriptedOauth, ScriptedPage, ScriptedServer,
+    Audit as McpAudit, Listing, McpError, McpSource, Page as McpPage, Remote as McpRemote,
+    ScriptedListing, ScriptedMcp, ScriptedOauth, ScriptedPage, ScriptedServer,
 };
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
