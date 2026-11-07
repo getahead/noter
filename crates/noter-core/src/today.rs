@@ -297,7 +297,6 @@ fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections
         "i.status = 'done' AND i.done_at >= ? AND i.done_at < ?",
         vec![Sql::Integer(w.day_start), Sql::Integer(day_end)],
     )?;
-    // @cpt-flow:cpt-noter-flow-core-items-today-dashboard:p1
     let review_calls = c.prepare(&format!(
         "SELECT c.id, c.title, c.started_at, c.call_type FROM calls c
          WHERE EXISTS (SELECT 1 FROM items i WHERE i.call_id = c.id AND i.review_state = 'suggested')
