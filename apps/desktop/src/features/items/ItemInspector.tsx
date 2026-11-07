@@ -1,6 +1,6 @@
 // The Item inspector (II-R1/II-R2, 320 pt): Details by kind and the item's History. Owner and Engineering apply at once;
 // text, Due and Linked issue wait for Save. It opens through the shell's inspector override (`register.tsx`).
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -43,6 +43,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   const [loadError, setLoadError] = useState(false);
   const [draft, setDraft] = useState<{ text: string; due: string; linked_issue: string } | null>(null);
   const [saved, setSaved] = useState<Saved>("idle");
+  const draftBase = useRef<ItemView | null>(null);
 
   const load = async () => {
     setLoadError(false);
@@ -70,12 +71,20 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   };
   const save = async () => {
     setSaved("saving");
-    const err = await saveFields(bridge, it, fields);
-    if (err) return setSaved(err);
+    const err = await saveFields(bridge, draftBase.current ?? it, fields);
+    if (err) {
+      // A conflict refreshed the item; retain the text and require an explicit save against that revision.
+      draftBase.current = { ...(bridge.store.getState().entities.item[itemId] ?? it) };
+      return setSaved(err);
+    }
+    draftBase.current = null;
     setDraft(null);
     setSaved("saved");
   };
-  const set = (p: Partial<NonNullable<typeof draft>>) => setDraft({ ...fields, ...p });
+  const set = (p: Partial<NonNullable<typeof draft>>) => {
+    draftBase.current ??= { ...it };
+    setDraft({ ...fields, ...p });
+  };
 
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-details
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-kind

@@ -61,6 +61,15 @@ describe("ItemInspector (cpt-noter-component-ui-item-inspector)", () => {
 });
 
 describe("inspector seam (features/shell/inspector-override.ts)", () => {
+  it("route changes clear the inspector without restoring focus to the old page", async () => {
+    await ready();
+    let closed = 0;
+    openInspector({ width: 320, label: "items.inspector", render: () => null, onClose: () => closed++ });
+    closeInspector("route");
+    expect(inspectorOverride()).toBeNull();
+    expect(closed).toBe(0);
+  });
+
   it("opening replaces the page inspector, closing runs onClose and clears it", () => {
     let closed = 0;
     expect(inspectorOverride()).toBeNull();
@@ -179,6 +188,15 @@ describe("inspector and add-item commands", () => {
     const seen = log();
     expect(await applyPatch(bridge, { ...it, rev: it.rev + 5 }, { is_engineering: true })).toMatch(/^Item changed since you opened it/);
     expect(seen.map(([c]) => c)).toContain("item_get");
+  });
+
+  it("inspector edits keep the draft revision even when the store has a newer item", async () => {
+    await ready();
+    const current = item("itm_a11y");
+    store(current);
+    const seen = log();
+    expect(await applyPatch(bridge, { ...current, rev: current.rev - 1 }, { text: "Stale draft" })).toMatch(/^Item changed since/);
+    expect(seen).toContainEqual(["item_edit", { item_id: current.id, rev: current.rev - 1, patch: { text: "Stale draft" } }]);
   });
 
   it("the inspector's buttons review and edit the item", async () => {

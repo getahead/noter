@@ -37,7 +37,6 @@ async function lastChange(page: Page, itemId: string): Promise<string> {
 
 const DECISION = "Ship drawer events behind a flag"; // itm_d1
 const A0 = "Rotate the staging Jira token"; // itm_a0
-const A1 = "Write the flag rollout note"; // itm_a1
 const SPEC = "Update the drawer spec"; // itm_a3, accepted
 const TIME = /Open the source at \d\d:\d\d:\d\d/;
 
@@ -193,6 +192,38 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
 });
 
 test.describe("cpt-noter-seq-call-page-check-evidence", () => {
+  test("UI — inspector retains a conflicting draft and requires a second explicit Save", async ({ page }) => {
+    await openCall(page, suggest());
+    await button(rowOf(page, SPEC), "Show in Item inspector").click();
+    const inspector = page.locator(INSPECTOR);
+    await inspector.getByRole("textbox", { name: "Item text" }).fill("My unsaved update");
+    await page.evaluate(async () => {
+      const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
+      const invoke = (cmd: string, args: unknown) => g.__noterFake ? g.__noterFake.invoke(cmd, args) : g.__TAURI_INTERNALS__!.invoke(cmd, { args });
+      const detail = await invoke("item_get", { item_id: "itm_a3" }) as { item: { rev: number } };
+      await invoke("item_edit", { item_id: "itm_a3", rev: detail.item.rev, patch: { text: "Concurrent update" } });
+    });
+    await expect(rowOf(page, "Concurrent update")).toBeVisible();
+    await button(inspector, "Save").click();
+    await expect(inspector.getByRole("alert")).toContainText("Item changed since");
+    await expect(inspector.getByRole("textbox", { name: "Item text" })).toHaveValue("My unsaved update");
+    await expect(rowOf(page, "Concurrent update")).toBeVisible();
+    await button(inspector, "Save").click();
+    await expect(inspector.getByText("Saved", { exact: true })).toBeVisible();
+    await expect(rowOf(page, "My unsaved update")).toBeVisible();
+  });
+
+  test("UI — switching inspectors discards the previous item's unsaved draft", async ({ page }) => {
+    await openCall(page, suggest());
+    await button(rowOf(page, SPEC), "Show in Item inspector").click();
+    const inspector = page.locator(INSPECTOR);
+    await inspector.getByRole("textbox", { name: "Item text" }).fill("Unsaved draft for the first item");
+    await button(rowOf(page, A0), "Show in Item inspector").click();
+    await expect(inspector.getByRole("textbox", { name: "Item text" })).toHaveValue(A0);
+    await expect(button(inspector, "Save")).toBeDisabled();
+    expect(await sent(page, "item_edit")).toHaveLength(0);
+  });
+
   test("UI — happy path: the evidence time opens Transcript at that span with the line highlighted, ⌘[ returns to Summary", async ({ page }) => {
     await openCall(page, suggest());
     await button(rowOf(page, DECISION), TIME).click();

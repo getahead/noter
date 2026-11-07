@@ -88,7 +88,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const routeId = `${route.section}/${route.key}`;
   const override = useInspectorOverride();
   // a route change closes an inspector a feature opened (its row is gone from the page)
-  useEffect(() => closeInspector, [routeId]);
+  useEffect(() => () => closeInspector("route"), [routeId]);
 
   // Zoom: the layout width the page sees is the window width divided by the zoom (CSS zoom scales every length),
   // which is the width `collapse()` takes; zoom itself only feeds its sidebar rule.

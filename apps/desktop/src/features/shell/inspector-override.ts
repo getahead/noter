@@ -1,6 +1,7 @@
 // The seam by which a feature opens the trailing inspector (MW-R4) on whatever page is showing: the Item inspector
 // (320, 2.17) from a row, the Handoff drawer (400, 2.21) from a button. It replaces the page's own inspector until it
 // is closed (× or Esc), the route changes, or another override takes its place. A module store like the undo strip's.
+// Override contents handle Esc while focused; the shell does not route its global Escape action to this store.
 import { useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
@@ -11,7 +12,7 @@ export interface InspectorOverride {
   width: 320 | 400;
   label: MsgKey;
   render: (bridge: Bridge) => ReactNode;
-  /** Runs when it closes, for whatever the opener wants back (focus on its row). */
+  /** Runs on explicit close to restore focus, but not when navigating away from the opener's page. */
   onClose?: () => void;
 }
 
@@ -23,11 +24,11 @@ const set = (o: InspectorOverride | null) => ((current = o), listeners.forEach((
 export const openInspector = (o: InspectorOverride) => set(o);
 // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-get
 
-export function closeInspector() {
+export function closeInspector(reason?: "route") {
   const was = current;
   set(null);
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-return
-  was?.onClose?.(); // the opener puts focus back on its row
+  if (reason !== "route") was?.onClose?.(); // the opener puts focus back on its row
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-return
 }
 

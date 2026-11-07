@@ -19,7 +19,7 @@ rowSlots.inspect = (_bridge, itemId) =>
   openInspector({
     width: 320,
     label: "items.inspector",
-    render: (b) => <ItemInspector bridge={b} itemId={itemId} />,
+    render: (b) => <ItemInspector key={itemId} bridge={b} itemId={itemId} />,
     // focus goes back to the row that opened it
     onClose: () => Array.from(globalThis.document?.querySelectorAll<HTMLElement>("[data-item-id]") ?? []).find((r) => r.dataset.itemId === itemId)?.focus(),
   });
