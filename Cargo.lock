@@ -1276,6 +1276,7 @@ version = "0.1.0"
 dependencies = [
  "noter-core",
  "noter-db",
+ "noter-llm",
  "noter-protocol",
  "serde",
  "serde_json",

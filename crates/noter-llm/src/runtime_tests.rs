@@ -1137,7 +1137,7 @@ async fn a_run_with_tools_starts_noter_mcp_through_the_host_and_stops_it_on_ever
     assert!(!format!("{launch:?}").contains("tok-secret"));
     assert!(host.stopped.lock().unwrap().is_empty());
     run.await.unwrap().unwrap();
-    assert_eq!(*host.stopped.lock().unwrap(), [id.clone()]);
+    assert_eq!(*host.stopped.lock().unwrap(), std::slice::from_ref(&id));
     // The run is over: its result gate is gone with it.
     let late = f
         .llm
@@ -1230,6 +1230,13 @@ async fn a_cloud_tool_result_uses_the_runs_pseudonyms_and_its_audit_row_commits_
     // The run's own row and its tool_result row share the map.
     let run_row = f.row("SELECT redaction_map_id FROM audit_log WHERE kind = 'run'");
     assert_eq!(run_row["redaction_map_id"], audit["redaction_map_id"]);
+    // What the model asks for in its pseudonyms names the real people again.
+    let mut asked = json!({"owner_name": "Person 2", "text": "Person 1 and Person 2"});
+    f.llm.restore_tool_input(&run_id, &mut asked);
+    assert_eq!(
+        asked,
+        json!({"owner_name": "Bob Stone", "text": "Ann Lee and Bob Stone"})
+    );
     // The model answered with the pseudonyms of both; both come back inside the core.
     let done = run.await.unwrap().unwrap();
     assert_eq!(done.output["review_md"], "Bob Stone owes Ann Lee.");
@@ -1302,4 +1309,145 @@ async fn a_local_runs_tool_result_passes_without_an_audit_row() {
     assert_eq!(released, result);
     assert_eq!(f.count("SELECT count(*) FROM audit_log"), 0);
     run.abort();
+}
+
+/// The CLI adapters' lockdown with noter-mcp: a fake CLI records its command line, environment
+/// and MCP config; no real Claude Code or Codex runs.
+mod launch_tests {
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::{Path, PathBuf};
+
+    use crate::adapters::claude_code::ClaudeCode;
+    use crate::adapters::cli::CliConfig;
+    use crate::adapters::codex::Codex;
+    use crate::adapters::{Invocation, RuntimeAdapter};
+    use crate::secrets::Secret;
+    use crate::tools::McpLaunch;
+    use crate::Skill;
+    use noter_protocol::{Effort, RuntimeChoice};
+
+    /// A CLI that dumps `argv`, `$NOTER_MCP_TOKEN` and the file after `--mcp-config` into `out`,
+    /// then answers a valid result for either CLI.
+    fn fake_cli(dir: &Path) -> (CliConfig, PathBuf) {
+        let out = dir.join("out");
+        std::fs::create_dir(&out).unwrap();
+        let script = dir.join("cli");
+        let body = format!(
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > {o}/args\nprintf '%s' \"$NOTER_MCP_TOKEN\" > {o}/token\n\
+             while [ $# -gt 0 ]; do [ \"$1\" = --mcp-config ] && cp \"$2\" {o}/mcp.json; shift; done\n\
+             cat > /dev/null\n\
+             echo '{{\"is_error\":false,\"structured_output\":{{}},\"usage\":{{}},\"type\":\"turn.completed\"}}'\n",
+            o = out.display()
+        );
+        std::fs::write(&script, body).unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = CliConfig {
+            program: script,
+            home: dir.join("home"),
+            run_root: dir.join("runs"),
+            signed_in: true,
+            models: vec![],
+        };
+        (config, out)
+    }
+
+    fn call(runtime: RuntimeChoice, mcp: Option<McpLaunch>) -> Invocation {
+        Invocation {
+            runtime,
+            skill: Skill::AskAnswer,
+            schema: serde_json::json!({}),
+            model: String::new(),
+            effort: Effort::Medium,
+            tools: vec!["get_person".into(), "Bash".into(), "pin_item".into()],
+            packet: b"{}".to_vec(),
+            session: None,
+            budget_usd: None,
+            key: None::<Secret>,
+            mcp,
+        }
+    }
+
+    fn launch() -> McpLaunch {
+        McpLaunch {
+            binary: "/app/noter-mcp".into(),
+            config: "/data/run/mcp/llm_1.json".into(),
+            token: Secret::new("tok-secret".into()),
+            tools: vec!["get_person".into(), "pin_item".into()],
+        }
+    }
+
+    #[tokio::test]
+    async fn claude_code_runs_noter_mcp_as_its_only_server_with_the_token_in_a_private_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let (config, out) = fake_cli(dir.path());
+        std::fs::create_dir(&config.home).unwrap();
+        let adapter = ClaudeCode::new(config);
+        let _ = adapter
+            .invoke(call(RuntimeChoice::ClaudeAccount, Some(launch())))
+            .await;
+        let args = std::fs::read_to_string(out.join("args")).unwrap();
+        assert!(args.contains("--strict-mcp-config"));
+        // The built-in tools exclude Bash and noter's tools; those are allowed by their MCP names.
+        assert!(args.contains("--tools\n\n--allowedTools"), "{args}");
+        assert!(
+            args.contains("--allowedTools\nmcp__noter__get_person,mcp__noter__pin_item"),
+            "{args}"
+        );
+        let mcp: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(out.join("mcp.json")).unwrap()).unwrap();
+        let servers = mcp["mcpServers"].as_object().unwrap();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers["noter"]["command"], "/app/noter-mcp");
+        assert_eq!(servers["noter"]["args"][0], "/data/run/mcp/llm_1.json");
+        assert_eq!(servers["noter"]["env"]["NOTER_MCP_TOKEN"], "tok-secret");
+        // No token on the command line, and no run directory left behind.
+        assert!(!args.contains("tok-secret"));
+        assert_eq!(
+            std::fs::read_dir(dir.path().join("runs/runs"))
+                .unwrap()
+                .count(),
+            0
+        );
+
+        // Without tools the config is the M2 one: no server at all.
+        let _ = adapter
+            .invoke(call(RuntimeChoice::ClaudeAccount, None))
+            .await;
+        let mcp: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(out.join("mcp.json")).unwrap()).unwrap();
+        assert_eq!(mcp, serde_json::json!({"mcpServers": {}}));
+    }
+
+    #[tokio::test]
+    async fn codex_gets_noter_mcp_through_its_environment_never_the_command_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let (config, out) = fake_cli(dir.path());
+        std::fs::create_dir(&config.home).unwrap();
+        let adapter = Codex::new(config);
+        let _ = adapter
+            .invoke(call(RuntimeChoice::ChatgptAccount, Some(launch())))
+            .await;
+        let args = std::fs::read_to_string(out.join("args")).unwrap();
+        assert!(
+            args.contains("mcp_servers.noter.command=\"/app/noter-mcp\""),
+            "{args}"
+        );
+        assert!(
+            args.contains("mcp_servers.noter.args=[\"/data/run/mcp/llm_1.json\"]"),
+            "{args}"
+        );
+        assert!(
+            args.contains("mcp_servers.noter.env_vars=[\"NOTER_MCP_TOKEN\"]"),
+            "{args}"
+        );
+        assert!(
+            args.contains("mcp_servers.noter.enabled_tools=[\"get_person\",\"pin_item\"]"),
+            "{args}"
+        );
+        assert!(!args.contains("tok-secret"));
+        assert_eq!(
+            std::fs::read_to_string(out.join("token")).unwrap(),
+            "tok-secret"
+        );
+    }
 }

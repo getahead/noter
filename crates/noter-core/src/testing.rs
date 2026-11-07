@@ -197,4 +197,63 @@ pub fn carry_start(core: &Core, call: &noter_protocol::CallId) -> Result<usize, 
 pub fn carry_end(core: &Core, call: &noter_protocol::CallId) -> Result<(), CoreError> {
     core.carry_end(call)?;
     core.keep_talk_time(call)
+
+/// A cloud run as the router starts it, for tests that speak the socket as `noter-mcp` would:
+/// a Claude run whose packet names `people` (pseudonyms on), started through the router so its
+/// tool server is registered by the host. Answers `{ run_id, token, socket, config }` once the
+/// run is up; the run goes on in the background for as long as the runtime (the scripted one,
+/// slow) takes to answer.
+pub async fn mcp_cloud_run(
+    core: &std::sync::Arc<Core>,
+    call_id: Option<noter_protocol::CallId>,
+    tools: Vec<String>,
+    people: Vec<String>,
+) -> Result<serde_json::Value, CoreError> {
+    use noter_llm::{
+        LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
+    };
+    use noter_protocol::model::settings::AuditWhat;
+    use noter_protocol::{ErrorCode, PrivacyMode, RuntimeChoice};
+    let socket = core.serve_socket().await?;
+    let known: Vec<String> = core.mcp_launches().into_iter().map(|(id, ..)| id).collect();
+    let packet = Packet {
+        what: AuditWhat::FullTranscript,
+        items: vec![PacketItem {
+            id: "seg_context".into(),
+            source: SourceClass::Normal,
+            text: format!("{} met.", people.join(" and ")),
+        }],
+        people,
+        context: Default::default(),
+    };
+    let (privacy, rx) = tokio::sync::watch::channel(Privacy {
+        mode: PrivacyMode::CloudAllowed,
+        sensitive: false,
+        offline: false,
+    });
+    let mut req = RunRequest::new(Skill::RoleReview, "harness", packet, TaskKind::Ask, rx);
+    req.settings.configured = Some(RuntimeChoice::ClaudeAccount);
+    req.settings.tools = tools;
+    req.settings.pseudonyms = true;
+    req.call_id = call_id;
+    let llm = core.llm().clone();
+    tokio::spawn(async move {
+        let _keep = privacy;
+        let _ = llm.run_once(req).await;
+    });
+    for _ in 0..200 {
+        let launches = core.mcp_launches();
+        if let Some((run_id, token, config)) =
+            launches.into_iter().find(|(id, ..)| !known.contains(id))
+        {
+            return Ok(serde_json::json!({
+                "run_id": run_id, "token": token, "socket": socket, "config": config
+            }));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    Err(CoreError::new(
+        ErrorCode::Internal,
+        "the run did not start a tool server",
+    ))
 }

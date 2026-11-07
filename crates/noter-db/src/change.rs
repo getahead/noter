@@ -168,7 +168,7 @@ fn change_tx(
             after: new,
             delta,
         };
-        let change_id = insert_change(&tx, meta, &change)?;
+        let change_id = insert_change(&tx, meta, &change, None)?;
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
         out.push(Committed {
             record: after,
@@ -221,7 +221,28 @@ impl Store {
     // @cpt-algo:cpt-noter-algo-core-storage-custom-write:p1
     pub fn write_with<T: Send + 'static>(
         &self,
+        meta: ChangeMeta,
+        f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
+    ) -> Result<Custom<T>, CoreError> {
+        self.write_logged(meta, None, f)
+    }
+
+    /// `write_with` for work that only proposes (`cpt-noter-algo-core-mcp-stage-write`): `f`
+    /// rechecks and changes nothing the user has decided on, and each change row it reports
+    /// commits as `proposed` with `proposal_kind`, for the owning feature to apply or reject.
+    pub fn write_proposed<T: Send + 'static>(
+        &self,
+        meta: ChangeMeta,
+        proposal_kind: &'static str,
+        f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
+    ) -> Result<Custom<T>, CoreError> {
+        self.write_logged(meta, Some(proposal_kind), f)
+    }
+
+    fn write_logged<T: Send + 'static>(
+        &self,
         mut meta: ChangeMeta,
+        proposal: Option<&'static str>,
         f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
     ) -> Result<Custom<T>, CoreError> {
         self.on_writer(move |conn| {
@@ -249,7 +270,7 @@ impl Store {
             // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-insert-changes
             let change_ids = logged
                 .iter()
-                .map(|change| insert_change(&tx, &meta, change))
+                .map(|change| insert_change(&tx, &meta, change, proposal))
                 .collect::<Result<Vec<_>, _>>()?;
             // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-insert-changes
             // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-commit
@@ -344,7 +365,7 @@ impl Store {
                         after: None,
                         delta: None,
                     };
-                    let change_id = insert_change(&tx, &meta, &tombstone)?;
+                    let change_id = insert_change(&tx, &meta, &tombstone, None)?;
                     // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-insert-change
                     deleted.push((id, change_id));
                 }
@@ -365,6 +386,7 @@ fn insert_change(
     tx: &Transaction,
     meta: &ChangeMeta,
     change: &Logged,
+    proposal: Option<&'static str>,
 ) -> Result<ChangeId, CoreError> {
     let change_id = ChangeId::new(format!("chg_{}", ulid::Ulid::generate()));
     let delta = change
@@ -375,8 +397,8 @@ fn insert_change(
         .map_err(internal)?;
     tx.execute(
         "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, delta, summary,
-                              reason, evidence_ids, status, batch_id, undoable, surface)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 'applied', ?13, ?14, ?15)",
+                              reason, evidence_ids, status, proposal_kind, batch_id, undoable, surface)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
             change_id.as_str(),
             now_ms(),
@@ -390,6 +412,8 @@ fn insert_change(
             meta.summary,
             meta.reason,
             serde_json::to_string(&meta.evidence_ids).map_err(internal)?,
+            proposal.map_or("applied", |_| "proposed"),
+            proposal,
             meta.batch_id.as_ref().map(BatchId::as_str),
             meta.undoable,
             meta.surface.map(surface_column),

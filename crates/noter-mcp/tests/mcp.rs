@@ -8,6 +8,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use noter_core::{Clock, Core, CoreDeps, EventEmitter, McpRegistration, McpSession};
+use noter_llm::{Adapters, Scripted};
 use noter_protocol::{CallId, TimestampMs};
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -15,7 +16,9 @@ use tokio::net::UnixStream;
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 const NOW: i64 = 1_792_137_600_000;
-const ALL: [&str; 5] = [
+const ALL: [&str; 7] = [
+    "pin_item",
+    "propose_correction",
     "get_transcript_span",
     "get_person",
     "get_decisions",
@@ -69,20 +72,38 @@ INSERT INTO item_spans (item_id, call_id, t0_ms, t1_ms) VALUES ('it_dec', 'call_
 
 struct Rig {
     core: Arc<Core>,
+    scripted: Scripted,
     dir: tempfile::TempDir,
     socket: PathBuf,
 }
 
 async fn rig() -> Rig {
+    rig_with("").await
+}
+
+/// A run that never answers on its own for ten minutes: its tool server stays up.
+const HOLD: &str = r#"{"on": "role-review", "after_ms": 600000}"#;
+
+/// A core whose runtimes are the scripted one (`script`) and whose tool server is the built
+/// `noter-mcp`.
+async fn rig_with(script: &str) -> Rig {
     let dir = tempfile::tempdir().unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet));
+    let scripted = Scripted::parse(script).unwrap();
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
+        .with_llm(Adapters::scripted(&scripted))
+        .with_mcp_binary(env!("CARGO_BIN_EXE_noter-mcp").into());
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
         .unwrap()
         .execute_batch(SEED)
         .unwrap();
     let socket = core.serve_socket().await.expect("socket serves");
-    Rig { core, dir, socket }
+    Rig {
+        core,
+        scripted,
+        dir,
+        socket,
+    }
 }
 
 impl Rig {
@@ -101,6 +122,45 @@ impl Rig {
                 tools: tools.iter().map(|t| (*t).to_owned()).collect(),
             })
             .expect("run registers")
+    }
+
+    /// A cloud run as the router starts it: a scripted Claude run whose packet names `people`,
+    /// held open, with its tool server registered through the host. `(run id, token, config)`.
+    async fn cloud(&self, call: Option<&str>, people: &[&str]) -> (String, String, PathBuf) {
+        let people = people.iter().map(|p| (*p).to_owned()).collect();
+        let tools = ALL.iter().map(|t| (*t).to_owned()).collect();
+        let run =
+            noter_core::testing::mcp_cloud_run(&self.core, call.map(CallId::new), tools, people)
+                .await
+                .expect("the run starts");
+        (
+            run["run_id"].as_str().unwrap().to_owned(),
+            run["token"].as_str().unwrap().to_owned(),
+            PathBuf::from(run["config"].as_str().unwrap()),
+        )
+    }
+
+    fn sql(&self, sql: &str) -> Vec<Value> {
+        let db = noter_db::rusqlite::Connection::open(self.dir.path().join("noter.db")).unwrap();
+        let mut stmt = db.prepare(sql).unwrap();
+        let names: Vec<String> = stmt.column_names().map(str::to_owned).collect();
+        stmt.query_map([], |r| {
+            let mut row = serde_json::Map::new();
+            for (i, name) in names.iter().enumerate() {
+                let value = match r.get_ref(i)? {
+                    noter_db::rusqlite::types::ValueRef::Integer(n) => json!(n),
+                    noter_db::rusqlite::types::ValueRef::Text(t) => {
+                        json!(String::from_utf8_lossy(t))
+                    }
+                    _ => Value::Null,
+                };
+                row.insert(name.clone(), value);
+            }
+            Ok(Value::Object(row))
+        })
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
     }
 
     fn local(&self, id: &str) -> (String, PathBuf) {
@@ -748,4 +808,345 @@ fn the_binary_depends_on_the_protocol_serde_and_tokio_only() {
         .filter_map(|l| l.split_once('=').map(|(name, _)| name.trim()))
         .collect();
     assert_eq!(deps, ["noter-protocol", "serde", "serde_json", "tokio"]);
+}
+
+// ── slice 2: the cloud result gate, staging and the router's wiring ─
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cloud_result_keeps_the_packets_pseudonyms_and_commits_its_audit_row_first() {
+    let rig = rig_with(HOLD).await;
+    let (run, token, config) = rig.cloud(None, &["Anna"]).await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    let person = mcp
+        .tool("get_person", json!({ "person_id": "person_anna" }))
+        .await
+        .unwrap();
+    // Anna is the initial packet's Person 1; her alias is not released under another name.
+    assert_eq!(person["display_name"], "Person 1");
+    assert_eq!(person["aliases"], json!([]));
+    assert_eq!(person["open_items"][0]["owner"], "Person 1");
+    let text = person.to_string();
+    assert!(!text.contains("Anna") && !text.contains("Аня"), "{text}");
+    // Ids and evidence stay exactly as stored.
+    assert_eq!(person["person_id"], "person_anna");
+    assert_eq!(person["recent_calls"], json!(["call_a", "call_o"]));
+
+    let rows = rig.sql("SELECT * FROM audit_log WHERE kind = 'tool_result'");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["llm_run_id"], run.as_str());
+    assert_eq!(rows[0]["what"], "evidence_lookup");
+    assert_eq!(rows[0]["destination"], "api.anthropic.com");
+    assert_eq!(rows[0]["bytes_out"], text.len() as i64);
+    // Decisions and open items go through the same gate: one more row each, same pseudonyms.
+    let decisions = mcp.tool("get_decisions", json!({})).await.unwrap();
+    assert_eq!(decisions["items"][0]["owner"], "Person 1");
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+            .len(),
+        2
+    );
+    // The run's own packet row is the one the pseudonyms came from.
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'run' AND llm_run_id = 'x'")
+            .len(),
+        0
+    );
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'run'").len(),
+        1
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cloud_result_whose_audit_row_cannot_commit_releases_nothing() {
+    let rig = rig_with(HOLD).await;
+    let (_, token, config) = rig.cloud(None, &["Anna"]).await;
+    noter_db::rusqlite::Connection::open(rig.dir.path().join("noter.db"))
+        .unwrap()
+        .execute_batch("CREATE TRIGGER tool_down BEFORE INSERT ON audit_log WHEN NEW.kind = 'tool_result' BEGIN SELECT RAISE(ABORT, 'disk'); END;")
+        .unwrap();
+    let mut mcp = Mcp::start(&config, &token).await;
+    let span = json!({ "call_id": "call_a", "t0_ms": 0, "t1_ms": 9000 });
+    assert_eq!(mcp.tool("get_transcript_span", span).await, Err(-32603));
+    assert_eq!(mcp.tool("get_decisions", json!({})).await, Err(-32603));
+    assert!(rig
+        .sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+        .is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cloud_run_never_receives_a_sensitive_call_or_the_people_only_it_names() {
+    let rig = rig_with(HOLD).await;
+    let (_, token, config) = rig.cloud(None, &["Anna"]).await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    let secret = json!({ "call_id": "call_s", "t0_ms": 0, "t1_ms": 9000 });
+    assert_eq!(mcp.tool("get_transcript_span", secret).await, Err(-32001));
+    assert_eq!(
+        mcp.tool("get_person", json!({ "name": "Boris" })).await,
+        Err(-32002)
+    );
+    let items = mcp
+        .tool("get_open_items", json!({}))
+        .await
+        .unwrap()
+        .to_string();
+    let anna = mcp
+        .tool("get_person", json!({ "person_id": "person_anna" }))
+        .await
+        .unwrap()
+        .to_string();
+    for hidden in [
+        "Secret thing",
+        "call_s",
+        "Boris",
+        "person_boris",
+        "Hidden words",
+    ] {
+        assert!(
+            !items.contains(hidden) && !anna.contains(hidden),
+            "{hidden}"
+        );
+    }
+    // Nothing sensitive was released, so nothing sensitive is in an audit row's size either.
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+            .len(),
+        2
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pin_item_stages_a_suggested_item_and_leaves_the_records_it_cites_alone() {
+    let rig = rig().await;
+    let (token, config) = rig.local("run_pin");
+    let mut mcp = Mcp::start(&config, &token).await;
+    let before = rig.sql("SELECT id, rev, text FROM items ORDER BY id");
+    let staged = mcp
+        .tool(
+            "pin_item",
+            json!({ "call_id": "call_a", "kind": "action_item", "text": "Ship the importer docs",
+                    "owner_name": "Anna", "due": "2026-10-30",
+                    "evidence_segment_ids": ["seg_1", "seg_2"] }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(staged["staged"], true);
+    let reference = staged["reference"].as_str().unwrap();
+    let item = rig.sql(&format!("SELECT * FROM items WHERE id = '{reference}'"));
+    assert_eq!(item.len(), 1);
+    assert_eq!(item[0]["created_by"], "llm");
+    assert_eq!(item[0]["review_state"], "suggested");
+    assert_eq!(item[0]["status"], "open");
+    assert_eq!(item[0]["owner_person_id"], "person_anna");
+    assert_eq!(item[0]["due_date"], "2026-10-30");
+    let span = rig.sql(&format!(
+        "SELECT call_id, t0_ms, t1_ms FROM item_spans WHERE item_id = '{reference}'"
+    ));
+    assert_eq!(
+        span,
+        [json!({ "call_id": "call_a", "t0_ms": 0, "t1_ms": 9000 })]
+    );
+    let change = rig.sql(&format!(
+        "SELECT actor, status, undoable FROM changes WHERE entity_id = '{reference}'"
+    ));
+    assert_eq!(
+        change,
+        [json!({ "actor": "llm_run:run_pin", "status": "applied", "undoable": 0 })]
+    );
+    // Every record that already existed is as it was.
+    let mut after = rig.sql("SELECT id, rev, text FROM items ORDER BY id");
+    after.retain(|r| r["id"] != reference);
+    assert_eq!(before, after);
+
+    // Fabricated or foreign evidence, an unknown kind, an empty text: invalid, nothing staged.
+    let count = || rig.sql("SELECT id FROM items").len();
+    let n = count();
+    let pin = |evidence: Value, kind: &str, text: &str, call: &str| json!({ "call_id": call, "kind": kind, "text": text, "evidence_segment_ids": evidence });
+    for args in [
+        pin(json!(["seg_nope"]), "decision", "x", "call_a"),
+        pin(json!(["seg_s"]), "decision", "x", "call_a"),
+        pin(json!([]), "decision", "x", "call_a"),
+        pin(json!(["seg_1"]), "wish", "x", "call_a"),
+        pin(json!(["seg_1"]), "decision", "  ", "call_a"),
+    ] {
+        assert_eq!(
+            mcp.tool("pin_item", args.clone()).await,
+            Err(-32602),
+            "{args}"
+        );
+    }
+    assert_eq!(
+        mcp.tool(
+            "pin_item",
+            pin(json!(["seg_1"]), "decision", "x", "call_nope")
+        )
+        .await,
+        Err(-32002)
+    );
+    assert_eq!(count(), n);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn propose_correction_records_a_proposed_change_and_never_applies_it() {
+    let rig = rig().await;
+    let (token, config) = rig.local("run_fix");
+    let mut mcp = Mcp::start(&config, &token).await;
+    let fix = |field: &str, before: &str, evidence: Value| {
+        json!({ "entity": "segment", "entity_id": "seg_1", "field": field, "before": before,
+                "after": "We will ship the importer on Monday.", "reason": "Anna said Monday",
+                "evidence_segment_ids": evidence })
+    };
+    let staged = mcp
+        .tool(
+            "propose_correction",
+            fix(
+                "text",
+                "We will ship the importer.",
+                json!(["seg_1", "seg_2"]),
+            ),
+        )
+        .await
+        .unwrap();
+    assert_eq!(staged["staged"], true);
+    let reference = staged["reference"].as_str().unwrap();
+    let rows = rig.sql(&format!(
+        "SELECT actor, entity_type, entity_id, field, before, after, status, proposal_kind, reason, undoable FROM changes WHERE id = '{reference}'"
+    ));
+    assert_eq!(
+        rows,
+        [
+            json!({ "actor": "llm_run:run_fix", "entity_type": "segment", "entity_id": "seg_1",
+                 "field": "text", "before": "We will ship the importer.",
+                 "after": "We will ship the importer on Monday.", "status": "proposed",
+                 "proposal_kind": "correction", "reason": "Anna said Monday", "undoable": 0 })
+        ]
+    );
+    // The segment itself is unchanged.
+    assert_eq!(
+        rig.sql("SELECT text FROM segments WHERE id = 'seg_1'"),
+        [json!({ "text": "We will ship the importer." })]
+    );
+    let n = rig.sql("SELECT id FROM changes").len();
+    // A stale before value, a field the tool may not propose, fabricated evidence, a sensitive
+    // call's segment (not for a local run, but an unknown one): refused, nothing recorded.
+    for args in [
+        fix("text", "We shipped it.", json!(["seg_1"])),
+        fix("words_path", "x", json!(["seg_1"])),
+        fix("text", "We will ship the importer.", json!(["seg_nope"])),
+        fix("text", "We will ship the importer.", json!([])),
+    ] {
+        assert_eq!(
+            mcp.tool("propose_correction", args.clone()).await,
+            Err(-32602),
+            "{args}"
+        );
+    }
+    let mut gone = fix("text", "x", json!(["seg_1"]));
+    gone["entity_id"] = json!("seg_nope");
+    assert_eq!(mcp.tool("propose_correction", gone).await, Err(-32002));
+    let mut other = fix("text", "x", json!(["seg_1"]));
+    other["entity"] = json!("call");
+    assert_eq!(mcp.tool("propose_correction", other).await, Err(-32602));
+    assert_eq!(rig.sql("SELECT id FROM changes").len(), n);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn staging_by_a_cloud_run_passes_the_gate_and_cannot_touch_a_sensitive_call() {
+    let rig = rig_with(HOLD).await;
+    let (_, token, config) = rig.cloud(None, &["Anna"]).await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    let staged = mcp
+        .tool(
+            "propose_correction",
+            json!({ "entity": "item", "entity_id": "it_act", "field": "text", "before": "Send the report",
+                    "after": "Send the report by Friday", "reason": "said so",
+                    "evidence_segment_ids": ["seg_2"] }),
+        )
+        .await
+        .unwrap();
+    assert!(staged["reference"].as_str().unwrap().starts_with("chg_"));
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+            .len(),
+        1
+    );
+    // The sensitive call's segment, item and call are out of reach for a cloud run.
+    let sensitive = [
+        json!({ "entity": "segment", "entity_id": "seg_s", "field": "text", "before": "Hidden words.",
+                "after": "x", "reason": "r", "evidence_segment_ids": ["seg_1"] }),
+        json!({ "entity": "item", "entity_id": "it_sec", "field": "text", "before": "Secret thing",
+                "after": "x", "reason": "r", "evidence_segment_ids": ["seg_1"] }),
+        json!({ "entity": "item", "entity_id": "it_act", "field": "text", "before": "Send the report",
+                "after": "x", "reason": "r", "evidence_segment_ids": ["seg_s"] }),
+    ];
+    for args in sensitive {
+        assert_eq!(
+            mcp.tool("propose_correction", args.clone()).await,
+            Err(-32001),
+            "{args}"
+        );
+    }
+    let pin = json!({ "call_id": "call_s", "kind": "decision", "text": "x", "evidence_segment_ids": ["seg_s"] });
+    assert_eq!(mcp.tool("pin_item", pin).await, Err(-32001));
+    // The model writes in its pseudonyms: what is stored names the real person.
+    let named = json!({ "call_id": "call_a", "kind": "action_item", "text": "Person 1 sends the plan",
+                        "owner_name": "Person 1", "evidence_segment_ids": ["seg_1"] });
+    let staged = mcp.tool("pin_item", named).await.unwrap();
+    let reference = staged["reference"].as_str().unwrap();
+    assert_eq!(
+        rig.sql(&format!(
+            "SELECT text, owner_person_id FROM items WHERE id = '{reference}'"
+        )),
+        [json!({ "text": "Anna sends the plan", "owner_person_id": "person_anna" })]
+    );
+    assert_eq!(
+        rig.sql("SELECT id FROM changes WHERE status = 'proposed'")
+            .len(),
+        1
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_router_starts_noter_mcp_under_the_run_and_revokes_it_when_the_run_ends() {
+    let rig = rig_with(r#"{"on": "role-review", "after_ms": 700}"#).await;
+    let (run, token, config) = rig.cloud(Some("call_a"), &["Anna"]).await;
+    // The adapter got the built binary, the run's config and token, and the tools it may use.
+    let launch = rig.scripted.received()[0].mcp.clone().expect("a launch");
+    assert_eq!(launch.binary, Path::new(env!("CARGO_BIN_EXE_noter-mcp")));
+    assert_eq!(launch.config, config);
+    assert_eq!(launch.token.expose(), token);
+    assert!(launch.tools.contains(&"pin_item".to_owned()));
+    let mode = std::fs::metadata(&config).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600);
+    assert!(rig.core.mcp_session(&run).is_some());
+    // The run ends: the token is revoked and the config removed, without anyone closing it.
+    for _ in 0..100 {
+        if rig.core.mcp_session(&run).is_none() && !config.exists() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert_eq!(rig.core.mcp_session(&run), None);
+    assert!(!config.exists());
+    let late = raw(
+        &rig.socket,
+        &[request(
+            1,
+            "get_screen_context",
+            &token,
+            &run,
+            true,
+            json!({ "call_id": "call_a" }),
+        )],
+    )
+    .await;
+    assert_eq!(code(&late[0]), -32001);
+    // A core with no binary configured starts no tool server for a run that asks for tools.
+    let bare = {
+        let dir = tempfile::tempdir().unwrap();
+        let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet));
+        Arc::new(Core::open(dir.path(), deps).unwrap())
+    };
+    let _ = bare.serve_socket().await.unwrap();
+    assert_eq!(bare.mcp_session("llm_none"), None);
 }

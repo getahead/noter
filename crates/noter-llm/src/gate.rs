@@ -120,6 +120,13 @@ pub(crate) struct Release<'a> {
     pub repair: Option<&'a str>,
 }
 
+/// What a call carries besides its packet: the spend left, the API key, the tool server.
+pub(crate) struct SendExtras {
+    pub budget_usd: Option<f64>,
+    pub key: Option<Secret>,
+    pub mcp: Option<McpLaunch>,
+}
+
 /// The run a tool result is released for.
 pub(crate) struct ToolRelease<'a> {
     pub llm_run_id: &'a LlmRunId,
@@ -483,9 +490,7 @@ impl Gate {
         choice: &Choice,
         skill: Skill,
         session: Option<&str>,
-        budget_usd: Option<f64>,
-        key: Option<Secret>,
-        mcp: Option<McpLaunch>,
+        extras: SendExtras,
     ) -> BoxFuture<'static, Result<Reply, String>> {
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-release
         let Some(adapter) = self.adapter(approved.runtime) else {
@@ -500,9 +505,9 @@ impl Gate {
             tools: choice.tools.clone(),
             packet: approved.bytes.clone(),
             session: session.map(String::from),
-            budget_usd,
-            key,
-            mcp,
+            budget_usd: extras.budget_usd,
+            key: extras.key,
+            mcp: extras.mcp,
         })
         // @cpt-end:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-release
     }

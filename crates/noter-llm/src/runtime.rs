@@ -29,7 +29,7 @@ use tokio::sync::watch;
 use tokio::time::Instant;
 
 use crate::adapters::Reply;
-use crate::gate::{Adapters, Approved, Gate, Release, RunMap, ToolRelease};
+use crate::gate::{Adapters, Approved, Gate, Release, RunMap, SendExtras, ToolRelease};
 use crate::route::{self, Choice, Route};
 use crate::secrets::{key_account, MemorySecrets, Secret, SecretStore};
 use crate::tools::{McpLaunch, ToolHost, ToolStart};
@@ -541,6 +541,15 @@ impl Llm {
         self.configure(|i| i.tools = Some((host, binary)))
     }
 
+    /// A cloud run's tool call as the core sees it: the pseudonyms the model read in its packet
+    /// and earlier results name the real people again. Nothing happens for a run with no tool
+    /// server.
+    pub fn restore_tool_input(&self, run: &LlmRunId, params: &mut Value) {
+        if let Some(tool) = lock(&self.0.tool_runs).get(run) {
+            tool.map.map_back(params);
+        }
+    }
+
     /// One tool result of a running run through the egress gate
     /// (`cpt-noter-algo-core-mcp-release-result`). `people` are the names the result holds; a
     /// cloud run gets them as its pseudonyms, the packet's where it has them. An error means no
@@ -954,9 +963,11 @@ impl Inner {
                 &tally.choice,
                 tally.skill,
                 session,
-                budget_usd,
-                key,
-                launch,
+                SendExtras {
+                    budget_usd,
+                    key,
+                    mcp: launch,
+                },
             );
             // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-adapter
             // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-cancel

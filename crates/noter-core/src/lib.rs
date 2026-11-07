@@ -149,6 +149,9 @@ pub struct CoreDeps {
     /// Indexed MCP servers (TL-42; scripted in the harness and tests); no server is valid until
     /// set.
     pub mcp_source: Arc<dyn noter_knowledge::McpSource>,
+    /// The `noter-mcp` binary a run that may use tools starts under its CLI (the sidecar in the
+    /// app, the built test binary in tests); without it runs have no tools.
+    pub mcp_binary: Option<std::path::PathBuf>,
 }
 
 impl CoreDeps {
@@ -177,6 +180,12 @@ impl CoreDeps {
 
     pub fn with_mcp_source(mut self, mcp: Arc<dyn noter_knowledge::McpSource>) -> Self {
         self.mcp_source = mcp;
+            mcp_binary: None,
+        }
+    }
+
+    pub fn with_mcp_binary(mut self, binary: std::path::PathBuf) -> Self {
+        self.mcp_binary = Some(binary);
         self
     }
 
@@ -475,6 +484,11 @@ impl Core {
                     accounts.revoked(runtime, run);
                 }
             });
+        let mcp = mcp::McpRuns::default();
+        let llm = match &deps.mcp_binary {
+            Some(binary) => llm.with_tool_host(Arc::new(mcp.host()), binary.clone()),
+            None => llm,
+        };
         let (jobs, capture_guard) = jobs::build(store.clone(), &deps);
         let core = Core {
             deps,
@@ -509,7 +523,7 @@ impl Core {
             postcall: postcall::Sections::default(),
             handoffs: noter_handoff::Generations::default(),
             sources: knowledge::Sources::default(),
-            mcp: mcp::McpRuns::default(),
+            mcp,
             index: noter_retrieval::Index::default(),
         };
         Core::discard_stale_mcp_configs(data_dir);
