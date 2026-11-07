@@ -1478,6 +1478,24 @@ impl Controls for Harness {
                 // `{}` → `{ calls }`: the installs and sign-ins the scripted CLIs ran, oldest
                 // first (`install:ClaudeCode`, `login:Claude`).
                 "account_cli_log" => Ok(json!({ "calls": self.account_cli.log() })),
+                // `{ call_id?, cloud?, tools }` → `{ run_id, token, socket, config }`: a noter-mcp
+                // run registered as the router will, on the core's socket (TL-38).
+                "mcp_run" => {
+                    let call_id = args["call_id"].as_str().map(CallId::new);
+                    let tools = args["tools"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|t| t.as_str().map(str::to_owned))
+                        .collect();
+                    let cloud = args["cloud"].as_bool() == Some(true);
+                    noter_core::testing::mcp_run(&self.core, call_id, cloud, tools).await
+                }
+                // `{ run_id }` → `{ closed }`: the run's token stops working, its config goes.
+                "mcp_close" => {
+                    let run_id = args["run_id"].as_str().unwrap_or_default();
+                    Ok(json!({ "closed": self.core.close_mcp_run(run_id) }))
+                }
                 // `{ locked }`: the Keychain stand-in fails every access while locked.
                 "keychain" => {
                     self.secrets

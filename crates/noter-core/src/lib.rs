@@ -21,6 +21,7 @@ mod jobs;
 mod knowledge;
 mod library;
 mod log;
+mod mcp;
 mod merge;
 mod models;
 mod native_ops;
@@ -59,6 +60,7 @@ pub use first_run::{
 pub use hotkeys::{ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use hub::AnyHub;
 pub use hub::{StreamHub, StreamMsg, Subscribed, LAG_LIMIT};
+pub use mcp::{McpRegistration, McpSession};
 pub use models::PinnedModels;
 pub use native_ops::{ClipboardText, LaunchRequest, NativeOps, SaveKind};
 pub use noter_jobs::{PowerSource, Request, Trigger};
@@ -316,6 +318,8 @@ pub struct Core {
     handoffs: noter_handoff::Generations,
     /// Knowledge sources: folder watchers and their sync runs.
     sources: knowledge::Sources,
+    /// The noter-mcp runs and the socket they reach the core on.
+    mcp: mcp::McpRuns,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -486,7 +490,9 @@ impl Core {
             postcall: postcall::Sections::default(),
             handoffs: noter_handoff::Generations::default(),
             sources: knowledge::Sources::default(),
+            mcp: mcp::McpRuns::default(),
         };
+        Core::discard_stale_mcp_configs(data_dir);
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
         core.init_call_window();
@@ -497,6 +503,7 @@ impl Core {
     /// Ends the core: every stream ends with `shutdown`, then the writer drains its queue and
     /// checkpoints. Idempotent.
     pub async fn shutdown(&self) {
+        self.close_mcp();
         for hub in self.hubs() {
             hub.end_all(StreamEndReason::Shutdown);
         }

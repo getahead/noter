@@ -1232,6 +1232,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "noter-mcp"
+version = "0.1.0"
+dependencies = [
+ "noter-core",
+ "noter-db",
+ "noter-protocol",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "noter-native"
 version = "0.1.0"
 dependencies = [
