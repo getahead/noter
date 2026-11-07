@@ -368,6 +368,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "audio deletion time",
         sql: include_str!("../migrations/0008_audio_deleted_at.sql"),
     },
+    Migration {
+        owner: "noter-core",
+        version: 9,
+        name: "output speaker naming state",
+        sql: include_str!("../migrations/0009_names_updated.sql"),
+    },
 ];
 
 impl Core {

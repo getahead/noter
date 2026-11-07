@@ -2110,6 +2110,7 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
                     ("kind", s["kind"].clone()),
                     ("current_version_id", json!(format!("ver_{id}_{count}"))),
                     ("user_edited", s["user_edited"].clone()),
+                    ("names_updated", s["names_updated"].clone()),
                     (
                         "regenerated_with_edits",
                         s["regenerated_with_edits"].clone(),

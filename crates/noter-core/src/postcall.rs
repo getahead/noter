@@ -187,6 +187,7 @@ struct Stored {
     from_pass: String,
     user_edited: bool,
     regenerated_with_edits: bool,
+    names_updated: bool,
     versions: u32,
     writer: Option<WriterInfo>,
 }
@@ -229,7 +230,7 @@ fn writer_at(
 const STORED: &str = "SELECT s.id, s.call_id, s.rev, s.kind, v.body_md, v.lang, v.from_pass,
         s.user_edited, s.regenerated_with_edits,
         (SELECT count(*) FROM summary_versions WHERE summary_id = s.id),
-        l.runtime_choice, l.model, c.call_type, g.skill_version, g.created_at, g.from_pass
+        l.runtime_choice, l.model, c.call_type, g.skill_version, g.created_at, g.from_pass, s.names_updated
     FROM summaries s
     JOIN calls c ON c.id = s.call_id
     JOIN summary_versions v ON v.id = s.current_version_id
@@ -253,6 +254,7 @@ fn stored_row(r: &noter_db::rusqlite::Row) -> noter_db::rusqlite::Result<Option<
         regenerated_with_edits: r.get(8)?,
         versions: r.get(9)?,
         writer: writer_at(r, 10)?,
+        names_updated: r.get(16)?,
     }))
 }
 
@@ -267,6 +269,80 @@ fn stored(c: &Connection, by: &str, value: &str) -> noter_db::rusqlite::Result<V
         .into_iter()
         .flatten()
         .collect())
+}
+
+// @cpt-algo:cpt-noter-algo-core-speakers-audio-correct:p1
+pub(crate) fn named_sections(
+    c: &Connection,
+    call: &str,
+    names: &[(String, String)],
+    now: i64,
+) -> noter_db::rusqlite::Result<Vec<Mutation>> {
+    let mut changes = vec![];
+    let names: Vec<_> = names.iter().map(|(old, new)| (plain(old), new)).collect();
+    for row in stored(c, "call_id", call)? {
+        let Some(writer) = &row.writer else { continue };
+        if writer.generated_at.0 > now {
+            continue;
+        }
+        let mut body = String::new();
+        let text = row.body_md.as_str();
+        let mut at = 0;
+        while at < text.len() {
+            let rest = &text[at..];
+            let replacement = names.iter().find(|(old, _)| {
+                !old.is_empty()
+                    && rest.starts_with(old)
+                    && !text[..at]
+                        .chars()
+                        .next_back()
+                        .is_some_and(|c| c.is_alphanumeric() || c == '_')
+                    && !rest[old.len()..]
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_alphanumeric() || c == '_')
+            });
+            if let Some((old, new)) = replacement {
+                body.push_str(&plain(new));
+                at += old.len();
+            } else if let Some(ch) = rest.chars().next() {
+                body.push(ch);
+                at += ch.len_utf8();
+            }
+        }
+        if body == row.body_md {
+            continue;
+        }
+        let version = format!("ver_{}", ulid::Ulid::generate());
+        changes.push(Mutation {
+            entity_type: "summary_version",
+            table: "summary_versions",
+            id: version.clone(),
+            base_rev: None,
+            bump_rev: false,
+            values: vec![
+                ("summary_id", json!(row.id)),
+                ("n", json!(row.versions + 1)),
+                ("kind", json!("user_edit")),
+                ("body_md", json!(body)),
+                ("lang", json!(row.lang)),
+                ("from_pass", json!(row.from_pass)),
+                ("created_at", json!(now)),
+            ],
+        });
+        changes.push(Mutation {
+            entity_type: "summary",
+            table: "summaries",
+            id: row.id,
+            base_rev: Some(Rev(row.rev)),
+            bump_rev: true,
+            values: vec![
+                ("current_version_id", json!(version)),
+                ("names_updated", json!(1)),
+            ],
+        });
+    }
+    Ok(changes)
 }
 
 fn section(
@@ -295,6 +371,7 @@ fn section(
         writer: stored.and_then(|s| s.writer.clone()),
         user_edited: stored.is_some_and(|s| s.user_edited),
         regenerated_with_edits: stored.is_some_and(|s| s.regenerated_with_edits),
+        names_updated: stored.is_some_and(|s| s.names_updated),
         version_count: stored.map_or(0, |s| s.versions),
     }
 }
@@ -787,7 +864,7 @@ impl Core {
         if let Some(edited) = existing.filter(|s| s.user_edited) {
             // @cpt-begin:cpt-noter-algo-core-postcall-merge:p1:inst-merge-version
             let base = self.generated_base(&edited.id)?;
-            if g.body_md == base {
+            if g.body_md == base && !edited.names_updated {
                 return Ok(None);
             }
             let merged = merge(&base, &edited.body_md, &g.body_md);
@@ -805,6 +882,7 @@ impl Core {
             }
             // @cpt-end:cpt-noter-algo-core-postcall-merge:p1:inst-merge-version
         }
+        section.push(("names_updated", json!(0)));
         if existing.is_none() {
             section.extend([
                 ("call_id", json!(call.as_str())),

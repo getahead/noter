@@ -788,3 +788,120 @@ async fn regenerate_refuses_a_section_the_call_type_does_not_have() {
         .await
         .unwrap();
 }
+
+#[tokio::test(start_paused = true)]
+async fn speaker_naming_substitutes_labels_preserving_edits_and_publishes_the_section() {
+    use noter_protocol::model::{RenameScope, RenameSpeakerArgs};
+    use noter_protocol::PersonRef;
+    let (core, events, _dir, out) = written().await;
+    let summary = out
+        .sections
+        .iter()
+        .find(|s| s.kind == SectionKind::Summary)
+        .unwrap();
+    let id = summary.summary_id.as_ref().unwrap();
+    edit(
+        &core,
+        CALL,
+        id.as_str(),
+        summary.rev.unwrap().0,
+        "Speaker 1 owns this. Speaker 10 stays. My own note.",
+    )
+    .await
+    .unwrap();
+    let named = core
+        .transcript_rename_speaker(
+            &main_window(),
+            RenameSpeakerArgs {
+                call_id: CallId::new(CALL),
+                speaker_id: noter_protocol::SpeakerId::new(format!("{CALL}_spk")),
+                person: PersonRef::New {
+                    display_name: "Anna".into(),
+                    email: None,
+                },
+                scope: RenameScope::WholeCall,
+            },
+        )
+        .await
+        .unwrap();
+    let out = outputs(&core, CALL).await;
+    let section = out
+        .sections
+        .iter()
+        .find(|s| s.kind == SectionKind::Summary)
+        .unwrap();
+    assert_eq!(
+        section.body_md.as_deref(),
+        Some("Anna owns this. Speaker 10 stays. My own note.")
+    );
+    assert!(section.user_edited);
+    assert_eq!(
+        serde_json::to_value(section).unwrap()["names_updated"],
+        true
+    );
+    assert!(events
+        .all()
+        .iter()
+        .any(|(event, p)| *event == "entity:changed"
+            && p["type"] == "section"
+            && p["section"]["names_updated"] == true));
+    let undo_args = UndoArgs {
+        target: UndoTarget::Change {
+            change_id: named.change_id.clone(),
+        },
+    };
+    core.change_undo(&main_window(), undo_args.clone())
+        .await
+        .unwrap();
+    let undone = outputs(&core, CALL).await;
+    let undone = undone
+        .sections
+        .iter()
+        .find(|s| s.kind == SectionKind::Summary)
+        .unwrap();
+    assert!(!undone.names_updated);
+    assert_eq!(
+        undone.body_md.as_deref(),
+        Some("Speaker 1 owns this. Speaker 10 stays. My own note.")
+    );
+    core.change_redo(
+        &main_window(),
+        noter_protocol::model::RedoArgs {
+            target: undo_args.target,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        outputs(&core, CALL)
+            .await
+            .sections
+            .iter()
+            .find(|s| s.kind == SectionKind::Summary)
+            .unwrap()
+            .names_updated
+    );
+    core.outputs_regenerate(
+        &main_window(),
+        RegenerateArgs {
+            call_id: CallId::new(CALL),
+            sections: vec![SectionKind::Summary],
+            runtime: None,
+            model: None,
+            skill: None,
+            local: false,
+        },
+    )
+    .await
+    .unwrap();
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    assert!(
+        !outputs(&core, CALL)
+            .await
+            .sections
+            .iter()
+            .find(|s| s.kind == SectionKind::Summary)
+            .unwrap()
+            .names_updated
+    );
+}

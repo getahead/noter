@@ -114,12 +114,14 @@ fn plan_names(
     c: &Connection,
     call_id: &str,
     assignments: &[Assignment],
+    now: i64,
 ) -> Result<Plan, CoreError> {
     let mut plan = Plan {
         mutations: vec![],
         segments: vec![],
     };
     let mut minted = HashMap::new();
+    let mut names = vec![];
     for a in assignments {
         // A skipped speaker stays as it is.
         let Some(person) = &a.person else { continue };
@@ -148,7 +150,14 @@ fn plan_names(
         match &a.scope {
             RenameScope::WholeCall => {
                 // @cpt-begin:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-propagate
-                // Lines, summaries and owners read the speaker's name, so one row carries the change.
+                let old: String = db(c.query_row(
+                    "SELECT COALESCE(name, CASE WHEN person_id IS NOT NULL THEN label WHEN channel = 'mic' AND (label = 'you' OR named_by = 'you') THEN 'You' WHEN channel = 'mic' THEN 'Guest' ELSE 'Speaker ' || COALESCE(n, 0) END) FROM speakers WHERE id = ?1",
+                    [a.speaker_id.as_str()], |r| r.get(0),
+                ))?;
+                if old != name {
+                    names.push((old, name.clone()));
+                }
+                // Lines and owners read the speaker's name.
                 plan.mutations.push(Mutation {
                     entity_type: "speaker",
                     table: "speakers",
@@ -241,6 +250,9 @@ fn plan_names(
             }
         }
     }
+    plan.mutations.extend(db(crate::postcall::named_sections(
+        c, call_id, &names, now,
+    ))?);
     Ok(plan)
 }
 
@@ -308,6 +320,7 @@ impl Core {
         self.ready()?;
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-validate
         let id = call_id.as_str().to_string();
+        let now = self.deps.clock.now().0;
         let plan = self.store().read(move |c| {
             let known: bool = c.query_row(
                 "SELECT EXISTS (SELECT 1 FROM calls WHERE id = ?1)",
@@ -315,7 +328,7 @@ impl Core {
                 |r| r.get(0),
             )?;
             Ok(if known {
-                plan_names(c, &id, &assignments)
+                plan_names(c, &id, &assignments, now)
             } else {
                 Err(not_found("call"))
             })
@@ -355,6 +368,11 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-correct
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-publish
         let speakers = self.publish_corrected(call_id, &plan.segments)?;
+        for row in &written {
+            if row.entity_type == "summary" {
+                self.publish_section(&row.id)?;
+            }
+        }
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-publish
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-return
         // @cpt-begin:cpt-noter-algo-core-speakers-audio-correct:p1:inst-correct-return

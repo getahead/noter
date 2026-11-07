@@ -5,7 +5,7 @@ import { applyProgress, mergeSection, metaLine, orderSections, sectionCounts, ve
 
 const item = (review: ItemView["review"]) => ({ id: `i_${review}_${Math.random()}`, review }) as unknown as ItemView;
 const sec = (kind: SectionKind, o: Partial<OutputSection> = {}): OutputSection =>
-  ({ kind, state: { type: "ready" }, summary_id: null, rev: null, body_md: null, items: [], reviews: [], writer: null, user_edited: false, regenerated_with_edits: false, version_count: 1, ...o }) as OutputSection;
+  ({ kind, state: { type: "ready" }, summary_id: null, rev: null, body_md: null, items: [], reviews: [], writer: null, user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: 1, ...o }) as OutputSection;
 
 describe("orderSections", () => {
   it("keeps PRD order whatever order the core sent", () => {

@@ -69,6 +69,8 @@ pub struct OutputSection {
     pub user_edited: bool,
     /// Regenerated while the user's edit was kept: a diff is available.
     pub regenerated_with_edits: bool,
+    /// Speaker labels changed since generation; regeneration can improve wording.
+    pub names_updated: bool,
     pub version_count: u32,
 }
 
