@@ -101,6 +101,22 @@ describe("post-call output commands (2.17)", () => {
   });
 });
 
+// @cpt-flow:cpt-noter-flow-ui-call-page-outputs-regenerate:p1
+it("Use Local Model (regenerate with local) makes the local model the section's writer, on both cores", async () => {
+  s = openScenario({ alsoRecord: exercised, world: W.idle });
+  const main = s.core("main");
+  const before = ok(await main.outputsGet({ call_id: CALL }));
+  expect(summaryOf(before.sections).writer?.runtime).not.toBe("local");
+  expect(before.written_locally).toBe(false);
+  const progress = await s.events("outputs:progress");
+  ok(await main.outputsRegenerate({ call_id: CALL, sections: ["summary"], local: true }));
+  await until(() => progress.all.find((x) => x.section === "summary" && x.state.type === "ready"), "locally rewritten summary");
+  const after = ok(await main.outputsGet({ call_id: CALL }));
+  expect(summaryOf(after.sections).writer).toMatchObject({ runtime: "local" });
+  expect(after.written_locally).toBe(true);
+  expect(after.sections.filter((x) => x.kind !== "summary").every((x) => x.writer?.runtime !== "local")).toBe(true);
+});
+
 // @cpt-flow:cpt-noter-flow-ui-speakers-post-call:p1
 it.each(["rename", "name"] as const)("speaker %s publishes names_updated and regeneration clears it on both cores", async (method) => {
   s = openScenario({ alsoRecord: exercised, world: W.idle });
