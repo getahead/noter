@@ -36,13 +36,14 @@ design: docs/DESIGN-core.md
   - [Reads and cloud result gating](#reads-and-cloud-result-gating)
   - [Staged writes only](#staged-writes-only)
   - [D1 relay and network evidence](#d1-relay-and-network-evidence)
+  - [D1 relay network-monitor evidence](#d1-relay-network-monitor-evidence)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 
 <!-- /toc -->
 
 - [ ] `p4` - **ID**: `cpt-noter-featstatus-core-mcp`
 
-- [ ] `p4` - `cpt-noter-feature-core-mcp`
+- [x] `p4` - `cpt-noter-feature-core-mcp`
 
 ## 1. Feature Context
 
@@ -51,6 +52,8 @@ design: docs/DESIGN-core.md
 `noter-mcp` is a Rust stdio child of Claude Code or Codex for one run. It serves the protocol crate's tool schemas and forwards calls over the core's local Unix socket with a per-run token. The core owns retrieval, item reads and staged changes; its socket handler filters, redacts and audits cloud tool results before returning them. No TCP listener or database connection exists in the binary.
 
 > **M3 decisions (Backend Teamlead, 7 Nov 2026).** `noter-mcp` is a binary crate (`crates/noter-mcp`, core lane) depending only on `noter-protocol`, serde and tokio: no SQLite, no network crate. It speaks MCP over stdio and JSON-RPC over `$APP_SUPPORT/run/core.sock` (mode 0600) with `NOTER_MCP_TOKEN`; the socket handler is `noter_core::mcp` (`Core::serve_socket`). The run registry `McpRuns` (token → `McpRunContext`, constant-time compare) is filled by the core before a run starts and revoked on close; cloud results pass the gate's redaction map and get a `tool_result` `audit_log` row before release. Tests: a Rust integration test spawns the built binary (`env!("CARGO_BIN_EXE_noter-mcp")`) against a core on a temp socket, and the harness command `harness.mcp_run { call_id, cloud, tools }` → `{ token, socket }` lets conformance tests drive the socket. Bundling the binary as a Tauri sidecar (`externalBin`) and signing it in the release build is an owner/release item (TL-38). This feature wires the per-run token, `run/mcp/<run_id>.json` and the socket into the CLI adapters' lockdown config and ticks the "refinements use noter-mcp" half of `inst-ask-run` in `core-retrieval-ask` (TL-36). No table is added (TL-34).
+
+> **Delivery and open parts (Backend writer, 7 Nov 2026).** Delivered in #336 (binary, socket, `McpRuns`, entity read tools, `harness.mcp_run`), #356 (result gate, staging, router wiring through `Llm::with_tool_host`, TL-36 second half: the Ask refinements now run over `noter-mcp`, wired with 2.22 in #375) and #372 (search tools, D1 relay). Open, all owner items: (1) signing `noter-mcp` and bundling it as a Tauri sidecar (`externalBin`) in the release build (DoD `-transport`); (2) the network-monitor attribution of live-source relay traffic on macOS (DoD `-relay-network`, AC 6): relay implemented and tested against the scripted McpSource (#372); the network-monitor attribution on macOS is the owner's release test; (3) the Codex `-c mcp_servers.noter.*` and Claude `--allowedTools` launch flags are verified only against a fake CLI. The socket search is keyword-only (`keyword_only: true`) until be-mid-3's follow-up PR makes it hybrid, which is not on main yet.
 
 ### 1.2 Purpose
 
@@ -260,7 +263,7 @@ Closed sessions cannot be reopened with their old token. Another run gets a new 
 
 - [ ] `p4` - **ID**: `cpt-noter-dod-core-mcp-transport`
 
-The system **MUST** ship the signed Rust binary as a stdio child, serve protocol-derived tool schemas, use the 0600 Unix socket and bind every request to a live per-run token. It opens no TCP listener or database connection. Caller-supplied cloud and call fields cannot weaken trusted policy; JSON-RPC errors use exactly the four contract codes and retain the request id. Owner-gated, so this box stays `[ ]`: signing the binary and bundling it as a Tauri sidecar (`externalBin`) in the release build.
+The system **MUST** ship the signed Rust binary as a stdio child, serve protocol-derived tool schemas, use the 0600 Unix socket and bind every request to a live per-run token. It opens no TCP listener or database connection. Caller-supplied cloud and call fields cannot weaken trusted policy; JSON-RPC errors use exactly the four contract codes and retain the request id. Owner-gated, so this box stays `[ ]`: signing the binary and bundling it as a Tauri sidecar (`externalBin`) in the release build. Also owner-verified: the Codex `-c mcp_servers.noter.*` and Claude `--allowedTools mcp__noter__*` launch flags were tested against a fake CLI only (#356), on the pinned CLI versions.
 
 **Implements**:
 - `cpt-noter-flow-core-mcp-start`
@@ -306,7 +309,7 @@ The system **MUST** validate pin and correction evidence and record reviewable p
 
 - [x] `p4` - **ID**: `cpt-noter-dod-core-mcp-relay`
 
-The system **MUST** relay configured live source tools only for permitted Ask and post-call runs in Cloud allowed, write a lookup row before forwarding and gate each cloud result again. No live tick or isolated CLI config can start the user's server directly. The network-monitor test attributes configured source-host traffic to lookup rows and provider traffic to run rows; cloud tool-result rows link to the same run. (Owner-gated, so the DoD is ticked on the code and the scripted-source matrix: the macOS network-monitor test, AC 6 of section 6.)
+The system **MUST** relay configured live source tools only for permitted Ask and post-call runs in Cloud allowed, write a lookup row before forwarding and gate each cloud result again. No live tick or isolated CLI config can start the user's server directly. Ticked on the code and the scripted-source policy matrix (#372). The network-monitor half is split off as `cpt-noter-dod-core-mcp-relay-network` below (TL-49, as decision D-12 split the engine self-test): a `@cpt-dod` marker cannot be removed and `cfs` refuses an unticked DoD that code carries.
 
 **Implements**:
 - `cpt-noter-flow-core-mcp-live-relay`
@@ -317,14 +320,24 @@ The system **MUST** relay configured live source tools only for permitted Ask an
 - DB: existing `audit_log`, source metadata
 - Entities: lookup provenance, run audit linkage
 
+### D1 relay network-monitor evidence
+
+- [ ] `p4` - **ID**: `cpt-noter-dod-core-mcp-relay-network`
+
+The network-monitor test attributes configured source-host traffic to lookup rows and provider traffic to run rows; cloud tool-result rows link to the same run. Owner-gated, so this box stays `[ ]`: relay implemented and tested against the scripted McpSource (#372); the network-monitor attribution on macOS is the owner's release test (AC 6 of section 6).
+
+**Touches**:
+- API: `live_<source>_<tool>` relay
+- DB: existing `audit_log`
+
 ## 6. Acceptance Criteria
 
-- [ ] A real core and scripted CLI exercise initialization, tools/list, all stable tools and socket round trips; listed schemas match the exported protocol schemas.
-- [ ] Missing, wrong, expired or another run's token is rejected; spoofing cloud false or another call id cannot disclose sensitive evidence. Missing entities and malformed params return the documented JSON-RPC codes.
-- [ ] Search defaults to eight call hits and caps at 30; all read tools exclude sensitive calls and sources for cloud runs, including recent calls and items nested under a person.
-- [ ] A refined Ask lookup uses the same pseudonyms as its initial packet and writes a linked tool_result audit row before returning; forced audit failure releases no text.
-- [ ] Staging a pin or correction returns a reference while the original record is unchanged; fabricated evidence and stale before values cannot apply a mutation.
-- [ ] A matrix over privacy mode, sensitive context and task type permits live lookup only for eligible Ask/post-call Cloud allowed runs; every actual forwarding has a preceding lookup row. Network-monitor tests verify this on macOS.
-- [ ] End, cancellation, timeout and CLI crash revoke the token, close transports and remove secret configs; replay and late results fail. The binary opens no TCP port and has no SQLite access.
-- [ ] M3 adds no IPC command or DESIGN.md story to the milestone denominator for this feature; Ask stories remain counted only by their owning E2E tests against the real core.
-- [ ] `just gate-fast` and `just gate` pass.
+- [x] A real core and scripted CLI exercise initialization, tools/list, all stable tools and socket round trips; listed schemas match the exported protocol schemas.
+- [x] Missing, wrong, expired or another run's token is rejected; spoofing cloud false or another call id cannot disclose sensitive evidence. Missing entities and malformed params return the documented JSON-RPC codes.
+- [x] Search defaults to eight call hits and caps at 30; all read tools exclude sensitive calls and sources for cloud runs, including recent calls and items nested under a person.
+- [x] A refined Ask lookup uses the same pseudonyms as its initial packet and writes a linked tool_result audit row before returning; forced audit failure releases no text.
+- [x] Staging a pin or correction returns a reference while the original record is unchanged; fabricated evidence and stale before values cannot apply a mutation.
+- [ ] A matrix over privacy mode, sensitive context and task type permits live lookup only for eligible Ask/post-call Cloud allowed runs; every actual forwarding has a preceding lookup row. Network-monitor tests verify this on macOS (relay implemented and tested against the scripted McpSource (#372); the network-monitor attribution on macOS is the owner's release test; the matrix and the lookup-row-before-forward check are covered by `cargo test -p noter-mcp`, #372).
+- [x] End, cancellation, timeout and CLI crash revoke the token, close transports and remove secret configs; replay and late results fail. The binary opens no TCP port and has no SQLite access.
+- [x] M3 adds no IPC command or DESIGN.md story to the milestone denominator for this feature; Ask stories remain counted only by their owning E2E tests against the real core.
+- [x] `just gate-fast` and `just gate` pass.
