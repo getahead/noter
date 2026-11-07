@@ -437,3 +437,74 @@ fn removal_takes_the_whole_index_in_one_transaction_or_nothing() {
         ErrorCode::NotFound
     );
 }
+
+/// An indexed MCP row with `schedule`, last synced at `last`.
+fn mcp_row(schedule: &str, last: Option<i64>, status: SourceStatus, token: bool) -> SourceRow {
+    SourceRow {
+        id: SourceId::new("src_1"),
+        rev: Rev(1),
+        kind: SourceKind::Mcp,
+        name: "notion".into(),
+        location: "notion".into(),
+        mode: SourceMode::Indexed,
+        schedule: Some(schedule.into()),
+        privacy: PrivacyClass::Normal,
+        scope: SourceScope::AllCalls,
+        status,
+        documents: 0,
+        last_sync_at: last.map(TimestampMs),
+        has_token: token,
+    }
+}
+
+#[test]
+fn an_indexed_mcp_source_is_due_once_its_schedule_has_passed() {
+    const H: i64 = 3_600_000;
+    let now = TimestampMs(100 * H);
+    let due = |row: SourceRow| noter_knowledge::due(&row, now);
+    assert!(due(mcp_row("hourly", None, SourceStatus::Idle, true)));
+    assert!(due(mcp_row(
+        "hourly",
+        Some(99 * H),
+        SourceStatus::Idle,
+        true
+    )));
+    assert!(!due(mcp_row(
+        "daily",
+        Some(99 * H),
+        SourceStatus::Idle,
+        true
+    )));
+    assert!(due(mcp_row(
+        "daily",
+        Some(76 * H),
+        SourceStatus::Idle,
+        true
+    )));
+    assert!(!due(mcp_row(
+        "weekly",
+        Some(76 * H),
+        SourceStatus::Idle,
+        true
+    )));
+    // A failed sync retries on schedule; no token or an expired sign-in waits for the user.
+    let failed = SourceStatus::Failed {
+        code: ErrorCode::Offline,
+        at: TimestampMs(99 * H),
+    };
+    assert!(due(mcp_row("hourly", Some(99 * H), failed, true)));
+    assert!(!due(mcp_row("hourly", None, SourceStatus::Idle, false)));
+    assert!(!due(mcp_row(
+        "hourly",
+        None,
+        SourceStatus::SignInExpired,
+        true
+    )));
+    // Folders are watched and live sources are never indexed.
+    let mut folder = mcp_row("hourly", None, SourceStatus::Idle, true);
+    folder.kind = SourceKind::Folder;
+    assert!(!due(folder));
+    let mut live = mcp_row("hourly", None, SourceStatus::Idle, true);
+    live.mode = SourceMode::Live;
+    assert!(!due(live));
+}
