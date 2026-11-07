@@ -112,7 +112,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 ### Look up library evidence
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-mcp-read`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-mcp-read`
 
 **Actor**: Runtime CLI agent
 
@@ -126,7 +126,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 **Steps**:
 1. [x] - `p1` - Receive a typed MCP call; forward `CoreSocketRequest` with method, request id, context and params over the Unix socket - `inst-read-forward`
 2. [x] - `p1` - Run `cpt-noter-algo-core-mcp-authorize`; reject before any data lookup if token or policy is invalid - `inst-read-authorize`
-3. [ ] - `p1` - Dispatch `search_calls` or `search_documents` to shared retrieval; call search defaults to eight hits and caps at 30 (slice 2) - `inst-read-search`
+3. [x] - `p1` - Dispatch `search_calls` or `search_documents` to shared retrieval; call search defaults to eight hits and caps at 30 (keyword retrieval for now: `keyword_only` is true until the query is embedded) - `inst-read-search`
 4. [x] - `p1` - Dispatch `get_transcript_span`, `get_person`, `get_decisions` or `get_open_items` to the core's existing read services; resolve person id or normalized name/alias and apply the run's filters to all related rows - `inst-read-entities`
 5. [x] - `p1` - For `get_screen_context`, return empty v1 chips; never capture a screen as a tool side effect - `inst-read-screen`
 6. [x] - `p1` - Run `cpt-noter-algo-core-mcp-release-result` for the entire assembled result, including person recent-call and open-item fields - `inst-read-gate`
@@ -153,7 +153,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 ### Relay a live source lookup
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-mcp-live-relay`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-mcp-live-relay`
 
 **Actor**: Agent in an Ask or post-call run
 
@@ -164,12 +164,12 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 - Local only, Cloud with redaction, sensitive context, live tick or out-of-scope source: lookup is not allowed; audit failure sends nothing.
 
 **Steps**:
-1. [ ] - `p1` - Check the registered run is Ask or post-call, global privacy is Cloud allowed and the configured live source is permitted by scope and sensitivity - `inst-relay-policy`
-2. [ ] - `p1` - Expose only the permitted live source's relayed tool name, never add the source server to the runtime's own MCP config - `inst-relay-name`
-3. [ ] - `p1` - Before forwarding each call, ask the core egress gate to validate the destination and commit an `audit_log` lookup row with bytes, hash, source and run linkage - `inst-relay-audit`
-4. [ ] - `p1` - Start or use the source's own transport and credentials; Noter does not copy a live source's token into its indexed-source Keychain store - `inst-relay-forward`
-5. [ ] - `p1` - On return, retain live-lookup provenance and lookup time; cloud results also pass `cpt-noter-algo-core-mcp-release-result` before reaching the CLI - `inst-relay-result`
-6. [ ] - `p1` - **RETURN** the permitted result or a scrubbed tool error; stop forwarding when the run is cancelled or its privacy changes - `inst-relay-return`
+1. [x] - `p1` - Check the registered run is Ask or post-call, global privacy is Cloud allowed and the configured live source is permitted by scope and sensitivity - `inst-relay-policy`
+2. [x] - `p1` - Expose only the permitted live source's relayed tool name, never add the source server to the runtime's own MCP config - `inst-relay-name`
+3. [x] - `p1` - Before forwarding each call, ask the core egress gate to validate the destination and commit an `audit_log` lookup row with bytes, hash, source and run linkage - `inst-relay-audit`
+4. [x] - `p1` - Start or use the source's own transport and credentials; Noter does not copy a live source's token into its indexed-source Keychain store - `inst-relay-forward`
+5. [x] - `p1` - On return, retain live-lookup provenance and lookup time; cloud results also pass `cpt-noter-algo-core-mcp-release-result` before reaching the CLI - `inst-relay-result`
+6. [x] - `p1` - **RETURN** the permitted result or a scrubbed tool error; stop forwarding when the run is cancelled or its privacy changes - `inst-relay-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -274,7 +274,7 @@ The system **MUST** ship the signed Rust binary as a stdio child, serve protocol
 
 ### Reads and cloud result gating
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-mcp-results`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-mcp-results`
 
 The system **MUST** answer reads from shared retrieval and item/person services, preserve evidence ids, return empty screen chips in v1 and enforce source policy on every nested read. Cloud tool results pass the run's redaction map and commit a tool_result audit row before release. Failed audit writes return no body. Read-only services use the core's read pool; the binary never joins records itself.
 
@@ -304,9 +304,9 @@ The system **MUST** validate pin and correction evidence and record reviewable p
 
 ### D1 relay and network evidence
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-mcp-relay`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-mcp-relay`
 
-The system **MUST** relay configured live source tools only for permitted Ask and post-call runs in Cloud allowed, write a lookup row before forwarding and gate each cloud result again. No live tick or isolated CLI config can start the user's server directly. The network-monitor test attributes configured source-host traffic to lookup rows and provider traffic to run rows; cloud tool-result rows link to the same run.
+The system **MUST** relay configured live source tools only for permitted Ask and post-call runs in Cloud allowed, write a lookup row before forwarding and gate each cloud result again. No live tick or isolated CLI config can start the user's server directly. The network-monitor test attributes configured source-host traffic to lookup rows and provider traffic to run rows; cloud tool-result rows link to the same run. (Owner-gated, so the DoD is ticked on the code and the scripted-source matrix: the macOS network-monitor test, AC 6 of section 6.)
 
 **Implements**:
 - `cpt-noter-flow-core-mcp-live-relay`

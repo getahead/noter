@@ -38,6 +38,8 @@ use crate::{internal, lock, to_json, Core};
 
 /// The tools the core answers; a registration keeps only these.
 const SERVED: &[&str] = &[
+    "search_calls",
+    "search_documents",
     "pin_item",
     "propose_correction",
     "get_transcript_span",
@@ -53,6 +55,9 @@ const MAX_RECENT_CALLS: usize = 10;
 /// Longest text a staged pin, correction or reason may hold, and most segments it may cite.
 const MAX_TEXT: usize = 2000;
 const MAX_EVIDENCE: usize = 20;
+/// Hits a search returns unless the run asks for another number, and the most it may ask for.
+const DEFAULT_HITS: u32 = 8;
+const MAX_HITS: u32 = 30;
 
 const PARAMS: Rpc = (-32602, "invalid params");
 const FORBIDDEN: Rpc = (-32001, "not allowed for this run");
@@ -69,6 +74,9 @@ pub struct McpRegistration {
     pub call_id: Option<CallId>,
     pub cloud: bool,
     pub tools: Vec<String>,
+    /// D1 lets the run query live MCP sources (`ToolStart::live_ok`): the core adds their
+    /// relayed tools to the allow-list.
+    pub live: bool,
 }
 
 /// `cpt-noter-state-core-mcp-session`; closing and closed runs are not listed.
@@ -89,6 +97,7 @@ struct Run {
     /// The trusted context: the child's own claims never replace it.
     ctx: McpRunContext,
     tools: Vec<String>,
+    live: bool,
     state: State,
     /// `true` ends the run's connections and in-flight work.
     cancel: watch::Sender<bool>,
@@ -134,6 +143,7 @@ impl ToolHost for CoreTools {
                 call_id: run.call_id,
                 cloud: run.cloud,
                 tools: run.tools,
+                live: run.live_ok,
             })
             .map_err(|e| e.message)?;
         Ok(ToolLaunch { token, config })
@@ -149,6 +159,8 @@ impl ToolHost for CoreTools {
 /// The checked context of one request.
 struct Trusted {
     run_id: String,
+    call: Option<CallId>,
+    live: bool,
     cloud: bool,
     cancel: watch::Receiver<bool>,
 }
@@ -224,6 +236,12 @@ impl Core {
             call_id: reg.call_id,
             cloud: reg.cloud,
         };
+        if reg.live {
+            tools.extend(
+                self.live_tool_names(ctx.call_id.as_ref())
+                    .map_err(internal)?,
+            );
+        }
         // @cpt-end:cpt-noter-flow-core-mcp-start:p1:inst-start-register
         // @cpt-begin:cpt-noter-flow-core-mcp-start:p1:inst-start-config
         let run_dir = self.data_dir.join("run");
@@ -256,6 +274,7 @@ impl Core {
             runs.push(Run {
                 ctx,
                 tools,
+                live: reg.live,
                 state: State::Registered,
                 cancel: watch::channel(false).0,
                 config: config.clone(),
@@ -371,7 +390,7 @@ impl Core {
     }
 
     /// One request line to its response; `bound` is the run this connection serves.
-    fn answer(&self, line: &str, bound: &mut Option<Trusted>) -> CoreSocketResponse {
+    async fn answer(&self, line: &str, bound: &mut Option<Trusted>) -> CoreSocketResponse {
         // @cpt-begin:cpt-noter-algo-core-mcp-authorize:p1:inst-auth-params
         let envelope = serde_json::from_str::<CoreSocketRequest>(line)
             .ok()
@@ -387,22 +406,29 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-mcp-read:p1:inst-read-authorize
         let authorized = self.authorize(&req);
         // @cpt-end:cpt-noter-flow-core-mcp-read:p1:inst-read-authorize
-        let result = authorized.and_then(|trusted| {
-            if bound.as_ref().is_some_and(|b| b.run_id != trusted.run_id) {
-                return Err(FORBIDDEN);
-            }
-            let run_id = trusted.run_id.clone();
-            let value = self.dispatch(&trusted, &req.method, req.params);
-            bound.get_or_insert(trusted);
-            // @cpt-begin:cpt-noter-algo-core-mcp-close:p1:inst-close-late
-            // A run closed while the read ran gets no late result.
-            if self.mcp_live(&run_id) {
-                value
-            } else {
+        let result = match authorized {
+            Err(e) => Err(e),
+            Ok(trusted) if bound.as_ref().is_some_and(|b| b.run_id != trusted.run_id) => {
                 Err(FORBIDDEN)
             }
-            // @cpt-end:cpt-noter-algo-core-mcp-close:p1:inst-close-late
-        });
+            Ok(trusted) => {
+                let run_id = trusted.run_id.clone();
+                let value = if req.method.starts_with("live_") {
+                    self.relay(&trusted, &req.method, req.params).await
+                } else {
+                    self.dispatch(&trusted, &req.method, req.params)
+                };
+                bound.get_or_insert(trusted);
+                // @cpt-begin:cpt-noter-algo-core-mcp-close:p1:inst-close-late
+                // A run closed while the read ran gets no late result.
+                if self.mcp_live(&run_id) {
+                    value
+                } else {
+                    Err(FORBIDDEN)
+                }
+                // @cpt-end:cpt-noter-algo-core-mcp-close:p1:inst-close-late
+            }
+        };
         respond(req.id, result)
     }
 
@@ -445,12 +471,15 @@ impl Core {
         // @cpt-begin:cpt-noter-algo-core-mcp-authorize:p1:inst-auth-return
         Ok(Trusted {
             run_id: run.ctx.llm_run_id.clone(),
+            call: run.ctx.call_id.clone(),
+            live: run.live,
             cloud: run.ctx.cloud,
             cancel: run.cancel.subscribe(),
         })
         // @cpt-end:cpt-noter-algo-core-mcp-authorize:p1:inst-auth-return
     }
 
+    // @cpt-dod:cpt-noter-dod-core-mcp-results:p1
     // @cpt-flow:cpt-noter-flow-core-mcp-read:p1
     fn dispatch(&self, t: &Trusted, method: &str, mut params: Value) -> Result<Value, Rpc> {
         // The call a run belongs to does not narrow its reads (an Ask or a review looks across
@@ -779,6 +808,228 @@ impl Core {
             .ok_or(INTERNAL)
     }
 
+    /// `search_calls` and `search_documents` over the same retrieval as Ask, under the run's
+    /// filters and privacy: a cloud run gets no sensitive call or source, and every hit keeps
+    /// the segment or chunk ids it was stored under.
+    // @cpt-begin:cpt-noter-flow-core-mcp-read:p1:inst-read-search
+    // shortcut: keyword-only (`keyword_only: true`); the query is not embedded here, because the
+    // socket's answer path is not async over the engine. Embed it when a run's search quality
+    // needs the vector side.
+    fn search_tool(&self, t: &Trusted, method: &str, params: Value) -> Result<Value, Rpc> {
+        let documents = method == "search_documents";
+        let (text, filter, k) = if documents {
+            let a: SearchDocumentsInput = typed(params)?;
+            (a.query, noter_protocol::model::CallFilter::default(), a.k)
+        } else {
+            let a: SearchCallsInput = typed(params)?;
+            let f = a.filter;
+            let filter = noter_protocol::model::CallFilter {
+                people: f.people,
+                call_types: f.call_types,
+                languages: f.languages,
+                from: f.from,
+                to: f.to,
+                ..Default::default()
+            };
+            (a.query, filter, a.k)
+        };
+        if text.trim().is_empty() {
+            return Err(PARAMS);
+        }
+        let wanted = k.unwrap_or(DEFAULT_HITS).clamp(1, MAX_HITS) as usize;
+        let query = noter_retrieval::Query {
+            text,
+            filter,
+            scope: noter_retrieval::Scope {
+                include_documents: documents,
+                ..Default::default()
+            },
+            privacy: if t.cloud {
+                noter_retrieval::Privacy::Cloud
+            } else {
+                noter_retrieval::Privacy::Local
+            },
+            wanted,
+            vector: None,
+        };
+        let prepared = noter_retrieval::prepare(query).map_err(|_| PARAMS)?;
+        let found = self
+            .store
+            .read(|c| {
+                let r = noter_retrieval::retrieve(c, &prepared, &crate::retrieval::Documents)?;
+                if documents {
+                    return Ok(to_json(&SearchDocumentsOutput {
+                        hits: r
+                            .documents
+                            .iter()
+                            .take(wanted)
+                            .filter_map(document_hit)
+                            .collect(),
+                        sensitive_skipped: r.sensitive_skipped,
+                    }));
+                }
+                let mut hits = vec![];
+                for hit in r.calls.iter().take(wanted) {
+                    hits.extend(call_hit(c, hit)?);
+                }
+                Ok(to_json(&SearchCallsOutput {
+                    hits,
+                    keyword_only: true,
+                }))
+            })
+            .map_err(|_| INTERNAL)?;
+        Ok(found)
+    }
+    // @cpt-end:cpt-noter-flow-core-mcp-read:p1:inst-read-search
+
+    /// The live sources this run may query now, with the relayed tool each name stands for.
+    fn live_tools(&self, call: Option<&CallId>) -> Result<Vec<LiveTool>, CoreError> {
+        let scope = AskScope {
+            call_id: call.cloned(),
+            ..AskScope::default()
+        };
+        let sources = self
+            .store
+            .read(|c| noter_knowledge::live_sources(c, &scope))?;
+        let mut taken: Vec<String> = vec![];
+        let mut tools = vec![];
+        for source in sources {
+            let mut slug = slug_of(&source.name);
+            while taken.contains(&slug) {
+                slug.push('_');
+            }
+            taken.push(slug.clone());
+            for action in [Live::Search, Live::Read] {
+                tools.push(LiveTool {
+                    name: format!("live_{slug}_{}", action.word()),
+                    source: source.clone(),
+                    action,
+                });
+            }
+        }
+        Ok(tools)
+    }
+
+    /// The relayed tool names a run registered under D1 gets.
+    // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-name
+    fn live_tool_names(&self, call: Option<&CallId>) -> Result<Vec<String>, CoreError> {
+        Ok(self.live_tools(call)?.into_iter().map(|t| t.name).collect())
+    }
+    // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-name
+
+    /// The relayed tool a call names, if this run may use it right now: it was registered for
+    /// live lookups, its privacy is still Cloud allowed without sensitive context, and the
+    /// source row is still live and in scope.
+    // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-policy
+    fn live_target(&self, t: &Trusted, method: &str) -> Result<LiveTool, Rpc> {
+        let allowed = self
+            .llm
+            .tool_privacy(&LlmRunId::new(&t.run_id))
+            .is_some_and(|p| p.allows_live());
+        if !t.live || !allowed || !self.mcp_live(&t.run_id) {
+            return Err(FORBIDDEN);
+        }
+        let tools = self.live_tools(t.call.as_ref()).map_err(|_| INTERNAL)?;
+        tools
+            .into_iter()
+            .find(|tool| tool.name == method)
+            .ok_or(FORBIDDEN)
+    }
+    // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-policy
+
+    /// `live_<source>_<tool>` (`cpt-noter-flow-core-mcp-live-relay`): the lookup's `audit_log`
+    /// row commits before the request is sent; the answer keeps where and when it came from and
+    /// takes the same result gate as every tool.
+    // @cpt-dod:cpt-noter-dod-core-mcp-relay:p1
+    // @cpt-flow:cpt-noter-flow-core-mcp-live-relay:p1
+    async fn relay(&self, t: &Trusted, method: &str, mut params: Value) -> Result<Value, Rpc> {
+        let tool = self.live_target(t, method)?;
+        if t.cloud {
+            self.llm
+                .restore_tool_input(&LlmRunId::new(&t.run_id), &mut params);
+        }
+        let request = match tool.action {
+            Live::Search => json!({ "query": typed::<LiveSearch>(params)?.query }),
+            Live::Read => json!({ "uri": typed::<LiveRead>(params)?.uri }),
+        };
+        let server = tool.source.server.clone();
+        // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-audit
+        let sent = json!({ "tool": tool.action.word(), "request": request }).to_string();
+        let meta = self.staged_by(t, "Looked up a live source".into(), "live lookup", &[]);
+        let run = LlmRunId::new(&t.run_id);
+        noter_llm::audit_lookup(
+            &self.store,
+            meta,
+            self.deps.clock.now(),
+            &server,
+            sent.as_bytes(),
+            Some((&run, t.call.as_ref())),
+        )
+        .map_err(|_| INTERNAL)?;
+        // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-audit
+        // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
+        let mut cancel = t.cancel.clone();
+        let answer = tokio::select! {
+            a = self.forward_live(&server, tool.action, &request) => a,
+            _ = cancel.wait_for(|c| *c) => Err(FORBIDDEN),
+        }?;
+        // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
+        // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-return
+        // The run was cancelled or its privacy changed while the server answered: nothing of it
+        // goes on.
+        self.live_target(t, method)?;
+        // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-return
+        // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-result
+        let mut value = json!({
+            "source": tool.source.name,
+            "looked_up_at": self.deps.clock.now().0,
+        });
+        value
+            .as_object_mut()
+            .expect("an object")
+            .extend(answer.as_object().cloned().unwrap_or_default());
+        self.release(t, value)
+        // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-result
+    }
+
+    /// The source's own transport and sign-in: the token lives for this one request and goes
+    /// nowhere else.
+    // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
+    async fn forward_live(
+        &self,
+        server: &str,
+        action: Live,
+        request: &Value,
+    ) -> Result<Value, Rpc> {
+        let mcp = &self.deps.mcp_source;
+        let token = mcp.oauth(server).await.map_err(|_| INTERNAL)?;
+        Ok(match action {
+            Live::Search => {
+                let query = request["query"].as_str().unwrap_or_default();
+                let found = mcp
+                    .seed_query(server, &token, query)
+                    .await
+                    .map_err(|_| INTERNAL)?;
+                let results: Vec<Value> = found
+                    .items
+                    .into_iter()
+                    .take(MAX_ITEMS)
+                    .map(|d| json!({ "uri": d.uri, "title": d.title }))
+                    .collect();
+                json!({ "results": results })
+            }
+            Live::Read => {
+                let uri = request["uri"].as_str().unwrap_or_default();
+                let page = mcp
+                    .read_resource(server, &token, uri)
+                    .await
+                    .map_err(|_| MISSING)?;
+                json!({ "uri": uri, "title": page.title, "text": page.text })
+            }
+        })
+    }
+    // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
+
     fn read_as<T>(
         &self,
         f: impl Fn(&Connection) -> noter_db::rusqlite::Result<Result<T, Rpc>>,
@@ -869,6 +1120,7 @@ impl Core {
                     Ok(Ok(to_json(&ItemsOutput { items })))
                 })
             }
+            "search_calls" | "search_documents" => self.search_tool(t, method, params),
             "get_person" => {
                 let a: GetPersonInput = typed(params)?;
                 if a.person_id.is_none() && a.name.as_deref().map_or(true, |n| n.trim().is_empty())
@@ -889,6 +1141,113 @@ const OPEN: &str =
 
 fn typed<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, Rpc> {
     serde_json::from_value(params).map_err(|_| PARAMS)
+}
+
+/// A retrieval hit on a call as the tool returns it: the call, the span and the segment ids a
+/// citation may name (the hit's own segment, or those a chunk covers).
+fn call_hit(
+    c: &Connection,
+    hit: &noter_retrieval::Hit,
+) -> noter_db::rusqlite::Result<Option<CallHit>> {
+    let (Some(call), HitTarget::Segment { span }) = (&hit.call, &hit.target) else {
+        return Ok(None);
+    };
+    let segment_ids = match &hit.evidence {
+        noter_retrieval::Evidence::Segment(id) => vec![id.clone()],
+        _ => {
+            let mut st = c.prepare(
+                "SELECT id FROM segments WHERE call_id = ?1 AND t0_ms >= ?2 AND t1_ms <= ?3
+                 ORDER BY t0_ms, rowid",
+            )?;
+            let rows = st.query_map(
+                noter_db::rusqlite::params![call.id.as_str(), span.t0_ms.0, span.t1_ms.0],
+                |r| r.get::<_, String>(0),
+            )?;
+            rows.map(|id| id.map(SegmentId::new))
+                .collect::<Result<_, _>>()?
+        }
+    };
+    Ok(Some(CallHit {
+        call_id: call.id.clone(),
+        call_title: call.title.clone(),
+        call_date: LocalDate(crate::history::date_of(call.started_at.0)),
+        t0_ms: span.t0_ms,
+        t1_ms: span.t1_ms,
+        segment_ids,
+        text: hit.text.clone(),
+        strong: hit.keyword,
+    }))
+}
+
+fn document_hit(hit: &noter_retrieval::Hit) -> Option<DocumentHit> {
+    let noter_protocol::Provenance::Document {
+        document_id,
+        chunk_id,
+        section,
+        source_name,
+        ..
+    } = &hit.provenance
+    else {
+        return None;
+    };
+    Some(DocumentHit {
+        document_id: document_id.clone(),
+        chunk_id: chunk_id.clone(),
+        title: hit.title.clone(),
+        heading_path: section
+            .iter()
+            .flat_map(|s| s.split(" › ").map(str::to_owned))
+            .collect(),
+        source_name: source_name.clone(),
+        text: hit.text.clone(),
+    })
+}
+
+/// One relayed tool of a live source.
+struct LiveTool {
+    name: String,
+    source: noter_knowledge::LiveSource,
+    action: Live,
+}
+
+#[derive(Clone, Copy)]
+enum Live {
+    Search,
+    Read,
+}
+
+impl Live {
+    fn word(self) -> &'static str {
+        match self {
+            Live::Search => "search",
+            Live::Read => "read",
+        }
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct LiveSearch {
+    query: String,
+}
+
+#[derive(serde::Deserialize)]
+struct LiveRead {
+    uri: String,
+}
+
+/// A source's name as a tool-name part: lowercase letters, digits and single underscores.
+fn slug_of(name: &str) -> String {
+    let words: Vec<String> = name
+        .to_lowercase()
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_owned)
+        .collect();
+    if words.is_empty() {
+        "source".into()
+    } else {
+        words.join("_")
+    }
 }
 
 /// A staging write that did not commit: what the child asked for was stale or gone.
@@ -1085,7 +1444,7 @@ async fn connection(core: Weak<Core>, stream: UnixStream) {
             () = ended => return,
         }
         let Some(core) = core.upgrade() else { return };
-        let mut bytes = to_json(&core.answer(&line, &mut bound))
+        let mut bytes = to_json(&core.answer(&line, &mut bound).await)
             .to_string()
             .into_bytes();
         bytes.push(b'\n');
@@ -1309,6 +1668,8 @@ mod tests {
             .unwrap();
         let trusted = |cloud| Trusted {
             run_id: "r".into(),
+            call: None,
+            live: false,
             cloud,
             cancel: watch::channel(false).1,
         };
@@ -1347,6 +1708,8 @@ mod tests {
             .unwrap();
         let trusted = |cloud| Trusted {
             run_id: "r".into(),
+            call: None,
+            live: false,
             cloud,
             cancel: watch::channel(false).1,
         };
@@ -1357,6 +1720,7 @@ mod tests {
             call_id: None,
             cloud: true,
             tools: vec![],
+            live: false,
         })
         .unwrap();
         let named = |call: &str| json!({ "items": [{ "call_id": call }], "recent_calls": [call] });

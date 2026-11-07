@@ -16,7 +16,9 @@ use tokio::net::UnixStream;
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 const NOW: i64 = 1_792_137_600_000;
-const ALL: [&str; 7] = [
+const ALL: [&str; 9] = [
+    "search_calls",
+    "search_documents",
     "pin_item",
     "propose_correction",
     "get_transcript_span",
@@ -87,10 +89,16 @@ const HOLD: &str = r#"{"on": "role-review", "after_ms": 600000}"#;
 /// A core whose runtimes are the scripted one (`script`) and whose tool server is the built
 /// `noter-mcp`.
 async fn rig_with(script: &str) -> Rig {
+    rig_mcp(script, |_| Arc::new(noter_core::ScriptedMcp::default())).await
+}
+
+/// [`rig_with`] whose live and indexed MCP sources are `mcp(data folder)`.
+async fn rig_mcp(script: &str, mcp: impl FnOnce(&Path) -> Arc<dyn noter_core::McpSource>) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let scripted = Scripted::parse(script).unwrap();
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
         .with_llm(Adapters::scripted(&scripted))
+        .with_mcp_source(mcp(dir.path()))
         .with_mcp_binary(env!("CARGO_BIN_EXE_noter-mcp").into());
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
@@ -120,6 +128,7 @@ impl Rig {
                 call_id: call.map(CallId::new),
                 cloud,
                 tools: tools.iter().map(|t| (*t).to_owned()).collect(),
+                live: false,
             })
             .expect("run registers")
     }
@@ -282,7 +291,7 @@ fn ids(result: &Value) -> Vec<&str> {
 #[tokio::test(flavor = "multi_thread")]
 async fn initialize_lists_exactly_the_exported_schemas() {
     let rig = rig().await;
-    // `search_calls` is a slice-2 tool and `emit_card` is unstable: neither is served or listed.
+    // `emit_card` is unstable: it is neither served nor listed.
     let (token, config) = rig.register(
         "run_1",
         None,
@@ -323,7 +332,7 @@ async fn initialize_lists_exactly_the_exported_schemas() {
     .unwrap();
     let tools = listed["result"]["tools"].as_array().unwrap();
     let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
-    assert_eq!(names, ["get_person", "get_decisions"]);
+    assert_eq!(names, ["search_calls", "get_person", "get_decisions"]);
     for tool in tools {
         let name = tool["name"].as_str().unwrap();
         assert_eq!(tool["inputSchema"], schemas[name]["input"]);
@@ -743,6 +752,7 @@ async fn closing_a_run_revokes_its_token_and_removes_its_config() {
             call_id: None,
             cloud: false,
             tools: vec![],
+            live: false,
         };
         assert!(rig.core.register_mcp_run(reg).is_err(), "{bad:?}");
     }
@@ -1149,4 +1159,551 @@ async fn the_router_starts_noter_mcp_under_the_run_and_revokes_it_when_the_run_e
     };
     let _ = bare.serve_socket().await.unwrap();
     assert_eq!(bare.mcp_session("llm_none"), None);
+}
+
+// ── slice 2, PR B: the search tools and the D1 live relay ───────────────────────────────────
+
+impl Rig {
+    fn exec(&self, sql: &str) {
+        noter_db::rusqlite::Connection::open(self.dir.path().join("noter.db"))
+            .unwrap()
+            .execute_batch(sql)
+            .unwrap();
+    }
+}
+
+/// Forty more segments of `call_a` that all say "gadget", each its own span.
+fn gadgets() -> String {
+    let rows: Vec<String> = (0..40)
+        .map(|i| {
+            let t0 = 20_000 + i * 100;
+            let text = format!("gadget number {i}");
+            format!(
+                "('gad_{i}', 'call_a', 'sp_a', 'sys', {t0}, {}, '{text}', '{text}', 'en', 'live')",
+                t0 + 50
+            )
+        })
+        .collect();
+    format!(
+        "INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text, text_norm, lang, pass) VALUES {};",
+        rows.join(", ")
+    )
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn search_calls_defaults_to_eight_hits_caps_at_thirty_and_keeps_segment_ids() {
+    let rig = rig().await;
+    rig.exec(&gadgets());
+    let (token, config) = rig.local("run_s");
+    let mut mcp = Mcp::start(&config, &token).await;
+    let hits = |r: &Value| r["hits"].as_array().unwrap().len();
+
+    let default = mcp
+        .tool("search_calls", json!({ "query": "gadget" }))
+        .await
+        .unwrap();
+    assert_eq!(hits(&default), 8);
+    let capped = mcp
+        .tool("search_calls", json!({ "query": "gadget", "k": 500 }))
+        .await
+        .unwrap();
+    assert_eq!(hits(&capped), 30);
+    let three = mcp
+        .tool("search_calls", json!({ "query": "gadget", "k": 3 }))
+        .await
+        .unwrap();
+    assert_eq!(hits(&three), 3);
+    // Every hit names the call and the stored segment it came from, unchanged.
+    for hit in capped["hits"].as_array().unwrap() {
+        assert_eq!(hit["call_id"], "call_a");
+        let id = hit["segment_ids"][0].as_str().unwrap();
+        assert!(id.starts_with("gad_"), "{id}");
+        let stored = rig.sql(&format!("SELECT text FROM segments WHERE id = '{id}'"));
+        assert_eq!(hit["text"], stored[0]["text"]);
+        assert_eq!(hit["strong"], true);
+    }
+    assert_eq!(capped["keyword_only"], true);
+    // The run's filters apply: no call in 2030.
+    let none = mcp
+        .tool(
+            "search_calls",
+            json!({ "query": "gadget", "filter": { "from": "2030-01-01" } }),
+        )
+        .await
+        .unwrap();
+    assert_eq!(hits(&none), 0);
+    // A blank query or a bad date is invalid params.
+    assert_eq!(
+        mcp.tool("search_calls", json!({ "query": "  " })).await,
+        Err(-32602)
+    );
+    let bad = json!({ "query": "gadget", "filter": { "from": "2030-02-31x" } });
+    assert_eq!(mcp.tool("search_calls", bad).await, Err(-32602));
+}
+
+/// A normal and a sensitive knowledge source, each with one chunk about "roadmap".
+const DOCS: &str = "
+INSERT INTO sources (id, rev, kind, mode, name, location, privacy_class, scope, status) VALUES
+  ('src_ok', 1, 'folder', 'indexed', 'Handbook', '/h', 'normal', '{\"type\":\"all_calls\"}', '\"ready\"'),
+  ('src_hid', 1, 'folder', 'indexed', 'Legal', '/l', 'sensitive', '{\"type\":\"all_calls\"}', '\"ready\"');
+INSERT INTO documents (id, source_id, uri, title, mime, content_hash, indexed_at) VALUES
+  ('doc_ok', 'src_ok', 'a.md', 'Plan', 'text/markdown', 'h1', 1),
+  ('doc_hid', 'src_hid', 'b.md', 'Deal', 'text/markdown', 'h2', 1);
+INSERT INTO doc_chunks (id, document_id, heading_path, text, text_norm, token_count) VALUES
+  ('chunk_ok', 'doc_ok', '[\"Plan\",\"Q4\"]', 'Plan › Q4
+
+The roadmap ships in Q4.', 'plan q4 the roadmap ships in q4.', 9),
+  ('chunk_hid', 'doc_hid', '[\"Deal\"]', 'Deal
+
+The roadmap is under NDA.', 'deal the roadmap is under nda.', 8);
+";
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cloud_run_never_receives_a_sensitive_call_or_source_from_search() {
+    let rig = rig_with(HOLD).await;
+    rig.exec(DOCS);
+    let (local, lconfig) = rig.local("run_l");
+    let mut local = Mcp::start(&lconfig, &local).await;
+    let (_, token, config) = rig.cloud(None, &["Anna"]).await;
+    let mut cloud = Mcp::start(&config, &token).await;
+
+    // Local: the sensitive call and the sensitive source are both there.
+    let calls = local
+        .tool("search_calls", json!({ "query": "hidden" }))
+        .await
+        .unwrap();
+    assert_eq!(calls["hits"][0]["call_id"], "call_s");
+    let docs = local
+        .tool("search_documents", json!({ "query": "roadmap" }))
+        .await
+        .unwrap();
+    let titles: Vec<&str> = docs["hits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| h["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles.len(), 2, "{docs}");
+
+    // Cloud: neither, and the audit row says a result was released.
+    let calls = cloud
+        .tool("search_calls", json!({ "query": "hidden" }))
+        .await
+        .unwrap();
+    assert!(calls["hits"].as_array().unwrap().is_empty(), "{calls}");
+    let docs = cloud
+        .tool("search_documents", json!({ "query": "roadmap" }))
+        .await
+        .unwrap();
+    let hits = docs["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1, "{docs}");
+    assert_eq!(hits[0]["chunk_id"], "chunk_ok");
+    assert_eq!(hits[0]["document_id"], "doc_ok");
+    assert_eq!(hits[0]["source_name"], "Handbook");
+    assert_eq!(hits[0]["heading_path"], json!(["Plan", "Q4"]));
+    assert_eq!(docs["sensitive_skipped"], 1);
+    assert!(!docs.to_string().contains("NDA"));
+    assert!(!rig
+        .sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+        .is_empty());
+}
+
+// ── D1: the live-source relay ───────────────────────────────────────────────────────────────
+
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Mutex;
+
+use noter_core::{BoxFuture, Listing, McpError, McpPage as Page, McpSource};
+use noter_llm::{Privacy, TaskKind};
+use noter_protocol::PrivacyMode;
+
+/// The scripted MCP servers, noting how many `lookup` audit rows were committed whenever a
+/// request reached a server, and holding a request open when asked.
+struct Spy {
+    inner: noter_core::ScriptedMcp,
+    db: PathBuf,
+    /// `lookup` rows committed at each request that reached a server.
+    seen: Mutex<Vec<i64>>,
+    hold: AtomicBool,
+    answered: AtomicUsize,
+}
+
+impl Spy {
+    fn note(&self) {
+        let rows = noter_db::rusqlite::Connection::open(&self.db)
+            .unwrap()
+            .query_row(
+                "SELECT count(*) FROM audit_log WHERE kind = 'lookup'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        self.seen.lock().unwrap().push(rows);
+    }
+}
+
+impl McpSource for Spy {
+    fn oauth<'a>(&'a self, server: &'a str) -> BoxFuture<'a, Result<String, McpError>> {
+        self.inner.oauth(server)
+    }
+
+    fn list_resources<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+    ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
+        self.inner.list_resources(server, token)
+    }
+
+    fn read_resource<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        uri: &'a str,
+    ) -> BoxFuture<'a, Result<Page, McpError>> {
+        Box::pin(async move {
+            self.note();
+            let page = self.inner.read_resource(server, token, uri).await;
+            self.answered.fetch_add(1, Ordering::SeqCst);
+            page
+        })
+    }
+
+    fn seed_query<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        query: &'a str,
+    ) -> BoxFuture<'a, Result<Listing, McpError>> {
+        Box::pin(async move {
+            self.note();
+            if self.hold.load(Ordering::SeqCst) {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            }
+            let found = self.inner.seed_query(server, token, query).await;
+            self.answered.fetch_add(1, Ordering::SeqCst);
+            found
+        })
+    }
+}
+
+/// A core whose MCP servers are `tracker.example` (one page), seeded with a live source for
+/// it, a sensitive live source, an indexed one, and one limited to stand-ups.
+async fn relay_rig() -> (Rig, Arc<Spy>) {
+    let spy = Arc::new(std::sync::OnceLock::new());
+    let shared = spy.clone();
+    let rig = rig_mcp(&[HOLD; 12].join("\n"), move |dir| {
+        let inner = noter_core::ScriptedMcp::default();
+        inner.set(
+            "tracker.example",
+            noter_core::ScriptedServer {
+                pages: vec![noter_core::ScriptedPage {
+                    uri: "tracker://AB-1".into(),
+                    title: "AB-1 importer".into(),
+                    hash: None,
+                    text: "The importer ticket.".into(),
+                    mime: None,
+                }],
+                ..Default::default()
+            },
+        );
+        let made = Arc::new(Spy {
+            inner,
+            db: dir.join("noter.db"),
+            seen: Mutex::default(),
+            hold: AtomicBool::new(false),
+            answered: AtomicUsize::new(0),
+        });
+        let _ = shared.set(made.clone());
+        made
+    })
+    .await;
+    rig.exec(
+        r#"INSERT INTO sources (id, rev, kind, mode, name, location, privacy_class, scope, status) VALUES
+  ('src_l', 1, 'mcp', 'live', 'Work Tracker', 'tracker.example', 'normal', '{"type":"all_calls"}', '"ready"'),
+  ('src_v', 1, 'mcp', 'live', 'Vault', 'vault.example', 'sensitive', '{"type":"all_calls"}', '"ready"'),
+  ('src_i', 1, 'mcp', 'indexed', 'Wiki', 'wiki.example', 'normal', '{"type":"all_calls"}', '"ready"'),
+  ('src_s', 1, 'mcp', 'live', 'Standup Notes', 'notes.example', 'normal',
+   '{"type":"limited","call_types":["standup"],"people":[]}', '"ready"');"#,
+    );
+    (rig, spy.get().unwrap().clone())
+}
+
+fn ok_privacy() -> Privacy {
+    Privacy {
+        mode: PrivacyMode::CloudAllowed,
+        sensitive: false,
+        offline: false,
+    }
+}
+
+fn tools_of(config: &Path) -> Vec<String> {
+    let body: Value = serde_json::from_slice(&std::fs::read(config).unwrap()).unwrap();
+    serde_json::from_value(body["tools"].clone()).unwrap()
+}
+
+fn live_of(config: &Path) -> Vec<String> {
+    tools_of(config)
+        .into_iter()
+        .filter(|t| t.starts_with("live_"))
+        .collect()
+}
+
+impl Rig {
+    /// A router-started run (`task`, `privacy`) held open; `(run id, token, config, sender)`.
+    async fn run_under(
+        &self,
+        call: Option<&str>,
+        task: TaskKind,
+        privacy: Privacy,
+    ) -> (
+        String,
+        String,
+        PathBuf,
+        Arc<tokio::sync::watch::Sender<Privacy>>,
+    ) {
+        let tools = ALL.iter().map(|t| (*t).to_owned()).collect();
+        let (run, tx) = noter_core::testing::mcp_run_under(
+            &self.core,
+            call.map(CallId::new),
+            tools,
+            vec!["Anna".into()],
+            task,
+            privacy,
+        )
+        .await
+        .expect("the run starts");
+        (
+            run["run_id"].as_str().unwrap().to_owned(),
+            run["token"].as_str().unwrap().to_owned(),
+            PathBuf::from(run["config"].as_str().unwrap()),
+            tx,
+        )
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn live_tools_follow_the_policy_matrix_of_task_privacy_and_sensitive_context() {
+    let (rig, _) = relay_rig().await;
+    let both = ["live_work_tracker_search", "live_work_tracker_read"];
+    let rows = [
+        (TaskKind::Ask, ok_privacy(), true),
+        (TaskKind::PostCall, ok_privacy(), true),
+        (TaskKind::Live, ok_privacy(), false),
+        (
+            TaskKind::Ask,
+            Privacy {
+                mode: PrivacyMode::CloudRedacted,
+                ..ok_privacy()
+            },
+            false,
+        ),
+        (
+            TaskKind::Ask,
+            Privacy {
+                mode: PrivacyMode::LocalOnly,
+                ..ok_privacy()
+            },
+            false,
+        ),
+        (
+            TaskKind::Ask,
+            Privacy {
+                sensitive: true,
+                ..ok_privacy()
+            },
+            false,
+        ),
+        (
+            TaskKind::PostCall,
+            Privacy {
+                offline: true,
+                ..ok_privacy()
+            },
+            false,
+        ),
+    ];
+    for (i, (task, privacy, listed)) in rows.into_iter().enumerate() {
+        let (_, _, config, _tx) = rig.run_under(Some("call_a"), task, privacy).await;
+        let live = live_of(&config);
+        // Only the normal, in-scope live source: not the sensitive one, the indexed one, or the
+        // one limited to another call type.
+        let want: Vec<&str> = if listed { both.to_vec() } else { vec![] };
+        assert_eq!(live, want, "row {i}: {task:?} {privacy:?}");
+    }
+    // The runtime's own MCP config names the one noter-mcp server: no source, no address and
+    // no credential is in it.
+    let (run, token, config, _tx) = rig.run_under(None, TaskKind::Ask, ok_privacy()).await;
+    let body = std::fs::read_to_string(&config).unwrap();
+    for secret in [
+        "tracker.example",
+        "vault.example",
+        "wiki.example",
+        token.as_str(),
+    ] {
+        assert!(!body.contains(secret), "{secret} in the run config");
+    }
+    // Unbound to a call, a source limited to stand-ups is the run's too.
+    assert!(live_of(&config).contains(&"live_standup_notes_search".to_owned()));
+    // The binary lists them with a fixed schema.
+    let mut mcp = Mcp::start(&config, &token).await;
+    let listed = mcp.rpc("tools/list", json!({})).await;
+    let tool = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "live_work_tracker_search")
+        .expect("the relayed tool is listed")
+        .clone();
+    assert_eq!(tool["inputSchema"]["required"], json!(["query"]));
+    let _ = run;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_relayed_lookup_has_its_audit_row_before_the_request_and_keeps_its_provenance() {
+    let (rig, spy) = relay_rig().await;
+    let (run, token, config, _tx) = rig
+        .run_under(Some("call_a"), TaskKind::Ask, ok_privacy())
+        .await;
+    let mut mcp = Mcp::start(&config, &token).await;
+
+    let found = mcp
+        .tool("live_work_tracker_search", json!({ "query": "importer" }))
+        .await
+        .unwrap();
+    assert_eq!(found["source"], "Work Tracker");
+    assert_eq!(found["looked_up_at"], NOW);
+    assert_eq!(found["results"][0]["uri"], "tracker://AB-1");
+    let page = mcp
+        .tool("live_work_tracker_read", json!({ "uri": "tracker://AB-1" }))
+        .await
+        .unwrap();
+    assert_eq!(page["text"], "The importer ticket.");
+    assert_eq!(page["looked_up_at"], NOW);
+
+    // One `lookup` row per forwarding, committed before the server saw the request, linked to
+    // the run and its call, holding a size and a hash and never the request.
+    assert_eq!(*spy.seen.lock().unwrap(), [1, 2]);
+    let rows = rig.sql("SELECT * FROM audit_log WHERE kind = 'lookup' ORDER BY ts, rowid");
+    assert_eq!(rows.len(), 2);
+    for row in &rows {
+        assert_eq!(row["destination"], "tracker.example");
+        assert_eq!(row["llm_run_id"], run.as_str());
+        assert_eq!(row["call_id"], "call_a");
+        assert!(row["bytes_out"].as_i64().unwrap() > 0);
+        assert_eq!(row["payload_hash"].as_str().unwrap().len(), 64);
+        assert!(!row.to_string().contains("importer"), "{row}");
+    }
+    // The cloud run's results also passed the result gate.
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+            .len(),
+        2
+    );
+    // A source the run was not given is not a tool: sensitive, indexed, unknown.
+    for name in [
+        "live_vault_search",
+        "live_wiki_read",
+        "live_standup_notes_search",
+        "live_x_read",
+    ] {
+        assert_eq!(
+            mcp.tool(name, json!({ "query": "x", "uri": "x" })).await,
+            Err(-32001),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        mcp.tool("live_work_tracker_search", json!({ "nope": 1 }))
+            .await,
+        Err(-32602)
+    );
+    assert_eq!(
+        spy.seen.lock().unwrap().len(),
+        2,
+        "nothing else reached a server"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_lookup_whose_audit_row_cannot_commit_is_never_sent() {
+    let (rig, spy) = relay_rig().await;
+    let (_, token, config, _tx) = rig.run_under(None, TaskKind::PostCall, ok_privacy()).await;
+    rig.exec("CREATE TRIGGER lookup_down BEFORE INSERT ON audit_log WHEN NEW.kind = 'lookup' BEGIN SELECT RAISE(ABORT, 'disk'); END;");
+    let mut mcp = Mcp::start(&config, &token).await;
+    assert_eq!(
+        mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+            .await,
+        Err(-32603)
+    );
+    assert!(spy.seen.lock().unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn forwarding_stops_when_the_runs_privacy_changes() {
+    let (rig, spy) = relay_rig().await;
+    let (_, token, config, tx) = rig.run_under(None, TaskKind::Ask, ok_privacy()).await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+        .await
+        .unwrap();
+    for changed in [
+        Privacy {
+            mode: PrivacyMode::LocalOnly,
+            ..ok_privacy()
+        },
+        Privacy {
+            mode: PrivacyMode::CloudRedacted,
+            ..ok_privacy()
+        },
+        Privacy {
+            sensitive: true,
+            ..ok_privacy()
+        },
+    ] {
+        tx.send_replace(changed);
+        assert_eq!(
+            mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+                .await,
+            Err(-32001),
+            "{changed:?}"
+        );
+        assert_eq!(
+            mcp.tool("live_work_tracker_read", json!({ "uri": "tracker://AB-1" }))
+                .await,
+            Err(-32001)
+        );
+    }
+    assert_eq!(spy.seen.lock().unwrap().len(), 1);
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'lookup'")
+            .len(),
+        1
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_lookup_in_flight_when_the_run_is_cancelled_returns_nothing() {
+    let (rig, spy) = relay_rig().await;
+    spy.hold.store(true, Ordering::SeqCst);
+    let (run, token, config, _tx) = rig.run_under(None, TaskKind::Ask, ok_privacy()).await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    let call = tokio::spawn(async move {
+        mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+            .await
+    });
+    for _ in 0..100 {
+        if !spy.seen.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert_eq!(spy.seen.lock().unwrap().len(), 1, "the request is out");
+    assert!(rig.core.close_mcp_run(&run));
+    let answer = tokio::time::timeout(std::time::Duration::from_secs(5), call)
+        .await
+        .expect("the call ends with the run")
+        .unwrap();
+    assert!(answer.is_err(), "no result for a cancelled run: {answer:?}");
+    assert_eq!(spy.answered.load(Ordering::SeqCst), 0);
 }
