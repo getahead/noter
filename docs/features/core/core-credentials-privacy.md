@@ -45,7 +45,7 @@ design: docs/DESIGN-core.md
 
 - [ ] `p4` - **ID**: `cpt-noter-featstatus-core-credentials-privacy`
 
-- [ ] `p4` - `cpt-noter-feature-core-credentials-privacy`
+- [x] `p4` - `cpt-noter-feature-core-credentials-privacy`
 
 ## 1. Feature Context
 
@@ -54,6 +54,8 @@ design: docs/DESIGN-core.md
 The credentials service verifies API keys into the Keychain, drives separate Claude and ChatGPT sign-ins through their CLIs and reports runtime availability. It binds selected agents with Undo, installs missing CLIs as jobs and serves the Privacy pane over the existing append-only audit log. `storage_move` stays draft and is available only if Q4 results in an unsandboxed engine.
 
 > **M3 decisions (Backend Teamlead, 7 Nov 2026).** `storage_move` returns `not_implemented`: Q4 was decided on 20 Oct (the app is unsandboxed, the engine sandboxed) and the move does not ship, so only `inst-storage-guard` is implemented and ticked; the other storage steps and the storage DoD stay `[ ]` with the note "Q4: does not ship", and the command is outside the E2E denominator (38 provable commands) (TL-29). There is no `agents` table before `core-agents` (M4): `account_bind_agents` rejects every agent id with `not_found`, and with an empty `agent_ids` writes `default_for_new_agents` into the account's non-secret metadata as one undoable change; the sign-out fallback and the provider-ended pause act on the three `RuntimeSettings` roles (`live_copilot`, `post_call`, `search_answers`), switching a `claude_account`/`chatgpt_account` role to the matching API-key runtime through the logged settings writer, or marking it unavailable in `AccountsView` when no usable key exists; the per-agent switch lands with `core-agents` (option A cross-reference, TL-30, TL-27). Reading the Claude plan from the CLI (Q8) needs a real signed-in CLI and is an owner-Mac item: M3 ships the test-request fallback for both providers and `inst-check-spike` stays `[ ]` without holding the box (TL-31). `noter_llm::AccountCli` (`status`, `login`, `cancel`, `logout`, `install`) is the seam for the pinned CLIs; the harness scripts it through `harness.world_set` and the `--clock` (five-minute deadline), and real-CLI sign-in, sign-out and install on the owner's Mac are owner-gated (TL-32). Secret accounts are named in 3 (TL-33): a locked Keychain is `keychain_locked`, never a plaintext fallback. No table is added (TL-34).
+
+> **Delivered (#341 #344 #354 #360 #367).** The feature box (`cpt-noter-feature-core-credentials-privacy`, and 2.25 in the decomposition) ticks with these items open (all owner-gated or out of M3, none holds it). `cpt-noter-featstatus-core-credentials-privacy` stays `[ ]` because `cfs validate` refuses a ticked featstatus while the storage flow is unticked (`parent-checked-nested-unchecked`); it ticks only if the owner decides to drop or mark the storage flow: (1) the storage flow and DoD (Q4: does not ship; `storage_move` returns `not_implemented` and is outside the E2E denominator, TL-29); (2) `inst-check-spike`, so `check-account` stays `[ ]` (Q8, real signed-in CLI on the owner's Mac, TL-31); (3) AC 4, the per-agent switch (`core-agents`, M4, option A cross-reference, TL-30); (4) AC 7, the macOS half (Keychain, browser and panel on a real Mac) and real `CliAccounts` login and logout. Notes: (a) the 1.4 confirmation gap is resolved by recording `personal_use_confirmed` on a confirmed `account_signin_start`; `account_use_existing` reuses Claude only when that record exists. (b) The 300 s deadline is unit-proven on paused time; the story proves the clock-based late-success rejection. (c) The installers are pinned (Claude Code and Codex to the lower end of the tested range; Ollama by its package installer, which takes the latest). (d) The router does not refuse a paused account runtime (there is no per-role field to carry it), so a provider-ended account is paused through availability and the role fallback only. (e) Call-specific audit filtering stays the 1.4 contract limit.
 
 ### 1.2 Purpose
 
@@ -314,7 +316,7 @@ Within signing_in, `SignInStep` progresses through waiting_for_browser, signed_i
 
 ### Keychain keys and availability
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-keys`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-keys`
 
 The system **MUST** verify and store keys in Keychain, preserve a working key on failed replacement, publish versioned status-only account views and detect local-runtime readiness. Every window obeys manifest scope; removal from main or First run is refused. Keys remain the default and no assistant state ever gates capture.
 
@@ -365,7 +367,7 @@ The system **MUST** bind only selected agents and the requested default preferen
 
 ### Readable append-only audit
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-audit`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-credentials-privacy-audit`
 
 The system **MUST** page and export run, tool_result and lookup metadata by date without exposing raw payloads or changing the append-only log. Reads and export preserve run linkage and destinations so the gate's network-monitor evidence can be inspected. M3 exposes rows already written in M2; it does not introduce a second audit writer.
 
@@ -398,9 +400,9 @@ The system **MUST** keep `storage_move` draft and unavailable with a sandboxed e
 - [x] E2E against the real core, `cpt-noter-seq-first-run-connect-assistant`: a verified key or checked account appears connected; no-assistant Finish still opens Today and capture works.
 - [x] E2E against the real core, `cpt-noter-seq-settings-replace-api-key`: rejection, locked Keychain and corrected replacement report distinct states; secrets occur in no result, event, change row or diagnostic.
 - [x] E2E against the real core, `cpt-noter-seq-settings-sign-in-account`: both providers sign in independently; an injected clock tests timeout and late-success rejection; cancellation, offline and ineligible plans leave bindings untouched.
-- [ ] Selected-agent binding returns a change id; M2 Undo restores all selected runtime and default values; explicit sign-out falls back to the matching key or pauses, while provider-ended sessions stay bound and paused.
+- [ ] Selected-agent binding returns a change id (the per-agent switch lands with `core-agents` in M4, TL-30: until then the change id covers the default-for-new-agents value and the runtime roles); M2 Undo restores all selected runtime and default values; explicit sign-out falls back to the matching key or pauses, while provider-ended sessions stay bound and paused.
 - [x] E2E against the real core, `cpt-noter-seq-settings-check-privacy`: date-filtered audit rows and export preserve kind, run, bytes and destination; an empty log is empty; export contains no audio or raw payload. Call-specific server filtering remains the upstream gap in 1.4.
-- [ ] Missing and unsupported CLIs are distinguished; install-job progress and failed-install retry work through scripted seams without altering unrelated installs.
-- [x] All thirteen frozen commands succeed at least once in real-core E2E runs; native Keychain, browser and panel integration is checked on macOS. Native story tests use `test_cpt_noter_seq_…` names. Real-core part done in `m3-credentials-conformance` and `m3-stories-credentials`: all frozen credentials commands succeed there except `storage_move`, which is `not_implemented` (Q4, outside the denominator). The macOS Keychain, browser and panel check (and Q8, the real CLI) stays owner-gated.
+- [x] Missing and unsupported CLIs are distinguished; install-job progress and failed-install retry work through scripted seams without altering unrelated installs.
+- [ ] All thirteen frozen commands succeed at least once in real-core E2E runs; native Keychain, browser and panel integration is checked on macOS. Native story tests use `test_cpt_noter_seq_…` names. Real-core part done in `m3-credentials-conformance` and `m3-stories-credentials`: all frozen credentials commands succeed there except `storage_move`, which is `not_implemented` (Q4, outside the denominator). The macOS half (Keychain, browser and panel on a real Mac, and Q8, the real CLI) stays owner-gated, so this box stays `[ ]` until the owner checks it.
 - [ ] Sandboxed `storage_move` returns `not_implemented` and is not counted as a frozen command. If enabled by Q4, test success, cloud-folder rejection and copy-failure rollback.
-- [ ] `just gate-fast` and `just gate` pass; Q8 and the confirmation and call-filter contract limits are not represented as completed implementation.
+- [x] `just gate-fast` and `just gate` pass; Q8 and the confirmation and call-filter contract limits are not represented as completed implementation.

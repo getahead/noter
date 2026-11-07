@@ -25,6 +25,7 @@ pub(crate) fn cli_code(e: CliError) -> CoreError {
 
 impl Core {
     // @cpt-flow:cpt-noter-flow-core-credentials-privacy-keys:p1
+    // @cpt-dod:cpt-noter-dod-core-credentials-privacy-keys:p1
     pub(crate) async fn remove_key(
         &self,
         ctx: &noter_protocol::ipc::CommandCtx,

@@ -1387,9 +1387,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.25 Credentials, own accounts and the Privacy pane - MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-core-credentials-privacy`
+- [x] `p4` - **ID**: `cpt-noter-feature-core-credentials-privacy`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-credentials-privacy.md](features/core/core-credentials-privacy.md)
+- **Milestone**: M3 · **Lane**: core · **Status**: IMPLEMENTED (#341 #344 #354 #360 #367). FEATURE spec: [features/core/core-credentials-privacy.md](features/core/core-credentials-privacy.md)
 
 - **Purpose**: Keys in the Keychain, the own-account sign-in driven through the CLI, CLI install, the Privacy pane over the audit log, and the storage move if the engine ships unsandboxed.
 
@@ -1409,11 +1409,11 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p4` - `cpt-noter-principle-core-egress-gate`
+  - `cpt-noter-principle-core-egress-gate`
 
 - **Design Constraints Covered**:
 
-  - [ ] `p4` - `cpt-noter-constraint-core-api-keys`
+  - `cpt-noter-constraint-core-api-keys`
 
 - **Domain Model Entities**:
   - Credentials
@@ -1421,7 +1421,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-core-credentials`
+  - `cpt-noter-component-core-credentials`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `api_key_remove`, `account_signin_prepare`, `cli_install`, `account_signin_start`, `account_signin_cancel`, `account_use_existing`, `account_bind_agents`, `account_test`, `account_sign_out`, `audit_list`, `audit_export`, `storage_move`
