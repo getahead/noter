@@ -104,11 +104,11 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 - Missing token or socket: no tool can read data; a server failure becomes a runtime tool failure without a direct database fallback.
 
 **Steps**:
-1. [ ] - `p1` - Router registers trusted run id, optional call, effective privacy, cloud status, allowed tools and a fresh token in the core - `inst-start-register`
-2. [ ] - `p1` - Write the Noter-owned `run/mcp/<run_id>.json` and provide `NOTER_MCP_TOKEN` to the child; restrict config and socket files to the user - `inst-start-config`
-3. [ ] - `p1` - CLI starts the signed `noter-mcp` binary as a stdio child under its existing isolated run policy; no user hooks, plugins or unrelated MCP servers are loaded - `inst-start-child`
-4. [ ] - `p1` - Serve MCP initialization and `tools/list` from exported protocol schemas; stdout contains only MCP messages and diagnostics use scrubbed stderr - `inst-start-tools`
-5. [ ] - `p1` - Connect to `$APP_SUPPORT/run/core.sock` (0600); **RETURN** readiness to the CLI without opening a TCP port - `inst-start-return`
+1. [x] - `p1` - Router registers trusted run id, optional call, effective privacy, cloud status, allowed tools and a fresh token in the core - `inst-start-register`
+2. [x] - `p1` - Write the Noter-owned `run/mcp/<run_id>.json` and provide `NOTER_MCP_TOKEN` to the child; restrict config and socket files to the user - `inst-start-config`
+3. [ ] - `p1` - CLI starts the signed `noter-mcp` binary as a stdio child under its existing isolated run policy; no user hooks, plugins or unrelated MCP servers are loaded (slice 2: the CLI adapters start it under the lockdown config) - `inst-start-child`
+4. [x] - `p1` - Serve MCP initialization and `tools/list` from exported protocol schemas; stdout contains only MCP messages and diagnostics use scrubbed stderr - `inst-start-tools`
+5. [x] - `p1` - Connect to `$APP_SUPPORT/run/core.sock` (0600); **RETURN** readiness to the CLI without opening a TCP port - `inst-start-return`
 
 ### Look up library evidence
 
@@ -124,13 +124,13 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 - Invalid params: −32602; unauthenticated or forbidden runtime/tool: −32001; missing entity: −32002; internal or audit failure: −32603 without a result payload.
 
 **Steps**:
-1. [ ] - `p1` - Receive a typed MCP call; forward `CoreSocketRequest` with method, request id, context and params over the Unix socket - `inst-read-forward`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-mcp-authorize`; reject before any data lookup if token or policy is invalid - `inst-read-authorize`
-3. [ ] - `p1` - Dispatch `search_calls` or `search_documents` to shared retrieval; call search defaults to eight hits and caps at 30 - `inst-read-search`
-4. [ ] - `p1` - Dispatch `get_transcript_span`, `get_person`, `get_decisions` or `get_open_items` to the core's existing read services; resolve person id or normalized name/alias and apply the run's filters to all related rows - `inst-read-entities`
-5. [ ] - `p1` - For `get_screen_context`, return empty v1 chips; never capture a screen as a tool side effect - `inst-read-screen`
-6. [ ] - `p1` - Run `cpt-noter-algo-core-mcp-release-result` for the entire assembled result, including person recent-call and open-item fields - `inst-read-gate`
-7. [ ] - `p1` - **RETURN** `CoreSocketResponse` with the original request id and exactly one result or error; map it back to MCP without changing evidence ids - `inst-read-return`
+1. [x] - `p1` - Receive a typed MCP call; forward `CoreSocketRequest` with method, request id, context and params over the Unix socket - `inst-read-forward`
+2. [x] - `p1` - Run `cpt-noter-algo-core-mcp-authorize`; reject before any data lookup if token or policy is invalid - `inst-read-authorize`
+3. [ ] - `p1` - Dispatch `search_calls` or `search_documents` to shared retrieval; call search defaults to eight hits and caps at 30 (slice 2) - `inst-read-search`
+4. [x] - `p1` - Dispatch `get_transcript_span`, `get_person`, `get_decisions` or `get_open_items` to the core's existing read services; resolve person id or normalized name/alias and apply the run's filters to all related rows - `inst-read-entities`
+5. [x] - `p1` - For `get_screen_context`, return empty v1 chips; never capture a screen as a tool side effect - `inst-read-screen`
+6. [ ] - `p1` - Run `cpt-noter-algo-core-mcp-release-result` for the entire assembled result, including person recent-call and open-item fields (slice 2: until it lands a cloud run gets −32603 and no result) - `inst-read-gate`
+7. [x] - `p1` - **RETURN** `CoreSocketResponse` with the original request id and exactly one result or error; map it back to MCP without changing evidence ids - `inst-read-return`
 
 ### Stage a pin or correction
 
@@ -175,19 +175,19 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 ### Authenticate and authorize a socket request
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-mcp-authorize`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-mcp-authorize`
 
 **Input**: `CoreSocketRequest`, registered active run context, current privacy and source policy.
 
 **Output**: Trusted dispatch context or JSON-RPC error.
 
 **Steps**:
-1. [ ] - `p1` - Validate JSON-RPC version, method and typed params; reject malformed fields, invalid spans or limits with −32602 - `inst-auth-params`
-2. [ ] - `p1` - Resolve the token against active runs using a comparison that does not disclose token prefixes; reject absent, unknown or expired tokens with −32001 - `inst-auth-token`
-3. [ ] - `p1` - Require the request's run and call context to match the registered token; ignore child claims that would weaken cloud, privacy or scope restrictions - `inst-auth-context`
-4. [ ] - `p1` - Check the run's tool allow-list and current privacy; disallow live source tools for ticks or any mode other than Cloud allowed - `inst-auth-tool`
-5. [ ] - `p1` - Resolve each referenced entity under those restrictions; reject missing references with −32002 and forbidden references with −32001, without disclosing their content - `inst-auth-entity`
-6. [ ] - `p1` - **RETURN** trusted context to the core dispatcher; no client-held context can authorize a broader read - `inst-auth-return`
+1. [x] - `p1` - Validate JSON-RPC version, method and typed params; reject malformed fields, invalid spans or limits with −32602 - `inst-auth-params`
+2. [x] - `p1` - Resolve the token against active runs using a comparison that does not disclose token prefixes; reject absent, unknown or expired tokens with −32001 - `inst-auth-token`
+3. [x] - `p1` - Require the request's run and call context to match the registered token; ignore child claims that would weaken cloud, privacy or scope restrictions - `inst-auth-context`
+4. [x] - `p1` - Check the run's tool allow-list and current privacy; disallow live source tools for ticks or any mode other than Cloud allowed - `inst-auth-tool`
+5. [x] - `p1` - Resolve each referenced entity under those restrictions; reject missing references with −32002 and forbidden references with −32001, without disclosing their content - `inst-auth-entity`
+6. [x] - `p1` - **RETURN** trusted context to the core dispatcher; no client-held context can authorize a broader read - `inst-auth-return`
 
 ### Release a result through the egress gate
 
@@ -223,34 +223,34 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 ### Close a run and revoke access
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-mcp-close`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-mcp-close`
 
 **Input**: Run completion, cancellation, timeout, CLI exit, stdio EOF or core shutdown.
 
 **Output**: Closed child/socket resources and an unusable token.
 
 **Steps**:
-1. [ ] - `p1` - Revoke the run token before accepting further work and cancel outstanding tool and relay tasks - `inst-close-revoke`
-2. [ ] - `p1` - Close sockets and stdio, stop the child and relay transports, and release per-call caches and in-memory redaction references - `inst-close-resources`
-3. [ ] - `p1` - Remove secret-bearing per-run config files; do not erase committed audit or staged review records - `inst-close-files`
-4. [ ] - `p1` - Reject late results and replayed token requests without returning evidence - `inst-close-late`
-5. [ ] - `p1` - **RETURN** closed; startup cleanup discards stale configs whose runs no longer exist - `inst-close-return`
+1. [x] - `p1` - Revoke the run token before accepting further work and cancel outstanding tool and relay tasks - `inst-close-revoke`
+2. [x] - `p1` - Close sockets and stdio, stop the child and relay transports, and release per-call caches and in-memory redaction references; the child and relay transports stop with slice 2 - `inst-close-resources`
+3. [x] - `p1` - Remove secret-bearing per-run config files; do not erase committed audit or staged review records - `inst-close-files`
+4. [x] - `p1` - Reject late results and replayed token requests without returning evidence - `inst-close-late`
+5. [x] - `p1` - **RETURN** closed; startup cleanup discards stale configs whose runs no longer exist - `inst-close-return`
 
 ## 4. States (CDSL)
 
 ### Tool session lifecycle
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-mcp-session`
+- [x] `p4` - **ID**: `cpt-noter-state-core-mcp-session`
 
 **States**: registered, active, closing, closed
 
 **Initial State**: registered after trusted run/token creation
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** registered **TO** active **WHEN** the CLI child initializes and authenticates to the local socket - `inst-session-active`
-2. [ ] - `p1` - **FROM** registered **TO** closing **WHEN** child startup fails or the run is cancelled before initialization - `inst-session-start-failed`
-3. [ ] - `p1` - **FROM** active **TO** closing **WHEN** the run finishes, times out, is cancelled, loses its CLI or core shutdown begins; revoke the token first - `inst-session-closing`
-4. [ ] - `p1` - **FROM** closing **TO** closed **WHEN** child, socket, relay and per-run secret config cleanup completes - `inst-session-closed`
+1. [x] - `p1` - **FROM** registered **TO** active **WHEN** the CLI child initializes and authenticates to the local socket - `inst-session-active`
+2. [x] - `p1` - **FROM** registered **TO** closing **WHEN** child startup fails or the run is cancelled before initialization - `inst-session-start-failed`
+3. [x] - `p1` - **FROM** active **TO** closing **WHEN** the run finishes, times out, is cancelled, loses its CLI or core shutdown begins; revoke the token first - `inst-session-closing`
+4. [x] - `p1` - **FROM** closing **TO** closed **WHEN** child, socket, relay and per-run secret config cleanup completes - `inst-session-closed`
 
 Closed sessions cannot be reopened with their old token. Another run gets a new token and configuration. No persistent authentication or data cache belongs to the child.
 

@@ -2328,3 +2328,59 @@ async fn native_launch_environment_drives_denial_copy_and_terminal_fallback() {
         r.finish().await;
     }
 }
+
+// TL-38: `harness.mcp_run` registers a run as the router will and serves the core socket, so a
+// conformance test can speak to it; `harness.mcp_close` revokes it.
+#[tokio::test]
+async fn mcp_run_registers_a_run_on_the_core_socket_and_mcp_close_revokes_it() {
+    use tokio::io::AsyncReadExt;
+    let mut r = start().await;
+    let run = r
+        .ok(
+            "main",
+            "harness.mcp_run",
+            json!({ "tools": ["get_screen_context", "search_calls"] }),
+        )
+        .await;
+    let config = std::path::PathBuf::from(run["config"].as_str().unwrap());
+    let body: Value = serde_json::from_slice(&std::fs::read(&config).unwrap()).unwrap();
+    assert_eq!(body["tools"], json!(["get_screen_context"]));
+    assert_eq!(body["socket"], run["socket"]);
+
+    let ask = |id: u64| {
+        json!({ "jsonrpc": "2.0", "id": id, "method": "get_screen_context",
+                "params": { "call_id": "call_backend" },
+                "context": { "token": run["token"], "llm_run_id": run["run_id"],
+                             "call_id": null, "cloud": false } })
+    };
+    let call = |req: Value| {
+        let socket = run["socket"].as_str().unwrap().to_owned();
+        async move {
+            let mut s = tokio::net::UnixStream::connect(socket).await.unwrap();
+            s.write_all(format!("{req}\n").as_bytes()).await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let n = s.read(&mut buf).await.unwrap();
+            serde_json::from_slice::<Value>(&buf[..n]).unwrap()
+        }
+    };
+    assert_eq!(call(ask(1)).await["result"], json!({ "chips": [] }));
+
+    let closed = r
+        .ok(
+            "main",
+            "harness.mcp_close",
+            json!({ "run_id": run["run_id"] }),
+        )
+        .await;
+    assert_eq!(closed["closed"], true);
+    assert!(!config.exists());
+    assert_eq!(call(ask(2)).await["error"]["code"], -32001);
+    let again = r
+        .ok(
+            "main",
+            "harness.mcp_close",
+            json!({ "run_id": run["run_id"] }),
+        )
+        .await;
+    assert_eq!(again["closed"], false);
+}

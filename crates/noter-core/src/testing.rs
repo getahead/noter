@@ -154,3 +154,22 @@ pub async fn llm_run(
         "audit": audit,
     }))
 }
+
+/// `harness.mcp_run`: registers a run as the router will and serves the socket (once); answers
+/// `{ run_id, token, socket, config }`.
+pub async fn mcp_run(
+    core: &std::sync::Arc<Core>,
+    call_id: Option<noter_protocol::CallId>,
+    cloud: bool,
+    tools: Vec<String>,
+) -> Result<serde_json::Value, CoreError> {
+    let socket = core.serve_socket().await?;
+    let run_id = format!("run_{}", ulid::Ulid::generate().to_string().to_lowercase());
+    let (token, config) = core.register_mcp_run(crate::McpRegistration {
+        llm_run_id: run_id.clone(),
+        call_id,
+        cloud,
+        tools,
+    })?;
+    Ok(serde_json::json!({ "run_id": run_id, "token": token, "socket": socket, "config": config }))
+}
