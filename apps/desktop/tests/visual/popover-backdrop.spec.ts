@@ -56,11 +56,21 @@ for (const colorScheme of ["light", "dark"] as const) {
     await openWindow(page, "main", { world: w => { W.idle(w); w.app.setup.self_test = { type: "passed", at: 1 }; } });
     await navigate(page, "transcript", S.CALL);
     const text = page.locator(".cw-seg__text").first();
-    await text.dblclick();
-    await text.click({ button: "right" });
+    // Select a fixed word: double-clicking the line centre can select whitespace
+    // at different font metrics; these tests exercise material, not selection.
+    await text.evaluate(el => {
+      const start = el.textContent!.indexOf("open");
+      const range = document.createRange();
+      range.setStart(el.firstChild!, start);
+      range.setEnd(el.firstChild!, start + 4);
+      getSelection()!.removeAllRanges();
+      getSelection()!.addRange(range);
+    });
+    await text.dispatchEvent("contextmenu");
     await page.getByRole("menuitem", { name: "Fix Term…", exact: true }).click();
     const popover = page.getByRole("dialog", { name: "Fix term" });
     await expect(popover).toBeVisible();
+    await expect(popover.getByRole("textbox", { name: "Correct term" })).toHaveValue("open");
     await expect(popover).toHaveCSS("background-color", colorScheme === "light" ? "rgb(255, 255, 255)" : "rgb(42, 42, 42)");
     await popover.evaluate(el => (el.querySelector("input") as HTMLElement)?.blur());
     const screenshot = testInfo.outputPath(`fix-term-${colorScheme}.png`);
