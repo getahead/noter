@@ -117,6 +117,28 @@ it("Use Local Model (regenerate with local) makes the local model the section's 
   expect(after.sections.filter((x) => x.kind !== "summary").every((x) => x.writer?.runtime !== "local")).toBe(true);
 });
 
+// @cpt-flow:cpt-noter-flow-ui-call-page-outputs-regenerate:p1
+it("a rejected suggestion leaves its section and counts as suppressed in that section only, on both cores", async () => {
+  s = openScenario({
+    alsoRecord: exercised,
+    world: (w) => {
+      W.idle(w);
+      for (const i of [...w.items, ...w.outputs.flatMap((o) => o.sections.flatMap((x) => x.items))]) if (i.id === "itm_token") i.review = "suggested";
+    },
+  });
+  const main = s.core("main");
+  const before = ok(await main.outputsGet({ call_id: CALL })).sections;
+  expect(before.every((x) => x.suppressed_count === 0)).toBe(true);
+  const row = before.flatMap((x) => x.items).find((i) => i.id === "itm_token")!;
+  const home = before.find((x) => x.items.some((i) => i.id === row.id))!;
+  ok(await main.itemReview({ item_id: row.id, rev: row.rev, decision: "reject" }));
+  const after = ok(await main.outputsGet({ call_id: CALL })).sections;
+  const section = after.find((x) => x.kind === home.kind)!;
+  expect(section.suppressed_count).toBe(1);
+  expect(section.items.map((i) => i.id)).not.toContain(row.id);
+  expect(after.filter((x) => x.kind !== home.kind).every((x) => x.suppressed_count === 0)).toBe(true);
+});
+
 // @cpt-flow:cpt-noter-flow-ui-speakers-post-call:p1
 it.each(["rename", "name"] as const)("speaker %s publishes names_updated and regeneration clears it on both cores", async (method) => {
   s = openScenario({ alsoRecord: exercised, world: W.idle });
