@@ -2466,3 +2466,80 @@ async fn a_scripted_mcp_server_signs_in_and_its_pages_are_indexed() {
     assert_eq!(revoked["has_token"], json!(false));
     r.finish().await;
 }
+
+// 2.22 ACs on the real core (TL-48): the rebuild held keyword-only, then released to hybrid.
+#[tokio::test]
+async fn hold_rebuild_keeps_search_keyword_only_until_the_release_rebuilds() {
+    let mut r = start().await;
+    let search = json!({"query": "Ann agreed to ship the importer", "filter": {}, "limit": null});
+    r.ok("main", "harness.hold_rebuild", json!({"on": true}))
+        .await;
+    let held = r.ok("main", "search", search.clone()).await;
+    assert_eq!(
+        held["mode"],
+        json!({"type": "keyword_only", "rebuild_progress": 0.0})
+    );
+    assert_eq!(held["explain"]["semantic_hits"], 0);
+    r.ok("main", "harness.hold_rebuild", json!({"on": false}))
+        .await;
+    for _ in 0..250 {
+        let found = r.ok("main", "search", search.clone()).await;
+        if found["mode"]["type"] == "hybrid" {
+            return r.finish().await;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("the released rebuild never made search hybrid");
+}
+
+#[tokio::test]
+async fn hold_rebuild_needs_on() {
+    let mut r = start().await;
+    assert_eq!(
+        r.code("main", "harness.hold_rebuild", json!({})).await,
+        "invalid_input"
+    );
+}
+
+// The next answer of one skill, once; then the script (here: the built-in output) again.
+#[tokio::test]
+async fn llm_next_answers_the_next_run_of_its_skill_once() {
+    let mut r = start().await;
+    let summary = json!({"lang": "en", "summary_md": "From llm_next.", "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": [], "extras_md": null});
+    let run = json!({"skill": "post-call"});
+    r.ok(
+        "main",
+        "harness.llm_next",
+        json!({"skill": "post-call", "output": summary}),
+    )
+    .await;
+    let ran = r.ok("main", "harness.llm_run", run.clone()).await;
+    assert_eq!(ran["output"]["summary_md"], "From llm_next.");
+    let ran = r.ok("main", "harness.llm_run", run.clone()).await;
+    assert_eq!(ran["output"]["summary_md"], "Scripted summary.");
+    r.ok(
+        "main",
+        "harness.llm_next",
+        json!({"skill": "post-call", "fail": "rate_limited"}),
+    )
+    .await;
+    assert_ne!(
+        r.call("main", "harness.llm_run", run).await.0["error"],
+        Value::Null
+    );
+}
+
+#[tokio::test]
+async fn llm_next_refuses_an_unknown_skill_or_both_output_and_fail() {
+    let mut r = start().await;
+    for bad in [
+        json!({"skill": "nope", "fail": "rate_limited"}),
+        json!({"skill": "post-call", "output": {}, "fail": "rate_limited"}),
+        json!({"output": {}}),
+    ] {
+        assert_eq!(
+            r.code("main", "harness.llm_next", bad).await,
+            "invalid_input"
+        );
+    }
+}
