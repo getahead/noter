@@ -284,7 +284,7 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
       for (const c of [w.calls.find((x) => x.id === W.PAST_CALL)!, w.call_details.find((d) => d.call.id === W.PAST_CALL)!.call]) Object.assign(c, { audio_deleted: true, audio_deleted_at: 1_790_000_000_000 });
     });
     await button(rowOf(page, DECISION), TIME).click();
-    await expect(page.getByText(/Audio deleted · transcript kept/)).toBeVisible();
+    await expect(page.getByText(/Audio deleted on .+ · transcript kept/).first()).toBeVisible(); // the Transcript header names the day
     await expect(page.getByRole("button", { name: /^Play/ })).toHaveCount(0);
   });
 
@@ -305,7 +305,7 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     });
     await button(rowOf(page, DECISION), "Edit").click();
     await button(page.locator(INSPECTOR), TIME).click();
-    await expect(page.getByText(/Audio deleted · transcript kept/).first()).toBeVisible();
+    await expect(page.getByText(/Audio deleted on .+ · transcript kept/).first()).toBeVisible(); // the Transcript header names the day
     await expect(page.getByRole("button", { name: /^Play/ })).toHaveCount(0);
   });
 

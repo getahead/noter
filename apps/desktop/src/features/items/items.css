@@ -43,6 +43,7 @@
 .ii-details { display: grid; gap: 10px; }
 .ii-actions { display: flex; align-items: center; gap: 6px; }
 .ii-helper { margin: 0; font-size: 12px; }
+.it-row__end { display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .ii-evidence-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .ii-evidence { display: flex; align-items: baseline; gap: 8px; }
 .ii-error { color: var(--error); }
