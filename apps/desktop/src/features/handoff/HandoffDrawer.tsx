@@ -7,6 +7,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { HandoffTarget, HandoffView, ItemView, LaunchPath, UiPrefs } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { useSheetIfAny } from "../../ui/dialogs/host";
 import { Icon } from "../../ui/icons";
 import { Badge } from "../../ui/primitives/badge";
 import { Progress } from "../../ui/primitives/progress";
@@ -16,9 +17,10 @@ import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { clock, shortDay } from "../call-page/logic";
 import { useOutputs } from "../call-page/outputs-cache";
 import { closeInspector } from "../shell/inspector-override";
-import { cancel, copy, generate, load, open, setTarget } from "./actions";
+import { cancel, copy, generate, load, loadContext, open, refreshHandoff, setTarget } from "./actions";
 import { copyEnabled, drawerState, footer, launchLine, noMapping, openDisabledReason, openLabel, promptOf, schemeHelp, toolLabel, type DrawerState } from "./controls";
 import { patchLocal, useLocal, type Local } from "./local";
+import { useRepos } from "./mappings";
 import { PromptEditor } from "./PromptEditor";
 import "./handoff.css";
 
@@ -37,6 +39,8 @@ export function recordLine(item: ItemView, view: HandoffView, local: Local, pref
 
 // @cpt-component:cpt-noter-component-ui-handoff-drawer:p1
 export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: string }) {
+  const sheets = useSheetIfAny();
+  const repos = useRepos(bridge);
   const stored = useWindow(bridge, (s) => s.entities.handoff[itemId]);
   const local = useLocal(itemId);
   const view = local.restored ?? stored;
@@ -48,6 +52,16 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => void load(bridge, itemId), [bridge, itemId]);
+  useEffect(() => { if (callId) void loadContext(bridge, callId); }, [bridge, callId]);
+  useEffect(() => { if (repos) void refreshHandoff(bridge, itemId); }, [bridge, itemId, repos]);
+  const focusRepository = () => root.current?.querySelector<HTMLElement>('[data-region="HD-R3"] select, [data-region="HD-R3"] button')?.focus();
+  const addMapping = () => sheets?.open("add-mapping", {
+    bridge, sourceKey: view?.unmapped_key ?? "", fromHandoff: true, returnFocus: focusRepository,
+    onSaved: async () => {
+      await refreshHandoff(bridge, itemId);
+      requestAnimationFrame(focusRepository);
+    },
+  });
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-open
   const loaded = !!view;
   useEffect(() => void (loaded && root.current?.querySelector<HTMLElement>('[data-region="HD-R2"] [tabindex="0"]')?.focus()), [loaded]);
@@ -81,8 +95,8 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
   }, []);
   // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-return
 
-  const generating = state === "GENERATING" || state === "NOT_GENERATED" || state === "LOADING";
-  const variant = sensitive ? "sensitive-call" : view?.item.review === "suggested" ? "suggested-item" : view?.default_action === "copy_prompt" ? "someone-elses-item" : view?.target === "codex" ? "codex" : "claude-code";
+  const generating = state === "GENERATING" || state === "LOADING";
+  const variant = sensitive ? "sensitive-call" : item?.review === "suggested" ? "suggested-item" : view?.default_action === "copy_prompt" ? "someone-elses-item" : view?.target === "codex" ? "codex" : "claude-code";
   const launchId = elementId("hl", itemId);
   const record = view && recordLine(item ?? view.item, view, local, prefs);
   const tool = view ? toolLabel(view.target) : "";
@@ -96,6 +110,8 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
         {local.loadFailed !== "not_found" && <PushButton label={t("handoff.try_again")} size="small" variant="quiet" onAction={() => void load(bridge, itemId)} />}
       </div>
     );
+  else if (state === "NOT_GENERATED")
+    prompt = <div className="hd-gen"><span>{t("handoff.not_written")}</span><PushButton label={t("handoff.write_prompt")} size="small" onAction={() => void generate(bridge, itemId, false)} /></div>;
   else if (state === "GENERATION_FAILED")
     prompt = (
       <div className="hd-fail" role="alert">
@@ -149,19 +165,24 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
               <span className="hd__lab">{t("handoff.target")}</span>
               <SegmentedControl variant="option" label={t("handoff.target")} items={TARGETS.map((value) => ({ value, label: toolLabel(value), disabled: !!local.pending }))} value={view.target} onAction={(v) => void setTarget(bridge, itemId, v as HandoffTarget)} />
             </div>
-            <div className="hd__row" data-region="HD-R3">
+            <div className={view.repo ? "hd__row" : "hd__row hd__row--top"} data-region="HD-R3">
               <span className="hd__lab">{t("handoff.repository")}</span>
               {view.repo ? (
-                <PopupButton label={t("handoff.repository")} options={[{ value: view.repo.id, label: `${view.repo.local_path} (${view.repo.key})` }]} value={view.repo.id} />
+                <PopupButton label={t("handoff.repository")} options={[
+                  { value: view.repo.id, label: `${view.repo.local_path} (${view.repo.key})` },
+                  ...(repos?.mappings ?? []).filter((repo) => repo.id !== view.repo!.id).map((repo) => ({ value: repo.id, label: `${repo.local_path} (${repo.key})`, disabled: true })),
+                  { value: "add", label: t("mapping.add_more") },
+                ]} value={view.repo.id} onAction={(value) => { if (value === "add") addMapping(); }} />
               ) : (
-                <span className="hd__warn">
+                <span className="hd__warn hd__warn--line">
                   <Icon name="warning" size={12} />
-                  {noMapping(view)}
+                  <span className="hd__warn-text">{noMapping(view)} <PushButton label={t("mapping.add_more")} size="small" variant="quiet" onAction={addMapping} /></span>
                 </span>
               )}
             </div>
           </>
         )}
+        {view?.repo && !view.repo.path_exists && <p className="hd__warn">{t("handoff.disabled.path")} <PushButton label={t("handoff.mapping_settings")} size="small" variant="quiet" onAction={() => void bridge.core.windowNavigate({ target: { type: "settings", pane: "repositories" } })} /></p>}
         <div data-region="HD-R4">{prompt}</div>
         {view && state !== "GENERATING" && (
           <p className="hd__launch" id={launchId} data-region="HD-R5" title={schemeHelp(view.launch.path)}>
@@ -187,7 +208,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             {local.error}
           </p>
         )}
-        {view?.item.review === "suggested" && <p className="hd__accept">{t("handoff.accepts")}</p>}
+        {item?.review === "suggested" && <p className="hd__accept">{t("handoff.accepts")}</p>}
       </div>
       <footer className="hd__foot" data-region="HD-R7">
         {state === "OPEN_FAILED" && (

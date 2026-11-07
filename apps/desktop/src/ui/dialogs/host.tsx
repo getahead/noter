@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { AddMappingSheet } from "../../features/handoff/AddMappingSheet";
 import { askAlert, type AlertSpec } from "./alerts";
 import { DeleteOldAudioSheet } from "./delete-old-audio-sheet";
 import { ExportLogSheet } from "./export-log-sheet";
@@ -38,6 +39,7 @@ export function DialogsProvider({
 
 /** The sheets this feature delivers; features add theirs with `register`. */
 function withM1Sheets(s: Sheets) {
+  s.register("add-mapping", AddMappingSheet as never);
   s.register("delete-old-audio", DeleteOldAudioSheet as never);
   s.register("export-log", ExportLogSheet as never);
   return s;

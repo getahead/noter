@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { OutputSection, UiPrefs } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { Menu } from "../../ui/primitives/menu";
+import { Menu, type MenuItem } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { loadVersions } from "./outputs-actions";
@@ -25,12 +25,17 @@ export function VersionSwitcher({ bridge, section, prefs, showing, onShow, compa
     setOpen(!open);
   };
   const items = (versions?.versions ?? []).map((v) => ({ label: versionLabel(v, prefs), ...(v.id === showing ? { checked: true } : {}), onSelect: () => onShow(v.id) }));
+  return <VersionMenu id={id} label={t("outputs.version")} open={open} onToggle={toggle} onClose={() => setOpen(false)} items={[...items, { divider: true }, { label: comparing ? t("outputs.hide_diff") : t("outputs.compare"), onSelect: onCompare }]} />;
+}
+
+/** The same menu surface serves output versions and the handoff caption; owners supply only available actions. */
+export function VersionMenu({ id, label, ariaLabel, open, onToggle, onClose, items, caption }: { id: string; label: string; ariaLabel?: string; open: boolean; onToggle: () => void; onClose: () => void; items: MenuItem[]; caption?: boolean }) {
   return (
-    <span className="pc-ver">
-      <PullDownButton id={id} label={t("outputs.version")} buttonVariant="quiet" size="inline" open={open} onAction={toggle} />
+    <span className="pc-ver" data-variant={caption ? "caption" : undefined}>
+      <PullDownButton id={id} label={label} ariaLabel={ariaLabel} buttonVariant="quiet" size="inline" open={open} onAction={onToggle} />
       {open && (
-        <Popover variant="item-menu" anchor={globalThis.document?.getElementById(id) ?? null} align="end" label={t("outputs.version")} onClose={() => setOpen(false)}>
-          <Menu items={[...items, { divider: true }, { label: comparing ? t("outputs.hide_diff") : t("outputs.compare"), onSelect: onCompare }]} onClose={() => setOpen(false)} />
+        <Popover variant="item-menu" anchor={globalThis.document?.getElementById(id) ?? null} align="end" label={t("outputs.version")} onClose={onClose}>
+          <Menu items={items} onClose={onClose} />
         </Popover>
       )}
     </span>

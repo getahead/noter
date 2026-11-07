@@ -133,7 +133,7 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 
 ### Add, edit or remove a repository mapping
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-handoff-mapping`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-handoff-mapping`
 
 **Actor**: Primary user
 
@@ -146,14 +146,14 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 - A mapping removed in Settings invalidates the open drawer's launch plan.
 
 **Steps**:
-1. [ ] - `p1` - Read `repos_list` in Settings › Repositories and when a Handoff drawer needs mapping choices - `inst-list`
-2. [ ] - `p1` - User chooses Add Mapping…; dialog host opens dlg-mapping, preserves the source window and prefills unmapped_key from HandoffView - `inst-sheet`
-3. [ ] - `p1` - Require a non-empty project/component key and default tool; choose the folder through the core-owned folder panel, not a WebView filesystem read - `inst-choose`
-4. [ ] - `p1` - Add Mapping calls `repo_upsert` with no id; editing sends the existing mapping id; null local_path asks the core to show the folder panel - `inst-save`
-5. [ ] - `p1` - **IF** cancelled or invalid: keep the draft or show the returned field error; no success flash or launch - `inst-error`
-6. [ ] - `p1` - After success render returned mappings, refresh handoff_get and its LaunchPlan, then restore focus to the repository control - `inst-refresh`
-7. [ ] - `p1` - User removes a mapping from Settings only; `repo_remove` with its id returns the new list; refresh dependent drawer state - `inst-remove`
-8. [ ] - `p1` - **RETURN** the core mapping list; never infer a cwd from an issue-key string inside the UI - `inst-return`
+1. [x] - `p1` - Read `repos_list` in Settings › Repositories and when a Handoff drawer needs mapping choices - `inst-list`
+2. [x] - `p1` - User chooses Add Mapping…; dialog host opens dlg-mapping, preserves the source window and prefills unmapped_key from HandoffView - `inst-sheet`
+3. [x] - `p1` - Require a non-empty project/component key and default tool; choose the folder through the core-owned folder panel, not a WebView filesystem read - `inst-choose`
+4. [x] - `p1` - Add Mapping calls `repo_upsert` with no id; editing sends the existing mapping id; null local_path asks the core to show the folder panel - `inst-save`
+5. [x] - `p1` - **IF** cancelled or invalid: keep the draft or show the returned field error; no success flash or launch - `inst-error`
+6. [x] - `p1` - After success render returned mappings, refresh handoff_get and its LaunchPlan, then restore focus to the repository control - `inst-refresh`
+7. [x] - `p1` - User removes a mapping from Settings only; `repo_remove` with its id returns the new list; refresh dependent drawer state - `inst-remove`
+8. [x] - `p1` - **RETURN** the core mapping list; never infer a cwd from an issue-key string inside the UI - `inst-return`
 
 ## 3. Processes / Business Logic (CDSL)
 

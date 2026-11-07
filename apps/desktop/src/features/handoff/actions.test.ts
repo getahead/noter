@@ -145,6 +145,17 @@ describe("edit, target, copy and open (cpt-noter-flow-ui-handoff-deliver)", () =
     expect(bridge.store.getState().entities.item[ID]?.status).toBe("handed_off");
   });
 
+  it("refreshHandoff reads the view again after a mapping change and keeps the draft (cpt-noter-flow-ui-handoff-mapping)", async () => {
+    await ready();
+    await A.load(bridge, ID);
+    L.patchLocal(ID, { draft: "Mine" });
+    map();
+    const seen = sent();
+    await A.refreshHandoff(bridge, ID);
+    expect(seen.map((s) => s[0])).toEqual(["handoff_get"]);
+    expect(L.localOf(ID).draft).toBe("Mine");
+  });
+
   it("a conflict keeps the draft, reads the prompt again and runs no action", async () => {
     await ready();
     map();
@@ -228,5 +239,20 @@ describe("edit, target, copy and open (cpt-noter-flow-ui-handoff-deliver)", () =
     await A.copy(bridge, ID);
     expect(L.localOf(ID).error).toBe("Couldn't finish that. Try again.");
     expect(L.localOf(ID).copied).toBeUndefined();
+  });
+});
+
+describe("handoff context from a fresh item-only entry point", () => {
+  it("reads the call privacy and local-generation metadata without depending on the call page", async () => {
+    await ready();
+    const item = fake.world.items.find((i) => i.id === ID)!;
+    const detail = fake.world.call_details.find((c) => c.call.id === item.call.id)!;
+    detail.call.privacy = "sensitive";
+    fake.world.calls.find((c) => c.id === item.call.id)!.privacy = "sensitive";
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, call: {} } }));
+    const seen = sent();
+    await A.loadContext(bridge, item.call.id);
+    expect(bridge.store.getState().entities.call[item.call.id]?.privacy).toBe("sensitive");
+    expect(seen.map((s) => s[0])).toContain("outputs_get");
   });
 });

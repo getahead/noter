@@ -28,9 +28,19 @@
 .hd__launch .np-ic { margin-top: 2px; flex: none; }
 .hd__warn, .hd__err, .hd__rec { margin: 0; font-size: 12px; display: flex; gap: 5px; align-items: flex-start; flex-wrap: wrap; }
 .hd__warn { color: var(--warning); }
+.hd__warn--line { flex-wrap: nowrap; }
+.hd__warn-text { min-width: 0; }
+.hd__row--top { align-items: flex-start; } /* only the wrapped no-mapping warning; the pop-up and generating rows stay centred */
 .hd__err { color: var(--error); }
 .hd__rec { color: var(--success); }
 .hd__accept { margin: 0; font-size: 12px; color: var(--label-2); background: var(--sel-unemph); padding: 6px 8px; border-radius: var(--r-control); }
 .hd__foot { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--sep); background: var(--content-bg); }
 .hd-gen { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--label-2); margin-bottom: 6px; }
 .hd-fail { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--error); }
+
+.hd-mapping { display: grid; gap: 16px; }
+.hd-mapping > .np-field, .hd-mapping__folder > .np-field { display: flex; width: 100%; flex-direction: column; align-items: stretch; }
+.hd-mapping__folder { display: flex; align-items: center; gap: 8px; }
+.hd-mapping__folder > .np-field { flex: 1; min-width: 0; }
+.hd-mapping__tool { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hd-repositories td { overflow-wrap: anywhere; }

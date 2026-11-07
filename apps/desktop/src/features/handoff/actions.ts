@@ -5,6 +5,8 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { ErrorCode, HandoffTarget, HandoffView } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
+import { loadCall } from "../call-page/actions";
+import { loadOutputs } from "../call-page/outputs-actions";
 import { isDirty } from "./controls";
 import { localOf, patchLocal } from "./local";
 
@@ -152,3 +154,17 @@ export const open = (bridge: Bridge, itemId: string) =>
     // @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-repo-error
     // @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-failure
   });
+
+/** A drawer opened from an item-only page needs the same privacy/model context as the call page. */
+export async function loadContext(bridge: Bridge, callId: string) {
+  await Promise.all([loadCall(bridge, callId), loadOutputs(bridge, callId)]);
+}
+
+// @cpt-begin:cpt-noter-flow-ui-handoff-mapping:p1:inst-refresh
+/** Re-read the authoritative mapping and launch plan without discarding the prompt draft. */
+export async function refreshHandoff(bridge: Bridge, itemId: string) {
+  const result = await get(bridge, itemId);
+  if (result.status === "ok" && localOf(itemId).restored) patchLocal(itemId, { restored: result.data });
+  return result;
+}
+// @cpt-end:cpt-noter-flow-ui-handoff-mapping:p1:inst-refresh
