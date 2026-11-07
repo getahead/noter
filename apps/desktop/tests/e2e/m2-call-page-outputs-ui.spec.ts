@@ -113,6 +113,8 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await openReady(page);
     await section(page, /^Action items/).getByRole("button", { name: "Use Local Model" }).click();
     await expect.poll(() => sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"], local: true })]);
+    // the core flipped the section's writer to the local runtime: the section says so
+    await expect(section(page, /^Action items/)).toContainText("Written by the local model after Claude Code timed out");
   });
 
   test("UI — other path: a regenerate that is blocked during capture says it waits for the call to end, with no retry", async ({ page }) => {
