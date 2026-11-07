@@ -36,6 +36,43 @@ describe("speaker label and language tag", () => {
 });
 
 describe("SegmentRow (cpt-noter-component-ui-transcript-segment-row)", () => {
+  it("selected words open the Copy / Fix Term menu by pointer or keyboard, and the label opens Rename", () => {
+    const r = rowOf();
+    const onFixTerm = vi.fn();
+    const onRename = vi.fn();
+    const tree = rendered(SegmentRow, { row: r, variant: "live", speakers: [], onFixTerm, onRename });
+    const text = find(tree, (p) => "onContextMenu" in p).props as { onContextMenu: (e: unknown) => void };
+    const el = { contains: () => true };
+    const event = { currentTarget: el, preventDefault: vi.fn() };
+    vi.stubGlobal("document", { createRange: () => ({ selectNodeContents() {}, setEnd() {}, toString: () => "ab" }) });
+    vi.stubGlobal("getSelection", () => ({ rangeCount: 1, isCollapsed: false, getRangeAt: () => ({ startContainer: {}, endContainer: {}, startOffset: 0, toString: () => "cd" }) }));
+    text.onContextMenu(event);
+    expect(onFixTerm).toHaveBeenCalledWith(expect.anything(), { start: 2, end: 4 }, el);
+    expect(event.preventDefault).toHaveBeenCalled();
+    const keyboard = find(tree, (p) => "onKeyDown" in p).props as { onKeyDown: (e: unknown) => void };
+    const keyEvent = { currentTarget: { querySelector: () => el }, preventDefault: vi.fn(), key: "F10", shiftKey: true };
+    keyboard.onKeyDown(keyEvent);
+    expect(keyEvent.preventDefault).toHaveBeenCalledOnce();
+    keyboard.onKeyDown({ ...keyEvent, key: "ContextMenu", shiftKey: false });
+    expect(onFixTerm).toHaveBeenCalledTimes(3);
+    keyboard.onKeyDown({ ...keyEvent, shiftKey: false });
+    keyboard.onKeyDown({ ...keyEvent, currentTarget: { querySelector: () => null } });
+    expect(onFixTerm).toHaveBeenCalledTimes(3);
+    vi.stubGlobal("getSelection", () => null);
+    event.preventDefault.mockClear();
+    text.onContextMenu(event);
+    keyboard.onKeyDown({ ...keyEvent, preventDefault: event.preventDefault });
+    expect(onFixTerm).toHaveBeenCalledTimes(3);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+    const label = find(tree, (p) => "onRename" in p && "text" in p).props as { onRename: (a: unknown) => void };
+    label.onRename(el);
+    expect(onRename).toHaveBeenCalledWith(expect.any(String), expect.anything(), el);
+    const btn = find(rendered(SpeakerLabel, { text: "Speaker 3", variant: "unnamed" as never, onRename }), (p) => "onClick" in p).props as { onClick: (e: unknown) => void };
+    btn.onClick({ currentTarget: el });
+    expect(onRename).toHaveBeenCalledTimes(2);
+  });
+
   it("draws a confirmed row with its time, speaker, text, lang, tag and play control", () => {
     const html = renderToString(<SegmentRow row={rowOf()} variant="live" speakers={[]} control={{ state: "enabled", help: "transcript.play" }} />);
     expect(html).toContain('lang="ru"');
@@ -196,6 +233,19 @@ async function open(label: WindowLabel, mutate: (w: World) => void = () => {}) {
 }
 
 describe("useTranscript and TranscriptPanel (hosts)", () => {
+  it("requests the native call window key before live rename, but never for stored rename", async () => {
+    const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
+    await b.subscribe("transcript_subscribe", { call_id: LIVE });
+    const focus = vi.spyOn(b.core, "windowShowCall");
+    const tr = hookOf(b, LIVE);
+    const rename = (variant: "live" | "stored") => find(rendered(TranscriptLog, { tr, variant }), (p) => "onRename" in p).props.onRename as (...args: unknown[]) => Promise<void>;
+    await rename("live")("spk_3", tr.data!.segments[0], {});
+    expect(focus).toHaveBeenCalledWith({});
+    focus.mockClear();
+    await rename("stored")("spk_3", tr.data!.segments[0], {});
+    expect(focus).not.toHaveBeenCalled();
+  });
+
   it("draws the live call in CS-R2 from the Channel, and the call screen mounts it", async () => {
     const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
     await b.subscribe("transcript_subscribe", { call_id: LIVE });

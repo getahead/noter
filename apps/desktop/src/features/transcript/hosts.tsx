@@ -3,13 +3,17 @@
 // view and the playback bar in the host's regions. Hosts pass the call id and the variant; nothing else.
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { CallDetail, SegmentView, TimeSpan, UiPrefs } from "../../core/bindings";
+import type { CallDetail, SegmentView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { duration, t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { Menu } from "../../ui/primitives/menu";
+import { Popover } from "../../ui/primitives/popover";
 import { holdUndo } from "../history/undo";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
+import { SpeakerNamingPanel } from "../speakers/SpeakerNamingPanel";
+import { TermFixPopover } from "../speakers/TermFixPopover";
 import { buildRows, speakerColumn, spanKeys, type Row, type Variant } from "./model";
 import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
@@ -216,6 +220,8 @@ export interface TranscriptLogProps {
 /** The transcript view of `useTranscript`'s call, in the host's region (CS-R2, FP-R5 or PC-R5). */
 export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: TranscriptLogProps) {
   const [renaming, setRenaming] = useState<{ speakerId: string; segmentId: string; anchor: HTMLElement } | null>(null);
+  // a selection on a stored line: first the Copy / Fix Term… menu, then the popover
+  const [fixing, setFixing] = useState<{ seg: SegmentView; range: TextRange; anchor: HTMLElement; menu: boolean } | null>(null);
   const call = useWindow(tr.bridge, (s) => s.entities.call[tr.callId]);
   const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
   const rows = useMemo(() => (variant === "tail" && tr.data ? buildRows(tr.data, "tail", tailLines) : tr.rows), [variant, tr.data, tr.rows, tailLines]);
@@ -247,8 +253,31 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
       onRefusedDone={tr.clearRefused}
       timeHelp={gone ? (tr.detail!.audio_not_stored ? t("transcript.audio.not_stored") : t("transcript.audio.deleted_help")) : undefined}
       onPlay={(seg) => void tr.play(seg)}
-      onRename={variant === "tail" ? undefined : (speakerId, seg, anchor) => setRenaming({ speakerId, segmentId: seg.id, anchor })}
+      onRename={variant === "tail" ? undefined : async (speakerId, seg, anchor) => {
+        if (variant === "live") {
+          const focused = await tr.bridge.act("window_show_call", "window_show_call", () => tr.bridge.core.windowShowCall({}), {});
+          if (focused.status === "error") return;
+        }
+        setRenaming({ speakerId, segmentId: seg.id, anchor });
+      }}
+      onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
     />
+    {fixing?.menu && (
+      <Popover variant="context-menu" anchor={fixing.anchor} label={t("speakers.fix.menu")} onClose={() => setFixing(null)}>
+        <Menu
+          variant="context-menu"
+          label={t("speakers.fix.menu")}
+          items={[
+            { label: t("speakers.fix.copy"), onSelect: () => void globalThis.navigator?.clipboard?.writeText(fixing.seg.text.slice(fixing.range.start, fixing.range.end)) },
+            { label: t("speakers.fix.menu"), onSelect: () => setFixing({ ...fixing, menu: false }) },
+          ]}
+          onClose={() => setFixing((f) => (f?.menu ? null : f))}
+        />
+      </Popover>
+    )}
+    {fixing && !fixing.menu && (
+      <TermFixPopover bridge={tr.bridge} segment={fixing.seg} range={fixing.range} anchor={fixing.anchor} onClose={() => setFixing(null)} onFixed={named} />
+    )}
     {renamed && (
       <SpeakerRenamePopover
         bridge={tr.bridge}
@@ -301,6 +330,16 @@ export function StoredTranscript({ bridge, callId, audioKept, span, detail, head
   const tr = useTranscript(bridge, callId, { detail: given ? detail : read, audioKept, span });
   return (
     <>
+      {tr.data && (
+        <SpeakerNamingPanel
+          bridge={bridge}
+          callId={callId}
+          speakers={tr.data.speakers}
+          segments={tr.data.segments}
+          participants={tr.detail?.call.participants ?? []}
+          audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}
+        />
+      )}
       <TranscriptLog tr={tr} variant="stored" header={header} />
       <TranscriptBar tr={tr} variant="stored" />
     </>

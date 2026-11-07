@@ -13,9 +13,28 @@ const transcript = (w: World) => w.transcripts.find((t) => t.call_id === CALL)!;
 export function unnamed(w: World, n: number, lines = 3): void {
   const t = transcript(w);
   const base = t.speakers.find((s) => s.id === "spk_3")!;
+  const segment = t.segments.find((s) => s.speaker.speaker_id === base.id && s.state === "confirmed")!;
+  let nextMs = Math.max(...t.segments.map((s) => s.t1_ms)) + 1000;
   for (let i = 0; i < n; i++) {
     const id = `spk_${4 + i}`;
     const speaker: SpeakerView = { ...structuredClone(base), id, label: { type: "unnamed", n: 4 + i }, segment_count: lines };
+    speaker.sample = lines > 0 ? { call_id: CALL, t0_ms: nextMs, t1_ms: nextMs + 5000 } : null;
+    for (let j = 0; j < lines; j++) {
+      t.segments.push({
+        ...structuredClone(segment),
+        id: `seg_naming_${4 + i}_${j}`,
+        speaker: { speaker_id: id, label: speaker.label },
+        t0_ms: nextMs,
+        t1_ms: nextMs + 5000,
+        text: i % 2 === 0
+          ? ["Я проверю план перед следующей встречей.", "Сначала уточним сроки с командой.", "Результаты обсудим в пятницу."][j % 3]
+          : ["Ich prüfe die offenen Fragen bis morgen.", "Wir stimmen den Zeitplan mit dem Team ab.", "Die Ergebnisse besprechen wir am Freitag."][j % 3],
+        lang: i % 2 === 0 ? "ru" : "de",
+        state: "confirmed",
+        corrections: [],
+      });
+      nextMs += 6000;
+    }
     t.speakers.push(speaker);
     const detail = w.call_details.find((d) => d.call.id === CALL)!;
     detail.speakers = t.speakers;

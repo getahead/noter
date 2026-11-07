@@ -24,6 +24,7 @@ import {
   validateNew,
   type Entry,
 } from "./picker";
+import { usePeople } from "./people";
 import "./speakers.css";
 
 export interface PersonPickerProps {
@@ -32,6 +33,8 @@ export interface PersonPickerProps {
   /** The call's participants (In this call). */
   participants: readonly PersonChip[];
   speakers: readonly SpeakerView[];
+  /** The directory's rows when the host read them (`null`: no directory yet); omitted, the picker reads them. */
+  people?: readonly PersonRow[] | null;
   /** The New form's host button: **Create and Name**. */
   confirmLabel: string;
   /** The field's text when the host seeds it (a suggestion chip). */
@@ -53,20 +56,11 @@ export function PersonPicker(p: PersonPickerProps) {
   const [open, setOpen] = useState(p.variant === "popover");
   const [active, setActive] = useState<number | null>(null);
   const [form, setForm] = useState<string | null>(null);
-  const [people, setPeople] = useState<readonly PersonRow[] | null>(null);
   const list = useId();
+  // the host reads the directory once and passes the rows down; a lone picker reads it itself
+  const read = usePeople(p.bridge, p.people !== undefined);
+  const people = (p.people !== undefined ? p.people : read) ?? null;
   useEffect(() => setQuery(p.value ?? ""), [p.value]);
-  // Recent people come from M3's people_list: not_implemented leaves the group out
-  useEffect(
-    () =>
-      void p.bridge
-        .act("people:list", "people_list", () => p.bridge.core.peopleList({}), {
-          named: { not_implemented: "no_directory" },
-          screen: "person-picker",
-        })
-        .then((r) => setPeople(r.status === "ok" ? r.data.people : null)),
-    [p.bridge],
-  );
 
   const cap = p.variant === "inline" ? CAP_INLINE : CAP_POPOVER;
   const all = useMemo(

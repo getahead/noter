@@ -3,7 +3,7 @@
 // Jump to Live when they scroll up, and draws only the rows in view. It owns no segments and never announces lines.
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import type { SegmentView, SpeakerView } from "../../core/bindings";
+import type { SegmentView, SpeakerView, TextRange } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { useWindowShortcuts, type ShortcutTable } from "../../app/a11y/keys";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -44,6 +44,7 @@ export interface TranscriptViewProps {
   onRefusedDone?: () => void;
   onPlay?: (seg: SegmentView) => void;
   onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
+  onFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
 }
 
 const smooth = (): ScrollBehavior => (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth");
@@ -187,6 +188,7 @@ export function TranscriptView(p: TranscriptViewProps) {
               timeHelp={p.timeHelp}
               onPlay={p.onPlay}
               onRename={p.onRename}
+              onFixTerm={p.onFixTerm}
               onReason={(key, text) => setStatus({ key, text })}
               onStatusDone={() => (setStatus(null), p.onRefusedDone?.())}
             />
