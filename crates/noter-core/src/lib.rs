@@ -1440,7 +1440,6 @@ impl CoreApi for Core {
         self.accounts.settle(meta, provider, &candidate, verified)
     }
 
-    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-keys:p1
     async fn api_key_remove(
         &self,
         ctx: &CommandCtx,
@@ -1458,7 +1457,6 @@ impl CoreApi for Core {
         self.audit_page(args)
     }
 
-    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-audit:p1
     async fn audit_export(
         &self,
         _ctx: &CommandCtx,
@@ -1489,7 +1487,6 @@ impl CoreApi for Core {
         self.signin_prepare(args.provider).await
     }
 
-    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-prepare:p1
     async fn cli_install(
         &self,
         _ctx: &CommandCtx,

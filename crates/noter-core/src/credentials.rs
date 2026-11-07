@@ -74,7 +74,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-prepare-return
     }
 
-    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-prepare:p1
     pub(crate) fn queue_install(&self, tool: CliTool) -> Result<JobAccepted, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-request
         // `CliTool` is the contract's closed set: nothing else deserializes into it.

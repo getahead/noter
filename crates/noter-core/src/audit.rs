@@ -166,7 +166,6 @@ impl Core {
         })
     }
 
-    // @cpt-flow:cpt-noter-flow-core-credentials-privacy-audit:p1
     pub(crate) async fn export_audit(
         &self,
         args: AuditExportArgs,
