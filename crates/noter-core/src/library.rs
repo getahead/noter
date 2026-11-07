@@ -204,33 +204,7 @@ fn select_call(c: &Connection, id: &str) -> noter_db::rusqlite::Result<Option<St
     .optional()
 }
 
-/// Days since 1970-01-01 of a `YYYY-MM-DD` date; `None` for anything else.
-pub(crate) fn day_number(date: &LocalDate) -> Option<i64> {
-    let mut parts = date.0.split('-');
-    let (y, m, d) = (parts.next()?, parts.next()?, parts.next()?);
-    if parts.next().is_some() || y.len() != 4 || m.len() != 2 || d.len() != 2 {
-        return None;
-    }
-    let (y, m, d): (i64, i64, i64) = (y.parse().ok()?, m.parse().ok()?, d.parse().ok()?);
-    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
-    let last = match m {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if leap => 29,
-        2 => 28,
-        _ => return None,
-    };
-    if !(1..=last).contains(&d) {
-        return None;
-    }
-    // Days from civil (Howard Hinnant).
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    Some(era * 146_097 + doe - 719_468)
-}
+pub(crate) use noter_retrieval::day_number;
 
 /// What the list's `WHERE` clause needs, with its bound values (`?1` is the clock's now).
 pub(crate) struct Where {

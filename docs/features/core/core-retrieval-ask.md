@@ -92,7 +92,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Search and filter the library
 
-- [ ] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-search`
+- [x] `p4` - **ID**: `cpt-noter-flow-core-retrieval-ask-search`
 
 **Actor**: Primary user (main window › Calls)
 
@@ -105,11 +105,11 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 - No matches or only weak matches: the result says so without guessing; a read failure returns a typed error and leaves the query available for retry.
 
 **Steps**:
-1. [ ] - `p1` - API: `search { query, filter, limit }` from main; reject invalid dates or limits with `invalid_input`; the default limit is 20 per section - `inst-search-request`
-2. [ ] - `p1` - Run `cpt-noter-algo-core-retrieval-ask-retrieve` using the current library filters - `inst-search-retrieve`
-3. [ ] - `p1` - Build `SearchResults` sections and `SearchExplain` with normalized query, keyword and semantic counts and number of active filters - `inst-search-sections`
-4. [ ] - `p1` - Set `only_weak` only when there are hits and every hit is weak; return empty sections for no matches - `inst-search-strength`
-5. [ ] - `p1` - **RETURN** results with snippets, highlight ranges into the returned text, provenance and `cross_language`; a selected span uses existing `transcript_span`, `audio_play` and navigation - `inst-search-return`
+1. [x] - `p1` - API: `search { query, filter, limit }` from main; reject invalid dates or limits with `invalid_input`; the default limit is 20 per section - `inst-search-request`
+2. [x] - `p1` - Run `cpt-noter-algo-core-retrieval-ask-retrieve` using the current library filters - `inst-search-retrieve`
+3. [x] - `p1` - Build `SearchResults` sections and `SearchExplain` with normalized query, keyword and semantic counts and number of active filters - `inst-search-sections`
+4. [x] - `p1` - Set `only_weak` only when there are hits and every hit is weak; return empty sections for no matches - `inst-search-strength`
+5. [x] - `p1` - **RETURN** results with snippets, highlight ranges into the returned text, provenance and `cross_language`; a selected span uses existing `transcript_span`, `audio_play` and navigation - `inst-search-return`
 
 ### Ask a question or follow-up
 
@@ -182,22 +182,22 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Retrieve permitted evidence
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-retrieve`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-retrieve`
 
 **Input**: Query, filters, wanted count, runtime privacy context and index readiness.
 
 **Output**: Ranked strong or weak hits, source-skip count and search explanation.
 
 **Steps**:
-1. [ ] - `p1` - Normalize a shadow query as NFKC, lowercase, ё to е, ß to ss, and Snowball stems for English, Russian and German; retain raw text for display - `inst-retrieve-normalize`
-2. [ ] - `p1` - Build parameterized SQL predicates for people, dates, call types, languages, tags and open items; apply source privacy and scope before any model receives evidence - `inst-retrieve-filters`
-3. [ ] - `p1` - For cloud runs exclude sensitive calls and sources and count skips; for calls-only scope exclude documents - `inst-retrieve-privacy`
-4. [ ] - `p1` - Run FTS5 BM25 on normalized shadow text with trigram matches for names and acronyms - `inst-retrieve-keywords`
-5. [ ] - `p1` - **IF** vector indexes are ready, embed locally through the engine and scan call, item and permitted document vectors; over-fetch four times the requested count and filter people and scope in SQL before fusion - `inst-retrieve-vectors`
-6. [ ] - `p1` - **ELSE** use keyword hits only and report `KeywordOnly` with rebuild progress - `inst-retrieve-keyword-only`
-7. [ ] - `p1` - Fuse permitted keyword and vector ranks with reciprocal rank fusion, k = 60; rank matching items ahead of raw chunks and deduplicate evidence - `inst-retrieve-fuse`
-8. [ ] - `p1` - Mark literal keyword evidence strong and semantic-only evidence weak; preserve original quotes, segment spans, document headings and cross-language attribution - `inst-retrieve-evidence`
-9. [ ] - `p1` - **RETURN** the requested top hits and explanation without logging query or source text - `inst-retrieve-return`
+1. [x] - `p1` - Normalize a shadow query as NFKC, lowercase, ё to е, ß to ss, and Snowball stems for English, Russian and German; retain raw text for display - `inst-retrieve-normalize`
+2. [x] - `p1` - Build parameterized SQL predicates for people, dates, call types, languages, tags and open items; apply source privacy and scope before any model receives evidence - `inst-retrieve-filters`
+3. [x] - `p1` - For cloud runs exclude sensitive calls and sources and count skips; for calls-only scope exclude documents - `inst-retrieve-privacy`
+4. [x] - `p1` - Run FTS5 BM25 on normalized shadow text with trigram matches for names and acronyms - `inst-retrieve-keywords`
+5. [x] - `p1` - **IF** vector indexes are ready, embed locally through the engine and scan call, item and permitted document vectors; over-fetch four times the requested count and filter people and scope in SQL before fusion - `inst-retrieve-vectors`
+6. [x] - `p1` - **ELSE** use keyword hits only and report `KeywordOnly` with rebuild progress - `inst-retrieve-keyword-only`
+7. [x] - `p1` - Fuse permitted keyword and vector ranks with reciprocal rank fusion, k = 60; rank matching items ahead of raw chunks and deduplicate evidence - `inst-retrieve-fuse`
+8. [x] - `p1` - Mark literal keyword evidence strong and semantic-only evidence weak; preserve original quotes, segment spans, document headings and cross-language attribution - `inst-retrieve-evidence`
+9. [x] - `p1` - **RETURN** the requested top hits and explanation without logging query or source text - `inst-retrieve-return`
 
 ### Validate citations and answer provenance
 
@@ -233,19 +233,19 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Rebuild derived indexes
 
-- [ ] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-rebuild`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-retrieval-ask-rebuild`
 
 **Input**: Canonical segments, items, summaries, chunks and document chunks; local embeddings.
 
 **Output**: Rebuildable FTS5 and vector indexes, with progress.
 
 **Steps**:
-1. [ ] - `p1` - Enter keyword-only mode; keep normalized keyword reads available while vector indexes rebuild - `inst-rebuild-start`
-2. [ ] - `p1` - Read canonical rows in bounded batches; rebuild normalized shadows and indexes through `noter-db`, without holding a writer transaction during engine inference - `inst-rebuild-batches`
-3. [ ] - `p1` - Restore vectors from canonical embedding blobs; `chunk_vec` has no call partition and `doc_vec` partitions by privacy class - `inst-rebuild-vectors`
-4. [ ] - `p1` - Reconcile edits and deletions committed during the rebuild before making the replacement indexes visible - `inst-rebuild-reconcile`
-5. [ ] - `p1` - **IF** a batch fails, retain keyword-only mode and progress; retry cannot duplicate canonical data - `inst-rebuild-failure`
-6. [ ] - `p1` - **RETURN** hybrid readiness after successful completion; the maintenance trigger belongs to M5 - `inst-rebuild-return`
+1. [x] - `p1` - Enter keyword-only mode; keep normalized keyword reads available while vector indexes rebuild - `inst-rebuild-start`
+2. [x] - `p1` - Read canonical rows in bounded batches; rebuild normalized shadows and indexes through `noter-db`, without holding a writer transaction during engine inference - `inst-rebuild-batches`
+3. [x] - `p1` - Restore vectors from canonical embedding blobs; `chunk_vec` has no call partition and `doc_vec` partitions by privacy class - `inst-rebuild-vectors`
+4. [x] - `p1` - Reconcile edits and deletions committed during the rebuild before making the replacement indexes visible - `inst-rebuild-reconcile`
+5. [x] - `p1` - **IF** a batch fails, retain keyword-only mode and progress; retry cannot duplicate canonical data - `inst-rebuild-failure`
+6. [x] - `p1` - **RETURN** hybrid readiness after successful completion; the maintenance trigger belongs to M5 - `inst-rebuild-return`
 
 ## 4. States (CDSL)
 
@@ -266,21 +266,21 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 ### Retrieval index readiness
 
-- [ ] `p4` - **ID**: `cpt-noter-state-core-retrieval-ask-index`
+- [x] `p4` - **ID**: `cpt-noter-state-core-retrieval-ask-index`
 
 **States**: hybrid, keyword_only
 
 **Initial State**: keyword_only until indexes are ready
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** hybrid **TO** keyword_only **WHEN** a rebuild starts or vector indexes become unavailable - `inst-index-rebuilding`
-2. [ ] - `p1` - **FROM** keyword_only **TO** hybrid **WHEN** rebuilt indexes include all committed changes - `inst-index-ready`
+1. [x] - `p1` - **FROM** hybrid **TO** keyword_only **WHEN** a rebuild starts or vector indexes become unavailable - `inst-index-rebuilding`
+2. [x] - `p1` - **FROM** keyword_only **TO** hybrid **WHEN** rebuilt indexes include all committed changes - `inst-index-ready`
 
 ## 5. Definitions of Done
 
 ### One retrieval function
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-search`
+- [x] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-search`
 
 The system **MUST** use the same privacy-filtered hybrid function for search, Ask and later context consumers, with normalized keyword search, RRF k = 60, item preference, evidence strength, section limits and keyword-only rebuild progress. Queries use the read pool; bounded rebuild writes use the single writer.
 
@@ -332,6 +332,8 @@ The system **MUST** attach and name topics by the PRD thresholds, expose their t
 - [ ] `p4` - **ID**: `cpt-noter-dod-core-retrieval-ask-evaluation`
 
 The system **MUST** evaluate the 50-question golden-call set and 20-document question set, recording recall@5, citation correctness and latency, with citation correctness at least 85 %. Implement `retrieval_search` and `retrieval_rebuild` scenarios for a year of fixture calls and EN/RU/DE queries under the harness's instruction-count comparison. Test through the real core with a scripted runtime and engine.
+
+Owner item (Backend Teamlead TL-35): the golden sets and the two performance scenarios are the owner's; this DoD stays open and does not hold the feature box.
 
 **Implements**:
 - `cpt-noter-algo-core-retrieval-ask-retrieve`

@@ -31,6 +31,7 @@ mod people;
 mod playback;
 mod postcall;
 mod recovery;
+mod retrieval;
 mod self_test;
 mod settings;
 mod share;
@@ -320,6 +321,8 @@ pub struct Core {
     sources: knowledge::Sources,
     /// The noter-mcp runs and the socket they reach the core on.
     mcp: mcp::McpRuns,
+    /// Whether searches can use the vector indexes (`noter-retrieval`).
+    index: noter_retrieval::Index,
 }
 
 /// Other features' callbacks for a change, run after it committed.
@@ -416,6 +419,7 @@ impl Core {
                 MIGRATIONS,
                 noter_handoff::MIGRATIONS,
                 noter_knowledge::MIGRATIONS,
+                noter_retrieval::MIGRATIONS,
             ],
         ) {
             Ok(store) => Arc::new(store),
@@ -491,8 +495,10 @@ impl Core {
             handoffs: noter_handoff::Generations::default(),
             sources: knowledge::Sources::default(),
             mcp: mcp::McpRuns::default(),
+            index: noter_retrieval::Index::default(),
         };
         Core::discard_stale_mcp_configs(data_dir);
+        core.check_index();
         core.start_hotkeys().map_err(BootError::Load)?;
         core.retry_audio_removals();
         core.init_call_window();
@@ -858,6 +864,22 @@ impl CoreApi for Core {
         args: CallUpdateArgs,
     ) -> Result<CallMutation, CoreError> {
         self.update_call(ctx, args)
+    }
+
+    async fn search(
+        &self,
+        _ctx: &CommandCtx,
+        args: SearchArgs,
+    ) -> Result<SearchResults, CoreError> {
+        self.search_library(args).await
+    }
+
+    async fn ask_scope_presets(
+        &self,
+        _ctx: &CommandCtx,
+        _args: NoArgs,
+    ) -> Result<ScopePresetList, CoreError> {
+        self.scope_presets()
     }
 
     async fn call_types_list(

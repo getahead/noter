@@ -2492,6 +2492,7 @@ dependencies = [
  "noter-knowledge",
  "noter-llm",
  "noter-protocol",
+ "noter-retrieval",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -2653,6 +2654,20 @@ dependencies = [
  "specta",
  "specta-serde",
  "specta-typescript",
+]
+
+[[package]]
+name = "noter-retrieval"
+version = "0.1.0"
+dependencies = [
+ "noter-db",
+ "noter-engine-client",
+ "noter-jobs",
+ "noter-protocol",
+ "rust-stemmers",
+ "serde_json",
+ "ulid",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -3827,6 +3842,16 @@ dependencies = [
  "libsqlite3-sys",
  "smallvec",
  "sqlite-wasm-rs",
+]
+
+[[package]]
+name = "rust-stemmers"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e46a2036019fdb888131db7a4c847a1063a7493f971ed94ea82c67eada63ca54"
+dependencies = [
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
