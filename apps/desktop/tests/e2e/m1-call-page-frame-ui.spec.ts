@@ -119,7 +119,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await openCall(page);
     await expect(info(page)).toContainText(/Audio deleted on .+ · transcript kept/);
     await expect(info(page)).not.toContainText("Kept until");
-    await expect(head(page)).toContainText("Audio deleted · transcript kept"); // D-36: no deletion date in M1
+    await expect(head(page)).toContainText("Audio deleted · transcript kept"); // the core sent no audio_deleted_at here: no date is invented
     await expect(storedRows(page).first()).toBeVisible(); // the transcript stays readable
     await expect(button(page, "Delete Audio Now…")).toHaveCount(0);
   });

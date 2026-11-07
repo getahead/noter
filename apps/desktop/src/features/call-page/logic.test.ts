@@ -95,6 +95,8 @@ describe("callInfo (PC-R4)", () => {
     expect(i.audio).toBe("Audio deleted on Oct 24 · transcript kept"); // no date from the core: the call's own day
     expect(i.audioKept).toBe(false);
     expect(callInfo(row({ audio_deleted: true }), { audio_not_stored: false }, NOW, PREFS, "x").audio).toBe("Audio deleted on Nov 15 · transcript kept");
+    // the day the audio was really deleted, never the retention date it was due on
+    expect(callInfo(row({ audio_deleted: true, audio_deleted_at: Date.UTC(2026, 8, 21) }), { audio_not_stored: false }, NOW, PREFS, "x").audio).toBe("Audio deleted on Sep 21 · transcript kept");
   });
   it("says the audio was never stored", () => {
     expect(callInfo(row({ audio_kept_until: null }), { audio_not_stored: true }, NOW, PREFS, "x").audio).toBe("Audio not stored");

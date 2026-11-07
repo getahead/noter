@@ -140,6 +140,8 @@ describe("rows of the Summary view", () => {
     expect(outputSlots.itemTail).toBe(ItemTail);
     const html = renderToString(<ItemTail bridge={bridge} item={item("itm_notif", { review: "suggested" })} />);
     for (const label of ["Accept", "Edit", "Reject", "Show in Item inspector", "np-prov"]) expect(html).toContain(label);
+    // Share and the inspector button stay one unit, so a narrow row wraps them together and never leaves (i) alone
+    expect(html).toMatch(/class="it-row__end"[^>]*>(?:(?!<\/span><\/span>).)*Show in Item inspector/s);
   });
 
   it("Add Action Item trims the text, sends no owner and refuses an empty one", async () => {

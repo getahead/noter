@@ -115,9 +115,9 @@ const STATUS: Record<CallRow["status"], MsgKey> = {
 /** PC-R4 Call info: the rows of its five sections. `typeLabel` is the call type's name from `call_types_list`. */
 export function callInfo(c: CallRow, extra: { audio_not_stored: boolean }, now: number, prefs: UiPrefs, typeLabel: string): InfoModel {
   const kept = !c.audio_deleted && !extra.audio_not_stored;
-  // shortcut: the core sends no deletion date, so a deleted call's audio shows the date it was due, or the call's own day; replace when the contract has one
+  // shortcut: a call deleted before the core recorded the day falls back to the date it was due, or the call's own day
   const audio = c.audio_deleted
-    ? t("callpage.info.audio_deleted", { date: shortDay(c.audio_kept_until ?? c.started_at, prefs) })
+    ? t("callpage.info.audio_deleted", { date: shortDay(c.audio_deleted_at ?? c.audio_kept_until ?? c.started_at, prefs) })
     : extra.audio_not_stored || c.audio_kept_until == null
       ? t("callpage.info.audio_not_stored")
       : t("callpage.info.kept_until", { date: shortDay(c.audio_kept_until, prefs) });

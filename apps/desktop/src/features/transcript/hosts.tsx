@@ -194,15 +194,16 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
 
 export type TranscriptHandle = ReturnType<typeof useTranscript>;
 
-// D-36: M1 shows no deletion date ("audio_deleted_at" comes in M2)
 /** The stored variant's header line about the audio: kept until, deleted, or never stored. */
 export function audioLine(detail: AudioFacts | null | undefined, prefs: UiPrefs | undefined): string | null {
   if (!detail) return null;
   const { call } = detail;
   if (detail.audio_not_stored) return t("transcript.audio.not_stored");
-  if (call.audio_deleted) return t("transcript.audio.deleted");
+  const day = (ms: number) => new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", timeZone: prefs?.time_zone || undefined }).format(ms);
+  // D-36: the deletion date when the core knows it (Call info reads the same field)
+  if (call.audio_deleted) return call.audio_deleted_at == null ? t("transcript.audio.deleted") : t("transcript.audio.deleted_on", { date: day(call.audio_deleted_at) });
   if (call.audio_kept_until == null || !prefs) return null;
-  const date = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", timeZone: prefs.time_zone || undefined }).format(call.audio_kept_until);
+  const date = day(call.audio_kept_until);
   return t("transcript.audio.kept", { length: duration(call.duration_ms / 1000), date });
 }
 

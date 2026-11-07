@@ -25,8 +25,10 @@ export function ItemTail({ bridge, item }: { bridge: Bridge; item: ItemView }) {
       )}
       {it.review === "suggested" && !local.outcome && <ReviewButtons it={it} bridge={bridge} retryOnly={!!local.retryAccept} edit={inspect} />}
       {local.error && <span className="it-row__error" role="alert">{local.error}</span>}
-      <ShareMenu bridge={bridge} callId={it.call.id} origin={{ type: "row", kind: SECTION_OF[it.kind], id: it.id }} id={elementId("share", it.id)} />
-      {inspect && <IconButton icon="info" label={t("items.inspect")} size="inline" onAction={inspect} />}
+      <span className="it-row__end">
+        <ShareMenu bridge={bridge} callId={it.call.id} origin={{ type: "row", kind: SECTION_OF[it.kind], id: it.id }} id={elementId("share", it.id)} />
+        {inspect && <IconButton icon="info" label={t("items.inspect")} size="inline" onAction={inspect} />}
+      </span>
     </>
   );
 }

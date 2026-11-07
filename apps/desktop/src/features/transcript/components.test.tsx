@@ -314,7 +314,8 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     // the date in the macOS locale: "15 Nov" or "Nov 15"; D-36: no deletion date in M1
     expect(audioLine(d({}), prefs)).toMatch(/^52 min · audio kept until (15 Nov|Nov 15)$/);
     expect(audioLine(d({}), undefined)).toBeNull();
-    expect(audioLine(d({ audio_deleted: true }), prefs)).toBe("Audio deleted · transcript kept");
+    expect(audioLine(d({ audio_deleted: true }), prefs)).toBe("Audio deleted · transcript kept"); // no date known
+    expect(audioLine(d({ audio_deleted: true, audio_deleted_at: Date.UTC(2026, 10, 15) }), prefs)).toMatch(/^Audio deleted on (15 Nov|Nov 15) · transcript kept$/);
     expect(audioLine(d({}, true), prefs)).toBe("Audio not stored for this call");
     expect(audioLine(d({ audio_kept_until: null }), prefs)).toBeNull();
     expect(audioLine(null, prefs)).toBeNull();
