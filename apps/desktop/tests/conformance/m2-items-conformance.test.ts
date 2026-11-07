@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Core, ItemView } from "../../src/core/bindings";
 import { exercised } from "../support/core";
 import { ok, refused } from "../support/results";
-import { openScenario, type Scenario } from "../support/scenario";
+import { openScenario, type Scenario, type World } from "../support/scenario";
 import { LIVE_CALL, PAST_CALL } from "../support/world-presets";
 import { cancelNextSavePanel } from "./history-support";
 
@@ -158,5 +158,54 @@ describe("share_copy and calls_export", () => {
     await cancelNextSavePanel(s, "calls_export");
     expect(refused(await main.callsExport({ call_ids: [PAST_CALL], include })).code).toBe("cancelled");
     expect(ok(await main.callsExport({ call_ids: [PAST_CALL], include })).files).toBeGreaterThan(0);
+  });
+});
+
+describe("evidence after the audio is deleted (cpt-noter-dod-ui-items-inspector)", () => {
+  it("transcript_span still answers the quote with audio_available false, and audio_play refuses with audio_deleted", async () => {
+    const span = { call_id: PAST_CALL, channel: null, t0_ms: 12_000, t1_ms: 20_000 };
+    const before = ok(await main.transcriptSpan({ span }));
+    expect(before.audio_available).toBe(true);
+    ok(await main.audioDelete({ call_ids: [PAST_CALL] }));
+    const after = ok(await main.transcriptSpan({ span }));
+    expect(after.audio_available).toBe(false);
+    expect(after.segments.map((x) => x.id)).toEqual(before.segments.map((x) => x.id)); // the quote stays readable
+    expect(refused(await main.audioPlay({ call_id: PAST_CALL, from_ms: span.t0_ms, to_ms: span.t1_ms })).code).toBe("audio_deleted");
+  });
+});
+
+
+describe("evidence over the archive pass (cpt-noter-dod-ui-items-inspector)", () => {
+  /** Live-pass lines beside the archive ones PAST_CALL ships with: one reads differently, one has no archive line left. */
+  const upgradedWorld = (w: World) => {
+    const t = w.transcripts.find((x) => x.call_id === PAST_CALL)!;
+    const archived = t.segments[0];
+    t.segments.push(
+      { ...archived, id: "seg_backend_live_001", pass: "live", text: "Let us start with ostor: what about replication?" },
+      { ...archived, id: "seg_backend_live_gone", pass: "live", t0_ms: 90_000, t1_ms: 96_000, text: "A line the archive pass dropped." },
+    );
+  };
+
+  it("transcript_span carries the live and archive words of an upgraded span, and none while the archive is pending", async () => {
+    await s.dispose();
+    s = openScenario({ alsoRecord: exercised, world: upgradedWorld });
+    main = s.core("main");
+    const upgraded = ok(await main.transcriptSpan({ span: { call_id: PAST_CALL, channel: null, t0_ms: 12_000, t1_ms: 20_000 } }));
+    expect(upgraded.upgraded_by_archive).toBe(true);
+    expect(upgraded.archive_change?.before).toBe("Let us start with ostor: what about replication?");
+    expect(upgraded.archive_change?.after).toBe(upgraded.segments.map((x) => x.text).join(" "));
+    expect(upgraded.segments.every((x) => x.pass === "archive")).toBe(true);
+    // The live call's archive has not run: its evidence is the live line, with nothing to compare.
+    const pending = ok(await main.transcriptSpan({ span: { call_id: LIVE_CALL, channel: null, t0_ms: 1_180_000, t1_ms: 1_186_000 } }));
+    expect(pending.upgraded_by_archive).toBe(false);
+    expect(pending.archive_change).toBeNull();
+    expect(pending.segments.map((x) => x.id)).toEqual(["seg_live_001"]);
+  });
+
+  it("transcript_span is transcript_upgraded when the archive pass replaced the lines the span pointed to", async () => {
+    await s.dispose();
+    s = openScenario({ alsoRecord: exercised, world: upgradedWorld });
+    main = s.core("main");
+    expect(refused(await main.transcriptSpan({ span: { call_id: PAST_CALL, channel: null, t0_ms: 90_000, t1_ms: 96_000 } })).code).toBe("transcript_upgraded");
   });
 });

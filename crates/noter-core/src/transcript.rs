@@ -594,20 +594,80 @@ impl Core {
             // @cpt-begin:cpt-noter-flow-core-live-transcript-span:p2:inst-span-select
             let segments = segments_of(c, &call_id, Some((span.channel, span.t0_ms, span.t1_ms)))?;
             // @cpt-end:cpt-noter-flow-core-live-transcript-span:p2:inst-span-select
-            Ok(Some((call, state.audio_available, segments)))
+            let upgrade = archive_change_of(c, &call_id, &span)?;
+            Ok(Some((call, state.audio_available, segments, upgrade)))
         })?;
-        let (call, audio_available, segments) =
+        let (call, audio_available, segments, upgrade) =
             found.ok_or_else(|| CoreError::new(ErrorCode::NotFound, "no such call"))?;
+        let archive_change = match upgrade {
+            Upgrade::Gone => {
+                return Err(CoreError::new(
+                    ErrorCode::TranscriptUpgraded,
+                    "the archive pass replaced the lines of this span",
+                ));
+            }
+            Upgrade::Changed(change) => Some(change),
+            Upgrade::Same => None,
+        };
         // @cpt-begin:cpt-noter-flow-core-live-transcript-span:p2:inst-span-return
         Ok(SpanPreview {
             span,
             call,
             segments,
             audio_available,
-            upgraded_by_archive: false,
+            upgraded_by_archive: archive_change.is_some(),
+            archive_change,
         })
         // @cpt-end:cpt-noter-flow-core-live-transcript-span:p2:inst-span-return
     }
+}
+
+/// How the archive pass left a span.
+enum Upgrade {
+    /// No archive pass yet, or its words at the span read as the live ones.
+    Same,
+    Changed(ArchiveChange),
+    /// The archive pass exists but has no line at the span: the lines it pointed to were replaced.
+    Gone,
+}
+
+fn archive_change_of(
+    c: &Connection,
+    call_id: &CallId,
+    span: &TimeSpan,
+) -> noter_db::rusqlite::Result<Upgrade> {
+    let words = |pass: &str| -> noter_db::rusqlite::Result<Option<String>> {
+        let rows = c
+            .prepare(
+                "SELECT text FROM segments WHERE call_id = ?1 AND pass = ?2
+                   AND (?3 IS NULL OR channel = ?3) AND t1_ms > ?4 AND t0_ms < ?5
+                 ORDER BY t0_ms, rowid",
+            )?
+            .query_map(
+                (
+                    call_id.as_str(),
+                    pass,
+                    span.channel.map(|ch| format!("{ch:?}").to_lowercase()),
+                    span.t0_ms.0,
+                    span.t1_ms.0,
+                ),
+                |r| r.get::<_, String>(0),
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((!rows.is_empty()).then(|| rows.join(" ")))
+    };
+    let archived: bool = c.query_row(
+        "SELECT EXISTS (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')",
+        [call_id.as_str()],
+        |r| r.get(0),
+    )?;
+    Ok(match (archived, words("live")?, words("archive")?) {
+        (true, Some(_), None) => Upgrade::Gone,
+        (_, Some(before), Some(after)) if before != after => {
+            Upgrade::Changed(ArchiveChange { before, after })
+        }
+        _ => Upgrade::Same,
+    })
 }
 
 /// What the snapshot needs of the `calls` row.

@@ -319,6 +319,16 @@ pub struct SpanPreview {
     pub audio_available: bool,
     /// The archive pass changed the words at this span since the evidence was taken.
     pub upgraded_by_archive: bool,
+    /// The span's words before (live pass) and after (archive pass) the upgrade, for the
+    /// Show/Hide Archive Changes diff; `null` when nothing changed or the archive is pending.
+    pub archive_change: Option<ArchiveChange>,
+}
+
+/// A span's text in the live pass and in the archive pass that replaced it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ArchiveChange {
+    pub before: String,
+    pub after: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

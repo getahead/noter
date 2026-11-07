@@ -618,12 +618,27 @@ export const defaultHandlers: Handlers = {
   transcript_span: (a, { world }) => {
     const t = world.transcripts.find((x) => x.call_id === a.span.call_id);
     const c = call(world, a.span.call_id);
+    const all = t?.segments ?? [];
+    const { t0_ms, t1_ms, channel } = a.span;
+    const inSpan = (s: (typeof all)[number]) => (channel === null || s.channel === channel) && s.t1_ms > t0_ms && s.t0_ms < t1_ms;
+    const archived = all.some((s) => s.pass === "archive");
+    const words = (pass: string) => {
+      const hit = all.filter((s) => s.pass === pass && inSpan(s));
+      return hit.length ? hit.map((s) => s.text).join(" ") : null;
+    };
+    // The archive pass replaces the live lines: a span with none left is gone, one that reads differently is upgraded.
+    const before = words("live");
+    const after = words("archive");
+    if (archived && before !== null && after === null) throw coreError("transcript_upgraded", "the archive pass replaced the lines of this span");
+    const archive_change = before !== null && after !== null && before !== after ? { before, after } : null;
+    const current = archived ? "archive" : "live";
     return {
       span: a.span,
       call: callRef(c),
-      segments: (t?.segments ?? []).filter((s) => s.t1_ms >= a.span.t0_ms && s.t0_ms <= a.span.t1_ms),
+      segments: all.filter((s) => (s.pass ?? current) === current && inSpan(s)),
       audio_available: !c.audio_deleted,
-      upgraded_by_archive: false,
+      upgraded_by_archive: archive_change !== null,
+      archive_change,
     };
   },
   audio_play: (a, { world, fake, publish }) => {
