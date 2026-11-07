@@ -12,7 +12,8 @@ final class HandoffTests: NoterTestCase {
     }
 
     private func answers(_ panels: [String?]) {
-        let list = panels.map { $0 as Any? ?? NSNull() }
+        var list: [Any] = []
+        for panel in panels { if let panel { list.append(panel) } else { list.append(NSNull()) } }
         let data = try! JSONSerialization.data(withJSONObject: list)
         app.launchEnvironment["NOTER_TEST_FOLDER_PANELS"] = String(data: data, encoding: .utf8)
     }
@@ -25,7 +26,13 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button — \(screen())", file: file, line: line)
         // the page is still settling right after it loads: click once the button has stopped moving
         var last = CGRect.zero
-        _ = waitUntil(5) { let frame = handoff.frame; defer { last = frame }; return frame == last && frame.height > 0 }
+        let end = Date().addingTimeInterval(5)
+        while Date() < end {
+            let frame = handoff.frame
+            if frame == last && frame.height > 0 { break }
+            last = frame
+            Thread.sleep(forTimeInterval: 0.2)
+        }
         handoff.click()
         XCTAssertTrue(app.buttons["Copy Prompt"].firstMatch.waitForExistence(timeout: 10), "the Handoff drawer did not open — \(screen())", file: file, line: line)
     }
@@ -37,20 +44,20 @@ final class HandoffTests: NoterTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Add Mapping'")).firstMatch
     }
     private var choose: XCUIElement { app.buttons["Choose…"].firstMatch }
-    private var open: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
+    private var openButton: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
 
     func test_cpt_noter_seq_call_page_hand_off_item__error_no_repository_mapped_choose_folder() {
         answers([makeRepo()])
         launch("handoff")
         openDrawer()
         XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "an unmapped project shows Add Mapping… — \(screen())")
-        XCTAssertFalse(open.isEnabled, "Open waits for a repository")
+        XCTAssertFalse(openButton.isEnabled, "Open waits for a repository")
         addMapping.click()
         XCTAssertTrue(choose.waitForExistence(timeout: 5), "Add Mapping… opens the sheet")
         choose.click()
         XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "the folder the panel chose saves the mapping and closes the sheet")
-        XCTAssertTrue(open.waitForExistence(timeout: 10))
-        XCTAssertTrue(open.isEnabled, "Open is available once the project is mapped")
+        XCTAssertTrue(openButton.waitForExistence(timeout: 10))
+        XCTAssertTrue(openButton.isEnabled, "Open is available once the project is mapped")
     }
 
     func test_cpt_noter_seq_call_page_hand_off_item__error_folder_panel_cancelled_keeps_the_draft() {
