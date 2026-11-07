@@ -620,7 +620,7 @@ export const defaultHandlers: Handlers = {
     const c = call(world, a.span.call_id);
     const all = t?.segments ?? [];
     const { t0_ms, t1_ms, channel } = a.span;
-    const inSpan = (s: (typeof all)[number]) => (channel === null || s.channel === channel) && s.t1_ms > t0_ms && s.t0_ms < t1_ms;
+    const inSpan = (s: (typeof all)[number]) => (!channel || s.channel === channel) && s.t1_ms > t0_ms && s.t0_ms < t1_ms;
     const archived = all.some((s) => s.pass === "archive");
     const words = (pass: string) => {
       const hit = all.filter((s) => s.pass === pass && inSpan(s));
