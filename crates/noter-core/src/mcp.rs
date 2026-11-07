@@ -626,7 +626,11 @@ fn items_of(
                 &span.call_id,
                 Some((span.channel, span.t0_ms, span.t1_ms)),
             )?;
-            evidence.extend(lines.into_iter().map(|s| s.id));
+            for s in lines {
+                if !evidence.contains(&s.id) {
+                    evidence.push(s.id);
+                }
+            }
         }
         let item = McpItem {
             item_id: v.id,
