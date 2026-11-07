@@ -89,6 +89,11 @@ describe("OutputSection", () => {
     expect(html).toContain("Names updated");
     expect(html).toContain("Regenerate for better wording");
     expect(renderToString(<OutputSection {...props(sec("action_items", { items: [row("Rotate the token")] }))} />)).not.toContain("Names updated");
+    // the link regenerates that section with the current settings (not locally)
+    const asked: boolean[] = [];
+    const tree = rendered(OutputSection, props(renamed, (local) => void asked.push(local)));
+    (find(tree, (p, type) => type === "button" && typeof p.onClick === "function" && p.children === "Regenerate for better wording").props.onClick as () => void)();
+    expect(asked).toEqual([false]);
   });
 
   it("regenerates a failed section alone, and locally on Use Local Model", async () => {
