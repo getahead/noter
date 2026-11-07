@@ -6,9 +6,11 @@
 
 use std::sync::{Arc, OnceLock};
 
-use noter_db::{Mutation, Store};
+use noter_db::{ChangeMeta, Mutation, Store};
 use noter_protocol::egress::PROVIDER_HOSTS;
-use noter_protocol::{AuditId, CallId, LlmRunId, PrivacyMode, RuntimeChoice};
+use noter_protocol::{
+    AuditId, CallId, CoreError, LlmRunId, PrivacyMode, RuntimeChoice, TimestampMs,
+};
 use regex::Regex;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -25,6 +27,38 @@ use crate::runtime::{
     SourceClass,
 };
 use crate::secrets::Secret;
+
+/// A request to one of the user's own MCP servers (`user_configured` hosts): its `lookup` audit
+/// row commits before the request may leave, and `Err` means it must not. The row holds the
+/// request's size and hash, never its bytes.
+// shortcut: `what` is `live_mcp_query`, the frozen contract's only MCP-server value, for indexed
+// sync requests too; a value of their own is a contract change.
+pub fn audit_lookup(
+    store: &Store,
+    meta: ChangeMeta,
+    at: TimestampMs,
+    destination: &str,
+    request: &[u8],
+) -> Result<AuditId, CoreError> {
+    let id = AuditId::new(format!("aud_{}", ulid::Ulid::generate()));
+    let row = Mutation {
+        entity_type: "audit",
+        table: "audit_log",
+        id: id.as_str().into(),
+        base_rev: None,
+        bump_rev: false,
+        values: vec![
+            ("ts", json!(at.0)),
+            ("kind", json!("lookup")),
+            ("what", json!("live_mcp_query")),
+            ("destination", json!(destination)),
+            ("bytes_out", json!(request.len())),
+            ("payload_hash", json!(hex(&Sha256::digest(request)))),
+        ],
+    };
+    store.write(row, meta)?;
+    Ok(id)
+}
 
 /// The adapters, one per runtime choice. Only the gate can reach them.
 #[derive(Clone)]

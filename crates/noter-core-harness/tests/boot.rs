@@ -2384,3 +2384,47 @@ async fn mcp_run_registers_a_run_on_the_core_socket_and_mcp_close_revokes_it() {
         .await;
     assert_eq!(again["closed"], false);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_scripted_mcp_server_signs_in_and_its_pages_are_indexed() {
+    let mut r = start().await;
+    let page = json!({ "uri": "notion://roadmap", "title": "Roadmap", "hash": "h1",
+        "text": "# Roadmap\n\n## Launch\n\nThe launch is on Friday.\n" });
+    r.ok(
+        "main",
+        "harness.mcp_server",
+        json!({ "server": "notion", "pages": [page] }),
+    )
+    .await;
+    assert_eq!(
+        r.code("main", "harness.mcp_server", json!({ "pages": [] }))
+            .await,
+        "invalid_input"
+    );
+    let args = json!({ "server": "notion", "mode": "indexed", "privacy": "normal",
+        "scope": { "type": "all_calls" } });
+    let row = r.ok("settings", "source_add_mcp", args).await;
+    assert_eq!(
+        (&row["has_token"], &row["kind"]),
+        (&json!(true), &json!("mcp"))
+    );
+    let mut documents = json!(0);
+    for _ in 0..500 {
+        let list = r.ok("settings", "sources_list", json!({})).await;
+        documents = list["sources"][0]["documents"].clone();
+        if documents == json!(1) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(documents, json!(1));
+    let revoked = r
+        .ok(
+            "settings",
+            "source_revoke_token",
+            json!({ "source_id": row["id"] }),
+        )
+        .await;
+    assert_eq!(revoked["has_token"], json!(false));
+    r.finish().await;
+}

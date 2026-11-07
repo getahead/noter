@@ -17,8 +17,8 @@ use noter_core::{
     Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent,
     CaptureEvent, ChunkSink, ClipboardText, Clock, Core, CoreDeps, EnvironmentReading,
     EventEmitter, FetchError, LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices,
-    Placement, SaveKind, Scripted, ScriptedAccountCli, Surfaces, SystemClock, ToolScript,
-    TrayModel, Updater,
+    Placement, SaveKind, Scripted, ScriptedAccountCli, ScriptedMcp, ScriptedServer, Surfaces,
+    SystemClock, ToolScript, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -252,6 +252,8 @@ pub struct Harness {
     secrets: Arc<MemorySecrets>,
     /// Claude Code, Codex and Ollama as accounts and installs (TL-32).
     account_cli: ScriptedAccountCli,
+    /// The indexed MCP servers (TL-42); none until `harness.mcp_server` adds one.
+    mcp: Arc<ScriptedMcp>,
     panel: Arc<ScriptedPanel>,
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
@@ -323,6 +325,8 @@ impl Harness {
         let llm = Adapters::scripted(&options.llm_script.clone().unwrap_or_default());
         let secrets = Arc::new(MemorySecrets::default());
         let account_cli = ScriptedAccountCli::new();
+        let now = clock.clone();
+        let mcp = Arc::new(ScriptedMcp::new(Arc::new(move || now.now())));
         let panel = Arc::new(ScriptedPanel {
             dir: dir.join("exports"),
             cancel_next: AtomicBool::new(false),
@@ -343,7 +347,8 @@ impl Harness {
         .with_llm(llm)
         .with_secrets(secrets.clone())
         .with_account_cli(Arc::new(account_cli.clone()))
-        .with_native_ops(panel.clone());
+        .with_native_ops(panel.clone())
+        .with_mcp_source(mcp.clone());
         let deps = if options.battery {
             deps.with_power(Arc::new(OnBattery))
         } else {
@@ -366,6 +371,7 @@ impl Harness {
             surfaces,
             secrets,
             account_cli,
+            mcp,
             panel,
             world: Mutex::new(w.clone()),
             dir,
@@ -1495,6 +1501,24 @@ impl Controls for Harness {
                 "mcp_close" => {
                     let run_id = args["run_id"].as_str().unwrap_or_default();
                     Ok(json!({ "closed": self.core.close_mcp_run(run_id) }))
+                }
+                // `{ server, pages?: [{ uri, title, hash?, text, mime? }], listing?: complete |
+                // partial | none, oauth?: granted | cancelled | offline, expires_at?, offline? }`:
+                // adds or replaces the scripted MCP server `server` (TL-42); tokens it issued stay
+                // valid until `expires_at` on the clock.
+                "mcp_server" => {
+                    #[derive(serde::Deserialize)]
+                    struct Server {
+                        server: String,
+                        #[serde(flatten)]
+                        script: ScriptedServer,
+                    }
+                    let s: Server = parse(
+                        args,
+                        "harness.mcp_server needs { server, pages?, listing?, oauth?, expires_at?, offline? }",
+                    )?;
+                    self.mcp.set(&s.server, s.script);
+                    Ok(json!({}))
                 }
                 // `{ locked }`: the Keychain stand-in fails every access while locked.
                 "keychain" => {

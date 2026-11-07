@@ -1,6 +1,7 @@
-//! FEATURE cpt-noter-feature-core-knowledge, slice 1: folder sources through the five commands,
-//! the native folder panel, the `source_sync` job on the scheduler and the scripted engine's
-//! bge-m3 vectors.
+//! FEATURE cpt-noter-feature-core-knowledge: folder sources through the five commands, the native
+//! folder panel, the `source_sync` job on the scheduler and the scripted engine's bge-m3 vectors
+//! (slice 1); indexed and live MCP sources over the scripted `McpSource`, Keychain token
+//! references and revocation (slice 2).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -8,7 +9,10 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
-use noter_core::{BoxFuture, Clock, Core, CoreDeps, EventEmitter, NativeOps, SaveKind};
+use noter_core::{
+    BoxFuture, Clock, Core, CoreDeps, EventEmitter, MemorySecrets, NativeOps, SaveKind,
+    ScriptedMcp, ScriptedPage, ScriptedServer, SecretStore,
+};
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
@@ -64,6 +68,8 @@ struct Rig {
     clock: Arc<StepClock>,
     panel: Arc<Panel>,
     folder: PathBuf,
+    mcp: Arc<ScriptedMcp>,
+    secrets: Arc<MemorySecrets>,
     _dir: tempfile::TempDir,
 }
 
@@ -96,9 +102,14 @@ async fn open() -> Rig {
         folder: folder.clone(),
         cancel: AtomicBool::new(false),
     });
+    let now = clock.clone();
+    let mcp = Arc::new(ScriptedMcp::new(Arc::new(move || now.now())));
+    let secrets = Arc::new(MemorySecrets::default());
     let deps = CoreDeps::new(clock.clone(), events.clone())
         .with_engine(Arc::new(ScriptedEngine::new().with_container(&data)))
-        .with_native_ops(panel.clone());
+        .with_native_ops(panel.clone())
+        .with_mcp_source(mcp.clone())
+        .with_secrets(secrets.clone());
     let core = Arc::new(Core::open(&data, deps).unwrap());
     core.start_first_run();
     Rig {
@@ -107,6 +118,8 @@ async fn open() -> Rig {
         clock,
         panel,
         folder,
+        mcp,
+        secrets,
         _dir: dir,
     }
 }
@@ -530,4 +543,475 @@ async fn a_new_file_in_the_watched_folder_is_indexed_on_its_own() {
         .await;
     assert_eq!(row.documents, 7);
     assert!(chunk_ids(&rig.core).contains_key("later.md"));
+}
+
+// ── slice 2: MCP sources ─────────────────────────────────────
+
+fn page(n: u32, hash: &str) -> ScriptedPage {
+    ScriptedPage {
+        uri: format!("notion://page/{n}"),
+        title: format!("Page {n}"),
+        hash: Some(hash.into()),
+        text: format!("# Page {n}\n\n## Rollout\n\nThe rollout for page {n} ships on Friday.\n"),
+        mime: Some("text/markdown".into()),
+    }
+}
+
+fn server(pages: Vec<ScriptedPage>) -> ScriptedServer {
+    ScriptedServer {
+        pages,
+        ..ScriptedServer::default()
+    }
+}
+
+fn mcp_args(mode: SourceMode) -> SourceAddMcpArgs {
+    SourceAddMcpArgs {
+        server: "notion".into(),
+        mode,
+        schedule: None,
+        privacy: PrivacyClass::Normal,
+        scope: SourceScope::AllCalls,
+    }
+}
+
+fn lookups(core: &Core) -> i64 {
+    count(core, "SELECT COUNT(*) FROM audit_log WHERE kind = 'lookup'")
+}
+
+/// The last sync run's added, changed and removed counts and error code.
+fn last_run(core: &Core) -> (i64, i64, i64, Option<String>) {
+    read(core, |c| {
+        c.query_row(
+            "SELECT added, changed, removed, error FROM sync_runs
+             ORDER BY started_at DESC, rowid DESC LIMIT 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )
+    })
+}
+
+impl Rig {
+    /// An indexed `notion` source with two pages, synced at `T0`.
+    async fn add_mcp(&self) -> SourceRow {
+        self.mcp
+            .set("notion", server(vec![page(1, "h1"), page(2, "h2")]));
+        let row = self
+            .core
+            .source_add_mcp(&ctx(), mcp_args(SourceMode::Indexed))
+            .await
+            .unwrap();
+        self.synced_at(T0).await;
+        row
+    }
+
+    fn token(&self, id: &SourceId) -> Option<Secret> {
+        self.secrets
+            .get(&format!("source:{}", id.as_str()))
+            .unwrap()
+    }
+}
+
+use noter_core::Secret;
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_indexed_mcp_source_signs_in_keeps_only_a_token_reference_and_indexes_its_pages() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    assert_eq!(
+        (
+            row.kind,
+            row.mode,
+            row.location.as_str(),
+            row.schedule.as_deref(),
+            row.has_token
+        ),
+        (
+            SourceKind::Mcp,
+            SourceMode::Indexed,
+            "notion",
+            Some("daily"),
+            true
+        )
+    );
+    assert_eq!(rig.source().await.unwrap().documents, 2);
+    let token = rig.token(&row.id).expect("the token is in the Keychain");
+    let token_ref: Option<String> = read(&rig.core, |c| {
+        c.query_row("SELECT token_ref FROM sources", [], |r| r.get(0))
+    });
+    assert_eq!(token_ref, Some(format!("source:{}", row.id.as_str())));
+
+    // One audited lookup per request, before it left: the listing and each page.
+    let audit: Vec<(String, String, Option<String>)> = read(&rig.core, |c| {
+        let mut st = c.prepare(
+            "SELECT what, destination, runtime_choice FROM audit_log WHERE kind = 'lookup'",
+        )?;
+        let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        rows.collect()
+    });
+    assert_eq!(audit.len(), 3);
+    assert!(audit
+        .iter()
+        .all(|a| *a == ("live_mcp_query".into(), "notion".into(), None)));
+
+    // The heading arrives as document evidence.
+    let heading: String = read(&rig.core, |c| {
+        c.query_row(
+            "SELECT text FROM doc_chunks WHERE heading_path = '[\"Rollout\"]' LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+    });
+    assert!(heading.starts_with("Page "), "{heading}");
+
+    // The token is nowhere but the Keychain: not in the change log, the audit or an event.
+    let secret = token.expose().to_string();
+    let leaked: i64 = read(&rig.core, move |c| {
+        c.query_row(
+            "SELECT (SELECT COUNT(*) FROM changes WHERE instr(COALESCE(before, '') ||
+                 COALESCE(after, '') || COALESCE(CAST(delta AS TEXT), '') || summary, ?1) > 0)
+             + (SELECT COUNT(*) FROM sources WHERE instr(COALESCE(token_ref, ''), ?1) > 0)",
+            [secret],
+            |r| r.get(0),
+        )
+    });
+    assert_eq!(leaked, 0);
+    let events = format!("{:?}", rig.events.0.lock().unwrap());
+    assert!(!events.contains(token.expose()));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_cancelled_or_offline_sign_in_an_unknown_server_or_a_locked_keychain_writes_nothing() {
+    let rig = open().await;
+    let add = |server: &str| {
+        let mut args = mcp_args(SourceMode::Indexed);
+        args.server = server.into();
+        let core = rig.core.clone();
+        async move { core.source_add_mcp(&ctx(), args).await }
+    };
+    for (name, oauth) in [
+        ("cancelled", noter_core::ScriptedOauth::Cancelled),
+        ("offline", noter_core::ScriptedOauth::Offline),
+    ] {
+        rig.mcp.set(
+            name,
+            ScriptedServer {
+                oauth,
+                ..server(vec![page(1, "h1")])
+            },
+        );
+    }
+    rig.mcp.set("locked", server(vec![page(1, "h1")]));
+    assert_eq!(
+        add("cancelled").await.unwrap_err().code,
+        ErrorCode::SignInCancelled
+    );
+    assert_eq!(add("offline").await.unwrap_err().code, ErrorCode::Offline);
+    assert_eq!(
+        add("unknown").await.unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
+    rig.secrets.set_locked(true);
+    assert_eq!(
+        add("locked").await.unwrap_err().code,
+        ErrorCode::KeychainLocked
+    );
+    rig.secrets.set_locked(false);
+    // No row, no sync, no lookup, no event.
+    assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM sources"), 0);
+    assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM sync_runs"), 0);
+    assert_eq!(lookups(&rig.core), 0);
+    assert!(rig.events.named("entity:changed").is_empty());
+    // An empty server name is refused before any sign-in.
+    assert_eq!(add("  ").await.unwrap_err().code, ErrorCode::InvalidInput);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_live_source_is_stored_without_a_token_and_never_indexed() {
+    let rig = open().await;
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), mcp_args(SourceMode::Live))
+        .await
+        .unwrap();
+    assert_eq!(
+        (row.mode, row.has_token, row.schedule.clone(), row.documents),
+        (SourceMode::Live, false, None, 0)
+    );
+    assert_eq!(rig.events.named("entity:changed").len(), 1);
+    // Not scheduled, not reindexed, never signed in to.
+    let mut scheduled = mcp_args(SourceMode::Live);
+    scheduled.schedule = Some("daily".into());
+    assert_eq!(
+        rig.core
+            .source_add_mcp(&ctx(), scheduled)
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::InvalidInput
+    );
+    let args = SourceIdArgs {
+        source_id: row.id.clone(),
+    };
+    assert_eq!(
+        rig.core
+            .source_reindex(&ctx(), args)
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::InvalidInput
+    );
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM sync_runs"), 0);
+    assert_eq!(lookups(&rig.core), 0);
+    assert!(rig.token(&row.id).is_none());
+    // The same server twice is one source.
+    assert_eq!(
+        rig.core
+            .source_add_mcp(&ctx(), mcp_args(SourceMode::Live))
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::InvalidInput
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_indexed_source_needs_a_known_schedule() {
+    let rig = open().await;
+    rig.mcp.set("notion", server(vec![]));
+    let mut args = mcp_args(SourceMode::Indexed);
+    args.schedule = Some("every full moon".into());
+    let err = rig.core.source_add_mcp(&ctx(), args).await.unwrap_err();
+    assert_eq!(err.code, ErrorCode::InvalidInput);
+    let mut args = mcp_args(SourceMode::Indexed);
+    args.schedule = Some("hourly".into());
+    let row = rig.core.source_add_mcp(&ctx(), args).await.unwrap();
+    assert_eq!(row.schedule.as_deref(), Some("hourly"));
+    let update = SourceUpdateArgs {
+        source_id: row.id.clone(),
+        rev: row.rev,
+        name: None,
+        schedule: Some("sometimes".into()),
+        privacy: None,
+        scope: None,
+    };
+    let err = rig.core.source_update(&ctx(), update).await.unwrap_err();
+    assert_eq!(err.code, ErrorCode::InvalidInput);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unchanged_hashes_skip_and_a_partial_listing_deletes_nothing() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let before = lookups(&rig.core);
+    // Same hashes: the listing only, no page read, nothing written.
+    rig.reindex(T0 + 1, &row.id).await;
+    rig.synced_at(T0 + 1).await;
+    assert_eq!(last_run(&rig.core), (0, 0, 0, None));
+    assert_eq!(lookups(&rig.core), before + 1);
+    // An incomplete listing that misses page 2 keeps it.
+    rig.mcp.set(
+        "notion",
+        ScriptedServer {
+            listing: noter_core::ScriptedListing::Partial,
+            ..server(vec![page(1, "h1")])
+        },
+    );
+    rig.reindex(T0 + 2, &row.id).await;
+    let done = rig.synced_at(T0 + 2).await;
+    assert_eq!((done.documents, last_run(&rig.core)), (2, (0, 0, 0, None)));
+    // A complete one deletes it, and a changed hash re-reads only that page.
+    rig.mcp.set("notion", server(vec![page(1, "h1-new")]));
+    rig.reindex(T0 + 3, &row.id).await;
+    let done = rig.synced_at(T0 + 3).await;
+    assert_eq!((done.documents, last_run(&rig.core)), (1, (0, 1, 1, None)));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_server_without_resources_is_crawled_by_seed_query_and_never_pruned() {
+    let rig = open().await;
+    rig.mcp.set(
+        "notion",
+        ScriptedServer {
+            listing: noter_core::ScriptedListing::None,
+            ..server(vec![page(1, "h1"), page(2, "h2")])
+        },
+    );
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), mcp_args(SourceMode::Indexed))
+        .await
+        .unwrap();
+    let done = rig.synced_at(T0).await;
+    assert_eq!(done.documents, 2);
+    rig.mcp.set(
+        "notion",
+        ScriptedServer {
+            listing: noter_core::ScriptedListing::None,
+            ..server(vec![page(1, "h1")])
+        },
+    );
+    rig.reindex(T0 + 1, &row.id).await;
+    let done = rig.synced_at(T0 + 1).await;
+    assert_eq!(done.documents, 2);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_expired_token_makes_the_source_sign_in_expired_and_keeps_its_last_sync() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    rig.mcp.set(
+        "notion",
+        ScriptedServer {
+            expires_at: Some(TimestampMs(T0 + 5)),
+            ..server(vec![page(1, "h1"), page(2, "h2-new")])
+        },
+    );
+    rig.reindex(T0 + 10, &row.id).await;
+    let done = rig.until(|r| r.status == SourceStatus::SignInExpired).await;
+    assert_eq!(
+        (done.last_sync_at, done.documents),
+        (Some(TimestampMs(T0)), 2)
+    );
+    assert_eq!(
+        last_run(&rig.core).3.as_deref(),
+        Some("source_sign_in_expired")
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_offline_server_fails_the_sync_and_a_retry_succeeds() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    rig.mcp.set(
+        "notion",
+        ScriptedServer {
+            offline: true,
+            ..server(vec![page(1, "h1")])
+        },
+    );
+    rig.reindex(T0 + 1, &row.id).await;
+    let failed = rig
+        .until(|r| matches!(r.status, SourceStatus::Failed { .. }))
+        .await;
+    assert_eq!(
+        (failed.status, failed.last_sync_at),
+        (
+            SourceStatus::Failed {
+                code: ErrorCode::Offline,
+                at: TimestampMs(T0 + 1)
+            },
+            Some(TimestampMs(T0))
+        )
+    );
+    rig.mcp
+        .set("notion", server(vec![page(1, "h1"), page(2, "h2-new")]));
+    rig.reindex(T0 + 2, &row.id).await;
+    rig.synced_at(T0 + 2).await;
+    assert_eq!(last_run(&rig.core), (0, 1, 0, None));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn revoking_deletes_the_token_stops_sync_and_marks_the_source_sign_in_expired() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let args = || SourceIdArgs {
+        source_id: row.id.clone(),
+    };
+    // A locked Keychain keeps the token and says so.
+    rig.secrets.set_locked(true);
+    let err = rig
+        .core
+        .source_revoke_token(&ctx(), args())
+        .await
+        .unwrap_err();
+    rig.secrets.set_locked(false);
+    assert_eq!(err.code, ErrorCode::KeychainLocked);
+    assert!(rig.token(&row.id).is_some());
+    assert!(rig.source().await.unwrap().has_token);
+
+    let events = rig.events.named("entity:changed").len();
+    let revoked = rig.core.source_revoke_token(&ctx(), args()).await.unwrap();
+    assert_eq!(
+        (revoked.has_token, revoked.status.clone(), revoked.documents),
+        (false, SourceStatus::SignInExpired, 2)
+    );
+    assert!(rig.token(&row.id).is_none());
+    assert_eq!(rig.events.named("entity:changed").len(), events + 1);
+    // No authenticated work after it: a retry ends sign-in-expired without a lookup.
+    let before = lookups(&rig.core);
+    rig.reindex(T0 + 1, &row.id).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let after = rig.until(|r| r.status == SourceStatus::SignInExpired).await;
+    assert_eq!(after.last_sync_at, Some(TimestampMs(T0)));
+    assert_eq!(lookups(&rig.core), before);
+    // A folder holds no token to revoke.
+    let folder = rig
+        .core
+        .source_add_folder(&ctx(), folder_args())
+        .await
+        .unwrap();
+    let err = rig
+        .core
+        .source_revoke_token(
+            &ctx(),
+            SourceIdArgs {
+                source_id: folder.id,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::InvalidInput);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn removing_an_mcp_source_removes_its_token_and_index() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let args = || SourceIdArgs {
+        source_id: row.id.clone(),
+    };
+    rig.secrets.set_locked(true);
+    let err = rig.core.source_remove(&ctx(), args()).await.unwrap_err();
+    rig.secrets.set_locked(false);
+    assert_eq!(err.code, ErrorCode::KeychainLocked);
+    assert_eq!(rig.source().await.unwrap().documents, 2);
+
+    rig.core.source_remove(&ctx(), args()).await.unwrap();
+    assert!(rig.token(&row.id).is_none());
+    assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM doc_chunks"), 0);
+    assert!(rig.source().await.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_hourly_pass_syncs_an_indexed_source_once_its_schedule_has_passed() {
+    let rig = open().await;
+    let row = rig.add_mcp().await;
+    let runs = || count(&rig.core, "SELECT COUNT(*) FROM sync_runs");
+    let before = runs();
+    // Two hours on: the pass runs, but a daily source is not due.
+    rig.clock.0.store(T0 + 2 * 3_600_000, Ordering::SeqCst);
+    noter_core::testing::jobs_tick(&rig.core);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert_eq!(runs(), before);
+    // A day on, it is.
+    let later = T0 + 25 * 3_600_000;
+    rig.clock.0.store(later, Ordering::SeqCst);
+    noter_core::testing::jobs_tick(&rig.core);
+    let done = rig.synced_at(later).await;
+    assert_eq!(done.id, row.id);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_live_source_is_removed_even_with_the_keychain_locked() {
+    let rig = open().await;
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), mcp_args(SourceMode::Live))
+        .await
+        .unwrap();
+    rig.secrets.set_locked(true);
+    let args = SourceIdArgs { source_id: row.id };
+    rig.core.source_remove(&ctx(), args).await.unwrap();
+    assert!(rig.source().await.is_none());
 }

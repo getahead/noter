@@ -1,7 +1,7 @@
-//! Knowledge sources in the composition root: the five folder-source commands over
-//! `noter-knowledge`, the folder panel through `NativeOps`, the watchers and the `source_sync`
-//! job on the scheduler. MCP sources are slice 2 (`source_add_mcp` and `source_revoke_token`
-//! answer `not_implemented` until then).
+//! Knowledge sources in the composition root: the seven source commands over `noter-knowledge`,
+//! the folder panel through `NativeOps`, indexed MCP servers through `CoreDeps.mcp_source` with
+//! their tokens in `CoreDeps.secrets`, the watchers and the `source_sync` job on the scheduler
+//! (hourly, a pass that queues each indexed MCP source its schedule makes due).
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -120,6 +120,60 @@ impl Core {
         Ok(row)
     }
 
+    /// Adds an MCP source: an indexed one signs in to its server and is synced now and on its
+    /// schedule; a live one is stored for the relay and never indexed.
+    pub(crate) async fn add_mcp_source(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceAddMcpArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.ready()?;
+        self.check_scope(&args.scope)?;
+        let meta = self.change_meta(ctx, "Added an MCP source".into(), "source_add_mcp");
+        let mcp = self.deps.mcp_source.as_ref();
+        let secrets = self.deps.secrets.as_ref();
+        let row = noter_knowledge::add_mcp(self.store(), meta, mcp, secrets, args).await?;
+        // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-schedule
+        // The hourly pass queues it again whenever its schedule makes it due.
+        if row.mode == SourceMode::Indexed {
+            self.enqueue_sync(&row.id)?;
+        }
+        // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-schedule
+        // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-return
+        self.emit_entity_changed(&EntityChanged::Source {
+            source: row.clone(),
+        });
+        Ok(row)
+        // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-return
+    }
+
+    /// Revokes an indexed MCP source's token: its sync stops, the Keychain item goes, the source
+    /// is sign-in-expired.
+    pub(crate) fn revoke_source_token(
+        &self,
+        ctx: &CommandCtx,
+        args: SourceIdArgs,
+    ) -> Result<SourceRow, CoreError> {
+        self.ready()?;
+        let id = args.source_id;
+        let meta = self.change_meta(
+            ctx,
+            "Revoked a source's sign-in".into(),
+            "source_revoke_token",
+        );
+        let stop = || {
+            if let Some(run) = lock(&self.sources.runs).remove(&id) {
+                let _ = self.jobs.cancel(&run);
+            }
+        };
+        let row =
+            noter_knowledge::revoke(self.store(), meta, self.deps.secrets.as_ref(), &id, stop)?;
+        self.emit_entity_changed(&EntityChanged::Source {
+            source: row.clone(),
+        });
+        Ok(row)
+    }
+
     // @cpt-flow:cpt-noter-flow-core-knowledge-manage:p1
     pub(crate) fn update_source(
         &self,
@@ -179,6 +233,21 @@ impl Core {
     ) -> Result<DeleteResult, CoreError> {
         self.ready()?;
         let id = args.source_id;
+        // @cpt-begin:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-index
+        // An MCP source's token goes first: a locked Keychain keeps the source as it was.
+        let lookup = id.clone();
+        let row = self
+            .store()
+            .read(move |c| noter_knowledge::get(c, &lookup))?
+            .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this source no longer exists"))?;
+        if row.has_token {
+            let account = noter_knowledge::token_account(&id);
+            self.deps
+                .secrets
+                .remove(&account)
+                .map_err(|_| CoreError::new(ErrorCode::KeychainLocked, "the Keychain is locked"))?;
+        }
+        // @cpt-end:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-index
         // @cpt-begin:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-request
         if let Some(run) = lock(&self.sources.runs).remove(&id) {
             // A run that already ended is fine: a late worker finds no source and stops.
@@ -276,8 +345,22 @@ impl Core {
         }
     }
 
+    /// The scheduled pass: a sync for each indexed MCP source its schedule makes due.
+    fn queue_due_sources(&self) {
+        let Ok(list) = noter_knowledge::list(self.store()) else {
+            return;
+        };
+        let now = self.deps.clock.now();
+        for source in list.sources {
+            if noter_knowledge::due(&source, now) {
+                let _ = self.enqueue_sync(&source.id);
+            }
+        }
+    }
+
     async fn sync_source(&self, ctx: &mut RunCtx) -> Result<(), Stop> {
         let Some(id) = ctx.subject().map(SourceId::new) else {
+            self.queue_due_sources();
             return Ok(());
         };
         let clock = self.deps.clock.clone();
@@ -297,6 +380,8 @@ impl Core {
             now: &move || clock.now(),
             changed: &changed,
             published: &published,
+            mcp: self.deps.mcp_source.as_ref(),
+            secrets: self.deps.secrets.as_ref(),
         };
         let result = noter_knowledge::sync(&env, ctx, &id).await;
         // A request after the sync's last look waits for this run to close, then runs again.

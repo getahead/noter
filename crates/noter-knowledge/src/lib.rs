@@ -1,5 +1,6 @@
 //! noter-knowledge: knowledge sources (DESIGN-core cpt-noter-component-core-knowledge). Folder
-//! sources watched through `notify`, text extraction for the six formats, heading chunks, the
+//! sources watched through `notify`, indexed MCP servers through the [`McpSource`] seam with
+//! their tokens in the Keychain, text extraction for the six formats, heading chunks, the
 //! sync job on the M2 scheduler with bge-m3 embeddings from the engine, the source policy that
 //! retrieval applies to document hits, and removal in one transaction. noter-core wires it to its
 //! commands, the scheduler and the native folder panel; this crate touches SQLite only through
@@ -9,6 +10,7 @@
 
 mod chunk;
 mod extract;
+mod mcp;
 mod policy;
 mod sources;
 mod sync;
@@ -17,8 +19,14 @@ mod watch;
 use noter_db::Migration;
 
 pub use chunk::{normalize, Chunk};
+pub use mcp::{
+    due, Listing, McpError, McpSource, Page, RemoteDoc, ScriptedListing, ScriptedMcp,
+    ScriptedOauth, ScriptedPage, ScriptedServer,
+};
 pub use policy::{permitted_chunks, Permitted};
-pub use sources::{add_folder, get, list, remove, update, validate_folder};
+pub use sources::{
+    add_folder, add_mcp, get, list, remove, revoke, token_account, update, validate_folder,
+};
 pub use sync::{sync, SyncEnv};
 pub use watch::Watchers;
 

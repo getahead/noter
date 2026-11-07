@@ -1201,6 +1201,7 @@ dependencies = [
  "noter-db",
  "noter-engine-client",
  "noter-jobs",
+ "noter-llm",
  "noter-protocol",
  "notify",
  "pdf-extract",

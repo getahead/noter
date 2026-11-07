@@ -4,19 +4,20 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Knowledge sources: folder sources and their watcher, text extraction, heading chunks, the sync job, source policy for retrieval and atomic removal. Never touches SQLite or the network directly."
+description = "Knowledge sources: folder sources and their watcher, indexed MCP servers over a seam, text extraction, heading chunks, the sync job, source policy for retrieval and atomic removal. Never touches SQLite or the network directly."
 publish = false
 
 [dependencies]
 noter-db = { path = "../noter-db" }
 noter-engine-client = { path = "../noter-engine-client" }
 noter-jobs = { path = "../noter-jobs" }
+noter-llm = { path = "../noter-llm" }
 noter-protocol = { path = "../noter-protocol" }
 html2text = "0.15"
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
 pdf-extract = "0.12"
 quick-xml = "0.42"
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
 tokio = { version = "1", features = ["rt", "sync", "time"] }
