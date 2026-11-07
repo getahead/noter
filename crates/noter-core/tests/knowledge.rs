@@ -987,14 +987,9 @@ async fn removing_an_mcp_source_removes_its_token_and_index() {
 async fn the_hourly_pass_syncs_an_indexed_source_once_its_schedule_has_passed() {
     let rig = open().await;
     let row = rig.add_mcp().await;
-    let runs = || count(&rig.core, "SELECT COUNT(*) FROM sync_runs");
-    let before = runs();
-    // Two hours on: the pass runs, but a daily source is not due.
-    rig.clock.0.store(T0 + 2 * 3_600_000, Ordering::SeqCst);
-    noter_core::testing::jobs_tick(&rig.core);
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    assert_eq!(runs(), before);
-    // A day on, it is.
+    // A day on, the pass queues the daily source. Whether a source is due is `due()`'s, tested
+    // without a scheduler in noter-knowledge; counting runs here would race the scheduler's own
+    // ticks, which may sync once more while the first sync is still open.
     let later = T0 + 25 * 3_600_000;
     rig.clock.0.store(later, Ordering::SeqCst);
     noter_core::testing::jobs_tick(&rig.core);
