@@ -267,6 +267,12 @@ export type AppSnapshot = {
 	environment: EnvironmentState,
 };
 
+/**  A span's text in the live pass and in the archive pass that replaced it. */
+export type ArchiveChange = {
+	before: string,
+	after: string,
+};
+
 export type ArchiveStatus = 
 /**  Live call, or nothing scheduled yet. */
 "not_started" | "pending" | "running" | "done" | 
@@ -3075,6 +3081,11 @@ export type SpanPreview = {
 	audio_available: boolean,
 	/**  The archive pass changed the words at this span since the evidence was taken. */
 	upgraded_by_archive: boolean,
+	/**
+	 *  The span's words before (live pass) and after (archive pass) the upgrade, for the
+	 *  Show/Hide Archive Changes diff; `null` when nothing changed or the archive is pending.
+	 */
+	archive_change: ArchiveChange | null,
 };
 
 export type SpeakerAssignment = {

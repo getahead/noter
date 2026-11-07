@@ -630,6 +630,98 @@ async fn a_past_call_shows_the_archive_pass_once_it_exists() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_span_over_an_upgraded_transcript_carries_the_words_before_and_after() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    new_call(&r.core, "ready");
+    let seg = |id: &str, pass: &str, t0: u32, text: &str| Insert {
+        table: "segments",
+        values: vec![
+            ("id", json!(id)),
+            ("call_id", json!("call_live")),
+            ("pass", json!(pass)),
+            ("channel", json!("sys")),
+            ("t0_ms", json!(t0)),
+            ("t1_ms", json!(t0 + 1000)),
+            ("text", json!(text)),
+            ("text_norm", json!(text)),
+        ],
+    };
+    r.core
+        .store()
+        .insert_batch(vec![
+            seg("l1", "live", 0, "we ship friday"),
+            seg("a1", "archive", 0, "we ship on Friday"),
+            seg("l2", "live", 5000, "same words"),
+            seg("a2", "archive", 5000, "same words"),
+        ])
+        .unwrap();
+    let span = |t0, t1| SpanArgs {
+        span: TimeSpan {
+            call_id: call_id(),
+            channel: None,
+            t0_ms: OffsetMs(t0),
+            t1_ms: OffsetMs(t1),
+        },
+    };
+    let changed = r
+        .core
+        .transcript_span(&call_window(), span(0, 1000))
+        .await
+        .unwrap();
+    assert!(changed.upgraded_by_archive);
+    let change = changed.archive_change.unwrap();
+    assert_eq!(change.before, "we ship friday");
+    assert_eq!(change.after, "we ship on Friday");
+    let same = r
+        .core
+        .transcript_span(&call_window(), span(5000, 6000))
+        .await
+        .unwrap();
+    assert!(!same.upgraded_by_archive && same.archive_change.is_none());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_span_whose_lines_the_archive_replaced_is_transcript_upgraded() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    new_call(&r.core, "ready");
+    let seg = |id: &str, pass: &str, t0: u32| Insert {
+        table: "segments",
+        values: vec![
+            ("id", json!(id)),
+            ("call_id", json!("call_live")),
+            ("pass", json!(pass)),
+            ("channel", json!("sys")),
+            ("t0_ms", json!(t0)),
+            ("t1_ms", json!(t0 + 1000)),
+            ("text", json!("words")),
+            ("text_norm", json!("words")),
+        ],
+    };
+    r.core
+        .store()
+        .insert_batch(vec![seg("l1", "live", 0), seg("a1", "archive", 9000)])
+        .unwrap();
+    let err = r
+        .core
+        .transcript_span(
+            &call_window(),
+            SpanArgs {
+                span: TimeSpan {
+                    call_id: call_id(),
+                    channel: None,
+                    t0_ms: OffsetMs(0),
+                    t1_ms: OffsetMs(1000),
+                },
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::TranscriptUpgraded);
+}
+
+#[tokio::test(start_paused = true)]
 async fn levels_nobody_watches_do_not_use_up_seq_numbers() {
     let dir = tempfile::tempdir().unwrap();
     let r = open(dir.path());
