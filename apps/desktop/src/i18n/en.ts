@@ -893,6 +893,7 @@ export const en = {
   "outputs.written_local_after_timeout": "Written by the local model after Claude Code timed out",
   "outputs.names_updated": "Names updated",
   "outputs.names_regenerate": "Regenerate for better wording",
+  "outputs.suppressed": { one: "{count} item not suggested again because you rejected it", other: "{count} items not suggested again because you rejected them" },
   "outputs.regenerate": "Regenerate",
   "outputs.regenerating": "Regenerating…",
   "outputs.version": "Version",
