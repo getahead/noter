@@ -294,6 +294,7 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
         let second = format!("{speakers}{}", privacy_text(i.privacy));
         entries.push(TrayEntry::Line(second));
     }
+    // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-menu-next
     if let (true, Some((title, at))) = (idle, i.next_event) {
         let m = at.div_euclid(60_000);
         entries.push(TrayEntry::Line(format!(
@@ -302,6 +303,7 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
             m % 60
         )));
     }
+    // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-menu-next
     // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-first
     // @cpt-begin:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-degraded
     let degraded = i.degraded.iter().find_map(|d| match d {

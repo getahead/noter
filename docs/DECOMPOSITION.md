@@ -1239,11 +1239,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.20 Today dashboard — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-today`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-today`
 
 - **Purpose**: Show today's calls in calendar order with what is owed to each person, let the user tick items with **Undo**, and surface setup, quit and calendar states where the day starts.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/today.md`](features/ui/today.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/today.md`](features/ui/today.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-window`, `cpt-noter-feature-ui-first-run`
 
@@ -1269,8 +1269,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-screen-today`
-  - [ ] `p3` - `cpt-noter-component-ui-upcoming-call-card`
+  - [x] `p3` - `cpt-noter-component-screen-today`
+  - [x] `p3` - `cpt-noter-component-ui-upcoming-call-card`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `today_get`
