@@ -22,6 +22,7 @@ mod gate;
 mod route;
 mod runtime;
 mod secrets;
+mod tools;
 mod validate;
 
 pub use account_cli::{
@@ -38,6 +39,7 @@ pub use runtime::{
     TaskSettings, Tested, Usage, Validated,
 };
 pub use secrets::{key_account, KeychainLocked, MemorySecrets, Secret, SecretStore};
+pub use tools::{McpLaunch, ToolHost, ToolLaunch, ToolStart};
 pub use validate::raw_html;
 
 #[cfg(test)]

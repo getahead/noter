@@ -68,6 +68,33 @@ impl Codex {
             .arg(&work)
             .args(["-c", "project_doc_max_bytes=0"])
             .args(["-c", &format!("model_reasoning_effort=\"{effort}\"")]);
+        // noter-mcp is the only server: its token reaches it through the environment (never the
+        // command line, which any process of the user's could read).
+        if let Some(m) = &call.mcp {
+            let quoted = |s: &str| serde_json::Value::from(s).to_string();
+            let tools: Vec<String> = m.tools.iter().map(|t| quoted(t)).collect();
+            command
+                .env("NOTER_MCP_TOKEN", m.token.expose())
+                .args([
+                    "-c",
+                    &format!(
+                        "mcp_servers.noter.command={}",
+                        quoted(&m.binary.to_string_lossy())
+                    ),
+                ])
+                .args([
+                    "-c",
+                    &format!(
+                        "mcp_servers.noter.args=[{}]",
+                        quoted(&m.config.to_string_lossy())
+                    ),
+                ])
+                .args(["-c", "mcp_servers.noter.env_vars=[\"NOTER_MCP_TOKEN\"]"])
+                .args([
+                    "-c",
+                    &format!("mcp_servers.noter.enabled_tools=[{}]", tools.join(",")),
+                ]);
+        }
         if !call.model.is_empty() {
             command.args(["-m", &call.model]);
         }
