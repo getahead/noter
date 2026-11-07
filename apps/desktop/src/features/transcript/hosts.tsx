@@ -274,7 +274,9 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
         }
         setRenaming({ speakerId, segmentId: seg.id, anchor });
       }}
+      // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
       onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
+      // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
     />
     {fixing?.menu && (
       <Popover variant="context-menu" anchor={fixing.anchor} label={t("speakers.fix.menu")} onClose={() => setFixing(null)}>
@@ -344,21 +346,30 @@ export function StoredTranscript({ bridge, callId, audioKept, span, detail, head
   const tr = useTranscript(bridge, callId, { detail: given ? detail : read, audioKept, span });
   return (
     <>
-      {tr.data && (
-        <SpeakerNamingPanel
-          bridge={bridge}
-          callId={callId}
-          speakers={tr.data.speakers}
-          segments={tr.data.segments}
-          participants={tr.detail?.call.participants ?? []}
-          audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}
-        />
-      )}
+      <NamingPanel tr={tr} audioKept={audioKept} />
       {tr.archive && <ArchiveNotice note={tr.archive} />}
       <TranscriptLog tr={tr} variant="stored" header={header} />
       <TranscriptBar tr={tr} variant="stored" />
     </>
   );
+}
+
+function NamingPanel({ tr, audioKept }: { tr: ReturnType<typeof useTranscript>; audioKept?: boolean }) {
+  return tr.data ? (
+    <SpeakerNamingPanel
+      bridge={tr.bridge}
+      callId={tr.callId}
+      speakers={tr.data.speakers}
+      segments={tr.data.segments}
+      participants={tr.detail?.call.participants ?? []}
+      audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}
+    />
+  ) : null;
+}
+
+/** PC-R9 above the Summary (the call page's other host of the naming panel): reads the stored transcript for the first lines and speakers. */
+export function SummaryNamingPanel({ bridge, callId, detail }: { bridge: Bridge; callId: string; detail: AudioFacts }) {
+  return <NamingPanel tr={useTranscript(bridge, callId, { detail })} />;
 }
 
 /** Dev server only (App's `#transcript=<call id>`): the stored transcript in a PC-R5 of its own, until the call page lands. */

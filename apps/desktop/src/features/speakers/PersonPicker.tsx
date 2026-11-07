@@ -109,7 +109,9 @@ export function PersonPicker(p: PersonPickerProps) {
       if (current === newIndex) return openForm();
       const entry = flat[current];
       pick(entry);
+      // @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-return
       p.onConfirm?.(existing(entry), entry.display_name, false);
+      // @cpt-end:cpt-noter-algo-ui-speakers-picker:p1:inst-return
     } else if (e.key === "Escape" && query) {
       e.preventDefault(); // the first Esc clears, a second closes the host
       type("");
@@ -201,11 +203,13 @@ export function PersonPicker(p: PersonPickerProps) {
             p.variant === "inline" && "cw-pp__list--drop",
           )}
         >
+          {/* @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-empty */}
           {none && (
             <div className="cw-pp__none">
               {t("speakers.none", { query: quoted })}
             </div>
           )}
+          {/* @cpt-end:cpt-noter-algo-ui-speakers-picker:p1:inst-empty */}
           {groups.map((g) => (
             <div key={g.key} role="group" aria-label={header(g.key)}>
               <div className="cw-pp__hdr" aria-hidden="true">
@@ -294,7 +298,11 @@ export function NewPersonForm(p: NewFormProps) {
           caption: dup.role ?? "",
         },
       });
+    // @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-return
+    // @cpt-begin:cpt-noter-flow-ui-speakers-live-name:p1:inst-new
     p.onConfirm?.(created(form), form.name.trim(), true);
+    // @cpt-end:cpt-noter-flow-ui-speakers-live-name:p1:inst-new
+    // @cpt-end:cpt-noter-algo-ui-speakers-picker:p1:inst-return
   };
   // @cpt-end:cpt-noter-algo-ui-speakers-picker:p1:inst-duplicate
   const field = (

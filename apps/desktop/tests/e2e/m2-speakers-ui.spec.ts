@@ -132,6 +132,17 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await expect(panel(page)).toContainText("Name speakers · 2 not named");
   });
 
+  test("UI — happy path: the Summary tab shows the same Name speakers panel above the sections and naming there says Named Speaker 3 as Pavel", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => S.unnamed(w, 2) });
+    await navigate(page, "summary", S.CALL);
+    await expect(panel(page)).toContainText("Name speakers · 3 not named");
+    const row = rowOf(page, "Speaker 3");
+    await pick(row);
+    await row.getByRole("button", { name: "Name", exact: true }).click();
+    await expect(page.getByText(new RegExp(`Named Speaker 3 as Pavel[^·]* · ${LINES.source}`))).toBeVisible();
+    await expect(panel(page)).toContainText("Name speakers · 2 not named");
+  });
+
   test("UI — happy path: naming the last speaker says All speakers named · Undo, and Undo restores the row", async ({ page }) => {
     await open(page, () => {});
     await pick(rowOf(page, "Speaker 3"));

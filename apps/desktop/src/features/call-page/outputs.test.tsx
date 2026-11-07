@@ -137,6 +137,16 @@ describe("OutputSection", () => {
     expect(html).toContain("Edited");
     expect(html).toContain("Show Diff");
   });
+
+  it("says Names updated with a Regenerate for better wording link, never regenerating by itself", async () => {
+    await open([]);
+    const seen = sent();
+    const html = renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x", names_updated: true }))} />);
+    expect(html).toContain("Names updated");
+    expect(html).toContain("Regenerate for better wording");
+    expect(renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x" }))} />)).not.toContain("Names updated");
+    expect(seen.filter(([c]) => c === "outputs_regenerate")).toEqual([]);
+  });
 });
 
 describe("VersionSwitcher", () => {
