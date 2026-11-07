@@ -529,7 +529,7 @@ fn lookup<L: EngineLauncher>(
 ) -> Result<(), Stop> {
     let meta = ctx.change_meta("server lookup").ok_or(Stop::Cancelled)?;
     let bytes = request.to_string();
-    noter_llm::audit_lookup(env.store, meta, (env.now)(), server, bytes.as_bytes())?;
+    noter_llm::audit_lookup(env.store, meta, (env.now)(), server, bytes.as_bytes(), None)?;
     Ok(())
 }
 

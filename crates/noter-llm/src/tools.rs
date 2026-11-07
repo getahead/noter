@@ -17,6 +17,9 @@ pub struct ToolStart {
     /// The run is on a cloud runtime: its tool results are gated, redacted and audited.
     pub cloud: bool,
     pub tools: Vec<String>,
+    /// An Ask or post-call run whose privacy, as it starts, is Cloud allowed and not sensitive:
+    /// the only run D1 lets query the user's live MCP sources.
+    pub live_ok: bool,
 }
 
 /// What the host made for the run: the per-run token and the 0600 config noter-mcp reads.

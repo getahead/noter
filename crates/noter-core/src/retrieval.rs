@@ -16,7 +16,7 @@ use crate::{object, Core};
 
 /// Retrieval's documents: knowledge chunks by keyword and by vector, each ranking through the
 /// sources' policy as it stands now (`noter_knowledge::permitted_chunks`).
-struct Documents;
+pub(crate) struct Documents;
 
 impl DocumentSource for Documents {
     fn permitted_chunks(&self, conn: &Connection, q: &DocQuery<'_>) -> rusqlite::Result<DocHits> {
