@@ -1,4 +1,4 @@
-// @cpt-dod:cpt-noter-dod-core-mcp-results:p1
+// @cpt-flow:cpt-noter-flow-core-mcp-start:p1
 //! noter-mcp under a run (`cpt-noter-feature-core-mcp`): the host that starts and revokes a
 //! run's tool server, the launch the CLI adapters put in their lockdown config, and the
 //! run's redaction state that every tool result passes through before it is released.

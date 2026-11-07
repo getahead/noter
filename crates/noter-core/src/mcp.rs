@@ -126,7 +126,6 @@ impl McpRuns {
 }
 
 impl ToolHost for CoreTools {
-    // @cpt-flow:cpt-noter-flow-core-mcp-start:p1
     fn start(&self, run: ToolStart) -> Result<ToolLaunch, String> {
         let core = self.0.get().and_then(Weak::upgrade).ok_or("no_socket")?;
         let (token, config) = core
@@ -466,7 +465,9 @@ impl Core {
             "pin_item" | "propose_correction" => self.stage_tool(t, method, params)?,
             _ => self.read_tool(t, method, params)?,
         };
+        // @cpt-begin:cpt-noter-flow-core-mcp-read:p1:inst-read-gate
         self.release(t, value)
+        // @cpt-end:cpt-noter-flow-core-mcp-read:p1:inst-read-gate
     }
 
     // @cpt-algo:cpt-noter-algo-core-mcp-release-result:p1
@@ -524,15 +525,21 @@ impl Core {
     /// `pin_item` and `propose_correction` (`cpt-noter-flow-core-mcp-stage`): validate against
     /// rows this run may see, then stage through the owning change-log writer. Nothing a user
     /// decided on changes; the answer is the staged record's reference.
+    // @cpt-dod:cpt-noter-dod-core-mcp-staging:p1
     // @cpt-flow:cpt-noter-flow-core-mcp-stage:p1
     fn stage_tool(&self, t: &Trusted, method: &str, params: Value) -> Result<Value, Rpc> {
         // @cpt-begin:cpt-noter-flow-core-mcp-stage:p1:inst-stage-request
         // The token and the tool were checked by `authorize`; the referenced rows below.
         // @cpt-end:cpt-noter-flow-core-mcp-stage:p1:inst-stage-request
+        // @cpt-begin:cpt-noter-flow-core-mcp-stage:p1:inst-stage-store
         let reference = match method {
             "pin_item" => self.stage_pin(t, typed(params)?)?,
             _ => self.stage_correction(t, typed(params)?)?,
         };
+        // @cpt-end:cpt-noter-flow-core-mcp-stage:p1:inst-stage-store
+        // @cpt-begin:cpt-noter-flow-core-mcp-stage:p1:inst-stage-review
+        // Applying and undoing stay with the owning feature: nothing above approves a proposal.
+        // @cpt-end:cpt-noter-flow-core-mcp-stage:p1:inst-stage-review
         // @cpt-begin:cpt-noter-flow-core-mcp-stage:p1:inst-stage-return
         Ok(to_json(&StagedOutput {
             staged: true,
