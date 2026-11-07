@@ -192,6 +192,35 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
 });
 
 test.describe("cpt-noter-seq-call-page-check-evidence", () => {
+  for (const submit of ["button", "keyboard"] as const) test(`UI — inspector locks its draft while Save is pending and unlocks after success (${submit})`, async ({ page }) => {
+    await openCall(page, suggest());
+    await button(rowOf(page, SPEC), "Show in Item inspector").click();
+    const inspector = page.locator(INSPECTOR);
+    const text = inspector.getByRole("textbox", { name: "Item text" });
+    await text.fill("Save this draft");
+    await page.evaluate(() => {
+      type Host = { invoke(cmd: string, ...args: unknown[]): Promise<unknown> };
+      const g = globalThis as unknown as { __noterFake?: Host; __TAURI_INTERNALS__?: Host; releaseItemSave?: () => void };
+      const host = g.__noterFake ?? g.__TAURI_INTERNALS__!;
+      const invoke = host.invoke.bind(host);
+      host.invoke = async (cmd, ...args) => {
+        if (cmd === "item_edit") await new Promise<void>((resolve) => { g.releaseItemSave = resolve; });
+        return invoke(cmd, ...args);
+      };
+    });
+    if (submit === "keyboard") await text.press("Meta+Enter");
+    else await button(inspector, "Save").click();
+    await expect(text).toBeDisabled();
+    await expect(inspector.locator('input[type="date"]')).toBeDisabled();
+    await expect(inspector.getByRole("textbox", { name: "Linked issue" })).toBeDisabled();
+    await page.evaluate(() => (globalThis as unknown as { releaseItemSave: () => void }).releaseItemSave());
+    await expect(inspector.getByText("Saved", { exact: true })).toBeVisible();
+    await expect(text).toBeEnabled();
+    await expect(text).toHaveValue("Save this draft");
+    await text.fill("A later draft");
+    await expect(button(inspector, "Save")).toBeEnabled();
+  });
+
   test("UI — inspector retains a conflicting draft and requires a second explicit Save", async ({ page }) => {
     await openCall(page, suggest());
     await button(rowOf(page, SPEC), "Show in Item inspector").click();

@@ -70,6 +70,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
     if (err) setSaved(err);
   };
   const save = async () => {
+    if (saved === "saving") return;
     setSaved("saving");
     const err = await saveFields(bridge, draftBase.current ?? it, fields);
     if (err) {
@@ -90,7 +91,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-kind
   const details = (
     <div className="ii-details" onKeyDown={(e) => e.key === "Enter" && e.metaKey && (e.preventDefault(), void save())}>
-      <TextField multiline rows={3} value={fields.text} ariaLabel={t("items.field.text")} lang={langOf(it.lang)} onChange={(text) => set({ text })} />
+      <TextField multiline rows={3} value={fields.text} disabled={saved === "saving"} ariaLabel={t("items.field.text")} lang={langOf(it.lang)} onChange={(text) => set({ text })} />
       {action && (
         <>
           <label className="it-field">
@@ -99,7 +100,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
           </label>
           <label className="it-field">
             <span>{t("items.field.due")}</span>
-            <TextField variant="date" value={fields.due} ariaLabel={t("items.field.due")} onChange={(due) => set({ due })} />
+            <TextField variant="date" value={fields.due} disabled={saved === "saving"} ariaLabel={t("items.field.due")} onChange={(due) => set({ due })} />
           </label>
           <div className="it-field">
             <span>{t("items.field.status")}</span>
@@ -109,7 +110,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
       )}
       <label className="it-field">
         <span>{t("items.field.linked")}</span>
-        <TextField value={fields.linked_issue} ariaLabel={t("items.field.linked")} onChange={(linked_issue) => set({ linked_issue })} />
+        <TextField value={fields.linked_issue} disabled={saved === "saving"} ariaLabel={t("items.field.linked")} onChange={(linked_issue) => set({ linked_issue })} />
       </label>
       {fields.linked_issue && <p className="np-dim ii-helper">{t("items.linked_helper")}</p>}
       {action && (

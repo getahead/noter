@@ -60,6 +60,16 @@ describe("AddItem", () => {
 describe("ItemInspector", () => {
   const stored = () => bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { itm_a11y: fake.world.items.find((i) => i.id === "itm_a11y")! } } }));
 
+  it("ignores keyboard submission while a save is pending", async () => {
+    stored();
+    const invoke = vi.spyOn(fake, "invoke");
+    queue.push(["details", vi.fn()], [null, vi.fn()], [false, vi.fn()], [{ text: "Pending draft", due: "", linked_issue: "" }, vi.fn()], ["saving", vi.fn()]);
+    const tree = rendered(ItemInspector, { bridge, itemId: "itm_a11y" });
+    (find(tree, (p) => p.className === "ii-details").props.onKeyDown as (e: unknown) => void)({ key: "Enter", metaKey: true, preventDefault() {} });
+    await settle();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it("reads the item on mount, saves the draft and clears the Saved status after 2 s", async () => {
     vi.useFakeTimers();
     const [setEvidence, setLoadError, setDraft, setSaved] = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
