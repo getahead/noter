@@ -902,6 +902,10 @@ fn speaker_label(
     person_id: Option<String>,
     name: Option<&str>,
 ) -> SpeakerLabel {
+    // The "you" row may carry the user's person (items read it as the owner): it stays You.
+    if label == "you" {
+        return SpeakerLabel::You;
+    }
     if let Some(id) = person_id {
         return SpeakerLabel::Person {
             person: chip(id, name.unwrap_or(label)),
