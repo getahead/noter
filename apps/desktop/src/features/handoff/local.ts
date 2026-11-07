@@ -10,7 +10,7 @@ export interface Local {
   draft?: string;
   draftRev?: number;
   showDiff?: boolean;
-  pending?: "save" | "copy" | "open";
+  pending?: "save" | "copy" | "open" | "target";
   /** `handoff_get` failed with this code. */
   loadFailed?: ErrorCode;
   /** `handoff_generate` itself was refused. */

@@ -92,6 +92,27 @@ describe("load and generate (cpt-noter-flow-ui-handoff-prepare)", () => {
 });
 
 describe("edit, target, copy and open (cpt-noter-flow-ui-handoff-deliver)", () => {
+  it("does not launch or change target again while a target change is pending", async () => {
+    await ready();
+    map();
+    await A.load(bridge, ID);
+    const target = bridge.core.handoffSetTarget.bind(bridge.core);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(bridge.core, "handoffSetTarget").mockImplementation(async (args) => {
+      await held;
+      return target(args);
+    });
+    const seen = sent();
+    const first = A.setTarget(bridge, ID, "codex");
+    await A.open(bridge, ID);
+    const second = A.setTarget(bridge, ID, "claude_code");
+    release();
+    await Promise.all([first, second]);
+    expect(seen.map((s) => s[0])).toEqual(["handoff_set_target"]);
+    expect(A.viewOf(bridge, ID)?.target).toBe("codex");
+  });
+
   it("keeps text typed during a save and does not launch the older saved prompt", async () => {
     await ready();
     map();

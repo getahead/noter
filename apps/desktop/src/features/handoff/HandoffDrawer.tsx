@@ -140,14 +140,14 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
         </div>
         {(state === "EDITED" || view?.edited) && <Badge kind="status" text={t("handoff.edited")} />}
         {localModel && <Badge kind="kind" text={t("handoff.local_model")} />}
-        <PushButton label={t("handoff.regenerate")} size="small" variant="quiet" disabled={!view || state === "GENERATING"} onAction={() => void generate(bridge, itemId, true)} />
+        <PushButton label={t("handoff.regenerate")} size="small" variant="quiet" disabled={!view || state === "GENERATING" || !!local.pending} onAction={() => void generate(bridge, itemId, true)} />
       </header>
       <div className="hd__body">
         {view && (
           <>
             <div className="hd__row" data-region="HD-R2">
               <span className="hd__lab">{t("handoff.target")}</span>
-              <SegmentedControl variant="option" label={t("handoff.target")} items={TARGETS.map((value) => ({ value, label: toolLabel(value) }))} value={view.target} onAction={(v) => void setTarget(bridge, itemId, v as HandoffTarget)} />
+              <SegmentedControl variant="option" label={t("handoff.target")} items={TARGETS.map((value) => ({ value, label: toolLabel(value), disabled: !!local.pending }))} value={view.target} onAction={(v) => void setTarget(bridge, itemId, v as HandoffTarget)} />
             </div>
             <div className="hd__row" data-region="HD-R3">
               <span className="hd__lab">{t("handoff.repository")}</span>

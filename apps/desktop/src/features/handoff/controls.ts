@@ -24,7 +24,7 @@ export function drawerState(view: HandoffView | undefined, local: Local): Drawer
   // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-generate
   // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-save
   // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-action
-  if (local.pending) return local.pending === "save" ? "SAVING" : local.pending === "copy" ? "COPYING" : "OPENING";
+  if (local.pending) return local.pending === "copy" ? "COPYING" : local.pending === "open" ? "OPENING" : "SAVING";
   // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-action
   // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-save
   // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-edit

@@ -44,6 +44,7 @@ const loading = new Set<string>();
 
 /** Write the prompt (again): **Regenerate** drops the user's edit, **Try Again** repeats a failed first write. */
 export async function generate(bridge: Bridge, itemId: string, regenerate: boolean) {
+  if (localOf(itemId).pending || running.has(itemId)) return;
   if (!regenerate && asking.has(itemId)) return;
   asking.add(itemId);
   try {
@@ -96,8 +97,10 @@ export async function flushDraft(bridge: Bridge, itemId: string): Promise<boolea
 
 // @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-target
 export async function setTarget(bridge: Bridge, itemId: string, target: HandoffTarget) {
+  if (localOf(itemId).pending || running.has(itemId)) return;
+  patchLocal(itemId, { pending: "target" });
   const res = await bridge.act(`handoff:target:${itemId}`, "handoff_set_target", () => bridge.core.handoffSetTarget({ item_id: itemId, target }), { entity: "handoff" });
-  patchLocal(itemId, res.status === "ok" ? { error: undefined, openFailed: undefined, restored: undefined } : { error: errorText(res.error.code) });
+  patchLocal(itemId, { pending: undefined, ...(res.status === "ok" ? { error: undefined, openFailed: undefined, restored: undefined } : { error: errorText(res.error.code) }) });
 }
 // @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-target
 
@@ -106,7 +109,7 @@ const running = new Set<string>();
 
 /** Runs `go` as the item's one action, after the draft is saved; a second invocation while one runs does nothing. */
 async function action(bridge: Bridge, itemId: string, kind: "copy" | "open", go: () => Promise<void>) {
-  if (running.has(itemId)) return;
+  if (running.has(itemId) || localOf(itemId).pending) return;
   running.add(itemId);
   try {
     // @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-invoke
