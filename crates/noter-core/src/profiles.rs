@@ -266,6 +266,7 @@ fn stale() -> CoreError {
     CoreError::new(ErrorCode::NotFound, "a deletion won over this write")
 }
 
+// @cpt-dod:cpt-noter-dod-core-people-profiles:p4
 impl Core {
     /// The encryption key; created on the first profile when `create`, never stored in plain
     /// text: a locked Keychain is `keychain_locked` and nothing is written (TL-33).
