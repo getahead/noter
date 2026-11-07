@@ -245,3 +245,20 @@ describe("evidence notes (inst-audio, inst-archive)", () => {
     expect(evidenceNotes({ ...r.preview, audio_available: false, upgraded_by_archive: true })).toEqual({ audioGone: true, archiveChanged: true });
   });
 });
+
+describe("evidence over the archive pass (inst-archive)", () => {
+  it("resolves a transcript_upgraded span as upgraded and still opens the Transcript on it", async () => {
+    await ready();
+    const upgraded = { ...bridge, core: { ...bridge.core, transcriptSpan: async () => ({ status: "error", error: { code: "transcript_upgraded", message: "" } }) } } as unknown as Bridge;
+    expect(await resolveSpan(upgraded, span())).toEqual({ status: "upgraded" });
+    const navigated: unknown[] = [];
+    const nav = {
+      ...upgraded,
+      act: async (_key: string, _cmd: string, run: () => unknown) => run(),
+      core: { ...upgraded.core, windowNavigate: async (a: unknown) => (navigated.push(a), { status: "ok", data: null }) },
+    } as unknown as Bridge;
+    expect((await openEvidence(nav, span())).status).toBe("upgraded");
+    expect(navigated).toEqual([expect.objectContaining({ target: expect.objectContaining({ type: "call_page", tab: "transcript" }) })]);
+  });
+});
+
