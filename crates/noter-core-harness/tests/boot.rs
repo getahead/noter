@@ -2377,7 +2377,7 @@ async fn mcp_run_registers_a_run_on_the_core_socket_and_mcp_close_revokes_it() {
         .ok(
             "main",
             "harness.mcp_run",
-            json!({ "tools": ["get_screen_context", "search_calls"] }),
+            json!({ "tools": ["get_screen_context", "emit_card"] }),
         )
         .await;
     let config = std::path::PathBuf::from(run["config"].as_str().unwrap());
