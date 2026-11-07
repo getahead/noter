@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.19.0](https://github.com/getahead/noter/compare/v0.18.0...v0.19.0) (2026-11-07)
+
+
+### Features
+
+* **core:** add Today review links and fake regrouping (protocol 2.4) ([#338](https://github.com/getahead/noter/issues/338)) ([c961db0](https://github.com/getahead/noter/commit/c961db0c0e1f6fecb90ac0a8cffe5b96f6b41de7))
+* **core:** api_key_remove, the Privacy pane audit reads and export, storage_move guard, sign-in prepare and cli_install ([#341](https://github.com/getahead/noter/issues/341)) ([69d8671](https://github.com/getahead/noter/commit/69d86712bf7ab311c882f6262074766d895a8b20))
+* **core:** people tables, list, pages, create, update, merge and delete ([#335](https://github.com/getahead/noter/issues/335)) ([f62aca9](https://github.com/getahead/noter/commit/f62aca98bff1a5118a48249494600d728db9a6a3))
+
 ## [0.18.0](https://github.com/getahead/noter/compare/v0.17.0...v0.18.0) (2026-11-07)
 
 
