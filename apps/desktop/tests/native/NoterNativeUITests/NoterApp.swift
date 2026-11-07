@@ -113,6 +113,17 @@ class NoterTestCase: XCTestCase {
         menu.menuItems.matching(NSPredicate(format: "title == 'Recording' OR title BEGINSWITH 'Recording · '")).firstMatch
     }
 
+    /// The menu's Recording line, reopening the menu a bounded number of times: it is built when the menu opens and a
+    /// menu that opened just before the recording started does not follow the change.
+    func expectRecordingLine(file: StaticString = #filePath, line: UInt = #line) {
+        var recording = recordingLine(in: openMenu())
+        for _ in 0..<5 where !recording.waitForExistence(timeout: 2) {
+            closeMenu()
+            recording = recordingLine(in: openMenu())
+        }
+        XCTAssertTrue(recording.waitForExistence(timeout: 2), "the menu shows no Recording line", file: file, line: line)
+    }
+
     func assertItems(_ titles: [String], in menu: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         for t in titles {
             XCTAssertTrue(item(t, in: menu).exists, "menu item “\(t)” is missing", file: file, line: line)

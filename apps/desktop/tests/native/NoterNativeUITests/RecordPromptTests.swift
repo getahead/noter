@@ -9,7 +9,7 @@ final class RecordPromptTests: NoterTestCase {
         XCTAssertTrue(recordPrompt.waitForExistence(timeout: 10), "no record prompt")
         hotkey("r")
         XCTAssertEqual(other.state, .runningForeground, "the prompt never takes focus from the call app")
-        XCTAssertTrue(recordingLine(in: openMenu()).waitForExistence(timeout: 5))
+        expectRecordingLine()
     }
 
     func test_cpt_noter_seq_record_prompt_start_recording__click_record_keeps_focus() {
@@ -21,7 +21,7 @@ final class RecordPromptTests: NoterTestCase {
         XCTAssertTrue(recordPrompt.frame.contains(record.frame), "Record lies inside the panel (window_fit)")
         clickKeepingFocus(record)
         XCTAssertEqual(other.state, .runningForeground, "clicking Record never takes focus from the call app")
-        XCTAssertTrue(recordingLine(in: openMenu()).waitForExistence(timeout: 5))
+        expectRecordingLine()
     }
 
     func test_cpt_noter_seq_record_prompt_record_after_missed_prompt__hotkey_records() {
@@ -29,6 +29,6 @@ final class RecordPromptTests: NoterTestCase {
         XCTAssertTrue(item("Call Detected · Start Recording", in: openMenu()).exists)
         closeMenu()
         hotkey("r")
-        XCTAssertTrue(recordingLine(in: openMenu()).waitForExistence(timeout: 5))
+        expectRecordingLine()
     }
 }
