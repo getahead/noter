@@ -8,7 +8,7 @@
 //! goes through the same change-logged write path a user's edit takes; the Mac's side
 //! (permissions, displays, reachability, disk, update) lives in the scripted seams.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -55,6 +55,10 @@ pub struct Options {
     pub displays: Option<Vec<DisplayInfo>>,
     /// `--power battery`: the Mac runs on battery, so the jobs that need mains power wait.
     pub battery: bool,
+    /// The native app's scripted launch plan and failures (`NOTER_TEST_LAUNCH_WORLD`).
+    pub launch_world: Option<LaunchWorld>,
+    /// Folder-panel answers (`NOTER_TEST_FOLDER_PANELS`): null cancels; exhaustion cancels.
+    pub folder_panels: Option<VecDeque<Option<PathBuf>>>,
 }
 
 impl Options {
@@ -97,6 +101,9 @@ impl Options {
     /// The app's launch hooks, read with `var`: `None` unless `NOTER_TEST_FIXTURE` is set, to
     /// `world` (the fixture world) or `none` (a fresh install); `NOTER_TEST_CLOCK=fixed`,
     /// `NOTER_TEST_ENGINE_SCRIPT=<file>` and `NOTER_TEST_SCENARIO=<name>` as the flags say.
+    /// `NOTER_TEST_LAUNCH_WORLD` is the JSON accepted by `harness.launch_world`;
+    /// `NOTER_TEST_FOLDER_PANELS` is a JSON array of absolute chosen paths or null cancellations.
+    /// Chosen folders must already exist: these answers never create them.
     pub fn from_env(var: impl Fn(&str) -> Option<String>) -> Result<Option<Options>, String> {
         let Some(fixture) = var("NOTER_TEST_FIXTURE") else {
             return Ok(None);
@@ -118,6 +125,21 @@ impl Options {
             }
             scenario(&name, TimestampMs(0), &mut world())?;
             options.scenario = Some(name);
+        }
+        // @cpt-dod:cpt-noter-dod-core-handoff-tests:p1
+        if let Some(value) = var("NOTER_TEST_LAUNCH_WORLD") {
+            options.launch_world = Some(
+                serde_json::from_str(&value)
+                    .map_err(|e| format!("NOTER_TEST_LAUNCH_WORLD: {e}"))?,
+            );
+        }
+        if let Some(value) = var("NOTER_TEST_FOLDER_PANELS") {
+            let answers: VecDeque<Option<PathBuf>> = serde_json::from_str(&value)
+                .map_err(|e| format!("NOTER_TEST_FOLDER_PANELS: {e}"))?;
+            if answers.iter().flatten().any(|path| !path.is_absolute()) {
+                return Err("NOTER_TEST_FOLDER_PANELS: chosen paths must be absolute".into());
+            }
+            options.folder_panels = Some(answers);
         }
         Ok(Some(options))
     }
@@ -141,6 +163,21 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
     let at = |ms: i64| TimestampMs(now.0 + ms);
     match name {
         "idle" => w.app.capture = idle,
+        // @cpt-dod:cpt-noter-dod-core-handoff-tests:p1
+        "handoff" => {
+            w.app.capture = idle;
+            // Put the engineering item on the saved call's page, where native tests can open it.
+            let outputs = w.outputs.iter_mut().find(|o| o.call_id.as_str() == "call_backend")
+                .ok_or("handoff scenario: missing saved-call outputs")?;
+            let actions = outputs.sections.iter_mut().find(|s| s.kind == SectionKind::ActionItems)
+                .ok_or("handoff scenario: missing action items")?;
+            let item = w.items.iter_mut().find(|i| i.id.as_str() == "itm_replay")
+                .ok_or("handoff scenario: missing engineering item")?;
+            item.call.id = outputs.call_id.clone();
+            item.call.title = "Backend sync".into();
+            actions.items.retain(|i| i.id != item.id);
+            actions.items.push(item.clone());
+        }
         "low-disk" => {
             w.app.capture = idle;
             w.app.environment.disk_free_mb = 100;
@@ -188,7 +225,7 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
             w.call_details.retain(|d| first(&d.call.id));
             w.transcripts.retain(|t| first(&t.call_id));
         }
-        _ => return Err(format!("unknown scenario {name}; known: idle, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
+        _ => return Err(format!("unknown scenario {name}; known: idle, handoff, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
     }
     Ok(())
 }
@@ -285,7 +322,8 @@ impl Harness {
         let panel = Arc::new(ScriptedPanel {
             dir: dir.join("exports"),
             cancel_next: AtomicBool::new(false),
-            launch: Mutex::new(LaunchWorld::default()),
+            launch: Mutex::new(options.launch_world.unwrap_or_default()),
+            folder_panels: Mutex::new(options.folder_panels),
             log: Mutex::new(json!({ "launches": [], "clipboard": [] })),
             probe_fails: Mutex::new(None),
         });
@@ -1740,19 +1778,20 @@ struct ScriptedPanel {
     dir: PathBuf,
     cancel_next: AtomicBool,
     launch: Mutex<LaunchWorld>,
+    folder_panels: Mutex<Option<VecDeque<Option<PathBuf>>>>,
     log: Mutex<Value>,
     probe_fails: Mutex<Option<ErrorCode>>,
 }
 
 /// What the Mac reports for launches: the plan, and the paths that fail with a code.
-#[derive(serde::Deserialize)]
-struct LaunchWorld {
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct LaunchWorld {
     plan: LaunchPlan,
     #[serde(default)]
     fail: Vec<FailedLaunch>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 struct FailedLaunch {
     path: LaunchPath,
     code: ErrorCode,
@@ -1777,6 +1816,12 @@ impl NativeOps for ScriptedPanel {
         Box::pin(async move {
             if self.cancel_next.swap(false, Ordering::SeqCst) {
                 return None;
+            }
+            // @cpt-dod:cpt-noter-dod-core-handoff-tests:p1
+            if kind == SaveKind::Folder {
+                if let Some(answers) = lock(&self.folder_panels).as_mut() {
+                    return answers.pop_front().flatten();
+                }
             }
             let path = self.dir.join(name);
             let folder = if kind == SaveKind::Folder {
