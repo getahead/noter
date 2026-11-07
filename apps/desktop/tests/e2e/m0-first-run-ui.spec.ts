@@ -12,6 +12,7 @@ import type { ModelBundle } from "../../src/core/bindings";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { confirmSystemAudio, startSelfTest } from "./support/self-test";
 import { expect, test } from "./support/fixtures";
 
 const FAKE = process.env.NOTER_CORE !== "stdio";
@@ -29,23 +30,6 @@ const sent = async (page: Page, name: string): Promise<unknown[]> =>
 
 /** Noter is in front again after the user was in System Settings (the window's `focus`). */
 const backInNoter = (page: Page) => page.evaluate(() => void dispatchEvent(new Event("focus")));
-
-/**
- * System audio granted in the world: macOS reports no change of it, so the core hears it when the user comes back
- * from System Settings (the fake shows it granted at once, with no button to press).
- */
-async function confirmSystemAudio(page: Page): Promise<void> {
-  const sys = permissionRow(page, "System audio recording");
-  const open = sys.getByRole("button", { name: "Open System Settings…" });
-  await expect(sys).toContainText(/Granted|not allowed/); // the row is drawn
-  if (await open.count()) {
-    await open.click();
-    await backInNoter(page);
-  }
-  await expect(sys).toContainText("Granted", { timeout: 15_000 }); // the core's short tap takes a few seconds
-  // The fake's first levels tick inserts the microphone meter and can move Run Test during a click.
-  if (FAKE) await expect(permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" })).toBeVisible();
-}
 
 /** Both audio permissions granted. */
 function audioGranted(w: World): void {
@@ -155,9 +139,7 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
 
   test("UI — error path: Self-test hears only one stream — the hint, Run Test again, passed", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), audioGranted(w)) });
-    await confirmSystemAudio(page);
-
-    await button(page, "Run Test").click();
+    await startSelfTest(page, { manual: steer });
     await expect.poll(async () => (await sent(page, "self_test_run")).length).toBe(1);
     await steer.push("self_test_run", { event: { type: "levels", mic_db: -30, sys_db: null } });
     await steer.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
@@ -165,9 +147,26 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     await expect(selfTest(page)).toContainText("We hear your microphone but not system audio. Play any sound in another app and try again.");
     await expect(selfTest(page).getByRole("status")).toHaveCount(0); // not passed
 
-    await button(page, "Run Test").click(); // after playing a sound in another app
+    await startSelfTest(page); // after playing a sound in another app
     await expect(selfTest(page).getByRole("status")).toContainText("Self-test passed");
     await expect(selfTest(page)).not.toContainText("We hear your microphone but not system audio.");
+  });
+
+  test("UI — regression: a delayed self-test command opens its channel before injected failure", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { latency: 700, world: (w) => (W.firstRun(w), audioGranted(w)) });
+    await startSelfTest(page, { manual: steer });
+    await expect.poll(async () => (await sent(page, "self_test_run")).length).toBe(1);
+    await steer.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
+    await expect(selfTest(page)).toContainText("We hear your microphone but not system audio.");
+  });
+
+  test("UI — regression: a slow manual self-test driver retains the injected failure", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), audioGranted(w)) });
+    await startSelfTest(page, { manual: steer });
+    // Deliberately exceed the scripted pass time to reproduce an overloaded test driver.
+    await page.waitForTimeout(1800);
+    await steer.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
+    await expect(selfTest(page)).toContainText("We hear your microphone but not system audio.");
   });
 
   test("UI — empty path: Self-test skipped — Skip for Now marks Permissions with a dash and moves on", async ({ page }) => {

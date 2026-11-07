@@ -16,6 +16,8 @@ import type { World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
 
 export interface CorePlan {
+  /** Use the fixture clock for calendar scenarios instead of the host time (real core only). */
+  fixedClock?: boolean;
   /** The window's next calls of `cmd` fail with `code`, in order (FakeCore.failNext). */
   fail?: Array<{ cmd: CommandName; code: ErrorCode }>;
   /** The snapshot reports this contract version instead of the fixture's. */
@@ -37,12 +39,16 @@ export interface Steer {
   push(cmd: ChannelCommand, body: ChannelBody): Promise<void>;
   /** A download held by `holdDownloadAt` serves the rest (a no-op on the fake). */
   releaseDownload(): Promise<void>;
+  /** Hold the next self-test script for manually injected events. */
+  holdNextSelfTest(): Promise<void>;
 }
 
 export interface Call {
   kind: "invoke" | "listen";
   name: string;
   args?: unknown;
+  /** The core has returned successfully, so its Channel is open. */
+  completed?: boolean;
 }
 
 const HOOK = `
@@ -65,8 +71,12 @@ const HOOK = `
         }
       })();
     }
-    calls.push({ kind: "invoke", name: cmd, args: structuredClone(args) });
-    return Promise.resolve(this.__noterPlanned).then(() => invoke.call(this, cmd, args, onMessage));
+    const call = { kind: "invoke", name: cmd, args: structuredClone(args), completed: false };
+    calls.push(call);
+    return Promise.resolve(this.__noterPlanned).then(() => invoke.call(this, cmd, args, onMessage)).then((result) => {
+      call.completed = true;
+      return result;
+    });
   };
   FakeCore.prototype.listen = function (event, handler) {
     globalThis.__noterFake = this;
@@ -113,9 +123,11 @@ function tauriIpcStandIn(): void {
         return payload.handler;
       }
       if (cmd === "plugin:event|unlisten") return w.__noterUnlisten(doc, payload.eventId!);
-      calls.push({ kind: "invoke", name: cmd, args: structuredClone(payload.args) });
+      const call: Call = { kind: "invoke", name: cmd, args: structuredClone(payload.args), completed: false };
+      calls.push(call);
       const answer = await w.__noterInvoke(doc, cmd, payload.args, payload.channel?.id ?? null);
       if ("error" in answer) throw answer.error;
+      call.completed = true;
       return answer.ok;
     },
   };
@@ -130,7 +142,7 @@ const WINDOWS = COMMANDS.app_snapshot.windows as readonly string[];
 async function connectRealCore(page: Page, label: string, plan: CorePlan): Promise<Steer> {
   const command = process.env.NOTER_CORE_CMD;
   if (!command) throw new Error("NOTER_CORE=stdio needs NOTER_CORE_CMD (path to noter-core-harness and its flags)");
-  const core = new StdioCore({ command });
+  const core = new StdioCore({ command: plan.fixedClock ? `${command} --clock fixed` : command });
   page.once("close", () => void core.close());
   const win = (WINDOWS.includes(label) ? label : "main") as WindowLabel; // as main.tsx reads it
   // Harness control requests (tests/support/scenario.ts › HARNESS_CONTROLS), not contract commands.
@@ -144,6 +156,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     failNext: async (cmd, code, detail = null) => void (await control("harness.fail_next", { window: win, cmd, code, detail })),
     push: async (cmd, body) => void (await control("harness.push", { cmd, body })),
     releaseDownload: async () => void (await control("harness.release_download", {})),
+    holdNextSelfTest: async () => void (await control("harness.hold_next_self_test", {})),
   };
   if (plan.world) await steer.change(plan.world);
   if (plan.corruptNextDownload) await control("harness.corrupt_next_download", {});
@@ -178,7 +191,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
 }
 
 interface PageFake {
-  __noterFake: { world: World; setWorld(w: World): void; failNext(c: string, k: string, d: unknown): void; push(c: string, b: unknown): void };
+  __noterFake: { holdSelfTest: boolean; world: World; setWorld(w: World): void; failNext(c: string, k: string, d: unknown): void; push(c: string, b: unknown): void };
 }
 
 /** The fake target's controls: the FakeCore the page built, reached through the hook. */
@@ -193,6 +206,7 @@ function fakeSteer(page: Page): Steer {
       page.evaluate(([c, k, d]) => void (globalThis as unknown as PageFake).__noterFake.failNext(c, k, d), [cmd, code, detail] as const),
     push: (cmd, body) => page.evaluate(([c, b]) => void (globalThis as unknown as PageFake).__noterFake.push(c, b), [cmd, body] as const),
     releaseDownload: async () => {},
+    holdNextSelfTest: () => page.evaluate(() => { (globalThis as unknown as PageFake).__noterFake.holdSelfTest = true; }),
   };
 }
 

@@ -1415,6 +1415,11 @@ impl Controls for Harness {
                 "world_get" => self.world_get().await,
                 "world_set" => self.world_set(args).await,
                 "push" => self.push(args).await,
+                // `{}`: the next self-test waits for scenario events instead of its timed script.
+                "hold_next_self_test" => {
+                    self.engine.hold_next_self_test();
+                    Ok(json!({}))
+                }
                 // `{}`: what the core asked the native layer to show, in order (TL-2).
                 "surfaces" => Ok(json!({ "calls": *lock(&self.surfaces.0) })),
                 // `{}`: the next model download delivers bytes that fail their checksum.

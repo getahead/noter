@@ -27,8 +27,8 @@ const calendar = (state: "not_asked" | "denied") => (w: Parameters<typeof W.idle
 };
 
 /** The window opens on Today, the first section (⌘1). */
-async function openToday(page: Page, world: (w: Parameters<typeof W.idle>[0]) => void) {
-  const steer = await openWindow(page, "main", { world });
+async function openToday(page: Page, world: (w: Parameters<typeof W.idle>[0]) => void, options: { fixedClock?: boolean } = {}) {
+  const steer = await openWindow(page, "main", { world, ...options });
   await expect(async () => {
     await page.keyboard.press("Meta+Digit1");
     await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible({ timeout: 1000 });
@@ -83,7 +83,7 @@ const done = (page: Page) => page.locator('[data-region="TD-R7"]');
 
 test.describe("cpt-noter-seq-today-tick-item", () => {
   test("UI — happy — tick a suggested card item, retain Undo after feedback expires, restore the suggestion", async ({ page }) => {
-    await openToday(page, cardWorld);
+    await openToday(page, cardWorld, { fixedClock: true });
     const row = cards(page).first().locator('[data-item-id="itm_replay"]');
     await row.getByRole("checkbox").press("Space");
     await expect(button(done(page), "Done today · 1")).toBeVisible();
@@ -147,7 +147,8 @@ function cardWorld(w: Parameters<typeof W.idle>[0]) {
   const base = { ...w.today.today[0] };
   // Calendar events are harness input; the real core derives their carried items from participant history.
   const rows = w.items.filter((it) => it.call.id === W.LIVE_CALL);
-  const now = Date.now();
+  // Keep the later event on Today even when the host is close to midnight.
+  const now = w.now;
   const event = {
     ...base, event_id: "evt_today_s2", title: "Today preparation", starts_at: now + 60_000, ends_at: now + 3_600_000,
     platform: "Microsoft Teams", attendees: [{ name: "Anna Kuznetsova", email: null, person: rows[0]!.owner }],
@@ -163,7 +164,7 @@ function cardWorld(w: Parameters<typeof W.idle>[0]) {
 
 test.describe("cpt-noter-seq-today-review-before-call", () => {
   test("UI — happy — core-ranked cards, five rows then Show More, later and week disclosures", async ({ page }) => {
-    await openToday(page, cardWorld);
+    await openToday(page, cardWorld, { fixedClock: true });
     const first = cards(page).filter({ has: page.getByRole("heading", { name: "Today preparation", exact: true }) });
     await expect(first).toHaveAttribute("data-state", "expanded");
     await expect(first.locator('[data-item-id]')).toHaveCount(5);
@@ -179,7 +180,7 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     await expect(page.locator('[data-region="TD-R4"] [data-item-id]')).toHaveCount(5);
   });
   test("UI — Other — evidence Return and Back restore row focus and Show More", async ({ page }) => {
-    await openToday(page, cardWorld);
+    await openToday(page, cardWorld, { fixedClock: true });
     const first = cards(page).first();
     await button(first, "Show 1 More").click();
     const row = first.locator('[data-item-id="itm_spec"]');
@@ -196,7 +197,7 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
 test.describe("cpt-noter-seq-today-tick-item", () => {
   for (const [label, answer] of [["Keep Open", "keep_open"], ["Yes, Landed", "landed"], ["Done Another Way", "done_another_way"]] as const) {
     test(`UI — Other — handed-off card item asks explicitly: ${label}`, async ({ page }) => {
-      await openToday(page, cardWorld);
+      await openToday(page, cardWorld, { fixedClock: true });
       const first = cards(page).first();
       await button(first, "Show 1 More").click();
       const row = first.locator('[data-item-id="itm_virt"]');
@@ -213,7 +214,7 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
 
 
 test("cpt-noter-seq-today-review-before-call — TD-R8 lists a link per call with suggestions and opens its Summary", async ({ page }) => {
-  await openToday(page, cardWorld);
+  await openToday(page, cardWorld, { fixedClock: true });
   const review = page.locator('[data-region="TD-R8"]');
   await expect(review).toContainText(/\d+ suggested items? from \d+ calls?/);
   const link = review.getByRole("link").first();
@@ -245,7 +246,7 @@ test("cpt-noter-seq-today-tick-item — first use explains where items will appe
 });
 
 test("cpt-noter-seq-today-tick-item — Escape keeps a handed-off item open", async ({ page }) => {
-  await openToday(page, cardWorld);
+  await openToday(page, cardWorld, { fixedClock: true });
   const card = cards(page).first();
   await button(card, "Show 1 More").click();
   const row = card.locator('[data-item-id="itm_virt"]');

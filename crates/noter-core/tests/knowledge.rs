@@ -922,6 +922,15 @@ async fn an_offline_server_fails_the_sync_and_a_retry_succeeds() {
 async fn revoking_deletes_the_token_stops_sync_and_marks_the_source_sign_in_expired() {
     let rig = open().await;
     let row = rig.add_mcp().await;
+    // The sync commits Idle before publishing it; wait for that event before counting revoke's.
+    rig.until(|source| {
+        rig.events.named("entity:changed").iter().any(|event| {
+            event["source"]["id"] == source.id.as_str()
+                && event["source"]["status"]["type"] == "idle"
+                && event["source"]["last_sync_at"] == T0
+        })
+    })
+    .await;
     let args = || SourceIdArgs {
         source_id: row.id.clone(),
     };

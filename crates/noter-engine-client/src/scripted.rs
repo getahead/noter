@@ -187,6 +187,7 @@ struct State {
     kill: Option<oneshot::Sender<()>>,
     inject: Option<mpsc::UnboundedSender<EngineEvent>>,
     system_audio: PermissionState,
+    hold_next_self_test: bool,
     script: Arc<Script>,
 }
 
@@ -202,6 +203,7 @@ impl Default for State {
             kill: None,
             inject: None,
             system_audio: PermissionState::Granted,
+            hold_next_self_test: false,
             script: Arc::default(),
         }
     }
@@ -264,9 +266,14 @@ impl ScriptedEngine {
         }
     }
 
-    /// Sends `event` now on the current engine's stdout (next `seq`); `false` when no engine runs.
+    /// Sends `event` now on the engine's stdout; `false` before launch or a held self-test starts.
     pub fn inject(&self, event: EngineEvent) -> bool {
-        self.lock()
+        let state = self.lock();
+        // The core's self-test receiver must exist before a scenario sends its first event.
+        if state.hold_next_self_test {
+            return false;
+        }
+        state
             .inject
             .as_ref()
             .is_some_and(|tx| tx.send(event).is_ok())
@@ -276,6 +283,12 @@ impl ScriptedEngine {
     /// only zeros (`zero_buffers`), `NotAsked` nothing at all (`device_unavailable`).
     pub fn set_system_audio(&self, state: PermissionState) {
         self.lock().system_audio = state;
+    }
+
+    /// The next self-test acknowledges the command but waits for injected events.
+    // @cpt-algo:cpt-noter-algo-core-harness-scripted-engine:p1
+    pub fn hold_next_self_test(&self) {
+        self.lock().hold_next_self_test = true;
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
@@ -619,9 +632,15 @@ async fn run(
                 .await;
             }
             EngineCommand::SelfTest { .. } => {
-                out.emit(ack).await;
-                schedule(&mut steps, &script, &cmd, container.as_deref());
                 // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
+                // A new self-test cancels the rest of the previous one, as the real engine does.
+                due.clear();
+                let held = std::mem::take(&mut engine.lock().hold_next_self_test);
+                out.emit(ack).await;
+                if held {
+                    continue;
+                }
+                schedule(&mut steps, &script, &cmd, container.as_deref());
                 let failure = b.self_test_failure.or(match engine.lock().system_audio {
                     PermissionState::Granted => None,
                     PermissionState::Denied => Some(EngineErrorCode::ZeroBuffers),
@@ -644,8 +663,6 @@ async fn run(
                     failure,
                     own_sounds_leak: false,
                 });
-                // A new self-test cancels the rest of the previous one, as the real engine does.
-                due.clear();
                 if b.self_test_pace_ms == 0 {
                     for event in events {
                         out.emit(event).await;

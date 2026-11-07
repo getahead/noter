@@ -141,6 +141,9 @@ export class FakeCore implements Transport {
     this.callWindow = { version: 1, visible: cap.phase === "recording", key: false, layout: "dedicated", collapsed: false, display_id: this.world.settings.call_screen.display_id ?? null, chosen_display_missing: false, show_share_warning: false };
   }
 
+  /** The next self-test Channel stays open for manually injected scenario events. */
+  holdSelfTest = false;
+
   /** The next `models_download` start/resume ends in `checksum_failed` once, like `harness.corrupt_next_download` on the real core. */
   corruptDownload = false;
   corruptNextDownload(): this {
