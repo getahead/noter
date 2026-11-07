@@ -2247,3 +2247,69 @@ async fn a_codex_handoff_plans_the_terminal() {
     assert_eq!(view["launch"]["path"], "terminal", "{view}");
     r.finish().await;
 }
+
+#[tokio::test]
+async fn native_launch_environment_drives_denial_copy_and_terminal_fallback() {
+    let worlds = [
+        (
+            json!({"plan":{"path":"terminal","needs_automation":false,"automation_denied":true}}),
+            true,
+        ),
+        (
+            json!({"plan":{"path":"claude_cli_link","needs_automation":false,"automation_denied":false},
+            "fail":[{"path":"claude_cli_link","code":"no_link_handler"},{"path":"iterm","code":"no_link_handler"}]}),
+            false,
+        ),
+    ];
+    for (world, denied) in worlds {
+        let options = Options::from_env(|key| match key {
+            "NOTER_TEST_FIXTURE" => Some("world".into()),
+            "NOTER_TEST_SCENARIO" => Some("handoff".into()),
+            "NOTER_TEST_LAUNCH_WORLD" => Some(world.to_string()),
+            _ => None,
+        })
+        .unwrap()
+        .unwrap();
+        let mut r = start_with(options).await;
+        let args = json!({"item_id":"itm_replay"});
+        r.ok(
+            "main",
+            "repo_upsert",
+            json!({"key":"VSTOR","default_tool":"claude_code"}),
+        )
+        .await;
+        r.ok(
+            "main",
+            "handoff_generate",
+            json!({"item_id":"itm_replay","regenerate":false}),
+        )
+        .await;
+        let ready = handoff_ready(&mut r, "itm_replay").await;
+        let before = ready["item"].clone();
+        if denied {
+            assert_eq!(ready["launch"]["automation_denied"], true);
+            assert_eq!(
+                r.code("main", "handoff_open", args.clone()).await,
+                "automation_denied"
+            );
+            let after = r.ok("main", "handoff_get", args.clone()).await;
+            assert_eq!(
+                after["item"], before,
+                "denied launch must not accept or hand off the item"
+            );
+            let log = r.ok("main", "harness.native_log", json!({})).await;
+            assert_eq!(log["launches"], json!([]));
+            let copied = r.ok("main", "handoff_copy", args).await;
+            assert_eq!(copied["item"]["status"], "handed_off");
+            let log = r.ok("main", "harness.native_log", json!({})).await;
+            assert_eq!(log["clipboard"][0]["markdown"], ready["prompt_md"]);
+        } else {
+            let opened = r.ok("main", "handoff_open", args).await;
+            assert_eq!(opened["path_used"], "terminal");
+            let log = r.ok("main", "harness.native_log", json!({})).await;
+            assert_eq!(log["launches"].as_array().unwrap().len(), 1);
+            assert_eq!(log["launches"][0]["path"], "terminal");
+        }
+        r.finish().await;
+    }
+}

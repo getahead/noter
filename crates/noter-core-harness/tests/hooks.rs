@@ -222,3 +222,126 @@ async fn first_call_leaves_one_saved_call_and_notifications_not_asked() {
     );
     harness.shutdown().await;
 }
+
+#[test]
+fn malformed_native_launch_hooks_are_refused() {
+    for (key, value) in [
+        ("NOTER_TEST_LAUNCH_WORLD", "{}"),
+        ("NOTER_TEST_LAUNCH_WORLD", "null"),
+        ("NOTER_TEST_FOLDER_PANELS", "false"),
+        ("NOTER_TEST_FOLDER_PANELS", "[42]"),
+        ("NOTER_TEST_FOLDER_PANELS", r#"["relative"]"#),
+        ("NOTER_TEST_FOLDER_PANELS", r#"[""]"#),
+    ] {
+        assert!(
+            Options::from_env(env(&[("NOTER_TEST_FIXTURE", "world"), (key, value)])).is_err(),
+            "{key}={value}"
+        );
+        assert!(Options::from_env(env(&[(key, value)])).unwrap().is_none());
+    }
+}
+
+#[tokio::test]
+async fn native_folder_hook_cancels_then_chooses_without_creating_paths() {
+    let folder = std::env::temp_dir().join(format!("noter-folder-hook-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let missing = folder.as_path().join("does-not-exist");
+    let answers = json!([null, folder.as_path(), missing]).to_string();
+    let options = Options::from_env(env(&[
+        ("NOTER_TEST_FIXTURE", "world"),
+        ("NOTER_TEST_SCENARIO", "idle"),
+        ("NOTER_TEST_FOLDER_PANELS", &answers),
+    ]))
+    .unwrap()
+    .unwrap();
+    let h = Harness::start_with(options, Arc::new(Seen::default()), |d| d)
+        .await
+        .unwrap();
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let args = json!({"key": "VSTOR", "local_path": null, "default_tool": "claude_code"});
+    // Use the same long-lived core as the native app, with no stdio control commands.
+    let core = h.core();
+    let cancelled = dispatch_json(&*core, &main, "repo_upsert", args.clone(), None)
+        .await
+        .unwrap_err();
+    assert_eq!(cancelled.code, noter_protocol::ErrorCode::Cancelled);
+    let before = dispatch_json(&*core, &main, "repos_list", json!({}), None)
+        .await
+        .unwrap();
+    assert_eq!(before["mappings"], json!([]));
+    let chosen = dispatch_json(&*core, &main, "repo_upsert", args.clone(), None)
+        .await
+        .unwrap();
+    assert_eq!(chosen["mappings"][0]["local_path"], json!(folder.as_path()));
+    let missing_result = dispatch_json(
+        &*core,
+        &main,
+        "repo_upsert",
+        json!({"key":"OTHER", "default_tool":"codex"}),
+        None,
+    )
+    .await;
+    assert!(missing_result.is_err());
+    assert!(
+        !missing.exists(),
+        "a scripted selection must not create a repository"
+    );
+    let exhausted = dispatch_json(&*core, &main, "repo_upsert", args, None)
+        .await
+        .unwrap_err();
+    assert_eq!(exhausted.code, noter_protocol::ErrorCode::Cancelled);
+    h.shutdown().await;
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
+#[tokio::test]
+async fn handoff_scenario_places_the_engineering_item_in_the_saved_call_outputs() {
+    let (h, _) = boot(Some("handoff")).await;
+    assert_eq!(snapshot(&h).await["capture"]["phase"], "idle");
+    let core = h.core();
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let outputs = dispatch_json(
+        &*core,
+        &main,
+        "outputs_get",
+        json!({"call_id":"call_backend"}),
+        None,
+    )
+    .await
+    .unwrap();
+    let actions = outputs["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["kind"] == "action_items")
+        .unwrap();
+    let item = actions["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "itm_replay")
+        .unwrap();
+    assert_eq!(item["call"]["id"], "call_backend");
+    assert_eq!(item["is_engineering"], true);
+    assert_eq!(item["status"], "open");
+    let view = dispatch_json(
+        &*core,
+        &main,
+        "handoff_get",
+        json!({"item_id":"itm_replay"}),
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(view["unmapped_key"], "VSTOR");
+    assert_eq!(view["item"], *item);
+    h.shutdown().await;
+}
