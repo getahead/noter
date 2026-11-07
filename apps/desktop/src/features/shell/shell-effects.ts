@@ -46,7 +46,7 @@ export function createScrollMemory() {
 
 /** Moves focus to the page's first heading after navigation; false when the page has none. */
 export function focusHeading(root: { querySelector(selector: string): HTMLElement | null; scrollTop?: number } | null): boolean {
-  const heading = root?.querySelector("h1, h2, h3");
+  const heading = root?.querySelector("[data-return-focus]") ?? root?.querySelector("h1, h2, h3");
   if (!heading) return false;
   heading.tabIndex = -1;
   const top = root!.scrollTop;

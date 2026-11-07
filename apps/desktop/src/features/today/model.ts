@@ -23,8 +23,9 @@ export function calendarState(read: { state: string }, view: TodayView | undefin
   // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-read
 }
 
-/** TD-R8: the suggested items waiting for review, or no line when none wait. */
-export const reviewLine = (v: TodayView): { count: number } | null => (v.review_waiting > 0 ? { count: v.review_waiting } : null);
+/** TD-R8: the suggested items waiting, the unnamed speakers and one link per call to review; no line when nothing waits. */
+export const reviewLine = (v: TodayView): { count: number; unnamed: number; calls: TodayView["review_calls"] } | null =>
+  v.review_waiting > 0 || v.review_calls.length > 0 ? { count: v.review_waiting, unnamed: v.unnamed_speakers, calls: v.review_calls } : null;
 
 /** TD-R6: up to three read-only proposals, with the core's total for the heading. */
 export const proposalPreview = (v: TodayView): { rows: ProposalRow[]; total: number } => ({ rows: v.proposals.slice(0, 3), total: v.proposals_total });
@@ -62,7 +63,7 @@ export const weekCards = (view: TodayView): Card[] => view.this_week.map((event)
 
 /** At most five combined action and question rows until **Show N More**; the core's order within each kind. */
 export function cardRows(card: UpcomingCall, all: boolean): { rows: ItemView[]; more: number } {
-  const every = [...card.items, ...card.questions];
+  const every = [...card.items, ...card.questions, ...card.handed_off];
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-disclosures
   return all ? { rows: every, more: 0 } : { rows: every.slice(0, 5), more: Math.max(0, every.length - 5) };
   // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-disclosures
@@ -78,3 +79,10 @@ export function isExpanded(eventId: string, user: ReadonlyMap<string, boolean>, 
   // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-expand
 }
 
+
+/** A live card stays expanded after capture ends, without resetting other disclosures. */
+export function expandLive(user: ReadonlyMap<string, boolean>, eventId: string | undefined): ReadonlyMap<string, boolean> {
+  // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-stop
+  return eventId && !user.get(eventId) ? new Map(user).set(eventId, true) : user;
+  // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-stop
+}

@@ -1,23 +1,45 @@
 import type { Bridge } from "../../app/bridge/bridge";
+import { isLive } from "../shell/live-row";
 import { holdToday } from "./cache";
 
 export const READ_KEY = "today:get";
 const REFUSALS = { model_missing: "model_missing", disk_full: "disk_full", already_recording: "already_recording" } as const;
 
+type ReadResult = Awaited<ReturnType<Bridge["core"]["todayGet"]>>;
+const reads = new WeakMap<Bridge, { dirty: boolean; promise: Promise<ReadResult> }>();
+
 // @cpt-flow:cpt-noter-flow-ui-today-review:p1
-let latest = 0;
-/** `today_get`; a read superseded by a newer one is dropped, so a slow answer never overwrites a fresh one. */
-export async function loadToday(bridge: Bridge) {
-  const mine = ++latest;
-  // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-get
-  const res = await bridge.act(READ_KEY, "today_get", () => bridge.core.todayGet({}));
-  // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-get
-  if (mine === latest && res.status === "ok") holdToday(res.data);
-  return res;
+/** Coalesce one turn's refreshes; a change during a read schedules one fresh read after it. */
+export function loadToday(bridge: Bridge): Promise<ReadResult> {
+  const pending = reads.get(bridge);
+  if (pending) {
+    pending.dirty = true;
+    return pending.promise;
+  }
+  const job = { dirty: true, promise: undefined as unknown as Promise<ReadResult> };
+  job.promise = Promise.resolve().then(async () => {
+    let res: ReadResult;
+    try {
+      do {
+        job.dirty = false;
+        // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-get
+        res = await bridge.act(READ_KEY, "today_get", () => bridge.core.todayGet({}));
+        // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-get
+        if (!job.dirty && res.status === "ok") holdToday(res.data);
+      } while (job.dirty);
+    } finally {
+      reads.delete(bridge); // in the same turn as the last check, so a later call starts a new read instead of marking a finished one
+    }
+    return res;
+  });
+  reads.set(bridge, job);
+  return job.promise;
 }
 
 /** **Allow Calendar Access**: macOS asks, then Today reads the actual permission again. */
 export async function allowCalendar(bridge: Bridge) {
+  const capture = bridge.store.getState().whole.capture;
+  if (capture && isLive(capture)) return loadToday(bridge);
   // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-ask
   await bridge.act("today:calendar", "permission_request", () => bridge.core.permissionRequest({ kind: "calendar" }));
   // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-ask
@@ -48,5 +70,5 @@ export function showCall(bridge: Bridge) {
 
 /** **Show Previous Call** and **Last time:**: the previous call's Summary. */
 export function showPreviousCall(bridge: Bridge, callId: string) {
-  return bridge.act("today:last_time", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } }));
+  return bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } }));
 }

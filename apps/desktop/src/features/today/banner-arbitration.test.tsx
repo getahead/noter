@@ -99,3 +99,13 @@ describe("Today banner arbitration (cpt-noter-algo-ui-today-project)", () => {
     expect(html.match(/class="np-bannerslot"/g)).toHaveLength(1);
   });
 });
+
+it("shows failed-capture recovery ahead of Calendar and resumes the same call", async () => {
+  await open();
+  bridge.store.setState((s) => ({ ...s, whole: { ...s.whole, capture: { ...s.whole.capture!, phase: "failed" } } }));
+  const resume = vi.spyOn(bridge.core, "captureResumeInterrupted");
+  const slot = todaySlot();
+  expect(slotView(slot.banners, new Set(), false).first?.id).toBe("today-engine");
+  await slot.banners.find((b) => b.id === "today-engine")!.actions![0]!.onAction!();
+  expect(resume).toHaveBeenCalledWith({ call_id: "call_live" });
+});

@@ -62,7 +62,7 @@ test.describe("cpt-noter-dod-ui-today-dashboard today", () => {
   });
   test("no calls today with This week", async ({ page }) => {
     await open(page, day((w) => Object.assign(w.today, { today: [], this_week: [call(w, "qa", "Cross-team QA sync", w.now + 24 * HOUR, { open_count: 2 })] })));
-    await expect(page.getByText("This week")).toBeVisible();
+    await expect(page.getByText("This week", { exact: true })).toBeVisible();
     await shot(page, "today-no-calls-week");
   });
   test("Calendar not asked", async ({ page }) => {
@@ -75,3 +75,57 @@ test.describe("cpt-noter-dod-ui-today-dashboard today", () => {
     await shot(page, "today-calendar-denied");
   });
 });
+
+const itemDay = day((w) => {
+  const event = w.today.today[0]!;
+  const rows = w.items.filter((item) => item.call.id === W.LIVE_CALL);
+  event.items = rows.filter((item) => item.kind !== "open_question" && item.status !== "handed_off");
+  event.questions = rows.filter((item) => item.kind === "open_question");
+  event.handed_off = rows.filter((item) => item.status === "handed_off");
+  event.open_count = rows.length;
+  w.today.due_without_call = [w.items[0]!];
+  w.today.this_week = [call(w, "week", "Weekly review", w.now + 24 * HOUR)];
+});
+
+test("Today item regions at Wide and Narrow", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await open(page, itemDay);
+  await expect(page.locator('.td-card').first().locator('[data-item-id]')).toHaveCount(5);
+  await shot(page, "today-items-wide");
+  await page.setViewportSize({ width: 800, height: 1000 });
+  await shot(page, "today-items-narrow");
+});
+
+test("Today handed-off item asks before completion", async ({ page }) => {
+  await open(page, itemDay);
+  const card = page.locator('.td-card').first();
+  await card.getByRole("button", { name: "Show 1 More" }).click();
+  await card.locator('[data-item-id="itm_virt"]').getByRole("checkbox").press("Space");
+  await expect(card.getByRole("group", { name: "Did the handoff land?" })).toBeVisible();
+  await shot(page, "today-open-handoff");
+});
+
+test("Today Done list remains available with Reopen for earlier completions", async ({ page }) => {
+  await open(page, day((w) => {
+    const item = w.items[0]!;
+    Object.assign(item, { status: "done", done_at: w.now });
+    w.today.done_today = [item];
+  }));
+  await page.getByRole("button", { name: "Done today · 1" }).click();
+  await expect(page.locator('[data-region="TD-R7"]').getByRole("button", { name: "Reopen" })).toBeVisible();
+  await shot(page, "today-done");
+});
+
+for (const state of ["first-use", "calendar-failed", "self-test", "model-missing", "engine-stopped", "quit-recording"] as const) {
+  test(`Today ${state}`, async ({ page }) => {
+    await open(page, day((w) => {
+      if (state === "first-use") Object.assign(w.today, { first_use: true, today: [], this_week: [], proposals: [], proposals_total: 0 });
+      if (state === "calendar-failed") w.today.calendar = "read_failed";
+      if (state === "self-test") W.selfTestSkipped(w);
+      if (state === "model-missing") W.speechModel(w)!.state = "pending";
+      if (state === "engine-stopped") Object.assign(w.app.capture, { phase: "failed", call_id: W.LIVE_CALL });
+      if (state === "quit-recording") w.app.banners.banners = [{ type: "recording_interrupted_by_quit", call: w.items[0]!.call }];
+    }));
+    await shot(page, `today-${state}`);
+  });
+}

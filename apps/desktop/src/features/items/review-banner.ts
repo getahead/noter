@@ -15,10 +15,46 @@ export function startReview(): boolean {
   return !!first;
 }
 
+const pendingReview = new WeakMap<Bridge, { callId: string; at: number }>();
+/** A review request not honoured within this long (the call never opened, or had no rows) is dropped. */
+const PENDING_MS = 10_000;
+
+/** Today opens Summary and asks for Start Review; the call page applies it once its suggested rows are on the page. */
+export async function openReview(bridge: Bridge, callId: string) {
+  pendingReview.set(bridge, { callId, at: Date.now() });
+// @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-links
+  const result = await bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } }), { screen: "main-window-shell" });
+// @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-links
+  if (result.status !== "ok") pendingReview.delete(bridge);
+}
+
+/** Applies a pending Start Review for `callId`; true when nothing is left to do (applied, none pending, expired or meant for another call), false to try again once the rows render. */
+export function applyPendingReview(bridge: Bridge, callId: string): boolean {
+  const pending = pendingReview.get(bridge);
+  if (!pending) return true;
+  if (pending.callId !== callId || Date.now() - pending.at > PENDING_MS) {
+    pendingReview.delete(bridge);
+    return true;
+  }
+  if (!startReview()) return false;
+  pendingReview.delete(bridge);
+  return true;
+}
+
 // @cpt-flow:cpt-noter-flow-ui-items-review:p1
 /** The banner for `callId`, or null with nothing to review; opening a call reads its items. */
 export function useReviewBanner(bridge: Bridge, callId: string): Banner | null {
   const waiting = useWindow(bridge, (s) => Object.values(s.entities.item).filter((i) => i.call.id === callId && i.review === "suggested").length);
+  useEffect(() => {
+    let frame = 0;
+    let tries = 0;
+    const attempt = () => {
+      if (applyPendingReview(bridge, callId) || ++tries > 30) return;
+      frame = requestAnimationFrame(attempt);
+    };
+    attempt();
+    return () => cancelAnimationFrame(frame);
+  }, [bridge, callId, waiting]);
   const list = useWindow(bridge, (s) => s.commands[`items:list:${callId}`]);
   const batch = useWindow(bridge, (s) => s.commands[`items:review_all:${callId}`]);
   useEffect(() => {

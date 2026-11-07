@@ -177,8 +177,11 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     finishSetup: () => navigate({ type: "first_run" }),
     // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banner-action
     restartNow: () => run("update_install", () => bridge.core.updateInstall({})),
-    openCall: (id) => navigate({ type: "call_page", call_id: id, tab: "summary" }),
-    resumeRecording: (id) => run("capture_resume_interrupted", () => bridge.core.captureResumeInterrupted({ call_id: id })),
+    openCall: (id) => navigate({ type: "call_page", call_id: id, tab: "transcript" }),
+    resumeRecording: async (id) => {
+      const result = await bridge.act("capture_resume_interrupted", "capture_resume_interrupted", () => bridge.core.captureResumeInterrupted({ call_id: id }), { slice: "capture", screen: "main-window-shell" });
+      if (result.status === "ok") await bridge.act("window_show_call", "window_show_call", () => bridge.core.windowShowCall({}), { screen: "main-window-shell" });
+    },
     // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banner-action
     restart: { loading: updateInstall?.state === "WAITING", tryAgain: updateInstall?.state === "ERROR" && updateInstall.error?.tryAgain === true },
     retry: (key) => void bridge.retry(key),

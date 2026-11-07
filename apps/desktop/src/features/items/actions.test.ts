@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { resetUndo, useUndo } from "../history/undo";
+import { resetUndo, useUndo, undoLast, undoMode } from "../history/undo";
 import { answerHandoff, create, loadItems, reopen, review, reviewAll, saveDraft, setDone, undoRow } from "./actions";
-import { localOf, resetLocal } from "./local";
+import { localOf, resetLocal, patchLocal } from "./local";
 import { draftOf } from "./review";
 
 // The undo strip's hook is a thin useSyncExternalStore over module state: read it without React.
@@ -271,4 +271,25 @@ describe("undoRow", () => {
     await undoRow(bridge, "itm_replay", { type: "change", change_id: "chg_x" });
     expect(localOf("itm_replay").error).toBe("Couldn't finish that. Try again.");
   });
+});
+
+it("keeps a completed suggestion's change for Done today and Cmd-Z after feedback expires", async () => {
+  await ready();
+  await setDone(bridge, item("itm_replay"), true);
+  const target = localOf("itm_replay").outcome!.target;
+  patchLocal("itm_replay", { outcome: undefined });
+  expect(localOf("itm_replay").doneTarget).toEqual(target);
+  expect(useUndo()?.target).toEqual(target);
+  await undoLast(bridge);
+  expect(item("itm_replay").review).toBe("suggested");
+  expect(item("itm_replay").status).toBe("open");
+  expect(localOf("itm_replay").doneTarget).toBeUndefined();
+});
+
+it("inline completion Undo switches History to Redo instead of retaining an already-undone target", async () => {
+  await ready();
+  await setDone(bridge, item("itm_spec"), true);
+  const target = localOf("itm_spec").doneTarget!;
+  await undoRow(bridge, "itm_spec", target);
+  expect(undoMode()).toBe("redo");
 });

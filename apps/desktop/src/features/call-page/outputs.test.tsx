@@ -197,6 +197,15 @@ describe("CallBanners on the Summary view", () => {
 });
 
 describe("OutputItemRow", () => {
+  it("surfaces a refused evidence route through the shell command state", async () => {
+    await open([]);
+    fake.failNext("window_navigate", "internal");
+    const span = { call_id: id, t0_ms: 1000, t1_ms: 2000 };
+    const link = find(rendered(OutputItemRow, { bridge, item: { ...row("Ship it"), spans: [span] } as ItemView }), (p) => p.label === "Show in transcript");
+    (link.props.onAction as () => void)();
+    await settle();
+    expect(bridge.store.getState().commands.window_navigate?.state).toBe("ERROR");
+  });
   it("opens the transcript at the evidence span", async () => {
     await open([]);
     const seen = sent();

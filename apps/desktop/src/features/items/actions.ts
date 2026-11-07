@@ -31,7 +31,9 @@ export const refresh = (bridge: Bridge, id: string) => bridge.act(`item:get:${id
 /** A refused command: its named error stays on the row, no success status; a conflict reads the item again. */
 async function failed(bridge: Bridge, id: string, code: ErrorCode, local: Parameters<typeof patchLocal>[1] = {}) {
   patchLocal(id, { ...local, error: errorText(code) });
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-error
   if (code === "conflict") await refresh(bridge, id);
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-error
 }
 // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-failure
 // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-error
@@ -104,7 +106,8 @@ export async function setDone(bridge: Bridge, item: ItemView, done: boolean) {
   if (res.status !== "ok") return void (await failed(bridge, it.id, res.error.code));
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-result
   const key: MsgKey = suggested ? "items.outcome.accepted_done" : "items.outcome.done";
-  patchLocal(it.id, { error: undefined, outcome: done ? { text: t(key), target: changeOf(res.data), ms: OUTCOME_MS } : undefined });
+  patchLocal(it.id, { doneTarget: done ? changeOf(res.data) : undefined, error: undefined, outcome: done ? { text: t(key), target: changeOf(res.data), ms: OUTCOME_MS } : undefined });
+  if (done) holdCompletion(bridge, it.id, changeOf(res.data), t(key));
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-result
 }
 
@@ -114,12 +117,15 @@ export async function answerHandoff(bridge: Bridge, item: ItemView, answer: "lan
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-answer
   // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-landed
   // @cpt-begin:cpt-noter-state-ui-items-completion:p1:inst-keep
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-handoff
   const res = await bridge.act(`item:handoff:${it.id}`, "item_answer_handoff_landed", () => bridge.core.itemAnswerHandoffLanded({ item_id: it.id, rev: it.rev, answer }), { entity: "item" });
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-handoff
   // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-keep
   // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-landed
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-answer
   if (res.status !== "ok") return void (await failed(bridge, it.id, res.error.code));
-  patchLocal(it.id, { asking: undefined, error: undefined, outcome: answer === "keep_open" ? undefined : { text: t("items.outcome.done"), target: changeOf(res.data), ms: OUTCOME_MS } });
+  patchLocal(it.id, { doneTarget: answer === "keep_open" ? undefined : changeOf(res.data), asking: undefined, error: undefined, outcome: answer === "keep_open" ? undefined : { text: t("items.outcome.done"), target: changeOf(res.data), ms: OUTCOME_MS } });
+  if (answer !== "keep_open") holdCompletion(bridge, it.id, changeOf(res.data), t("items.outcome.done"));
 }
 
 /** **Reopen** on an item closed by evidence or answered in a call. */
@@ -198,9 +204,10 @@ export async function undoRow(bridge: Bridge, id: string, target: UndoTarget) {
   const res = await bridge.act(`item:undo:${id}`, "change_undo", () => bridge.core.changeUndo({ target }));
   if (res.status !== "ok") return patchLocal(id, { outcome, error: errorText(res.error.code === "conflict" ? "conflict" : "internal") });
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-return
-  patchLocal(id, { outcome: undefined, error: undefined });
+  patchLocal(id, { outcome: undefined, doneTarget: undefined, error: undefined });
   await refresh(bridge, id); // the core's item again, with its prior review and handoff state
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-return
+  holdUndo({ target, mode: "redo", message: t("undo.undone", { count: res.data.undone }), refresh: () => refreshCompletion(bridge, id, target) });
 }
 
 export type EditResult = "ok" | "invalid" | "conflict" | "failed";
@@ -242,4 +249,17 @@ export async function saveFields(bridge: Bridge, item: ItemView, fields: Pick<Dr
   if (!draftValid(draft)) return errorText("invalid_input");
   const patch = draftPatch(draft, item);
   return Object.keys(patch).length ? applyPatch(bridge, item, patch) : null;
+}
+
+async function refreshCompletion(bridge: Bridge, id: string, target: UndoTarget) {
+  await refresh(bridge, id);
+  const done = bridge.store.getState().entities.item[id]?.status === "done";
+  patchLocal(id, { outcome: undefined, doneTarget: done ? target : undefined, error: undefined });
+}
+
+/** Completion shares History's keyboard Undo, while the row keeps its own persistent target. */
+function holdCompletion(bridge: Bridge, id: string, target: UndoTarget, message: string) {
+  // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-undo
+  holdUndo({ target, message, refresh: () => refreshCompletion(bridge, id, target) });
+  // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-undo
 }

@@ -9,7 +9,7 @@ import { loadOutputs } from "../call-page/outputs-actions";
 import { holdOutputs, resetOutputsCache } from "../call-page/outputs-cache";
 import { resetUndo } from "../history/undo";
 import { resetLocal } from "./local";
-import { startReview, useReviewBanner } from "./review-banner";
+import { applyPendingReview, openReview, startReview, useReviewBanner } from "./review-banner";
 import { loadItems, reviewAll } from "./actions";
 import { CallBanners } from "../call-page/CallBanners";
 
@@ -135,4 +135,48 @@ describe("review banner (PC-R2)", () => {
     vi.stubGlobal("document", { querySelector: () => null });
     expect(startReview()).toBe(false);
   });
+});
+
+it("Today review navigation applies Start Review once the suggested row is on the page, then forgets it", async () => {
+  await ready();
+  const nav = vi.spyOn(bridge.core, "windowNavigate");
+  const focus = vi.fn();
+  let row: { focus: () => void } | null = null;
+  vi.stubGlobal("document", { querySelector: () => row });
+  await openReview(bridge, "call_live");
+  expect(nav).toHaveBeenCalledWith({ target: { type: "call_page", call_id: "call_live", tab: "summary" } });
+  expect(applyPendingReview(bridge, "call_live")).toBe(false); // the rows have not rendered yet
+  expect(focus).not.toHaveBeenCalled();
+  row = { focus };
+  expect(applyPendingReview(bridge, "call_live")).toBe(true);
+  expect(focus).toHaveBeenCalledOnce();
+  expect(applyPendingReview(bridge, "call_live")).toBe(true); // forgotten: no second focus
+  expect(focus).toHaveBeenCalledOnce();
+});
+
+it("a failed review navigation cancels the pending request", async () => {
+  await ready();
+  fake.failNext("window_navigate", "not_found");
+  await openReview(bridge, "call_missing");
+  const focus = vi.fn();
+  vi.stubGlobal("document", { querySelector: () => ({ focus }) });
+  expect(applyPendingReview(bridge, "call_missing")).toBe(true);
+  expect(focus).not.toHaveBeenCalled();
+  expect(bridge.store.getState().commands.window_navigate?.state).toBe("ERROR");
+});
+
+it("a review request is dropped when another call opens or after ten seconds", async () => {
+  await ready();
+  const focus = vi.fn();
+  vi.stubGlobal("document", { querySelector: () => ({ focus }) });
+  await openReview(bridge, "call_live");
+  expect(applyPendingReview(bridge, "call_other")).toBe(true);
+  expect(applyPendingReview(bridge, "call_live")).toBe(true);
+  expect(focus).not.toHaveBeenCalled();
+  vi.useFakeTimers();
+  await openReview(bridge, "call_live");
+  vi.advanceTimersByTime(10_001);
+  expect(applyPendingReview(bridge, "call_live")).toBe(true);
+  expect(focus).not.toHaveBeenCalled();
+  vi.useRealTimers();
 });

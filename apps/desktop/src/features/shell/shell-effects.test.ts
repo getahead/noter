@@ -178,3 +178,12 @@ describe("layoutFor", () => {
     expect(r.widthClass).toBe("medium"); // 800 pt of content, not 580 (Narrow)
   });
 });
+
+it("restores a page's marked return row instead of replacing its focus with the heading", () => {
+  const row = { focus: vi.fn(), tabIndex: 0 };
+  const heading = { focus: vi.fn(), tabIndex: -1 };
+  const root = { querySelector: (selector: string) => (selector === "[data-return-focus]" ? row : heading) as unknown as HTMLElement };
+  focusHeading(root);
+  expect(row.focus).toHaveBeenCalled();
+  expect(heading.focus).not.toHaveBeenCalled();
+});
