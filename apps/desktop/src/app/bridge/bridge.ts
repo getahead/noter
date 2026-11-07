@@ -194,7 +194,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       (Object.keys(EVENTS) as EventName[]).map((event) =>
         core.on(event, (payload) => {
           if (!closed)
-            set((s) => applyEvent(s, { event, payload } as AnyEvent));
+            write((s) => applyEvent(s, { event, payload } as AnyEvent));
         }),
       ),
     );
@@ -254,6 +254,12 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-return-flush
     });
     // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-commit
+  }
+
+  /** A write that lands now is newer than every buffered Channel message: apply those first, so a stale one cannot overwrite it on the next flush. */
+  function write(f: Parameters<typeof set>[0]): void {
+    if (flushTimer) (clearTimeout(flushTimer), flush());
+    set(f);
   }
 
   function buffer(cmd: ChannelCommand, m: StreamMsg): void {
@@ -389,8 +395,8 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-if-ok
     if (res.status === "ok") {
       // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-write-result
-      if (opts.slice) set((s) => applyWhole(s, opts.slice!, res.data as never));
-      if (opts.entity) set((s) => applyRecord(s, opts.entity!, res.data));
+      if (opts.slice) write((s) => applyWhole(s, opts.slice!, res.data as never));
+      if (opts.entity) write((s) => applyRecord(s, opts.entity!, res.data));
       // @cpt-end:cpt-noter-flow-ui-core-bridge-act:p1:inst-write-result
       // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-render-result
       // @cpt-begin:cpt-noter-state-ui-core-bridge-command:p1:inst-waiting-done
