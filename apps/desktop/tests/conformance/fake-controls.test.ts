@@ -1,7 +1,7 @@
 // The fake core's scenario controls that stories rely on (fake only).
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createCore, ERROR_CODES } from "../../src/core/bindings";
+import { createCore, ERROR_CODES, type SelfTestMsg } from "../../src/core/bindings";
 import { isFake, fakeFor } from "../support/core";
 
 describe.skipIf(!isFake)("fake core controls", () => {
@@ -36,6 +36,28 @@ describe.skipIf(!isFake)("fake core controls", () => {
     await vi.advanceTimersByTimeAsync(800);
     expect(speech().state).toBe("ready");
     expect(fake.world.app.setup.models.error).toBeNull();
+  });
+
+  it("holds only the next self-test script so manual verdicts cannot race automatic success", async () => {
+    vi.useFakeTimers();
+    const fake = fakeFor("first-run");
+    const core = createCore(fake);
+    fake.world.app.setup.models.bundles.forEach((b) => (b.state = "ready"));
+    fake.holdSelfTest = true;
+    const held: SelfTestMsg[] = [];
+    expect((await core.selfTestRun({ play_clip: false }, (m) => held.push(m))).status).toBe("ok");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(held).toEqual([]);
+    expect(fake.holdSelfTest).toBe(false);
+
+    fake.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
+    expect(held).toHaveLength(1);
+    expect(held[0]!.event).toEqual({ type: "failed", reason: { type: "one_stream_silent", channel: "sys" } });
+    const automatic: SelfTestMsg[] = [];
+    expect((await core.selfTestRun({ play_clip: false }, (m) => automatic.push(m))).status).toBe("ok");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(automatic.map((m) => m.event.type)).toEqual(["stream_arrived", "stream_arrived", "levels", "line", "passed", "ended"]);
+    fake.dispose();
   });
 
   it("output_edit sends the whole section as entity:changed", async () => {

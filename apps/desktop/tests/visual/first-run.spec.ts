@@ -7,6 +7,7 @@ import { expect, test } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { openWindow } from "../e2e/support/app";
+import { startSelfTest } from "../e2e/support/self-test";
 import { freeze, settled } from "./freeze";
 import { hold } from "./hold";
 
@@ -61,7 +62,7 @@ const states: { id: string; world: (w: World) => void; ready?: (page: Page) => P
     id: "passed",
     world: (w) => (W.firstRun(w), at("permissions")(w), granted(w)),
     ready: async (page) => {
-      await page.getByRole("button", { name: "Run Test", exact: true }).click();
+      await startSelfTest(page);
       await expect(win(page).getByRole("status").filter({ hasText: "Self-test passed" })).toBeVisible({ timeout: 10_000 });
       await expect(page.getByRole("button", { name: "Run Test", exact: true })).toBeEnabled();
     },
@@ -101,8 +102,7 @@ test.describe("first-run window states that need a step on the way", () => {
 
   test("renders one stream silent", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), at("permissions")(w), granted(w)) });
-    await settled(page);
-    await page.getByRole("button", { name: "Run Test", exact: true }).click();
+    await startSelfTest(page, { manual: steer });
     await steer.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
     await steer.push("self_test_run", { event: { type: "ended", reason: "call_stopped" } });
     await expect(page.getByText("We hear your microphone but not system audio.")).toBeVisible();

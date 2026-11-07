@@ -1871,11 +1871,16 @@ export const defaultHandlers: Handlers = {
     publish("env:changed");
     return row;
   },
+  // @cpt-flow:cpt-noter-flow-core-first-run-self-test:p1
   self_test_run: (_a, { world, fake, send, publish }) => {
     // D-21: the same refusal as the core (core-first-run inst-if-model-missing), before the Channel opens.
     if (world.app.setup.models.bundles.some((b) => b.required_for_capture && b.state !== "ready")) throw coreError("model_missing", "the live model is not downloaded");
     const sub = newId("sub");
     fake.openChannel(sub, "self_test_run", send as (m: unknown) => void);
+    if (fake.holdSelfTest) {
+      fake.holdSelfTest = false;
+      return { subscription_id: sub };
+    }
     const at = (ms: number, event: Parameters<typeof fake.push<"self_test_run">>[1]["event"]) => fake.later(ms, () => fake.push(sub, { event }));
     at(300, { type: "stream_arrived", channel: "mic" });
     at(600, { type: "stream_arrived", channel: "sys" });
