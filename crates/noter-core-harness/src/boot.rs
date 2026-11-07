@@ -554,11 +554,6 @@ impl Harness {
         };
         let empty = vec![];
         let transcripts = wanted["transcripts"].as_array().unwrap_or(&empty);
-        // The user's person rides on the "you" speaker rows: that is how the core tells which owner is you.
-        let you = wanted["people"]
-            .as_array()
-            .and_then(|p| p.iter().find(|x| x["is_you"] == json!(true)))
-            .map_or(Value::Null, |p| p["id"].clone());
         let mut rows = vec![];
         for call in wanted["calls"].as_array().unwrap_or(&empty) {
             let id = &call["id"];
@@ -632,7 +627,7 @@ impl Harness {
             for sp in d["speakers"].as_array().unwrap_or(&empty) {
                 let label = &sp["label"];
                 let (text, n, person) = match label["type"].as_str() {
-                    Some("you") => (json!("you"), Value::Null, you.clone()),
+                    Some("you") => (json!("you"), Value::Null, Value::Null),
                     Some("guest_your_side") => (json!("guest_your_side"), Value::Null, Value::Null),
                     Some("person") => (
                         label["person"]["display_name"].clone(),

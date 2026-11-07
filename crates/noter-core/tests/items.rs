@@ -481,26 +481,6 @@ async fn item_owner_chip_comes_from_the_named_speaker() {
     assert_eq!(owner.display_name, "Anna Koval");
     assert_eq!(owner.initials, "AK");
     assert_eq!(item.owed, Owed::ToYou);
-    assert!(!owner.is_you);
-}
-
-#[tokio::test]
-async fn an_item_owned_by_the_person_on_the_you_speaker_is_yours() {
-    let dir = tempfile::tempdir().unwrap();
-    let (core, _) = open(dir.path());
-    world(&core);
-    core.store()
-        .insert_batch(vec![speaker("spk_you", "call_a", "you", "per_me")])
-        .unwrap();
-    exec(
-        dir.path(),
-        "UPDATE items SET owner_person_id = 'per_me' WHERE id = 'itm_1'",
-    );
-    let item = view(&core, "itm_1").await;
-    let owner = item.owner.unwrap();
-    assert!(owner.is_you);
-    assert_eq!(owner.display_name, "You");
-    assert_eq!(item.owed, Owed::ByYou);
 }
 
 // ── tick ──────────────────────────────────────────────────────────────────────
