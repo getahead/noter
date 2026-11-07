@@ -220,7 +220,7 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 5. [x] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
 6. [ ] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`
 
-Owner decision (6 Nov): M2 selection means one row. This step remains open until row-scope Share is delivered with Items (2.17); removing an unavailable row must never broaden its scope to Whole call.
+Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered with Items (2.17 S2); removing an unavailable row must never broaden its scope to Whole call.
 
 ## 4. States (CDSL)
 
