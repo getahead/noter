@@ -1381,6 +1381,8 @@ struct Spy {
     seen: Mutex<Vec<i64>>,
     hold: AtomicBool,
     answered: AtomicUsize,
+    /// Sign-ins started.
+    oauths: AtomicUsize,
 }
 
 impl Spy {
@@ -1413,6 +1415,7 @@ impl McpSource for Spy {
         server: &'a str,
         audit: noter_core::McpAudit<'a>,
     ) -> BoxFuture<'a, Result<String, McpError>> {
+        self.oauths.fetch_add(1, Ordering::SeqCst);
         self.inner.oauth(server, audit)
     }
 
@@ -1494,6 +1497,7 @@ async fn relay_rig() -> (Rig, Arc<Spy>) {
             seen: Mutex::default(),
             hold: AtomicBool::new(false),
             answered: AtomicUsize::new(0),
+            oauths: AtomicUsize::new(0),
         });
         let _ = shared.set(made.clone());
         made
@@ -1641,6 +1645,22 @@ async fn live_tools_follow_the_policy_matrix_of_task_privacy_and_sensitive_conte
         .clone();
     assert_eq!(tool["inputSchema"]["required"], json!(["query"]));
     let _ = run;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_run_signs_in_to_a_live_source_once() {
+    let (rig, spy) = relay_rig().await;
+    let (_, token, config, _tx) = rig
+        .run_under(Some("call_a"), TaskKind::Ask, ok_privacy())
+        .await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+        .await
+        .unwrap();
+    mcp.tool("live_work_tracker_read", json!({ "uri": "tracker://AB-1" }))
+        .await
+        .unwrap();
+    assert_eq!(spy.oauths.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
