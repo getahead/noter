@@ -1441,9 +1441,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.26 noter-mcp and the core socket - MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-core-mcp`
+- [x] `p4` - **ID**: `cpt-noter-feature-core-mcp`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-mcp.md](features/core/core-mcp.md)
+- **Milestone**: M3 · **Lane**: core · **Status**: IMPLEMENTED (#336 #356 #372; the signed sidecar and the macOS network-monitor relay test are owner items). FEATURE spec: [features/core/core-mcp.md](features/core/core-mcp.md)
 
 - **Purpose**: Let agents look things up in the library themselves through a local-only tool server whose results pass the egress gate for cloud runs (owner decision O2).
 
@@ -1461,7 +1461,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Principles Covered**:
 
-  - [ ] `p4` - `cpt-noter-principle-core-egress-gate`
+  - `cpt-noter-principle-core-egress-gate`
 
 - **Design Constraints Covered**:
 
@@ -1472,7 +1472,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-core-mcp`
+  - `cpt-noter-component-core-mcp`
 
 - **API**:
   - Interface `cpt-noter-interface-mcp-tools`
