@@ -288,6 +288,26 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     await expect(page.getByRole("tab", { name: "Summary", selected: true })).toBeVisible();
   });
 
+  test("UI — the evidence highlight expires after 3 s even while store events keep arriving", async ({ page }) => {
+    const steer = await openCall(page, suggest());
+    await button(rowOf(page, DECISION), TIME).click();
+    const lit = page.locator('[data-component="cpt-noter-component-ui-transcript-segment-row"].np-hl-evidence');
+    await expect(lit.first()).toBeVisible();
+    const spans = (await sent(page, "transcript_span")).length;
+    // each event re-renders the main window; the span prop must not restart the timer. The real core refuses to
+    // change world state from a test (harness.world_set), so there the highlight is checked without events.
+    const real = process.env.NOTER_CORE === "stdio";
+    const busy = (async () => {
+      for (let i = 0; i < 12 && !real; i++) {
+        await steer.change((w) => (w.app.setup.detection_enabled = i % 2 === 0));
+        await page.waitForTimeout(400);
+      }
+    })();
+    await expect(lit).toHaveCount(0, { timeout: 4_500 });
+    await busy;
+    expect((await sent(page, "transcript_span")).length).toBe(spans); // no new read for the same span
+  });
+
   test("UI — error path — Audio deleted by retention: the line shows, the call says the audio is deleted and no play control is offered", async ({ page }) => {
     await openCall(page, (w) => {
       O.written(w);
