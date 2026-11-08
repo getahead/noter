@@ -112,7 +112,8 @@ async function unreachable(page: Page, key: "Tab" | "Shift+Tab"): Promise<{ miss
   let total = await markTabbable(page);
   const reached = await walk(page, key, total + 5);
   total = await markTabbable(page); // a control a stop enabled (selecting a row enables Remove) counts too
-  const missed = await page.$$eval("[data-kbd]", (els, got) => els.filter((e) => !got.includes(e.getAttribute("data-kbd")!)).map((e) => `${e.tagName.toLowerCase()}${e.getAttribute("role") ? `[${e.getAttribute("role")}]` : ""} "${(e.getAttribute("aria-label") || e.textContent || "").trim().slice(0, 40)}"`), reached);
+  // a roving list (Today's item rows) is one stop that moves with focus: a row that stopped being the stop during the walk is not owed a visit
+  const missed = await page.$$eval("[data-kbd]", (els, got) => els.filter((e) => (e as HTMLElement).tabIndex >= 0 && !got.includes(e.getAttribute("data-kbd")!)).map((e) => `${e.tagName.toLowerCase()}${e.getAttribute("role") ? `[${e.getAttribute("role")}]` : ""} "${(e.getAttribute("aria-label") || e.textContent || "").trim().slice(0, 40)}"`), reached);
   return { missed, reached: reached.length, total };
 }
 
