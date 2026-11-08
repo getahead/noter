@@ -1,6 +1,7 @@
 // The pure part of the History timeline: the read key, the day groups, the read state and the undo target of a row.
 import type { ActorFilter, ChangeRow, HistoryTarget, UiPrefs, UndoTarget } from "../../core/bindings";
 import { dayOf, shortDay, t } from "../../i18n/format";
+import { runtimeLabel } from "../call-page/outputs-logic";
 
 export type HistoryState = "LOADING" | "READY" | "EMPTY" | "FILTERED_EMPTY" | "ERROR";
 
@@ -53,8 +54,5 @@ export function jobsOf(rows: ChangeRow[]): { id: string; name: string }[] {
 export const undoTarget = (r: ChangeRow): UndoTarget => (r.batch_id && r.batch_size > 1 ? { type: "batch", batch_id: r.batch_id } : { type: "change", change_id: r.id });
 
 export const sameTarget = (a: UndoTarget, b: UndoTarget) => JSON.stringify(a) === JSON.stringify(b);
-
-const RUNTIME: Record<string, string> = { claude_api_key: "Claude", claude_account: "Claude", codex_api_key: "Codex", chatgpt_account: "ChatGPT", local: "Local" };
-export const runtimeLabel = (r: string) => RUNTIME[r] ?? r;
 
 export const actorLabel = (r: ChangeRow): string => (r.actor.type === "you" ? t("history.actor_you") : r.actor.type === "job" ? t("history.actor_job", { name: r.actor.name }) : t("history.actor_model", { runtime: runtimeLabel(r.actor.runtime) }));

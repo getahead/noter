@@ -41,6 +41,6 @@ describe("history (cpt-noter-flow-ui-history-undo-read)", () => {
   it("labels the actor", () => {
     expect(actorLabel(row("a", 1))).toBe("you");
     expect(actorLabel(row("a", 1, { actor: { type: "job", job_id: "j", name: "Reconcile" } }))).toBe("job: Reconcile");
-    expect(actorLabel(row("a", 1, { actor: { type: "model", llm_run_id: "r", runtime: "claude_account", model: "m" } }))).toBe("model: Claude");
+    expect(actorLabel(row("a", 1, { actor: { type: "model", llm_run_id: "r", runtime: "claude_account", model: "m" } }))).toBe("model: Claude Code");
   });
 });

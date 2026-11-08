@@ -6,7 +6,8 @@ import { clock, t } from "../../i18n/format";
 import { DiffView } from "../../ui/diff/DiffView";
 import { Badge } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
-import { actorLabel, runtimeLabel } from "./history";
+import { runtimeLabel } from "../call-page/outputs-logic";
+import { actorLabel } from "./history";
 
 export interface ChangeRowProps {
   row: Change;

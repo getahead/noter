@@ -11,9 +11,7 @@ import {
   firstLine,
   fixMessage,
   panelRows,
-  rangeOf,
   samplePlaying,
-  selectionRange,
   staleFix,
 } from "./naming";
 
@@ -140,18 +138,6 @@ describe("samplePlaying", () => {
       ),
     ).toBe(false);
     expect(samplePlaying(null, pb({ playing: true }))).toBe(false);
-  });
-});
-
-describe("selection → TextRange", () => {
-  it("counts UTF-16 units, so astral characters keep the range on the right word", () => {
-    expect(rangeOf("😀 ab cd", 3, 5)).toEqual({ start: 3, end: 5 });
-    expect(selectionRange("hello world", 6, 11)).toEqual({ start: 6, end: 11 });
-  });
-  it("an empty or reversed selection has no range", () => {
-    expect(selectionRange("hello", 2, 2)).toBeNull();
-    expect(selectionRange("hello", 4, 1)).toEqual({ start: 1, end: 4 });
-    expect(selectionRange("hello", 0, 99)).toEqual({ start: 0, end: 5 });
   });
 });
 

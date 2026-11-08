@@ -86,7 +86,7 @@ export function TranscriptView(p: TranscriptViewProps) {
   // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-jump
   const moveMatch = (by: number) => setFind((f) => f && { ...f, at: f.at + by });
   const openFind = () => setFind((f) => f ?? { query: "", at: 0 });
-  useWindowShortcuts(useMemo((): ShortcutTable => (live ? { "Meta+KeyJ": jump } : variant === "stored" && p.loaded ? { "Meta+KeyF": openFind } : {}), [live, variant, p.loaded, confirmed]));
+  useWindowShortcuts(useMemo((): ShortcutTable => (live ? { "Meta+KeyJ": jump } : variant === "stored" && p.loaded ? { "Meta+KeyF": openFind } : {}), [live, variant, p.loaded, confirmed]), variant === "stored"); // stored: ⌘F is the find bar here, not the shell's search
 
   // After every render: measure the drawn rows, keep the rows in view where they were, and keep the end in view while following.
   useLayoutEffect(() => {

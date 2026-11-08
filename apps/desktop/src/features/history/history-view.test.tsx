@@ -99,7 +99,7 @@ describe("ChangeRow (cpt-noter-component-ui-change-row)", () => {
     expect(out).not.toContain(">Undo<");
     expect(out).toContain("batch · 37");
     expect(out).toContain("model: Claude");
-    expect(out).toContain("Claude · sonnet");
+    expect(out).toContain("Claude Code · sonnet");
     expect(out).toContain('data-variant="model-run"');
   });
 

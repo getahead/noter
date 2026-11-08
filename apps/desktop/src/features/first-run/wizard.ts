@@ -6,7 +6,7 @@ import { createStore } from "zustand/vanilla";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AudioRetention, DisplayId, ModelBundle, PermissionKind, PermissionState, PrivacyMode, SelfTestMsg, SetupStatus, SetupStep, StepRow, StepState } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { initialPermissionRow, type PermissionRowState } from "./permission-row";
+import { initialPermissionRow, permissionRowNext, type PermissionRowState } from "./permission-row";
 import { applySelfTestEvent, initialSelfTestPanel, newAnnouncements, runSelfTest, selfTestNext, type SelfTestPanel } from "./self-test";
 import { nextStep, STEP_ORDER, type WizardAction, type WizardStep } from "./steps";
 
@@ -387,7 +387,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
 
 /** The permission row's state for what the core reports, the wizard's own checking and the self-test's zero buffers. */
 export function rowStateFor(kind: PermissionKind, core: PermissionState | undefined, s: Pick<WizardState, "checking" | "zeroBuffers">): PermissionRowState {
-  if (s.checking.includes(kind) && core !== "granted") return "CHECKING";
-  if (kind === "system_audio" && s.zeroBuffers) return "MISSING";
-  return initialPermissionRow(kind, core ?? "not_asked");
+  const row = initialPermissionRow(kind, core ?? "not_asked");
+  if (s.checking.includes(kind) && core !== "granted") return permissionRowNext(row, { type: "returned_from_settings" });
+  return kind === "system_audio" && s.zeroBuffers ? permissionRowNext(row, { type: "self_test_zero_buffers" }) : row;
 }

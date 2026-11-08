@@ -3,6 +3,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { openWindow, wheelUpTo, type Steer } from "../e2e/support/app";
+import { navigate } from "../e2e/support/call-page";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { freeze, settled } from "./freeze";
@@ -69,7 +70,7 @@ test.describe("cpt-noter-dod-ui-live-transcript-view transcript view", () => {
 
   test("stored: the call's transcript with its audio line", async ({ page }) => {
     await openWindow(page, "main", { world: (w) => (W.idle(w), void (w.app.capture.phase = "idle")) });
-    await page.evaluate((id) => (location.hash = `transcript=${id}`), W.PAST_CALL);
+    await navigate(page, "transcript");
     await expect(page.locator('[data-region="PC-R5"]')).toContainText(/audio kept until/);
     await shot(page, "stored");
   });

@@ -1,12 +1,11 @@
 // Pure parts of the post-call naming panel and the Fix Term popover (DESIGN › Speaker naming panel, Term fix popover):
-// which speakers the panel lists, its suggestion chips, the sample's playing state and the selection's TextRange.
+// which speakers the panel lists, its suggestion chips, the sample's playing state.
 import type {
   ErrorCode,
   PersonChip,
   PlaybackState,
   SegmentView,
   SpeakerView,
-  TextRange,
 } from "../../core/bindings";
 import { t } from "../../i18n/format";
 
@@ -65,22 +64,6 @@ export function samplePlaying(
   const fresh = pb && pb.version > sample.since;
   if (fresh && (pb.call_id !== sample.callId || (sample.toMs !== undefined && pb.to_ms !== sample.toMs))) return false;
   return !fresh || pb.playing || !pb.stopped_reason;
-}
-
-/** A TextRange in UTF-16 units (as JavaScript counts and the core expects), ordered and clamped to the text. */
-export const rangeOf = (text: string, a: number, b: number): TextRange => ({
-  start: Math.max(0, Math.min(a, b)),
-  end: Math.min(text.length, Math.max(a, b)),
-});
-
-/** The selection's range in the segment's text; `null` when nothing is selected. */
-export function selectionRange(
-  text: string,
-  a: number,
-  b: number,
-): TextRange | null {
-  const r = rangeOf(text, a, b);
-  return r.end > r.start ? r : null;
 }
 
 // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
