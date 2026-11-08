@@ -34,6 +34,7 @@ export class StdioCore {
   private listeners = new Map<string, Set<(p: unknown) => void>>();
   private stderr = "";
   private exited: Error | null = null;
+  private closing = false;
 
   constructor(opts: StdioCoreOptions) {
     const [bin, ...args] = splitCommand(opts.command);
@@ -76,6 +77,8 @@ export class StdioCore {
 
   invoke(window: WindowLabel, cmd: CommandName, args: unknown, onMessage?: (m: unknown) => void): Promise<unknown> {
     if (this.exited) return Promise.reject(this.exited);
+    // A page can still call after the test ends and `close()` ended stdin: a refusal, not a write to a closed pipe.
+    if (this.closing) return Promise.reject(new Error("core harness closed"));
     const id = this.nextId++;
     if (onMessage) this.channels.set(id, onMessage);
     return new Promise((resolve, reject) => {
@@ -102,6 +105,7 @@ export class StdioCore {
   async close(): Promise<void> {
     if (this.exited) return;
     const done = new Promise((r) => this.child.once("exit", r));
+    this.closing = true;
     this.child.stdin.end();
     const timer = setTimeout(() => this.child.kill("SIGKILL"), 3000);
     await done;

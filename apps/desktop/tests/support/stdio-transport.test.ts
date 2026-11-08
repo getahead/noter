@@ -40,6 +40,15 @@ describe("StdioCore", () => {
     await expect(main.invoke("app_snapshot", {})).rejects.toThrow(/exited/);
   });
 
+  it("rejects a call made while the core is closing instead of writing to its closed stdin", async () => {
+    core = new StdioCore({ command: `node "${script}"` });
+    const main = core.transport("main");
+    await main.invoke("app_snapshot", {});
+    const closing = core.close();
+    await expect(main.invoke("app_snapshot", {})).rejects.toThrow(/closed/);
+    await closing;
+  });
+
   it("splits command lines with quotes", () => {
     expect(splitCommand(`a "b c" d`)).toEqual(["a", "b c", "d"]);
     expect(() => splitCommand("  ")).toThrow();
