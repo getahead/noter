@@ -157,6 +157,8 @@ native:
       -resultBundlePath "$result" -quiet || status=$?
     xcrun xcresulttool get test-results tests --path "$result" > coverage/native/xcuitest-results.json \
       || { echo "GATE FAILED: native: could not export the XCUITest results" >&2; status=1; }
+    # A test that passed only on a retry is flaky: warn and record it (docs/FLAKY.md); never changes the result.
+    python3 scripts/harness/flaky_native.py detect || true
     # `-quiet` prints no test names: name every failure (an annotation in CI).
     if [ "$status" -ne 0 ]; then
       xcrun xcresulttool get test-results summary --path "$result" | python3 -I -c 'import json, os, sys
