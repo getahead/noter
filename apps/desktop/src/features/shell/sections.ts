@@ -55,9 +55,11 @@ export function navRoute(target: NavTarget): Route | null {
     case "performance":
       return { section: target.type, key: "root" };
     case "call_page":
+      // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-nt-click
       // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-route
       return { section: "library", key: ["call", target.call_id, target.tab, ...(target.span ? [target.span.t0_ms, target.span.t1_ms] : [])].join(":") };
       // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-route
+      // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-nt-click
     case "item":
       return { section: "activity", key: ["item", target.item_id].join(":") };
     case "person":

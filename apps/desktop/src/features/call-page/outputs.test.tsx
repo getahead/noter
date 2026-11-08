@@ -93,6 +93,24 @@ describe("OutputSection", () => {
     expect(ready).not.toContain("Regenerating…");
   });
 
+  it("notices what the regeneration returned: written by the local model, and names updated with a way to regenerate", async () => {
+    await open([]);
+    const local = { runtime: "local", model: "qwen3-14b", skill: "planning", skill_version: "1", generated_at: 1, from_pass: "live" } as never;
+    const items = sec("action_items", { writer: local, items: [row("Rotate the token")] });
+    expect(renderToString(<OutputSection {...props(items)} />)).toContain("Written by the local model after Claude Code timed out");
+    expect(renderToString(<OutputSection {...props({ ...items, writer: { ...(local as object), runtime: "claude_api_key" } as never })} />)).not.toContain("Written by the local model");
+    const renamed = sec("action_items", { names_updated: true, items: [row("Rotate the token")] });
+    const html = renderToString(<OutputSection {...props(renamed)} />);
+    expect(html).toContain("Names updated");
+    expect(html).toContain("Regenerate for better wording");
+    expect(renderToString(<OutputSection {...props(sec("action_items", { items: [row("Rotate the token")] }))} />)).not.toContain("Names updated");
+    // the link asks for that section to be regenerated
+    const asked: boolean[] = [];
+    const tree = rendered(OutputSection, props(renamed, () => void asked.push(false)));
+    (find(tree, (p, type) => type === "button" && typeof p.onClick === "function" && p.children === "Regenerate for better wording").props.onClick as () => void)();
+    expect(asked).toEqual([false]);
+  });
+
   it("regenerates a failed section alone, and locally on Use Local Model", async () => {
     await open([]);
     const asked: boolean[] = [];
