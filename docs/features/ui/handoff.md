@@ -33,11 +33,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-handoff`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-handoff`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-handoff`
+- [x] `p3` - `cpt-noter-feature-ui-handoff`
 
 ### 1.1 Overview
 
@@ -77,7 +77,7 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 
 ### Prepare, edit and compare a prompt
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-handoff-prepare`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-handoff-prepare`
 
 **Actor**: Primary user
 
@@ -90,20 +90,20 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 - An unknown/deleted or non-engineering item cannot open a usable handoff; prompt conflicts retain the draft.
 
 **Steps**:
-1. [ ] - `p1` - User clicks Handoff on a non-done engineering item; open the 400-pt drawer in the inspector slot and focus Target - `inst-open`
-2. [ ] - `p1` - API: `handoff_get` with item id; render the returned state; if not generated call `handoff_generate` with regenerate false - `inst-get`
-3. [ ] - `p1` - While generating show prompt skeleton, spinner, Writing the handoff prompt… and Cancel; disable open/copy until a usable prompt exists - `inst-generating`
-4. [ ] - `p1` - Consume `entity:changed` for this handoff only; the immediate generating response is not a finished prompt - `inst-event`
-5. [ ] - `p1` - User edits the soft-wrapped Markdown text; retain the base handoff rev and save with `handoff_edit` before a copy/open action - `inst-edit`
-6. [ ] - `p1` - **IF** save conflicts: keep the draft separate, refresh handoff_get and require an explicit new save; no launch or copy follows a failed save - `inst-conflict`
-7. [ ] - `p1` - User toggles Diff to compare prompt_md and generated_md; show read-only inserted/deleted words, then Hide Diff to return to the same edit - `inst-diff`
-8. [ ] - `p1` - **IF** Regenerate is chosen: `handoff_generate` with regenerate true; keep previous versions, replace the prompt draft only after the user's regenerate action - `inst-regenerate`
-9. [ ] - `p1` - **IF** Cancel is chosen while generating: `handoff_cancel`; render its previous ready or not_generated result and ignore superseded completion events - `inst-cancel`
-10. [ ] - `p1` - **RETURN** ready/edited prompt; Esc closes the drawer outside composition and returns focus to its Handoff row - `inst-return`
+1. [x] - `p1` - User clicks Handoff on a non-done engineering item; open the 400-pt drawer in the inspector slot and focus Target - `inst-open`
+2. [x] - `p1` - API: `handoff_get` with item id; render the returned state; if not generated call `handoff_generate` with regenerate false - `inst-get`
+3. [x] - `p1` - While generating show prompt skeleton, spinner, Writing the handoff prompt… and Cancel; disable open/copy until a usable prompt exists - `inst-generating`
+4. [x] - `p1` - Consume `entity:changed` for this handoff only; the immediate generating response is not a finished prompt - `inst-event`
+5. [x] - `p1` - User edits the soft-wrapped Markdown text; retain the base handoff rev and save with `handoff_edit` before a copy/open action - `inst-edit`
+6. [x] - `p1` - **IF** save conflicts: keep the draft separate, refresh handoff_get and require an explicit new save; no launch or copy follows a failed save - `inst-conflict`
+7. [x] - `p1` - User toggles Diff to compare prompt_md and generated_md; show read-only inserted/deleted words, then Hide Diff to return to the same edit - `inst-diff`
+8. [x] - `p1` - **IF** Regenerate is chosen: `handoff_generate` with regenerate true; keep previous versions, replace the prompt draft only after the user's regenerate action - `inst-regenerate`
+9. [x] - `p1` - **IF** Cancel is chosen while generating: `handoff_cancel`; render its previous ready or not_generated result and ignore superseded completion events - `inst-cancel`
+10. [x] - `p1` - **RETURN** ready/edited prompt; Esc closes the drawer outside composition and returns focus to its Handoff row - `inst-return`
 
 ### Open or copy the handoff
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-handoff-deliver`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-handoff-deliver`
 
 **Actor**: Primary user
 
@@ -118,18 +118,18 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 - No mapped or missing repository: Open disabled with reason; Copy remains usable once the prompt is ready.
 
 **Steps**:
-1. [ ] - `p1` - Show Target Claude Code/Codex, mapping, prompt and LaunchPlan explanation before the footer; default_action comes from the core - `inst-plan`
-2. [ ] - `p1` - User changes Target; API: `handoff_set_target`; update returned target, default action and launch line together - `inst-target`
-3. [ ] - `p1` - **IF** sensitive: show **This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal.**; no automatic send - `inst-sensitive`
-4. [ ] - `p1` - **IF** suggested: show **Opening or copying accepts this suggested item.** above the footer - `inst-suggested`
-5. [ ] - `p1` - User invokes a footer action or ⌘Return; flush any prompt draft with handoff_edit, then run the current core default or clicked action once - `inst-invoke`
-6. [ ] - `p1` - **MATCH** action - `inst-action`
-   1. [ ] - `p1` - **CASE** Copy Prompt: `handoff_copy`; show Copied for 2 s and apply the returned item as the core sets it: a successful copy marks it `handed_off` and accepts a suggested item (DESIGN-core: handoff opened or copied → handed_off); no tool is launched - `inst-copy`
-   2. [ ] - `p1` - **CASE** Open: `handoff_open`; core resolves the launch path and permissions; on success use path_used and the returned item to show Handed off to Claude Code/Codex or Opened in iTerm - `inst-launch`
-7. [ ] - `p1` - **IF** automation_denied, no_link_handler or another launch failure: show the matching reason and Copy Prompt; do not mark success or retry automatically - `inst-failure`
-8. [ ] - `p1` - **IF** repo_not_mapped or repo_path_missing: refresh mapping/launch state, disable Open with its reason and offer Add Mapping… or repair in Settings - `inst-repo-error`
-9. [ ] - `p1` - **IF** prompt_not_ready: return to generation state; copy/open cannot use a stale or absent prompt - `inst-prompt-error`
-10. [ ] - `p1` - **RETURN** copied prompt or core handoff record with time and cwd; a successful copy or open marks Handed off, a failed launch does not - `inst-return`
+1. [x] - `p1` - Show Target Claude Code/Codex, mapping, prompt and LaunchPlan explanation before the footer; default_action comes from the core - `inst-plan`
+2. [x] - `p1` - User changes Target; API: `handoff_set_target`; update returned target, default action and launch line together - `inst-target`
+3. [x] - `p1` - **IF** sensitive: show **This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal.**; no automatic send - `inst-sensitive`
+4. [x] - `p1` - **IF** suggested: show **Opening or copying accepts this suggested item.** above the footer - `inst-suggested`
+5. [x] - `p1` - User invokes a footer action or ⌘Return; flush any prompt draft with handoff_edit, then run the current core default or clicked action once - `inst-invoke`
+6. [x] - `p1` - **MATCH** action - `inst-action`
+   1. [x] - `p1` - **CASE** Copy Prompt: `handoff_copy`; show Copied for 2 s and apply the returned item as the core sets it: a successful copy marks it `handed_off` and accepts a suggested item (DESIGN-core: handoff opened or copied → handed_off); no tool is launched - `inst-copy`
+   2. [x] - `p1` - **CASE** Open: `handoff_open`; core resolves the launch path and permissions; on success use path_used and the returned item to show Handed off to Claude Code/Codex or Opened in iTerm - `inst-launch`
+7. [x] - `p1` - **IF** automation_denied, no_link_handler or another launch failure: show the matching reason and Copy Prompt; do not mark success or retry automatically - `inst-failure`
+8. [x] - `p1` - **IF** repo_not_mapped or repo_path_missing: refresh mapping/launch state, disable Open with its reason and offer Add Mapping… or repair in Settings - `inst-repo-error`
+9. [x] - `p1` - **IF** prompt_not_ready: return to generation state; copy/open cannot use a stale or absent prompt - `inst-prompt-error`
+10. [x] - `p1` - **RETURN** copied prompt or core handoff record with time and cwd; a successful copy or open marks Handed off, a failed launch does not - `inst-return`
 
 ### Add, edit or remove a repository mapping
 
@@ -159,51 +159,51 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 
 ### Derive launch controls from the core view
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-handoff-controls`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-handoff-controls`
 
 **Input**: HandoffView, unsaved draft, in-flight action and core error
 
 **Output**: Target label, launch explanation, footer order and enabled/default actions
 
 **Steps**:
-1. [ ] - `p1` - Use target for Open in Claude Code/Codex and launch path for the explanation; put the actual scheme only in help text and the open button description - `inst-label`
-2. [ ] - `p1` - **IF** default_action is open: put Copy left and Open right/default; otherwise put Open left and Copy right/default - `inst-default`
-3. [ ] - `p1` - Disable Open while prompt is absent/generating, repository is absent/missing, launch path is none or a mutation is pending; attach the specific reason as its help tag - `inst-open`
-4. [ ] - `p1` - Keep Copy enabled for a ready prompt even without a repository or launch handler; serialize draft save before either action and suppress duplicate launches - `inst-copy`
-5. [ ] - `p1` - Keep the launch line as the open button's accessible description and announce only returned copied/opened outcomes - `inst-accessible`
-6. [ ] - `p1` - **RETURN** controls; never probe schemes, invoke subprocesses or use a direct clipboard API from this drawer - `inst-return`
+1. [x] - `p1` - Use target for Open in Claude Code/Codex and launch path for the explanation; put the actual scheme only in help text and the open button description - `inst-label`
+2. [x] - `p1` - **IF** default_action is open: put Copy left and Open right/default; otherwise put Open left and Copy right/default - `inst-default`
+3. [x] - `p1` - Disable Open while prompt is absent/generating, repository is absent/missing, launch path is none or a mutation is pending; attach the specific reason as its help tag - `inst-open`
+4. [x] - `p1` - Keep Copy enabled for a ready prompt even without a repository or launch handler; serialize draft save before either action and suppress duplicate launches - `inst-copy`
+5. [x] - `p1` - Keep the launch line as the open button's accessible description and announce only returned copied/opened outcomes - `inst-accessible`
+6. [x] - `p1` - **RETURN** controls; never probe schemes, invoke subprocesses or use a direct clipboard API from this drawer - `inst-return`
 
 ## 4. States (CDSL)
 
 ### Handoff prompt and action
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-handoff-drawer`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-handoff-drawer`
 
 **States**: LOADING, LOAD_FAILED, NOT_GENERATED, GENERATING, GENERATION_FAILED, READY, EDITED, SAVING, COPYING, OPENING, OPENED, OPEN_FAILED
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** NOT_GENERATED, GENERATING, READY, GENERATION_FAILED **WHEN** handoff_get returns its state - `inst-load`
-2. [ ] - `p1` - **FROM** NOT_GENERATED, READY, EDITED, GENERATION_FAILED **TO** GENERATING **WHEN** generation/regeneration is accepted - `inst-generate`
-3. [ ] - `p1` - **FROM** GENERATING **TO** READY **WHEN** the current handoff completion event returns the generated prompt - `inst-ready`
-4. [ ] - `p1` - **FROM** GENERATING **TO** GENERATION_FAILED **WHEN** core reports generation failed - `inst-failed`
-5. [ ] - `p1` - **FROM** GENERATING **TO** READY, NOT_GENERATED **WHEN** cancel returns the previous state - `inst-cancel`
-6. [ ] - `p1` - **FROM** READY, OPENED, OPEN_FAILED **TO** EDITED **WHEN** prompt text changes - `inst-edit`
-7. [ ] - `p1` - **FROM** EDITED **TO** SAVING **WHEN** the draft is saved before an action - `inst-save`
-8. [ ] - `p1` - **FROM** SAVING **TO** EDITED **WHEN** save succeeds or fails; retain the saved-edit badge or failed draft and error respectively - `inst-saved`
-9. [ ] - `p1` - **FROM** READY, EDITED, OPEN_FAILED, OPENED **TO** COPYING, OPENING **WHEN** a valid action starts after any required save - `inst-action`
-10. [ ] - `p1` - **FROM** COPYING **TO** READY, EDITED **WHEN** copy succeeds or fails; keep the prior prompt and show Copied only on success - `inst-copied`
-11. [ ] - `p1` - **FROM** OPENING **TO** OPENED **WHEN** core confirms the launch and item mutation - `inst-opened`
-12. [ ] - `p1` - **FROM** OPENING **TO** OPEN_FAILED **WHEN** launch fails; retain Copy Prompt - `inst-open-error`
-13. [ ] - `p1` - **FROM** LOADING **TO** LOAD_FAILED **WHEN** handoff_get fails; show a retryable drawer error or Item not found - `inst-load-error`
-14. [ ] - `p1` - **FROM** LOAD_FAILED **TO** LOADING **WHEN** Try Again requests the same existing engineering item - `inst-load-retry`
+1. [x] - `p1` - **FROM** LOADING **TO** NOT_GENERATED, GENERATING, READY, GENERATION_FAILED **WHEN** handoff_get returns its state - `inst-load`
+2. [x] - `p1` - **FROM** NOT_GENERATED, READY, EDITED, GENERATION_FAILED **TO** GENERATING **WHEN** generation/regeneration is accepted - `inst-generate`
+3. [x] - `p1` - **FROM** GENERATING **TO** READY **WHEN** the current handoff completion event returns the generated prompt - `inst-ready`
+4. [x] - `p1` - **FROM** GENERATING **TO** GENERATION_FAILED **WHEN** core reports generation failed - `inst-failed`
+5. [x] - `p1` - **FROM** GENERATING **TO** READY, NOT_GENERATED **WHEN** cancel returns the previous state - `inst-cancel`
+6. [x] - `p1` - **FROM** READY, OPENED, OPEN_FAILED **TO** EDITED **WHEN** prompt text changes - `inst-edit`
+7. [x] - `p1` - **FROM** EDITED **TO** SAVING **WHEN** the draft is saved before an action - `inst-save`
+8. [x] - `p1` - **FROM** SAVING **TO** EDITED **WHEN** save succeeds or fails; retain the saved-edit badge or failed draft and error respectively - `inst-saved`
+9. [x] - `p1` - **FROM** READY, EDITED, OPEN_FAILED, OPENED **TO** COPYING, OPENING **WHEN** a valid action starts after any required save - `inst-action`
+10. [x] - `p1` - **FROM** COPYING **TO** READY, EDITED **WHEN** copy succeeds or fails; keep the prior prompt and show Copied only on success - `inst-copied`
+11. [x] - `p1` - **FROM** OPENING **TO** OPENED **WHEN** core confirms the launch and item mutation - `inst-opened`
+12. [x] - `p1` - **FROM** OPENING **TO** OPEN_FAILED **WHEN** launch fails; retain Copy Prompt - `inst-open-error`
+13. [x] - `p1` - **FROM** LOADING **TO** LOAD_FAILED **WHEN** handoff_get fails; show a retryable drawer error or Item not found - `inst-load-error`
+14. [x] - `p1` - **FROM** LOAD_FAILED **TO** LOADING **WHEN** Try Again requests the same existing engineering item - `inst-load-retry`
 
 ## 5. Definitions of Done
 
 ### Prompt lifecycle and delivery
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-handoff-drawer`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-handoff-drawer`
 
 The system **MUST** render HD-R1–HD-R7, generation/cancellation, revision-safe edits, generated/current diff, target choice and the core launch plan. Footer defaults follow the owner; a successful copy or open marks the item Handed off (and accepts a suggested item); copy never launches a tool; a failed launch marks nothing. Failure always leaves a path to Copy Prompt.
 
@@ -221,7 +221,7 @@ The system **MUST** render HD-R1–HD-R7, generation/cancellation, revision-safe
 
 ### Repository mappings
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-handoff-mappings`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-handoff-mappings`
 
 The system **MUST** share the repository list between Settings and the drawer, prefill the source project, persist add/edit/remove through the core and refresh launch eligibility after each change. Folder cancellation and invalid keys never invent a mapping.
 
@@ -238,12 +238,12 @@ The system **MUST** share the repository list between Settings and the drawer, p
 
 ## 6. Acceptance Criteria
 
-- [ ] Draft edits persist before launch/copy, remain separate from item text and survive conflicts for explicit retry
-- [ ] The current target, repository, launch line and default button agree before every action
-- [ ] Others' items default to Copy; suggestions accept only after a successful copy/open
-- [ ] Automation denial never marks Handed off; a successful launch records target, time and cwd
-- [ ] Cancellation stops generation; a stale event cannot replace the restored prompt
-- [ ] Mapping changes persist and revalidate the drawer; unavailable prompt versions or repositories are never fabricated
+- [x] Draft edits persist before launch/copy, remain separate from item text and survive conflicts for explicit retry
+- [x] The current target, repository, launch line and default button agree before every action
+- [x] Others' items default to Copy; suggestions accept only after a successful copy/open
+- [x] Automation denial never marks Handed off; a successful launch records target, time and cwd
+- [x] Cancellation stops generation; a stale event cannot replace the restored prompt
+- [x] Mapping changes persist and revalidate the drawer; unavailable prompt versions or repositories are never fabricated
 
 ## 7. Additional Context
 

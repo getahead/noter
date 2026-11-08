@@ -34,11 +34,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-today`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-today`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-today`
+- [x] `p3` - `cpt-noter-feature-ui-today`
 
 ### 1.1 Overview
 
@@ -78,7 +78,7 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 
 ### Prepare from today's calls
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-today-review`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-today-review`
 
 **Actor**: Primary user
 
@@ -93,18 +93,18 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 - Failed read: **Couldn't read today's calendar. · Try Again**; retry shows two loading cards.
 
 **Steps**:
-1. [ ] - `p1` - User opens Today; API: `today_get` with no args; after 300 ms show two non-shimmering skeleton cards; a command-level calendar_unavailable error uses the same retryable calendar-error region - `inst-get`
-2. [ ] - `p1` - **MATCH** CalendarAccess - `inst-calendar`
-   1. [ ] - `p1` - **CASE** not_asked: show the empty-state explanation; only Allow Calendar Access calls `permission_request` for calendar, then refresh Today after the answer - `inst-ask`
-   2. [ ] - `p1` - **CASE** denied: show the Calendar warning and Open System Settings… through `open_external`; refresh on return to Today - `inst-denied`
-   3. [ ] - `p1` - **CASE** read_failed: retain non-calendar regions, show the read error and retry `today_get` only after Try Again - `inst-failed`
-   4. [ ] - `p1` - **CASE** granted: render today's events, or No calls today, plus This week - `inst-allowed`
-3. [ ] - `p1` - Render core-ranked open actions and questions in each card, at most five before Show More; next call is expanded and later calls can expand/collapse in place - `inst-cards`
-4. [ ] - `p1` - Render TD-R5 due_without_call, TD-R6 at most three proposal previews, TD-R7 Done today disclosure and TD-R8 while review is waiting - `inst-regions`
-5. [ ] - `p1` - Review links open the corresponding Call page Summary with Start Review applied; evidence and Last time use typed routes, preserving the Today return state - `inst-links`
-6. [ ] - `p1` - Card More offers Call Type, Mark as Sensitive and Show Previous Call; apply changes through existing call/capture commands and refresh the card, showing Local only after attendees - `inst-menu`
-7. [ ] - `p1` - Menu bar MB-R6: the next calendar call as the disabled line **Next: <event> <time>** in the status menu, from the same upcoming-call read (from `cpt-noter-algo-ui-menu-bar-build-menu`, owner decision A, 28 Oct 2026) - `inst-menu-next`
-8. [ ] - `p1` - **RETURN** Today with core order, plural counts and each row's language, or the calendar-specific empty/error state - `inst-return`
+1. [x] - `p1` - User opens Today; API: `today_get` with no args; after 300 ms show two non-shimmering skeleton cards; a command-level calendar_unavailable error uses the same retryable calendar-error region - `inst-get`
+2. [x] - `p1` - **MATCH** CalendarAccess - `inst-calendar`
+   1. [x] - `p1` - **CASE** not_asked: show the empty-state explanation; only Allow Calendar Access calls `permission_request` for calendar, then refresh Today after the answer - `inst-ask`
+   2. [x] - `p1` - **CASE** denied: show the Calendar warning and Open System Settings… through `open_external`; refresh on return to Today - `inst-denied`
+   3. [x] - `p1` - **CASE** read_failed: retain non-calendar regions, show the read error and retry `today_get` only after Try Again - `inst-failed`
+   4. [x] - `p1` - **CASE** granted: render today's events, or No calls today, plus This week - `inst-allowed`
+3. [x] - `p1` - Render core-ranked open actions and questions in each card, at most five before Show More; next call is expanded and later calls can expand/collapse in place - `inst-cards`
+4. [x] - `p1` - Render TD-R5 due_without_call, TD-R6 at most three proposal previews, TD-R7 Done today disclosure and TD-R8 while review is waiting - `inst-regions`
+5. [x] - `p1` - Review links open the corresponding Call page Summary with Start Review applied; evidence and Last time use typed routes, preserving the Today return state - `inst-links`
+6. [x] - `p1` - Card More offers Call Type, Mark as Sensitive and Show Previous Call; apply changes through existing call/capture commands and refresh the card, showing Local only after attendees - `inst-menu`
+7. [x] - `p1` - Menu bar MB-R6: the next calendar call as the disabled line **Next: <event> <time>** in the status menu, from the same upcoming-call read (from `cpt-noter-algo-ui-menu-bar-build-menu`, owner decision A, 28 Oct 2026) - `inst-menu-next`
+8. [x] - `p1` - **RETURN** Today with core order, plural counts and each row's language, or the calendar-specific empty/error state - `inst-return`
 
 ### Tick an item and take back a mistake
 
@@ -130,7 +130,7 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 
 ### Record or return to interrupted capture
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-today-capture`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-today-capture`
 
 **Actor**: Primary user
 
@@ -143,50 +143,50 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 - Engine stopped banner offers Try Again for the same call; starting another capture or dismissing the interrupted banner ends Resume's offer.
 
 **Steps**:
-1. [ ] - `p1` - User chooses Record; call `capture_start` with the existing start arguments; model_missing, disk_full and already_recording use the established capture error states - `inst-start`
-2. [ ] - `p1` - While capturing show the live card first, or Recording with app and elapsed time if no calendar match; Open Call Screen and the toolbar indicator invoke `window_show_call` - `inst-live`
-3. [ ] - `p1` - While self-test has not passed show Call detection is off until the audio self-test passes, Run Audio Self-Test… and Finish Setup…; these open existing setup surfaces without replacing Record - `inst-setup`
-4. [ ] - `p1` - After a quit show the returned call title and saved timestamp with Open Call, Resume Recording and ×; Open Call routes to Transcript - `inst-quit`
-5. [ ] - `p1` - Resume Recording calls `capture_resume_interrupted` for that call; render the existing transcript and gap from the core, then show the call window - `inst-resume`
-6. [ ] - `p1` - **IF** × is clicked: `banner_dismiss` ends the resume offer; a new capture removes the old offer through core state - `inst-dismiss`
-7. [ ] - `p1` - **RETURN** capture state; engine-stopped Try Again uses the same-call recovery service from the call-window feature - `inst-return`
+1. [x] - `p1` - User chooses Record; call `capture_start` with the existing start arguments; model_missing, disk_full and already_recording use the established capture error states - `inst-start`
+2. [x] - `p1` - While capturing show the live card first, or Recording with app and elapsed time if no calendar match; Open Call Screen and the toolbar indicator invoke `window_show_call` - `inst-live`
+3. [x] - `p1` - While self-test has not passed show Call detection is off until the audio self-test passes, Run Audio Self-Test… and Finish Setup…; these open existing setup surfaces without replacing Record - `inst-setup`
+4. [x] - `p1` - After a quit show the returned call title and saved timestamp with Open Call, Resume Recording and ×; Open Call routes to Transcript - `inst-quit`
+5. [x] - `p1` - Resume Recording calls `capture_resume_interrupted` for that call; render the existing transcript and gap from the core, then show the call window - `inst-resume`
+6. [x] - `p1` - **IF** × is clicked: `banner_dismiss` ends the resume offer; a new capture removes the old offer through core state - `inst-dismiss`
+7. [x] - `p1` - **RETURN** capture state; engine-stopped Try Again uses the same-call recovery service from the call-window feature - `inst-return`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Project the day without reranking
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-today-project`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-today-project`
 
 **Input**: TodayView, current capture/setup state, per-event disclosure state, main-window size class
 
 **Output**: Today regions, card variants and focus order
 
 **Steps**:
-1. [ ] - `p1` - Preserve the core's event and ranked-item order; move only the matching live card to the top; create the unmatched-live presentation from live_call when no calendar event matches - `inst-order`
-2. [ ] - `p1` - Reconcile disclosures by opaque event id, keeping a user's expanded later card across refreshes; show five combined action/question rows until Show More - `inst-disclosures`
-3. [ ] - `p1` - Wide uses full-width review/cards then left This week, due and Done today with proposals right; Medium/Narrow use review, cards, due, proposals, This week, Done today - `inst-layout`
-4. [ ] - `p1` - Keep one highest-severity banner and +More via shell service; setup never gates Record except the model/disk blockers - `inst-banner`
-5. [ ] - `p1` - Render empty lines Nothing due without a call, Nothing waiting. Noter asks before it changes older records., and Nothing ticked today where their collections are empty - `inst-empty`
-6. [ ] - `p1` - Refresh on relevant entity, capture, permission and ranking changes; discard superseded reads and coalesce simultaneous refresh requests through the existing store - `inst-refresh`
-7. [ ] - `p1` - **RETURN** the day; do not manufacture counts, participants, speaker-review totals or proposal decisions from sample data - `inst-return`
+1. [x] - `p1` - Preserve the core's event and ranked-item order; move only the matching live card to the top; create the unmatched-live presentation from live_call when no calendar event matches - `inst-order`
+2. [x] - `p1` - Reconcile disclosures by opaque event id, keeping a user's expanded later card across refreshes; show five combined action/question rows until Show More - `inst-disclosures`
+3. [x] - `p1` - Wide uses full-width review/cards then left This week, due and Done today with proposals right; Medium/Narrow use review, cards, due, proposals, This week, Done today - `inst-layout`
+4. [x] - `p1` - Keep one highest-severity banner and +More via shell service; setup never gates Record except the model/disk blockers - `inst-banner`
+5. [x] - `p1` - Render empty lines Nothing due without a call, Nothing waiting. Noter asks before it changes older records., and Nothing ticked today where their collections are empty - `inst-empty`
+6. [x] - `p1` - Refresh on relevant entity, capture, permission and ranking changes; discard superseded reads and coalesce simultaneous refresh requests through the existing store - `inst-refresh`
+7. [x] - `p1` - **RETURN** the day; do not manufacture counts, participants, speaker-review totals or proposal decisions from sample data - `inst-return`
 
 ## 4. States (CDSL)
 
 ### Calendar region
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-today-calendar`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-today-calendar`
 
 **States**: LOADING, NOT_ASKED, ASKING, DENIED, READY, NO_CALLS, ERROR
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** NOT_ASKED, DENIED, READY, NO_CALLS, ERROR **WHEN** today_get returns the corresponding calendar result - `inst-read`
-2. [ ] - `p1` - **FROM** NOT_ASKED **TO** ASKING **WHEN** Allow Calendar Access is clicked outside capture - `inst-ask`
-3. [ ] - `p1` - **FROM** ASKING **TO** LOADING **WHEN** permission_request settles; re-read the actual permission - `inst-answer`
-4. [ ] - `p1` - **FROM** DENIED **TO** LOADING **WHEN** Today is revisited after System Settings changes - `inst-settings`
-5. [ ] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** Try Again is chosen - `inst-retry`
-6. [ ] - `p1` - **FROM** READY, NO_CALLS **TO** LOADING **WHEN** the date or calendar environment changes - `inst-date`
+1. [x] - `p1` - **FROM** LOADING **TO** NOT_ASKED, DENIED, READY, NO_CALLS, ERROR **WHEN** today_get returns the corresponding calendar result - `inst-read`
+2. [x] - `p1` - **FROM** NOT_ASKED **TO** ASKING **WHEN** Allow Calendar Access is clicked outside capture - `inst-ask`
+3. [x] - `p1` - **FROM** ASKING **TO** LOADING **WHEN** permission_request settles; re-read the actual permission - `inst-answer`
+4. [x] - `p1` - **FROM** DENIED **TO** LOADING **WHEN** Today is revisited after System Settings changes - `inst-settings`
+5. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** Try Again is chosen - `inst-retry`
+6. [x] - `p1` - **FROM** READY, NO_CALLS **TO** LOADING **WHEN** the date or calendar environment changes - `inst-date`
 
 ### Call card disclosure
 
@@ -207,7 +207,7 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 
 ### Calendar, cards and recovery
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-today-dashboard`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-today-dashboard`
 
 The system **MUST** render TD-R1–TD-R8 from TodayView, preserve ranked order, disclosures and return navigation, ask Calendar permission only on demand outside capture, and keep Record and recovery actions consistent with capture state.
 
@@ -226,7 +226,7 @@ The system **MUST** render TD-R1–TD-R8 from TodayView, preserve ranked order, 
 
 ### Done today and Undo
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-today-items`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-today-items`
 
 The system **MUST** reuse the Items completion/answer flow and History Undo, show accurate counts in every instance, keep Done today accessible after feedback expires and retain focus when an item moves.
 
@@ -243,12 +243,12 @@ The system **MUST** reuse the Items completion/answer flow and History Undo, sho
 
 ## 6. Acceptance Criteria
 
-- [ ] Calendar permission is never requested on launch or during capture
-- [ ] Next call expands, later/week cards disclose, Show More reveals rows without changing core ranking
-- [ ] Calendar failures leave due items and proposals usable; retries show two loading cards
-- [ ] Suggested ticks accept and complete; open handoffs wait for an answer; Undo restores the original state
-- [ ] Record remains available with unfinished setup; model/disk blockers show their reasons
-- [ ] Live and interrupted calls open the right call window or Transcript without stealing call-app focus
+- [x] Calendar permission is never requested on launch or during capture
+- [x] Next call expands, later/week cards disclose, Show More reveals rows without changing core ranking
+- [x] Calendar failures leave due items and proposals usable; retries show two loading cards
+- [x] Suggested ticks accept and complete; open handoffs wait for an answer; Undo restores the original state
+- [x] Record remains available with unfinished setup; model/disk blockers show their reasons
+- [x] Live and interrupted calls open the right call window or Transcript without stealing call-app focus
 
 ## 7. Additional Context
 

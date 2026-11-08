@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.22.0](https://github.com/getahead/noter/compare/v0.21.0...v0.22.0) (2026-11-08)
+
+
+### Features
+
+* **core:** add Open Last Summary to the menu bar (2.18) ([#447](https://github.com/getahead/noter/issues/447)) ([2e1dc04](https://github.com/getahead/noter/commit/2e1dc0421ac1d3de80d6fcd5fe42e24db73a9d98))
+* **ui:** add Fix Term to the native Edit menu (2.19) ([#422](https://github.com/getahead/noter/issues/422)) ([52cd0bb](https://github.com/getahead/noter/commit/52cd0bb54cd02a99f8b0e1d265ec39f510c2a6a2))
+* **ui:** close today 2.20 markers and tick the feature ([#386](https://github.com/getahead/noter/issues/386)) ([10e5dbc](https://github.com/getahead/noter/commit/10e5dbc052fd42a640a10c1a942e9ddbbc2f301c))
+* **ui:** count the rejected suggestions a regeneration will not suggest again (2.18) ([#420](https://github.com/getahead/noter/issues/420)) ([1b51bb3](https://github.com/getahead/noter/commit/1b51bb30d62dd806e59352b51ee9a20c0285e0fb))
+* **ui:** mark the remaining 2.21 instruction blocks and tick the covered flows ([#437](https://github.com/getahead/noter/issues/437)) ([4cb482e](https://github.com/getahead/noter/commit/4cb482e77a96b247114912d6c5865ddfb89c1da1))
+* **ui:** mount the naming panel on summary and show names updated (2.19) ([#388](https://github.com/getahead/noter/issues/388)) ([fba4ff3](https://github.com/getahead/noter/commit/fba4ff3669753b197722623afb08660980dcf57f))
+* **ui:** trace the regenerate flow, show the local-model and names-updated notices (2.18) ([#379](https://github.com/getahead/noter/issues/379)) ([802454e](https://github.com/getahead/noter/commit/802454ee9dcb44adc21309e95df9df4849c67831))
+
+
+### Bug fixes
+
+* **mcp:** a closed run's connection answers nothing, not a racing refusal ([#442](https://github.com/getahead/noter/issues/442)) ([50f9e97](https://github.com/getahead/noter/commit/50f9e97781694bf5b705624227f9159a14afea3e))
+* **mcp:** hybrid search on the socket path and one sign-in per run for live sources ([#419](https://github.com/getahead/noter/issues/419)) ([cd5cf83](https://github.com/getahead/noter/commit/cd5cf8398e91ea35b5b72823b25ce9ffbab24d40))
+* **ui:** apply buffered channel messages before an entity write so Undo's restored rows stay ([#429](https://github.com/getahead/noter/issues/429)) ([762f060](https://github.com/getahead/noter/commit/762f0601a62bcaadf841215b50d8b8efbd39157c))
+* **ui:** re-read the line when undo reverses a term fix (2.19) ([#444](https://github.com/getahead/noter/issues/444)) ([9056f8b](https://github.com/getahead/noter/commit/9056f8be8e13984bccc642064b2de28378bc47b1))
+
+
+### Performance
+
+* **ci:** cache the pinned WebKit for the browser test jobs ([#432](https://github.com/getahead/noter/issues/432)) ([8574edd](https://github.com/getahead/noter/commit/8574edddbc70c902d605d4cca5695f31ae8a21fc))
+* **ci:** cache the Swift engine build in the macOS job ([#426](https://github.com/getahead/noter/issues/426)) ([1db49e0](https://github.com/getahead/noter/commit/1db49e0cb973b8edec4e5c156a470811908a25ef))
+* **conformance:** probe the commands a few at a time, each in its own core ([#449](https://github.com/getahead/noter/issues/449)) ([48ef5b4](https://github.com/getahead/noter/commit/48ef5b4a0426fc888b029b97464d59bdbdccbd72))
+* **conformance:** replace archive fixture delays with explicit completion handshakes ([#441](https://github.com/getahead/noter/issues/441)) ([9839451](https://github.com/getahead/noter/commit/98394511ebdf64c6fd719276dca38a1bfd5b5193))
+
+## [0.21.0](https://github.com/getahead/noter/compare/v0.20.0...v0.21.0) (2026-11-08)
+
+
+### Features
+
+* **contract:** add suppressed_count to output sections ([#380](https://github.com/getahead/noter/issues/380)) ([9856408](https://github.com/getahead/noter/commit/98564081929ffa33cbaa36dd8a7b54eceaccffb3))
+* **contract:** archive old-vs-new text in spanpreview and the transcript_upgraded case ([#359](https://github.com/getahead/noter/issues/359)) ([ee80fa3](https://github.com/getahead/noter/commit/ee80fa33d4a1fa8444f92a76d73bf24c5ce18127))
+* **fake:** switch the section writer to the local model ([#381](https://github.com/getahead/noter/issues/381)) ([d723638](https://github.com/getahead/noter/commit/d72363873dec8a1686d2fd8a5f302cc9faddb7a7))
+* **harness:** advance_clock control moves the core clock ([#360](https://github.com/getahead/noter/issues/360)) ([21e25cd](https://github.com/getahead/noter/commit/21e25cd6df7afe8857d7f7c0cdea43d4fe1dbb21))
+* **harness:** hold the index rebuild and script the next ask-answer output ([#415](https://github.com/getahead/noter/issues/415)) ([e088d23](https://github.com/getahead/noter/commit/e088d2329f162f0d23778650dcded55ab32ffc81))
+* **knowledge:** document hits in search through the source policy ([#362](https://github.com/getahead/noter/issues/362)) ([7f71fbd](https://github.com/getahead/noter/commit/7f71fbdef28d895099708863a9cf8deebdf7eb89))
+* **knowledge:** real indexed-MCP transport over the egress gate with OAuth ([#376](https://github.com/getahead/noter/issues/376)) ([b319a20](https://github.com/getahead/noter/commit/b319a201a0f4a9b9e82b19adbb61afe67038e670))
+* **mcp:** cloud result gate, staged pins and corrections, and the router's tool server ([#356](https://github.com/getahead/noter/issues/356)) ([f0628cb](https://github.com/getahead/noter/commit/f0628cbab031ea3c1d8a6cf56271a569c06d4624))
+* **mcp:** search tools over shared retrieval and the D1 live-source relay ([#372](https://github.com/getahead/noter/issues/372)) ([5f969d3](https://github.com/getahead/noter/commit/5f969d31b72163e89f60d2fbc019d254654ab4fa))
+* **retrieval:** ask threads, cited streamed answers, stop and delete ([#361](https://github.com/getahead/noter/issues/361)) ([7b944ab](https://github.com/getahead/noter/commit/7b944ab9f844de1c65d2dc98947516ee794f4392))
+* **retrieval:** topics, post-call attachment and Ask tool refinement ([#375](https://github.com/getahead/noter/issues/375)) ([fc666a4](https://github.com/getahead/noter/commit/fc666a4ed8e1531d33b5f14fe9fafb01715cb0b3))
+* **ui:** show/hide archive changes diff and archive-upgraded/pending evidence (2.17 archive) ([#369](https://github.com/getahead/noter/issues/369)) ([3419df0](https://github.com/getahead/noter/commit/3419df0abd8b09fb919d846f2f2e7f997897fd8c))
+* **ui:** trace the audio sheet submit and the delete-audio return (2.18) ([#391](https://github.com/getahead/noter/issues/391)) ([011b1a8](https://github.com/getahead/noter/commit/011b1a83b8d6e75e1041404639981febdf48aee5))
+* **ui:** trace the output section state machine and the share scope return (2.18) ([#383](https://github.com/getahead/noter/issues/383)) ([e66b4d6](https://github.com/getahead/noter/commit/e66b4d6dcc8fb1b33a2feacba94c1ca04b182a54))
+* **ui:** trace the outputs notification flow steps (2.18 gaps) ([#358](https://github.com/getahead/noter/issues/358)) ([d18a641](https://github.com/getahead/noter/commit/d18a641259e30ece970e793ebc28b6bc2cb11292))
+
+
+### Bug fixes
+
+* **library:** count open items on call rows and filter calls by them ([#382](https://github.com/getahead/noter/issues/382)) ([e5e7080](https://github.com/getahead/noter/commit/e5e70804ff4bcbe7a1d75b92571c1d76ae4a9d27))
+* **test:** settle first-run screenshots before interaction ([#390](https://github.com/getahead/noter/issues/390)) ([fd2052d](https://github.com/getahead/noter/commit/fd2052de841458abbe4c3970b6f7b33439a4a3e7))
+* **ui:** inspector screenshots, Share/(i) kept together, deletion day in the Transcript header (2.17 gaps) ([#357](https://github.com/getahead/noter/issues/357)) ([d544ed7](https://github.com/getahead/noter/commit/d544ed7e94fb849dd6da22e668ae83b4a2c5a29a))
+
+
+### Performance
+
+* **ci:** cache the standalone Tauri target in the macOS job ([#425](https://github.com/getahead/noter/issues/425)) ([304430f](https://github.com/getahead/noter/commit/304430f98b1b47253bdfa0e9667af5bfd4f39324))
+* **test:** avoid the native pause reminder wall-clock wait ([#417](https://github.com/getahead/noter/issues/417)) ([ad0cae8](https://github.com/getahead/noter/commit/ad0cae8f2b9a7d9fd6634ae343f175af104dccb0))
+
 ## [0.20.0](https://github.com/getahead/noter/compare/v0.19.0...v0.20.0) (2026-11-07)
 
 

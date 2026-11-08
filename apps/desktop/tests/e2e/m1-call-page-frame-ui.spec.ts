@@ -5,7 +5,7 @@
 // them. Markup follows the prototype (`screen('call-page')`): toolbar PC-R1, banner slot PC-R2, Call info in the inspector slot
 // (MW-R4/PC-R4), the transcript in PC-R5; the call is opened as the core opens it (`window_navigate` → `nav:request`); the Calls list is 2.13's.
 // Native, not here: the delete NSAlert (Cancel default, Return keeps the call) is XCUITest
-// `test_cpt_noter_seq_dialogs_delete_call__alert_has_cancel_as_default`; the macOS notifications prompt is on the manual
+// `test_cpt_noter_seq_dialogs_delete_call__error_return_pressed_by_habit`; the macOS notifications prompt is on the manual
 // checklist; the page loading without activating the window after a stop is XCUITest
 // `test_cpt_noter_seq_call_screen_stop_at_call_end__call_page_loads_without_taking_focus`.
 import type { Page } from "@playwright/test";
@@ -13,6 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { windowReady } from "./support/call-page";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
@@ -57,6 +58,7 @@ const quiet =
  * this feature, so Back lands on Library › Calls whatever it shows. Works on the fake core and the real one.
  */
 async function openCall(page: Page, title = TITLE) {
+  await windowReady(page); // a `nav:request` (or a key) before the window subscribed to the core's events is lost
   // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
   await expect(async () => {
     await page.keyboard.press("Meta+Digit3");

@@ -135,6 +135,13 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
         }
       }
     }
+    // shortcut: only the undo of a term fix restores its words (a redo keeps the line as it is); the core replays both
+    const fixed = value === "before" && r.entity.kind === "segment" && r.field === "text" ? world.transcripts.flatMap((t) => t.segments).find((x) => x.id === r.entity.id) : undefined;
+    const fix = fixed?.corrections.slice().reverse().find((c) => fixed.text.slice(c.range.start, c.range.end) === r.after);
+    if (fixed && fix) {
+      fixed.text = fixed.text.slice(0, fix.range.start) + r.before + fixed.text.slice(fix.range.end);
+      fixed.corrections.splice(fixed.corrections.indexOf(fix), 1);
+    }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
@@ -1950,14 +1957,22 @@ export const defaultHandlers: Handlers = {
     publish("copilot:status");
     return world.app.presenting;
   },
-  window_navigate: (a, { emit }) => {
-    if (a.target) emit("nav:request", a.target);
+  window_navigate: (a, { world, emit }) => {
+    let target = a.target;
+    // Open Last Summary: the Summary of the latest call whose outputs are ready, as the core resolves it; none, none.
+    if (target?.type === "last_summary") {
+      const latest = world.calls.filter((c) => world.outputs.some((o) => o.call_id === c.id && o.status === "ready")).sort((x, y) => y.started_at - x.started_at)[0];
+      target = latest ? { type: "call_page", call_id: latest.id, tab: "summary", span: null } : null;
+    }
+    if (target) emit("nav:request", target);
     return ack;
   },
   window_report_view: (a, { fake }) => {
     fake.viewedCall = a.call_id ?? null;
     return ack;
   },
+  // The Edit menu's Fix Term… is native: the fake has no menu to enable.
+  window_set_fix_term_enabled: () => ({}),
   window_announce: (a) => {
     if (!a.text.trim()) throw coreError("invalid_input", "text", { type: "validation", field: "text", rule: "required" });
     return ack;

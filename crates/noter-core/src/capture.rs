@@ -49,6 +49,8 @@ pub trait Surfaces: Send + Sync {
     fn post_notification(&self, notification: &Notification);
     /// The record prompt takes this size (points), keeping its top-right corner.
     fn fit_record_prompt(&self, _width: u32, _height: u32) {}
+    /// The Edit menu's **Fix Term…** is enabled while a confirmed-text selection is on screen.
+    fn set_fix_term_enabled(&self, _enabled: bool) {}
 }
 
 /// No native layer: nothing is shown.

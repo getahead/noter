@@ -272,6 +272,7 @@ fn whole_state_events_carry_a_version() {
         "jobs:progress",
         "signin:progress",
         "nav:request",
+        "menu:fix_term",
     ];
     let types = noter_protocol::ipc::ipc_types();
     for e in EVENTS.iter().filter(|e| !not_whole_state.contains(&e.name)) {

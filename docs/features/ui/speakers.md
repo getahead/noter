@@ -34,11 +34,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-speakers`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-speakers`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-speakers`
+- [x] `p3` - `cpt-noter-feature-ui-speakers`
 
 ### 1.1 Overview
 
@@ -64,7 +64,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 - **PRD**: [PRD.md](../../PRD.md) › Feature specification › 2 and 4; Diarization and speaker identity
 - **Design**: [DESIGN.md](../../DESIGN.md) › Call screen; Call page PC-R9; Speaker label; Speaker naming panel; Term fix popover; Person picker; D88, D89, D92, D93
-- **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.19, M2, NOT_STARTED
+- **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.19, M2, IMPLEMENTED
 - **Design elements**: `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-ui-term-fix-popover`, `cpt-noter-component-ui-person-picker`
 - **Stories**: `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers` (M2, every path)
 - **Frozen commands it delivers (M2)**: `transcript_rename_speaker`, `transcript_fix_term`, `transcript_name_speakers`
@@ -78,7 +78,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 ### Name a speaker during the call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-speakers-live-name`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-speakers-live-name`
 
 **Actor**: Primary user
 
@@ -93,7 +93,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 1. [x] - `p1` - User clicks the speaker label; open the 320-pt popover anchored to it, make the panel key for editing and focus **Name…** without moving the panel - `inst-open`
 2. [x] - `p1` - Show **In this call** then **Recent people**, role/source captions, Whole call selected and Only this line; the picker process filters suggestions - `inst-picker`
 3. [x] - `p1` - User chooses a person by click or arrows/Return; Rename remains disabled until selection is valid - `inst-select`
-4. [ ] - `p1` - **IF** the user chooses New Person: replace the list with Name, Email, Role, Back and Create and Name; validate and check duplicates without opening a sheet - `inst-new`
+4. [x] - `p1` - **IF** the user chooses New Person: replace the list with Name, Email, Role, Back and Create and Name; validate and check duplicates without opening a sheet - `inst-new`
 5. [x] - `p1` - User confirms; API: `transcript_rename_speaker` with call id, speaker id, existing or new PersonRef and whole_call or one_segment scope; never submit during composition - `inst-rename`
 6. [x] - `p1` - **IF** the command fails: keep the draft and focus, show the typed error with explicit retry; a missing speaker refreshes the transcript before another attempt - `inst-error`
 7. [x] - `p1` - **ELSE** apply the returned speakers and core events to every affected line and header; announce the actual affected count when supplied and retain change_id for Undo - `inst-result`
@@ -101,7 +101,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 ### Name speakers after the call
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-speakers-post-call`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-speakers-post-call`
 
 **Actor**: Primary user
 
@@ -114,18 +114,18 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 - Naming fails: the row stays with its chosen person and retry. All skipped is not All speakers named.
 
 **Steps**:
-1. [ ] - `p1` - In Summary and Transcript show PC-R9 above the content with one row per unnamed speaker, first confirmed line, line count, Name field, suggestion chips, Name and Skip - `inst-panel`
+1. [x] - `p1` - In Summary and Transcript show PC-R9 above the content with one row per unnamed speaker, first confirmed line, line count, Name field, suggestion chips, Name and Skip - `inst-panel`
 2. [x] - `p1` - **IF** audio is available: Play Sample requests a 5-s span through `audio_play`, shows Playing… until audio state ends and uses existing replay safety rules; a second sample stops the previous one - `inst-sample`
-3. [ ] - `p1` - User chooses an invitation chip or picker result; mark the chip pressed, put the name in the field and enable Name - `inst-pick`
+3. [x] - `p1` - User chooses an invitation chip or picker result; mark the chip pressed, put the name in the field and enable Name - `inst-pick`
 4. [x] - `p1` - Name submits `transcript_name_speakers` with this row's assignment; Skip submits the assignment with person null and keeps the local skipped disclosure - `inst-name`
-5. [ ] - `p1` - Core updates transcript labels, owners, Per participant and label substitutions in Summary while preserving edits; show **Names updated · Regenerate for better wording**, never regenerate automatically - `inst-update`
+5. [x] - `p1` - Core updates transcript labels, owners, Per participant and label substitutions in Summary while preserving edits; show **Names updated · Regenerate for better wording**, never regenerate automatically - `inst-update`
 6. [x] - `p1` - Show the result with Undo for 10 s; on the last named speaker show All speakers named, then remove the panel; skipped rows remain nameable - `inst-outcome`
-7. [ ] - `p1` - **IF** Name… in Skipped is chosen: restore that row to the naming list; choosing Hide or Show changes presentation only - `inst-unskip`
-8. [ ] - `p1` - **RETURN** the core identities with undo targets, or the unchanged row on failure - `inst-return`
+7. [x] - `p1` - **IF** Name… in Skipped is chosen: restore that row to the naming list; choosing Hide or Show changes presentation only - `inst-unskip`
+8. [x] - `p1` - **RETURN** the core identities with undo targets, or the unchanged row on failure - `inst-return`
 
 ### Correct a transcript term
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-speakers-fix-term`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-speakers-fix-term`
 
 **Actor**: Primary user
 
@@ -137,7 +137,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 - Esc cancels and returns focus; during capture the call app regains typing focus.
 
 **Steps**:
-1. [ ] - `p1` - User opens Fix Term… from the selected text's context menu or Edit menu; anchor the 280–360-pt popover to that selection - `inst-open`
+1. [x] - `p1` - User opens Fix Term… from the selected text's context menu or Edit menu; anchor the 280–360-pt popover to that selection - `inst-open`
 2. [x] - `p1` - Keep call id, segment id and the selected TextRange; populate Correct term and `glossary_list` suggestions; show **Older calls get a proposal in Activity** - `inst-range`
 3. [x] - `p1` - User types a replacement or picks a glossary variant and optionally clears Add to glossary; Return applies only outside composition - `inst-draft`
 4. [x] - `p1` - API: `transcript_fix_term` with retained ids/range, replacement and add_to_glossary; show the Fix spinner - `inst-call`
@@ -149,7 +149,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 ### Person picker matching and validation
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-speakers-picker`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-speakers-picker`
 
 **Input**: Query, core-ordered invitees/recent people, host scope, selected person and optional new-person draft
 
@@ -158,56 +158,56 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 **Steps**:
 1. [x] - `p1` - Keep original display names; match core-provided names, aliases and transliterations with case folding, ё/е and ß/ss equivalence; preserve core order within In this call and Recent people - `inst-match`
 2. [x] - `p1` - Limit inline groups to five visible entries each and popover list to eight before scrolling; New Person… remains last - `inst-groups`
-3. [ ] - `p1` - **IF** no match: show No one called the query and New Person with the quoted query, not an empty menu - `inst-empty`
+3. [x] - `p1` - **IF** no match: show No one called the query and New Person with the quoted query, not an empty menu - `inst-empty`
 4. [x] - `p1` - New form trims Name to 1–80 characters; empty submit says **Enter a name.**; invalid non-empty Email on blur says **Enter an email like name@company.com.** - `inst-validate`
 5. [x] - `p1` - **IF** a duplicate is returned: show **Lena K. (QA) is already in your people.**, **Use Lena K.**, **Create Anyway**; require the user's choice - `inst-duplicate`
 6. [x] - `p1` - Keep draft when focus leaves; suppress Return, Esc submission and review/card keys during composition; first Esc clears query and a second closes the picker - `inst-focus`
-7. [ ] - `p1` - **RETURN** existing or new PersonRef for the host command; owner hosts use Create and Assign, speaker hosts Create and Name; the picker creates no voice profile - `inst-return`
+7. [x] - `p1` - **RETURN** existing or new PersonRef for the host command; owner hosts use Create and Assign, speaker hosts Create and Name; the picker creates no voice profile - `inst-return`
 
 ## 4. States (CDSL)
 
 ### Naming row and panel
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-speakers-naming`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-speakers-naming`
 
 **States**: UNNAMED, SELECTED, NAMING, NAMED, SKIPPED, ERROR, ALL_NAMED, HIDDEN
 
 **Initial State**: UNNAMED for a provisional speaker
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** UNNAMED, ERROR **TO** SELECTED **WHEN** a valid person is picked - `inst-pick`
-2. [ ] - `p1` - **FROM** SELECTED **TO** NAMING **WHEN** Name is confirmed - `inst-name`
-3. [ ] - `p1` - **FROM** NAMING **TO** NAMED **WHEN** the core returns the identity - `inst-named`
+1. [x] - `p1` - **FROM** UNNAMED, ERROR **TO** SELECTED **WHEN** a valid person is picked - `inst-pick`
+2. [x] - `p1` - **FROM** SELECTED **TO** NAMING **WHEN** Name is confirmed - `inst-name`
+3. [x] - `p1` - **FROM** NAMING **TO** NAMED **WHEN** the core returns the identity - `inst-named`
 4. [x] - `p1` - **FROM** NAMING **TO** ERROR **WHEN** the command fails; keep the draft - `inst-error`
 5. [x] - `p1` - **FROM** UNNAMED, SELECTED **TO** SKIPPED **WHEN** Skip is chosen - `inst-skip`
-6. [ ] - `p1` - **FROM** SKIPPED **TO** UNNAMED **WHEN** Name… is chosen in Skipped - `inst-unskip`
-7. [ ] - `p1` - **FROM** NAMED **TO** UNNAMED **WHEN** core Undo restores the provisional speaker - `inst-undo`
+6. [x] - `p1` - **FROM** SKIPPED **TO** UNNAMED **WHEN** Name… is chosen in Skipped - `inst-unskip`
+7. [x] - `p1` - **FROM** NAMED **TO** UNNAMED **WHEN** core Undo restores the provisional speaker - `inst-undo`
 8. [x] - `p1` - **FROM** NAMED **TO** ALL_NAMED **WHEN** no unnamed or skipped speakers remain; show result for 10 s - `inst-all`
 9. [x] - `p1` - **FROM** UNNAMED, SELECTED, SKIPPED, ALL_NAMED **TO** HIDDEN **WHEN** Hide is clicked, or the all-named outcome expires; retain row states - `inst-hide`
-10. [ ] - `p1` - **FROM** HIDDEN **TO** UNNAMED **WHEN** Show is chosen with unnamed rows remaining; restore selected and skipped row state - `inst-show`
+10. [x] - `p1` - **FROM** HIDDEN **TO** UNNAMED **WHEN** Show is chosen with unnamed rows remaining; restore selected and skipped row state - `inst-show`
 
 ### Correction popover
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-speakers-correction`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-speakers-correction`
 
 **States**: CLOSED, EDITING, INVALID, APPLYING, ERROR
 
 **Initial State**: CLOSED
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** CLOSED **TO** EDITING **WHEN** Fix Term… opens with a confirmed-text selection - `inst-open`
-2. [ ] - `p1` - **FROM** EDITING **TO** INVALID **WHEN** the replacement is empty - `inst-invalid`
-3. [ ] - `p1` - **FROM** INVALID, ERROR **TO** EDITING **WHEN** valid text and current selection are restored - `inst-valid`
-4. [ ] - `p1` - **FROM** EDITING **TO** APPLYING **WHEN** Fix is confirmed - `inst-apply`
-5. [ ] - `p1` - **FROM** APPLYING **TO** CLOSED **WHEN** the returned segment is applied - `inst-done`
-6. [ ] - `p1` - **FROM** APPLYING **TO** ERROR **WHEN** the command fails or selection becomes stale - `inst-error`
-7. [ ] - `p1` - **FROM** EDITING, INVALID, ERROR **TO** CLOSED **WHEN** Esc cancels; restore anchor/call-app focus - `inst-cancel`
+1. [x] - `p1` - **FROM** CLOSED **TO** EDITING **WHEN** Fix Term… opens with a confirmed-text selection - `inst-open`
+2. [x] - `p1` - **FROM** EDITING **TO** INVALID **WHEN** the replacement is empty - `inst-invalid`
+3. [x] - `p1` - **FROM** INVALID, ERROR **TO** EDITING **WHEN** valid text and current selection are restored - `inst-valid`
+4. [x] - `p1` - **FROM** EDITING **TO** APPLYING **WHEN** Fix is confirmed - `inst-apply`
+5. [x] - `p1` - **FROM** APPLYING **TO** CLOSED **WHEN** the returned segment is applied - `inst-done`
+6. [x] - `p1` - **FROM** APPLYING **TO** ERROR **WHEN** the command fails or selection becomes stale - `inst-error`
+7. [x] - `p1` - **FROM** EDITING, INVALID, ERROR **TO** CLOSED **WHEN** Esc cancels; restore anchor/call-app focus - `inst-cancel`
 
 ## 5. Definitions of Done
 
 ### Shared identity and post-call naming
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-speakers-naming`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-speakers-naming`
 
 The system **MUST** render the picker, New person form, live rename and PC-R9 with all scopes, invitation suggestions, sample/text-only paths, skip/unskip, hide/show and core Undo. Identity changes preserve user edits and never rename earlier calls automatically.
 
@@ -225,7 +225,7 @@ The system **MUST** render the picker, New person form, live rename and PC-R9 wi
 
 ### Correct terms with glossary intent
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-speakers-corrections`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-speakers-corrections`
 
 The system **MUST** preserve the selected range and original wording, apply only confirmed corrections, honour Add to glossary and show older-call proposal intent, with inline retry and focus return.
 
@@ -243,12 +243,12 @@ The system **MUST** preserve the selected range and original wording, apply only
 
 ## 6. Acceptance Criteria
 
-- [ ] Live rename defaults to Whole call; Only this line uses the selected segment id
-- [ ] Choosing or creating a person never submits during composition or drops a draft when the call app regains focus
-- [ ] Names reach transcript, owners and prose through core views; the UI never substitutes strings in generated prose
-- [ ] Skipped speakers remain nameable and are never counted as All speakers named
-- [ ] Deleted audio removes sample controls but keeps first-line naming
-- [ ] Term fixes retain original words, respect glossary intent and never silently alter past calls
+- [x] Live rename defaults to Whole call; Only this line uses the selected segment id
+- [x] Choosing or creating a person never submits during composition or drops a draft when the call app regains focus
+- [x] Names reach transcript, owners and prose through core views; the UI never substitutes strings in generated prose
+- [x] Skipped speakers remain nameable and are never counted as All speakers named
+- [x] Deleted audio removes sample controls but keeps first-line naming
+- [x] Term fixes retain original words, respect glossary intent and never silently alter past calls
 
 ## 7. Additional Context
 

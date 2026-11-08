@@ -80,6 +80,17 @@ pub fn jobs_tick(core: &Core) {
     core.jobs.tick();
 }
 
+/// `harness.hold_rebuild`: `on` puts the indexes keyword-only at the rebuild's start (nothing
+/// else rebuilds in the harness); the release checks and rebuilds them as an open does.
+pub fn hold_rebuild(core: &Core, on: bool) {
+    if on {
+        core.index.rebuilding(0.0);
+    } else {
+        core.check_index();
+        core.start_rebuild();
+    }
+}
+
 /// The next transcript commit "crashes" before it publishes (D-27: never in a release build).
 pub fn fail_transcript_after_commit_once(core: &Core) {
     core.transcript.fail_after_commit_once();

@@ -7,9 +7,11 @@ final class DialogsTests: NoterTestCase {
         launch("idle")
         openCall("Backend sync")
         app.typeKey(.delete, modifierFlags: .command)
-        XCTAssertTrue(alert.buttons["Cancel"].waitForExistence(timeout: 5), "Delete Call… shows no alert")
+        let cancel = alert.buttons["Cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5), "Delete Call… shows no alert")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5), "Return presses the default button, which is Cancel")
         XCTAssertTrue(app.staticTexts["Backend sync"].firstMatch.exists, "Return chose Cancel: the call is kept")
     }
 
@@ -23,18 +25,6 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(alert.buttons["Cancel"].isEnabled)
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
-    }
-
-    func test_cpt_noter_seq_dialogs_delete_call__alert_has_cancel_as_default() {
-        // Nothing recording: the live call's window would cover the library (its fixture display is not this Mac's).
-        launch("idle")
-        openCall("Backend sync")
-        app.typeKey(.delete, modifierFlags: .command)
-        let cancel = alert.buttons["Cancel"]
-        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
-        app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5), "Return presses the default button, which is Cancel")
-        XCTAssertTrue(app.staticTexts["Backend sync"].firstMatch.exists)
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording() {

@@ -8,8 +8,10 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use noter_core::{Clock, Core, CoreDeps, EventEmitter, McpRegistration, McpSession};
+use noter_engine_client::scripted::ScriptedEngine;
 use noter_llm::{Adapters, Scripted};
 use noter_protocol::{CallId, TimestampMs};
+use noter_retrieval::Embedder;
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::UnixStream;
@@ -94,12 +96,25 @@ async fn rig_with(script: &str) -> Rig {
 
 /// [`rig_with`] whose live and indexed MCP sources are `mcp(data folder)`.
 async fn rig_mcp(script: &str, mcp: impl FnOnce(&Path) -> Arc<dyn noter_core::McpSource>) -> Rig {
+    rig_all(script, mcp, false).await
+}
+
+/// [`rig_mcp`] with the scripted engine embedding queries (`engine`), else no engine.
+async fn rig_all(
+    script: &str,
+    mcp: impl FnOnce(&Path) -> Arc<dyn noter_core::McpSource>,
+    engine: bool,
+) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let scripted = Scripted::parse(script).unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
+    let mut deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
         .with_llm(Adapters::scripted(&scripted))
         .with_mcp_source(mcp(dir.path()))
         .with_mcp_binary(env!("CARGO_BIN_EXE_noter-mcp").into());
+    if engine {
+        let launcher = ScriptedEngine::new().with_container(dir.path());
+        deps = deps.with_engine(Arc::new(launcher));
+    }
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
         .unwrap()
@@ -1190,6 +1205,46 @@ fn gadgets() -> String {
     )
 }
 
+/// The socket path is hybrid like `search`: a query that shares no word with the stored text but
+/// whose embedding matches a chunk's returns that chunk as a weak hit.
+#[tokio::test(flavor = "multi_thread")]
+async fn search_calls_embeds_the_query_and_returns_a_semantic_only_weak_hit() {
+    let rig = rig_all("", |_| Arc::new(noter_core::ScriptedMcp::default()), true).await;
+    let engine = noter_engine_client::EngineClient::new(
+        Arc::new(ScriptedEngine::new().with_container(rig.dir.path())),
+        noter_engine_client::Config::default(),
+    );
+    let vector = engine
+        .embed(vec!["zebra orbit".into()])
+        .await
+        .unwrap()
+        .remove(0);
+    let blob: Vec<u8> = vector.iter().flat_map(|x| x.to_le_bytes()).collect();
+    let db = noter_db::rusqlite::Connection::open(rig.dir.path().join("noter.db")).unwrap();
+    db.execute_batch(
+        "INSERT INTO chunks (id, call_id, t0_ms, t1_ms, text, text_norm, token_count) VALUES
+           ('ch_sem', 'call_a', 0, 5000, 'Quarterly budget review', 'quarterly budget review', 3);",
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO chunk_vec (chunk_id, embedding, call_id, started_at)
+         VALUES ('ch_sem', ?1, 'call_a', 1792130000000)",
+        [blob],
+    )
+    .unwrap();
+    let (token, config) = rig.local("run_h");
+    let mut mcp = Mcp::start(&config, &token).await;
+    let found = mcp
+        .tool("search_calls", json!({ "query": "zebra orbit" }))
+        .await
+        .unwrap();
+    let hits = found["hits"].as_array().unwrap();
+    assert_eq!(hits.len(), 1, "{found}");
+    assert_eq!(hits[0]["call_id"], "call_a");
+    assert_eq!(hits[0]["strong"], false);
+    assert_eq!(found["keyword_only"], false);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn search_calls_defaults_to_eight_hits_caps_at_thirty_and_keeps_segment_ids() {
     let rig = rig().await;
@@ -1326,6 +1381,8 @@ struct Spy {
     seen: Mutex<Vec<i64>>,
     hold: AtomicBool,
     answered: AtomicUsize,
+    /// Sign-ins started.
+    oauths: AtomicUsize,
 }
 
 impl Spy {
@@ -1358,6 +1415,7 @@ impl McpSource for Spy {
         server: &'a str,
         audit: noter_core::McpAudit<'a>,
     ) -> BoxFuture<'a, Result<String, McpError>> {
+        self.oauths.fetch_add(1, Ordering::SeqCst);
         self.inner.oauth(server, audit)
     }
 
@@ -1439,6 +1497,7 @@ async fn relay_rig() -> (Rig, Arc<Spy>) {
             seen: Mutex::default(),
             hold: AtomicBool::new(false),
             answered: AtomicUsize::new(0),
+            oauths: AtomicUsize::new(0),
         });
         let _ = shared.set(made.clone());
         made
@@ -1586,6 +1645,22 @@ async fn live_tools_follow_the_policy_matrix_of_task_privacy_and_sensitive_conte
         .clone();
     assert_eq!(tool["inputSchema"]["required"], json!(["query"]));
     let _ = run;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_run_signs_in_to_a_live_source_once() {
+    let (rig, spy) = relay_rig().await;
+    let (_, token, config, _tx) = rig
+        .run_under(Some("call_a"), TaskKind::Ask, ok_privacy())
+        .await;
+    let mut mcp = Mcp::start(&config, &token).await;
+    mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+        .await
+        .unwrap();
+    mcp.tool("live_work_tracker_read", json!({ "uri": "tracker://AB-1" }))
+        .await
+        .unwrap();
+    assert_eq!(spy.oauths.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -53,6 +53,16 @@ export function selectedRange(el: HTMLElement, sel: Selection | null): TextRange
   return { start, end: start + r.toString().length };
 }
 
+/** The confirmed words selected in a stored line: the segment, the range in its text and the line's text element; `null` for any other selection. */
+export function selectedFixTerm(sel: Selection | null, segments: readonly SegmentView[]): { seg: SegmentView; range: TextRange; anchor: HTMLElement } | null {
+  const node = sel?.anchorNode;
+  const el = (node && "closest" in node ? (node as Element) : node?.parentElement)?.closest<HTMLElement>(".cw-seg__text");
+  const id = el?.closest<HTMLElement>("[data-segment-id]")?.dataset.segmentId;
+  const seg = segments.find((x) => x.id === id);
+  const range = el ? selectedRange(el, sel) : null;
+  return seg && el && range ? { seg, range, anchor: el } : null;
+}
+
 /** The text with the find match highlighted. */
 function Text({ text, find }: { text: string; find?: string }) {
   const parts = find ? splitMatch(text, find) : null;
@@ -119,6 +129,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
       ref={ref}
       data-component={COMPONENT}
       data-variant={v}
+      data-segment-id={seg.id}
       data-state={playing ? "playing" : highlighted ? "highlighted" : "default"}
       className={cx("cw-seg", tail && "cw-seg--tail", highlighted && "np-hl-evidence", playing && "is-playing", current && "is-current")}
       lang={langAttr(seg.lang)}

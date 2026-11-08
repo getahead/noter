@@ -109,6 +109,13 @@ fn placement_of(call: &CallWindowState) -> Placement {
     }
 }
 
+/// The latest summary: its call, title and start as a local wall clock (ms).
+struct LastSummary {
+    id: CallId,
+    title: String,
+    local_start: i64,
+}
+
 impl Core {
     fn placement_for(&self, call_screen: &CallScreenSettings) -> Placement {
         let displays = self.app().environment.displays.clone();
@@ -412,6 +419,7 @@ impl Core {
         };
         let elapsed_ms = i64::from(capture.recorded_ms.0) + running;
         let next_event = self.next_calendar_event(now);
+        let last_summary = self.last_summary();
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         let model = tray_model(&TrayInputs {
@@ -428,6 +436,9 @@ impl Core {
             elapsed_ms,
             now,
             next_event: next_event.as_ref().map(|(t, at)| (t.as_str(), *at)),
+            last_summary: last_summary
+                .as_ref()
+                .map(|s| (s.title.as_str(), s.local_start)),
         });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-glyph
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-build-menu
@@ -482,8 +493,50 @@ impl Core {
         found
     }
 
+    /// The latest call whose outputs are ready, for the menu bar's Open Last Summary.
+    // shortcut: one indexed read per tray refresh (1 s); cache it like the calendar line if it shows up in profiles.
+    fn last_summary(&self) -> Option<LastSummary> {
+        let (id, title, started) = self
+            .store()
+            .read(|c| {
+                c.query_row(
+                    "SELECT id, title, started_at FROM calls WHERE outputs_status = 'ready'
+                     ORDER BY started_at DESC LIMIT 1",
+                    [],
+                    |r| {
+                        Ok((
+                            r.get::<_, String>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, i64>(2)?,
+                        ))
+                    },
+                )
+                .map(Some)
+                .or_else(|e| match e {
+                    noter_db::rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                    e => Err(e),
+                })
+            })
+            .ok()??;
+        let offset = self.deps.native.utc_offset_minutes(TimestampMs(started));
+        Some(LastSummary {
+            id: CallId::new(id),
+            title,
+            local_start: started + i64::from(offset) * 60_000,
+        })
+    }
+
     // @cpt-flow:cpt-noter-flow-core-native-surfaces-navigation:p2
     pub(crate) fn navigate(&self, target: Option<NavTarget>) {
+        // Open Last Summary: the call's Summary, or nothing while no call has one.
+        let target = match target {
+            Some(NavTarget::LastSummary) => self.last_summary().map(|s| NavTarget::CallPage {
+                call_id: s.id,
+                tab: CallPageTab::Summary,
+                span: None,
+            }),
+            other => other,
+        };
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-navigate
         let window = match &target {
             Some(NavTarget::Settings { .. }) => WindowLabel::Settings,

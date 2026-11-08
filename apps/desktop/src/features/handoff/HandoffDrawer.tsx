@@ -28,6 +28,7 @@ const elementId = (kind: string, id: string) => [kind, id].join("-");
 const TARGETS: HandoffTarget[] = ["claude_code", "codex"];
 const TERMINAL_APP: Partial<Record<LaunchPath, string>> = { iterm: "iTerm", terminal: "Terminal" };
 
+// @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-return
 /** **Handed off to Claude Code · Nov 6 10:58 · cwd**, or **Opened in iTerm · item marked Handed off** right after a terminal launch. */
 export function recordLine(item: ItemView, view: HandoffView, local: Local, prefs: UiPrefs | undefined): string | null {
   const app = local.opened && TERMINAL_APP[local.opened];
@@ -36,7 +37,9 @@ export function recordLine(item: ItemView, view: HandoffView, local: Local, pref
   if (!h || !prefs) return null;
   return t("handoff.record", { tool: toolLabel(h.target), when: `${shortDay(h.at, prefs)} ${clock(h.at, prefs)}`, cwd: h.cwd });
 }
+// @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-return
 
+// @cpt-dod:cpt-noter-dod-ui-handoff-drawer:p1
 // @cpt-component:cpt-noter-component-ui-handoff-drawer:p1
 export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: string }) {
   const sheets = useSheetIfAny();
@@ -68,9 +71,13 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
   // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-open
 
   const state = drawerState(view, local);
+  // @cpt-begin:cpt-noter-algo-ui-handoff-controls:p1:inst-return
   const { primary, order } = view ? footer(view) : { primary: "open" as const, order: ["copy", "open"] as const };
+  // @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-action
   const run = (which: "copy" | "open") => void (which === "copy" ? copy(bridge, itemId) : open(bridge, itemId));
+  // @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-action
   const reason = openDisabledReason(view, local);
+  // @cpt-end:cpt-noter-algo-ui-handoff-controls:p1:inst-return
 
   // @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-return
   // ⌘Return runs the default button and Esc closes, both unless an input method is composing; a popover has taken its own Esc
@@ -107,7 +114,9 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
       <div className="hd-fail" role="alert">
         <Icon name="error" size={12} />
         {t(local.loadFailed === "not_found" ? "handoff.gone" : "handoff.load_failed")}
+        {/* @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-load-retry */}
         {local.loadFailed !== "not_found" && <PushButton label={t("handoff.try_again")} size="small" variant="quiet" onAction={() => void load(bridge, itemId)} />}
+        {/* @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-load-retry */}
       </div>
     );
   else if (state === "NOT_GENERATED")
@@ -123,6 +132,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
   else
     prompt = (
       <>
+        {/* @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-generating */}
         {generating && (
           <div className="hd-gen" role="status">
             <Progress variant="spinner" label={t("handoff.writing")} />
@@ -130,6 +140,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             {state !== "LOADING" && <PushButton label={t("handoff.cancel")} size="small" variant="quiet" onAction={() => void cancel(bridge, itemId)} />}
           </div>
         )}
+        {/* @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-generating */}
         <PromptEditor
           itemId={itemId}
           value={promptOf(view, local)}
@@ -159,6 +170,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
         <PushButton label={t("handoff.regenerate")} size="small" variant="quiet" disabled={!view || state === "GENERATING" || !!local.pending} onAction={() => void generate(bridge, itemId, true)} />
       </header>
       <div className="hd__body">
+        {/* @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-plan */}
         {view && (
           <>
             <div className="hd__row" data-region="HD-R2">
@@ -182,6 +194,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             </div>
           </>
         )}
+        {/* @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-plan */}
         {view?.repo && !view.repo.path_exists && <p className="hd__warn">{t("handoff.disabled.path")} <PushButton label={t("handoff.mapping_settings")} size="small" variant="quiet" onAction={() => void bridge.core.windowNavigate({ target: { type: "settings", pane: "repositories" } })} /></p>}
         <div data-region="HD-R4">{prompt}</div>
         {view && state !== "GENERATING" && (
@@ -190,12 +203,14 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             {launchLine(view)}
           </p>
         )}
+        {/* @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-sensitive */}
         {sensitive && (
           <p className="hd__warn">
             <Icon name="warning" size={12} />
             {t("handoff.sensitive")}
           </p>
         )}
+        {/* @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-sensitive */}
         {record && (
           <p className="hd__rec" data-region="HD-R6" role="status">
             <Icon name="checkCircle" size={12} />
@@ -208,7 +223,9 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             {local.error}
           </p>
         )}
+        {/* @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-suggested */}
         {item?.review === "suggested" && <p className="hd__accept">{t("handoff.accepts")}</p>}
+        {/* @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-suggested */}
       </div>
       <footer className="hd__foot" data-region="HD-R7">
         {state === "OPEN_FAILED" && (
@@ -217,6 +234,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             {t("handoff.open_failed", { tool })}
           </p>
         )}
+        {/* @cpt-begin:cpt-noter-algo-ui-handoff-controls:p1:inst-accessible */}
         {order.map((which) =>
           which === "copy" ? (
             <PushButton key="copy" label={t("handoff.copy")} icon="copy" variant={primary === "copy" ? "primary" : "secondary"} kbd={primary === "copy" ? "⌘↩" : undefined} disabled={!copyEnabled(view, local)} loading={local.pending === "copy"} {...(local.copied ? { flash: t("handoff.copied") } : {})} onAction={() => run("copy")} />
@@ -224,6 +242,7 @@ export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: stri
             <PushButton key="open" label={view ? openLabel(view.target) : t("handoff.open", { tool: "Claude Code" })} variant={primary === "open" ? "primary" : "secondary"} kbd={primary === "open" ? "⌘↩" : undefined} disabled={!!reason} loading={local.pending === "open"} help={reason ?? (view ? schemeHelp(view.launch.path) : undefined)} attrs={{ "aria-describedby": launchId }} onAction={() => run("open")} />
           ),
         )}
+        {/* @cpt-end:cpt-noter-algo-ui-handoff-controls:p1:inst-accessible */}
       </footer>
     </div>
   );

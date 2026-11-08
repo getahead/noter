@@ -1012,11 +1012,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.16 History, change log and undo — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-history-undo`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-history-undo`
 
 - **Purpose**: Make every user change undoable from where it happened and from History: the undo strip, change rows, the History timeline per call, person and item, and **Export Log…**.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/history-undo.md`](features/ui/history-undo.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/history-undo.md`](features/ui/history-undo.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1042,9 +1042,9 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-undo-strip`
-  - [ ] `p3` - `cpt-noter-component-ui-change-row`
-  - [ ] `p3` - `cpt-noter-component-ui-history-timeline`
+  - [x] `p3` - `cpt-noter-component-ui-undo-strip`
+  - [x] `p3` - `cpt-noter-component-ui-change-row`
+  - [x] `p3` - `cpt-noter-component-ui-history-timeline`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `history_list`
@@ -1122,11 +1122,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.18 Call page outputs and sharing — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-call-page-outputs`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-call-page-outputs`
 
 - **Purpose**: Show the outputs in PRD order as each is written, keep edits through regeneration with a diff, and share or export the call, a section or a selection in one action.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/call-page-outputs.md`](features/ui/call-page-outputs.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/call-page-outputs.md`](features/ui/call-page-outputs.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-history-undo`
 
@@ -1152,11 +1152,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-output-section`
-  - [ ] `p3` - `cpt-noter-component-ui-output-item-row`
-  - [ ] `p3` - `cpt-noter-component-ui-share-menu`
-  - [ ] `p3` - `cpt-noter-component-ui-version-switcher`
-  - [ ] `p3` - `cpt-noter-component-ui-diff-view`
+  - [x] `p3` - `cpt-noter-component-ui-output-section`
+  - [x] `p3` - `cpt-noter-component-ui-output-item-row`
+  - [x] `p3` - `cpt-noter-component-ui-share-menu`
+  - [x] `p3` - `cpt-noter-component-ui-version-switcher`
+  - [x] `p3` - `cpt-noter-component-ui-diff-view`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `outputs_get`
@@ -1185,11 +1185,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.19 Speaker naming and transcript corrections — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-speakers`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-speakers`
 
 - **Purpose**: Let the user name a speaker during or after the call in one step, fix a term with the glossary, and pick or create a person without leaving the surface.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/speakers.md`](features/ui/speakers.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/speakers.md`](features/ui/speakers.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-live-transcript`, `cpt-noter-feature-ui-call-page-frame`
 
@@ -1215,9 +1215,9 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-speaker-naming-panel`
-  - [ ] `p3` - `cpt-noter-component-ui-term-fix-popover`
-  - [ ] `p3` - `cpt-noter-component-ui-person-picker`
+  - [x] `p3` - `cpt-noter-component-ui-speaker-naming-panel`
+  - [x] `p3` - `cpt-noter-component-ui-term-fix-popover`
+  - [x] `p3` - `cpt-noter-component-ui-person-picker`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `transcript_rename_speaker`
@@ -1239,11 +1239,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.20 Today dashboard — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-today`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-today`
 
 - **Purpose**: Show today's calls in calendar order with what is owed to each person, let the user tick items with **Undo**, and surface setup, quit and calendar states where the day starts.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/today.md`](features/ui/today.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/today.md`](features/ui/today.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-call-window`, `cpt-noter-feature-ui-first-run`
 
@@ -1269,8 +1269,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-screen-today`
-  - [ ] `p3` - `cpt-noter-component-ui-upcoming-call-card`
+  - [x] `p3` - `cpt-noter-component-screen-today`
+  - [x] `p3` - `cpt-noter-component-ui-upcoming-call-card`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `today_get`
@@ -1291,11 +1291,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.21 Handoff to Claude Code and Codex — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-handoff`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-handoff`
 
 - **Purpose**: Turn an engineering item into an editable prompt and open it in Claude Code or Codex in the mapped repository, or copy it, with the launch path visible beforehand.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/handoff.md`](features/ui/handoff.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/handoff.md`](features/ui/handoff.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-settings`
 
@@ -1321,8 +1321,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-handoff-drawer`
-  - [ ] `p3` - `cpt-noter-component-ui-prompt-editor`
+  - [x] `p3` - `cpt-noter-component-ui-handoff-drawer`
+  - [x] `p3` - `cpt-noter-component-ui-prompt-editor`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `handoff_get`

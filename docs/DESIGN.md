@@ -1415,7 +1415,7 @@ menu bar ───────────────────────�
 
 #### Screen — Today
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-today`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-today`
 
 ##### Why this component exists
 
@@ -4941,7 +4941,7 @@ In rows the tag is not focusable on its own; it is read with the row.
 
 #### Component — Term fix popover
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-term-fix-popover`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-term-fix-popover`
 
 ##### Why this component exists
 
@@ -5500,7 +5500,7 @@ The council reads past calls, carried-forward items and document sections during
 
 #### Component — Output section
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-output-section`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-output-section`
 
 ##### Why this component exists
 
@@ -5709,7 +5709,7 @@ The review keys are also in the app menu: **Edit › Accept Item**, **Accept All
 
 #### Component — Output item row
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-output-item-row`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-output-item-row`
 
 ##### Why this component exists
 
@@ -5788,7 +5788,7 @@ The output item row shows a decision, an open question, a risk or a call-type ex
 
 #### Component — Speaker naming panel
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-speaker-naming-panel`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-speaker-naming-panel`
 
 ##### Why this component exists
 
@@ -5873,7 +5873,7 @@ Owners on action items are only right once the speakers are named. The naming pa
 
 #### Component — Share menu
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-share-menu`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-share-menu`
 
 ##### Why this component exists
 
@@ -5969,7 +5969,7 @@ The items are also in the app menu: **Edit › Copy for Slack**, **Copy for Jira
 
 #### Component — Handoff drawer
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-handoff-drawer`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-handoff-drawer`
 
 ##### Why this component exists
 
@@ -6065,7 +6065,7 @@ On opening, focus moves to the target control.
 
 #### Component — Prompt editor
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-prompt-editor`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-prompt-editor`
 
 ##### Why this component exists
 
@@ -6134,7 +6134,7 @@ Handoff prompts, agent skills and the improvement brief are long Markdown texts 
 
 #### Component — Version switcher
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-version-switcher`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-version-switcher`
 
 ##### Why this component exists
 
@@ -6199,7 +6199,7 @@ Summaries, role reviews, handoff prompts and skills keep every generated version
 
 #### Component — Diff view
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-diff-view`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-diff-view`
 
 ##### Why this component exists
 
@@ -6356,7 +6356,7 @@ The item inspector shows the details and the history of one item without leaving
 
 #### Component — Upcoming call card
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-upcoming-call-card`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-upcoming-call-card`
 
 ##### Why this component exists
 
@@ -6945,7 +6945,7 @@ Speaker identity is a first-class fact: speakers map to people and people persis
 
 #### Component — Person picker
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-person-picker`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-person-picker`
 
 ##### Why this component exists
 
@@ -7240,7 +7240,7 @@ Single keys match the physical key, so they work on Russian and German layouts (
 
 #### Component — Undo strip
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-undo-strip`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-undo-strip`
 
 ##### Why this component exists
 
@@ -7330,7 +7330,7 @@ Undo is shown inline and never as a modal: "Undone 37 changes · Redo" for ten s
 
 #### Component — Change row
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-change-row`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-change-row`
 
 ##### Why this component exists
 
@@ -7426,7 +7426,7 @@ Every change by the user, a job or a model run is logged with who did it, what c
 
 #### Component — History timeline
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-history-timeline`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-history-timeline`
 
 ##### Why this component exists
 

@@ -25,6 +25,12 @@ export interface TermFixPopoverProps {
   onFixed: (text: string, change_id: string) => void;
 }
 
+/** The segment's span from the core into the transcript Channel: after a stale range or an Undo of the fix. */
+export async function rereadSegment(bridge: Bridge, segment: SegmentView): Promise<void> {
+  const fresh = await bridge.core.transcriptSpan({ span: { call_id: segment.call_id, t0_ms: segment.t0_ms, t1_ms: segment.t1_ms } });
+  if (fresh.status === "ok") for (const updated of fresh.data.segments) bridge.store.setState((s) => withStreamSegment(s, updated));
+}
+
 // @cpt-flow:cpt-noter-flow-ui-speakers-fix-term:p1
 // @cpt-state:cpt-noter-state-ui-speakers-correction:p1
 /** Fix the term: the segment replaces the line in the transcript Channel; an error text keeps the replacement. */
@@ -37,10 +43,7 @@ export async function applyFix(bridge: Bridge, segment: SegmentView, range: Text
   if (res.status === "error") {
     const reselect = staleFix(res.error.code);
     if (reselect) {
-      const fresh = await bridge.core.transcriptSpan({ span: { call_id: segment.call_id, t0_ms: segment.t0_ms, t1_ms: segment.t1_ms } });
-      if (fresh.status === "ok") {
-        for (const updated of fresh.data.segments) bridge.store.setState((s) => withStreamSegment(s, updated));
-      }
+      await rereadSegment(bridge, segment);
     }
     return { error: t(reselect ? "speakers.fix.stale" : "speakers.fix.err"), reselect };
   }
@@ -51,6 +54,7 @@ export async function applyFix(bridge: Bridge, segment: SegmentView, range: Text
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
 }
 
+// @cpt-dod:cpt-noter-dod-ui-speakers-corrections:p1
 // @cpt-component:cpt-noter-component-ui-term-fix-popover:p1
 export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixed }: TermFixPopoverProps) {
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-range
@@ -68,24 +72,36 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reselect, setReselect] = useState(false);
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-invalid
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-valid
   const valid = text.trim().length > 0 && !reselect;
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-valid
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-invalid
 
   const fix = async () => {
     if (!valid || busy) return;
+    // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-apply
     setBusy(true);
     setError(null);
+    // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-apply
     const out = await applyFix(bridge, segment, range, text.trim(), glossary);
     setBusy(false);
+    // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-error
     if ("error" in out) {
       setReselect(!!out.reselect);
       return setError(out.error);
     }
+    // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-error
+    // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-done
     onFixed(out.message, out.change_id);
+    // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-done
     // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
     onClose();
     // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
   };
 
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-open
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-cancel
   return (
     <Popover variant="term-fix" anchor={anchor} width={320} label={t("speakers.fix.title")} onClose={onClose}>
       <div className="cw-pr" data-component="cpt-noter-component-ui-term-fix-popover" data-state={busy ? "applying" : error ? "error" : valid ? "editing" : "invalid"}>
@@ -116,4 +132,6 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
       </div>
     </Popover>
   );
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-cancel
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-open
 }

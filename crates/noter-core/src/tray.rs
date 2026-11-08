@@ -34,6 +34,8 @@ pub enum TrayAction {
     MarkMoment,
     OpenCallScreen,
     UseFloatingPanel,
+    /// **Open Last Summary — <title> · <time>** in MB-R5.
+    OpenLastSummary,
     HideForPresenting,
     ShowAfterPresenting,
     OpenNoter,
@@ -111,6 +113,8 @@ pub(crate) struct TrayInputs<'a> {
     pub now: i64,
     /// The next calendar event: its title and start as a local wall clock (ms).
     pub next_event: Option<(&'a str, i64)>,
+    /// The latest call whose outputs are ready: its title and start as a local wall clock (ms).
+    pub last_summary: Option<(&'a str, i64)>,
 }
 
 /// "23:14", or "1:02:03" past an hour.
@@ -294,6 +298,7 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
         let second = format!("{speakers}{}", privacy_text(i.privacy));
         entries.push(TrayEntry::Line(second));
     }
+    // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-menu-next
     if let (true, Some((title, at))) = (idle, i.next_event) {
         let m = at.div_euclid(60_000);
         entries.push(TrayEntry::Line(format!(
@@ -302,6 +307,7 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
             m % 60
         )));
     }
+    // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-menu-next
     // @cpt-end:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-first
     // @cpt-begin:cpt-noter-algo-ui-menu-bar-build-menu:p1:inst-mbr2-degraded
     let degraded = i.degraded.iter().find_map(|d| match d {
@@ -444,6 +450,20 @@ pub(crate) fn tray_model(i: &TrayInputs) -> TrayModel {
         checked: Some(i.layout == CallLayoutPreference::Floating),
         key: None,
     }));
+    // M2: absent until a call has a summary (menu-bar.md, D-39).
+    if let Some((title, at)) = i.last_summary {
+        let m = at.div_euclid(60_000);
+        entries.push(entry(
+            TrayAction::OpenLastSummary,
+            &format!(
+                "Open Last Summary — {title} · {:02}:{:02}",
+                m / 60 % 24,
+                m % 60
+            ),
+            true,
+            None,
+        ));
+    }
     let hide = key(HotkeyAction::HideForPresenting);
     entries.push(if i.hidden {
         entry(TrayAction::ShowAfterPresenting, "Show Noter", true, hide)
@@ -497,6 +517,7 @@ mod tests {
         start_blocked: bool,
         speakers: usize,
         elapsed_ms: i64,
+        last_summary: Option<(&'static str, i64)>,
     }
 
     fn idle() -> State {
@@ -519,6 +540,7 @@ mod tests {
             start_blocked: false,
             speakers: 0,
             elapsed_ms: 0,
+            last_summary: None,
         }
     }
 
@@ -547,6 +569,7 @@ mod tests {
             elapsed_ms: s.elapsed_ms,
             now: NOW,
             next_event: None,
+            last_summary: s.last_summary,
         })
     }
 
@@ -607,6 +630,20 @@ mod tests {
             "-",
         ];
         assert_eq!(menu(&m), with_surfaces(&want));
+    }
+
+    #[test]
+    fn open_last_summary_names_the_latest_summary_and_is_absent_without_one() {
+        let mut s = idle();
+        assert!(!menu(&model(&s)).iter().any(|l| l.contains("Last Summary")));
+        s.last_summary = Some(("Design review", (9 * 60 + 30) * 60_000));
+        let lines = menu(&model(&s));
+        let at = lines
+            .iter()
+            .position(|l| l == "[✓ Use Floating Panel]")
+            .unwrap();
+        assert_eq!(lines[at + 1], "[Open Last Summary — Design review · 09:30]");
+        assert_eq!(lines[at + 2], "[Hide for Presenting Ctrl+Alt+Super+0]");
     }
 
     #[test]

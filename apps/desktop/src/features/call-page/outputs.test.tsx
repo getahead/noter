@@ -93,6 +93,32 @@ describe("OutputSection", () => {
     expect(ready).not.toContain("Regenerating…");
   });
 
+  it("notices what the regeneration returned: written by the local model, and names updated with a way to regenerate", async () => {
+    await open([]);
+    const local = { runtime: "local", model: "qwen3-14b", skill: "planning", skill_version: "1", generated_at: 1, from_pass: "live" } as never;
+    const items = sec("action_items", { writer: local, items: [row("Rotate the token")] });
+    expect(renderToString(<OutputSection {...props(items)} />)).toContain("Written by the local model after Claude Code timed out");
+    expect(renderToString(<OutputSection {...props({ ...items, writer: { ...(local as object), runtime: "claude_api_key" } as never })} />)).not.toContain("Written by the local model");
+    const renamed = sec("action_items", { names_updated: true, items: [row("Rotate the token")] });
+    const html = renderToString(<OutputSection {...props(renamed)} />);
+    expect(html).toContain("Names updated");
+    expect(html).toContain("Regenerate for better wording");
+    expect(renderToString(<OutputSection {...props(sec("action_items", { items: [row("Rotate the token")] }))} />)).not.toContain("Names updated");
+    // the link asks for that section to be regenerated
+    const asked: boolean[] = [];
+    const tree = rendered(OutputSection, props(renamed, () => void asked.push(false)));
+    (find(tree, (p, type) => type === "button" && typeof p.onClick === "function" && p.children === "Regenerate for better wording").props.onClick as () => void)();
+    expect(asked).toEqual([false]);
+  });
+
+  it("counts the rejected suggestions a regeneration will not bring back, in the section's meta line", async () => {
+    await open([]);
+    const items = (n: number) => sec("action_items", { suppressed_count: n, items: [row("Rotate the token")] });
+    expect(renderToString(<OutputSection {...props(items(1))} />)).toContain("1 item not suggested again because you rejected it");
+    expect(renderToString(<OutputSection {...props(items(3))} />)).toContain("3 items not suggested again because you rejected them");
+    expect(renderToString(<OutputSection {...props(items(0))} />)).not.toContain("not suggested again");
+  });
+
   it("regenerates a failed section alone, and locally on Use Local Model", async () => {
     await open([]);
     const asked: boolean[] = [];
@@ -118,6 +144,20 @@ describe("OutputSection", () => {
     const html = renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x", user_edited: true, regenerated_with_edits: true }))} />);
     expect(html).toContain("Edited");
     expect(html).toContain("Show Diff");
+  });
+
+  it("says Names updated with a Regenerate for better wording link, never regenerating by itself", async () => {
+    await open([]);
+    const seen = sent();
+    const html = renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x", names_updated: true }))} />);
+    expect(html).toContain("Names updated");
+    expect(html).toContain("Regenerate for better wording");
+    expect(renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x" }))} />)).not.toContain("Names updated");
+    expect(seen.filter(([c]) => c === "outputs_regenerate")).toEqual([]);
+    const asked: boolean[] = [];
+    const tree = rendered(OutputSection, props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x", names_updated: true }), () => void asked.push(false)));
+    (find(tree, (p) => p.className === "np-link").props.onClick as () => void)(); // only the link regenerates
+    expect(asked).toHaveLength(1);
   });
 });
 

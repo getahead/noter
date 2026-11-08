@@ -85,6 +85,19 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await expect.poll(async () => (await sent(page, "output_edit")).length).toBe(2);
   });
 
+  test("UI — error path — Regenerated after review: the section counts the rejected suggestions it will not suggest again", async ({ page }) => {
+    await openWindow(page, "main", {
+      world: (w) => {
+        O.written(w);
+        // the user rejected one action item: the core drops it from the section and counts it as not to be suggested again
+        for (const i of [...w.items, ...O.outputsOf(w).sections.flatMap((x) => x.items)]) if (i.id === "itm_a0") i.review = "rejected";
+      },
+    });
+    await openSummary(page);
+    await expect(section(page, /^Action items/)).toContainText("1 item not suggested again because you rejected it");
+    await expect(section(page, /^Decisions/)).not.toContainText("not suggested again");
+  });
+
   test("UI — empty path: the local runtime says Writing with the local model · up to 10 min · role reviews follow in the background", async ({ page }) => {
     await openWindow(page, "main", {
       world: O.writingLocally,
@@ -113,6 +126,8 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await openReady(page);
     await section(page, /^Action items/).getByRole("button", { name: "Use Local Model" }).click();
     await expect.poll(() => sent(page, "outputs_regenerate")).toEqual([expect.objectContaining({ sections: ["action_items"], local: true })]);
+    // the core flipped the section's writer to the local runtime: the section says so
+    await expect(section(page, /^Action items/)).toContainText("Written by the local model after Claude Code timed out");
   });
 
   test("UI — other path: a regenerate that is blocked during capture says it waits for the call to end, with no retry", async ({ page }) => {

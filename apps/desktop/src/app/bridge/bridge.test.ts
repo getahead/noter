@@ -37,15 +37,15 @@ afterEach(async () => {
 });
 
 describe("open a window (snapshot, then stream)", () => {
-  it("cpt-noter-flow-ui-core-bridge-open-window: subscribes to all 20 events before asking for the snapshot, then is READY", async () => {
+  it("cpt-noter-flow-ui-core-bridge-open-window: subscribes to all 21 events before asking for the snapshot, then is READY", async () => {
     const { b, calls, fake, state } = setup();
     const opening = b.open();
     expect(state().status).toBe("LOADING");
     await opening;
     const events = Object.keys(EVENTS);
-    expect(events).toHaveLength(20);
-    expect(calls.slice(0, 20).map((c) => c.cmd)).toEqual(events.map((e) => `listen:${e}`));
-    expect(calls[20]?.cmd).toBe("app_snapshot");
+    expect(events).toHaveLength(21);
+    expect(calls.slice(0, 21).map((c) => c.cmd)).toEqual(events.map((e) => `listen:${e}`));
+    expect(calls[21]?.cmd).toBe("app_snapshot");
     expect(state().status).toBe("READY");
     expect(state().whole.capture).toEqual(fake.world.app.capture);
     expect(state().app?.window).toBe("main");
@@ -122,6 +122,21 @@ describe("streams", () => {
     expect(ids.length).toBe(snap.segments.length + 2);
     // The fixture's first live event (a hypothesis) reached the page before the snapshot resolved: not lost.
     expect(stream().data!.hypotheses).toEqual([fake.world.live_script[0]!.type === "hypothesis" && fake.world.live_script[0]!.segment]);
+  });
+
+  it("a buffered Channel message older than an entity write cannot overwrite it on the flush (Undo of a naming)", async () => {
+    vi.useFakeTimers();
+    const { b, fake, state } = setup();
+    await b.open();
+    await b.subscribe("transcript_subscribe", { call_id: "call_live" });
+    const speaker = fake.world.transcripts.find((t) => t.call_id === "call_live")!.speakers[0]!;
+    const named = { ...speaker, label: { type: "unnamed", n: 99 } } as never; // any label other than the restored one
+    const label = () => state().streams.transcript_subscribe!.data!.speakers.find((x) => x.id === speaker.id)!.label;
+    // the naming's Channel message waits for the 100 ms flush; the restored row (Undo's entity:changed) lands first
+    fake.push("transcript_subscribe", { event: { type: "speakers_updated", speakers: [named], relabelled_by_archive: false } });
+    fake.emit("entity:changed", { type: "speakers", call_id: "call_live", speakers: [speaker] });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(label()).toEqual(speaker.label);
   });
 
   it("a seq gap resubscribes (RESYNCING) and the slice ends equal to the core's state", async () => {

@@ -11,6 +11,7 @@ import type { OutputRoute, SegmentView, SpeakerRef } from "../../src/core/bindin
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow, wheelUpTo, type Steer } from "./support/app";
+import { windowReady } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const FAKE = process.env.NOTER_CORE !== "stdio";
@@ -154,6 +155,7 @@ function stored(n: number, matching = 0, patch: { audio_deleted?: boolean; audio
 /** The call's stored transcript ("Backend sync"). Until Library › Calls (2.13) and the call page (2.14) land, the dev
  *  server's `#transcript=<call id>` route mounts it in the main window without reloading (the core keeps its plan). */
 async function openCall(page: Page, _title: string) {
+  await windowReady(page);
   await page.evaluate((id) => (location.hash = `transcript=${id}`), W.PAST_CALL);
 }
 /** What the core does by itself when the route flips during replay: it stops and says why (the fake only publishes what a test hands it). */

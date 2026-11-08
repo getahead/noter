@@ -102,3 +102,11 @@ describe("audio_delete and audio_delete_older", () => {
     expect(ok(await main.audioDeleteOlder({ older_than_days: 1 })).calls).toBe(0);
   });
 });
+
+describe("window_set_fix_term_enabled", () => {
+  it("the main window and the call screen set the Edit menu's Fix Term…; other windows may not", async () => {
+    for (const enabled of [true, false]) expect(ok(await main.windowSetFixTermEnabled({ enabled }))).toEqual({});
+    expect(ok(await s.core("call-screen").windowSetFixTermEnabled({ enabled: true }))).toEqual({});
+    expect(refused(await s.core("settings").windowSetFixTermEnabled({ enabled: true })).code).toBe("window_not_allowed");
+  });
+});

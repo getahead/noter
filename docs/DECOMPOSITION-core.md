@@ -1229,9 +1229,9 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 ### 2.22 Retrieval, search, Ask and topics - MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-core-retrieval-ask`
+- [x] `p4` - **ID**: `cpt-noter-feature-core-retrieval-ask`
 
-- **Milestone**: M3 · **Lane**: core · **Status**: NOT_STARTED. FEATURE spec: [features/core/core-retrieval-ask.md](features/core/core-retrieval-ask.md)
+- **Milestone**: M3 · **Lane**: core · **Status**: IMPLEMENTED (#332 #361 #375 #382 #387 #415 #433). FEATURE spec: [features/core/core-retrieval-ask.md](features/core/core-retrieval-ask.md)
 
 - **Purpose**: One retrieval function behind search, Ask, copilot facts and the pre-call brief: hybrid FTS5 and vector search with filters, cited answers, and topics across calls.
 
@@ -1263,7 +1263,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-core-retrieval`
+  - `cpt-noter-component-core-retrieval`
 
 - **API**:
   - Commands (frozen unless noted in DESIGN-core 3.3): `search`, `ask_start`, `ask_stop`, `ask_threads_list`, `ask_thread_get`, `ask_thread_delete`, `ask_scope_presets`, `topics_list`, `topic_get`, `topic_rename`, `topics_merge`, `topics_keep_separate`

@@ -83,13 +83,17 @@ const done = (page: Page) => page.locator('[data-region="TD-R7"]');
 
 test.describe("cpt-noter-seq-today-tick-item", () => {
   test("UI — happy — tick a suggested card item, retain Undo after feedback expires, restore the suggestion", async ({ page }) => {
+    await page.clock.install();
     await openToday(page, cardWorld);
     const row = cards(page).first().locator('[data-item-id="itm_replay"]');
     await row.getByRole("checkbox").press("Space");
     await expect(button(done(page), "Done today · 1")).toBeVisible();
     await button(done(page), "Done today · 1").click();
     await expect(done(page).getByText("Accepted and done")).toBeVisible();
-    await expect(done(page).getByText("Accepted and done")).toHaveCount(0, { timeout: 15_000 });
+    await page.clock.fastForward(7000);
+    await expect(done(page).getByText("Accepted and done")).toBeVisible(); // still inside the 10 s
+    await page.clock.fastForward(3000);
+    await expect(done(page).getByText("Accepted and done")).toHaveCount(0);
     await button(done(page), "Undo").click();
     await expect(row.getByText("Suggested", { exact: true })).toBeVisible();
     expect(await sent(page, "change_undo")).toHaveLength(1);

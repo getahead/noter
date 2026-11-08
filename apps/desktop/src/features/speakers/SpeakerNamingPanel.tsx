@@ -60,19 +60,24 @@ export async function nameSpeaker(bridge: Bridge, callId: string, speaker: Speak
   const named = res.data.speakers.find((s) => s.id === speaker.id);
   const short = named?.label.type === "person" ? named.label.person.short_name : to;
   // an Undo re-reads the call's speakers: no event orders the restored rows after this answer
+  // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-undo
   const refresh = async () => {
     const detail = await bridge.core.callGet({ call_id: callId });
     if (detail.status === "ok") bridge.store.setState((s) => applyRecord(s, "speaker", { speakers: detail.data.speakers }));
   };
+  // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-undo
   const undo = {
     refresh,
     target: { type: "change" as const, change_id: res.data.change_id },
     message: t("speakers.named", { from: label, to: short, count: named?.segment_count ?? speaker.segment_count }),
   };
   // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-outcome
+  // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-return
   return { undo };
+  // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-return
 }
 
+// @cpt-dod:cpt-noter-dod-ui-speakers-naming:p1
 // @cpt-component:cpt-noter-component-ui-speaker-naming-panel:p1
 // @cpt-flow:cpt-noter-flow-ui-speakers-post-call:p1
 export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
@@ -123,8 +128,12 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
     if (res.status === "ok") setSkipped((x) => new Set(x).add(s.id));
     // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-skip
   };
+  // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-unskip
+  // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-unskip
   const unskip = (id: string) =>
     setSkipped((x) => new Set([...x].filter((k) => k !== id)));
+  // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-unskip
+  // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-unskip
   const row = (s: SpeakerView) => (
     <NameRow
       key={s.id}
@@ -153,12 +162,14 @@ export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
             : t("speakers.panel.title", { count: rows.open.length })}
         </h3>
         {/* @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-hide */}
+        {/* @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-show */}
         <PushButton
           variant="quiet"
           size="small"
           label={hidden ? t("speakers.panel.show") : t("speakers.panel.hide")}
           onAction={() => setHidden(!hidden)}
         />
+        {/* @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-show */}
         {/* @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-hide */}
       </header>
       {!hidden && rows.open.map(row)}
@@ -242,14 +253,20 @@ export function NameRow({
   // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-name
   const name = async (ref: PersonRef, to: string) => {
     if (busy) return;
+    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-name
     setBusy(true);
     setError(null);
+    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-name
     const out = await nameSpeaker(p.bridge, p.callId, speaker, ref, to);
     setBusy(false);
     if ("error" in out) return setError(out.error);
+    // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-named
     holdUndo(out.undo);
+    // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-named
     // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-name
   };
+  // @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-pick
+  // @cpt-begin:cpt-noter-state-ui-speakers-naming:p1:inst-pick
   const chip = (c: PersonChip) => (
     <button
       key={c.id}
@@ -269,6 +286,8 @@ export function NameRow({
       <PersonChipView speaker={{ ...speaker, label: { type: "person", person: c } }} />
     </button>
   );
+  // @cpt-end:cpt-noter-state-ui-speakers-naming:p1:inst-pick
+  // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-pick
   return (
     <div
       role="group"

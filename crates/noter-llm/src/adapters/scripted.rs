@@ -61,6 +61,8 @@ struct State {
     received: Vec<Received>,
     opened: u32,
     closed: Vec<String>,
+    /// Lines `answer_next` put ahead of the script: the next one goes after them.
+    pinned: usize,
 }
 
 /// Every runtime choice, available, answered from the script. Cloning shares it.
@@ -79,14 +81,10 @@ impl Scripted {
             if text.trim().is_empty() {
                 continue;
             }
-            let line: Line =
-                serde_json::from_str(text).map_err(|e| format!("line {}: {e}", n + 1))?;
-            if Skill::from_id(&line.on).is_none() {
-                return Err(format!("line {}: unknown skill {:?}", n + 1, line.on));
-            }
-            if line.output.is_some() && line.fail.is_some() {
-                return Err(format!("line {}: both output and fail", n + 1));
-            }
+            let line = serde_json::from_str(text)
+                .map_err(|e| e.to_string())
+                .and_then(checked)
+                .map_err(|e| format!("line {}: {e}", n + 1))?;
             lines.push(Some(line));
         }
         let state = State {
@@ -94,6 +92,19 @@ impl Scripted {
             ..State::default()
         };
         Ok(Self(Arc::new(Mutex::new(state))))
+    }
+
+    /// `line` (a script line as JSON) answers the next run of its skill, ahead of the script and
+    /// after the lines given here before it.
+    pub fn answer_next(&self, line: Value) -> Result<(), String> {
+        let line = serde_json::from_value(line)
+            .map_err(|e| e.to_string())
+            .and_then(checked)?;
+        let mut state = lock(&self.0);
+        let at = state.pinned;
+        state.lines.insert(at, Some(line));
+        state.pinned += 1;
+        Ok(())
     }
 
     /// Every packet received so far.
@@ -188,6 +199,16 @@ impl RuntimeAdapter for Scripted {
     fn close_session(&self, _: RuntimeChoice, session: &str) {
         lock(&self.0).closed.push(session.into());
     }
+}
+
+fn checked(line: Line) -> Result<Line, String> {
+    if Skill::from_id(&line.on).is_none() {
+        return Err(format!("unknown skill {:?}", line.on));
+    }
+    if line.output.is_some() && line.fail.is_some() {
+        return Err("both output and fail".into());
+    }
+    Ok(line)
 }
 
 /// The evidence ids of a released packet (`{"items": [{"id": …}]}`).

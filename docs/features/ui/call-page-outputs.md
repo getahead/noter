@@ -35,11 +35,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-call-page-outputs`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-call-page-outputs`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-call-page-outputs`
+- [x] `p3` - `cpt-noter-feature-ui-call-page-outputs`
 
 ### 1.1 Overview
 
@@ -79,7 +79,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 
 ### Read and correct outputs
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-read-edit`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-read-edit`
 
 **Actor**: Primary user
 
@@ -101,12 +101,12 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 6. [x] - `p1` - Save or ⌘Return calls `output_edit` with call id, summary id, base rev and Markdown; raw HTML is never rendered - `inst-save`
 7. [x] - `p1` - **IF** conflict or validation error: keep the draft, refresh current output and show the error; require an explicit new save - `inst-error`
 8. [x] - `p1` - **ELSE** render the returned section, Edited badge, refreshed version list and **Saved** for 2 s - `inst-saved`
-9. [ ] - `p1` - User clicks the NT-1 or NT-2 notification; `nav:request` opens the call's **Summary** in the main window - `inst-nt-click`
+9. [x] - `p1` - User clicks the NT-1 or NT-2 notification; `nav:request` opens the call's **Summary** in the main window - `inst-nt-click`
 10. [x] - `p1` - **RETURN** readable outputs with each item's evidence one action away - `inst-return`
 
 ### Regenerate and compare versions
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-regenerate`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-call-page-outputs-regenerate`
 
 **Actor**: Primary user
 
@@ -119,16 +119,16 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - A failed runtime leaves old output and offers explicit retry/local fallback.
 
 **Steps**:
-1. [ ] - `p1` - User chooses **Regenerate Outputs…**, **With a Different Model…** or **Regenerate with Claude Code…**; dialog host shows Runtime and model, Skill, Sections and **Your edits are kept and shown as a diff.** - `inst-sheet`
+1. [x] - `p1` - User chooses **Regenerate Outputs…**, **With a Different Model…** or **Regenerate with Claude Code…**; dialog host shows Runtime and model, Skill, Sections and **Your edits are kept and shown as a diff.** - `inst-sheet`
 2. [x] - `p1` - User selects at least one section; API: `outputs_regenerate` with selected SectionKind values, runtime/model, call-type skill and local flag; **With Current Settings** sends current defaults - `inst-call`
-3. [ ] - `p1` - A section's Try Again requests that section only; Use Local Model sets local true and later shows **Written by the local model after Claude Code timed out** - `inst-section`
+3. [x] - `p1` - A section's Try Again requests that section only; Use Local Model sets local true and later shows **Written by the local model after Claude Code timed out** - `inst-section`
 4. [x] - `p1` - Accept the job id as scheduled work, not completion; keep previous content while matching `outputs:progress` updates it; refetch `outputs_get` for final bodies - `inst-job`
-5. [ ] - `p1` - Core keeps user prose edits and accepted/edited items, replaces only remaining suggestions and preserves rejected suppression; UI renders the returned notices and counts - `inst-preserve`
+5. [x] - `p1` - Core keeps user prose edits and accepted/edited items, replaces only remaining suggestions and preserves rejected suppression; UI renders the returned notices and counts - `inst-preserve`
 6. [x] - `p1` - User opens the version menu; `output_versions` lists generated and user versions with writer/time; hide the switcher with only one version - `inst-versions`
 7. [x] - `p1` - User selects a version; `output_version_get` returns its body for read-only inspection; selecting it never writes it over the current edit - `inst-version`
 8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, fold long unchanged stretches - `inst-diff`
-9. [ ] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
-10. [ ] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
+9. [x] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
+10. [x] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
 
 ### Copy or export a visible scope
 
@@ -252,7 +252,7 @@ Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered
 
 ### Sections, edits, regeneration and versions
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-content`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-content`
 
 The system **MUST** render ordered sections and output rows from typed core views, preserve independent section failures and readable old content, save drafts with revision checks and compare versions without overwriting edits. Shared diff rendering handles no differences, folded unchanged stretches, transcript marks and before/after sheets.
 
@@ -270,7 +270,7 @@ The system **MUST** render ordered sections and output rows from typed core view
 
 ### Sharing, tags, audio and notification routing
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-actions`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-actions`
 
 The system **MUST** show the exact copy/export scope and review/privacy notice, format through the core, use native save/delete surfaces, retain text evidence after audio deletion, and open ready/failed Summary from native notifications.
 
@@ -291,10 +291,10 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 
 - [x] Ready sections remain usable when another fails; old prose stays readable during regeneration
 - [x] Save retains user edits as a version; regeneration and naming preserve them and rejected suppression
-- [ ] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
+- [x] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
 - [x] No success feedback follows a failed or cancelled copy/export/delete
-- [ ] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
-- [ ] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
+- [x] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
+- [x] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
 
 ## 7. Additional Context
 

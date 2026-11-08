@@ -9,6 +9,7 @@ import * as W from "../support/world-presets";
 import { openWindow } from "../e2e/support/app";
 import { startSelfTest } from "../e2e/support/self-test";
 import { freeze, settled } from "./freeze";
+import { hold } from "./hold";
 
 test.beforeEach(({ page }) => freeze(page));
 
@@ -114,13 +115,11 @@ test.describe("first-run window states that need a step on the way", () => {
   test("renders Back from System Settings (Checking…)", async ({ page }) => {
     await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), at("permissions")(w), W.permission(w, "microphone", "granted")) });
     await settled(page);
+    // the core is slow to answer: park its re-read, so the row shows Checking… until the page is gone (no latency to guess, and a real focus event cannot cut it short)
+    await hold(page, "permission_request");
+    await hold(page, "setup_status");
     await page.locator('[data-component="cpt-noter-component-ui-permission-check-row"]').filter({ hasText: "System audio recording" }).getByRole("button", { name: "Open System Settings…" }).click();
-    // the core is slow to answer: the row shows Checking… until it does
-    await page.evaluate(() => {
-      const fake = (globalThis as unknown as { __noterFake: { latency: number } }).__noterFake;
-      fake.latency = 60_000;
-      dispatchEvent(new Event("focus"));
-    });
+    await page.evaluate(() => dispatchEvent(new Event("focus")));
     await expect(page.getByText("Checking…").first()).toBeVisible();
     await settled(page);
     await expect(win(page)).toHaveScreenshot("first-run-checking-light.png");

@@ -15,7 +15,10 @@ const ERRORS: Partial<Record<ErrorCode, MsgKey>> = { conflict: "handoff.err.conf
 export const errorText = (code: ErrorCode) => t(ERRORS[code] ?? "handoff.err.other");
 
 /** What the drawer shows: the view Cancel restored while a late completion is ignored, else the store's. */
+// @cpt-begin:cpt-noter-flow-ui-handoff-prepare:p1:inst-event
+// the store slice of this one handoff, written by `entity:changed`; a response that still says generating is not a finished prompt
 export const viewOf = (bridge: Bridge, itemId: string): HandoffView | undefined => localOf(itemId).restored ?? bridge.store.getState().entities.handoff[itemId];
+// @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-event
 
 const get = (bridge: Bridge, itemId: string) => bridge.act(`handoff:${itemId}`, "handoff_get", () => bridge.core.handoffGet({ item_id: itemId }), { entity: "handoff" });
 
@@ -68,7 +71,9 @@ async function write(bridge: Bridge, itemId: string, regenerate: boolean) {
 /** **Cancel** while writing: the core's previous state wins over a completion that was already on its way. */
 export async function cancel(bridge: Bridge, itemId: string) {
   const res = await bridge.act(`handoff:cancel:${itemId}`, "handoff_cancel", () => bridge.core.handoffCancel({ item_id: itemId }), { entity: "handoff" });
+  // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-cancel
   if (res.status === "ok") patchLocal(itemId, { restored: res.data });
+  // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-cancel
 }
 // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-cancel
 
@@ -80,6 +85,7 @@ export async function flushDraft(bridge: Bridge, itemId: string): Promise<boolea
   if (!view || draft === undefined || !isDirty(view, localOf(itemId))) return true;
   patchLocal(itemId, { pending: "save", error: undefined });
   const res = await bridge.act(`handoff:edit:${itemId}`, "handoff_edit", () => bridge.core.handoffEdit({ item_id: itemId, rev: localOf(itemId).draftRev ?? view.rev ?? 0, prompt_md: draft }), { entity: "handoff" });
+  // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-saved
   if (res.status === "ok") {
     const changedWhileSaving = localOf(itemId).draft !== draft;
     patchLocal(itemId, { pending: undefined, restored: undefined, draft: changedWhileSaving ? localOf(itemId).draft : undefined, draftRev: changedWhileSaving ? res.data.rev ?? 0 : undefined });
@@ -93,6 +99,7 @@ export async function flushDraft(bridge: Bridge, itemId: string): Promise<boolea
     if (latest.status === "ok") patchLocal(itemId, { draftRev: latest.data.rev ?? 0 });
   }
   // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-conflict
+  // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-saved
   return false;
 }
 // @cpt-end:cpt-noter-flow-ui-handoff-prepare:p1:inst-edit
@@ -131,9 +138,11 @@ export const copy = (bridge: Bridge, itemId: string) =>
   action(bridge, itemId, "copy", async () => {
     // @cpt-begin:cpt-noter-flow-ui-handoff-deliver:p1:inst-copy
     const res = await bridge.act(`handoff:act:${itemId}`, "handoff_copy", () => bridge.core.handoffCopy({ item_id: itemId }), { entity: "item" });
+    // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-copied
     if (res.status !== "ok") return void patchLocal(itemId, { error: errorText(res.error.code) });
     patchLocal(itemId, { copied: true, openFailed: undefined });
     setTimeout(() => patchLocal(itemId, { copied: undefined }), COPIED_MS);
+    // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-copied
     // @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-copy
   });
 

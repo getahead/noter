@@ -138,6 +138,15 @@ it("a rejected suggestion leaves its section and counts as suppressed in that se
   expect(after.filter((x) => x.kind !== home.kind).every((x) => x.suppressed_count === 0)).toBe(true);
 });
 
+// @cpt-flow:cpt-noter-flow-ui-menu-bar-start:p1
+it("Open Last Summary (window_navigate last_summary) opens the Summary of the latest call with ready outputs, on both cores", async () => {
+  s = openScenario({ alsoRecord: exercised, world: W.idle });
+  const nav = await s.events("nav:request");
+  ok(await s.core("main").windowNavigate({ target: { type: "last_summary" } }));
+  await until(() => nav.latest(), "nav:request");
+  expect(nav.latest()).toMatchObject({ type: "call_page", call_id: CALL, tab: "summary" });
+});
+
 // @cpt-flow:cpt-noter-flow-ui-speakers-post-call:p1
 it.each(["rename", "name"] as const)("speaker %s publishes names_updated and regeneration clears it on both cores", async (method) => {
   s = openScenario({ alsoRecord: exercised, world: W.idle });

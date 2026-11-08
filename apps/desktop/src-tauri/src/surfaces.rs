@@ -243,6 +243,7 @@ pub fn tray_command(
         // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-if-finish
         // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-navigate
         TrayAction::OpenNoter => navigate(None),
+        TrayAction::OpenLastSummary => navigate(Some(NavTarget::LastSummary)),
         TrayAction::OpenSettings => navigate(Some(NavTarget::Settings {
             pane: SettingsPane::General,
         })),
@@ -253,7 +254,7 @@ pub fn tray_command(
     // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-match-item
 }
 
-const ACTIONS: [TrayAction; 20] = [
+const ACTIONS: [TrayAction; 21] = [
     TrayAction::StartDetected,
     TrayAction::FinishSetup,
     TrayAction::KeepRecording,
@@ -269,6 +270,7 @@ const ACTIONS: [TrayAction; 20] = [
     TrayAction::MarkMoment,
     TrayAction::OpenCallScreen,
     TrayAction::UseFloatingPanel,
+    TrayAction::OpenLastSummary,
     TrayAction::HideForPresenting,
     TrayAction::ShowAfterPresenting,
     TrayAction::OpenNoter,
@@ -571,7 +573,30 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         let item = MenuItem::with_id(app, APP_QUIT, "Quit Noter", true, Some("CmdOrCtrl+Q"))?;
         first.append(&item)?;
     }
+    // Fix Term… sits in the Edit menu, disabled until the window reports a confirmed-text selection.
+    for kind in menu.items()? {
+        if let MenuItemKind::Submenu(sub) = kind {
+            if sub.text()? == "Edit" {
+                sub.append(&PredefinedMenuItem::separator(app)?)?;
+                sub.append(&MenuItem::with_id(
+                    app,
+                    APP_FIX_TERM,
+                    "Fix Term…",
+                    false,
+                    None::<&str>,
+                )?)?;
+            }
+        }
+    }
     Ok(menu)
+}
+
+/// The Edit menu's id for **Fix Term…**.
+pub const APP_FIX_TERM: &str = "AppFixTerm";
+
+/// **Fix Term…** was chosen: the windows open the term fix on their current selection.
+pub fn fix_term_chosen<R: Runtime>(app: &AppHandle<R>) {
+    let _ = app.emit(event_names::MENU_FIX_TERM, json!({}));
 }
 
 /// The windows that are non-activating panels; the others are ordinary windows.
@@ -1030,6 +1055,14 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
     // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
+
+    fn set_fix_term_enabled(&self, enabled: bool) {
+        if let Some(MenuItemKind::MenuItem(item)) =
+            self.app.menu().and_then(|menu| menu.get(APP_FIX_TERM))
+        {
+            let _ = item.set_enabled(enabled);
+        }
+    }
 
     fn close_record_prompt(&self) {
         if let Some(prompt) = self

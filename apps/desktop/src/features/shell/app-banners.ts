@@ -48,11 +48,17 @@ export function appBanners(whole: Pick<Partial<WholeSlices>, "banners" | "setup"
       out.push({
         id: b.type,
         severity: "warning",
+        // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-dismiss
         dismissible: true,
+        // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-dismiss
+        // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-quit
         text: t("banner.quit_recording", { title: quoted(b.call.title) }),
         actions: [
           { label: t("banner.open_call"), onAction: () => a.openCall(b.call.id) },
+          // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-quit
+          // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-resume
           { label: t("banner.resume_recording"), variant: "primary", onAction: () => a.resumeRecording(b.call.id) },
+          // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-resume
         ],
       });
     } else if (b.type === "update_ready") {
@@ -67,6 +73,7 @@ export function appBanners(whole: Pick<Partial<WholeSlices>, "banners" | "setup"
     }
   }
   const test = whole.setup?.self_test.type;
+  // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-setup
   if (test === "skipped" || test === "failed")
     out.push({
       id: "self-test",
@@ -77,6 +84,7 @@ export function appBanners(whole: Pick<Partial<WholeSlices>, "banners" | "setup"
         { label: t("banner.finish_setup"), link: true, onAction: a.finishSetup },
       ],
     });
+  // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-setup
   // a failed command shows where the user acts, never silently (the slot's × clears it; running the command again brings it back if it fails again)
   for (const f of failures)
     out.push({

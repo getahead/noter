@@ -2115,6 +2115,19 @@
       ]
     },
     {
+      "args": "FixTermEnabledArgs",
+      "channel": null,
+      "doc": "The Edit menu's **Fix Term…** is enabled while confirmed words are selected.",
+      "group": "windows",
+      "name": "window_set_fix_term_enabled",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "call-screen"
+      ]
+    },
+    {
       "args": "HiddenArgs",
       "channel": null,
       "doc": "Hide for Presenting (wanted state).",
@@ -2196,7 +2209,7 @@
       ]
     }
   ],
-  "contract_version": "2.5",
+  "contract_version": "2.7",
   "default_retryable": [
     "not_ready",
     "internal",
@@ -2398,6 +2411,12 @@
       "doc": "The core asks the main or Settings window to navigate (notification click, menu).",
       "name": "nav:request",
       "payload": "NavTarget",
+      "stability": "frozen"
+    },
+    {
+      "doc": "The native Edit menu's **Fix Term…** was chosen: open the term fix on the current selection.",
+      "name": "menu:fix_term",
+      "payload": "Ack",
       "stability": "frozen"
     }
   ],

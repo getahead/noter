@@ -36,7 +36,9 @@ export function drawerState(view: HandoffView | undefined, local: Local): Drawer
   // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-opened
   if (local.opened) return "OPENED";
   // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-opened
+  // @cpt-begin:cpt-noter-state-ui-handoff-drawer:p1:inst-ready
   return view.edited ? "EDITED" : "READY";
+  // @cpt-end:cpt-noter-state-ui-handoff-drawer:p1:inst-ready
 }
 
 /** The user typed something the core does not hold yet. */

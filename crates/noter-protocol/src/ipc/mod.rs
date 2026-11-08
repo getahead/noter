@@ -596,6 +596,8 @@ commands! {
     window_set_call_layout(CallLayoutArgs) -> CallWindowState [Windows, Frozen, CallScreen | Main];
     window_set_collapsed(CollapseArgs) -> CallWindowState [Windows, Frozen, CallScreen];
     window_share_warning_seen(NoArgs) -> CallWindowState [Windows, Frozen, CallScreen];
+    /// The Edit menu's **Fix Term…** is enabled while confirmed words are selected.
+    window_set_fix_term_enabled(FixTermEnabledArgs) -> Ack [Windows, Frozen, Main | CallScreen];
     /// Hide for Presenting (wanted state).
     app_set_hidden_for_presenting(HiddenArgs) -> PresentingState [Windows, Frozen, CallScreen | Main];
     /// Show Noter / Open in Noter at a place (main window or Settings window).
@@ -643,6 +645,8 @@ events! {
     APP_PRESENTING = "app:presenting" => PresentingState [Frozen];
     /// The core asks the main or Settings window to navigate (notification click, menu).
     NAV_REQUEST = "nav:request" => NavTarget [Frozen];
+    /// The native Edit menu's **Fix Term…** was chosen: open the term fix on the current selection.
+    MENU_FIX_TERM = "menu:fix_term" => Ack [Frozen];
 }
 
 /// All types of the IPC contract, for the TypeScript exporter.

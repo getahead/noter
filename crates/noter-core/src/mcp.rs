@@ -13,6 +13,7 @@
 //! cloud run: its own redaction map and an audit row before the body leaves); a cloud run
 //! the router did not start through [`ToolHost`] has no map, so it gets no result at all.
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
@@ -102,6 +103,8 @@ struct Run {
     /// `true` ends the run's connections and in-flight work.
     cancel: watch::Sender<bool>,
     config: PathBuf,
+    /// Live sources' sign-in tokens by server: in memory for the run, gone when it closes.
+    tokens: HashMap<String, String>,
 }
 
 pub(crate) struct McpRuns {
@@ -278,6 +281,7 @@ impl Core {
                 state: State::Registered,
                 cancel: watch::channel(false).0,
                 config: config.clone(),
+                tokens: HashMap::new(),
             });
         }
         // @cpt-end:cpt-noter-flow-core-mcp-start:p1:inst-start-config
@@ -416,7 +420,7 @@ impl Core {
                 let value = if req.method.starts_with("live_") {
                     self.relay(&trusted, &req.method, req.params).await
                 } else {
-                    self.dispatch(&trusted, &req.method, req.params)
+                    self.dispatch(&trusted, &req.method, req.params).await
                 };
                 bound.get_or_insert(trusted);
                 // @cpt-begin:cpt-noter-algo-core-mcp-close:p1:inst-close-late
@@ -481,7 +485,7 @@ impl Core {
 
     // @cpt-dod:cpt-noter-dod-core-mcp-results:p1
     // @cpt-flow:cpt-noter-flow-core-mcp-read:p1
-    fn dispatch(&self, t: &Trusted, method: &str, mut params: Value) -> Result<Value, Rpc> {
+    async fn dispatch(&self, t: &Trusted, method: &str, mut params: Value) -> Result<Value, Rpc> {
         // The call a run belongs to does not narrow its reads (an Ask or a review looks across
         // the library); what a cloud run cannot read is a sensitive call.
         if t.cloud {
@@ -492,6 +496,7 @@ impl Core {
         }
         let value = match method {
             "pin_item" | "propose_correction" => self.stage_tool(t, method, params)?,
+            "search_calls" | "search_documents" => self.search_tool(t, method, params).await?,
             _ => self.read_tool(t, method, params)?,
         };
         // @cpt-begin:cpt-noter-flow-core-mcp-read:p1:inst-read-gate
@@ -812,10 +817,9 @@ impl Core {
     /// filters and privacy: a cloud run gets no sensitive call or source, and every hit keeps
     /// the segment or chunk ids it was stored under.
     // @cpt-begin:cpt-noter-flow-core-mcp-read:p1:inst-read-search
-    // shortcut: keyword-only (`keyword_only: true`); the query is not embedded here, because the
-    // socket's answer path is not async over the engine. Embed it when a run's search quality
-    // needs the vector side.
-    fn search_tool(&self, t: &Trusted, method: &str, params: Value) -> Result<Value, Rpc> {
+    // The query is embedded locally exactly as `search` does: keyword-only (`keyword_only: true`)
+    // while the indexes rebuild or when this embedding failed.
+    async fn search_tool(&self, t: &Trusted, method: &str, params: Value) -> Result<Value, Rpc> {
         let documents = method == "search_documents";
         let (text, filter, k) = if documents {
             let a: SearchDocumentsInput = typed(params)?;
@@ -837,6 +841,7 @@ impl Core {
             return Err(PARAMS);
         }
         let wanted = k.unwrap_or(DEFAULT_HITS).clamp(1, MAX_HITS) as usize;
+        let (vector, mode) = self.query_vector(&text).await;
         let query = noter_retrieval::Query {
             text,
             filter,
@@ -850,7 +855,7 @@ impl Core {
                 noter_retrieval::Privacy::Local
             },
             wanted,
-            vector: None,
+            vector,
         };
         let prepared = noter_retrieval::prepare(query).map_err(|_| PARAMS)?;
         let found = self
@@ -874,7 +879,7 @@ impl Core {
                 }
                 Ok(to_json(&SearchCallsOutput {
                     hits,
-                    keyword_only: true,
+                    keyword_only: mode != SearchMode::Hybrid,
                 }))
             })
             .map_err(|_| INTERNAL)?;
@@ -973,7 +978,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
         let mut cancel = t.cancel.clone();
         let answer = tokio::select! {
-            a = self.forward_live(&server, tool.action, &request, &audit) => a,
+            a = self.forward_live(&t.run_id, &server, tool.action, &request, &audit) => a,
             _ = cancel.wait_for(|c| *c) => Err(FORBIDDEN),
         }?;
         // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
@@ -995,30 +1000,73 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-result
     }
 
-    /// The source's own transport and sign-in: the token lives for this one request and goes
-    /// nowhere else.
+    /// The source's own transport and sign-in: the run signs in once and keeps the token in
+    /// memory (a renewed one replaces it); a rejected token is signed in again once.
     // @cpt-begin:cpt-noter-flow-core-mcp-live-relay:p1:inst-relay-forward
     async fn forward_live(
         &self,
+        run_id: &str,
         server: &str,
         action: Live,
         request: &Value,
         audit: noter_knowledge::Audit<'_>,
     ) -> Result<Value, Rpc> {
         let mcp = &self.deps.mcp_source;
-        // Nothing is kept of the sign-in: a renewed token is dropped.
+        let keep = |token: &str| {
+            let mut runs = lock(&self.mcp.runs);
+            if let Some(run) = runs.iter_mut().find(|r| r.ctx.llm_run_id == run_id) {
+                run.tokens.insert(server.to_owned(), token.to_owned());
+            }
+        };
         let remote = noter_knowledge::Remote {
             audit,
-            renewed: &|_| {},
+            renewed: &|token| keep(&token),
         };
-        let token = mcp.oauth(server, audit).await.map_err(|_| INTERNAL)?;
+        let cached = lock(&self.mcp.runs)
+            .iter()
+            .find(|r| r.ctx.llm_run_id == run_id)
+            .and_then(|r| r.tokens.get(server).cloned());
+        let mut token = match cached {
+            Some(token) => token,
+            None => {
+                let token = mcp.oauth(server, audit).await.map_err(|_| INTERNAL)?;
+                keep(&token);
+                token
+            }
+        };
+        let mut signed_in_again = false;
+        let answer = loop {
+            match self
+                .live_call(server, action, request, &token, &remote)
+                .await
+            {
+                Err(noter_knowledge::McpError::Rejected) if !signed_in_again => {
+                    signed_in_again = true;
+                    token = mcp.oauth(server, audit).await.map_err(|_| INTERNAL)?;
+                    keep(&token);
+                }
+                answer => break answer,
+            }
+        };
+        answer.map_err(|e| match (action, e) {
+            (Live::Read, noter_knowledge::McpError::Invalid) => MISSING,
+            _ => INTERNAL,
+        })
+    }
+
+    async fn live_call(
+        &self,
+        server: &str,
+        action: Live,
+        request: &Value,
+        token: &str,
+        remote: &noter_knowledge::Remote<'_>,
+    ) -> Result<Value, noter_knowledge::McpError> {
+        let mcp = &self.deps.mcp_source;
         Ok(match action {
             Live::Search => {
                 let query = request["query"].as_str().unwrap_or_default();
-                let found = mcp
-                    .seed_query(server, &token, query, &remote)
-                    .await
-                    .map_err(|_| INTERNAL)?;
+                let found = mcp.seed_query(server, token, query, remote).await?;
                 let results: Vec<Value> = found
                     .items
                     .into_iter()
@@ -1029,13 +1077,7 @@ impl Core {
             }
             Live::Read => {
                 let uri = request["uri"].as_str().unwrap_or_default();
-                let page = mcp
-                    .read_resource(server, &token, uri, &remote)
-                    .await
-                    .map_err(|e| match e {
-                        noter_knowledge::McpError::Invalid => MISSING,
-                        _ => INTERNAL,
-                    })?;
+                let page = mcp.read_resource(server, token, uri, remote).await?;
                 json!({ "uri": uri, "title": page.title, "text": page.text })
             }
         })
@@ -1132,7 +1174,6 @@ impl Core {
                     Ok(Ok(to_json(&ItemsOutput { items })))
                 })
             }
-            "search_calls" | "search_documents" => self.search_tool(t, method, params),
             "get_person" => {
                 let a: GetPersonInput = typed(params)?;
                 if a.person_id.is_none() && a.name.as_deref().map_or(true, |n| n.trim().is_empty())
@@ -1451,9 +1492,12 @@ async fn connection(core: Weak<Core>, stream: UnixStream) {
                 None => std::future::pending().await,
             }
         };
+        // Biased: a run closed before the request was read still gets no answer, never a
+        // refusal that races the connection's end (the unbiased pick is random).
         tokio::select! {
-            n = got => if !matches!(n, Ok(n) if n > 0 && n as u64 <= MAX_FRAME) { return },
+            biased;
             () = ended => return,
+            n = got => if !matches!(n, Ok(n) if n > 0 && n as u64 <= MAX_FRAME) { return },
         }
         let Some(core) = core.upgrade() else { return };
         let mut bytes = to_json(&core.answer(&line, &mut bound).await)

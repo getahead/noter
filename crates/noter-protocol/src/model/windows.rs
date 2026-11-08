@@ -69,6 +69,12 @@ pub struct CollapseArgs {
     pub collapsed: bool,
 }
 
+/// Whether the Edit menu's **Fix Term…** is enabled: a confirmed-text selection is on screen.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct FixTermEnabledArgs {
+    pub enabled: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HiddenArgs {
     pub hidden: bool,
@@ -105,6 +111,9 @@ pub enum SettingsPane {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NavTarget {
     Today,
+    /// The Summary of the latest call whose outputs are ready (the menu bar's Open Last Summary);
+    /// the core answers with the call's `call_page` target.
+    LastSummary,
     CallPage {
         call_id: CallId,
         tab: CallPageTab,

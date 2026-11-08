@@ -132,6 +132,17 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await expect(panel(page)).toContainText("Name speakers · 2 not named");
   });
 
+  test("UI — happy path: the Summary tab shows the same Name speakers panel above the sections and naming there says Named Speaker 3 as Pavel", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => S.unnamed(w, 2) });
+    await navigate(page, "summary", S.CALL);
+    await expect(panel(page)).toContainText("Name speakers · 3 not named");
+    const row = rowOf(page, "Speaker 3");
+    await pick(row);
+    await row.getByRole("button", { name: "Name", exact: true }).click();
+    await expect(page.getByText(new RegExp(`Named Speaker 3 as Pavel[^·]* · ${LINES.source}`))).toBeVisible();
+    await expect(panel(page)).toContainText("Name speakers · 2 not named");
+  });
+
   test("UI — happy path: naming the last speaker says All speakers named · Undo, and Undo restores the row", async ({ page }) => {
     await open(page, () => {});
     await pick(rowOf(page, "Speaker 3"));
@@ -237,6 +248,21 @@ test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy a
   await expect(fix).toHaveCount(0);
   await expect(text).toContainText("corrected");
   expect(await sent(page, "transcript_fix_term")).toEqual([expect.objectContaining({ replacement: "corrected" })]);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(text).not.toContainText("corrected");
+  await expect(text).toContainText(selected!);
+  expect((await sent(page, "change_undo")).length).toBe(1);
+});
+
+test("cpt-noter-seq-call-page-name-speakers — the native Edit menu's Fix Term… follows the selected words", async ({ page }) => {
+  await openWindow(page, "main");
+  await navigate(page, "transcript", S.CALL);
+  const text = page.locator('[data-region="PC-R5"] .cw-seg .cw-seg__text').first();
+  const lastEnabled = async () => (await sent(page, "window_set_fix_term_enabled")).at(-1);
+  await text.dblclick();
+  await expect.poll(lastEnabled).toEqual({ enabled: true });
+  await page.evaluate(() => getSelection()?.removeAllRanges());
+  await expect.poll(lastEnabled).toEqual({ enabled: false });
 });
 
 test("cpt-noter-seq-call-page-name-speakers — stale Fix Term refreshes the span and requires reselection", async ({ page }) => {
