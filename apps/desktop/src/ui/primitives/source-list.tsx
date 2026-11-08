@@ -7,7 +7,7 @@ import { base, cx } from "./attrs";
 import { moveFocus } from "./roving";
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
-export function SourceList({ label = "Sidebar", children }: { label?: string; children?: ReactNode }) {
+export function SourceList({ label = t("shell.sidebar"), children }: { label?: string; children?: ReactNode }) {
   return (
     <nav className="np-srclist" role="list" {...base("source-list", {})} aria-label={label} onKeyDown={(e) => moveFocus(e, '[role="listitem"]', false)}>
       {children}

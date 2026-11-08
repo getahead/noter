@@ -12,29 +12,27 @@ export interface ModeInput {
 
 export interface ModeView {
   state: ModeState;
-  /** The indicator's word (the prototype's `MODE_TEXT` keys). */
-  word: string;
   /** Degraded: the warning glyph and word. */
   warning: boolean;
 }
 
 const BY_MODE: Record<PrivacyMode, ModeView> = {
-  cloud_allowed: { state: "CLOUD", word: "Cloud", warning: false },
-  cloud_redacted: { state: "CLOUD_REDACTED", word: "Cloud, redacted", warning: false },
-  local_only: { state: "LOCAL_ONLY", word: "Local only", warning: false },
+  cloud_allowed: { state: "CLOUD", warning: false },
+  cloud_redacted: { state: "CLOUD_REDACTED", warning: false },
+  local_only: { state: "LOCAL_ONLY", warning: false },
 };
 
 // @cpt-state:cpt-noter-state-ui-main-window-shell-mode-indicator:p1
 export function modeIndicator({ mode, degraded, sensitiveCall }: ModeInput): ModeView {
   const has = (type: DegradedState["type"]) => degraded.some((d) => d.type === type);
   // @cpt-begin:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-none
-  if (has("no_assistant")) return { state: "NO_ASSISTANT", word: "No assistant", warning: true };
+  if (has("no_assistant")) return { state: "NO_ASSISTANT", warning: true };
   // @cpt-end:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-none
   // @cpt-begin:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-switched
-  if (has("switched_to_local")) return { state: "SWITCHED_TO_LOCAL", word: "Switched to local", warning: true };
+  if (has("switched_to_local")) return { state: "SWITCHED_TO_LOCAL", warning: true };
   // @cpt-end:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-switched
   // @cpt-begin:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-sensitive
-  if (sensitiveCall) return { state: "SENSITIVE_LOCAL", word: "Sensitive · local", warning: false };
+  if (sensitiveCall) return { state: "SENSITIVE_LOCAL", warning: false };
   // @cpt-end:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-sensitive
   // The mode the user chose answers when nothing degrades: Cloud allowed, Local only, or back to Cloud, redacted
   // once the degraded state clears or a key, an account or a local runtime becomes available.

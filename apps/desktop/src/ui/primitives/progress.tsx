@@ -15,7 +15,7 @@ export interface ProgressProps {
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 /** progress: a 5-pt capsule bar with value text ("64 percent"), or the small row spinner. */
 export function Progress({ variant, value = null, state = "running", label, cls }: ProgressProps) {
-  if (variant === "spinner") return <span className={cx("np-spin", cls)} role="progressbar" aria-label={label || "Working"} {...base("progress", { variant: "spinner", state })} />;
+  if (variant === "spinner") return <span className={cx("np-spin", cls)} role="progressbar" aria-label={label || t("progress.working")} {...base("progress", { variant: "spinner", state })} />;
   const ind = value == null;
   return (
     <span

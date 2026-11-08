@@ -9,6 +9,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
 import { Toggle } from "../../ui/primitives/toggle";
+import { MODE_MSG } from "../shell/mode-indicator-view";
 import { modeIndicator } from "../shell/mode-indicator";
 import { saveSection, useRowErrors } from "./actions";
 import { Group, Row } from "./form";
@@ -39,7 +40,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.privacy.mode")} error={rowError("privacy", "mode")}>
           <RadioGroup name="st-pmode" label={t("settings.privacy.mode")} options={MODES} value={privacy.mode} onAction={(mode) => void saveSection(bridge, "privacy", { mode: mode as PrivacyMode })} />
           <div className="st-modenow">
-            {t("settings.privacy.in_force")} <Badge text={inForce.word} tone={inForce.warning ? "warning" : "info"} />
+            {t("settings.privacy.in_force")} <Badge text={t(MODE_MSG[inForce.state].word)} tone={inForce.warning ? "warning" : "info"} />
           </div>
         </Row>
         <Row label={t("settings.privacy.retention")} error={rowError("audio", "retention")} note={due ? t("settings.privacy.retention_due", { count: due }) : t("settings.privacy.retention_none")}>
