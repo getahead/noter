@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* NoterApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* NoterApp.swift */; };
 		A10000000000000000000002 /* MenuBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* MenuBarTests.swift */; };
+		A10000000000000000000011 /* WebViewRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* WebViewRecoveryTests.swift */; };
 		A10000000000000000000003 /* DialogsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* DialogsTests.swift */; };
 		A10000000000000000000004 /* NotificationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* NotificationsTests.swift */; };
 		A10000000000000000000005 /* RecordPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* RecordPromptTests.swift */; };
@@ -21,6 +22,7 @@
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* NoterApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoterApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* MenuBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* WebViewRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewRecoveryTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000003 /* DialogsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogsTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* NotificationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* RecordPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordPromptTests.swift; sourceTree = "<group>"; };
@@ -55,6 +57,7 @@
 			children = (
 				A20000000000000000000001 /* NoterApp.swift */,
 				A20000000000000000000002 /* MenuBarTests.swift */,
+				A20000000000000000000011 /* WebViewRecoveryTests.swift */,
 				A20000000000000000000003 /* DialogsTests.swift */,
 				A20000000000000000000004 /* NotificationsTests.swift */,
 				A20000000000000000000005 /* RecordPromptTests.swift */,
@@ -128,6 +131,7 @@
 			files = (
 				A10000000000000000000001 /* NoterApp.swift in Sources */,
 				A10000000000000000000002 /* MenuBarTests.swift in Sources */,
+				A10000000000000000000011 /* WebViewRecoveryTests.swift in Sources */,
 				A10000000000000000000003 /* DialogsTests.swift in Sources */,
 				A10000000000000000000004 /* NotificationsTests.swift in Sources */,
 				A10000000000000000000005 /* RecordPromptTests.swift in Sources */,

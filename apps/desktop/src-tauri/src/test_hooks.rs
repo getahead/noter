@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 
 use noter_core::{EventEmitter, ShortcutRegistrar};
 use noter_core_harness::boot::{Harness, Options};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime, Webview};
 
 use crate::surfaces::TauriSurfaces;
 use crate::Booted;
@@ -74,6 +74,53 @@ pub fn watch_hotkey_trigger<R: Runtime>(app: AppHandle<R>) {
             crate::hotkey_pressed(&app, &chord);
         }
     });
+}
+
+/// With `NOTER_TEST_STALL_FILE`, stalls the main window's page once, a few seconds after it loaded:
+/// its web process is stopped and the page reloaded, so the load hangs like the CI runner's (#521)
+/// until the watch (`webview_watch`) gives the page a new process. The file is written once the
+/// page is stalled. The path is given whole, like `NOTER_TEST_HOTKEY_FILE`.
+pub fn stall_after_load<R: Runtime>(webview: &Webview<R>) {
+    static STALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let Some(file) = std::env::var_os("NOTER_TEST_STALL_FILE").map(PathBuf::from) else {
+        return;
+    };
+    if webview.label() != "main" || STALLED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let webview = webview.clone();
+    std::thread::spawn(move || {
+        // Long enough for a test to see the page first.
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        // The reload never reports its start from a stopped process: it is reported here.
+        if let Some(watch) = webview.try_state::<crate::webview_watch::Watch>() {
+            crate::webview_watch::lock(&watch).started(webview.label(), std::time::Instant::now());
+        }
+        let reload = webview.clone();
+        let _ = webview.with_webview(move |platform| {
+            stop_content_process(platform.inner());
+            let _ = reload.reload();
+            let _ = std::fs::write(&file, "stalled");
+        });
+    });
+}
+
+/// shortcut: private WebKit API (WKWebViewPrivate `_webProcessIdentifier`), debug builds only: a
+/// test has no other way to find the web view's content process.
+fn stop_content_process(webview: *mut std::ffi::c_void) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    // SAFETY: `webview` is the WKWebView Tauri hands to `with_webview`, used on the main thread;
+    // `_webProcessIdentifier` takes nothing and returns a pid_t.
+    let pid: i32 = match unsafe { (webview as *const AnyObject).as_ref() } {
+        Some(webview) => unsafe { msg_send![webview, _webProcessIdentifier] },
+        None => 0,
+    };
+    if pid > 0 {
+        let _ = std::process::Command::new("kill")
+            .args(["-STOP", &pid.to_string()])
+            .status();
+    }
 }
 
 #[cfg(test)]

@@ -12,6 +12,7 @@ pub mod surfaces;
 #[cfg(debug_assertions)]
 mod test_hooks;
 pub mod updater;
+pub mod webview_watch;
 
 use std::sync::{Arc, OnceLock};
 
@@ -40,13 +41,29 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
         .invoke_handler(invoke::<R>)
         .on_page_load(|webview, payload| {
-            if payload.event() == PageLoadEvent::Started {
-                reset(webview.label(), webview.try_state::<Booted>().as_deref());
+            let (label, event) = (webview.label(), payload.event());
+            if event == PageLoadEvent::Started {
+                reset(label, webview.try_state::<Booted>().as_deref());
+            }
+            // A page that never finishes gets a new web process (#521).
+            if let Some(watch) = webview.try_state::<webview_watch::Watch>() {
+                let mut loads = webview_watch::lock(&watch);
+                match event {
+                    PageLoadEvent::Started => loads.started(label, std::time::Instant::now()),
+                    PageLoadEvent::Finished => loads.finished(label),
+                }
+            }
+            #[cfg(debug_assertions)]
+            if event == PageLoadEvent::Finished {
+                test_hooks::stall_after_load(webview);
             }
         })
         .on_window_event(|window, event| match event {
             WindowEvent::Destroyed => {
-                reset(window.label(), window.try_state::<Booted>().as_deref())
+                reset(window.label(), window.try_state::<Booted>().as_deref());
+                if let Some(watch) = window.try_state::<webview_watch::Watch>() {
+                    webview_watch::lock(&watch).closed(window.label());
+                }
             }
             // The user moved or resized the call window: its frame is saved (inst-frame).
             WindowEvent::Moved(_) | WindowEvent::Resized(_)
@@ -104,6 +121,7 @@ pub fn run() {
                 .unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group);
             app.manage(surfaces.clone());
+            app.manage(webview_watch::start(app.handle()));
             app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
             #[cfg(debug_assertions)]
             test_hooks::watch_hotkey_trigger(app.handle().clone());
