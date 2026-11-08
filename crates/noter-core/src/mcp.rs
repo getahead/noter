@@ -1492,9 +1492,12 @@ async fn connection(core: Weak<Core>, stream: UnixStream) {
                 None => std::future::pending().await,
             }
         };
+        // Biased: a run closed before the request was read still gets no answer, never a
+        // refusal that races the connection's end (the unbiased pick is random).
         tokio::select! {
-            n = got => if !matches!(n, Ok(n) if n > 0 && n as u64 <= MAX_FRAME) { return },
+            biased;
             () = ended => return,
+            n = got => if !matches!(n, Ok(n) if n > 0 && n as u64 <= MAX_FRAME) { return },
         }
         let Some(core) = core.upgrade() else { return };
         let mut bytes = to_json(&core.answer(&line, &mut bound).await)
