@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.1](https://github.com/getahead/noter/compare/v0.22.0...v0.22.1) (2026-11-08)
+
+
+### Bug fixes
+
+* **knowledge:** the hourly pass joins an open sync instead of queuing another ([#457](https://github.com/getahead/noter/issues/457)) ([5fd3665](https://github.com/getahead/noter/commit/5fd3665a9b231d4170eaeb85c614c55a0b839a1d))
+
 ## [0.22.0](https://github.com/getahead/noter/compare/v0.21.0...v0.22.0) (2026-11-08)
 
 
