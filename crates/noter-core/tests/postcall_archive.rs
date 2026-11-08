@@ -530,6 +530,81 @@ async fn the_summary_ready_notification_waits_for_the_live_call_and_names_the_ca
 }
 
 #[tokio::test(start_paused = true)]
+async fn the_failed_notice_waits_for_the_live_call_like_the_ready_one() {
+    let fail = r#"{"on": "post-call", "fail": "rate_limited"}"#;
+    let r = open(&[fail; 14].join("\n"), true).await;
+    seed_call(&r.core, CALL, 3);
+    let mut live = r
+        .core
+        .app_snapshot(&main_window(), NoArgs {})
+        .await
+        .unwrap()
+        .capture;
+    live.phase = CapturePhase::Recording;
+    live.call_id = Some(CallId::new("call_live"));
+    live.started_at = Some(TimestampMs(NOW - 60_000));
+    noter_core::testing::seed_capture(&r.core, live.clone())
+        .await
+        .unwrap();
+    let run = trigger(&r.core, JobKind::PostCall, CALL);
+    assert_eq!(settle(&r.core, &run).await.status, JobRunStatus::Failed);
+    assert!(
+        r.posted.0.lock().unwrap().is_empty(),
+        "held during the live call"
+    );
+    live.phase = CapturePhase::Idle;
+    live.call_id = None;
+    noter_core::testing::seed_capture(&r.core, live)
+        .await
+        .unwrap();
+    assert_eq!(
+        *r.posted.0.lock().unwrap(),
+        [Notification {
+            call_id: CallId::new(CALL),
+            kind: NotificationKind::SummaryFailed
+        }]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn open_last_summary_opens_the_summary_of_the_latest_call_with_ready_outputs() {
+    let r = open("", true).await;
+    seed_call(&r.core, CALL, 3);
+    let navigate = || {
+        let events = r.events.0.lock().unwrap().len();
+        let core = r.core.clone();
+        async move {
+            core.window_navigate(
+                &main_window(),
+                NavigateArgs {
+                    target: Some(NavTarget::LastSummary),
+                },
+            )
+            .await
+            .unwrap();
+            events
+        }
+    };
+    let navs = |from: usize| -> Vec<Value> {
+        r.events.0.lock().unwrap()[from..]
+            .iter()
+            .filter(|(e, _)| *e == "nav:request")
+            .map(|(_, p)| p.clone())
+            .collect()
+    };
+    // No call has a summary yet: the menu item is absent and nothing navigates.
+    let before = navigate().await;
+    assert!(navs(before).is_empty());
+    let run = trigger(&r.core, JobKind::PostCall, CALL);
+    assert_eq!(settle(&r.core, &run).await.status, JobRunStatus::Succeeded);
+    let before = navigate().await;
+    assert_eq!(
+        navs(before),
+        [json!({ "type": "call_page", "call_id": CALL, "tab": "summary", "span": null })]
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_call_whose_sections_all_failed_gets_the_failed_notice_unless_its_page_is_open() {
     let fail = r#"{"on": "post-call", "fail": "rate_limited"}"#;
     let r = open(&[fail; 14].join("\n"), true).await;

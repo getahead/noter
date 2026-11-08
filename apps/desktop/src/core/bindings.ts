@@ -2225,7 +2225,12 @@ export type NamedBy = "you" | "voice_profile" | "calendar";
  *  A place in the main window or the Settings window. The core sends it with
  *  `nav:request` (notification click, Open Last Summary, Open in Noter).
  */
-export type NavTarget = { type: "today" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step?: SetupStep | null } | 
+export type NavTarget = { type: "today" } | 
+/**
+ *  The Summary of the latest call whose outputs are ready (the menu bar's Open Last Summary);
+ *  the core answers with the call's `call_page` target.
+ */
+{ type: "last_summary" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step?: SetupStep | null } | 
 /**  The **Delete Old Audio…** sheet over the main window's current page (D-17). */
 { type: "delete_old_audio" };
 
@@ -3616,7 +3621,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.6";
+export const CONTRACT_VERSION = "2.7";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

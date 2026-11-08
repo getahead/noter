@@ -129,6 +129,16 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
     }
 
+    /// With notifications denied the menu bar still shows a ready summary: Open Last Summary names the latest call
+    /// whose outputs are ready and opens its Summary in the main window.
+    func test_cpt_noter_flow_ui_menu_bar_start__open_last_summary_opens_the_latest_ready_summary() {
+        launch("idle")
+        let last = openMenu().menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Open Last Summary — '")).firstMatch
+        XCTAssertTrue(last.waitForExistence(timeout: 10), "the menu offers Open Last Summary for the call with ready outputs")
+        last.click()
+        XCTAssertTrue(window("Noter").waitForExistence(timeout: 5))
+    }
+
     func test_cpt_noter_seq_record_prompt_record_after_missed_prompt__call_detected_start_recording() {
         launch("detected")
         let menu = openMenu()

@@ -111,6 +111,9 @@ pub enum SettingsPane {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NavTarget {
     Today,
+    /// The Summary of the latest call whose outputs are ready (the menu bar's Open Last Summary);
+    /// the core answers with the call's `call_page` target.
+    LastSummary,
     CallPage {
         call_id: CallId,
         tab: CallPageTab,
