@@ -347,6 +347,9 @@ const skills = new Map<string, { rev: number; body: string }>();
 const defaultSkill = (a: AgentView) => `---\nname: ${a.name}\n---\n\nYou are the ${a.name} of the council. Ask one question at a time; cite the call.`;
 
 /** The call a scripted transcript event belongs to, if it names one. */
+/** How many events of the live script each transcript snapshot has had streamed into it. */
+const scriptPlayed = new WeakMap<object, number>();
+
 function scriptCall(e: World["live_script"][number]): string | undefined {
   if ("segment" in e) return e.segment.call_id;
   if ("gap" in e) return e.gap.call_id;
@@ -556,10 +559,19 @@ export const defaultHandlers: Handlers = {
     // snapshot already contains (seq = last_seq) and the first new one. The client drops the
     // first and holds the second until the snapshot is in (R23).
     // The script is the fixture call's speech: a call started at runtime waits for its own (D-37).
-    const [first, ...rest] = world.live_script.filter((e) => scriptCall(e) === undefined || scriptCall(e) === a.call_id);
+    const played = scriptPlayed.get(snap) ?? 0; // a resubscribe carries on where the script was, like the real core's snapshot
+    const [first, ...rest] = world.live_script.filter((e) => scriptCall(e) === undefined || scriptCall(e) === a.call_id).slice(played);
     send({ seq: snap.last_seq, event: { type: "segments_updated", segments: snap.segments.slice(-1) } });
-    if (first) fake.push(sub, { event: first });
-    rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => fake.push(sub, { event })));
+    // what the stream sends joins the snapshot, so the next subscribe returns everything up to `last_seq`
+    const play = (event: (typeof rest)[number]) => {
+      const seq = fake.push(sub, { event });
+      if (seq === null) return;
+      if (event.type === "confirmed") snap.segments.push(event.segment);
+      snap.last_seq = seq;
+      scriptPlayed.set(snap, (scriptPlayed.get(snap) ?? 0) + 1);
+    };
+    if (first) play(first);
+    rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => play(event)));
     return { ...snap, subscription_id: sub };
   },
   levels_subscribe: (_a, { fake, send }) => {
