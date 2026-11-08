@@ -46,7 +46,14 @@ export interface PopoverProps {
 }
 
 /** Closing hands focus back to the anchor when it can take it (a span that is no control cannot), else to what had it before. */
-export const returnFocus = (anchor: { tabIndex: number; focus(): void } | null | undefined, restore: () => void): void => (anchor && anchor.tabIndex >= 0 ? anchor.focus() : restore());
+export function returnFocus(anchor: { tabIndex: number; focus(): void } | null | undefined, restore: () => void): void {
+  const focusable = anchor !== null && anchor !== undefined && anchor.tabIndex >= 0;
+  if (!focusable) {
+    restore();
+    return;
+  }
+  anchor.focus();
+}
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 export function Popover({ variant, anchor, align, width, label, onClose, children }: PopoverProps) {
