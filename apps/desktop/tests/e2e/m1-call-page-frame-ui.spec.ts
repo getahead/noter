@@ -13,6 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { windowReady } from "./support/call-page";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
@@ -57,6 +58,7 @@ const quiet =
  * this feature, so Back lands on Library › Calls whatever it shows. Works on the fake core and the real one.
  */
 async function openCall(page: Page, title = TITLE) {
+  await windowReady(page); // a `nav:request` (or a key) before the window subscribed to the core's events is lost
   // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
   await expect(async () => {
     await page.keyboard.press("Meta+Digit3");
