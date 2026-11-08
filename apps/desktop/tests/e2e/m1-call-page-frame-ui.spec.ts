@@ -114,6 +114,21 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await expect.poll(async () => (await sent(page, "window_report_view")).at(-1)).toEqual({ call_id: null });
   });
 
+  test("UI — other path: Call info docks without taking focus (a nav:request moves none); ⌥⌘I takes it and hiding returns it", async ({ page }) => {
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    await expect(info(page)).toBeVisible();
+    const inInfo = () => page.evaluate(() => document.activeElement?.closest('[data-region="MW-R4"]') !== null);
+    expect(await inInfo()).toBe(false);
+    await page.keyboard.press("Alt+Meta+KeyI"); // hide
+    await expect(info(page)).toHaveCount(0);
+    await page.keyboard.press("Alt+Meta+KeyI"); // show: the user asked for it, so it takes focus
+    await expect.poll(inInfo).toBe(true);
+    await page.keyboard.press("Alt+Meta+KeyI"); // hide: focus is back on the page, not on body
+    await expect(info(page)).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(false);
+  });
+
   test("UI — empty path: Audio no longer kept — Call info says so and the page offers no way to delete it again", async ({ page }) => {
     await openWindow(page, "main", {
       world: quiet(false, (w) => patchCall(w, W.PAST_CALL, (c) => ((c.audio_deleted = true), (c.audio_kept_until = null)))),

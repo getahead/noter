@@ -52,6 +52,13 @@ describe("page view state", () => {
     expect(focusHeading({ querySelector: () => null })).toBe(false);
     expect(focusHeading(null)).toBe(false);
   });
+
+  it("falls back to the h1 of the toolbar, outside the content region (the Call page)", () => {
+    const h1 = { tabIndex: 0, focus: vi.fn() };
+    const main = { querySelector: (sel: string) => (sel === "h1" ? (h1 as never) : null) };
+    expect(focusHeading({ querySelector: () => null, closest: (sel: string) => (sel === ".np-main" ? main : null) })).toBe(true);
+    expect(h1.focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
 });
 
 describe("watchWidth", () => {

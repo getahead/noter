@@ -12,7 +12,7 @@ import { leaveTimer, openFocus } from "./shell-effects";
 
 type Def = NonNullable<PageDef["inspector"]>;
 
-export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: Def | undefined; route: Route; bridge: Bridge; overlay: boolean; onClose: () => void }) {
+export function InspectorSlot({ def, route, bridge, overlay, onClose, quietOpen }: { def: Def | undefined; route: Route; bridge: Bridge; overlay: boolean; onClose: () => void; quietOpen?: { current: boolean } }) {
   // the page that opened it, drawn until it has slid out: the route it leaves for is not its own
   const held = useRef(def && { def, route });
   if (def) held.current = { def, route };
@@ -27,7 +27,12 @@ export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: D
       }),
     [leaving],
   );
-  useEffect(() => openFocus(def !== undefined, ref.current ?? undefined, () => document.activeElement as HTMLElement | null), [def !== undefined]);
+  // a page's default inspector docks open without taking focus (D81); only a user's open does
+  useEffect(() => {
+    const quiet = quietOpen?.current;
+    if (quietOpen) quietOpen.current = false;
+    return openFocus(def !== undefined && !quiet, ref.current ?? undefined, () => ((document.activeElement === document.body ? null : document.activeElement) ?? document.querySelector("[data-region=MW-R3]")) as HTMLElement | null);
+  }, [def !== undefined]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = held.current?.def;
   if (!shown) return null;
   return (
