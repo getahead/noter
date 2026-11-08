@@ -8,7 +8,6 @@ The UI talks to the Rust core only through this folder (DESIGN › Core bridge).
 | `tauri-transport.ts` | The real transport over Tauri IPC (`invoke` with `{ args, channel }`, `listen`) | Rarely |
 | `fake/fake-core.ts` | In-memory transport: window scoping, `failNext`, latency, shared event bus, `publish`, `push`, `setWorld` | Yes |
 | `fake/handlers.ts` | Fake behaviour for every command over `contracts/fixtures/world.json` | Yes, keep one handler per command |
-| `contract.smoke.ts` | Checks the rules the UI relies on against the fake | Yes |
 
 ## Using it
 
@@ -47,6 +46,6 @@ fake.push("transcript_subscribe", { event: { type: "gap", gap } });  // push on 
 
 `setWorld` emits an event with a new `version` for every whole-state slice it changed; `publish(event)` does it for one slice; `push` stamps the next `seq` on an open Channel (pass `seq` to test gaps). Windows built with `new FakeCore({ window, world: other.world })` share one core state.
 
-Smoke check: `pnpm --dir apps/desktop smoke`. The behaviour rules above are also checked by the conformance suite (`pnpm --dir apps/desktop test:conformance`, `apps/desktop/tests/conformance`), which runs against this fake today and against the real core through `noter-core-harness` from M0 (docs/HARNESS.md).
+The behaviour rules above are checked by the conformance suite (`pnpm --dir apps/desktop test:conformance`, `apps/desktop/tests/conformance`), which runs against this fake today and against the real core through `noter-core-harness` from M0 (docs/HARNESS.md).
 
 Dependencies are in `apps/desktop/package.json` (pinned); `tsconfig.core.json` enables `resolveJsonModule` for the fixtures import.

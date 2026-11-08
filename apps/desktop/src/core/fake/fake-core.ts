@@ -43,22 +43,12 @@ import worldJson from "../../../../../contracts/fixtures/world.json";
 export type World = FakeWorld;
 
 /** Events whose payload is a whole state with a `version`. */
-export type StateEvent =
-  | "capture:state"
-  | "capture:detected"
-  | "copilot:status"
-  | "degraded:changed"
-  | "banners:changed"
-  | "proposals:counts"
-  | "setup:changed"
-  | "env:changed"
-  | "settings:changed"
-  | "privacy:changed"
-  | "accounts:changed"
-  | "hotkeys:changed"
-  | "playback:state"
-  | "window:call"
-  | "app:presenting";
+export const STATE_EVENTS = [
+  "capture:state", "capture:detected", "copilot:status", "degraded:changed", "banners:changed", "proposals:counts",
+  "setup:changed", "env:changed", "settings:changed", "privacy:changed", "accounts:changed", "hotkeys:changed",
+  "playback:state", "window:call", "app:presenting",
+] as const;
+export type StateEvent = (typeof STATE_EVENTS)[number];
 
 export interface HandlerCtx<K extends CommandName> {
   window: WindowLabel;
@@ -214,11 +204,7 @@ export class FakeCore implements Transport {
    * whole-state slice that changed. Pass a mutator or a whole new world.
    */
   setWorld(change: World | ((world: World) => void)): this {
-    const events: StateEvent[] = [
-      "capture:state", "capture:detected", "copilot:status", "degraded:changed", "banners:changed", "proposals:counts",
-      "setup:changed", "env:changed", "settings:changed", "privacy:changed", "accounts:changed", "hotkeys:changed",
-      "playback:state", "window:call", "app:presenting",
-    ];
+    const events: readonly StateEvent[] = STATE_EVENTS;
     const strip = (v: Versioned) => JSON.stringify({ ...v, version: 0 });
     const before = new Map(events.map((e) => [e, strip(this.slice(e))]));
     const versions = new Map(events.map((e) => [e, this.slice(e).version]));

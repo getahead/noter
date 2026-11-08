@@ -8,7 +8,7 @@ A FEATURE, a task or a pull request is done when `just gate` passes. CI runs the
 
 | Command | When | What it runs |
 | --- | --- | --- |
-| `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, fake-core smoke, architecture checks, trace coverage, unit tests |
+| `just gate-fast` | Continuously while working; the Claude Code Stop hook runs it before an agent may finish | Formatting, clippy, `tsc`, contract export check and contract tests, architecture checks, trace coverage, unit tests |
 | `just gate` | Before opening a PR; CI on every PR and on `main` | Everything in `gate-fast`, plus unit coverage, native UI tests (XCUITest, macOS only; skipped with a notice on Linux), E2E and E2E coverage, screenshots, `cfs validate`, the gate-config guard |
 | `just setup` | Once per machine (idempotent; `just doctor` only checks) | Git hooks, Rust toolchain and components (pinned in `rust-toolchain.toml`), `cargo-llvm-cov`, `pnpm install`, Playwright WebKit, the Constructor Studio core; then verifies and prints every version |
 
@@ -60,7 +60,7 @@ The kind slug matches the ID's kind (`component`, `interface`, `seq`, `dbtable`,
 | --- | --- | --- |
 | Rust unit and integration | `crates/*/src`, `crates/*/tests` | The crate, with scripted fakes at its seams |
 | UI unit | `apps/desktop/src/**/*.test.ts(x)` | Components and stores with the fake core |
-| Contract | `crates/noter-protocol/tests`, `contract.smoke.ts` | The contract itself and the fake core |
+| Contract | `crates/noter-protocol/tests`, `apps/desktop/tests/conformance` | The contract itself and the fake core |
 | Conformance | `apps/desktop/tests/conformance` | The fake core today; the real core through `noter-core-harness` from M0 (`NOTER_CORE=stdio`) |
 | UI end to end | `apps/desktop/tests/e2e` (Playwright, WebKit) | The UI served by Vite, with the real core behind the harness bridge; flows name their story IDs |
 | Real app | Mac runner, WebdriverIO with its embedded driver (`tauri-driver` does not support WKWebView) | The signed app, from M1 |

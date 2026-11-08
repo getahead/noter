@@ -78,9 +78,6 @@ why = "test double; its behaviour is checked by the conformance suite the real c
 path = "apps/desktop/src/core/tauri-transport.ts"
 why = "the only file that touches Tauri IPC; exercised by the Mac E2E run"
 [[coverage.exclude]]
-path = "apps/desktop/src/core/contract.smoke.ts"
-why = "a test"
-[[coverage.exclude]]
 path = "apps/desktop/src/main.tsx"
 why = "bootstrap: picks the transport and mounts the app"
 [[coverage.exclude]]
