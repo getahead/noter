@@ -1,7 +1,7 @@
 // TD-R1: Today's toolbar. The shell's toolbar with the long date, **Record**, and while a call is captured the
 // recording indicator, which opens the call window.
 import { useWindow } from "../../app/use-window";
-import { t } from "../../i18n/format";
+import { locale, t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RecordingIndicator } from "../call-window/strip";
 import { isLive } from "../shell/live-row";
@@ -12,7 +12,7 @@ import { useToday } from "./cache";
 import { useRecordingClock } from "./clock";
 import { recordBlock } from "./model";
 
-const longDate = (d: string) => new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date(`${d}T12:00:00`));
+const longDate = (d: string) => new Intl.DateTimeFormat(locale(), { dateStyle: "full" }).format(new Date(`${d}T12:00:00`));
 
 // @cpt-component:cpt-noter-component-screen-today:p1
 export function TodayToolbar({ bridge, base }: PageToolbarProps) {

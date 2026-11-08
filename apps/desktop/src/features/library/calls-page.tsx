@@ -60,6 +60,7 @@ export function CallsPage() {
     bridge,
     (s) => s.whole.setup?.self_test.type === "passed",
   );
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const sentinel = useRef<HTMLDivElement>(null);
   const known = useRef<Set<string>>(new Set());
 
@@ -186,6 +187,7 @@ export function CallsPage() {
       slow={slow}
       failed={failed}
       selfTestPassed={selfTestPassed}
+      prefs={prefs}
       menu={menu}
       sentinel={sentinel}
       onSort={sortBy}

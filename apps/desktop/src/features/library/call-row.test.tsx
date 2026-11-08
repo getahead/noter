@@ -61,6 +61,11 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
     expect(typeLabel("one_on_one")).toBe("One on one");
   });
 
+  it("uses the 12-hour setting and the zone the core passes", () => {
+    const prefs = { time_format: "h12" as const, first_weekday: 1, time_zone: "UTC" };
+    expect(whenOf(Date.UTC(2026, 9, 2, 14, 30), Date.UTC(2026, 9, 2, 20), prefs)).toMatch(/^Today 2:30\sPM$/);
+  });
+
   it("renders the table row: Local only, languages, two tags and +1, the open count and the audio glyph", () => {
     const h = renderToString(
       <table>

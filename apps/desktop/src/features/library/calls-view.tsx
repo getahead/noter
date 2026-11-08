@@ -4,7 +4,7 @@ import {
   type MouseEvent,
   type Ref,
 } from "react";
-import type { CallRow } from "../../core/bindings";
+import type { CallRow, UiPrefs } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -29,6 +29,8 @@ export interface CallsViewProps {
   slow: boolean;
   failed: string | null;
   selfTestPassed: boolean;
+  /** The core's time zone and 12/24-hour setting. */
+  prefs?: UiPrefs;
   menu: { x: number; y: number } | null;
   sentinel?: Ref<HTMLDivElement>;
   onSort: (col: Column) => void;
@@ -61,6 +63,7 @@ export function CallsView(p: CallsViewProps) {
             state.rows,
             state.total ?? state.rows.length,
             selection.ids.length,
+            p.prefs?.time_zone || undefined,
           )}
       </div>
       {p.failed && (
@@ -155,7 +158,7 @@ function Body(p: CallsViewProps) {
         )}
       </div>
     );
-  const groups = groupByMonth(state.rows);
+  const groups = groupByMonth(state.rows, undefined, p.prefs?.time_zone || undefined);
   const stopId = state.rows.find((c) => selection.ids.includes(c.id))?.id ?? groups[0]?.rows[0]?.id;
   const head = (col: Column, width: string) => (
     <Th
@@ -213,6 +216,7 @@ function Body(p: CallsViewProps) {
                 onPress={(e) => p.onPress(c.id, e)}
                 onOpen={() => p.onOpen(c.id)}
                 onContext={(e) => p.onContext(c.id, e)}
+                prefs={p.prefs}
               />
             )),
           ])}

@@ -4,10 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "./en";
 import {
   callTime,
+  clock,
+  dayOf,
   duration,
   formatDateTime,
   quote,
   setPseudo,
+  shortDay,
   t,
   tParts,
   usd,
@@ -81,6 +84,16 @@ describe("pseudo-localisation", () => {
 });
 
 describe("value helpers", () => {
+  it("clock, dayOf and shortDay follow the 12/24-hour setting and the zone the core passes", () => {
+    const at = Date.UTC(2026, 10, 8, 23, 5); // 23:05 UTC, already the 9th in Auckland
+    const h12 = { time_format: "h12" as const, first_weekday: 1, time_zone: "UTC" };
+    expect(clock(at, h12)).toMatch(/^11:05\sPM$/);
+    expect(clock(at, { ...h12, time_format: "h24" as never })).toBe("23:05");
+    expect(dayOf(at, h12)).toBe("2026-11-08");
+    expect(dayOf(at, { ...h12, time_zone: "Pacific/Auckland" })).toBe("2026-11-09");
+    expect(shortDay(at, { ...h12, time_zone: "Pacific/Auckland" })).toBe("Nov 9");
+    expect(dayOf(at, { ...h12, time_zone: "Not/AZone" })).toMatch(/^2026-11-0[89]$/); // an unknown zone falls back to the system's
+  });
   it("callTime is always HH:MM:SS", () => {
     expect(callTime(0)).toBe("00:00:00");
     expect(callTime(3725.9)).toBe("01:02:05");
