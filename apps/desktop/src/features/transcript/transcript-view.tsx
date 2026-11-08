@@ -12,7 +12,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { LogScroller, newLines, viewState, type Follow, type RowList } from "./follow";
 import { moveFocus } from "../../ui/primitives/roving";
-import { findMatches, meterLevel, tabStop, type Row, type Variant } from "./model";
+import { findMatches, lineKey, meterLevel, tabStop, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
 import { SegmentRow } from "./segment-row";
 import "./transcript.css";
@@ -181,7 +181,7 @@ export function TranscriptView(p: TranscriptViewProps) {
           className="cw-tv__rows"
           style={{ paddingTop: win.before, paddingBottom: win.after }}
           // roving focus (DESIGN transcript keyboard table): ↑/↓ between lines, ⌘↑/⌘↓ to the first and last
-          onKeyDown={(e) => void moveFocus(e, "[data-segment-id]", false, e.metaKey ? ({ ArrowUp: "Home", ArrowDown: "End" } as Record<string, string>)[e.key] : e.key)}
+          onKeyDown={(e) => void moveFocus(e, "[data-segment-id]", false, lineKey(e))}
           onFocus={(e) => setLastFocus((e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id") ?? lastFocus)}
         >
           {shown.map((row) => (

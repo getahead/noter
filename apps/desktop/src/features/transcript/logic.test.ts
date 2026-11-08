@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CaptureState, PlaybackState } from "../../core/bindings";
 import { atEnd, LogScroller, measure, newLines, onScroll, viewState, windowOf } from "./follow";
 import { after, holdChannel, showSpan, spanArchiveNote } from "./hosts";
-import { buildRows, tabStop } from "./model";
+import { buildRows, lineKey, tabStop } from "./model";
 import { barState, scrubRange, type Replay } from "./playback";
 import { capturing, playControl, REFUSED } from "./play-control";
 import { seg } from "./testing";
@@ -239,4 +239,13 @@ describe("tabStop (one Tab stop for the transcript)", () => {
     expect(tabStop(rows, "gone")).toBe("a");
   });
   it("is none for no lines", () => expect(tabStop([], null)).toBeUndefined());
+});
+
+describe("lineKey", () => {
+  it("maps ⌘↑ and ⌘↓ to Home and End and leaves every other key alone", () => {
+    expect(lineKey({ key: "ArrowUp", metaKey: true })).toBe("Home");
+    expect(lineKey({ key: "ArrowDown", metaKey: true })).toBe("End");
+    expect(lineKey({ key: "ArrowDown", metaKey: false })).toBe("ArrowDown");
+    expect(lineKey({ key: "c", metaKey: true })).toBe("c");
+  });
 });

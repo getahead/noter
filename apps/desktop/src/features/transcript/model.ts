@@ -156,3 +156,11 @@ export const meterLevel = (db: number | null | undefined) => (db == null ? 0 : M
 export function tabStop(shown: readonly Row[], last: string | null): string | undefined {
   return shown.find((r) => r.kind === "segment" && r.key === last)?.key ?? shown.find((r) => r.kind === "segment")?.key;
 }
+
+/** The key a line list moves by: ⌘↑ and ⌘↓ go to the first and the last line, as Home and End do. */
+export function lineKey(e: { key: string; metaKey: boolean }): string {
+  if (!e.metaKey) return e.key;
+  if (e.key === "ArrowUp") return "Home";
+  if (e.key === "ArrowDown") return "End";
+  return e.key;
+}
