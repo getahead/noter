@@ -1415,7 +1415,7 @@ menu bar ───────────────────────�
 
 #### Screen — Today
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-today`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-today`
 
 ##### Why this component exists
 
@@ -6356,7 +6356,7 @@ The item inspector shows the details and the history of one item without leaving
 
 #### Component — Upcoming call card
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-upcoming-call-card`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-upcoming-call-card`
 
 ##### Why this component exists
 

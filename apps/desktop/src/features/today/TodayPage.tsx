@@ -29,6 +29,8 @@ function useAfter(ms: number, active: boolean): boolean {
 }
 
 // @cpt-component:cpt-noter-component-screen-today:p1
+// @cpt-dod:cpt-noter-dod-ui-today-dashboard:p1
+// @cpt-dod:cpt-noter-dod-ui-today-items:p1
 // @cpt-flow:cpt-noter-flow-ui-today-tick:p1
 export function TodayPage({ bridge }: { bridge: Bridge }) {
   const view = useToday();
@@ -45,9 +47,13 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   const settings = useWindow(bridge, (s) => s.whole.settings);
   const calls = useWindow(bridge, (s) => s.entities.call);
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-refresh
+  // @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-settings
+  // @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-date
   // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-refresh
   useEffect(() => void (ready && loadToday(bridge)), [bridge, ready, capture, env, settings, items, calls]);
   // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-refresh
+  // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-date
+  // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-settings
   // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-refresh
   // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-calendar
   const state = calendarState(read, view, ask?.state === "WAITING");
@@ -99,6 +105,9 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       }
     }
   };
+  // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-return
+  // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-return
+  // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-layout
   return (
     <div ref={root} onKeyDown={rowKey} onFocus={(event) => {
       const row = (event.target as HTMLElement).closest<HTMLElement>("[data-item-id]");
@@ -112,6 +121,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
         }
       }
     }} className="td" data-component="cpt-noter-component-screen-today">
+      {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-regions */}
       {review && (
         <section data-region="TD-R8" className="td-review">
           <div>
@@ -124,14 +134,19 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
           </div>
         </section>
       )}
+      {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-regions */}
       {view?.first_use && <EmptyState variant="first-use" icon="inbox" title={t("today.first_use_title")} body={t("today.first_use_body")} />}
       <section data-region="TD-R3" className="td-calendar" aria-label={t("today.title")}>
         {(state === "NOT_ASKED" || state === "NO_CALLS") && <h2 className="td-h">{t("today.title")}</h2>}
         {skeleton && <div role="status" aria-label={t("today.loading")}><div className="td-skel" /><div className="td-skel" /></div>}
         {state === "NOT_ASKED" && <EmptyState variant="first-use" icon="calendar" title={t("today.not_asked_title")} body={t("today.not_asked_body")} actionLabel={live ? undefined : t("today.allow_calendar")} onAction={() => void allowCalendar(bridge)} />}
+        {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-failed */}
         {state === "ERROR" && <InlineBanner banner={{ id: "today-error", severity: "error", text: t("today.read_failed"), actions: [{ label: t("action.try_again"), onAction: tryAgain }] }} />}
+        {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-failed */}
+        {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-allowed */}
         {state === "NO_CALLS" && <p className="td-empty">{t("today.no_calls")}</p>}
         {state === "READY" && view && <h2 className="td-h">{t("today.calls", { count: day.length })}</h2>}
+        {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-allowed */}
         {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-cards */}
         {/* the live call card comes from live_call, so it shows whatever the calendar says */}
         {(state === "READY" ? day : day.filter((c) => c.variant === "live" || c.variant === "unmatched")).map((c, i) => (
@@ -147,6 +162,8 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
           ))}
         </section>
       )}
+      {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-regions */}
+      {/* @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-empty */}
       {view && (
         <section data-region="TD-R5" data-today-group="due" className="td-due">
           <h2 className="td-h">{t("today.due")}</h2>
@@ -175,6 +192,11 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
           {(doneOpen ?? view.done_today.length === 0) && (view.done_today.length === 0 ? <EmptyState variant="section" title={t("today.nothing_ticked")} /> : view.done_today.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="done" />))}
         </section>
       )}
+      {/* @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-empty */}
+      {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-regions */}
     </div>
   );
+  // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-layout
+  // @cpt-end:cpt-noter-algo-ui-today-project:p1:inst-return
+  // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-return
 }

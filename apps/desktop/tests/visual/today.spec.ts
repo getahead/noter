@@ -116,7 +116,7 @@ test("Today Done list remains available with Reopen for earlier completions", as
   await shot(page, "today-done");
 });
 
-for (const state of ["first-use", "calendar-failed", "self-test", "model-missing", "engine-stopped", "quit-recording"] as const) {
+for (const state of ["first-use", "calendar-failed", "self-test", "model-missing", "engine-stopped", "quit-recording", "nothing-to-review"] as const) {
   test(`Today ${state}`, async ({ page }) => {
     await open(page, day((w) => {
       if (state === "first-use") Object.assign(w.today, { first_use: true, today: [], this_week: [], proposals: [], proposals_total: 0 });
@@ -124,6 +124,9 @@ for (const state of ["first-use", "calendar-failed", "self-test", "model-missing
       if (state === "self-test") W.selfTestSkipped(w);
       if (state === "model-missing") W.speechModel(w)!.state = "pending";
       if (state === "engine-stopped") Object.assign(w.app.capture, { phase: "failed", call_id: W.LIVE_CALL });
+      if (state === "nothing-to-review") Object.assign(w.today, { proposals: [], proposals_total: 0, due_without_call: [], done_today: [], review_waiting: 0 });
+      // the fake core counts unnamed speakers from transcripts and call details, so none may be left unnamed
+      if (state === "nothing-to-review") { w.transcripts = []; w.call_details.forEach((d) => { d.speakers = []; }); }
       if (state === "quit-recording") w.app.banners.banners = [{ type: "recording_interrupted_by_quit", call: w.items[0]!.call }];
     }));
     await shot(page, `today-${state}`);
