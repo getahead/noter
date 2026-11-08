@@ -30,7 +30,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | --- | --- | --- | --- | --- |
 | [#405](https://github.com/getahead/noter/issues/405) | Native pause reminder wall-clock wait | 314s | [#417](https://github.com/getahead/noter/pull/417) | closed |
 | [#411](https://github.com/getahead/noter/issues/411) | Standalone Tauri target built cold | median 224s | [#425](https://github.com/getahead/noter/pull/425) | closed |
-| [#412](https://github.com/getahead/noter/issues/412) | Swift engine built twice, cold | about 156s | [#426](https://github.com/getahead/noter/pull/426) | open |
+| [#412](https://github.com/getahead/noter/issues/412) | Swift engine built twice, cold | about 156s | [#426](https://github.com/getahead/noter/pull/426) | closed |
 | [#413](https://github.com/getahead/noter/issues/413) | WebKit setup in both E2E jobs | 28-42s each | [#432](https://github.com/getahead/noter/pull/432) | open |
 | [#406](https://github.com/getahead/noter/issues/406) | Duplicate native delete-dialog tests | about 8s | [#424](https://github.com/getahead/noter/pull/424) | closed |
 | [#407](https://github.com/getahead/noter/issues/407) | 10 s feedback expiry waited in real time | 13-14s each | [#428](https://github.com/getahead/noter/pull/428) | closed |
