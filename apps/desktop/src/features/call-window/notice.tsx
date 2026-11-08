@@ -32,7 +32,7 @@ function NoticeFrame(p: {
       data-variant={p.variant}
       data-state={p.state}
       className={cx("cw-notice", `cw-notice--${p.tone}`, p.floating && "is-floating")}
-      role="alertdialog"
+      role="group"
       aria-label={p.title}
       onMouseEnter={hold && (() => hold(true))}
       onMouseLeave={hold && (() => hold(false))}
