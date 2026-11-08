@@ -152,6 +152,9 @@ describe("CaptureNotice (cpt-noter-component-ui-capture-notice)", () => {
     const p = noticeProps({});
     expect(renderToString(<CaptureNotice {...p} />)).toContain("Stopping in 7 s.");
     expect(renderToString(<CaptureNotice {...p} seconds={null} />)).toContain("Paused while you&#x27;re here");
+    // an alert-style group labelled by its title: it never takes focus, so it is no (modal) dialog
+    expect(renderToString(<CaptureNotice {...p} />)).toMatch(/role="group"[^>]*aria-label=/);
+    expect(renderToString(<CaptureNotice {...p} />)).not.toContain("alertdialog");
     const f = frame(p);
     (f.props.onMouseEnter as () => void)();
     (f.props.onMouseLeave as () => void)();
