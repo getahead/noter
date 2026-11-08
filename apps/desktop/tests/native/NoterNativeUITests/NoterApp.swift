@@ -189,4 +189,13 @@ class NoterTestCase: XCTestCase {
 
     /// A global hotkey, typed while `other` is in front so it reaches Noter as a global shortcut.
     func hotkey(_ key: String) { other.typeKey(key, modifierFlags: [.control, .option, .command]) }
+
+    /// The same hotkey, pressed through the app's test hook instead of typed: typing goes through Finder and waits for
+    /// it to be idle (about 10 s a key). The app takes the chord from a file in its temp folder and runs it like a
+    /// registered global shortcut; `hotkey` keeps one typed test of the delivery itself.
+    func press(_ key: String) {
+        guard let home else { return XCTFail("the app has no temp folder") }
+        let file = home.appendingPathComponent("noter-test-hotkey")
+        try? "Ctrl+Alt+Super+\(key.uppercased())".write(to: file, atomically: true, encoding: .utf8)
+    }
 }

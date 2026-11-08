@@ -105,6 +105,8 @@ pub fn run() {
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group);
             app.manage(surfaces.clone());
             app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
+            #[cfg(debug_assertions)]
+            test_hooks::watch_hotkey_trigger(app.handle().clone());
             // Without a feed (M0) the check ends at once and nothing is ever ready.
             tauri::async_runtime::spawn(async move {
                 let _ = updater.check().await;
