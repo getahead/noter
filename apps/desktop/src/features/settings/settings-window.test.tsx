@@ -138,6 +138,14 @@ describe("panes", () => {
     expect(html).toContain("In force:");
   });
 
+  it("Privacy: Manage on Person Pages is disabled and names the later version; it sends no command", async () => {
+    await props();
+    const tree = rendered(PrivacyPane, { bridge, settings: stored() });
+    const manage = find(tree, (pr) => pr.label === "Manage on Person Pages").props;
+    expect(manage.disabled).toBe(true);
+    expect(manage.help).toBe("Person Pages arrive in a later version");
+  });
+
   it("Call screen and menu bar: layout, automatic opening, title and quick actions save", async () => {
     await props();
     const tree = rendered(CallScreenPane, { bridge, settings: stored() });

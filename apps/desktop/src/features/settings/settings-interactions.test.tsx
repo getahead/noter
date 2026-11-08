@@ -109,16 +109,16 @@ describe("Call screen", () => {
 });
 
 describe("Privacy", () => {
-  it("Calendar asks through permission_request, opens System Settings, and the share test and voice profiles open", async () => {
+  it("Calendar asks through permission_request, opens System Settings, and Manage on Person Pages sends nothing", async () => {
     await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "calendar" && (p.state = "not_asked")));
     const seen = calls();
     const tree = rendered(PrivacyPane, { bridge, settings: stored() });
     const cal = find(tree, (p) => p.id === "cal").props;
     (cal.onAllow as () => void)();
     (cal.onOpenSettings as () => void)();
-    on(tree, "Manage on Person Pages")();
     await settle();
-    expect(seen).toEqual(expect.arrayContaining(["permission_request", "open_external", "window_navigate"]));
+    expect(seen).toEqual(expect.arrayContaining(["permission_request", "open_external"]));
+    expect(seen).not.toContain("window_navigate"); // the voice-profiles button is disabled until Person Pages land
   });
 });
 
