@@ -46,8 +46,8 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
           </tr>
         </thead>
         <tbody>
-          {terms.map((g) => (
-            <tr key={g.id} tabIndex={0} aria-selected={g.id === selected} onClick={() => setSelected(g.id)} onFocus={() => setSelected(g.id)}>
+          {terms.map((g, i) => (
+            <tr key={g.id} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => setSelected(g.id)} onFocus={() => setSelected(g.id)}>
               <td lang="und">{g.term}</td>
               <td lang="und">{cell(g.variants_latin)}</td>
               <td lang="ru">{cell(g.variants_cyrillic)}</td>

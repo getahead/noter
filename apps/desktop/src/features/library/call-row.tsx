@@ -51,6 +51,8 @@ const LanguageTag = ({ code }: { code: string }) => (
 export interface CallRowProps {
   call: Call;
   selected?: boolean;
+  /** The table's one Tab stop (the selected row, else the first); the others are reached with ↑/↓. */
+  stop?: boolean;
   onPress: (e: MouseEvent) => void;
   onOpen: () => void;
   onContext: (e: MouseEvent) => void;
@@ -61,6 +63,7 @@ export interface CallRowProps {
 export function CallRowView({
   call: c,
   selected,
+  stop,
   onPress,
   onOpen,
   onContext,
@@ -87,7 +90,7 @@ export function CallRowView({
       data-lib-row={c.id}
       aria-selected={!!selected}
       aria-label={title}
-      tabIndex={0}
+      tabIndex={stop ? 0 : -1}
       onClick={onPress}
       // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
       onDoubleClick={onOpen}

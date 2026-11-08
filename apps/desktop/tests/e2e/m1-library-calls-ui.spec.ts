@@ -253,6 +253,18 @@ test.describe("cpt-noter-algo-ui-library-calls-status-cell (Medium)", () => {
   });
 });
 
+test.describe("cpt-noter-flow-ui-library-calls-browse (keyboard)", () => {
+  test("UI — other path: the Calls table is one Tab stop; the selected row, else the first, carries it", async ({ page }) => {
+    await openCalls(page, (w) => W.morePastCalls(w, 2));
+    const stops = () => page.locator(`${ROW}[tabindex="0"]`);
+    await expect(stops()).toHaveCount(1);
+    await expect(stops()).toHaveAttribute("data-lib-row", /./);
+    await rowOf(page, "Backend sync #3").click();
+    await expect(stops()).toHaveCount(1);
+    await expect(rowOf(page, "Backend sync #3")).toHaveAttribute("tabindex", "0");
+  });
+});
+
 test.describe("cpt-noter-flow-ui-library-calls-delete", () => {
   test("UI — error path: a right-click on an unselected row selects only it; Delete… from its menu asks about that one call and Cancel keeps it", async ({
     page,
