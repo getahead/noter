@@ -255,6 +255,7 @@ e2e-report = ["rust", "ui", "protocol", "stories"]   # posts e2e-coverage's repo
 visual = ["ui", "contracts"]
 docs = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
 macos = ["rust", "tauri", "native", "engine"]
+flaky-register = []   # main and the nightly only (its own `if`); never selected for a pull request
 
 [ci.jobs.hygiene]
 title = ["always"]

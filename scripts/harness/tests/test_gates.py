@@ -20,6 +20,7 @@ import common  # noqa: E402
 import config_guard  # noqa: E402
 import coverage_gate  # noqa: E402
 import e2e_coverage  # noqa: E402
+import flaky_native  # noqa: E402
 import lane_guard  # noqa: E402
 import perf_gate  # noqa: E402
 import review  # noqa: E402
@@ -1026,3 +1027,46 @@ class CiChangesTests(unittest.TestCase):
         self.assertEqual(files, ["b.rs"], "the merge commit against main as merged, not main's own changes")
         self.assertIsNone(ci_changes.changed_files("push", "main", "origin/main", root)[0])
         self.assertIsNone(ci_changes.changed_files("workflow_dispatch", "main", "origin/main", root)[0])
+
+
+class FlakyNativeTests(unittest.TestCase):
+    @staticmethod
+    def _results():
+        def case(name, *reps):
+            return {"nodeType": "Test Case", "name": name, "nodeIdentifier": "Suite/" + name,
+                    "result": "Passed", "children": [
+                        {"nodeType": "Repetition", "name": f"Run {i + 1}", "result": r,
+                         "children": [{"nodeType": "Failure Message", "name": "timed out\nwaiting"}] if r == "Failed" else []}
+                        for i, r in enumerate(reps)]}
+        return {"testNodes": [{"nodeType": "Test Plan", "children": [{"nodeType": "Test Suite", "children": [
+            case("test_steady()", "Passed"), case("test_retried()", "Failed", "Passed"), case("test_plain()")]}]}]}
+
+    def test_only_retried_cases_are_found(self):
+        self.assertEqual(flaky_native.retried(self._results()), [
+            {"id": "Suite/test_retried()", "attempts": 2, "failures": ["timed out\nwaiting"]}])
+
+    def test_detect_writes_json_and_annotates_without_failing(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, out = Path(d, "r.json"), Path(d, "retried.json")
+            src.write_text(json.dumps(self._results()))
+            with mock.patch("builtins.print") as pr:
+                flaky_native.detect(src, out)
+            self.assertEqual(json.loads(out.read_text())[0]["attempts"], 2)
+            line = pr.call_args.args[0]
+            self.assertTrue(line.startswith("::warning title=Flaky XCUITest (retried)::"))
+            self.assertNotIn("\n", line)
+            flaky_native.detect(Path(d, "missing.json"), out)  # no results (skipped run): nothing to report
+            self.assertEqual(json.loads(out.read_text()), [])
+
+    def test_register_opens_or_comments(self):
+        calls = []
+
+        def gh(*a):
+            calls.append(a)
+            return json.dumps([{"number": 7, "title": "flaky: Suite/test_open()"}]) if a[:2] == ("issue", "list") else ""
+        entries = [{"id": "Suite/test_open()", "attempts": 2, "failures": ["x"]},
+                   {"id": "Suite/test_new()", "attempts": 3, "failures": []}]
+        flaky_native.register(entries, "https://example/run/1", gh)
+        verbs = [a[:2] for a in calls if a[:2] != ("issue", "list")]
+        self.assertEqual(verbs, [("label", "create"), ("issue", "comment"), ("issue", "create")])
+        self.assertIn("flaky: Suite/test_new()", next(a for a in calls if a[:2] == ("issue", "create")))

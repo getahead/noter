@@ -437,10 +437,38 @@ jobs:
           path: coverage/native
           if-no-files-found: ignore
 
+  # main only (push, nightly): a test the macos job had to retry becomes a `flaky` issue (docs/FLAKY.md).
+  # Never on a pull request (its annotation is enough): the job runs there so `gate` can wait for it, every step is skipped. The only job with issues: write.
+  flaky-register:
+    name: Register retried native tests
+    needs: [changes, macos]
+    if: always() && fromJSON(needs.changes.outputs.jobs)['flaky-register']
+    runs-on: ubuntu-24.04
+    continue-on-error: true   # bookkeeping: a failed registration never fails the gate
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: coverage-native
+          path: coverage/native
+      - run: python3 scripts/harness/flaky_native.py register
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
   gate:
     name: gate
     if: always()
-    needs: [changes, lint-rust, lint-ui, contract, arch, unit-rust, unit-ui, e2e-core, e2e-ui, e2e-coverage, e2e-report, visual, docs, macos]
+    needs: [changes, lint-rust, lint-ui, contract, arch, unit-rust, unit-ui, e2e-core, e2e-ui, e2e-coverage, e2e-report, visual, docs, macos, flaky-register]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

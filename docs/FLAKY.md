@@ -2,6 +2,8 @@
 
 One place to look up a check that failed intermittently, or a check that is slower than it should be, before filing a new issue. Source: the CI history audit of 17 Oct to 7 Nov 2026 (issue #404, 1,824 CI runs, 391 pull requests). Counts are *matching failing job attempts / those with a later passing attempt on the same run and commit*; they are not per-test failure rates.
 
+Retried native tests register themselves: `just native` retries a failed XCUITest up to twice, and every test that needed it gets a warning annotation on its run and `coverage/native/retried.json`. On `main` (push, nightly) CI opens an issue `flaky: <test id>` labelled `flaky`, or comments the run link on the open one (`scripts/harness/flaky_native.py`). Those issues are the live record; a Playwright test is not retried (`retries: 0` in `playwright.config.ts`), so none is tracked there.
+
 Rules: a new occurrence goes into the matching issue (failing job, commit, attempt, assertion, same-commit recovery), not into a new one. Fix flakiness at its cause (explicit waits on state, deterministic clocks and fixtures, completion handshakes) with the same assertions; never skip a test or lower a threshold. A closed record reopens when a commit that contains its fix reproduces the signature. When the issue or fix state below changes, update this file in the same pull request that closes it.
 
 ## Flaky checks

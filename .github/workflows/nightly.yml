@@ -25,5 +25,6 @@ jobs:
       contents: read
       actions: read
       pull-requests: write
+      issues: write # flaky-register opens issues for retried native tests
     secrets:
       CF_STUDIO_TOKEN: ${{ secrets.CF_STUDIO_TOKEN }}
