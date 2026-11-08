@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.5](https://github.com/getahead/noter/compare/v0.22.4...v0.22.5) (2026-11-08)
+
+
+### Bug fixes
+
+* **desktop:** a page that never finishes loading gets a new web process ([#558](https://github.com/getahead/noter/issues/558)) ([b9e2a36](https://github.com/getahead/noter/commit/b9e2a3649440ff9a4f70c0807d18c28ef29f0fff))
+
 ## [0.22.4](https://github.com/getahead/noter/compare/v0.22.3...v0.22.4) (2026-11-08)
 
 
