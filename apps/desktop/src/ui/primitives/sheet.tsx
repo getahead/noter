@@ -2,8 +2,9 @@
 // Esc cancels; Return runs the default button (⌘Return in a multi-line field); focus stays inside and goes back
 // to where it was when the sheet closes.
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { FOCUSABLE } from "../../app/a11y/focus";
 import { base } from "./attrs";
+
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 /** Keys of a modal surface: Esc and Return to the default button. Tab is kept inside by the window's handler (`aria-modal`). */
 export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, onDefault?: () => void) {
