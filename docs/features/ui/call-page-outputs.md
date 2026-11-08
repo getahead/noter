@@ -252,7 +252,7 @@ Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered
 
 ### Sections, edits, regeneration and versions
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-content`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-content`
 
 The system **MUST** render ordered sections and output rows from typed core views, preserve independent section failures and readable old content, save drafts with revision checks and compare versions without overwriting edits. Shared diff rendering handles no differences, folded unchanged stretches, transcript marks and before/after sheets.
 
@@ -270,7 +270,7 @@ The system **MUST** render ordered sections and output rows from typed core view
 
 ### Sharing, tags, audio and notification routing
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-actions`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-actions`
 
 The system **MUST** show the exact copy/export scope and review/privacy notice, format through the core, use native save/delete surfaces, retain text evidence after audio deletion, and open ready/failed Summary from native notifications.
 
@@ -291,9 +291,9 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 
 - [x] Ready sections remain usable when another fails; old prose stays readable during regeneration
 - [x] Save retains user edits as a version; regeneration and naming preserve them and rejected suppression
-- [ ] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
+- [x] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
 - [x] No success feedback follows a failed or cancelled copy/export/delete
-- [ ] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
+- [x] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
 - [ ] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
 
 ## 7. Additional Context

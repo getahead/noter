@@ -42,6 +42,7 @@ const sameOrigin = (a: ShareOrigin, b: ShareOrigin) => a.type === b.type && (a.t
 
 /** One Share control: a labelled pull-down on the toolbar, an icon button on a section. */
 // @cpt-component:cpt-noter-component-ui-share-menu:p1
+// @cpt-dod:cpt-noter-dod-ui-call-page-outputs-actions:p1
 export function ShareMenu({ bridge, callId, origin, id }: { bridge: Bridge; callId: string; origin: ShareOrigin; id: string }) {
   const outputs = useOutputs(callId);
   const status = useShareStatus();
