@@ -466,13 +466,34 @@ async fn resume_right_after_pause_keeps_the_running_download_going() {
     let big = vec![6u8; 64 * 4000];
     let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
     let s = open(dir.path(), source, 90_000);
+    // The fetch waits at its start, so Pause and Resume both reach a task that is running,
+    // whenever the scheduler gets to it (#394).
+    let hold = |on| s.source.hold.store(on, std::sync::atomic::Ordering::SeqCst);
+    hold(true);
     download(&s.core, DownloadAction::Start).await.unwrap();
+    for _ in 0..500 {
+        if !s.source.fetches.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        !s.source.fetches.lock().unwrap().is_empty(),
+        "the fetch began"
+    );
     download(&s.core, DownloadAction::Pause).await.unwrap();
     download(&s.core, DownloadAction::Resume).await.unwrap();
+    hold(false);
     until(&s.core, "ready", |st| {
         state(st, "whisper-turbo") == BundleState::Ready
     })
     .await;
+    let fetches = s.source.fetches.lock().unwrap().clone();
+    assert_eq!(
+        fetches,
+        [("whisper-turbo/model.bin".to_string(), 0)],
+        "the running fetch went on; nothing was fetched again"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
