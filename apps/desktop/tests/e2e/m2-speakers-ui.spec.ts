@@ -250,6 +250,17 @@ test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy a
   expect(await sent(page, "transcript_fix_term")).toEqual([expect.objectContaining({ replacement: "corrected" })]);
 });
 
+test("cpt-noter-seq-call-page-name-speakers — the native Edit menu's Fix Term… follows the selected words", async ({ page }) => {
+  await openWindow(page, "main");
+  await navigate(page, "transcript", S.CALL);
+  const text = page.locator('[data-region="PC-R5"] .cw-seg .cw-seg__text').first();
+  const lastEnabled = async () => (await sent(page, "window_set_fix_term_enabled")).at(-1);
+  await text.dblclick();
+  await expect.poll(lastEnabled).toEqual({ enabled: true });
+  await page.evaluate(() => getSelection()?.removeAllRanges());
+  await expect.poll(lastEnabled).toEqual({ enabled: false });
+});
+
 test("cpt-noter-seq-call-page-name-speakers — stale Fix Term refreshes the span and requires reselection", async ({ page }) => {
   const steer = await openWindow(page, "main");
   await navigate(page, "transcript", S.CALL);

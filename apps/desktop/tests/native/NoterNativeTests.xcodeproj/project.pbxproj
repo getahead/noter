@@ -15,6 +15,7 @@
 		A10000000000000000000006 /* CallWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* CallWindowTests.swift */; };
 		A10000000000000000000007 /* WindowSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* WindowSizeTests.swift */; };
 		A10000000000000000000008 /* HandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* HandoffTests.swift */; };
+		A10000000000000000000009 /* SpeakersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* SpeakersTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 		A20000000000000000000006 /* CallWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CallWindowTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* WindowSizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowSizeTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000008 /* HandoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* SpeakersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakersTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000010 /* NoterNativeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NoterNativeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -59,6 +61,7 @@
 				A20000000000000000000006 /* CallWindowTests.swift */,
 				A20000000000000000000007 /* WindowSizeTests.swift */,
 				A20000000000000000000008 /* HandoffTests.swift */,
+				A20000000000000000000009 /* SpeakersTests.swift */,
 			);
 			path = NoterNativeUITests;
 			sourceTree = "<group>";
@@ -131,6 +134,7 @@
 				A10000000000000000000006 /* CallWindowTests.swift in Sources */,
 				A10000000000000000000007 /* WindowSizeTests.swift in Sources */,
 				A10000000000000000000008 /* HandoffTests.swift in Sources */,
+				A10000000000000000000009 /* SpeakersTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

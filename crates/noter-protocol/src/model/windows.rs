@@ -69,6 +69,12 @@ pub struct CollapseArgs {
     pub collapsed: bool,
 }
 
+/// Whether the Edit menu's **Fix Term…** is enabled: a confirmed-text selection is on screen.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct FixTermEnabledArgs {
+    pub enabled: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HiddenArgs {
     pub hidden: bool,

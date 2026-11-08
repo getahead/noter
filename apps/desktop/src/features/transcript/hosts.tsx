@@ -19,6 +19,8 @@ import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
 import { playControl, REFUSED } from "./play-control";
 import { ArchiveNotice, type ArchiveNote } from "./ArchiveNotice";
+import { followFixTermChoice, watchFixTermMenu } from "./fix-term-menu";
+import { selectedFixTerm } from "./segment-row";
 import { TranscriptView } from "./transcript-view";
 
 const HIGHLIGHT_MS = 3000;
@@ -245,6 +247,14 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   const error = tr.error && <InlineBanner banner={{ id: "transcript-error", severity: "error", text: t("transcript.error"), actions: [{ label: t("action.try_again"), onAction: tr.retry }] }} />;
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-return-stored
   const speakers = tr.data?.speakers ?? [];
+  // The Edit menu's Fix Term…: enabled while confirmed words are selected, and it opens the term fix on them.
+  const segments = tr.data?.segments;
+  const segmentsRef = useRef(segments);
+  segmentsRef.current = segments;
+  useEffect(() => (variant === "stored" ? watchFixTermMenu(document, () => globalThis.getSelection(), () => segmentsRef.current ?? [], (enabled) => void tr.bridge.core.windowSetFixTermEnabled({ enabled })) : undefined), [variant, tr.bridge]);
+  const chosen = useWindow(tr.bridge, (s) => s.fixTerm);
+  const handled = useRef(chosen);
+  useEffect(() => followFixTermChoice(handled, chosen, () => (variant === "stored" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null), (picked) => setFixing({ ...picked, menu: false })), [chosen, variant]);
   const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
   const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
   return (

@@ -1577,6 +1577,11 @@ export type FixTermArgs = {
 	add_to_glossary: boolean,
 };
 
+/**  Whether the Edit menu's **Fix Term…** is enabled: a confirmed-text selection is on screen. */
+export type FixTermEnabledArgs = {
+	enabled: boolean,
+};
+
 export type FixTermResult = {
 	segment: SegmentView,
 	change_id: ChangeId,
@@ -3611,7 +3616,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.5";
+export const CONTRACT_VERSION = "2.6";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3785,6 +3790,7 @@ export const COMMANDS = {
   window_set_call_layout: { group: "windows", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   window_set_collapsed: { group: "windows", stability: "frozen", windows: ["call-screen"], channel: false },
   window_share_warning_seen: { group: "windows", stability: "frozen", windows: ["call-screen"], channel: false },
+  window_set_fix_term_enabled: { group: "windows", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   app_set_hidden_for_presenting: { group: "windows", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   window_navigate: { group: "windows", stability: "frozen", windows: ["main", "call-screen", "record-prompt", "settings", "first-run"], channel: false },
   window_report_view: { group: "windows", stability: "frozen", windows: ["main"], channel: false },
@@ -3964,6 +3970,7 @@ export interface CommandArgs {
   window_set_call_layout: CallLayoutArgs;
   window_set_collapsed: CollapseArgs;
   window_share_warning_seen: NoArgs;
+  window_set_fix_term_enabled: FixTermEnabledArgs;
   app_set_hidden_for_presenting: HiddenArgs;
   window_navigate: NavigateArgs;
   window_report_view: ViewReportArgs;
@@ -4141,6 +4148,7 @@ export interface CommandResults {
   window_set_call_layout: CallWindowState;
   window_set_collapsed: CallWindowState;
   window_share_warning_seen: CallWindowState;
+  window_set_fix_term_enabled: Ack;
   app_set_hidden_for_presenting: PresentingState;
   window_navigate: Ack;
   window_report_view: Ack;
@@ -4215,6 +4223,10 @@ export interface EventPayloads {
    * The core asks the main or Settings window to navigate (notification click, menu).
    */
   "nav:request": NavTarget;
+  /**
+   * The native Edit menu's **Fix Term…** was chosen: open the term fix on the current selection.
+   */
+  "menu:fix_term": Ack;
 }
 
 export type EventName = keyof EventPayloads;
@@ -4240,6 +4252,7 @@ export const EVENTS = {
   "window:call": { stability: "frozen" },
   "app:presenting": { stability: "frozen" },
   "nav:request": { stability: "frozen" },
+  "menu:fix_term": { stability: "frozen" },
 } as const satisfies Record<EventName, { stability: Stability }>;
 
 export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "permission_missing", "permission_denied", "disk_full", "offline", "checksum_failed", "model_missing", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "output_invalid", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "calendar_unavailable", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "already_undone", "not_undone", "not_undoable", "edited_later", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "tracker_unreachable", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
@@ -4773,6 +4786,10 @@ export function createCore(transport: Transport) {
     windowSetCallLayout: (args: CallLayoutArgs) => call("window_set_call_layout", args),
     windowSetCollapsed: (args: CollapseArgs) => call("window_set_collapsed", args),
     windowShareWarningSeen: (args: NoArgs) => call("window_share_warning_seen", args),
+    /**
+     * The Edit menu's **Fix Term…** is enabled while confirmed words are selected.
+     */
+    windowSetFixTermEnabled: (args: FixTermEnabledArgs) => call("window_set_fix_term_enabled", args),
     /**
      * Hide for Presenting (wanted state).
      */

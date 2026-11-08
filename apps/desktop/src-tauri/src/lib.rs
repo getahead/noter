@@ -93,6 +93,8 @@ pub fn run() {
         .on_menu_event(|app, event| {
             if event.id() == surfaces::APP_QUIT {
                 surfaces::quit(app);
+            } else if event.id() == surfaces::APP_FIX_TERM {
+                surfaces::fix_term_chosen(app);
             }
         })
         .setup(move |app| {
