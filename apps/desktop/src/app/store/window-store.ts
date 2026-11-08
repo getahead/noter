@@ -320,6 +320,8 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
           const { [c.id]: _gone, ...rest } = slice;
           return { ...s, entities: { ...s.entities, [c.kind]: rest } };
         }
+        default: // a kind a same-major contract bump added: ignore it rather than fall into outputs:progress
+          return s;
       }
     }
     case "outputs:progress":
