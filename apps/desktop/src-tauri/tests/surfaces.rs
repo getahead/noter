@@ -441,6 +441,42 @@ fn the_host_creates_the_core_windows_on_first_use() {
     surfaces.restore_all();
 }
 
+// The mock runtime's windows are always "visible" and its show/hide do nothing, so these read the
+// host's own list of what Show Noter will bring back.
+#[test]
+fn show_noter_does_not_bring_back_a_surface_the_core_closed_while_hidden() {
+    let app = mock_builder().build(mock_context(noop_assets())).unwrap();
+    let surfaces = TauriSurfaces::new(app.handle().clone(), std::env::temp_dir());
+    surfaces.show_window(WindowLabel::Settings);
+    surfaces.show_record_prompt();
+    surfaces.make_call_window_key();
+    surfaces.hide_all();
+    // The prompt's timer and the call's end both close their surface while Noter is hidden.
+    surfaces.close_record_prompt();
+    surfaces.hide_call_window();
+    assert_eq!(surfaces.hidden_for_presenting(), [WindowLabel::Settings]);
+    surfaces.restore_all();
+    assert!(surfaces.hidden_for_presenting().is_empty());
+}
+
+#[test]
+fn show_noter_restores_the_windows_in_a_fixed_order_panels_last() {
+    let app = mock_builder().build(mock_context(noop_assets())).unwrap();
+    let surfaces = TauriSurfaces::new(app.handle().clone(), std::env::temp_dir());
+    surfaces.show_record_prompt();
+    surfaces.show_window(WindowLabel::Settings);
+    surfaces.show_window(WindowLabel::Main);
+    surfaces.hide_all();
+    assert_eq!(
+        surfaces.hidden_for_presenting(),
+        [
+            WindowLabel::Main,
+            WindowLabel::Settings,
+            WindowLabel::RecordPrompt
+        ]
+    );
+}
+
 #[test]
 fn a_saved_frame_is_clamped_to_the_visible_display() {
     // Inside: kept as it was.

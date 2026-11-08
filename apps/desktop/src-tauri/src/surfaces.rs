@@ -606,6 +606,13 @@ pub fn is_panel(label: WindowLabel) -> bool {
     matches!(label, WindowLabel::CallScreen | WindowLabel::RecordPrompt)
 }
 
+/// The order Show Noter brings the windows back in: the ordinary windows, then the panels.
+fn presenting_order() -> Vec<WindowLabel> {
+    let (panels, windows): (Vec<_>, Vec<_>) =
+        WindowLabel::ALL.into_iter().partition(|l| is_panel(*l));
+    [windows, panels].concat()
+}
+
 /// Whether panels exist: only the app registers the nspanel plugin; the tests' mock runtime has
 /// no AppKit window to convert, so its panels stay plain windows.
 fn panels_on<R: Runtime>(app: &AppHandle<R>) -> bool {
@@ -754,6 +761,20 @@ impl<R: Runtime> TauriSurfaces<R> {
     }
 
     /// The core the menu bar's clicks go to, once it opened.
+    /// The windows Show Noter will bring back, in that order.
+    pub fn hidden_for_presenting(&self) -> Vec<WindowLabel> {
+        self.hidden
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// A surface the core closed while Noter was hidden must not come back on Show Noter.
+    fn forget_hidden(&self, label: WindowLabel) {
+        let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
+        hidden.retain(|l| *l != label);
+    }
+
     /// The core the menu bar's clicks go to, once it opened; it rebuilds the menu every second
     /// for the clock and the countdowns while the core lives.
     pub fn attach(&self, core: &Arc<Core>) {
@@ -1065,6 +1086,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     }
 
     fn close_record_prompt(&self) {
+        self.forget_hidden(WindowLabel::RecordPrompt);
         if let Some(prompt) = self
             .app
             .get_webview_window(WindowLabel::RecordPrompt.as_str())
@@ -1091,6 +1113,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     }
 
     fn hide_call_window(&self) {
+        self.forget_hidden(WindowLabel::CallScreen);
         self.frames.save();
         if let Some(window) = self
             .app
@@ -1105,8 +1128,8 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     fn hide_all(&self) {
         self.frames.save();
         let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
-        for (label, window) in self.app.webview_windows() {
-            let Some(label) = crate::window_label(&label) else {
+        for label in presenting_order() {
+            let Some(window) = self.app.get_webview_window(label.as_str()) else {
                 continue;
             };
             if window.is_visible().unwrap_or(false) && window.hide().is_ok() {
