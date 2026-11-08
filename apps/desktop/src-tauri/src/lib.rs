@@ -193,9 +193,7 @@ fn browser<R: Runtime>(
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
 /// this Mac. Own-account sign-in is M3, so only the API-key and local runtimes run in M2.
 fn runtimes(data: &std::path::Path) -> Adapters {
-    let home = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default();
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
     let cli = |name: &str| CliConfig {
         program: find_cli(&home, name),
         home: home.clone(),
@@ -212,9 +210,7 @@ fn runtimes(data: &std::path::Path) -> Adapters {
 
 /// The pinned CLIs as accounts and installs, found where `runtimes` finds them.
 fn account_cli() -> Arc<CliAccounts> {
-    let home = std::env::var_os("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default();
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
     Arc::new(CliAccounts {
         claude: find_cli(&home, "claude"),
         codex: find_cli(&home, "codex"),
