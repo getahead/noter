@@ -11,5 +11,5 @@ export function elapsedSeconds(c: Pick<CaptureState, "phase" | "recorded_ms">, r
   return (c.recorded_ms + (c.phase === "recording" ? Math.max(0, now - receivedAt) : 0)) / 1000;
 }
 
-/** The call's name in the live row and the footer: the part of the title before its colon (**Planning: VHI 8.0** → **Planning**). */
-export const shortTitle = (title: string | null): string => (title ?? "").split(":")[0]!.trim();
+/** The call's name in the live row and the footer: the part of the title before its first ": " — colon and space, so **1:1 with Anna** stays whole (**Planning: VHI 8.0** → **Planning**). */
+export const shortTitle = (title: string | null): string => (title ?? "").split(": ")[0]!.trim();

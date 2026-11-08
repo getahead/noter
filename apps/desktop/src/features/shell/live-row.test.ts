@@ -15,9 +15,11 @@ describe("live row", () => {
     expect(elapsedSeconds({ phase: "recording", recorded_ms: 0 }, 5000, 4000)).toBe(0); // a clock behind the core never runs backwards
   });
 
-  it("names the call by the part before its colon", () => {
+  it("names the call by the part before its colon and space", () => {
     expect(shortTitle("Planning: VHI 8.0 drawer redesign")).toBe("Planning");
     expect(shortTitle("Standup")).toBe("Standup");
     expect(shortTitle(null)).toBe("");
+    expect(shortTitle("1:1 with Anna")).toBe("1:1 with Anna");
+    expect(shortTitle("10:30 standup")).toBe("10:30 standup");
   });
 });
