@@ -200,6 +200,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
         </div>
       )}
       {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-update */}
+      {state === "ready" && (section.suppressed_count ?? 0) > 0 && <div className="pc-sec__notice">{t("outputs.suppressed", { count: section.suppressed_count ?? 0 })}</div>}
       {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-preserve */}
       {/* @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-regen */}
       {state === "writing" && (section.body_md || section.items.length > 0) && <div className="pc-sec__meta" role="status">{t("outputs.regenerating")}</div>}

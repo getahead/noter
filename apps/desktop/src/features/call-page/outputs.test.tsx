@@ -111,6 +111,14 @@ describe("OutputSection", () => {
     expect(asked).toEqual([false]);
   });
 
+  it("counts the rejected suggestions a regeneration will not bring back, in the section's meta line", async () => {
+    await open([]);
+    const items = (n: number) => sec("action_items", { suppressed_count: n, items: [row("Rotate the token")] });
+    expect(renderToString(<OutputSection {...props(items(1))} />)).toContain("1 item not suggested again because you rejected it");
+    expect(renderToString(<OutputSection {...props(items(3))} />)).toContain("3 items not suggested again because you rejected them");
+    expect(renderToString(<OutputSection {...props(items(0))} />)).not.toContain("not suggested again");
+  });
+
   it("regenerates a failed section alone, and locally on Use Local Model", async () => {
     await open([]);
     const asked: boolean[] = [];
