@@ -232,7 +232,7 @@ describe("host effects", () => {
 });
 
 describe("tabStop (one Tab stop for the transcript)", () => {
-  const rows = buildRows({ segments: [seg("a", 1000), seg("b", 2000)], hypotheses: [], gaps: [{ call_id: "c", t0_ms: 500, t1_ms: 900, reason: "system_audio_silent" as const }], marks: [] });
+  const rows = buildRows({ segments: [seg("a", 1000), seg("b", 2000)], hypotheses: [], gaps: [{ call_id: "c", t0_ms: 500, t1_ms: 900, reason: "system_audio_silent" as const }], marks: [] }, "stored");
   it("is the line focus last was on while it is drawn", () => expect(tabStop(rows, "b")).toBe("b"));
   it("else the first line, never a gap", () => {
     expect(tabStop(rows, null)).toBe("a");

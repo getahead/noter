@@ -81,7 +81,8 @@ describe("SegmentRow (cpt-noter-component-ui-transcript-segment-row)", () => {
     expect(html).toContain("Anna K.");
     expect(html).toContain('aria-label="Play this line"');
     expect(html).toContain('data-variant="confirmed"');
-    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('tabindex="-1"'); // reached with ↑/↓ unless it is the list's one Tab stop
+    expect(renderToString(<SegmentRow row={rowOf()} variant="live" speakers={[]} stop />)).toContain('tabindex="0"');
   });
 
   it("plays when enabled, and posts the reason when disabled (it stays focusable)", () => {

@@ -259,6 +259,31 @@ test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy a
   expect((await sent(page, "change_undo")).length).toBe(1);
 });
 
+test("cpt-noter-flow-ui-live-transcript-stored — the stored transcript is one Tab stop; ↑/↓, Home/End and ⌘↑/⌘↓ move between lines", async ({ page }) => {
+  await openWindow(page, "main");
+  await navigate(page, "transcript", S.CALL);
+  const lines = page.locator('[data-region="PC-R5"] [data-segment-id]');
+  const stops = page.locator('[data-region="PC-R5"] [data-segment-id][tabindex="0"]');
+  await expect(lines.nth(1)).toBeVisible();
+  await expect(stops).toHaveCount(1);
+  await expect(lines.first()).toHaveAttribute("tabindex", "0");
+  await lines.first().focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(lines.nth(1)).toBeFocused();
+  await expect(lines.nth(1)).toHaveAttribute("tabindex", "0"); // the stop follows focus
+  await expect(stops).toHaveCount(1);
+  await page.keyboard.press("ArrowUp");
+  await expect(lines.first()).toBeFocused();
+  await page.keyboard.press("Meta+ArrowDown");
+  await expect(lines.last()).toBeFocused();
+  await page.keyboard.press("Meta+ArrowUp");
+  await expect(lines.first()).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(lines.last()).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(lines.first()).toBeFocused();
+});
+
 test("cpt-noter-seq-call-page-name-speakers — the native Edit menu's Fix Term… follows the selected words", async ({ page }) => {
   await openWindow(page, "main");
   await navigate(page, "transcript", S.CALL);
