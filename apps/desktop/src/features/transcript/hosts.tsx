@@ -3,7 +3,7 @@
 // view and the playback bar in the host's regions. Hosts pass the call id and the variant; nothing else.
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { CallDetail, SegmentView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
+import type { CallDetail, SegmentView, SpeakerView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { duration, t } from "../../i18n/format";
@@ -344,21 +344,49 @@ export function StoredTranscript({ bridge, callId, audioKept, span, detail, head
   const tr = useTranscript(bridge, callId, { detail: given ? detail : read, audioKept, span });
   return (
     <>
-      {tr.data && (
-        <SpeakerNamingPanel
-          bridge={bridge}
-          callId={callId}
-          speakers={tr.data.speakers}
-          segments={tr.data.segments}
-          participants={tr.detail?.call.participants ?? []}
-          audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}
-        />
-      )}
+      <NamingPanel tr={tr} audioKept={audioKept} />
       {tr.archive && <ArchiveNotice note={tr.archive} />}
       <TranscriptLog tr={tr} variant="stored" header={header} />
       <TranscriptBar tr={tr} variant="stored" />
     </>
   );
+}
+
+function NamingPanel({ tr, audioKept }: { tr: ReturnType<typeof useTranscript>; audioKept?: boolean }) {
+  return tr.data ? (
+    <SpeakerNamingPanel
+      bridge={tr.bridge}
+      callId={tr.callId}
+      speakers={tr.data.speakers}
+      segments={tr.data.segments}
+      participants={tr.detail?.call.participants ?? []}
+      audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}
+    />
+  ) : null;
+}
+
+/** The call's speakers and every line, read once (no Channel; the span ends at the protocol's u32 OffsetMs maximum): the first lines the naming rows quote. */
+export async function readNaming(bridge: Bridge, callId: string): Promise<{ speakers: SpeakerView[]; segments: SegmentView[] } | null> {
+  const [c, t] = await Promise.all([bridge.core.callGet({ call_id: callId }), bridge.core.transcriptSpan({ span: { call_id: callId, t0_ms: 0, t1_ms: 0xffff_ffff } })]);
+  return c.status === "ok" && t.status === "ok" ? { speakers: c.data.speakers, segments: t.data.segments } : null;
+}
+
+/** PC-R9 above the Summary: one read of the speakers and lines, no Channel (the Transcript tab owns the one Channel slot); a naming re-reads. */
+export function SummaryNamingPanel({ bridge, callId, detail }: { bridge: Bridge; callId: string; detail: AudioFacts }) {
+  const [read, setRead] = useState<Awaited<ReturnType<typeof readNaming>>>(null);
+  const named = useWindow(bridge, (s) => s.entities.speaker);
+  // shortcut: a slow older read can land after a newer one, a naming re-reads again at once; no cancel until a DOM test harness exists
+  useEffect(() => void readNaming(bridge, callId).then(setRead), [bridge, callId, named]);
+  return read ? (
+    <SpeakerNamingPanel
+      bridge={bridge}
+      callId={callId}
+      speakers={read.speakers}
+      segments={read.segments}
+      participants={detail.call.participants ?? []}
+      audio={!detail.call.audio_deleted && !detail.audio_not_stored}
+    />
+  ) : null;
 }
 
 /** Dev server only (App's `#transcript=<call id>`): the stored transcript in a PC-R5 of its own, until the call page lands. */

@@ -68,24 +68,36 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reselect, setReselect] = useState(false);
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-invalid
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-valid
   const valid = text.trim().length > 0 && !reselect;
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-valid
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-invalid
 
   const fix = async () => {
     if (!valid || busy) return;
+    // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-apply
     setBusy(true);
     setError(null);
+    // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-apply
     const out = await applyFix(bridge, segment, range, text.trim(), glossary);
     setBusy(false);
+    // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-error
     if ("error" in out) {
       setReselect(!!out.reselect);
       return setError(out.error);
     }
+    // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-error
+    // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-done
     onFixed(out.message, out.change_id);
+    // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-done
     // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
     onClose();
     // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-return
   };
 
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-open
+  // @cpt-begin:cpt-noter-state-ui-speakers-correction:p1:inst-cancel
   return (
     <Popover variant="term-fix" anchor={anchor} width={320} label={t("speakers.fix.title")} onClose={onClose}>
       <div className="cw-pr" data-component="cpt-noter-component-ui-term-fix-popover" data-state={busy ? "applying" : error ? "error" : valid ? "editing" : "invalid"}>
@@ -116,4 +128,6 @@ export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixe
       </div>
     </Popover>
   );
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-cancel
+  // @cpt-end:cpt-noter-state-ui-speakers-correction:p1:inst-open
 }

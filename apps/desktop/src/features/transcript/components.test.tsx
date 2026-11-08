@@ -7,7 +7,7 @@ import type { CallDetail, WindowLabel } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
-import { audioLine, StoredTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
+import { audioLine, readNaming, StoredTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
 import { PlaybackBar } from "./playback-bar";
@@ -231,6 +231,16 @@ async function open(label: WindowLabel, mutate: (w: World) => void = () => {}) {
   await bridge.open();
   return { fake, bridge };
 }
+
+describe("readNaming (the Summary's naming panel)", () => {
+  it("reads the call's speakers and lines once, or nothing for a call the core does not know", async () => {
+    const { bridge: b } = await open("main");
+    const got = await readNaming(b, LIVE);
+    expect(got?.speakers.length).toBeGreaterThan(0);
+    expect(got?.segments.length).toBeGreaterThan(0);
+    expect(await readNaming(b, "call_missing")).toBeNull();
+  });
+});
 
 describe("useTranscript and TranscriptPanel (hosts)", () => {
   it("requests the native call window key before live rename, but never for stored rename", async () => {

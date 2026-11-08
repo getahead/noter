@@ -193,11 +193,13 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
         </div>
       )}
       {state === "ready" && section.kind !== "summary" && section.writer?.runtime === "local" && <div className="pc-sec__notice">{t("outputs.written_local_after_timeout")}</div>}
+      {/* @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-update */}
       {state === "ready" && section.names_updated && (
         <div className="pc-sec__notice">
           {t("outputs.names_updated")} · <button type="button" className="np-link" onClick={() => onRegenerate(false)}>{t("outputs.names_regenerate")}</button>
         </div>
       )}
+      {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-update */}
       {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-preserve */}
       {/* @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-regen */}
       {state === "writing" && (section.body_md || section.items.length > 0) && <div className="pc-sec__meta" role="status">{t("outputs.regenerating")}</div>}
