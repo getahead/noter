@@ -65,11 +65,11 @@ export function subtitle(
     rows.reduce((sum, r) => sum + r.duration_ms, 0) / HOUR,
   );
   const since = rows.length ? Math.min(...rows.map((r) => r.started_at)) : null;
-  const parts = [
-    t("library.calls.count", { count: total }),
-    t("library.calls.hours", { count: hours }),
-  ];
-  if (since !== null)
+  const parts = [t("library.calls.count", { count: total })];
+  // hours and since are sums over the loaded page: shown only once every call is loaded (Page carries just `total`)
+  const loaded = rows.length >= total;
+  if (loaded) parts.push(t("library.calls.hours", { count: hours }));
+  if (loaded && since !== null)
     parts.push(t("library.calls.since", { date: shortDay(since, tz) }));
   if (selected > 1)
     parts.push(t("library.calls.selected", { count: selected }));
