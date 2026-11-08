@@ -8,6 +8,7 @@ import type { ChangeRow } from "../../src/core/bindings";
 import { openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { hold } from "./hold";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown>; latency: number };
 const T0 = 1_792_000_000_000;
@@ -110,7 +111,7 @@ test.describe("cpt-noter-flow-ui-history-undo-export Export Log sheet", () => {
 test.describe("cpt-noter-dod-ui-history-undo-undo undo strip", () => {
   test("working: the strip keeps its message with a spinner while the core answers", async ({ page }) => {
     await open(page, rows());
-    await page.evaluate(() => ((globalThis as unknown as { __noterFake: Fake }).__noterFake.latency = 4000));
+    await hold(page, "change_undo");
     await page.locator('[data-component="cpt-noter-component-ui-change-row"]').filter({ hasText: "Renamed the call" }).getByRole("button", { name: "Undo" }).click();
     await expect(page.locator('[data-component="cpt-noter-component-ui-undo-strip"]')).toHaveAttribute("data-state", "working");
     await shot(page, "strip-working");
