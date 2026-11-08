@@ -50,6 +50,10 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
     ).toBe("A, B, C +2");
   });
 
+  it("drops a trailing initial in any script: Anna K. and Борис К. read Anna, Борис", () => {
+    expect(peopleOf(call({ participants: [person("Anna"), { ...person("Борис"), short_name: "Борис К." }, person("Dmitri")] }))).toBe("Anna, Борис, Dmitri");
+  });
+
   it("writes the time as Today or the day, and a type id as words", () => {
     const now = Date.UTC(2026, 9, 2, 20);
     expect(whenOf(Date.UTC(2026, 9, 2, 12), now)).toMatch(/^Today \d\d:\d\d$/);
