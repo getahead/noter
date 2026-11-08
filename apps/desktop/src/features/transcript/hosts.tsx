@@ -13,7 +13,7 @@ import { Popover } from "../../ui/primitives/popover";
 import { holdUndo } from "../history/undo";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 import { SpeakerNamingPanel } from "../speakers/SpeakerNamingPanel";
-import { TermFixPopover } from "../speakers/TermFixPopover";
+import { rereadSegment, TermFixPopover } from "../speakers/TermFixPopover";
 import { buildRows, speakerColumn, spanKeys, type Row, type Variant } from "./model";
 import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
@@ -233,6 +233,9 @@ export interface TranscriptLogProps {
   onNamed?: (text: string, change_id: string) => void;
 }
 
+/** The Undo strip of a term fix; Undo re-reads the line, which no Channel event restores. */
+export const holdFix = (bridge: Bridge, seg: SegmentView) => (message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message, refresh: () => rereadSegment(bridge, seg) });
+
 /** The transcript view of `useTranscript`'s call, in the host's region (CS-R2, FP-R5 or PC-R5). */
 export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: TranscriptLogProps) {
   const [renaming, setRenaming] = useState<{ speakerId: string; segmentId: string; anchor: HTMLElement } | null>(null);
@@ -300,7 +303,7 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
       </Popover>
     )}
     {fixing && !fixing.menu && (
-      <TermFixPopover bridge={tr.bridge} segment={fixing.seg} range={fixing.range} anchor={fixing.anchor} onClose={() => setFixing(null)} onFixed={named} />
+      <TermFixPopover bridge={tr.bridge} segment={fixing.seg} range={fixing.range} anchor={fixing.anchor} onClose={() => setFixing(null)} onFixed={onNamed ?? holdFix(tr.bridge, fixing.seg)} />
     )}
     {renamed && (
       <SpeakerRenamePopover

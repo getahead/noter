@@ -25,6 +25,12 @@ export interface TermFixPopoverProps {
   onFixed: (text: string, change_id: string) => void;
 }
 
+/** The segment's span from the core into the transcript Channel: after a stale range or an Undo of the fix. */
+export async function rereadSegment(bridge: Bridge, segment: SegmentView): Promise<void> {
+  const fresh = await bridge.core.transcriptSpan({ span: { call_id: segment.call_id, t0_ms: segment.t0_ms, t1_ms: segment.t1_ms } });
+  if (fresh.status === "ok") for (const updated of fresh.data.segments) bridge.store.setState((s) => withStreamSegment(s, updated));
+}
+
 // @cpt-flow:cpt-noter-flow-ui-speakers-fix-term:p1
 // @cpt-state:cpt-noter-state-ui-speakers-correction:p1
 /** Fix the term: the segment replaces the line in the transcript Channel; an error text keeps the replacement. */
@@ -37,10 +43,7 @@ export async function applyFix(bridge: Bridge, segment: SegmentView, range: Text
   if (res.status === "error") {
     const reselect = staleFix(res.error.code);
     if (reselect) {
-      const fresh = await bridge.core.transcriptSpan({ span: { call_id: segment.call_id, t0_ms: segment.t0_ms, t1_ms: segment.t1_ms } });
-      if (fresh.status === "ok") {
-        for (const updated of fresh.data.segments) bridge.store.setState((s) => withStreamSegment(s, updated));
-      }
+      await rereadSegment(bridge, segment);
     }
     return { error: t(reselect ? "speakers.fix.stale" : "speakers.fix.err"), reselect };
   }

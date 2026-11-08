@@ -7,9 +7,10 @@ import type { CallDetail, WindowLabel } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
-import { audioLine, readNaming, StoredTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
+import { audioLine, holdFix, readNaming, StoredTranscript, StoredTranscriptRoute, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
+import { resetUndo, undoLast } from "../history/undo";
 import { PlaybackBar } from "./playback-bar";
 import { SegmentRow } from "./segment-row";
 import { ANNA, S3, seg, YOU } from "./testing";
@@ -231,6 +232,18 @@ async function open(label: WindowLabel, mutate: (w: World) => void = () => {}) {
   await bridge.open();
   return { fake, bridge };
 }
+
+describe("holdFix (the Undo of a term fix)", () => {
+  it("re-reads the fixed line when the strip's Undo ran, since no Channel event restores it", async () => {
+    const { bridge: b } = await open("main");
+    const span = vi.spyOn(b.core, "transcriptSpan");
+    resetUndo();
+    holdFix(b, seg("seg_fix", 0))("Fixed “a” · added to the glossary", "chg_unknown");
+    await undoLast(b);
+    expect(span).toHaveBeenCalledOnce();
+    resetUndo();
+  });
+});
 
 describe("readNaming (the Summary's naming panel)", () => {
   it("reads the call's speakers and lines once, or nothing for a call the core does not know", async () => {
