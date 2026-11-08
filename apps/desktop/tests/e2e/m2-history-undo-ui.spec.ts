@@ -5,6 +5,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
+import { hold } from "../visual/hold";
 import { calls, coreReady, openWindow } from "./support/app";
 import * as O from "./support/outputs-world";
 import { expect, test } from "./support/fixtures";
@@ -16,8 +17,9 @@ const ROW = '[data-component="cpt-noter-component-ui-action-item-row"], [data-co
 const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
 
 /** The written outputs with a suggested decision, then Backend sync the way the core opens it (`window_navigate`) on `tab`. */
-async function openCall(page: Page, tab: "summary" | "history") {
+async function openCall(page: Page, tab: "summary" | "history", plan: { latency?: number } = {}) {
   await openWindow(page, "main", {
+    ...plan,
     world: (w) => {
       O.written(w);
       for (const i of O.outputsOf(w).sections.flatMap((s) => s.items)) if (i.id === "itm_d1") Object.assign(i, { review: "suggested", created_by: "llm" });
@@ -60,6 +62,21 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     const sent = (await calls(page)).filter((c) => c.kind === "invoke" && c.name === "history_export").map((c) => c.args as Record<string, unknown>);
     expect(sent).toEqual([expect.objectContaining({ scope: { type: "call", call_id: W.PAST_CALL }, format: "markdown" })]);
     await expect(page.getByText(/Exported log to /)).toBeVisible();
+  });
+
+  test("UI — Other — Return while the export runs does not start a second one", async ({ page }) => {
+    const real = process.env.NOTER_CORE === "stdio"; // only the fake can park one command; the real core answers after a latency
+    await openCall(page, "history", real ? { latency: 500 } : {});
+    const release = real ? undefined : await hold(page, "history_export");
+    await page.getByRole("button", { name: "Export Log…" }).click();
+    const sheet = page.getByRole("dialog", { name: /Export Log/ });
+    await page.keyboard.press("Enter");
+    await expect(sheet).toHaveAttribute("data-state", "busy");
+    await page.keyboard.press("Enter");
+    await release?.();
+    await expect(page.getByText(/Exported log to /)).toBeVisible();
+    const sent = (await calls(page)).filter((c) => c.kind === "invoke" && c.name === "history_export");
+    expect(sent).toHaveLength(1);
   });
 });
 
