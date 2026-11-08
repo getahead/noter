@@ -65,7 +65,7 @@ test.describe("cpt-noter-seq-record-prompt-start-recording", () => {
     await button(page, "Record").click();
     expect(await sent(page, "capture_start")).toEqual([{ source: "record_prompt", sensitive: false, detection_id: TEAMS }]);
     await expect(panel(page)).toHaveCount(0); // fades out in 200 ms
-    expect(await sent(page, "window_announce")).toContainEqual(expect.objectContaining({ text: "Recording started", politeness: "polite" }));
+    await expect.poll(() => sent(page, "window_announce")).toContainEqual(expect.objectContaining({ text: "Recording started", politeness: "polite" }));
   });
 
   test("UI — other path: Vendor call recorded as sensitive — Record as Sensitive sends sensitive true", async ({ page }) => {
