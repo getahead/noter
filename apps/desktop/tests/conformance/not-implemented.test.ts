@@ -10,7 +10,7 @@
 // wrong, against the real core that the core differs from the fake on that command. The rest of
 // "differs from the fake" (scope, typed errors, streams, revisions, versions) is checked by the
 // other files of this suite against the same fixtures. Each command runs in its own scenario (a
-// fresh core on the fixture world), so a destructive command cannot change what the next one sees.
+// fresh core on the fixture world, a few at a time), so a destructive command cannot change what any other one sees.
 // The table is complete by construction (its type requires every command, and the first test below
 // fails on a missing or extra entry), so every command is judged; none is left "not judged".
 // @cpt-flow:cpt-noter-flow-core-contract-conformance:p1
@@ -54,7 +54,9 @@ describe("commands the core does not answer yet", () => {
     expect(Object.keys(EXAMPLE_ARGS).sort()).toEqual([...names].sort());
   });
 
-  it.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
+  // Concurrent (vitest's default of five at a time), each in its own scenario: the isolation is
+  // unchanged, only the waiting on the process starts overlaps.
+  it.concurrent.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
     const s = openScenario(); // not recorded: the probe asserts no behaviour, so it must not count toward the E2E command gate
     const client = s.core(COMMANDS[name].windows[0] as WindowLabel) as unknown as Record<string, (a: unknown, m?: unknown) => Promise<{ status: string; error?: { code: string } }>>;
     const method = name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
