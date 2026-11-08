@@ -812,7 +812,7 @@ One repository (the empty `~/projects/noter` you already have) with three toolch
 noter/
   apps/desktop/              Tauri 2 app
     src/                     React UI (Vite, TypeScript, Tailwind, Zustand); windows: main, call window (one window, two layouts: call screen and floating panel), record prompt, first-run wizard, Settings
-      core/                  the core bridge: generated bindings.ts, tauri-transport.ts, fake/ (the fake core and its handlers), contract.smoke.ts
+      core/                  the core bridge: generated bindings.ts, tauri-transport.ts, fake/ (the fake core and its handlers)
     src-tauri/               thin IPC host over noter-core: one command per contract entry, window scopes, capabilities/, tray menu, native panels
       binaries/              noter-engine (signed by the Swift build, copied in through bundle.macOS.files), noter-mcp
   crates/

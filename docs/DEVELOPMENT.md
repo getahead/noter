@@ -99,7 +99,7 @@ are stale.
 | --- | --- | --- |
 | Rust unit and integration | `crates/*/src`, `crates/*/tests` | `just test-unit`, `just cov-unit` |
 | UI unit | `apps/desktop/src/**/*.test.ts(x)` (Vitest) | `just test-unit`, `just cov-unit` |
-| Contract | `crates/noter-protocol/tests`, `apps/desktop/src/core/contract.smoke.ts` | `just contract` |
+| Contract | `crates/noter-protocol/tests`, `apps/desktop/tests/conformance` | `just contract` |
 | Conformance (fake core, real core from M0) | `apps/desktop/tests/conformance` | `just e2e` |
 | UI end to end (Playwright, WebKit) | `apps/desktop/tests/e2e` (titles name `cpt-noter-seq-…` story IDs) | `just e2e` |
 | Native UI (XCUITest) | `apps/desktop/tests/native` (`test_cpt_noter_seq_…`) | `just native` |

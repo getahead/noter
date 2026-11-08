@@ -63,7 +63,7 @@ Chosen option: "Rust types in noter-protocol, specta for TypeScript, our exporte
 
 ### Confirmation
 
-`noter-contract-export --check` in CI; `cargo test -p noter-protocol` (contract tests); `tsc` over `apps/desktop/src/core` and `contract.smoke.ts` against the fake; from M0, a test in `src-tauri` that the registered handlers equal `COMMANDS` and that each window's capability allows exactly its commands.
+`noter-contract-export --check` in CI; `cargo test -p noter-protocol` (contract tests); `tsc` over `apps/desktop/src/core` and the conformance suite against the fake; from M0, a test in `src-tauri` that the registered handlers equal `COMMANDS` and that each window's capability allows exactly its commands.
 
 ## Pros and Cons of the Options
 

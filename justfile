@@ -45,11 +45,10 @@ lint-rust:
 lint-ui:
     pnpm --dir apps/desktop typecheck
 
-# The contract: generated files up to date, contract tests, fake-core smoke
+# The contract: generated files up to date, contract tests
 contract:
     cargo run --quiet --locked -p noter-protocol --bin noter-contract-export -- --check
     cargo test --quiet --locked -p noter-protocol
-    pnpm --dir apps/desktop smoke
 
 # Regenerate bindings, manifest, schemas and fixtures after changing noter-protocol
 contract-regen:
