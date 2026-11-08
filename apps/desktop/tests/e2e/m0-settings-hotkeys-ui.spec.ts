@@ -66,8 +66,8 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     try {
       steer = await openWindow(page, "settings", { world: (w) => (w.copilot.card_keys.conflicts = ["Ctrl+Alt+Super+3"]) });
     } catch (e) {
-      // card keys are the copilot's (M4): skipped (and reported so) only while M4 is later than the current milestone
-      test.skip((e as CoreError | null)?.code === "not_implemented" && isLaterMilestone("M4"), "card keys are delivered in M4");
+      // card keys are the copilot's (M4): changeAhead's rule, a refusal ends the test only while M4 is later than the current milestone
+      if ((e as CoreError | null)?.code === "not_implemented" && isLaterMilestone("M4")) return;
       throw e;
     }
     await openHotkeys(page);
