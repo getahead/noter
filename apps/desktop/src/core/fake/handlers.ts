@@ -571,9 +571,10 @@ export const defaultHandlers: Handlers = {
       snap.last_seq = seq;
       scriptPlayed.set(snap, (scriptPlayed.get(snap) ?? 0) + 1);
     };
+    const snapshot = { ...snap, segments: [...snap.segments], subscription_id: sub }; // taken before the first new message, which the client holds (R23)
     if (first) play(first);
     rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => play(event)));
-    return { ...snap, subscription_id: sub };
+    return snapshot;
   },
   levels_subscribe: (_a, { fake, send }) => {
     const sub = newId("sub");
