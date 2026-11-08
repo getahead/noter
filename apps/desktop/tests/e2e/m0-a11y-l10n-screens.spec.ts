@@ -56,8 +56,10 @@ const focusedName = (page: Page) =>
   });
 
 /** Every control a user can reach by Tab: natively focusable or tabindex >= 0, enabled, drawn. Each gets a marker to be told apart. */
-const markTabbable = (page: Page) =>
-  page.evaluate(() => {
+const scan = (page: Page, frames = 0) =>
+  page.evaluate(async (frames) => {
+    // `frames` animation frames pass first: the page's own updates land on frames, not on a fixed sleep
+    for (let i = 0; i < frames; i++) await new Promise((r) => requestAnimationFrame(r));
     const sel = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, [contenteditable="true"], [tabindex]';
     const els = [...document.querySelectorAll<HTMLElement>(sel)].filter((el) => {
       const r = el.getBoundingClientRect();
@@ -72,9 +74,10 @@ const markTabbable = (page: Page) =>
     // idempotent: controls that became enabled since (a selection enables Remove) are marked on the next call
     let next = document.querySelectorAll("[data-kbd]").length;
     els.filter((el) => !el.hasAttribute("data-kbd")).forEach((el) => el.setAttribute("data-kbd", String(next++)));
-    return next;
-  });
-const focusedMark = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("data-kbd") ?? null);
+    // the focused control's marker, and whether focus sits on the body: one round trip with the marking
+    return { count: next, mark: document.activeElement?.getAttribute("data-kbd") ?? null, onBody: document.activeElement === document.body || document.activeElement === null };
+  }, frames);
+const markTabbable = async (page: Page, frames = 0) => (await scan(page, frames)).count;
 
 /** Walk Tab (or Shift+Tab) from the page start until the walk repeats or leaves the controls; return the markers reached, in order. */
 async function walk(page: Page, key: "Tab" | "Shift+Tab", limit: number): Promise<string[]> {
@@ -82,11 +85,10 @@ async function walk(page: Page, key: "Tab" | "Shift+Tab", limit: number): Promis
   const reached: string[] = [];
   for (let i = 0; i < limit; i++) {
     await page.keyboard.press(key);
-    await markTabbable(page);
-    const mark = await focusedMark(page);
+    const { mark, onBody } = await scan(page);
     if (mark === null) {
       // focus left the page (not trapped), or sits on a programmatic target such as the page heading: keep walking
-      if (await page.evaluate(() => document.activeElement === document.body || document.activeElement === null)) break;
+      if (onBody) break;
       continue;
     }
     if (reached.includes(mark)) break; // came round: not trapped
@@ -99,8 +101,7 @@ async function walk(page: Page, key: "Tab" | "Shift+Tab", limit: number): Promis
 async function settleTabbable(page: Page): Promise<void> {
   let last = -1;
   for (let same = 0; same < 4; ) {
-    await page.waitForTimeout(100);
-    const n = await markTabbable(page);
+    const n = await markTabbable(page, 3);
     same = n === last ? same + 1 : 0;
     last = n;
   }
