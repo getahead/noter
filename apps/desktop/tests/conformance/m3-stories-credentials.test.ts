@@ -188,8 +188,11 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-replace-api-key on the real core
 describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core (2.25)", () => {
   it("both providers sign in independently with their own progress", async () => {
     open();
-    await claudeCli({ delay_ms: 150 });
-    await codexCli({ delay_ms: 50 });
+    // ChatGPT answers at once; Claude's browser step stays open far longer than the scheduling
+    // jitter of a loaded run, so "Claude is still signing in" is not a race (a held login the
+    // test releases needs a harness control: see the PR body).
+    await claudeCli({ delay_ms: 1_500 });
+    await codexCli();
     const claude = await signIn("claude");
     const chatgpt = await signIn("chatgpt");
     expect(chatgpt.prepared.needs_personal_use_confirmation).toBe(false);
@@ -197,6 +200,9 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     expect(chatgpt.session.expires_at - claude.session.expires_at).toBeLessThan(5_000);
     await ended(chatgpt.steps);
     expect(accountStatus(await accounts(), "chatgpt")).toMatchObject({ type: "signed_in", identity: BOB });
+    // Claude's own progress has not moved past the browser step: read from its event stream, and
+    // before the status, so a status read that comes late cannot excuse an early step.
+    expect(claude.steps().map((p) => p.step)).toEqual(["waiting_for_browser"]);
     expect(accountStatus(await accounts(), "claude")).toMatchObject({ type: "signing_in" });
     await ended(claude.steps);
     expect(accountStatus(await accounts(), "claude")).toMatchObject({ type: "signed_in", identity: ANN });
