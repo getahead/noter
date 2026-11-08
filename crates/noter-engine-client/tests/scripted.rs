@@ -114,6 +114,62 @@ async fn an_injected_event_lands_between_the_events_of_a_paced_self_test() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_held_self_test_waits_for_injection_and_only_holds_one_run() {
+    let engine = ScriptedEngine::new().with_default(Behaviour {
+        self_test_pace_ms: 400,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    let mut events = c.events();
+    c.command(SELF_TEST).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    engine.hold_next_self_test();
+    assert!(
+        !engine.inject(EngineEvent::SelfTestStream {
+            channel: AudioChannel::Mic,
+        }),
+        "injection waits until the held self-test command reaches the engine"
+    );
+    c.command(SELF_TEST).await.unwrap();
+    while events.try_recv().is_ok() {}
+
+    tokio::time::advance(Duration::from_secs(3)).await;
+    c.ping().await.unwrap();
+    while let Ok(line) = events.try_recv() {
+        assert!(
+            !matches!(
+                line.event,
+                EngineEvent::SelfTestStream { .. }
+                    | EngineEvent::SelfTestLine { .. }
+                    | EngineEvent::SelfTestResult { .. }
+                    | EngineEvent::Levels { .. }
+            ),
+            "the held run must not emit automatic events: {:?}",
+            line.event
+        );
+    }
+    let result = EngineEvent::SelfTestResult {
+        passed: false,
+        failure: Some(EngineErrorCode::ZeroBuffers),
+        own_sounds_leak: false,
+    };
+    let stream = EngineEvent::SelfTestStream {
+        channel: AudioChannel::Mic,
+    };
+    assert!(engine.inject(stream.clone()));
+    assert!(engine.inject(result.clone()));
+    let got = until_result(&mut events).await;
+    assert!(got.contains(&stream));
+    assert_eq!(got.last(), Some(&result));
+
+    c.command(SELF_TEST).await.unwrap();
+    assert!(matches!(
+        until_result(&mut events).await.last(),
+        Some(EngineEvent::SelfTestResult { passed: true, .. })
+    ));
+}
+
+#[tokio::test(start_paused = true)]
 async fn system_audio_follows_the_permission_state_the_world_gives() {
     let engine = ScriptedEngine::new();
     let c = client(&engine);

@@ -813,6 +813,7 @@ async fn data_dir_names_the_folder_the_running_core_keeps_its_database_in() {
 #[tokio::test]
 async fn push_reaches_the_running_self_test_as_an_engine_fact() {
     let mut r = start().await;
+    r.ok("main", "harness.hold_next_self_test", json!({})).await;
     let id = r.next;
     r.next += 1;
     let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
@@ -820,6 +821,8 @@ async fn push_reaches_the_running_self_test_as_an_engine_fact() {
         .write_all(format!("{req}\n").as_bytes())
         .await
         .unwrap();
+    // Manual events must still control the result after the normal 1.5 s script finishes.
+    tokio::time::sleep(Duration::from_secs(2)).await;
     let push = r
         .call(
             "main",
@@ -828,10 +831,16 @@ async fn push_reaches_the_running_self_test_as_an_engine_fact() {
         )
         .await;
     assert!(push.0.get("ok").is_some(), "{push:?}");
-    let mut failed = None;
+    let mut failed = push
+        .1
+        .iter()
+        .find(|line| {
+            line["event"] == "setup:changed" && line["payload"]["self_test"]["type"] == "failed"
+        })
+        .map(|line| line["payload"]["self_test"].clone());
     while failed.is_none() {
         let line = r.line().await;
-        if line["event"] == "setup:changed" {
+        if line["event"] == "setup:changed" && line["payload"]["self_test"]["type"] == "failed" {
             failed = Some(line["payload"]["self_test"].clone());
         }
     }
