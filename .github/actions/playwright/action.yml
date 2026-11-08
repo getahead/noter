@@ -1,0 +1,22 @@
+name: Playwright WebKit
+description: WebKit for the UI flows, from a cache keyed by the locked Playwright version; the OS libraries still come from apt.
+runs:
+  using: composite
+  steps:
+    - id: version
+      shell: bash
+      run: echo "v=$(pnpm --dir apps/desktop exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+    - id: browsers
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-webkit-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.v }}
+    # Downloads the browser only on a cache miss; always installs the OS dependencies.
+    - shell: bash
+      run: pnpm --dir apps/desktop exec playwright install --with-deps webkit
+    # Saved from main only, like rust-cache.
+    - if: github.ref == 'refs/heads/main' && steps.browsers.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.browsers.outputs.cache-primary-key }}
