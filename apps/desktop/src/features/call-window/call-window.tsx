@@ -93,6 +93,12 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // the second sources the user kept, for one call
   const [kept, setKept] = useState<{ call: string | null; ids: ReadonlySet<string> }>({ call: null, ids: new Set() });
   const [marked, setMarked] = useState<string | null>(null);
+  // the flash ends 2 s after the latest mark, and not after unmount
+  useEffect(() => {
+    if (!marked) return;
+    const timer = setTimeout(() => setMarked(null), 2000);
+    return () => clearTimeout(timer);
+  }, [marked]);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [continueClosed, setContinueClosed] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -249,7 +255,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     const res = await run("capture_mark_moment", () => bridge.core.captureMarkMoment(id));
     if (res.status !== "ok") return;
     setMarked(t("cw.marked", { time: callTime(res.data.at_ms / 1000) }));
-    setTimeout(() => setMarked(null), 2000);
   };
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-case-mark
   // @cpt-begin:cpt-noter-flow-ui-call-window-controls:p1:inst-case-pause

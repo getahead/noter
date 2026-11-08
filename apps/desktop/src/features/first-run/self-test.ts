@@ -75,7 +75,6 @@ export const OWN_SOUNDS_MESSAGE: Record<OwnSounds, MsgKey | null> = { pending: n
 export const ONE_STREAM_SILENT: Record<AudioChannel, MsgKey> = { sys: "self_test.silent_sys", mic: "self_test.silent_mic" };
 export const SYSTEM_AUDIO_MISSING: MsgKey = "self_test.sys_missing";
 export const TIMED_OUT: MsgKey = "self_test.timed_out";
-export const LEVELS_MIN_INTERVAL_MS = 100;
 
 /** A dB reading as 0 to 10 lit meter segments (-60 dB and below is silent, 0 dB is full). */
 export const dbToLevel = (db: number | null) => (db === null ? 0 : Math.max(0, Math.min(10, Math.round(((db + 60) / 60) * 10))));
@@ -94,9 +93,6 @@ export function runSelfTest(panel: SelfTestPanel, modelReady: boolean): SelfTest
   const state = selfTestNext(panel.state, { type: "run", modelReady });
   return state === panel.state ? panel : { ...initialSelfTestPanel(state, panel.excludeOwnSounds) };
 }
-
-/** True when a `levels` message should update the meters. */
-export const levelsDue = (lastMs: number | null, nowMs: number) => lastMs === null || nowMs - lastMs >= LEVELS_MIN_INTERVAL_MS;
 
 // @cpt-algo:cpt-noter-algo-ui-first-run-self-test-result:p1
 export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): SelfTestPanel {

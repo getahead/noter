@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCore, type SelfTestEvent, type SelfTestMsg } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import {
-  SYSTEM_AUDIO_MISSING, TIMED_OUT, applySelfTestEvent, initialSelfTestPanel, levelsDue, newAnnouncements, ONE_STREAM_SILENT, OWN_SOUNDS_MESSAGE, runSelfTest,
+  SYSTEM_AUDIO_MISSING, TIMED_OUT, applySelfTestEvent, initialSelfTestPanel, newAnnouncements, ONE_STREAM_SILENT, OWN_SOUNDS_MESSAGE, runSelfTest,
   selfTestNext, type SelfTestInput, type SelfTestPanel, type SelfTestState,
 } from "./self-test";
 
@@ -121,14 +121,6 @@ describe("applySelfTestEvent (cpt-noter-algo-ui-first-run-self-test-result)", ()
 
   it("ignores messages that arrive while no test runs, apart from showing them", () => {
     expect(applySelfTestEvent(initialSelfTestPanel("PERMISSION_MISSING", true), { type: "passed" }).state).toBe("PERMISSION_MISSING");
-  });
-});
-
-describe("levelsDue", () => {
-  it("lets a levels message through at most every 100 ms", () => {
-    expect(levelsDue(null, 0)).toBe(true);
-    expect(levelsDue(1000, 1099)).toBe(false);
-    expect(levelsDue(1000, 1100)).toBe(true);
   });
 });
 
