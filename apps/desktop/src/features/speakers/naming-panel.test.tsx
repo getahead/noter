@@ -48,7 +48,7 @@ const bridge = (over: Record<string, unknown> = {}) =>
       ...over,
     },
     act: async (_k: string, _c: string, run: () => Promise<unknown>) => run(),
-    store: { getState: () => ({ whole: {} }), subscribe: () => () => {} },
+    store: { getState: () => ({ whole: {}, entities: { person: {} } }), subscribe: () => () => {} },
   }) as unknown as Bridge;
 
 const props = (over = {}) => ({

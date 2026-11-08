@@ -38,6 +38,7 @@ const bridgeFor = (answer: unknown, sent: unknown[] = []) =>
       transcriptRenameSpeaker: async (a: unknown) => (sent.push(a), answer),
     },
     act: async (_k: string, _c: string, run: () => Promise<unknown>) => run(),
+    store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} },
   }) as unknown as Bridge;
 
 describe("PersonPicker", () => {
