@@ -406,14 +406,3 @@ export function SummaryNamingPanel({ bridge, callId, detail }: { bridge: Bridge;
     />
   ) : null;
 }
-
-/** Dev server only (App's `#transcript=<call id>`): the stored transcript in a PC-R5 of its own, until the call page lands. */
-export function StoredTranscriptRoute({ bridge, callId }: { bridge: Bridge; callId: string }) {
-  return (
-    <div className="tr-window">
-      <section data-region="PC-R5" className="pc-tr" aria-label={t("transcript.label")}>
-        <StoredTranscript bridge={bridge} callId={callId} />
-      </section>
-    </div>
-  );
-}

@@ -11,7 +11,7 @@ import type { OutputRoute, SegmentView, SpeakerRef } from "../../src/core/bindin
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow, wheelUpTo, type Steer } from "./support/app";
-import { windowReady } from "./support/call-page";
+import { navigate } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const FAKE = process.env.NOTER_CORE !== "stdio";
@@ -152,12 +152,8 @@ function stored(n: number, matching = 0, patch: { audio_deleted?: boolean; audio
     detail.audio_not_stored = !!patch.audio_not_stored;
   };
 }
-/** The call's stored transcript ("Backend sync"). Until Library › Calls (2.13) and the call page (2.14) land, the dev
- *  server's `#transcript=<call id>` route mounts it in the main window without reloading (the core keeps its plan). */
-async function openCall(page: Page, _title: string) {
-  await windowReady(page);
-  await page.evaluate((id) => (location.hash = `transcript=${id}`), W.PAST_CALL);
-}
+/** The call's stored transcript ("Backend sync"): the call page's Transcript tab, opened the way the core does. */
+const openCall = (page: Page, _title: string) => navigate(page, "transcript");
 /** What the core does by itself when the route flips during replay: it stops and says why (the fake only publishes what a test hands it). */
 async function routeFlips(page: Page, steer: Steer) {
   await steer.change((w) => route(w, "speakers"));
@@ -408,7 +404,7 @@ test.describe("cpt-noter-flow-ui-live-transcript-stored", () => {
   });
 
   for (const [name, patch, header] of [
-    ["Audio deleted", { audio_deleted: true }, /^Audio deleted · transcript kept/], // D-36: no deletion date in M1
+    ["Audio deleted", { audio_deleted: true }, /Audio deleted · transcript kept/], // D-36: no deletion date in M1
     ["Audio not stored", { audio_not_stored: true }, /Audio not stored for this call/],
   ] as const) {
     test(`UI — empty path: ${name} — no play controls, the header says why, the rows stay readable`, async ({ page }) => {

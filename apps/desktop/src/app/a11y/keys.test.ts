@@ -120,6 +120,11 @@ describe("handleShortcut", () => {
     expect(handleShortcut(e, [{}])).toBe(false);
     expect(e.preventDefault).not.toHaveBeenCalled();
   });
+  it("leaves an event another handler already consumed", () => {
+    const run = vi.fn();
+    expect(handleShortcut(ev("KeyA", { defaultPrevented: true }), [{ KeyA: run }])).toBe(false);
+    expect(run).not.toHaveBeenCalled();
+  });
   it("useShortcuts returns a handler over the table", () => {
     const run = vi.fn();
     useShortcuts({ KeyA: run })(ev("KeyA"));

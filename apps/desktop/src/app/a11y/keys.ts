@@ -11,6 +11,7 @@ type Mods = Pick<
   Partial<Pick<KeyboardEvent, "isComposing" | "repeat">>;
 export type ShortcutEvent = Mods & {
   target: EventTarget | null;
+  defaultPrevented?: boolean;
   preventDefault(): void;
   stopPropagation(): void;
 };
@@ -85,11 +86,12 @@ export function matchShortcut(
 
 // @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
 // @cpt-dod:cpt-noter-dod-ui-accessibility-l10n-keyboard:p1
-/** Runs the matched action and consumes the event; true when one ran. */
+/** Runs the matched action and consumes the event; true when one ran. An event a deeper handler already consumed is left alone (⌘F: the transcript's find bar, not the shell's search). */
 export function handleShortcut(
   e: ShortcutEvent,
   tables: ShortcutTable[],
 ): boolean {
+  if (e.defaultPrevented) return false;
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-user-key
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-shortcut
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-match-key
@@ -108,10 +110,11 @@ export function handleShortcut(
 export const useShortcuts = (table: ShortcutTable) => (e: ShortcutEvent) =>
   void handleShortcut(e, [table]);
 
-export function useWindowShortcuts(table: ShortcutTable): void {
+/** `first`: listen before the window's other tables (capture phase), so a page's chord beats the shell's. */
+export function useWindowShortcuts(table: ShortcutTable, first = false): void {
   useEffect(() => {
     const on = (e: KeyboardEvent) => void handleShortcut(e, [table]);
-    window.addEventListener("keydown", on);
-    return () => window.removeEventListener("keydown", on);
-  }, [table]);
+    window.addEventListener("keydown", on, first);
+    return () => window.removeEventListener("keydown", on, first);
+  }, [table, first]);
 }
