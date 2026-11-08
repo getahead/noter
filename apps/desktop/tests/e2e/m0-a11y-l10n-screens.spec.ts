@@ -94,8 +94,20 @@ async function walk(page: Page, key: "Tab" | "Shift+Tab", limit: number): Promis
   return reached;
 }
 
+/** Wait until the set of Tab stops stops changing (a streaming line, a late chip), so the walk is not racing the page's own updates. */
+async function settleTabbable(page: Page): Promise<void> {
+  let last = -1;
+  for (let same = 0; same < 4; ) {
+    await page.waitForTimeout(100);
+    const n = await markTabbable(page);
+    same = n === last ? same + 1 : 0;
+    last = n;
+  }
+}
+
 /** The controls (by identity) that `key` never lands on in a walk from the page start; Tab-reachable ones are all of them, or the screen traps focus. */
 async function unreachable(page: Page, key: "Tab" | "Shift+Tab"): Promise<{ missed: string[]; reached: number; total: number }> {
+  await settleTabbable(page);
   await page.evaluate(() => document.querySelectorAll("[data-kbd]").forEach((e) => e.removeAttribute("data-kbd")));
   let total = await markTabbable(page);
   const reached = await walk(page, key, total + 5);
