@@ -6,23 +6,20 @@
 import type { CallWindowState, TranscriptMsg } from "../../src/core/bindings";
 import { ahead, ok, until } from "../support/results";
 import * as W from "../support/world-presets";
-import { changeAhead, expect, given, test, versionsGrow } from "./support/fixtures";
+import { expect, given, test, versionsGrow } from "./support/fixtures";
 
 test.describe("cpt-noter-seq-floating-panel-display-unplugged", () => {
   test("happy path: unplug the display, the same call goes on in the floating panel, ⌃⌥⌘2 pins card 2", async ({ scenario }) => {
     const screen = scenario.core("call-screen");
     const windows = await scenario.events("window:call");
-    const before = ahead(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
-    if (!before) return; // transcript_subscribe (M1)
-    const call = ahead(await screen.windowCallState({}));
-    if (!call) return; // window_call_state (M1)
+    const before = ok(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
+    const call = ok(await screen.windowCallState({}));
     expect(call.layout).toBe("dedicated");
 
     await scenario.change(W.laptopOnly); // the external display is unplugged
     // The core re-evaluates the layout on a display change; re-sending the saved preference
     // (wanted state, harmless to repeat) makes the fake do the same.
-    const panel = ahead(await screen.windowSetCallLayout({ preference: "auto" }));
-    if (!panel) return; // window_set_call_layout (M1)
+    const panel = ok(await screen.windowSetCallLayout({ preference: "auto" }));
     expect(panel.layout).toBe("floating");
     await until(() => windows.latest()?.layout === "floating", "window:call floating");
     expect(versionsGrow(windows.all)).toBe(true);
@@ -39,8 +36,7 @@ test.describe("cpt-noter-seq-floating-panel-display-unplugged", () => {
   test("empty path — Display connected again: the panel closes, the call screen fills the external display", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    const panel = ahead(await screen.windowSetCallLayout({ preference: "auto" }));
-    if (!panel) return; // window_set_call_layout (M1)
+    const panel = ok(await screen.windowSetCallLayout({ preference: "auto" }));
     expect(panel.layout).toBe("floating");
 
     await scenario.change((w) => {
@@ -82,10 +78,9 @@ test.describe("cpt-noter-seq-floating-panel-collapse-strip", () => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
     const windows = await scenario.events("window:call");
-    if (!ahead(await screen.windowSetCallLayout({ preference: "floating" }))) return; // window_set_call_layout (M1)
+    ok(await screen.windowSetCallLayout({ preference: "floating" })); // window_set_call_layout (M1)
 
-    const collapsed = ahead(await screen.windowSetCollapsed({ collapsed: true }));
-    if (!collapsed) return; // window_set_collapsed (M1)
+    const collapsed = ok(await screen.windowSetCollapsed({ collapsed: true }));
     expect(collapsed.collapsed).toBe(true);
     await until(() => windows.latest()?.collapsed === true, "window:call collapsed");
     const got: TranscriptMsg[] = [];
@@ -103,7 +98,7 @@ test.describe("cpt-noter-seq-floating-panel-collapse-strip", () => {
   test("other path — Pin from the strip: Pin on the newest card, the strip stays collapsed", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    if (!ahead(await screen.windowSetCollapsed({ collapsed: true }))) return; // window_set_collapsed (M1)
+    ok(await screen.windowSetCollapsed({ collapsed: true })); // window_set_collapsed (M1)
     const cards = ahead(await screen.cardsSubscribe({ call_id: W.LIVE_CALL }, () => {}));
     const newest = cards?.visible.at(-1);
     if (newest) expect(ahead(await screen.cardPin({ card_id: newest.id }))?.card.state).toBe("pinned");
@@ -114,12 +109,11 @@ test.describe("cpt-noter-seq-floating-panel-collapse-strip", () => {
   test("error path — Capture notice while collapsed: The call seems to have ended, Keep Recording, back to one line", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    if (!ahead(await screen.windowSetCollapsed({ collapsed: true }))) return; // window_set_collapsed (M1)
-    if (!(await changeAhead(scenario, "M1", (w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 })))) return; // capture notice (M1)
+    ok(await screen.windowSetCollapsed({ collapsed: true })); // window_set_collapsed (M1)
+    await given(scenario, (w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 }));
 
     expect(ok(await screen.appSnapshot({})).capture.notice?.type).toBe("call_ended"); // the strip expands for the notice
-    const kept = ahead(await screen.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "keep_recording" }));
-    if (!kept) return; // capture_answer_call_end (M1)
+    const kept = ok(await screen.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "keep_recording" }));
     expect(kept).toMatchObject({ phase: "recording", notice: null });
     expect(ok(await screen.windowSetCollapsed({ collapsed: true })).collapsed).toBe(true); // back to one line
   });
@@ -127,7 +121,7 @@ test.describe("cpt-noter-seq-floating-panel-collapse-strip", () => {
   test("empty path — Copilot muted while collapsed: Copilot muted in the strip, recording dot and clock still in view", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    if (!ahead(await screen.windowSetCollapsed({ collapsed: true }))) return; // window_set_collapsed (M1)
+    ok(await screen.windowSetCollapsed({ collapsed: true })); // window_set_collapsed (M1)
     const muted = ahead(await screen.copilotMute({ call_id: W.LIVE_CALL, scope: { type: "for_minutes", minutes: 15 } })); // ⌃⌥⌘K (M4 command)
     if (muted) expect(muted.muted).not.toBeNull();
     const snap = ok(await screen.appSnapshot({}));
@@ -141,15 +135,12 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
   test("happy path: Hide to the menu bar, recording goes on, ⌃⌥⌘N brings the panel back as it was", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    const before = ahead(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
-    if (!before) return; // transcript_subscribe (M1)
+    const before = ok(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
 
-    const hidden = ahead(await screen.windowHideCall({})); // Hide
-    if (!hidden) return; // window_hide_call (M1)
+    const hidden = ok(await screen.windowHideCall({})); // Hide
     expect(hidden.visible).toBe(false);
     expect(ok(await scenario.core("main").appSnapshot({})).capture.phase).toBe("recording"); // menu bar icon still recording
-    const back = ahead(await screen.windowShowCall({})); // ⌃⌥⌘N or Open Call Screen
-    if (!back) return; // window_show_call (M1)
+    const back = ok(await screen.windowShowCall({})); // ⌃⌥⌘N or Open Call Screen
     expect(back.visible).toBe(true);
     const after = ok(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
     expect(after.last_seq).toBeGreaterThanOrEqual(before.last_seq); // cards and transcript where they were
@@ -158,8 +149,8 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
   test("error path — Capture problem while hidden: System audio silent, the notification opens the call window with the fix", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    if (!ahead(await screen.windowHideCall({}))) return; // window_hide_call (M1)
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: W.LIVE_CALL, since: Date.now(), confidence: 0.8 })))) return; // degraded (M1)
+    ok(await screen.windowHideCall({})); // window_hide_call (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: W.LIVE_CALL, since: Date.now(), confidence: 0.8 }));
 
     const shown = ahead(await scenario.core("main").windowShowCall({})); // clicking the notification
     if (shown) expect(shown.visible).toBe(true); // window_show_call (M1)
@@ -170,8 +161,7 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
 
   test("error path — Panel closed by a crash: the menu bar still shows recording, ⌃⌥⌘N reopens it with the same transcript", async ({ scenario }) => {
     await given(scenario, W.laptopOnly);
-    const before = ahead(await scenario.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
-    if (!before) return; // transcript_subscribe (M1)
+    const before = ok(await scenario.core("call-screen").transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
 
     const reopened = scenario.reopen("call-screen"); // the WebView crashed; a new one loads
     const snap = ok(await reopened.appSnapshot({})); // snapshot after a crash

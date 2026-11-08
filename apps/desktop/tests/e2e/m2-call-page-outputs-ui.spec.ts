@@ -7,7 +7,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { calls, openWindow } from "./support/app";
+import { calls, coreReady, openWindow } from "./support/app";
 import { banner, body, navigate, openSummary, section, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import * as O from "./support/outputs-world";
@@ -174,7 +174,7 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
 
   test("UI — error path: Outputs failed — the click opens the failed section with Try Again, Try Again writes it", async ({ page }) => {
     await openWindow(page, "main", { world: O.actionItemsFailed });
-    await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+    await coreReady(page);
     await navigate(page, "summary");
     const failed = section(page, /^Action items/);
     await expect(failed.getByRole("button", { name: "Try Again" })).toBeVisible();
@@ -194,7 +194,7 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
 
   test("UI — error path: the call was deleted — a notification click for it opens the frame's not-found state, not a dead Summary", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
-    await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+    await coreReady(page);
     await page.evaluate(async () => {
       const args = { target: { type: "call_page", call_id: "call_deleted", tab: "summary" } };
       const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
@@ -212,7 +212,7 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
         O.outputsOf(w).status = "partially_failed";
       },
     });
-    await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+    await coreReady(page);
     await navigate(page, "summary");
     await section(page, /^Summary/).getByRole("button", { name: "Try Again" }).click();
     await expect(async () => {

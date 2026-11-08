@@ -8,7 +8,7 @@ import type { ChangeRow } from "../../src/core/bindings";
 import { openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { hold } from "./hold";
+import { fakeReady, hold } from "./hold";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown>; latency: number };
 const T0 = 1_792_000_000_000;
@@ -52,7 +52,7 @@ const TIMELINE = '[data-component="cpt-noter-component-ui-history-timeline"]';
 async function open(page: Page, changes: ChangeRow[], fail: Array<{ cmd: "history_list"; code: "change_log_unreadable" }> = []) {
   await openWindow(page, "main", { world: quiet(changes), fail });
   await ready(page);
-  await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: Fake }).__noterFake);
+  await fakeReady(page);
   await page.evaluate((id) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "history" } }), W.PAST_CALL);
   await expect(page.locator(TIMELINE)).toBeVisible();
 }
@@ -134,7 +134,7 @@ test.describe("cpt-noter-dod-ui-history-undo-undo undo strip", () => {
       },
     });
     await ready(page);
-    await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: Fake }).__noterFake);
+    await fakeReady(page);
     await page.evaluate((id) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "history" } }), W.PAST_CALL);
     await page.locator('[data-component="cpt-noter-component-ui-change-row"]').first().getByRole("button", { name: "Undo" }).click();
     await expect(page.locator('[data-component="cpt-noter-component-ui-undo-strip"]')).toHaveAttribute("data-state", "partial");

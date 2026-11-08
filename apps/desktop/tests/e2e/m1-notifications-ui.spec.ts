@@ -7,7 +7,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { calls, openWindow } from "./support/app";
+import { calls, coreReady, openWindow } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
 const PAST_TITLE = "Backend sync";
@@ -19,7 +19,7 @@ const sent = async (page: Page, name: string): Promise<Array<Record<string, unkn
 /** Calls (⌘3), then the recorded call's page the way the core opens it (`window_navigate` → `nav:request`); the Calls list is 2.13's. */
 async function openCallPage(page: Page) {
   await page.keyboard.press("Meta+Digit3");
-  await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+  await coreReady(page);
   await page.evaluate(async (callId) => {
     const args = { target: { type: "call_page", call_id: callId, tab: "transcript" } };
     const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };

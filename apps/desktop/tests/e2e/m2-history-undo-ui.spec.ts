@@ -5,7 +5,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { calls, openWindow } from "./support/app";
+import { calls, coreReady, openWindow } from "./support/app";
 import * as O from "./support/outputs-world";
 import { expect, test } from "./support/fixtures";
 
@@ -32,7 +32,7 @@ async function openCall(page: Page, tab: "summary" | "history") {
   await expect(toolbar(page)).toContainText(O.TITLE);
 }
 async function navigate(page: Page, tab: "summary" | "history") {
-  await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+  await coreReady(page);
   await page.evaluate(
     async ([id, view]) => {
       const args = { target: { type: "call_page", call_id: id, tab: view } };

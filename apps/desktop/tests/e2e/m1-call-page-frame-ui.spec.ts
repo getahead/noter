@@ -12,7 +12,7 @@ import type { Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { calls, openWindow } from "./support/app";
+import { calls, coreReady, openWindow } from "./support/app";
 import { windowReady } from "./support/call-page";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
@@ -65,7 +65,7 @@ async function openCall(page: Page, title = TITLE) {
     await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
   }).toPass();
   const id = title === TITLE ? W.PAST_CALL : W.LIVE_CALL;
-  await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+  await coreReady(page);
   await page.evaluate(async (callId) => {
     const args = { target: { type: "call_page", call_id: callId, tab: "transcript" } };
     const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };

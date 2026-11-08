@@ -9,7 +9,7 @@ import * as W from "../../support/world-presets";
 import type { World } from "../../support/scenario";
 
 export const TITLE = "Backend sync";
-export const WRITER = { from_pass: "live", generated_at: 1792140600000, model: "claude-sonnet", runtime: "claude_api_key", skill: "planning", skill_version: "1.0.0" } as const;
+const WRITER = { from_pass: "live", generated_at: 1792140600000, model: "claude-sonnet", runtime: "claude_api_key", skill: "planning", skill_version: "1.0.0" } as const;
 
 export const outputsOf = (w: World) => w.outputs.find((o) => o.call_id === W.PAST_CALL)!;
 export const sectionOf = (w: World, kind: SectionKind) => outputsOf(w).sections.find((s) => s.kind === kind)!;

@@ -3,10 +3,9 @@
 import type { Locator, Page } from "@playwright/test";
 
 import * as W from "../../support/world-presets";
-import { calls } from "./app";
+import { calls, coreReady } from "./app";
 import { expect } from "./fixtures";
 
-export const PAGE_TITLE = "Backend sync";
 export const banner = (page: Page) => page.locator('[data-region="PC-R2"]');
 export const body = (page: Page) => page.locator('[data-region="PC-R3"]');
 /** A section by its heading name (a labelled region: "Summary", "Decisions", "Action items"…). */
@@ -22,7 +21,7 @@ export const windowReady = (page: Page) => expect(page.locator('[data-region="wi
 /** The core's navigation to a call page tab, as a notification click or a Calls row does it. */
 export async function navigate(page: Page, tab: "summary" | "transcript" | "history" = "summary", callId: string = W.PAST_CALL) {
   await windowReady(page); // a `nav:request` published before the window subscribed to events is lost
-  await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+  await coreReady(page);
   await page.evaluate(
     async ([id, t]) => {
       const args = { target: { type: "call_page", call_id: id, tab: t } };

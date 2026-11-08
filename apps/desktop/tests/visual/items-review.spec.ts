@@ -7,6 +7,7 @@ import { openWindow } from "../e2e/support/app";
 import { threeSuggested, written } from "../e2e/support/outputs-world";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { fakeReady } from "./hold";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 const quiet = (more: (w: World) => void = () => {}) => (w: World) => {
@@ -18,7 +19,7 @@ const quiet = (more: (w: World) => void = () => {}) => (w: World) => {
 async function open(page: Page, world: (w: World) => void) {
   await openWindow(page, "main", { world });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
-  await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: Fake }).__noterFake);
+  await fakeReady(page);
   await page.evaluate((id) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "summary" } }), W.PAST_CALL);
   await expect(page.locator('[data-region="PC-R1"]')).toContainText("Backend sync");
   await expect(page.locator('[data-region="PC-R3"]')).toContainText("Drawer events will ship behind a flag.");

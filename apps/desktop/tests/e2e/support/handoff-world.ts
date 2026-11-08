@@ -19,7 +19,7 @@ export const invoke = (page: Page, cmd: string, args: unknown) =>
   page.evaluate(([c, a]) => (globalThis as unknown as { __TAURI_INTERNALS__: { invoke(c: string, p: unknown): Promise<unknown> } }).__TAURI_INTERNALS__.invoke(c, { args: a }).catch((e: unknown) => { throw new Error(JSON.stringify(e)); }), [cmd, args] as const);
 
 export const ITEM = "itm_replay";
-export const itemOf = (w: World): ItemView => w.items.find((i) => i.id === ITEM)!;
+const itemOf = (w: World): ItemView => w.items.find((i) => i.id === ITEM)!;
 export const callOf = (w: World) => itemOf(w).call.id;
 
 /** The item stands in the written outputs of the past call (both cores take the world: the real one through harness.world_set), so its call page shows it. */
