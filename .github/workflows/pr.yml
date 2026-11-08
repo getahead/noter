@@ -134,11 +134,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+      - id: deny
+        continue-on-error: true
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           # Advisories change daily; they are checked nightly (security.yml) and by Dependabot.
           command: check
           command-arguments: licenses bans sources
+      # The action downloads cargo-deny from GitHub releases (504 on 8 Nov 2026): the same version
+      # (the action's deny_version) is built from crates.io, cached once, and the same check runs.
+      # A real violation fails here too, so nothing is hidden.
+      - id: deny-cache
+        if: steps.deny.outcome == 'failure'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo-tools
+          key: cargo-deny-0.20.2-${{ runner.os }}-${{ runner.arch }}
+      - if: steps.deny.outcome == 'failure'
+        run: |
+          [ -x "$HOME/.cargo-tools/bin/cargo-deny" ] || cargo install --locked --root "$HOME/.cargo-tools" cargo-deny --version 0.20.2
+          "$HOME/.cargo-tools/bin/cargo-deny" check licenses bans sources
+      - if: steps.deny.outcome == 'failure' && github.ref == 'refs/heads/main' && steps.deny-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo-tools
+          key: ${{ steps.deny-cache.outputs.cache-primary-key }}
 
   workflows:
     name: Workflow lint (actionlint, zizmor)
