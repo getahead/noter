@@ -20,7 +20,7 @@ import { dbToLevel } from "../first-run/self-test";
 import { capsOf } from "../settings/accelerator";
 import { elapsedSeconds } from "../shell/live-row";
 import { modeIndicator } from "../shell/mode-indicator";
-import { tickWhile } from "../shell/shell-effects";
+import { leaveTimer, tickWhile } from "../shell/shell-effects";
 import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, stopped, windowState, type BannerHandlers, type Seen } from "./model";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
 import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
@@ -94,11 +94,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const [kept, setKept] = useState<{ call: string | null; ids: ReadonlySet<string> }>({ call: null, ids: new Set() });
   const [marked, setMarked] = useState<string | null>(null);
   // the flash ends 2 s after the latest mark, and not after unmount
-  useEffect(() => {
-    if (!marked) return;
-    const timer = setTimeout(() => setMarked(null), 2000);
-    return () => clearTimeout(timer);
-  }, [marked]);
+  useEffect(() => leaveTimer(!!marked, () => setMarked(null), 2000), [marked]);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [continueClosed, setContinueClosed] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());

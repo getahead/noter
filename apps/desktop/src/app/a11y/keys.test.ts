@@ -4,6 +4,7 @@ import {
   chord,
   handleShortcut,
   isTyping,
+  listenKeys,
   matchShortcut,
   useShortcuts,
   type ShortcutEvent,
@@ -129,5 +130,19 @@ describe("handleShortcut", () => {
     const run = vi.fn();
     useShortcuts({ KeyA: run })(ev("KeyA"));
     expect(run).toHaveBeenCalled();
+  });
+});
+
+describe("listenKeys", () => {
+  it("listens for keydown in the chosen phase and stops on cleanup", () => {
+    const run = vi.fn();
+    const target = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    const stop = listenKeys({ KeyA: run }, true, target);
+    const [type, on, capture] = target.addEventListener.mock.calls[0]!;
+    expect([type, capture]).toEqual(["keydown", true]);
+    on(ev("KeyA"));
+    expect(run).toHaveBeenCalledOnce();
+    stop();
+    expect(target.removeEventListener).toHaveBeenCalledWith("keydown", on, true);
   });
 });
