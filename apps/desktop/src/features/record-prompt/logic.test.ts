@@ -73,6 +73,18 @@ describe("createPromptTimer (15 s, paused while the pointer or focus is on the p
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
+  it("created while the pointer is on the panel it does not run until the pointer leaves", () => {
+    const done = vi.fn();
+    const t = createPromptTimer(15_000, done, true);
+    vi.advanceTimersByTime(60_000);
+    expect(done).not.toHaveBeenCalled();
+    t.resume();
+    vi.advanceTimersByTime(14_999);
+    expect(done).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(done).toHaveBeenCalledOnce();
+  });
+
   it("fires once after 15 s", () => {
     const done = vi.fn();
     createPromptTimer(15_000, done);
