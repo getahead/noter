@@ -1,6 +1,6 @@
 // MW-R2: the glass sidebar of the prototype's `sidebar()` (src/js/05-shell.js): the live-call row, the
 // eight sections in three groups with their badges, and the status footer with the mode indicator.
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { callTime, t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -10,6 +10,14 @@ import type { ModeView } from "./mode-indicator";
 import { ModeIndicator } from "./mode-indicator-view";
 import type { SectionKey } from "./history";
 import { GROUPS } from "./sections";
+import { tickWhile } from "./shell-effects";
+
+/** The live call: `seconds(now)` is read by the row alone, which owns the one-second clock. */
+export interface LiveCall {
+  title: string;
+  paused: boolean;
+  seconds: (now: number) => number;
+}
 
 export interface SidebarProps {
   selected: SectionKey;
@@ -18,7 +26,7 @@ export interface SidebarProps {
   problems: number;
   /** `outputs:progress`: a call's outputs are being written (the glyph beside Calls). */
   writing?: boolean;
-  live: { title: string; paused: boolean; seconds: number } | null;
+  live: LiveCall | null;
   mode: ModeView;
   /** The footer line (**Idle · API key · local fallback ready**, **Recording · Planning**…). */
   footer: string;
@@ -32,6 +40,30 @@ export interface SidebarProps {
   onOpenPrivacy: () => void;
 }
 
+// Its own clock, so a recording re-renders this button each second and not the page beside it.
+function LiveRow({ live, onShowCall }: { live: LiveCall; onShowCall: () => void }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => tickWhile(!live.paused, setNow), [live.paused]);
+  return (
+    <SourceListLive>
+      <button
+        type="button"
+        className="np-recind np-recind--row"
+        data-component="cpt-noter-component-ui-recording-indicator"
+        data-variant="live-row"
+        data-state={live.paused ? "paused" : "recording"}
+        title={t("shell.live_help")}
+        onClick={onShowCall}
+      >
+        <span className={live.paused ? "np-recdot is-paused" : "np-recdot"} aria-hidden="true" />
+        <span className="np-recind__title">{live.title}</span>
+        <span className="np-recind__sep">·</span>
+        {live.paused ? <span>{t("shell.live_paused")}</span> : <span className="np-tnum">{callTime(live.seconds(now))}</span>}
+      </button>
+    </SourceListLive>
+  );
+}
+
 export function Sidebar({ selected, waiting, problems, writing, live, mode, footer, overlay, width, onSelect, onShowCall, onToggle, onOpenPrivacy }: SidebarProps) {
   return (
     <aside className={overlay ? "np-sidebar is-overlay" : "np-sidebar"} data-region="MW-R2" style={{ width }} aria-label={t("shell.sidebar")}>
@@ -40,24 +72,7 @@ export function Sidebar({ selected, waiting, problems, writing, live, mode, foot
       </div>
       <SourceList label={t("shell.sidebar")}>
         {/* @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-live-row */}
-        {live && (
-          <SourceListLive>
-            <button
-              type="button"
-              className="np-recind np-recind--row"
-              data-component="cpt-noter-component-ui-recording-indicator"
-              data-variant="live-row"
-              data-state={live.paused ? "paused" : "recording"}
-              title={t("shell.live_help")}
-              onClick={onShowCall}
-            >
-              <span className={live.paused ? "np-recdot is-paused" : "np-recdot"} aria-hidden="true" />
-              <span className="np-recind__title">{live.title}</span>
-              <span className="np-recind__sep">·</span>
-              {live.paused ? <span>{t("shell.live_paused")}</span> : <span className="np-tnum">{callTime(live.seconds)}</span>}
-            </button>
-          </SourceListLive>
-        )}
+        {live && <LiveRow live={live} onShowCall={onShowCall} />}
         {/* @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-live-row */}
         {GROUPS.map((g) => (
           <Fragment key={g.title ?? "top"}>

@@ -23,7 +23,7 @@ import { modeIndicator } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
 import { shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
-import { actionEvent, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
+import { actionEvent, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
@@ -162,10 +162,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-capture
   const frame = frameState({ snapshotApplied, phase: capture?.phase ?? "idle", hidden: presenting?.hidden ?? false });
   const receivedAt = useMemo(() => Date.now(), [capture?.version]);
-  const [now, setNow] = useState(() => Date.now());
-  const recording = capture?.phase === "recording";
-  useEffect(() => tickWhile(recording, setNow), [recording]);
-  const live = capture && isLive(capture) ? { title: shortTitle(capture.title), paused: capture.phase === "paused", seconds: elapsedSeconds(capture, receivedAt, Math.max(now, receivedAt)) } : null;
+  const live = capture && isLive(capture) ? { title: shortTitle(capture.title), paused: capture.phase === "paused", seconds: (now: number) => elapsedSeconds(capture, receivedAt, Math.max(now, receivedAt)) } : null;
 
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-capture
 
