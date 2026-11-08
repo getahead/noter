@@ -282,6 +282,7 @@ test("cpt-noter-flow-ui-live-transcript-stored — the stored transcript is one 
   await expect(lines.last()).toBeFocused();
   await page.keyboard.press("Home");
   await expect(lines.first()).toBeFocused();
+});
 
 test("cpt-noter-flow-ui-speakers-fix-term — Esc on the Fix Term menu and on the popover returns focus to the line", async ({ page }) => {
   await openWindow(page, "main");
