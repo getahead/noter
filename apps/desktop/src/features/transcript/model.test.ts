@@ -91,6 +91,8 @@ describe("find, spans and meters", () => {
     expect(splitMatch("We add a Replay buffer", "replay")).toEqual(["We add a ", "Replay", " buffer"]);
     expect(splitMatch("nothing", "replay")).toBeNull();
     expect(splitMatch("text", "")).toBeNull();
+    expect(splitMatch("İstanbul plan", "stanbul")).toEqual(["İ", "stanbul", " plan"]); // İ lower-cases to two characters
+    expect(splitMatch("a.b (c) a.b", "(c)")).toEqual(["a.b ", "(c)", " a.b"]); // the query is text, not a pattern
   });
   it("picks the rows a span covers and maps dBFS to meter segments", () => {
     expect(spanKeys(rows, { t0_ms: 3000, t1_ms: 6000 })).toEqual(["a", "b"]);

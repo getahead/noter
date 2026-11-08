@@ -126,18 +126,23 @@ export function rowVariant(seg: SegmentView, variant: Variant, speakers: readonl
   return seg.confidence != null && seg.confidence < LOW_CONFIDENCE ? "low-confidence" : "confirmed";
 }
 
+/** The first case-insensitive match of the trimmed `query` in `text`, as a position in `text` itself. */
+function firstMatch(text: string, query: string): { index: number; length: number } | null {
+  const q = query.trim();
+  if (!q) return null;
+  const m = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "iu").exec(text);
+  return m && { index: m.index, length: m[0].length };
+}
+
 /** Rows whose text contains `query` (case-insensitive); the stored variant's find bar. */
 export function findMatches(rows: readonly Row[], query: string): string[] {
-  const q = query.trim().toLocaleLowerCase();
-  if (!q) return [];
-  return rows.filter((r) => r.kind === "segment" && r.seg.text.toLocaleLowerCase().includes(q)).map((r) => r.key);
+  return rows.filter((r) => r.kind === "segment" && firstMatch(r.seg.text, query)).map((r) => r.key);
 }
 
 /** The text split around the first match, for the match highlight. */
 export function splitMatch(text: string, query: string): [string, string, string] | null {
-  const q = query.trim();
-  const i = q ? text.toLocaleLowerCase().indexOf(q.toLocaleLowerCase()) : -1;
-  return i < 0 ? null : [text.slice(0, i), text.slice(i, i + q.length), text.slice(i + q.length)];
+  const m = firstMatch(text, query);
+  return m && [text.slice(0, m.index), text.slice(m.index, m.index + m.length), text.slice(m.index + m.length)];
 }
 
 /** The rows a span covers (evidence, search result). */
