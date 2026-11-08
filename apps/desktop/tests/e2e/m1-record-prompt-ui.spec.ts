@@ -211,6 +211,20 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     await expect(panel(page)).toHaveCount(0);
   });
 
+  test("UI — empty path: Prompt closed unanswered — a detection that replaces the prompt under the pointer keeps the timer paused", async ({ page }) => {
+    await page.clock.install();
+    const steer = await openWindow(page, "record-prompt", { world: detected(W.APPS.teams) });
+    await expect(panel(page)).toBeVisible();
+    await panel(page).hover();
+    await steer.change((w) => W.detect(w, W.APPS.zoom)); // the core re-sends: a new prompt (a new 15 s timer) with the pointer already on it
+    await expect(panel(page)).toContainText("Zoom");
+    await page.clock.fastForward(20_000);
+    expect(await sent(page, "capture_dismiss_detection")).toEqual([]);
+    await page.mouse.move(0, 0);
+    await page.clock.fastForward(16_000);
+    expect(await sent(page, "capture_dismiss_detection")).toEqual([{ detection_id: `det_${W.APPS.zoom.bundle_id}`, reason: "timed_out" }]);
+  });
+
   test("UI — empty path: Setup incomplete — no prompt is drawn", async ({ page }) => {
     await openWindow(page, "record-prompt", { world: (w) => (W.idle(w), W.selfTestSkipped(w)) });
     await settled(page);

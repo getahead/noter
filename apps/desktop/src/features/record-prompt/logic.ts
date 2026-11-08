@@ -86,11 +86,15 @@ export interface PromptTimer {
 
 // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-pause-timer
 /** The 15 s the prompt waits for an answer; it does not run while the pointer or focus is on the panel (no visible countdown). */
-export function createPromptTimer(ms: number, onElapsed: () => void): PromptTimer {
+export function createPromptTimer(ms: number, onElapsed: () => void, held = false): PromptTimer {
   let left = ms;
-  let since: number | null = Date.now();
-  let id: ReturnType<typeof setTimeout> | null = setTimeout(onElapsed, left);
-  return {
+  let since: number | null = null;
+  let id: ReturnType<typeof setTimeout> | null = null;
+  const arm = () => {
+    since = Date.now();
+    id = setTimeout(onElapsed, left);
+  };
+  const timer: PromptTimer = {
     pause() {
       if (id === null || since === null) return;
       clearTimeout(id);
@@ -100,8 +104,7 @@ export function createPromptTimer(ms: number, onElapsed: () => void): PromptTime
     },
     resume() {
       if (id !== null || left <= 0) return;
-      since = Date.now();
-      id = setTimeout(onElapsed, left);
+      arm();
     },
     stop() {
       if (id !== null) clearTimeout(id);
@@ -109,6 +112,9 @@ export function createPromptTimer(ms: number, onElapsed: () => void): PromptTime
       left = 0;
     },
   };
+  arm();
+  if (held) timer.pause(); // drawn under the pointer: it starts held, and only a leave resumes it
+  return timer;
 }
 // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-pause-timer
 
