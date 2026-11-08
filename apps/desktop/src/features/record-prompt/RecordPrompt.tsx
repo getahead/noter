@@ -103,6 +103,7 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     if (!timed) return;
     const t0 = createPromptTimer(15_000, () => close("timed_out"));
     timer.current = t0;
+    if (held) t0.pause(); // a prompt drawn under the pointer starts held: the effect below reacts only to a change of `held`
     return () => t0.stop();
   }, [timed, key]); // eslint-disable-line react-hooks/exhaustive-deps
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-while-hover
