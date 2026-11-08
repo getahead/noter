@@ -192,8 +192,11 @@ class NoterTestCase: XCTestCase {
 
     /// The same hotkey, pressed through the app's test hook instead of typed: typing goes through Finder and waits for
     /// it to be idle (about 10 s a key). The app takes the chord from a file in its temp folder and runs it like a
-    /// registered global shortcut; `hotkey` keeps one typed test of the delivery itself.
+    /// registered global shortcut; `hotkey` keeps one typed test of the delivery itself. Like a typed chord, it is
+    /// pressed with the other app in front (typing activates it): Noter's windows leave its accessibility tree
+    /// only once the app is no longer frontmost.
     func press(_ key: String) {
+        if other.state != .runningForeground { other.activate() }
         guard let home else { return XCTFail("the app has no temp folder") }
         let file = home.appendingPathComponent("noter-test-hotkey")
         try? "Ctrl+Alt+Super+\(key.uppercased())".write(to: file, atomically: true, encoding: .utf8)
