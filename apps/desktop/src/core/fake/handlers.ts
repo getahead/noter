@@ -1945,8 +1945,14 @@ export const defaultHandlers: Handlers = {
     publish("copilot:status");
     return world.app.presenting;
   },
-  window_navigate: (a, { emit }) => {
-    if (a.target) emit("nav:request", a.target);
+  window_navigate: (a, { world, emit }) => {
+    let target = a.target;
+    // Open Last Summary: the Summary of the latest call whose outputs are ready, as the core resolves it; none, none.
+    if (target?.type === "last_summary") {
+      const latest = world.calls.filter((c) => world.outputs.some((o) => o.call_id === c.id && o.status === "ready")).sort((x, y) => y.started_at - x.started_at)[0];
+      target = latest ? { type: "call_page", call_id: latest.id, tab: "summary", span: null } : null;
+    }
+    if (target) emit("nav:request", target);
     return ack;
   },
   window_report_view: (a, { fake }) => {

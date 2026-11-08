@@ -69,6 +69,7 @@ export function navRoute(target: NavTarget): Route | null {
     case "settings":
     case "first_run":
     case "delete_old_audio": // a sheet over the current page (D-17), not a route
+    case "last_summary": // the core resolves it to the call page before it sends `nav:request`
       return null;
   }
 }

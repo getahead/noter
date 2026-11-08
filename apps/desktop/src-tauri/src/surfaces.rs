@@ -243,6 +243,7 @@ pub fn tray_command(
         // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-if-finish
         // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-navigate
         TrayAction::OpenNoter => navigate(None),
+        TrayAction::OpenLastSummary => navigate(Some(NavTarget::LastSummary)),
         TrayAction::OpenSettings => navigate(Some(NavTarget::Settings {
             pane: SettingsPane::General,
         })),
@@ -253,7 +254,7 @@ pub fn tray_command(
     // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-match-item
 }
 
-const ACTIONS: [TrayAction; 20] = [
+const ACTIONS: [TrayAction; 21] = [
     TrayAction::StartDetected,
     TrayAction::FinishSetup,
     TrayAction::KeepRecording,
@@ -269,6 +270,7 @@ const ACTIONS: [TrayAction; 20] = [
     TrayAction::MarkMoment,
     TrayAction::OpenCallScreen,
     TrayAction::UseFloatingPanel,
+    TrayAction::OpenLastSummary,
     TrayAction::HideForPresenting,
     TrayAction::ShowAfterPresenting,
     TrayAction::OpenNoter,

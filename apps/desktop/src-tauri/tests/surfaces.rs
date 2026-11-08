@@ -314,6 +314,12 @@ fn every_menu_item_runs_its_command_with_the_live_call() {
             json!({ "target": null }),
         ),
         (
+            TrayAction::OpenLastSummary,
+            false,
+            "window_navigate",
+            json!({ "target": { "type": "last_summary" } }),
+        ),
+        (
             TrayAction::OpenSettings,
             false,
             "window_navigate",
