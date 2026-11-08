@@ -24,7 +24,7 @@ export function whenOf(ms: number, now = Date.now()): string {
 export function peopleOf(c: Call, max = 3): string {
   const names = c.participants
     .filter((p) => !p.is_you)
-    .map((p) => p.short_name.replace(/ [A-Z]\.$/, ""));
+    .map((p) => p.short_name.replace(/ \p{Lu}\.$/u, ""));
   if (c.participants.some((p) => p.is_you)) names.push(t("library.you"));
   return names.length > max
     ? `${names.slice(0, max).join(", ")} +${names.length - max}`
