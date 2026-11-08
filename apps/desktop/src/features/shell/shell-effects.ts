@@ -122,6 +122,24 @@ export function openFocus(open: boolean, inspector: Parameters<ReturnType<typeof
   return () => fr.close();
 }
 
+/** The inspector opens for the user, or docks by itself (D81): only the user's open takes focus; the flag is spent either way. */
+export function inspectorFocus(quiet: { current: boolean } | undefined, open: boolean, inspector: Parameters<typeof openFocus>[1], getActive: () => FocusTarget | null): (() => void) | undefined {
+  const mine = !quiet?.current;
+  if (quiet) quiet.current = false;
+  return openFocus(open && mine, inspector, getActive);
+}
+
+/** A page's default inspector docks open without taking focus; there is nothing to silence when it is open already. */
+export function dockQuietly(quiet: { current: boolean }, inspectorOpen: boolean, dispatch: (e: ShellEvent) => void): void {
+  quiet.current = !inspectorOpen;
+  dispatch({ type: "open-inspector" });
+}
+
+/** Where closing the inspector puts focus: the opener, or the content region when nothing had focus (body). */
+export function returnTarget(doc: { activeElement: unknown; body: unknown; querySelector(selector: string): unknown }): FocusTarget | null {
+  return ((doc.activeElement === doc.body ? null : doc.activeElement) ?? doc.querySelector("[data-region=MW-R3]")) as FocusTarget | null;
+}
+
 /**
  * The collapse step for the window as it is drawn: a sidebar that is hidden, or collapsed into an overlay, gives its
  * width back to the content, so a window with the sidebar hidden is not judged Narrow by space it no longer uses.

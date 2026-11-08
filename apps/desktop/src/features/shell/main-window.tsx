@@ -23,7 +23,7 @@ import { modeIndicator } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
 import { shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
-import { actionEvent, createScrollMemory, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
+import { actionEvent, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, tickWhile, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
@@ -112,11 +112,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // A page with a default inspector (Call info) docks it open on arrival at Wide width; it stays closed as an overlay.
   const wide = layout.inspector !== "overlay";
   const quietOpen = useRef(false);
-  useEffect(() => {
-    if (!page.inspector?.openByDefault || !wide) return;
-    quietOpen.current = !shellRef.current.history.inspectorOpen;
-    dispatch({ type: "open-inspector" });
-  }, [routeId, wide]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => void (page.inspector?.openByDefault && wide && dockQuietly(quietOpen, shellRef.current.history.inspectorOpen, dispatch)), [routeId, wide]); // eslint-disable-line react-hooks/exhaustive-deps
   const overlay = layout.sidebar === "overlay";
   const sidebarShown = overlay ? shell.overlayOpen : shell.sidebar;
 

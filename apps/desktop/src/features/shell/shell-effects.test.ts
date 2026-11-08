@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
+import { dockQuietly, inspectorFocus, returnTarget, layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
 
 describe("shell actions", () => {
   it("turns each action into its view-state event", () => {
@@ -193,4 +193,44 @@ it("restores a page's marked return row instead of replacing its focus with the 
   focusHeading(root);
   expect(row.focus).toHaveBeenCalled();
   expect(heading.focus).not.toHaveBeenCalled();
+});
+
+describe("the inspector and focus (D81)", () => {
+  const inspector = { focus: vi.fn() };
+  const opener = { focus: vi.fn(), isConnected: true };
+
+  it("a default inspector docks quietly: the next open takes no focus, and the flag is spent", () => {
+    const quiet = { current: false };
+    const dispatch = vi.fn();
+    dockQuietly(quiet, false, dispatch);
+    expect(dispatch).toHaveBeenCalledWith({ type: "open-inspector" });
+    expect(quiet.current).toBe(true);
+    expect(inspectorFocus(quiet, true, inspector, () => opener)).toBeUndefined();
+    expect(quiet.current).toBe(false);
+    expect(inspector.focus).not.toHaveBeenCalled();
+  });
+
+  it("an inspector open already leaves nothing to silence, so the user's next open takes focus", () => {
+    const quiet = { current: true };
+    dockQuietly(quiet, true, vi.fn());
+    expect(quiet.current).toBe(false);
+    const close = inspectorFocus(quiet, true, inspector, () => opener)!;
+    expect(inspector.focus).toHaveBeenCalledOnce();
+    close();
+    expect(opener.focus).toHaveBeenCalledOnce();
+  });
+
+  it("without a flag the inspector takes focus on open and a close has nothing to return", () => {
+    expect(inspectorFocus(undefined, false, inspector, () => opener)).toBeUndefined();
+    expect(inspectorFocus(undefined, true, inspector, () => opener)).toBeTypeOf("function");
+  });
+
+  it("focus returns to the opener, or to the content region when nothing was focused", () => {
+    const content = { focus: vi.fn() };
+    const body = {};
+    const query = (sel: string) => (sel === "[data-region=MW-R3]" ? content : null);
+    expect(returnTarget({ activeElement: opener, body, querySelector: query })).toBe(opener);
+    expect(returnTarget({ activeElement: body as never, body, querySelector: query })).toBe(content);
+    expect(returnTarget({ activeElement: null, body, querySelector: query })).toBe(content);
+  });
 });

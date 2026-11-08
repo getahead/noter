@@ -8,7 +8,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Route } from "./history";
 import type { PageDef } from "./pages";
-import { leaveTimer, openFocus } from "./shell-effects";
+import { inspectorFocus, leaveTimer, returnTarget } from "./shell-effects";
 
 type Def = NonNullable<PageDef["inspector"]>;
 
@@ -27,12 +27,7 @@ export function InspectorSlot({ def, route, bridge, overlay, onClose, quietOpen 
       }),
     [leaving],
   );
-  // a page's default inspector docks open without taking focus (D81); only a user's open does
-  useEffect(() => {
-    const quiet = quietOpen?.current;
-    if (quietOpen) quietOpen.current = false;
-    return openFocus(def !== undefined && !quiet, ref.current ?? undefined, () => ((document.activeElement === document.body ? null : document.activeElement) ?? document.querySelector("[data-region=MW-R3]")) as HTMLElement | null);
-  }, [def !== undefined]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => inspectorFocus(quietOpen, def !== undefined, ref.current ?? undefined, () => returnTarget(document)), [def !== undefined]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = held.current?.def;
   if (!shown) return null;
   return (
