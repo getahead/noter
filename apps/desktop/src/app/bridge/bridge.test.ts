@@ -176,6 +176,31 @@ describe("streams", () => {
     expect(ids()).toEqual(["s1", "s2", "s3"]); // the script is not played again from event 1
   });
 
+  it("a superseded subscribe that settles late does not clear the newer one's slow mark", async () => {
+    vi.useFakeTimers();
+    const gates: Record<string, () => void> = {};
+    const { b, state } = setup("main", {
+      handlers: {
+        transcript_subscribe: (a) =>
+          new Promise((resolve) => {
+            gates[a.call_id] = () => resolve({ subscription_id: null, call_id: a.call_id, live: false, pass: "archive", archive: null, segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true } as never);
+          }),
+      },
+    });
+    await b.open();
+    const first = b.subscribe("transcript_subscribe", { call_id: "call_a" });
+    await vi.advanceTimersByTimeAsync(400);
+    const second = b.subscribe("transcript_subscribe", { call_id: "call_b" }); // the screen moved to another call
+    await vi.advanceTimersByTimeAsync(400);
+    expect(state().streams.transcript_subscribe?.slow).toBe(true);
+    gates.call_a!();
+    await first;
+    expect(state().streams.transcript_subscribe?.slow).toBe(true); // call_b is still loading
+    gates.call_b!();
+    await second;
+    expect(state().streams.transcript_subscribe?.slow).toBe(false);
+  });
+
   it("ended with lagged resubscribes; any other reason ends the stream", async () => {
     vi.useFakeTimers();
     const { b, fake, count, state } = setup();

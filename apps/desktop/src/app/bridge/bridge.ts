@@ -331,8 +331,9 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       args,
       receive as (m: ChannelMessages[K]) => void,
     );
-    const res = await slowAfter(subscribing, (slow) =>
-      setStream(cmd, { slow }),
+    const res = await slowAfter(
+      subscribing,
+      (slow) => current() && setStream(cmd, { slow }), // a superseded call must not write into the newer one's slice
     );
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-call-subscribing
     if (!current()) {
