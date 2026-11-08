@@ -1496,6 +1496,11 @@ async fn connection(core: Weak<Core>, stream: UnixStream) {
             n = got => if !matches!(n, Ok(n) if n > 0 && n as u64 <= MAX_FRAME) { return },
             () = ended => return,
         }
+        // `select!` may take the request when both are ready: a run closed before the request was
+        // read still gets no answer, never a refusal that races the connection's end.
+        if bound.as_ref().is_some_and(|t| *t.cancel.borrow()) {
+            return;
+        }
         let Some(core) = core.upgrade() else { return };
         let mut bytes = to_json(&core.answer(&line, &mut bound).await)
             .to_string()
