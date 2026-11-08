@@ -761,20 +761,6 @@ impl<R: Runtime> TauriSurfaces<R> {
     }
 
     /// The core the menu bar's clicks go to, once it opened.
-    /// The windows Show Noter will bring back, in that order.
-    pub fn hidden_for_presenting(&self) -> Vec<WindowLabel> {
-        self.hidden
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
-    }
-
-    /// A surface the core closed while Noter was hidden must not come back on Show Noter.
-    fn forget_hidden(&self, label: WindowLabel) {
-        let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
-        hidden.retain(|l| *l != label);
-    }
-
     /// The core the menu bar's clicks go to, once it opened; it rebuilds the menu every second
     /// for the clock and the countdowns while the core lives.
     pub fn attach(&self, core: &Arc<Core>) {
@@ -787,6 +773,20 @@ impl<R: Runtime> TauriSurfaces<R> {
             core.refresh_tray();
         });
         // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
+    }
+
+    /// The windows Show Noter will bring back, in that order.
+    pub fn hidden_for_presenting(&self) -> Vec<WindowLabel> {
+        self.hidden
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// A surface the core closed while Noter was hidden must not come back on Show Noter.
+    fn forget_hidden(&self, label: WindowLabel) {
+        let mut hidden = self.hidden.lock().unwrap_or_else(|e| e.into_inner());
+        hidden.retain(|l| *l != label);
     }
 
     /// Shows the latest model `set_tray` was given; on the main thread only.
