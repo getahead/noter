@@ -40,6 +40,10 @@ export function onScroll(f: Follow, p: ScrollPos, prevTop: number, row: number, 
 export const newLines = (f: Follow, confirmed: number) => (f.following ? 0 : Math.max(0, confirmed - f.base));
 // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-count
 
+/** A popover anchored to a row holds the log still: detached, no new-lines count; the real state follows again after. */
+export const holdFollow = (f: Follow, hold: boolean, confirmed: number): Follow =>
+  hold && f.following ? { following: false, base: confirmed } : f;
+
 export interface Window {
   start: number;
   end: number;

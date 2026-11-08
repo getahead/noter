@@ -1,7 +1,7 @@
 // Transcript view (DESIGN › Transcript view; prototype src/js/20-b-components.js C.transcriptView): the virtualised log
 // of a call in its live, tail and stored variants. It follows live speech while the user is at the end, detaches with
 // Jump to Live when they scroll up, and draws only the rows in view. It owns no segments and never announces lines.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { SegmentView, SpeakerView, TextRange } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -10,7 +10,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { LevelMeter } from "../../ui/primitives/level-meter";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
-import { LogScroller, newLines, viewState, type Follow, type RowList } from "./follow";
+import { holdFollow, LogScroller, newLines, viewState, type Follow, type RowList } from "./follow";
 import { moveFocus } from "../../ui/primitives/roving";
 import { findMatches, lineKey, meterLevel, tabStop, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
@@ -66,22 +66,14 @@ export function TranscriptView(p: TranscriptViewProps) {
   const [pos, setPos] = useState({ top: 0, height: 800 });
   const confirmed = segments(rows);
   const [follow, setFollow] = useState<Follow>({ following: live, base: confirmed });
-  const following = useRef(follow.following);
-  following.current = follow.following;
-  const confirmedNow = useRef(confirmed);
-  confirmedNow.current = confirmed;
-  useEffect(() => {
-    if (!p.holdFollow || !following.current) return;
-    setFollow({ following: false, base: confirmedNow.current });
-    return () => setFollow({ following: true, base: confirmedNow.current });
-  }, [p.holdFollow]);
+  const held = holdFollow(follow, !!p.holdFollow, confirmed); // what the view shows; the real follow state resumes when the hold ends
   const [find, setFind] = useState<{ query: string; at: number } | null>(null);
   const [lastFocus, setLastFocus] = useState<string | null>(null);
   const [status, setStatus] = useState<{ key: string; text: string } | null>(null);
   const keys = useMemo(() => rows.map((r) => r.key), [rows]);
   const matches = useMemo(() => (find ? findMatches(rows, find.query) : []), [rows, find]);
   const current = matches.length ? matches[(((find?.at ?? 0) % matches.length) + matches.length) % matches.length] : undefined;
-  const state = viewState({ error: !!p.error, loaded: p.loaded, waiting: !!p.waiting, follow, find: !!find });
+  const state = viewState({ error: !!p.error, loaded: p.loaded, waiting: !!p.waiting, follow: held, find: !!find });
   const el = () => scroller.current;
 
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-jump
@@ -100,7 +92,7 @@ export function TranscriptView(p: TranscriptViewProps) {
   useLayoutEffect(() => {
     const area = el();
     if (!area || !list.current) return;
-    const changed = log.current.afterRender(area, list.current as unknown as RowList, keys, follow.following && live, smooth());
+    const changed = log.current.afterRender(area, list.current as unknown as RowList, keys, held.following && live, smooth());
     if (changed || area.clientHeight !== pos.height) setPos({ top: area.scrollTop, height: area.clientHeight });
   });
 
@@ -135,7 +127,7 @@ export function TranscriptView(p: TranscriptViewProps) {
   const win = variant === "tail" ? { start: 0, end: rows.length, before: 0, after: 0 } : log.current.window(keys, pos.top, pos.height);
   const shown = rows.slice(win.start, win.end);
   const stopKey = tabStop(shown, lastFocus);
-  const count = newLines(follow, confirmed);
+  const count = newLines(held, confirmed);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-user-scroll
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-follow
   const scroll = () => {
