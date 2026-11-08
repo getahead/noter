@@ -318,6 +318,7 @@ export function NewPersonForm(p: NewFormProps) {
           className="np-field__input"
           type="text"
           aria-label={label}
+          autoFocus={name === "name"} // the combobox that had focus unmounted with the list
           placeholder={placeholder}
           aria-invalid={(msg && form.shown) || undefined}
           value={form[name]}
