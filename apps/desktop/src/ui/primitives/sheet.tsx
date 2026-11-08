@@ -61,7 +61,7 @@ export function Sheet({ title, width, busy, onCancel, onDefault, children }: She
         aria-modal="true"
         aria-label={title}
         style={width ? { width } : undefined}
-        onKeyDown={(e) => sheetKey(e, onCancel, onDefault)}
+        onKeyDown={(e) => sheetKey(e, onCancel, busy ? undefined : onDefault)}
       >
         {children}
       </div>
