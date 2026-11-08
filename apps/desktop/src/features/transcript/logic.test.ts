@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CaptureState, PlaybackState } from "../../core/bindings";
-import { atEnd, LogScroller, measure, newLines, onScroll, viewState, windowOf } from "./follow";
+import { atEnd, holdFollow, LogScroller, measure, newLines, onScroll, viewState, windowOf } from "./follow";
 import { after, holdChannel, showSpan, spanArchiveNote } from "./hosts";
 import { buildRows, lineKey, tabStop } from "./model";
 import { barState, scrubRange, type Replay } from "./playback";
@@ -43,6 +43,12 @@ describe("playControl (cpt-noter-algo-ui-live-transcript-play-control)", () => {
 });
 
 describe("follow output (cpt-noter-algo-ui-live-transcript-follow-output)", () => {
+  it("holdFollow detaches a following log without a new-lines count, and leaves a detached one alone", () => {
+    expect(holdFollow({ following: true, base: 3 }, true, 9)).toEqual({ following: false, base: 9 });
+    expect(holdFollow({ following: true, base: 3 }, false, 9)).toEqual({ following: true, base: 3 });
+    expect(holdFollow({ following: false, base: 3 }, true, 9)).toEqual({ following: false, base: 3 });
+  });
+
   const pos = (scrollTop: number) => ({ scrollTop, clientHeight: 500, scrollHeight: 2000 });
   it("is at the end within one row", () => {
     expect(atEnd(pos(1480), 32)).toBe(true);

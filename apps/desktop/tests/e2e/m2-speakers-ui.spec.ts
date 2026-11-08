@@ -31,6 +31,8 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     expect(await sent(page, "window_show_call")).toHaveLength(focusRequests + 1);
     await expect(rename).toContainText("In this call");
     await expect(rename.getByRole("radio", { name: "Whole call" })).toBeChecked();
+    const log = transcript(page).locator('[data-component="cpt-noter-component-ui-transcript-view"]');
+    await expect(log).toHaveAttribute("data-state", "detached"); // the log holds still under its popover instead of scrolling the label away
 
     await page.keyboard.press("ArrowDown");
     await expect(rename.getByRole("option", { selected: true })).toContainText(/Pavel|Anna|Dmitri/);
@@ -44,6 +46,7 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await expect(transcript(page).getByText("Speaker 3")).toHaveCount(0); // every line of the call carries the name
     await page.keyboard.press("Escape");
     await expect(rename).toHaveCount(0);
+    await expect(log).toHaveAttribute("data-state", "following"); // and follows the call again once it closes
   });
 
   test("UI — happy path: Return picks the highlighted person and renames without the mouse", async ({ page }) => {
