@@ -17,6 +17,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#393](https://github.com/getahead/noter/issues/393) | First-run Checking screenshot | 10 / 4 | [#390](https://github.com/getahead/noter/pull/390) (merged), #423 | open |
 | [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | none yet | open |
 | [#400](https://github.com/getahead/noter/issues/400) | Speaker naming Undo restoration | 3 / 1 | [#429](https://github.com/getahead/noter/pull/429) | open |
+| [#438](https://github.com/getahead/noter/issues/438) | Undo on Rejected reads `lastChange` before `item_review` lands (`m2-items-ui.spec.ts`) | 1 / 0 | none yet | open |
 | [#395](https://github.com/getahead/noter/issues/395) | MCP token revocation after closing a run | 1 / 1 | none yet | open |
 | [#414](https://github.com/getahead/noter/issues/414) | Knowledge token-revocation event count | local | [#423](https://github.com/getahead/noter/pull/423) | open |
 | [#418](https://github.com/getahead/noter/issues/418) | Independent account sign-in progress ordering | local | none yet | open |
