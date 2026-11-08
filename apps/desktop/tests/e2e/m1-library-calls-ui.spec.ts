@@ -12,6 +12,7 @@ import type { Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { hold } from "../visual/hold";
 import { calls, openWindow } from "./support/app";
 import { expect, test } from "./support/fixtures";
 import {
@@ -67,18 +68,20 @@ async function openCalls(
   page: Page,
   world: (w: World) => void = () => {},
   plan: { latency?: number } = {},
+  parked?: string,
 ) {
   await watchAlerts(page);
   const steer = await openWindow(page, "main", {
     ...plan,
     world: (w) => (W.idle(w), world(w)),
   });
+  const release = parked ? await hold(page, parked) : undefined;
   // a key pressed before the window's shortcuts are bound is lost on a slow runner, so press until the page is Calls
   await expect(async () => {
     await page.keyboard.press("Meta+Digit3");
     await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  return steer;
+  return Object.assign(steer, { release });
 }
 
 test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
@@ -158,11 +161,13 @@ test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
     ).toHaveCount(0);
   });
 
-  test("UI — slow read: skeleton rows after 300 ms", async ({ page }) => {
-    await openCalls(page, () => {}, { latency: 900 });
+  test("UI — slow read: skeleton rows while the list read is pending", async ({ page }) => {
+    const real = process.env.NOTER_CORE === "stdio"; // only the fake can park one command; the real core answers after a latency
+    const { release } = await openCalls(page, () => {}, real ? { latency: 2_000 } : {}, real ? undefined : "calls_list");
     await expect(
       table(page).locator('[aria-busy="true"], [data-state="loading"]').first(),
-    ).toBeVisible({ timeout: 1_200 });
+    ).toBeVisible();
+    await release?.();
     await expect(page.locator(ROW).first()).toBeVisible();
   });
 

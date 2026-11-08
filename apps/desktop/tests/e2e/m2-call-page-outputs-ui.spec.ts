@@ -134,11 +134,17 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     const steer = await openWindow(page, "main", { world: O.written });
     await openReady(page);
     await steer.failNext("outputs_regenerate", "job_blocked");
+    const real = process.env.NOTER_CORE === "stdio";
+    if (!real) {
+      const now = new Date("2026-11-07T10:00:00Z");
+      await page.clock.install({ time: now });
+      await page.clock.pauseAt(now);
+    }
     await toolbar(page).getByRole("button", { name: "More" }).click();
     await menu(page).getByRole("menuitem", { name: "Regenerate Outputs…" }).click();
     await page.getByRole("dialog", { name: "Regenerate Outputs" }).getByRole("button", { name: "Regenerate", exact: true }).click();
     await expect(page.getByText(/waits for the call to end/i)).toBeVisible();
-    await page.waitForTimeout(1500);
+    if (!real) await page.clock.runFor(60_000); // any timer retry the page armed fires now
     await expect.poll(() => sent(page, "outputs_regenerate")).toHaveLength(1); // no timer retry
   });
 
