@@ -24,13 +24,17 @@ final class HandoffTests: NoterTestCase {
         app.typeKey(.return, modifierFlags: []) // Return opens the selected call's page
         let handoff = app.buttons["Handoff"].firstMatch
         XCTAssertTrue(handoff.waitForExistence(timeout: 10), "the engineering item has no Handoff button — \(screen())", file: file, line: line)
-        // A click on a web button can land on its neighbour in the native window (the Item inspector opened for another
-        // item on CI): reach the button with the keyboard instead, Tab until it has focus and Space runs it.
-        func focused(_ element: XCUIElement) -> Bool { (element.value(forKey: "hasKeyboardFocus") as? Bool) ?? false }
-        for _ in 0..<80 where !focused(handoff) { app.typeKey(.tab, modifierFlags: []) }
-        XCTAssertTrue(focused(handoff), "Tab never reached the Handoff button — \(screen())", file: file, line: line)
-        app.typeKey(" ", modifierFlags: [])
+        pressWithKeyboard(handoff, file: file, line: line)
         XCTAssertTrue(app.buttons["Copy Prompt"].firstMatch.waitForExistence(timeout: 10), "the Handoff drawer did not open — \(screen())", file: file, line: line)
+    }
+
+    /// A click on a web button can land on its neighbour in the native window (the Item inspector opened for another item
+    /// on CI): reach the button with the keyboard instead, Tab until it has focus and Space runs it.
+    private func pressWithKeyboard(_ button: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        func focused(_ element: XCUIElement) -> Bool { (element.value(forKey: "hasKeyboardFocus") as? Bool) ?? false }
+        for _ in 0..<80 where !focused(button) { app.typeKey(.tab, modifierFlags: []) }
+        XCTAssertTrue(focused(button), "Tab never reached \(button.title) — \(screen())", file: file, line: line)
+        app.typeKey(" ", modifierFlags: [])
     }
 
     /// What the window shows, for a failure message: the CI log is the only screen a native failure leaves.
@@ -50,6 +54,47 @@ final class HandoffTests: NoterTestCase {
     private var addMapping: XCUIElement { app.buttons["Add Mapping…"].firstMatch }
     private var choose: XCUIElement { app.buttons["Choose…"].firstMatch }
     private var openButton: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
+
+    /// Maps the unmapped project through Add Mapping… (the folder panel answers with `makeRepo()`), leaving a usable drawer.
+    private func mapRepository(file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "Add Mapping… — \(screen())", file: file, line: line)
+        addMapping.click()
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "Choose… — \(screen())", file: file, line: line)
+        choose.click()
+        XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "the chosen folder saves the mapping", file: file, line: line)
+        XCTAssertTrue(openButton.waitForExistence(timeout: 10), file: file, line: line)
+    }
+
+    /// The failed-open line the drawer shows above its footer (handoff.open_failed).
+    private var openFailed: XCUIElement { app.staticTexts["Couldn't open Claude Code · use Copy Prompt"].firstMatch }
+    /// The item row's status chip (items.handed_off).
+    private var handedOff: XCUIElement { app.staticTexts["Handed off · awaiting PR"].firstMatch }
+
+    func test_cpt_noter_seq_call_page_hand_off_item__automation_denied() {
+        // The launch plan says macOS refused Automation: Open fails, nothing is marked Handed off, Copy Prompt stays.
+        app.launchEnvironment["NOTER_TEST_LAUNCH_WORLD"] = #"{"plan":{"path":"terminal","needs_automation":false,"automation_denied":true}}"#
+        answers([makeRepo()])
+        launch("handoff")
+        openDrawer()
+        mapRepository()
+        // not ⌘Return: after a denial the core makes Copy the default action, so Open is pressed itself
+        pressWithKeyboard(openButton)
+        XCTAssertTrue(openFailed.waitForExistence(timeout: 10), "a denied launch says it could not open — \(screen())")
+        XCTAssertFalse(handedOff.waitForExistence(timeout: 3), "automation denial never marks the item Handed off")
+        XCTAssertTrue(app.buttons["Copy Prompt"].firstMatch.isEnabled, "Copy Prompt stays available")
+    }
+
+    func test_cpt_noter_seq_call_page_hand_off_item__error_no_link_handler_falls_back_to_the_terminal() {
+        // Claude's link and iTerm both refuse: the core falls back to the terminal and the launch counts as opened.
+        app.launchEnvironment["NOTER_TEST_LAUNCH_WORLD"] = #"{"plan":{"path":"claude_cli_link","needs_automation":false,"automation_denied":false},"fail":[{"path":"claude_cli_link","code":"no_link_handler"},{"path":"iterm","code":"no_link_handler"}]}"#
+        answers([makeRepo()])
+        launch("handoff")
+        openDrawer()
+        mapRepository()
+        app.typeKey(.return, modifierFlags: .command)
+        XCTAssertTrue(handedOff.waitForExistence(timeout: 10), "the terminal fallback hands the item off — \(screen())")
+        XCTAssertFalse(openFailed.exists, "a fallback that worked shows no failure")
+    }
 
     func test_cpt_noter_seq_call_page_hand_off_item__error_no_repository_mapped_choose_folder() {
         answers([makeRepo()])
