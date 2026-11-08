@@ -54,6 +54,7 @@ export async function applyFix(bridge: Bridge, segment: SegmentView, range: Text
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-result
 }
 
+// @cpt-dod:cpt-noter-dod-ui-speakers-corrections:p1
 // @cpt-component:cpt-noter-component-ui-term-fix-popover:p1
 export function TermFixPopover({ bridge, segment, range, anchor, onClose, onFixed }: TermFixPopoverProps) {
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-range
