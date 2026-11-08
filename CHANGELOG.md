@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.2](https://github.com/getahead/noter/compare/v0.22.1...v0.22.2) (2026-11-08)
+
+
+### Bug fixes
+
+* **ui:** a record prompt drawn under the pointer starts with its timer paused ([#467](https://github.com/getahead/noter/issues/467)) ([f028d35](https://github.com/getahead/noter/commit/f028d35fd8968ac127be89582435b145aef638a7))
+* **ui:** call info docks without taking focus, and the toolbar h1 is the heading fallback ([#517](https://github.com/getahead/noter/issues/517)) ([011bbd0](https://github.com/getahead/noter/commit/011bbd03d527516c5a565042102460bed59eca88))
+* **ui:** ignore an entity:changed type the bindings do not know ([#515](https://github.com/getahead/noter/issues/515)) ([d51dc86](https://github.com/getahead/noter/commit/d51dc863a19e349dfa98e7c23ddaf0ccb9ec434b))
+* **ui:** the live row keeps titles whose colon has no space after it ([#514](https://github.com/getahead/noter/issues/514)) ([5550ddb](https://github.com/getahead/noter/commit/5550ddb8d159beaf9229c06fe32d1fc2cd5e9ed3))
+* **ui:** the people line drops a trailing initial in any script ([#518](https://github.com/getahead/noter/issues/518)) ([03e860c](https://github.com/getahead/noter/commit/03e860c62aa75f401a29cfbaae25303ca5592b51))
+* **ui:** the transcript find highlight marks the matched characters when lower-casing changes the length ([#519](https://github.com/getahead/noter/issues/519)) ([c715506](https://github.com/getahead/noter/commit/c71550626aa27a7e7c0826ee9ccafe7cfb1e4dc6))
+
 ## [0.22.1](https://github.com/getahead/noter/compare/v0.22.0...v0.22.1) (2026-11-08)
 
 
