@@ -8,11 +8,11 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Route } from "./history";
 import type { PageDef } from "./pages";
-import { leaveTimer, openFocus } from "./shell-effects";
+import { inspectorFocus, leaveTimer, returnTarget } from "./shell-effects";
 
 type Def = NonNullable<PageDef["inspector"]>;
 
-export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: Def | undefined; route: Route; bridge: Bridge; overlay: boolean; onClose: () => void }) {
+export function InspectorSlot({ def, route, bridge, overlay, onClose, quietOpen }: { def: Def | undefined; route: Route; bridge: Bridge; overlay: boolean; onClose: () => void; quietOpen?: { current: boolean } }) {
   // the page that opened it, drawn until it has slid out: the route it leaves for is not its own
   const held = useRef(def && { def, route });
   if (def) held.current = { def, route };
@@ -27,7 +27,7 @@ export function InspectorSlot({ def, route, bridge, overlay, onClose }: { def: D
       }),
     [leaving],
   );
-  useEffect(() => openFocus(def !== undefined, ref.current ?? undefined, () => document.activeElement as HTMLElement | null), [def !== undefined]);
+  useEffect(() => inspectorFocus(quietOpen, def !== undefined, ref.current ?? undefined, () => returnTarget(document)), [def !== undefined]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = held.current?.def;
   if (!shown) return null;
   return (

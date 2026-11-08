@@ -45,8 +45,9 @@ export function createScrollMemory() {
 }
 
 /** Moves focus to the page's first heading after navigation; false when the page has none. */
-export function focusHeading(root: { querySelector(selector: string): HTMLElement | null; scrollTop?: number } | null): boolean {
-  const heading = root?.querySelector("[data-return-focus]") ?? root?.querySelector("h1, h2, h3");
+export function focusHeading(root: { querySelector(selector: string): HTMLElement | null; closest?(selector: string): { querySelector(selector: string): HTMLElement | null } | null; scrollTop?: number } | null): boolean {
+  // the Call page's h1 lives in its toolbar (PC-R1), outside the content region
+  const heading = root?.querySelector("[data-return-focus]") ?? root?.querySelector("h1, h2, h3") ?? root?.closest?.(".np-main")?.querySelector("h1");
   if (!heading) return false;
   heading.tabIndex = -1;
   const top = root!.scrollTop;
@@ -119,6 +120,24 @@ export function openFocus(open: boolean, inspector: Parameters<ReturnType<typeof
   const fr = createFocusReturn(getActive);
   fr.open(inspector);
   return () => fr.close();
+}
+
+/** The inspector opens for the user, or docks by itself (D81): only the user's open takes focus; the flag is spent either way. */
+export function inspectorFocus(quiet: { current: boolean } | undefined, open: boolean, inspector: Parameters<typeof openFocus>[1], getActive: () => FocusTarget | null): (() => void) | undefined {
+  const mine = !quiet?.current;
+  if (quiet) quiet.current = false;
+  return openFocus(open && mine, inspector, getActive);
+}
+
+/** A page's default inspector docks open without taking focus; there is nothing to silence when it is open already. */
+export function dockQuietly(quiet: { current: boolean }, inspectorOpen: boolean, dispatch: (e: ShellEvent) => void): void {
+  quiet.current = !inspectorOpen;
+  dispatch({ type: "open-inspector" });
+}
+
+/** Where closing the inspector puts focus: the opener, or the content region when nothing had focus (body). */
+export function returnTarget(doc: { activeElement: unknown; body: unknown; querySelector(selector: string): unknown }): FocusTarget | null {
+  return ((doc.activeElement === doc.body ? null : doc.activeElement) ?? doc.querySelector("[data-region=MW-R3]")) as FocusTarget | null;
 }
 
 /**
