@@ -135,6 +135,13 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
         }
       }
     }
+    // shortcut: only the undo of a term fix restores its words (a redo keeps the line as it is); the core replays both
+    const fixed = value === "before" && r.entity.kind === "segment" && r.field === "text" ? world.transcripts.flatMap((t) => t.segments).find((x) => x.id === r.entity.id) : undefined;
+    const fix = fixed?.corrections.slice().reverse().find((c) => fixed.text.slice(c.range.start, c.range.end) === r.after);
+    if (fixed && fix) {
+      fixed.text = fixed.text.slice(0, fix.range.start) + r.before + fixed.text.slice(fix.range.end);
+      fixed.corrections.splice(fixed.corrections.indexOf(fix), 1);
+    }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;

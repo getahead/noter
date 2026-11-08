@@ -248,6 +248,10 @@ test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy a
   await expect(fix).toHaveCount(0);
   await expect(text).toContainText("corrected");
   expect(await sent(page, "transcript_fix_term")).toEqual([expect.objectContaining({ replacement: "corrected" })]);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(text).not.toContainText("corrected");
+  await expect(text).toContainText(selected!);
+  expect((await sent(page, "change_undo")).length).toBe(1);
 });
 
 test("cpt-noter-seq-call-page-name-speakers — stale Fix Term refreshes the span and requires reselection", async ({ page }) => {

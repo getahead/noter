@@ -5,7 +5,7 @@ import { find, rendered } from "../../ui/testing";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { SegmentView } from "../../core/bindings";
-import { TermFixPopover } from "./TermFixPopover";
+import { rereadSegment, TermFixPopover } from "./TermFixPopover";
 
 const segment = { id: "seg1", call_id: "c1", text: "send the notification surface", t0_ms: 0, lang: "en" } as unknown as SegmentView;
 const bridge = { core: {}, act: async () => ({ status: "ok", data: { terms: [] } }), store: { setState: () => {} } } as unknown as Bridge;
@@ -41,5 +41,14 @@ describe("TermFixPopover", () => {
     (find(tree, (pr) => "onEnter" in pr).props as { onEnter: () => void }).onEnter();
     (find(tree, (pr) => pr.label === "Add to glossary").props as { onAction: (v: boolean) => void }).onAction(false);
     (find(tree, (pr) => pr.label === "Fix").props as { onAction: () => void }).onAction();
+  });
+  it("rereadSegment puts the core's span lines into the transcript Channel, and ignores a refused read", async () => {
+    const writes: unknown[] = [];
+    const ok = { core: { transcriptSpan: async () => ({ status: "ok", data: { segments: [{ ...segment, text: "fresh" }] } }) }, store: { setState: (f: unknown) => writes.push(f) } } as unknown as Bridge;
+    await rereadSegment(ok, segment);
+    expect(writes).toHaveLength(1);
+    const refused = { core: { transcriptSpan: async () => ({ status: "error" }) }, store: { setState: (f: unknown) => writes.push(f) } } as unknown as Bridge;
+    await rereadSegment(refused, segment);
+    expect(writes).toHaveLength(1);
   });
 });
