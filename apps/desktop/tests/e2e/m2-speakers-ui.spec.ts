@@ -69,6 +69,7 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await page.keyboard.press("Enter"); // on New Person “Zoya”…
     for (const field of ["Name", "Email", "Role"]) await expect(rename.getByRole("textbox", { name: field })).toBeVisible();
     await expect(rename.getByRole("textbox", { name: "Name" })).toHaveValue("Zoya");
+    await expect(rename.getByRole("textbox", { name: "Name" })).toBeFocused(); // the list's combobox is gone: the form takes focus
     await rename.getByRole("textbox", { name: "Email" }).fill("zoya@example.com");
     await rename.getByRole("button", { name: "Create and Name" }).click();
 
