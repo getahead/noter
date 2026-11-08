@@ -5500,7 +5500,7 @@ The council reads past calls, carried-forward items and document sections during
 
 #### Component — Output section
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-output-section`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-output-section`
 
 ##### Why this component exists
 
@@ -5709,7 +5709,7 @@ The review keys are also in the app menu: **Edit › Accept Item**, **Accept All
 
 #### Component — Output item row
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-output-item-row`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-output-item-row`
 
 ##### Why this component exists
 
@@ -5873,7 +5873,7 @@ Owners on action items are only right once the speakers are named. The naming pa
 
 #### Component — Share menu
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-share-menu`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-share-menu`
 
 ##### Why this component exists
 
@@ -6134,7 +6134,7 @@ Handoff prompts, agent skills and the improvement brief are long Markdown texts 
 
 #### Component — Version switcher
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-version-switcher`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-version-switcher`
 
 ##### Why this component exists
 
@@ -6199,7 +6199,7 @@ Summaries, role reviews, handoff prompts and skills keep every generated version
 
 #### Component — Diff view
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-diff-view`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-diff-view`
 
 ##### Why this component exists
 

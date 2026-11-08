@@ -35,11 +35,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-call-page-outputs`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-call-page-outputs`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-call-page-outputs`
+- [x] `p3` - `cpt-noter-feature-ui-call-page-outputs`
 
 ### 1.1 Overview
 
@@ -294,7 +294,7 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 - [x] Copy and export act only on the displayed scope, exclude rejected items and show unreviewed/sensitive notices
 - [x] No success feedback follows a failed or cancelled copy/export/delete
 - [x] Audio deletion preserves transcript, summary and items, removes replay and reports real freed-space totals
-- [ ] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
+- [x] Notification clicks open Summary, visible pages announce readiness once, and live-call notifications wait; with notifications denied, the menu bar and the Call page show every ready and failed state
 
 ## 7. Additional Context
 
