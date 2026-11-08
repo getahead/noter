@@ -115,7 +115,7 @@ function namingState(world: World, callId: string) {
 }
 
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
-function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"]): void {
+function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"], fake: FakeCore): void {
   rows.forEach((r) => {
     if (r.field === "naming" && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
@@ -141,6 +141,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     if (fixed && fix) {
       fixed.text = fixed.text.slice(0, fix.range.start) + r.before + fixed.text.slice(fix.range.end);
       fixed.corrections.splice(fixed.corrections.indexOf(fix), 1);
+      fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [fixed] } }); // the stream carries the restored words
     }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
@@ -1309,7 +1310,7 @@ export const defaultHandlers: Handlers = {
     );
     return { rows: historyRows(world, rows), next_cursor: null, total: rows.length };
   },
-  change_undo: (a, { world, emit }) => {
+  change_undo: (a, { world, emit, fake }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
@@ -1320,11 +1321,11 @@ export const defaultHandlers: Handlers = {
     const undo = open.filter((r) => !editedLater(world, r));
     if (!undo.length) throw coreError("edited_later");
     undo.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
-    replayChanges(world, undo, "before", emit);
+    replayChanges(world, undo, "before", emit, fake);
     return { undone: undo.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: open.length - undo.length };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
-  change_redo: (a, { world, emit }) => {
+  change_redo: (a, { world, emit, fake }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
@@ -1335,7 +1336,7 @@ export const defaultHandlers: Handlers = {
       JSON.stringify(namingState(world, (JSON.parse(r.before!) as ReturnType<typeof namingState>).callId)) === r.before));
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
-    replayChanges(world, redoable, "after", emit);
+    replayChanges(world, redoable, "after", emit, fake);
     redoable.forEach((r) => logChange(world, { entity: r.entity, summary: `Redid: ${r.summary}`, field: r.field, before: r.before, after: r.after }));
     return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: undone.length - redoable.length };
   },
