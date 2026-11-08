@@ -129,7 +129,7 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   const span = o.span;
   const loaded = !!data;
   const [archive, setArchive] = useState<ArchiveNote | null>(null);
-  useEffect(() => void (span && loaded && showSpan(bridge, span, rows, setHighlight)), [span, loaded]);
+  useEffect(() => void (span && loaded && showSpan(bridge, span, rows, setHighlight)), [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
   useEffect(() => void (span ? spanArchiveNote(bridge, span, setArchive) : setArchive(null)), [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => (highlight.length ? after(HIGHLIGHT_MS, () => setHighlight([])) : undefined), [highlight]);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
