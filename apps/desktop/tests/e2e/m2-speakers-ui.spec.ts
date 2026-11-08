@@ -52,6 +52,11 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
     await expect.poll(async () => (await sent(page, "transcript_rename_speaker")).length).toBe(1);
+    expect(await sent(page, "transcript_rename_speaker")).toEqual([
+      expect.objectContaining({ call_id: S.CALL, speaker_id: "spk_3", person: expect.objectContaining({ type: "existing" }) }),
+    ]);
+    await expect(strip(page)).toContainText(new RegExp(`Named Speaker 3 as [^·]* · ${LINES.source}`));
+    await expect(transcript(page).getByText("Speaker 3")).toHaveCount(0);
   });
 
   test("UI — empty path: No matching person — Zoya shows No one called “Zoya” and New Person “Zoya”…, the form has Name, Email, Role, Create and Name says You added Zoya and named Speaker 3 as Zoya", async ({ page }) => {

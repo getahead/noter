@@ -233,6 +233,7 @@ test("cpt-noter-seq-today-review-before-call — quit recovery opens the saved T
   });
   await button(page, "Open Call",).click();
   await expect.poll(() => sent(page, "window_navigate")).toContainEqual({ target: { type: "call_page", call_id: W.LIVE_CALL, tab: "transcript" } });
+  await expect(page.getByRole("tab", { name: "Transcript", exact: true })).toHaveAttribute("aria-selected", "true");
 });
 
 test("cpt-noter-seq-today-tick-item — first use explains where items will appear", async ({ page }) => {
