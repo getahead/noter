@@ -1,12 +1,22 @@
-# Preview builds (docs/DELIVERY.md › Packages): every commit on main, and any PR
-# labelled `build-preview`, produces an installable DMG attached to the run for
-# 14 days. Until the Tauri host exists the job reports "no app yet" and passes.
+# Preview builds (docs/DELIVERY.md › Packages): every commit on main that can change
+# the app, and any PR labelled `build-preview`, produces an installable DMG attached
+# to the run for 14 days. Until the Tauri host exists the job reports "no app yet" and passes.
 name: Preview build
 
 on:
   push:
     branches: [main]
-    paths-ignore: ["docs/**", "**/*.md", ".cf-studio/**"]
+    # Nothing here is built into the app: tests, the harness, docs and notes.
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".cf-studio/**"
+      - "apps/desktop/tests/**"
+      - "harness/**"
+      - "scripts/harness/**"
+      - ".prs/**"
+      - ".plans/**"
+      - ".claude/**"
   pull_request:
     branches: [main]
     types: [labeled, synchronize]

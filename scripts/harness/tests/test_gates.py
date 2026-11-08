@@ -793,7 +793,8 @@ class CiChangesTests(unittest.TestCase):
         unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
         self.assertEqual(unknown, [])
 
-    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "docs"}
+    # The XCUITests drive the built app, UI bundle included: UI code runs macos too.
+    UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "docs", "macos"}
     BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "e2e-report", "docs", "macos"}
 
     def test_frontend_only_change_runs_the_ui_side(self):
@@ -810,8 +811,10 @@ class CiChangesTests(unittest.TestCase):
 
     def test_protocol_change_touches_both_sides(self):
         both = {"unit-rust", "unit-ui", "e2e-core", "e2e-ui", "e2e-coverage", "contract"}
-        for f in ["crates/noter-protocol/src/lib.rs", "contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
+        for f in ["contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
             self.assertLessEqual(both, self.run_jobs([f]), f)
+        # noter-protocol reaches the UI side only through the regenerated files, which `contract` requires.
+        self.assertLessEqual(both - {"unit-ui"}, self.run_jobs(["crates/noter-protocol/src/lib.rs"]))
 
     def test_screenshots_follow_the_ui_and_the_generated_contract(self):
         # noter-protocol reaches the pixels only through the regenerated contracts/** and bindings.ts.
@@ -875,17 +878,61 @@ class CiChangesTests(unittest.TestCase):
         with self.assertRaises(common.HarnessError):
             ci_changes.plan([], cfg, "ci")
 
-    def test_native_tests_tie_e2e_and_macos_together(self):
+    def test_macos_brings_the_e2e_judgement(self):
         native = ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True)
-        tied = ci_changes.apply_repo(ci_changes.plan(["apps/desktop/src/App.tsx"], CFG, "ci"), native)
-        self.assertTrue(tied.jobs["macos"] and tied.jobs["e2e-coverage"])
-        self.assertFalse(tied.jobs["e2e-core"], "the real-core run is still judged on main's logs")
         p = ci_changes.plan(["apps/desktop/src-tauri/src/main.rs"], CFG, "ci")
         tied = ci_changes.apply_repo(p, native)
-        self.assertTrue(tied.jobs["e2e-coverage"])
+        self.assertTrue(tied.jobs["e2e-coverage"] and tied.jobs["e2e-report"])
+        self.assertFalse(tied.jobs["e2e-core"] or tied.jobs["e2e-ui"], "the Linux suites are main's")
         self.assertFalse(ci_changes.apply_repo(ci_changes.plan(["docs/PRD.md"], CFG, "ci"), native).jobs["macos"])
         loose = ci_changes.apply_repo(p, ci_changes.Repo(engine=False, tauri=False, core_harness=False, native_tests=False))
         self.assertFalse(loose.jobs["macos"], "nothing to build on macOS")
+
+    # (files, the jobs they run) for the repository's kinds of change; Repo and main's run as in CI.
+    PLANS = [
+        # #559: screenshot baselines only.
+        (["apps/desktop/tests/visual/__screenshots__/l10n-pseudo.spec.ts/main-german.png"], {"visual"}),
+        (["apps/desktop/tests/visual/primitives.spec.ts"], {"visual", "lint-ui", "arch", "docs"}),
+        (["docs/PRD.md"], {"arch", "docs"}),
+        (["docs/DESIGN.md"], {"arch", "docs", "e2e-coverage", "e2e-report"}),
+        (["apps/desktop/AGENTS.md"], {"arch", "docs"}),
+        (["apps/desktop/tests/native/NoterNativeUITests/MenuBarTests.swift"],
+         {"macos", "e2e-coverage", "e2e-report", "arch", "docs"}),
+        (["apps/desktop/src-tauri/src/main.rs"], {"macos", "e2e-coverage", "e2e-report", "arch", "docs"}),
+        (["engine/Sources/NoterEngineKit/WhisperTranscriber.swift"], {"macos", "e2e-coverage", "e2e-report", "arch", "docs"}),
+        (["apps/desktop/src/App.tsx"], UI_ONLY),
+        (["apps/desktop/src/styles/app.css"], {"lint-ui", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "macos"}),
+        (["crates/noter-core/src/lib.rs"], BACKEND_ONLY),
+        (["scripts/models/manifest.json"], BACKEND_ONLY - {"arch", "docs"}),
+        (["apps/desktop/tests/e2e/m1-floating-panel.spec.ts"],
+         {"e2e-core", "e2e-ui", "e2e-coverage", "e2e-report", "lint-ui", "arch", "docs"}),
+        (["apps/desktop/tests/support/scenario.ts"],
+         {"e2e-core", "e2e-ui", "e2e-coverage", "e2e-report", "unit-ui", "visual", "lint-ui", "arch", "docs"}),
+        (["apps/desktop/tests/perf/window-open.ts"], {"lint-ui", "arch", "docs"}),
+        (["contracts/fixtures/world.json"],
+         {"contract", "unit-rust", "unit-ui", "lint-ui", "e2e-core", "e2e-ui", "e2e-coverage", "e2e-report", "visual"}),
+        ([".github/dependabot.yml"], set()),
+        (["harness/harness.toml"], set(CFG["ci"]["jobs"]["ci"])),
+        (["apps/desktop/new-kind-of-file.bin"], set(CFG["ci"]["jobs"]["ci"])),
+    ]
+
+    def test_each_kind_of_change_runs_exactly_the_jobs_it_can_affect(self):
+        repo = ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True)
+        for files, expected in self.PLANS:
+            p, _, _ = ci_changes.e2e_selection(ci_changes.apply_repo(ci_changes.plan(files, CFG, "ci"), repo), CFG["ci"], "123")
+            p, _ = ci_changes.native_judgement(p, repo, "123")
+            self.assertEqual({j for j, run in p.jobs.items() if run}, expected, files)
+
+    def test_without_macos_e2e_coverage_takes_mains_xcuitest_results(self):
+        repo = ci_changes.Repo(engine=True, tauri=True, core_harness=True, native_tests=True)
+        design = ci_changes.plan(["docs/DESIGN.md"], CFG, "ci")
+        self.assertEqual(ci_changes.native_judgement(design, repo, "123")[1], "123")
+        forced, native = ci_changes.native_judgement(design, repo, "")
+        self.assertEqual((forced.jobs["macos"], native), (True, ""), "no main run to take them from: macos runs")
+        tauri = ci_changes.apply_repo(ci_changes.plan(["apps/desktop/src-tauri/src/main.rs"], CFG, "ci"), repo)
+        self.assertEqual(ci_changes.native_judgement(tauri, repo, "123")[1], "", "macos runs: its own results")
+        docs = ci_changes.plan(["docs/PRD.md"], CFG, "ci")
+        self.assertFalse(ci_changes.native_judgement(docs, repo, "")[0].jobs["macos"], "nothing judged")
 
     def test_verdict_over_partial_runs(self):
         # A frontend-only plan: the skipped backend half passes, a backend half that ran and failed does not.

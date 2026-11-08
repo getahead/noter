@@ -23,7 +23,8 @@ With GITHUB_OUTPUT set it writes `jobs` (JSON object job -> bool; for codeql,
 language -> analyse it rather than carry main's result forward), and for ci the
 facts the macOS and E2E jobs need (`engine`, `tauri`, `core_harness`, `native_tests`), the UI
 flows to re-run (`e2e_specs`: "all", the specs of the touched features, or "") and the run of main
-whose E2E logs judge the rest (`e2e_baseline`, NOTER_E2E_BASELINE; none means every flow runs).
+whose E2E logs judge the rest (`e2e_baseline`, NOTER_E2E_BASELINE; none means every flow runs), and
+the run of main whose XCUITest results e2e-coverage takes when macOS does not run (`native_baseline`).
 
   ci_changes.py verdict    # in an aggregator: RESULTS=toJSON(needs), EXPECTED=the jobs output
 
@@ -131,16 +132,26 @@ class Repo:
 
 
 def apply_repo(p: Plan, repo: Repo) -> Plan:
-    """ci.yml only: the macOS job needs something to build, and with XCUITests the E2E bar
-    is judged over the Linux and the macOS runs together: the XCUITests drive the built app
-    (UI and core), so any E2E run brings the macOS run and the judgement with it. A skipped
-    real-core run is judged on main's logs (e2e-coverage in ci.yml)."""
+    """ci.yml only: the macOS job needs something to build, and with XCUITests its results count
+    toward the E2E bar, so a macOS run brings e2e-coverage (and its report) with it."""
     jobs = dict(p.jobs)
-    if repo.native_tests and any(jobs.get(j) for j in ("e2e-core", "e2e-ui", "e2e-coverage", "macos")):
-        jobs.update({"e2e-coverage": True, "macos": True})
     if not (repo.engine or repo.tauri):
         jobs["macos"] = False
+    if repo.native_tests and jobs.get("macos"):
+        jobs.update({"e2e-coverage": True, "e2e-report": True})
     return Plan(p.workflow, jobs, p.reason, p.files, p.areas)
+
+
+def native_judgement(p: Plan, repo: Repo, baseline: str) -> tuple[Plan, str]:
+    """ci.yml only: e2e-coverage judges the XCUITest results too. Without a macOS run it takes
+    them from main's latest successful run (`native_baseline`); with none to take, macOS runs."""
+    jobs = dict(p.jobs)
+    if not (repo.native_tests and jobs.get("e2e-coverage")) or jobs.get("macos") or not (repo.engine or repo.tauri):
+        return p, ""
+    if baseline:
+        return p, baseline
+    jobs["macos"] = True
+    return Plan(p.workflow, jobs, p.reason, p.files, p.areas), ""
 
 
 PLAYWRIGHT = ("rust", "ui", "protocol", "e2e-suites")   # areas whose files can change a UI flow's result
@@ -284,15 +295,18 @@ def main(argv: list[str] | None = None) -> int:
                 files, reason = None, f"the changed files could not be read ({e})"
         p = plan(files, cfg, args.workflow, reason)
         repo = Repo.at(ROOT)
-        specs = baseline = ""
+        specs = baseline = native_baseline = ""
         if args.workflow == "ci":
             # Explaining a list of files assumes main has a run to take the logs from.
-            p, specs, baseline = e2e_selection(apply_repo(p, repo), cfg["ci"], args.baseline or ("main" if args.files is not None else ""))
+            main_run = args.baseline or ("main" if args.files is not None else "")
+            p, specs, baseline = e2e_selection(apply_repo(p, repo), cfg["ci"], main_run)
+            p, native_baseline = native_judgement(p, repo, main_run)
     except HarnessError as e:
         return fail(str(e))
     flows = "" if args.workflow != "ci" or not any(p.jobs.get(j) for j in ("e2e-core", "e2e-ui", "e2e-coverage")) else (
         f"\nUI flows re-run: {'every spec' if specs == 'all' else specs or 'none'}"
-        + (f"; the rest judged on main's logs (run {baseline})" if baseline else "") + "\n")
+        + (f"; the rest judged on main's logs (run {baseline})" if baseline else "")
+        + (f"\nXCUITest results: main's (run {native_baseline}), macOS does not run" if native_baseline else "") + "\n")
     write_summary(p.summary() + flows)
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
@@ -301,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.workflow == "ci":
                 for k, v in vars(repo).items():
                     f.write(f"{k}={'true' if v else 'false'}\n")
-                f.write(f"e2e_specs={specs}\ne2e_baseline={baseline}\n")
+                f.write(f"e2e_specs={specs}\ne2e_baseline={baseline}\nnative_baseline={native_baseline}\n")
     return 0
 
 

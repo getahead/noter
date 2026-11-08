@@ -45,6 +45,7 @@ jobs:
       native_tests: ${{ steps.c.outputs.native_tests }}
       e2e_specs: ${{ steps.c.outputs.e2e_specs }}
       e2e_baseline: ${{ steps.c.outputs.e2e_baseline }}
+      native_baseline: ${{ steps.c.outputs.native_baseline }}
     permissions:
       contents: read
       actions: read
@@ -252,7 +253,8 @@ jobs:
     # Judged over the real-core logs and the macos job's XCUITest run together (stories and commands
     # proven against the built app count too, HARNESS.md); fake runs never count. A pull request that
     # re-ran only part of the suites (`e2e_baseline` set) is judged on its fresh logs plus the logs of
-    # main's latest successful run for every suite and spec it did not re-run.
+    # main's latest successful run for every suite and spec it did not re-run; one that did not run
+    # macos (`native_baseline` set) is judged on main's XCUITest results.
     needs: [changes, e2e-core, e2e-ui, macos]
     if: >-
       !cancelled() && fromJSON(needs.changes.outputs.jobs)['e2e-coverage'] &&
@@ -290,11 +292,20 @@ jobs:
           echo "Not re-run here: judged on main's run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$BASELINE" | tee -a "$GITHUB_STEP_SUMMARY"
           gh run download "$BASELINE" -R "$GITHUB_REPOSITORY" -n e2e-logs -D coverage/main
       - name: XCUITest results from the macos job
-        if: needs.changes.outputs.native_tests == 'true'
+        if: needs.changes.outputs.native_tests == 'true' && fromJSON(needs.changes.outputs.jobs)['macos']
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-native
           path: coverage/native
+      # Nothing the XCUITests drive changed (harness.toml [ci.jobs.ci] macos): main's results stand.
+      - name: XCUITest results of main's latest successful run, when macos did not run
+        if: needs.changes.outputs.native_baseline != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NATIVE_BASELINE: ${{ needs.changes.outputs.native_baseline }}
+        run: |
+          echo "XCUITest results: main's run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$NATIVE_BASELINE" | tee -a "$GITHUB_STEP_SUMMARY"
+          gh run download "$NATIVE_BASELINE" -R "$GITHUB_REPOSITORY" -n coverage-native -D coverage/native
       - run: |
           args=()
           if [ -n "$BASELINE" ]; then args=(--baseline 'coverage/main/commands-*.json' --rerun-specs "$SPECS"); fi

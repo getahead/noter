@@ -153,11 +153,20 @@ inert = [
 ]
 
 [ci.areas]
-rust = ["crates/**", "Cargo.toml", "Cargo.lock", "perf/**"]
+# Each area is a set of paths some job reads; a job runs when a changed file is in one of its areas
+# (HARNESS.md › What a pull request runs has the table of what each job reads).
+rust = ["crates/**", "Cargo.toml", "Cargo.lock", "perf/**", "scripts/models/**"]   # noter-llm compiles in scripts/models/manifest.json
 protocol = [
   "crates/noter-protocol/**", "contracts/**", "apps/desktop/src/core/**", "apps/desktop/package.json", "Cargo.lock", "pnpm-lock.yaml",
 ]
-ui = ["apps/desktop/**", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]
+# The UI the app bundle is built from: the code, its page, build config and dependencies.
+ui = [
+  "apps/desktop/src/**", "apps/desktop/index.html", "apps/desktop/vite.config.ts", "apps/desktop/tsconfig*.json",
+  "apps/desktop/package.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+]
+# The rest of what `tsc -p apps/desktop/tsconfig.json` reads (tests and configs).
+ui-types = ["apps/desktop/tests/**/*.ts", "apps/desktop/tests/**/*.tsx", "apps/desktop/*.config.ts"]
+ui-unit = ["apps/desktop/vitest.unit.config.ts", "apps/desktop/tests/support/**"]
 tauri = ["apps/desktop/src-tauri/**"]
 native = ["apps/desktop/tests/native/**"]
 engine = ["engine/**"]
@@ -167,8 +176,17 @@ e2e-suites = [
   "apps/desktop/tests/conformance/**", "apps/desktop/tests/e2e/**", "apps/desktop/tests/support/**",
   "apps/desktop/playwright.config.ts", "apps/desktop/vitest.conformance.config.ts",
 ]
+# The screenshot specs, their fixtures and baselines, and the test helpers they import.
+visual = [
+  "apps/desktop/tests/visual/**", "apps/desktop/tests/support/**", "apps/desktop/tests/e2e/support/**",
+  "apps/desktop/playwright.config.ts",
+]
 contracts = ["contracts/**"]
+protocol-rust = ["crates/noter-protocol/**", "Cargo.toml", "Cargo.lock"]   # noter-protocol depends on no other crate (arch)
+bindings = ["apps/desktop/src/core/bindings.ts"]   # written by noter-contract-export, which cov-unit-rust runs with --check
 docs = ["docs/**", ".cf-studio/**", "**/*.md"]
+# What arch_check.py and the trace markers read: source files, crate manifests, entitlements.
+code = ["**/*.rs", "**/*.ts", "**/*.tsx", "**/*.swift", "**/Cargo.toml", "**/*.entitlements"]
 cargo = ["**/Cargo.toml", "**/Cargo.lock", "deny.toml"]
 manifests = [
   "**/Cargo.toml", "**/Cargo.lock", "**/package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
@@ -183,7 +201,6 @@ js-source = [
 
 # An area is excluded from a file that also matches one of these.
 [ci.except]
-ui = ["apps/desktop/src-tauri/**", "apps/desktop/tests/native/**"]
 docs = ["CHANGELOG.md"]   # written by release-please, checked by no job
 
 # The UI flows (Playwright, apps/desktop/tests/e2e) a pull request re-runs: the specs of the features
@@ -235,23 +252,25 @@ specs = ["apps/desktop/tests/e2e/m1-menu-bar.spec.ts"]
 # job = the areas that switch it on ("always": every pull request).
 [ci.jobs.ci]
 lint-rust = ["rust"]
-lint-ui = ["ui"]
-contract = ["protocol"]
-arch = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
+lint-ui = ["ui", "ui-types", "contracts"]
+contract = ["protocol-rust", "contracts", "bindings"]
+arch = ["code", "docs"]
 # Each side's unit coverage and E2E suites run only for that side; a skipped side is unchanged
 # from main (HARNESS.md › What a pull request runs). e2e-core runs the suites against the real core,
 # e2e-ui against the fake world; DESIGN.md alone is judged by e2e-coverage on main's real-core logs.
-unit-rust = ["rust", "protocol"]
-unit-ui = ["ui", "protocol"]
+unit-rust = ["rust", "contracts", "bindings"]
+unit-ui = ["ui", "ui-unit", "contracts"]
 e2e-core = ["rust", "protocol", "e2e-suites"]
-e2e-ui = ["ui", "protocol"]
-e2e-coverage = ["rust", "ui", "protocol", "stories"]
-e2e-report = ["rust", "ui", "protocol", "stories"]   # posts e2e-coverage's report on the pull request
+e2e-ui = ["ui", "protocol", "e2e-suites"]
+# Also switched on with macos (its XCUITest results count); a run without macos takes main's.
+e2e-coverage = ["rust", "ui", "protocol", "e2e-suites", "stories"]
+e2e-report = ["rust", "ui", "protocol", "e2e-suites", "stories"]   # posts e2e-coverage's report on the pull request
 # Screenshots render the UI over the fake world (contracts/fixtures): a noter-protocol change
 # reaches them only through the regenerated contracts/** and bindings.ts, which `contract` enforces.
-visual = ["ui", "contracts"]
-docs = ["rust", "ui", "protocol", "tauri", "native", "engine", "docs"]
-macos = ["rust", "tauri", "native", "engine"]
+visual = ["ui", "visual", "contracts"]
+docs = ["code", "docs"]
+# The XCUITests drive the built app: the UI bundle, the Tauri host (it embeds src/i18n/en.ts) and the core.
+macos = ["rust", "ui", "tauri", "native", "engine"]
 flaky-register = []   # main and the nightly only (its own `if`); never selected for a pull request
 
 [ci.jobs.hygiene]
