@@ -28,10 +28,8 @@ export async function startSelfTest(page: Page, { manual }: { manual?: Steer } =
   const before = await sentRuns();
   const run = page.getByRole("button", { name: "Run Test", exact: true });
   await expect(run).toBeEnabled();
-  // The row above (the microphone meter on the real core) can still shift the button after the click's stability check, and that click hits nothing: press again until the UI has sent the command.
-  await expect(async () => {
-    if ((await sentRuns()) === before) await run.click();
-    expect(await sentRuns()).toBeGreaterThan(before);
-  }).toPass({ timeout: 15_000 });
+  // One press from the keyboard: a mouse click goes to coordinates, and the row above (the microphone meter on the real core) can shift the button after the click's stability check, so the click hits nothing.
+  await run.press("Enter");
+  await expect.poll(sentRuns).toBe(before + 1);
   await expect.poll(async () => (await calls(page)).filter((c) => c.name === "self_test_run" && c.completed).length).toBe(before + 1);
 }
