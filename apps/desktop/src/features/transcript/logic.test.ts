@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CaptureState, PlaybackState } from "../../core/bindings";
 import { atEnd, LogScroller, measure, newLines, onScroll, viewState, windowOf } from "./follow";
 import { after, holdChannel, showSpan, spanArchiveNote } from "./hosts";
-import { buildRows } from "./model";
+import { buildRows, lineKey, tabStop } from "./model";
 import { barState, scrubRange, type Replay } from "./playback";
 import { capturing, playControl, REFUSED } from "./play-control";
 import { seg } from "./testing";
@@ -228,5 +228,24 @@ describe("host effects", () => {
     expect(await note({ status: "ok", data: { archive_change: null } })).toEqual([null]);
     expect(await note({ status: "error", error: { code: "transcript_upgraded", message: "" } })).toEqual([{ change: null }]);
     expect(await note({ status: "error", error: { code: "not_found", message: "" } })).toEqual([null]);
+  });
+});
+
+describe("tabStop (one Tab stop for the transcript)", () => {
+  const rows = buildRows({ segments: [seg("a", 1000), seg("b", 2000)], hypotheses: [], gaps: [{ call_id: "c", t0_ms: 500, t1_ms: 900, reason: "system_audio_silent" as const }], marks: [] }, "stored");
+  it("is the line focus last was on while it is drawn", () => expect(tabStop(rows, "b")).toBe("b"));
+  it("else the first line, never a gap", () => {
+    expect(tabStop(rows, null)).toBe("a");
+    expect(tabStop(rows, "gone")).toBe("a");
+  });
+  it("is none for no lines", () => expect(tabStop([], null)).toBeUndefined());
+});
+
+describe("lineKey", () => {
+  it("maps ⌘↑ and ⌘↓ to Home and End and leaves every other key alone", () => {
+    expect(lineKey({ key: "ArrowUp", metaKey: true })).toBe("Home");
+    expect(lineKey({ key: "ArrowDown", metaKey: true })).toBe("End");
+    expect(lineKey({ key: "ArrowDown", metaKey: false })).toBe("ArrowDown");
+    expect(lineKey({ key: "c", metaKey: true })).toBe("c");
   });
 });

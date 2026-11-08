@@ -27,6 +27,8 @@ export interface SegmentRowProps {
   find?: string;
   /** The current find match: a focus ring. */
   current?: boolean;
+  /** The list's one Tab stop; the other lines are reached with ↑/↓. */
+  stop?: boolean;
   /** The disabled control's reason, posted as an inline status (Space or click). */
   status?: string;
   /** The time's help tag when the audio is gone. */
@@ -77,7 +79,7 @@ function Text({ text, find }: { text: string; find?: string }) {
 }
 
 // @cpt-component:cpt-noter-component-ui-transcript-segment-row:p1
-export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, status, timeHelp, onPlay, onRename, onFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
+export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, stop, status, timeHelp, onPlay, onRename, onFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
   const tail = variant === "tail";
   if (row.kind === "gap") {
     return (
@@ -133,7 +135,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
       data-state={playing ? "playing" : highlighted ? "highlighted" : "default"}
       className={cx("cw-seg", tail && "cw-seg--tail", highlighted && "np-hl-evidence", playing && "is-playing", current && "is-current")}
       lang={langAttr(seg.lang)}
-      tabIndex={tail ? undefined : 0}
+      tabIndex={tail ? undefined : stop ? 0 : -1}
       // the keyboard path of the context menu: Shift+F10 or the Menu key on the focused line
       onKeyDown={
         onFixTerm && !tail

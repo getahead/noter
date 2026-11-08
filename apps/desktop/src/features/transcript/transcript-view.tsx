@@ -11,7 +11,8 @@ import { LevelMeter } from "../../ui/primitives/level-meter";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { LogScroller, newLines, viewState, type Follow, type RowList } from "./follow";
-import { findMatches, meterLevel, type Row, type Variant } from "./model";
+import { moveFocus } from "../../ui/primitives/roving";
+import { findMatches, lineKey, meterLevel, tabStop, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
 import { SegmentRow } from "./segment-row";
 import "./transcript.css";
@@ -64,6 +65,7 @@ export function TranscriptView(p: TranscriptViewProps) {
   const confirmed = segments(rows);
   const [follow, setFollow] = useState<Follow>({ following: live, base: confirmed });
   const [find, setFind] = useState<{ query: string; at: number } | null>(null);
+  const [lastFocus, setLastFocus] = useState<string | null>(null);
   const [status, setStatus] = useState<{ key: string; text: string } | null>(null);
   const keys = useMemo(() => rows.map((r) => r.key), [rows]);
   const matches = useMemo(() => (find ? findMatches(rows, find.query) : []), [rows, find]);
@@ -120,6 +122,8 @@ export function TranscriptView(p: TranscriptViewProps) {
   }
 
   const win = variant === "tail" ? { start: 0, end: rows.length, before: 0, after: 0 } : log.current.window(keys, pos.top, pos.height);
+  const shown = rows.slice(win.start, win.end);
+  const stopKey = tabStop(shown, lastFocus);
   const count = newLines(follow, confirmed);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-user-scroll
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-follow
@@ -172,8 +176,15 @@ export function TranscriptView(p: TranscriptViewProps) {
         </div>
       )}
       <div className="cw-tv__scroll" ref={scroller} onScroll={scroll}>
-        <div ref={list} className="cw-tv__rows" style={{ paddingTop: win.before, paddingBottom: win.after }}>
-          {rows.slice(win.start, win.end).map((row) => (
+        <div
+          ref={list}
+          className="cw-tv__rows"
+          style={{ paddingTop: win.before, paddingBottom: win.after }}
+          // roving focus (DESIGN transcript keyboard table): ↑/↓ between lines, ⌘↑/⌘↓ to the first and last
+          onKeyDown={(e) => void moveFocus(e, "[data-segment-id]", false, lineKey(e))}
+          onFocus={(e) => setLastFocus((e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id") ?? lastFocus)}
+        >
+          {shown.map((row) => (
             <SegmentRow
               key={row.key}
               row={row}
@@ -184,6 +195,7 @@ export function TranscriptView(p: TranscriptViewProps) {
               highlighted={p.highlight?.includes(row.key)}
               find={find?.query}
               current={current === row.key}
+              stop={row.key === stopKey}
               status={(status?.key === row.key ? status.text : undefined) ?? (p.refused?.key === row.key ? p.refused.text : undefined)}
               timeHelp={p.timeHelp}
               onPlay={p.onPlay}

@@ -151,3 +151,16 @@ export const spanKeys = (rows: readonly Row[], span: { t0_ms: number; t1_ms: num
 
 /** dBFS (-90..0) to the level meter's 0–10 segments; -60 dB and below is silent. */
 export const meterLevel = (db: number | null | undefined) => (db == null ? 0 : Math.max(0, Math.min(10, Math.round((db + 60) / 6))));
+
+/** The transcript's one Tab stop: the row focus last was on while it is drawn, else the first line drawn (gaps and marks are no stops). */
+export function tabStop(shown: readonly Row[], last: string | null): string | undefined {
+  return shown.find((r) => r.kind === "segment" && r.key === last)?.key ?? shown.find((r) => r.kind === "segment")?.key;
+}
+
+/** The key a line list moves by: ⌘↑ and ⌘↓ go to the first and the last line, as Home and End do. */
+export function lineKey(e: { key: string; metaKey: boolean }): string {
+  if (!e.metaKey) return e.key;
+  if (e.key === "ArrowUp") return "Home";
+  if (e.key === "ArrowDown") return "End";
+  return e.key;
+}
