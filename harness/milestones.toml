@@ -92,7 +92,7 @@ commands = [
   "account_test", "account_sign_out",
   "sources_list", "source_add_folder", "source_add_mcp", "source_update", "source_reindex",
   "source_remove", "source_revoke_token",
-  "audit_list", "audit_export", "storage_move",
+  "audit_list", "audit_export",
 ]
 stories = [
   "cpt-noter-seq-first-run-connect-assistant",
@@ -118,6 +118,7 @@ commands = [
   "copilot_raise_budget", "context_chip_set",
   "agents_get", "agent_create", "agent_update", "agents_reorder", "agent_remove",
   "agent_skill_get", "agent_skill_save", "agent_skill_reset", "council_set_mode",
+  "storage_move",
 ]
 stories = [
   "cpt-noter-seq-call-screen-pin-card",
