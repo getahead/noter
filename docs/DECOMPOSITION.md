@@ -1122,11 +1122,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.18 Call page outputs and sharing — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-call-page-outputs`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-call-page-outputs`
 
 - **Purpose**: Show the outputs in PRD order as each is written, keep edits through regeneration with a diff, and share or export the call, a section or a selection in one action.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/call-page-outputs.md`](features/ui/call-page-outputs.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/call-page-outputs.md`](features/ui/call-page-outputs.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-history-undo`
 
@@ -1152,11 +1152,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-output-section`
-  - [ ] `p3` - `cpt-noter-component-ui-output-item-row`
-  - [ ] `p3` - `cpt-noter-component-ui-share-menu`
-  - [ ] `p3` - `cpt-noter-component-ui-version-switcher`
-  - [ ] `p3` - `cpt-noter-component-ui-diff-view`
+  - [x] `p3` - `cpt-noter-component-ui-output-section`
+  - [x] `p3` - `cpt-noter-component-ui-output-item-row`
+  - [x] `p3` - `cpt-noter-component-ui-share-menu`
+  - [x] `p3` - `cpt-noter-component-ui-version-switcher`
+  - [x] `p3` - `cpt-noter-component-ui-diff-view`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `outputs_get`
