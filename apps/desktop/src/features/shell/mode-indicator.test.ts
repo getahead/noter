@@ -9,24 +9,24 @@ const input = (o: Partial<ModeInput> = {}): ModeInput => ({ mode: "cloud_redacte
 
 describe("modeIndicator", () => {
   it("starts CLOUD_REDACTED, the default privacy mode", () => {
-    expect(modeIndicator(input())).toEqual({ state: "CLOUD_REDACTED", word: "Cloud, redacted", warning: false });
+    expect(modeIndicator(input())).toEqual({ state: "CLOUD_REDACTED", warning: false });
   });
 
   it.each([
-    ["cloud_allowed", "CLOUD", "Cloud"],
-    ["cloud_redacted", "CLOUD_REDACTED", "Cloud, redacted"],
-    ["local_only", "LOCAL_ONLY", "Local only"],
-  ] as [PrivacyMode, string, string][])("maps the %s privacy mode", (mode, state, word) => {
-    expect(modeIndicator(input({ mode }))).toEqual({ state, word, warning: false });
+    ["cloud_allowed", "CLOUD"],
+    ["cloud_redacted", "CLOUD_REDACTED"],
+    ["local_only", "LOCAL_ONLY"],
+  ] as [PrivacyMode, string][])("maps the %s privacy mode", (mode, state) => {
+    expect(modeIndicator(input({ mode }))).toEqual({ state, warning: false });
   });
 
   it("is SENSITIVE_LOCAL for a sensitive call in view", () => {
-    expect(modeIndicator(input({ sensitiveCall: true }))).toEqual({ state: "SENSITIVE_LOCAL", word: "Sensitive · local", warning: false });
+    expect(modeIndicator(input({ sensitiveCall: true }))).toEqual({ state: "SENSITIVE_LOCAL", warning: false });
   });
 
   it("warns on switched_to_local and no_assistant, and clears when the degraded set clears", () => {
-    expect(modeIndicator(input({ degraded: [switched] }))).toEqual({ state: "SWITCHED_TO_LOCAL", word: "Switched to local", warning: true });
-    expect(modeIndicator(input({ degraded: [noAssistant] }))).toEqual({ state: "NO_ASSISTANT", word: "No assistant", warning: true });
+    expect(modeIndicator(input({ degraded: [switched] }))).toEqual({ state: "SWITCHED_TO_LOCAL", warning: true });
+    expect(modeIndicator(input({ degraded: [noAssistant] }))).toEqual({ state: "NO_ASSISTANT", warning: true });
     expect(modeIndicator(input({ degraded: [] })).state).toBe("CLOUD_REDACTED");
   });
 

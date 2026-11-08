@@ -1,4 +1,5 @@
 import { base, cx } from "./attrs";
+import { t } from "../../i18n/format";
 
 export interface LevelMeterProps {
   /** 0 to 10 lit segments. */
@@ -13,7 +14,7 @@ export interface LevelMeterProps {
 /** level-meter: 10 horizontal segments; silent, signal or clipping. */
 export function LevelMeter({ level = 0, clipping, label }: LevelMeterProps) {
   return (
-    <span className="np-meter" {...base("level-meter", { variant: "horizontal", state: clipping ? "clipping" : level > 0 ? "signal" : "silent" })} role="meter" aria-label={label || "Level"} aria-valuenow={level * 10} aria-valuemin={0} aria-valuemax={100}>
+    <span className="np-meter" {...base("level-meter", { variant: "horizontal", state: clipping ? "clipping" : level > 0 ? "signal" : "silent" })} role="meter" aria-label={label || t("level.meter")} aria-valuenow={level * 10} aria-valuemin={0} aria-valuemax={100}>
       {Array.from({ length: 10 }, (_, i) => (
         <span key={i} className={cx("np-meter__seg", i < level && "is-on", clipping && i === 9 && "is-clip")} />
       ))}
