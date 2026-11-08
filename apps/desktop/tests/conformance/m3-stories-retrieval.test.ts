@@ -11,7 +11,7 @@ import { exercised } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { LIVE_CALL, PAST_CALL } from "../support/world-presets";
-import { rows } from "./history-support";
+import { rows, wire } from "./history-support";
 
 let s: Scenario;
 let main: Core;
@@ -34,6 +34,20 @@ async function ask(question: string, thread: string | null = null, sc: AskScope 
   const terminal = await until(() => got.find((m) => m.event.type === "done" || m.event.type === "failed"), `the end of "${question}"`);
   const answer = terminal.event.type === "done" ? terminal.event.answer : null;
   return { handle, got, answer };
+}
+
+/** A real-core harness control (`harness.hold_rebuild`, `harness.llm_next`). */
+const control = (name: string, args: object) => wire(s).invoke("main", `harness.${name}`, args);
+const types = (got: AskMsg[]) => got.map((m) => m.event.type);
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Starts a turn whose answer the scripted runtime holds back `ms`, and waits for `started`. */
+async function slowTurn(ms: number) {
+  await control("llm_next", { skill: "ask-answer", after_ms: ms });
+  const got: AskMsg[] = [];
+  const handle = ok(await main.askStart({ thread_id: null, question: "What is open on the drawer?", scope: scope() }, (m: AskMsg) => got.push(m)));
+  await until(() => got.find((m) => m.event.type === "started"), "started");
+  return { handle, got };
 }
 
 describe("cpt-noter-seq-library-search-calls", () => {
@@ -65,6 +79,28 @@ describe("cpt-noter-seq-library-search-calls", () => {
     if (r.mode.type === "keyword_only") expect(r.mode.rebuild_progress).toBeGreaterThanOrEqual(0);
     expect(r.topics.map((t) => t.id)).toContain("top_ws");
     expect(r.only_weak).toBe(r.calls.length + r.items.length > 0 && [...r.calls, ...r.items].every((h) => h.strength === "weak"));
+  });
+
+  it("other — keyword-only while the rebuild is held, hybrid after it; a match by meaning alone is weak-only", async () => {
+    open();
+    if (s.target !== "stdio") return; // the index and the engine's vectors are the real core's
+    await control("hold_rebuild", { on: true });
+    const held = await search("websocket");
+    expect(held.mode).toEqual({ type: "keyword_only", rebuild_progress: 0 });
+    expect([held.calls.length > 0, held.explain.semantic_hits]).toEqual([true, 0]);
+    // One-letter words are no search terms, and the scripted engine embeds this string exactly as
+    // the item "Rotate the staging Jira token": its vectors come from a 32-bit hash of the text.
+    const meaning = "d r p q q h p";
+    expect((await search(meaning)).items).toEqual([]);
+    await control("hold_rebuild", { on: false });
+    const r = await until(async () => {
+      const r = await search(meaning);
+      return r.mode.type === "hybrid" && r.items.length > 0 && r;
+    }, "a hybrid search after the release");
+    expect([r.explain.keyword_hits, r.explain.semantic_hits > 0]).toEqual([0, true]);
+    expect(r.items.map((h) => h.target)).toContainEqual({ type: "item", item_id: "itm_token" });
+    expect([...r.calls, ...r.items, ...r.documents].every((h) => h.strength === "weak")).toBe(true);
+    expect(r.only_weak).toBe(true);
   });
 });
 
@@ -190,6 +226,78 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
     ok(await main.askStop({ turn_id: handle.turn_id }));
     expect(refused(await main.askStart({ thread_id: null, question: " ", scope: scope() }, () => {})).code).toBe("invalid_input");
     if (s.target === "stdio") expect(refused(await main.askStart({ thread_id: null, question: "Q", scope: scope({ call_id: "call_none" }) }, () => {})).code).toBe("not_found");
+  });
+
+  it("error — an answer citing an unknown id fails validation, is retried, then answers not found", async () => {
+    open();
+    if (s.target !== "stdio") return; // the scripted runtime is the real core's
+    const made_up = { answer_md: "We shipped it [1].", citations: [{ n: 1, segment_ids: ["seg_none"], chunk_ids: [], quote: "q" }], found: true };
+    // The first try, the router's repair and its fallback all cite it.
+    for (let i = 0; i < 3; i++) await control("llm_next", { skill: "ask-answer", output: made_up });
+    const { answer } = await ask("What did we agree about the websocket notifications?");
+    expect(answer).toMatchObject({ found: false, citations: [] });
+    expect(answer!.answer_md).not.toContain("We shipped it");
+  });
+
+  it("other — a cloud answer skips a sensitive call, a local one may cite it", async () => {
+    open();
+    if (s.target !== "stdio") return; // the fake answers its canned thread
+    await s.change((w) => {
+      w.calls.find((c) => c.id === PAST_CALL)!.privacy = "sensitive";
+    });
+    const question = "Can we keep serving reads while it rebuilds?";
+    const cloud = (await ask(question, null, scope({ call_id: PAST_CALL }))).answer!;
+    expect(cloud).toMatchObject({ found: false, citations: [], answered_locally: false });
+    expect(cloud.sensitive_sources_skipped).toBeGreaterThan(0);
+    await s.change((w) => {
+      w.settings.runtimes.search_answers = "local";
+    });
+    const local = (await ask(question, null, scope({ call_id: PAST_CALL }))).answer!;
+    expect(local).toMatchObject({ found: true, answered_locally: true, runtime: "local" });
+    expect(local.citations.some((c) => c.provenance.type === "past_call" && c.provenance.call.id === PAST_CALL)).toBe(true);
+  });
+
+  it("other — a stopped turn ends answer_stopped once, and its late answer sends nothing", async () => {
+    open();
+    if (s.target !== "stdio") return; // the runtime's delay is the real core's
+    const { handle, got } = await slowTurn(1500);
+    ok(await main.askStop({ turn_id: handle.turn_id }));
+    const end = await until(() => got.find((m) => m.event.type === "failed"), "the stop");
+    expect(end.event.type === "failed" && end.event.error.code).toBe("answer_stopped");
+    await pause(2500); // past the held answer
+    expect(types(got)).toEqual(["started", "failed"]);
+    const turn = ok(await main.askThreadGet({ thread_id: handle.thread_id })).turns[0];
+    expect(turn.found).toBe(false);
+  });
+
+  it("other — deleting the thread mid-turn ends it once and its late answer recreates nothing", async () => {
+    open();
+    if (s.target !== "stdio") return;
+    const { handle, got } = await slowTurn(1500);
+    ok(await main.askThreadDelete({ thread_id: handle.thread_id }));
+    await until(() => got.find((m) => m.event.type === "failed"), "the cancelled turn");
+    await pause(2500);
+    expect(types(got)).toEqual(["started", "failed"]);
+    expect(refused(await main.askThreadGet({ thread_id: handle.thread_id })).code).toBe("not_found");
+    expect(await rows(s, "SELECT id FROM ask_turns WHERE thread_id = ?", handle.thread_id)).toEqual([]);
+  });
+
+  it("other — a subscriber that never acknowledges ends lagged at 2,000 messages; the answer is stored whole", async () => {
+    open();
+    if (s.target !== "stdio") return; // this client never sends stream_ack; the hub's limit is the real core's
+    const lines = "Websocket уведомления go through the notification service [1].\n".repeat(2050);
+    const cites = { n: 1, segment_ids: ["seg_live_005"], chunk_ids: [], quote: "q" };
+    await control("llm_next", { skill: "ask-answer", output: { answer_md: lines, citations: [cites], found: true } });
+    const got: AskMsg[] = [];
+    const handle = ok(await main.askStart({ thread_id: null, question: "websocket уведомления", scope: scope() }, (m: AskMsg) => got.push(m)));
+    const end = await until(() => got.find((m) => m.event.type === "ended"), "the lagged end", 20000);
+    expect(end.event.type === "ended" && end.event.reason).toBe("lagged");
+    expect(got.length).toBe(2001);
+    const thread = await until(async () => {
+      const t = ok(await main.askThreadGet({ thread_id: handle.thread_id }));
+      return t.turns[0]?.found === true && t;
+    }, "the stored answer");
+    expect(thread.turns[0].answer_md.split("\n").length).toBeGreaterThan(2000);
   });
 });
 
