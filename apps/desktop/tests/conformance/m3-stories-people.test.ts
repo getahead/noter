@@ -4,7 +4,7 @@
 // Steps that read the database or run a recorded call exist only in the real core and are guarded
 // by `s.target === "stdio"`; the commands themselves run on the fake too. All eight 2.23 commands
 // succeed at least once here.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -216,9 +216,9 @@ describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
   });
 });
 
-// A call recorded through the scripted engine whose archive pass (the same lines, two voices) lands
-// 6 s after the stop. The scripted engine's speaker embedding is one vector per call, so a profile
-// seeded from one voice of the call matches the other voice of the same call.
+// A call recorded through the scripted engine whose archive pass (the same lines, two voices) is
+// installed after the stop. The scripted engine's speaker embedding is one vector per call, so a
+// profile seeded from one voice of the call matches the other voice of the same call.
 describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive install)", { timeout: 60_000 }, () => {
   const LINES = ["Let's ship the drawer redesign in 8.0.", "Anna takes the virtualised table.", "Who owns the reconnect is still open."];
   const voice = (n: number) => `spk_${(n % 2) + 1}`;
@@ -227,12 +227,20 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
     speaker_label: voice(n), text, words_path: null, avg_logprob: -0.1, no_speech_p: 0.01, corrections: [], crosstalk_labels: [],
   });
 
-  const record = async (): Promise<{ call: CallId; owner: PersonId; first: SpeakerId }> => {
+  type SetUp = (owner: PersonId, first: SpeakerId) => Promise<void>;
+  /**
+   * Records the call and runs `setUp` (the profile step) on its named first voice. `whileRecording`:
+   * before the stop, so the archive pass answers at once; otherwise once the pass has read the live
+   * names (it writes their constraints file next), so it starts without that name, and before it
+   * answers. shortcut: the scripted pass answers 6 s later, the one fixed delay left; swap it for a
+   * scripted-engine hold/release once noter-engine-client/src/scripted.rs offers one (#409, after #423).
+   */
+  const record = async (setUp: SetUp, whileRecording: boolean): Promise<{ call: CallId; owner: PersonId }> => {
     dir = mkdtempSync(join(tmpdir(), "noter-people-"));
     const archive = join(dir, "archive.json");
     writeFileSync(archive, JSON.stringify({ call_id: "call_recorded", backend: "whisper_large_v3", segments: LINES.map((t, i) => heard(i, t, "call_recorded")) }));
     const script = join(dir, "engine.jsonl");
-    writeFileSync(script, JSON.stringify({ on: "offline_pass", after_ms: 6000, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }) + "\n");
+    writeFileSync(script, JSON.stringify({ on: "offline_pass", after_ms: whileRecording ? 0 : 6000, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }) + "\n");
     const base = process.env.NOTER_CORE_CMD;
     process.env.NOTER_CORE_CMD = `${base} --engine-script ${script}`;
     try {
@@ -251,26 +259,37 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
       await until(() => s.engineFact({ type: "segment", segment }), "the engine to hear the line");
     }
     await until(async () => (await rows(s, "SELECT id FROM segments WHERE call_id = ?", call))!.length === LINES.length, "the live lines persisted");
-    expect(ok(await main.captureStop({ call_id: call })).phase).toBe("stopped");
     const speakers = ok(await main.callGet({ call_id: call })).speakers.filter((x) => x.label.type === "unnamed");
     expect(speakers.length).toBe(2);
-    // The owner's profile is seeded from the call's first voice, named while the archive pass is still running.
     const owner = (await make("Voice Owner")).id;
-    ok(await main.transcriptNameSpeakers({ call_id: call, assignments: [{ speaker_id: speakers[0].id, person: { type: "existing", person_id: owner } }] }));
-    return { call, owner, first: speakers[0].id };
+    const profile = async () => {
+      // The owner's profile is seeded from the call's first voice, named by the user.
+      ok(await main.transcriptNameSpeakers({ call_id: call, assignments: [{ speaker_id: speakers[0].id, person: { type: "existing", person_id: owner } }] }));
+      await setUp(owner, speakers[0].id);
+    };
+    if (whileRecording) await profile();
+    expect(ok(await main.captureStop({ call_id: call })).phase).toBe("stopped");
+    if (!whileRecording) {
+      const read = join((await dataDir(s))!, "audio", call, "constraints.json");
+      await until(() => existsSync(read), "the archive pass to read the live names");
+      await profile();
+    }
+    return { call, owner };
   };
-  // The pass is "done" before the voices are embedded and matched (the next step of the same job):
-  // wait until every archive voice has its stored centroid, or briefly when nobody is opted in.
+  // The archive job's run ends after the pass is installed, its voices embedded and matched: wait
+  // for it, then every archive voice has its stored centroid (none when nobody is opted in).
   const archived = async (call: CallId, embedded = true) => {
-    await until(async () => (await rows<{ archive_status: string }>(s, "SELECT archive_status FROM calls WHERE id = ?", call))![0].archive_status === "done", "the archive pass done");
-    if (embedded) await until(async () => (await count("SELECT count(*) AS n FROM speakers WHERE call_id = ? AND pass = 'archive' AND centroid IS NULL", call)) === 0, "the voices embedded");
-    await new Promise((r) => setTimeout(r, 500));
+    const run = "SELECT r.status FROM job_runs r JOIN jobs j ON j.id = r.job_id WHERE j.kind = 'archive_pass' AND r.subject = ?";
+    await until(async () => (await rows<{ status: string }>(s, run, call))!.some((r) => r.status === "succeeded"), "the archive job finished", 20_000);
+    expect((await rows<{ archive_status: string }>(s, "SELECT archive_status FROM calls WHERE id = ?", call))![0].archive_status).toBe("done");
+    if (embedded) expect(await count("SELECT count(*) AS n FROM speakers WHERE call_id = ? AND pass = 'archive' AND centroid IS NULL", call)).toBe(0);
   };
   const archiveSpeakers = (call: CallId) => rows<{ person_id: string | null; named_by: string | null }>(s, "SELECT person_id, named_by FROM speakers WHERE call_id = ? AND pass = 'archive' ORDER BY rowid", call);
 
   it("an archive install names the matching voice by voice_profile", async () => {
-    const { call, owner, first } = await record();
-    ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
+    const { call, owner } = await record(async (owner, first) => {
+      ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
+    }, false);
     await archived(call);
     // The archive pass starts without names: both voices of the call carry the profile's vector.
     expect(await archiveSpeakers(call)).toEqual([
@@ -280,21 +299,24 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
   });
 
   it("a profile unused for 90 days stops matching", async () => {
-    const { call, owner, first } = await record();
-    ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
-    // Stand-in for the injected clock (proved in noter-core's profiles tests): the profile was last used 91 days ago.
-    const db = new DatabaseSync(join((await dataDir(s))!, "noter.db"));
-    db.exec("PRAGMA busy_timeout = 5000");
-    db.prepare("UPDATE voice_profiles SET last_used_at = last_used_at - ? WHERE person_id = ?").run(91 * 86_400_000, owner);
-    db.close();
+    const { call } = await record(async (owner, first) => {
+      ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
+      // Stand-in for the injected clock (proved in noter-core's profiles tests): the profile was last used 91 days ago.
+      const db = new DatabaseSync(join((await dataDir(s))!, "noter.db"));
+      db.exec("PRAGMA busy_timeout = 5000");
+      db.prepare("UPDATE voice_profiles SET last_used_at = last_used_at - ? WHERE person_id = ?").run(91 * 86_400_000, owner);
+      db.close();
+    }, true);
+    // The first voice carries the live name; the second, unnamed one is what the profile would match.
     await archived(call);
     expect((await archiveSpeakers(call))!.filter((x) => x.named_by === "voice_profile")).toEqual([]);
   });
 
   it("Delete Profile stops matching and keeps the names", async () => {
-    const { call, owner, first } = await record();
-    ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
-    ok(await main.voiceProfileDelete({ person_id: owner }));
+    const { call, owner } = await record(async (owner, first) => {
+      ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
+      ok(await main.voiceProfileDelete({ person_id: owner }));
+    }, true);
     await archived(call, false);
     const speakers = (await archiveSpeakers(call))!;
     expect(speakers.filter((x) => x.named_by === "voice_profile")).toEqual([]);
