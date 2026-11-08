@@ -35,13 +35,16 @@ runs:
     - id: rustv
       if: inputs.cache == 'true'
       shell: bash
-      run: echo "v=$(rustc --version 2>&1 | tr -c 'A-Za-z0-9.\n' '_')" >> "$GITHUB_OUTPUT"
+      env:
+        TOOLS: ${{ inputs.tools }}
+      # a cache key cannot hold commas
+      run: echo "v=$(rustc --version 2>&1 | tr -c 'A-Za-z0-9.\n' '_')-${TOOLS//,/_}" >> "$GITHUB_OUTPUT"
     - id: tools-cache
       if: inputs.cache == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cargo-tools
-        key: cargo-tools-${{ runner.os }}-${{ runner.arch }}-${{ steps.rustv.outputs.v }}-${{ inputs.tools }}
+        key: cargo-tools-${{ runner.os }}-${{ runner.arch }}-${{ steps.rustv.outputs.v }}
     - id: install
       continue-on-error: true
       uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
