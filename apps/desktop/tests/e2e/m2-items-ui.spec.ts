@@ -24,7 +24,7 @@ const sent = async (page: Page, name: string): Promise<Array<Record<string, unkn
   (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args as Record<string, unknown>);
 /** The change a mutation of `itemId` logged last, as the core's History lists it (item_review's ItemMutation carries the same id). */
 async function lastChange(page: Page, itemId: string): Promise<string> {
-  const rows = await page.evaluate(
+  const read = () => page.evaluate(
     async ([id]) => {
       const args = { target: { type: "item", item_id: id }, actor: "all", job_id: null, page: {} };
       const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
@@ -32,7 +32,9 @@ async function lastChange(page: Page, itemId: string): Promise<string> {
     },
     [itemId],
   );
-  return rows.rows[0]!.id;
+  // item_review answers before History lists its change: wait for the row instead of reading once
+  await expect.poll(async () => (await read()).rows.length).toBeGreaterThan(0);
+  return (await read()).rows[0]!.id;
 }
 
 const DECISION = "Ship drawer events behind a flag"; // itm_d1
