@@ -29,9 +29,47 @@ runs:
         # No shared-key: the key carries the job id, so each job restores its own build (clippy,
         # llvm-cov, perf...); one shared key was saved once by whichever job finished first.
         save-if: ${{ github.ref == 'refs/heads/main' }}
-    - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+    # The release downloads install-action relies on can be down (8 Nov 2026: github.com 504 for
+    # cargo-llvm-cov): then the same tools are built from crates.io into their own root, cached so
+    # that happens once. Never ~/.cargo/bin: it holds rustup's cargo/rustc shims.
+    - id: rustv
+      if: inputs.cache == 'true'
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      # a cache key cannot hold commas
+      run: echo "v=$(rustc --version 2>/dev/null | head -1 | tr -c 'A-Za-z0-9.' '_')-${TOOLS//,/_}" >> "$GITHUB_OUTPUT"
+    - id: tools-cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cargo-tools
+        key: cargo-tools-${{ runner.os }}-${{ runner.arch }}-${{ steps.rustv.outputs.v }}
+    - id: install
+      continue-on-error: true
+      uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
       with:
         tool: ${{ inputs.tools }}
+    - if: steps.install.outcome == 'failure'
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        echo "::warning title=install-action failed::building $TOOLS from crates.io"
+        export PATH="$HOME/.cargo-tools/bin:$PATH"
+        for t in ${TOOLS//,/ }; do
+          name="${t%@*}"
+          command -v "$name" >/dev/null && continue
+          if [ "$name" = "$t" ]; then cargo install --locked --root "$HOME/.cargo-tools" "$name"; else cargo install --locked --root "$HOME/.cargo-tools" "$name" --version "${t#*@}"; fi
+        done
+        # ~/.cargo/bin is already on PATH (and writing GITHUB_PATH is a zizmor error): link only the tools, never the shims
+        mkdir -p "$HOME/.cargo/bin"
+        for b in "$HOME"/.cargo-tools/bin/*; do ln -sf "$b" "$HOME/.cargo/bin/"; done
+    - if: steps.install.outcome == 'failure' && inputs.cache == 'true' && github.ref == 'refs/heads/main' && steps.tools-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cargo-tools
+        key: ${{ steps.tools-cache.outputs.cache-primary-key }}
     - if: inputs.node == 'true'
       uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
     - if: inputs.node == 'true'
