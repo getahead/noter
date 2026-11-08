@@ -66,6 +66,17 @@ class NoterTestCase: XCTestCase {
         return menu
     }
 
+    /// Runs `body` as a named activity and prints how long it took ("NOTER-STEP"): a failure that stalls inside a UI
+    /// query then shows, in the xcresult and the CI log, which step it was in and how long the steps before it took.
+    func step<T>(_ name: String, _ body: () -> T) -> T {
+        XCTContext.runActivity(named: name) { _ in
+            let start = Date()
+            print("NOTER-STEP \(name): start")
+            defer { print("NOTER-STEP \(name): \(String(format: "%.1f", Date().timeIntervalSince(start))) s") }
+            return body()
+        }
+    }
+
     /// Polls `condition` until it holds or `timeout` seconds pass: a bounded wait that issues no UI query of its own.
     func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) -> Bool {
         let end = Date().addingTimeInterval(timeout)
