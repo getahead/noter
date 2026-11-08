@@ -10,6 +10,16 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const sent = async (page: Page, name: string): Promise<unknown[]> => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 test.describe("cpt-noter-flow-ui-settings-change-setting (glossary)", () => {
+  test("UI — other path: the Glossary table is one Tab stop (the selected term, else the first)", async ({ page }) => {
+    await openWindow(page, "settings");
+    await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();
+    await expect.poll(() => sent(page, "glossary_list")).not.toEqual([]);
+    const rows = pane(page).getByRole("table", { name: "Glossary" }).locator("tbody tr");
+    await expect(rows.first()).toBeVisible();
+    await expect(pane(page).locator('table[aria-label="Glossary"] tbody tr[tabindex="0"]')).toHaveCount(1);
+    await expect(rows.first()).toHaveAttribute("tabindex", "0");
+  });
+
   test("UI — happy path: + adds a term with glossary_upsert, it is listed; − removes the selected one with glossary_remove", async ({ page }) => {
     await openWindow(page, "settings");
     await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();

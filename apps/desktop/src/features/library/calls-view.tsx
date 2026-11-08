@@ -155,6 +155,8 @@ function Body(p: CallsViewProps) {
         )}
       </div>
     );
+  const groups = groupByMonth(state.rows);
+  const stopId = state.rows.find((c) => selection.ids.includes(c.id))?.id ?? groups[0]?.rows[0]?.id;
   const head = (col: Column, width: string) => (
     <Th
       label={t(COLUMNS[col])}
@@ -192,7 +194,7 @@ function Body(p: CallsViewProps) {
           </tr>
         </thead>
         <tbody onKeyDown={p.onKeyDown}>
-          {groupByMonth(state.rows).flatMap((g) => [
+          {groups.flatMap((g) => [
             <tr
               key={g.label}
               className="lb-month"
@@ -207,6 +209,7 @@ function Body(p: CallsViewProps) {
                 key={c.id}
                 call={c}
                 selected={selection.ids.includes(c.id)}
+                stop={c.id === stopId}
                 onPress={(e) => p.onPress(c.id, e)}
                 onOpen={() => p.onOpen(c.id)}
                 onContext={(e) => p.onContext(c.id, e)}
