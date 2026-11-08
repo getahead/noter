@@ -52,6 +52,10 @@ describe("subtitle", () => {
     );
   });
 
+  it("gives the count alone while only part of the library is loaded", () => {
+    expect(subtitle([at(2026, 9, 2)], 212, 0, "UTC")).toBe("212 calls");
+  });
+
   it("adds how many are selected and uses the core's total when it has one", () => {
     expect(subtitle([at(2026, 9, 2)], 212, 3, "UTC")).toContain("212 calls · ");
     expect(subtitle([at(2026, 9, 2)], 212, 3, "UTC")).toMatch(/ · 3 selected$/);
