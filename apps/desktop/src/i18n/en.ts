@@ -553,6 +553,7 @@ export const en = {
   "settings.privacy.calendar_note":
     "The macOS prompt follows. Noter never asks during a recording.",
   "settings.privacy.voice_profiles_manage": "Manage on Person Pages",
+  "settings.privacy.voice_profiles_later": "Person Pages arrive in a later version",
   "settings.audio.permissions": "Permissions",
   "settings.audio.self_test": "Audio self-test",
   "settings.audio.self_test_note":

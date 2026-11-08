@@ -60,7 +60,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
           <Toggle on={privacy.behaviour_metrics} size="small" ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
         </Row>
         <Row label={t("settings.privacy.voice_profiles")}>
-          <PushButton label={t("settings.privacy.voice_profiles_manage")} size="small" onAction={() => void bridge.core.windowNavigate({ target: null })} />
+          <PushButton label={t("settings.privacy.voice_profiles_manage")} size="small" disabled help={t("settings.privacy.voice_profiles_later")} />
         </Row>
       </Group>
       <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
