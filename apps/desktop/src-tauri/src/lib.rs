@@ -31,14 +31,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 pub use native::{Mac, MacOps, Windows};
 
-const WINDOWS: [WindowLabel; 5] = [
-    WindowLabel::Main,
-    WindowLabel::CallScreen,
-    WindowLabel::RecordPrompt,
-    WindowLabel::Settings,
-    WindowLabel::FirstRun,
-];
-
 /// The core, or why it did not start (then every command answers `internal`).
 pub struct Booted(pub Result<Arc<Core>, String>);
 
@@ -201,7 +193,9 @@ fn browser<R: Runtime>(
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
 /// this Mac. Own-account sign-in is M3, so only the API-key and local runtimes run in M2.
 fn runtimes(data: &std::path::Path) -> Adapters {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
     let cli = |name: &str| CliConfig {
         program: find_cli(&home, name),
         home: home.clone(),
@@ -218,7 +212,9 @@ fn runtimes(data: &std::path::Path) -> Adapters {
 
 /// The pinned CLIs as accounts and installs, found where `runtimes` finds them.
 fn account_cli() -> Arc<CliAccounts> {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
     Arc::new(CliAccounts {
         claude: find_cli(&home, "claude"),
         codex: find_cli(&home, "codex"),
@@ -337,7 +333,7 @@ pub async fn handle<R: Runtime>(
 
 /// The app's windows by label; any other webview (devtools, a stray page) is no window.
 fn window_label(label: &str) -> Option<WindowLabel> {
-    WINDOWS.into_iter().find(|w| w.as_str() == label)
+    WindowLabel::ALL.into_iter().find(|w| w.as_str() == label)
 }
 
 /// A webview loaded a page or closed: its subscriptions end and the page subscribes again.

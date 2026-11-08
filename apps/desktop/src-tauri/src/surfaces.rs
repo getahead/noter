@@ -660,7 +660,7 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
     let builder = tauri::WebviewWindowBuilder::new(app, label.as_str(), url)
         .title("Noter")
         .visible(false);
-    let builder = if matches!(label, WindowLabel::CallScreen | WindowLabel::RecordPrompt) {
+    let builder = if is_panel(label) {
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
         builder
@@ -753,7 +753,6 @@ impl<R: Runtime> TauriSurfaces<R> {
         surfaces
     }
 
-    /// The core the menu bar's clicks go to, once it opened.
     /// The core the menu bar's clicks go to, once it opened; it rebuilds the menu every second
     /// for the clock and the countdowns while the core lives.
     pub fn attach(&self, core: &Arc<Core>) {

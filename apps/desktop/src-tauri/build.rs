@@ -7,26 +7,19 @@ use std::path::PathBuf;
 use noter_protocol::ipc::COMMANDS;
 use noter_protocol::model::WindowLabel;
 
-const WINDOWS: [WindowLabel; 5] = [
-    WindowLabel::Main,
-    WindowLabel::CallScreen,
-    WindowLabel::RecordPrompt,
-    WindowLabel::Settings,
-    WindowLabel::FirstRun,
-];
-
 fn main() {
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
 
     let caps = out.join("capabilities");
     std::fs::create_dir_all(&caps).expect("capabilities dir");
-    for w in WINDOWS {
-        // The M1 alerts (dialogs host) are native ask/message dialogs of the main window and the
-        // call screen.
-        let dialogs = matches!(w, WindowLabel::Main | WindowLabel::CallScreen)
-            .then(|| ["dialog:allow-ask", "dialog:allow-message"].map(String::from))
-            .into_iter()
-            .flatten();
+    for w in WindowLabel::ALL {
+        // The alerts (dialogs host) are native message dialogs of the windows that raise them; the
+        // call screen never shows one.
+        let dialogs = matches!(
+            w,
+            WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
+        )
+        .then(|| "dialog:allow-message".to_string());
         let permissions: Vec<String> = std::iter::once("core:default".to_string())
             .chain(dialogs)
             .chain(

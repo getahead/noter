@@ -8,14 +8,24 @@ use tauri::utils::config::FrontendDist;
 fn the_bundle_carries_the_package_version_and_the_built_ui() {
     let context: tauri::Context<tauri::test::MockRuntime> = tauri::generate_context!();
     let config = context.config();
-    let package: serde_json::Value =
-        serde_json::from_str(include_str!("../../package.json")).expect("apps/desktop/package.json");
-    assert_eq!(config.version.as_deref(), package["version"].as_str(), "version follows package.json");
-    assert!(config.bundle.active, "tauri build must bundle (preview.yml, release.yml)");
+    let package: serde_json::Value = serde_json::from_str(include_str!("../../package.json"))
+        .expect("apps/desktop/package.json");
+    assert_eq!(
+        config.version.as_deref(),
+        package["version"].as_str(),
+        "version follows package.json"
+    );
+    assert!(
+        config.bundle.active,
+        "tauri build must bundle (preview.yml, release.yml)"
+    );
     assert_eq!(
         config.build.frontend_dist,
         Some(FrontendDist::Directory("../dist".into())),
         "the bundle embeds the Vite build"
     );
-    assert!(config.build.dev_url.is_some(), "development builds do not need dist");
+    assert!(
+        config.build.dev_url.is_some(),
+        "development builds do not need dist"
+    );
 }

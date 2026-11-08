@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
-    BoxFuture, CalendarEvent, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps, NativeServices,
-    SaveKind,
+    BoxFuture, CalendarEvent, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps,
+    NativeServices, SaveKind,
 };
 use noter_native::{PanelRequest, ParentWindow};
 use noter_protocol::model::{
