@@ -13,6 +13,7 @@ import "./handoff.css";
 
 export interface AddMappingProps { bridge: Bridge; sourceKey?: string; mapping?: RepoMapping; fromHandoff?: boolean; returnFocus?: () => void; close: () => void; onSaved?: () => Promise<void> | void }
 
+// @cpt-dod:cpt-noter-dod-ui-handoff-mappings:p1
 // @cpt-begin:cpt-noter-flow-ui-handoff-mapping:p1:inst-sheet
 export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, returnFocus, close, onSaved }: AddMappingProps) {
   const [draft, setDraft] = useState(() => initialMapping(sourceKey, mapping));

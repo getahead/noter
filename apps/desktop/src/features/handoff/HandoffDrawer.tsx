@@ -39,6 +39,7 @@ export function recordLine(item: ItemView, view: HandoffView, local: Local, pref
 }
 // @cpt-end:cpt-noter-flow-ui-handoff-deliver:p1:inst-return
 
+// @cpt-dod:cpt-noter-dod-ui-handoff-drawer:p1
 // @cpt-component:cpt-noter-component-ui-handoff-drawer:p1
 export function HandoffDrawer({ bridge, itemId }: { bridge: Bridge; itemId: string }) {
   const sheets = useSheetIfAny();

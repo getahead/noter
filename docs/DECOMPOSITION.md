@@ -1291,11 +1291,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.21 Handoff to Claude Code and Codex — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-handoff`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-handoff`
 
 - **Purpose**: Turn an engineering item into an editable prompt and open it in Claude Code or Codex in the mapped repository, or copy it, with the launch path visible beforehand.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/handoff.md`](features/ui/handoff.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/handoff.md`](features/ui/handoff.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-settings`
 
@@ -1321,8 +1321,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-handoff-drawer`
-  - [ ] `p3` - `cpt-noter-component-ui-prompt-editor`
+  - [x] `p3` - `cpt-noter-component-ui-handoff-drawer`
+  - [x] `p3` - `cpt-noter-component-ui-prompt-editor`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `handoff_get`
