@@ -44,6 +44,14 @@ describe("moveFocus (cpt-noter-flow-ui-primitives-operate-control)", () => {
     expect(prevented()).toBe(true);
   });
 
+  it("moves by a key other than the event's (⌘↓ as End) and stops at the ends without wrapping", () => {
+    const log: string[] = [];
+    const items = [item(log, "a"), item(log, "b"), item(log, "c")];
+    expect(moveFocus(keyEvent("ArrowDown", items[0], items).e, "li", false, "End")).toBe(true);
+    expect(moveFocus(keyEvent("ArrowDown", items[2], items).e, "li", false)).toBe(true);
+    expect(log).toEqual(["c", "c"]);
+  });
+
   it("finds the item that holds the focused element", () => {
     const log: string[] = [];
     const inner = {};
