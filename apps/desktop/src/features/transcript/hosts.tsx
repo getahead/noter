@@ -257,7 +257,9 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   useEffect(() => (variant === "stored" ? watchFixTermMenu(document, () => globalThis.getSelection(), () => segmentsRef.current ?? [], (enabled) => void tr.bridge.core.windowSetFixTermEnabled({ enabled })) : undefined), [variant, tr.bridge]);
   const chosen = useWindow(tr.bridge, (s) => s.fixTerm);
   const handled = useRef(chosen);
+  // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
   useEffect(() => followFixTermChoice(handled, chosen, () => (variant === "stored" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null), (picked) => setFixing({ ...picked, menu: false })), [chosen, variant]);
+  // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
   const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
   const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
   return (
@@ -287,7 +289,9 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
         }
         setRenaming({ speakerId, segmentId: seg.id, anchor });
       }}
+      // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
       onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
+      // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
     />
     {fixing?.menu && (
       <Popover variant="context-menu" anchor={fixing.anchor} label={t("speakers.fix.menu")} onClose={() => setFixing(null)}>

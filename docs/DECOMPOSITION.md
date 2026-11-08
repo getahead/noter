@@ -1185,11 +1185,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.19 Speaker naming and transcript corrections — M2 · MEDIUM
 
-- [ ] `p3` - **ID**: `cpt-noter-feature-ui-speakers`
+- [x] `p3` - **ID**: `cpt-noter-feature-ui-speakers`
 
 - **Purpose**: Let the user name a speaker during or after the call in one step, fix a term with the glossary, and pick or create a person without leaving the surface.
 
-- **Milestone**: M2. **Spec**: [`docs/features/ui/speakers.md`](features/ui/speakers.md). **Status**: NOT_STARTED.
+- **Milestone**: M2. **Spec**: [`docs/features/ui/speakers.md`](features/ui/speakers.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-live-transcript`, `cpt-noter-feature-ui-call-page-frame`
 
@@ -1215,9 +1215,9 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p3` - `cpt-noter-component-ui-speaker-naming-panel`
-  - [ ] `p3` - `cpt-noter-component-ui-term-fix-popover`
-  - [ ] `p3` - `cpt-noter-component-ui-person-picker`
+  - [x] `p3` - `cpt-noter-component-ui-speaker-naming-panel`
+  - [x] `p3` - `cpt-noter-component-ui-term-fix-popover`
+  - [x] `p3` - `cpt-noter-component-ui-person-picker`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `transcript_rename_speaker`

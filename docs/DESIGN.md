@@ -4941,7 +4941,7 @@ In rows the tag is not focusable on its own; it is read with the row.
 
 #### Component — Term fix popover
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-term-fix-popover`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-term-fix-popover`
 
 ##### Why this component exists
 
@@ -5788,7 +5788,7 @@ The output item row shows a decision, an open question, a risk or a call-type ex
 
 #### Component — Speaker naming panel
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-speaker-naming-panel`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-speaker-naming-panel`
 
 ##### Why this component exists
 
@@ -6945,7 +6945,7 @@ Speaker identity is a first-class fact: speakers map to people and people persis
 
 #### Component — Person picker
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-person-picker`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-person-picker`
 
 ##### Why this component exists
 

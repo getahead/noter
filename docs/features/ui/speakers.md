@@ -34,11 +34,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-speakers`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-speakers`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-speakers`
+- [x] `p3` - `cpt-noter-feature-ui-speakers`
 
 ### 1.1 Overview
 
@@ -64,7 +64,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 - **PRD**: [PRD.md](../../PRD.md) › Feature specification › 2 and 4; Diarization and speaker identity
 - **Design**: [DESIGN.md](../../DESIGN.md) › Call screen; Call page PC-R9; Speaker label; Speaker naming panel; Term fix popover; Person picker; D88, D89, D92, D93
-- **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.19, M2, NOT_STARTED
+- **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.19, M2, IMPLEMENTED
 - **Design elements**: `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-ui-term-fix-popover`, `cpt-noter-component-ui-person-picker`
 - **Stories**: `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers` (M2, every path)
 - **Frozen commands it delivers (M2)**: `transcript_rename_speaker`, `transcript_fix_term`, `transcript_name_speakers`
@@ -125,7 +125,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 ### Correct a transcript term
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-speakers-fix-term`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-speakers-fix-term`
 
 **Actor**: Primary user
 
@@ -137,7 +137,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 - Esc cancels and returns focus; during capture the call app regains typing focus.
 
 **Steps**:
-1. [ ] - `p1` - User opens Fix Term… from the selected text's context menu or Edit menu; anchor the 280–360-pt popover to that selection - `inst-open`
+1. [x] - `p1` - User opens Fix Term… from the selected text's context menu or Edit menu; anchor the 280–360-pt popover to that selection - `inst-open`
 2. [x] - `p1` - Keep call id, segment id and the selected TextRange; populate Correct term and `glossary_list` suggestions; show **Older calls get a proposal in Activity** - `inst-range`
 3. [x] - `p1` - User types a replacement or picks a glossary variant and optionally clears Add to glossary; Return applies only outside composition - `inst-draft`
 4. [x] - `p1` - API: `transcript_fix_term` with retained ids/range, replacement and add_to_glossary; show the Fix spinner - `inst-call`
@@ -207,7 +207,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 
 ### Shared identity and post-call naming
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-speakers-naming`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-speakers-naming`
 
 The system **MUST** render the picker, New person form, live rename and PC-R9 with all scopes, invitation suggestions, sample/text-only paths, skip/unskip, hide/show and core Undo. Identity changes preserve user edits and never rename earlier calls automatically.
 
@@ -225,7 +225,7 @@ The system **MUST** render the picker, New person form, live rename and PC-R9 wi
 
 ### Correct terms with glossary intent
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-speakers-corrections`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-speakers-corrections`
 
 The system **MUST** preserve the selected range and original wording, apply only confirmed corrections, honour Add to glossary and show older-call proposal intent, with inline retry and focus return.
 
@@ -243,12 +243,12 @@ The system **MUST** preserve the selected range and original wording, apply only
 
 ## 6. Acceptance Criteria
 
-- [ ] Live rename defaults to Whole call; Only this line uses the selected segment id
-- [ ] Choosing or creating a person never submits during composition or drops a draft when the call app regains focus
-- [ ] Names reach transcript, owners and prose through core views; the UI never substitutes strings in generated prose
-- [ ] Skipped speakers remain nameable and are never counted as All speakers named
-- [ ] Deleted audio removes sample controls but keeps first-line naming
-- [ ] Term fixes retain original words, respect glossary intent and never silently alter past calls
+- [x] Live rename defaults to Whole call; Only this line uses the selected segment id
+- [x] Choosing or creating a person never submits during composition or drops a draft when the call app regains focus
+- [x] Names reach transcript, owners and prose through core views; the UI never substitutes strings in generated prose
+- [x] Skipped speakers remain nameable and are never counted as All speakers named
+- [x] Deleted audio removes sample controls but keeps first-line naming
+- [x] Term fixes retain original words, respect glossary intent and never silently alter past calls
 
 ## 7. Additional Context
 

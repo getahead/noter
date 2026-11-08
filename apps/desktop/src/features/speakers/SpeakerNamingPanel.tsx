@@ -77,6 +77,7 @@ export async function nameSpeaker(bridge: Bridge, callId: string, speaker: Speak
   // @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-return
 }
 
+// @cpt-dod:cpt-noter-dod-ui-speakers-naming:p1
 // @cpt-component:cpt-noter-component-ui-speaker-naming-panel:p1
 // @cpt-flow:cpt-noter-flow-ui-speakers-post-call:p1
 export function SpeakerNamingPanel(p: SpeakerNamingPanelProps) {
