@@ -45,17 +45,12 @@ describe("sheetKey", () => {
     expect(onDefault).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps focus inside: Tab from the last control goes to the first and ⇧Tab back", () => {
+  it("leaves Tab to the window's modal trap (app/a11y/focus), which also skips hidden controls", () => {
     const [a, b] = [el("BUTTON"), el("BUTTON")];
     const tab = key("Tab", b, { items: [a, b] });
     sheetKey(tab, vi.fn());
-    expect(a.focus).toHaveBeenCalled();
-    expect(tab.preventDefault).toHaveBeenCalled();
-    sheetKey(key("Tab", a, { shiftKey: true, items: [a, b] }), vi.fn());
-    expect(b.focus).toHaveBeenCalled();
-    const inner = key("Tab", a, { items: [a, b] });
-    sheetKey(inner, vi.fn());
-    expect(inner.preventDefault).not.toHaveBeenCalled();
+    expect(tab.preventDefault).not.toHaveBeenCalled();
+    expect(a.focus).not.toHaveBeenCalled();
   });
 });
 

@@ -46,6 +46,19 @@ test.describe("cpt-noter-seq-settings-replace-api-key", () => {
     expect(await keySets(page)).toEqual([{ provider: "anthropic", hasKey: true }]);
   });
 
+  test("other path: Tab and Shift+Tab never leave the open sheet (the window's modal trap wraps them)", async ({ page }) => {
+    await openWindow(page, "settings");
+    await openModels(page);
+    await openSheet(page);
+    const inside = () => page.evaluate(() => document.activeElement?.closest('[role="dialog"][aria-modal="true"]') !== null);
+    for (const key of ["Tab", "Shift+Tab"]) {
+      for (let i = 0; i < 8; i++) {
+        await page.keyboard.press(key);
+        expect(await inside(), `${key} press ${i + 1}`).toBe(true);
+      }
+    }
+  });
+
   test("happy path: the key never shows again — the row shows dots, never the key, and a closed sheet forgets the draft", async ({ page }) => {
     await openWindow(page, "settings");
     await openModels(page);
