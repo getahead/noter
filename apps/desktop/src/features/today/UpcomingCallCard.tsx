@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import { t } from "../../i18n/format";
+import { clock, t, zoned } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
 import { Disclosure } from "../../ui/primitives/disclosure";
 import { Menu } from "../../ui/primitives/menu";
@@ -21,12 +21,11 @@ import { OutputItemRow } from "../call-page/OutputItemRow";
 import { positionOf } from "./position";
 import { cardRows, type Card } from "./model";
 
-const clock = (ms: number) => new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(ms);
-
 // @cpt-component:cpt-noter-component-ui-upcoming-call-card:p1
 export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggle }: { bridge: Bridge; card: Card; expanded: boolean; /** The next call: expanded by default, with no Collapse. */ next?: boolean; onToggle: () => void }) {
   const e = card.event;
   const types = useTypes();
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const call = useWindow(bridge, (s) => (e?.call_id ? s.entities.call[e.call_id] : undefined));
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const live = card.variant === "live" || card.variant === "unmatched";
@@ -60,7 +59,7 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   return (
     <article data-today-group={id} className="td-card" data-component="cpt-noter-component-ui-upcoming-call-card" data-variant={card.variant} data-state={live ? "live" : expanded ? "expanded" : "collapsed"} aria-label={title}>
       <header className="td-card__head">
-        {e && <time className="td-card__time">{live && <RecordingIndicator variant="dot" status={capture?.phase === "paused" ? "paused" : "recording"} />}{week ? new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(e.starts_at) : clock(e.starts_at)}</time>}
+        {e && <time className="td-card__time">{live && <RecordingIndicator variant="dot" status={capture?.phase === "paused" ? "paused" : "recording"} />}{week ? zoned(e.starts_at, { weekday: "short" }, prefs) : clock(e.starts_at, prefs)}</time>}
         {card.variant === "unmatched" ? (
           <h3 className="td-card__title td-card__recording">
             <RecordingIndicator variant="dot-text" status={capture?.phase === "paused" ? "paused" : "recording"} />

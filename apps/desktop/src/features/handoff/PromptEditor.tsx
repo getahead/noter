@@ -3,13 +3,12 @@
 import { useState } from "react";
 
 import type { UiPrefs, VersionMeta } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import { clock, t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
 import { DiffView } from "../../ui/diff/DiffView";
 import { VersionMenu } from "../call-page/VersionSwitcher";
-import { clock } from "../call-page/logic";
 import "./handoff.css";
 
 export interface PromptEditorProps {

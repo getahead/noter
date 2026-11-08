@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
-import type { CallRow as Call } from "../../core/bindings";
-import { duration, t } from "../../i18n/format";
+import type { CallRow as Call, UiPrefs } from "../../core/bindings";
+import { clock, dayOf, duration, t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Icon } from "../../ui/icons";
@@ -9,15 +9,11 @@ import { Progress } from "../../ui/primitives/progress";
 import { shortDay, audioDeletedHelp, statusOf } from "./status-cell";
 
 const ROOT = "cpt-noter-component-ui-call-row";
-const TIME = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
-/** "Today 14:30", or "2 Oct 14:30". */
-export function whenOf(ms: number, now = Date.now()): string {
-  const same = shortDay(ms) === shortDay(now);
-  return `${same ? t("section.today") : shortDay(ms)} ${TIME.format(ms)}`;
+/** "Today 14:30", or "2 Oct 14:30", in the zone and 12/24-hour setting the core passes. */
+export function whenOf(ms: number, now = Date.now(), prefs?: UiPrefs): string {
+  const same = dayOf(ms, prefs) === dayOf(now, prefs);
+  return `${same ? t("section.today") : shortDay(ms, prefs?.time_zone || undefined)} ${clock(ms, prefs)}`;
 }
 
 /** The call's people as "Anna, Boris +2", the user last as "You". */
@@ -56,6 +52,7 @@ export interface CallRowProps {
   onPress: (e: MouseEvent) => void;
   onOpen: () => void;
   onContext: (e: MouseEvent) => void;
+  prefs?: UiPrefs;
 }
 
 // @cpt-component:cpt-noter-component-ui-call-row:p1
@@ -67,6 +64,7 @@ export function CallRowView({
   onPress,
   onOpen,
   onContext,
+  prefs,
 }: CallRowProps) {
   const sensitive = c.privacy === "sensitive";
   const st = statusOf(c);
@@ -100,7 +98,7 @@ export function CallRowView({
       }
       // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
     >
-      <td className="lb-crow__when np-tnum">{whenOf(c.started_at)}</td>
+      <td className="lb-crow__when np-tnum">{whenOf(c.started_at, undefined, prefs)}</td>
       <td className="lb-crow__call">
         <div className="lb-crow__l1">
           <span className="lb-crow__title" title={title}>

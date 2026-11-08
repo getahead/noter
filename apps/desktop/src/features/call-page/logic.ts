@@ -2,7 +2,7 @@
 // subtitle and the Call info rows. Nothing here reads the store or draws.
 import type { CommandState } from "../../app/store/window-store";
 import type { CallPageTab, CallRow, TimeSpan, UiPrefs } from "../../core/bindings";
-import { duration, formatDateTime, t } from "../../i18n/format";
+import { clock, dayOf, duration, formatDateTime, shortDay, t } from "../../i18n/format";
 import type { MsgKey } from "../../i18n/en";
 
 /** The page's route key in the Library section, as `navRoute` builds it for a `call_page` target. */
@@ -57,31 +57,6 @@ export function pageState(read: CommandState | undefined, haveCall: boolean): Pa
   return "LOADING";
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-error-loading
 }
-
-export const dayOf = (ms: number, prefs: UiPrefs): string => {
-  try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: prefs.time_zone || undefined }).format(ms);
-  } catch {
-    return new Intl.DateTimeFormat("en-CA").format(ms);
-  }
-};
-export const clock = (ms: number, prefs: UiPrefs): string => {
-  const o: Intl.DateTimeFormatOptions = { timeStyle: "short", hourCycle: prefs.time_format === "h12" ? "h12" : "h23" };
-  try {
-    return new Intl.DateTimeFormat("en", { ...o, timeZone: prefs.time_zone || undefined }).format(ms);
-  } catch {
-    return new Intl.DateTimeFormat("en", o).format(ms);
-  }
-};
-/** "Nov 15": a day without a year, in the user's zone. */
-export const shortDay = (ms: number, prefs: UiPrefs): string => {
-  const o: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-  try {
-    return new Intl.DateTimeFormat("en", { ...o, timeZone: prefs.time_zone || undefined }).format(ms);
-  } catch {
-    return new Intl.DateTimeFormat("en", o).format(ms);
-  }
-};
 
 /** **Today 10:00**, or the date and time of another day. */
 export const whenLabel = (ms: number, now: number, prefs: UiPrefs): string =>

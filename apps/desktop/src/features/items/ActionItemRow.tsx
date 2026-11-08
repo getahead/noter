@@ -6,7 +6,7 @@ import { useId, useState, type KeyboardEvent } from "react";
 import { useWindow } from "../../app/use-window";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { ItemView, PersonChip } from "../../core/bindings";
-import { quote, t } from "../../i18n/format";
+import { dayOf, locale, quote, t } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
 import { InlineStatus } from "../../ui/feedback/inline-status";
 import { Badge } from "../../ui/primitives/badge";
@@ -29,8 +29,7 @@ import { handoffButtonId, slots } from "./slots";
 import "./items.css";
 
 export const elementId = (kind: string, id: string) => [kind, id].join("-");
-const today = () => new Date().toLocaleDateString("sv"); // YYYY-MM-DD in the local zone
-const dueText = (due: string) => new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${due}T00:00`));
+const dueText = (due: string) => new Intl.DateTimeFormat(locale(), { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${due}T00:00`));
 
 /** The live item: the store's record unless the section handed over a newer one. */
 export function useItem(bridge: Bridge, item: ItemView): ItemView {
@@ -154,6 +153,7 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
   const rowId = useId();
   const it = useItem(bridge, item);
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const heldLocal = useLocal(it.id);
   const local: Local = variant === "read-only" ? {} : heldLocal;
   const state = rowState(it, { phase: local.phase, outcome: !!local.outcome });
@@ -176,7 +176,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     );
 
   const edit = it.review === "suggested" && full ? () => startEdit(it) : slots.inspect ? () => slots.inspect!(bridge, it.id) : null;
-  const overdue = isOverdue(it.due, done, today());
+  const overdue = isOverdue(it.due, done, dayOf(Date.now(), prefs));
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-handoff
   const tick1 = (checked: boolean) => (it.status === "handed_off" ? patchLocal(it.id, { asking: true }) : void setDone(bridge, it, checked));
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-handoff

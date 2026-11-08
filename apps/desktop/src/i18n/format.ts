@@ -10,7 +10,7 @@ export type Part = { text: string; lang?: string };
 
 const INTERFACE_LANG = "en";
 /** The macOS locale for dates, numbers and money. */
-const locale = () =>
+export const locale = () =>
   (typeof navigator === "undefined" ? "" : navigator.language) || "en";
 
 export type Pseudo = "off" | "cyrillic" | "german";
@@ -121,21 +121,27 @@ export const quote = (text: string, lang: string): Quoted => ({
 // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-quote-user-text
 
 // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
-export const formatDateTime = (ms: number, prefs: UiPrefs): string => {
-  const o: Intl.DateTimeFormatOptions = {
-    dateStyle: "medium",
-    timeStyle: "short",
-    hourCycle: prefs.time_format === "h12" ? "h12" : "h23",
-  };
+/** `o` in the user's zone; a zone this WebView does not know falls back to the system zone. */
+export const zoned = (ms: number, o: Intl.DateTimeFormatOptions, prefs: UiPrefs | undefined, loc = locale()): string => {
   try {
-    return new Intl.DateTimeFormat(locale(), {
-      ...o,
-      timeZone: prefs.time_zone || undefined,
-    }).format(ms);
+    return new Intl.DateTimeFormat(loc, { ...o, timeZone: prefs?.time_zone || undefined }).format(ms);
   } catch {
-    return new Intl.DateTimeFormat(locale(), o).format(ms); // a zone this WebView does not know: the system zone
+    return new Intl.DateTimeFormat(loc, o).format(ms);
   }
 };
+const hourCycle = (prefs: UiPrefs | undefined) => (prefs?.time_format === "h12" ? "h12" : "h23");
+
+export const formatDateTime = (ms: number, prefs: UiPrefs): string =>
+  zoned(ms, { dateStyle: "medium", timeStyle: "short", hourCycle: hourCycle(prefs) }, prefs);
+
+/** The calendar day in the user's zone, YYYY-MM-DD: the key two times share when they fall on one day. */
+export const dayOf = (ms: number, prefs: UiPrefs | undefined): string => zoned(ms, {}, prefs, "en-CA");
+
+/** "10:00" or "10:00 AM": the 12/24-hour setting and zone the core passes. */
+export const clock = (ms: number, prefs: UiPrefs | undefined): string => zoned(ms, { timeStyle: "short", hourCycle: hourCycle(prefs) }, prefs);
+
+/** "Nov 15": a day without a year, in the user's zone. */
+export const shortDay = (ms: number, prefs: UiPrefs | undefined): string => zoned(ms, { month: "short", day: "numeric" }, prefs);
 
 /** Call-relative time, always HH:MM:SS. */
 export const callTime = (seconds: number): string => {

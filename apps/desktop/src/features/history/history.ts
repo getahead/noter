@@ -1,7 +1,6 @@
 // The pure part of the History timeline: the read key, the day groups, the read state and the undo target of a row.
 import type { ActorFilter, ChangeRow, HistoryTarget, UiPrefs, UndoTarget } from "../../core/bindings";
-import { t } from "../../i18n/format";
-import { dayOf, shortDay } from "../call-page/logic";
+import { dayOf, shortDay, t } from "../../i18n/format";
 
 export type HistoryState = "LOADING" | "READY" | "EMPTY" | "FILTERED_EMPTY" | "ERROR";
 

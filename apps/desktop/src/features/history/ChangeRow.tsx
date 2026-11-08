@@ -2,11 +2,10 @@
 // call the core by the row's change or batch id. No batch members: the contract carries none.
 import { useState, type KeyboardEvent } from "react";
 import type { ChangeRow as Change, UiPrefs } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import { clock, t } from "../../i18n/format";
 import { DiffView } from "../../ui/diff/DiffView";
 import { Badge } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
-import { clock } from "../call-page/logic";
 import { actorLabel, runtimeLabel } from "./history";
 
 export interface ChangeRowProps {

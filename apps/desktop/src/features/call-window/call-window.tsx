@@ -10,7 +10,7 @@ import { announcerFor, writeLive } from "../../app/a11y/announce";
 import type { ActOptions, Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, Result } from "../../core/bindings";
-import { callTime, quote, t } from "../../i18n/format";
+import { callTime, clock as timeOf, quote, t } from "../../i18n/format";
 import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
 import { cx } from "../../ui/primitives/attrs";
@@ -35,13 +35,6 @@ const DEFAULT_KEYS: Partial<Record<HotkeyAction, string>> = {
   hide_for_presenting: "⌃⌥⌘0",
 };
 const live = (c: CaptureState | undefined) => !!c && (c.phase === "recording" || c.phase === "paused" || c.phase === "failed");
-const hhmm = (ms: number) =>
-  new Intl.DateTimeFormat("en", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(ms);
-
 /** Keep one Channel open while `on` holds: snapshot then stream; the cleanup ends it. */
 export function subscribeWhile<K extends "levels_subscribe">(bridge: Bridge, on: boolean, cmd: K, args: CommandArgs[K]): (() => void) | undefined {
   if (!on) return undefined;
@@ -398,7 +391,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
         notice={noticeShown}
         floating={floating}
         seconds={"stops_at" in noticeShown && noticeShown.stops_at !== null ? Math.max(0, Math.ceil((noticeShown.stops_at - now) / 1000)) : null}
-        detectedAt={noticeShown.type === "new_meeting" ? hhmm(noticeShown.detected_at) : ""}
+        detectedAt={noticeShown.type === "new_meeting" ? timeOf(noticeShown.detected_at, prefs) : ""}
         levels={{
           mic: dbToLevel(levels?.mic_db ?? null),
           sys: dbToLevel(levels?.sys_db ?? null),

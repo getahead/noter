@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CallDetail, SegmentView, SpeakerView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import { duration, t } from "../../i18n/format";
+import { duration, shortDay, t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Menu } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
@@ -214,7 +214,7 @@ export function audioLine(detail: AudioFacts | null | undefined, prefs: UiPrefs 
   if (!detail) return null;
   const { call } = detail;
   if (detail.audio_not_stored) return t("transcript.audio.not_stored");
-  const day = (ms: number) => new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", timeZone: prefs?.time_zone || undefined }).format(ms);
+  const day = (ms: number) => shortDay(ms, prefs);
   // D-36: the deletion date when the core knows it (Call info reads the same field)
   if (call.audio_deleted) return call.audio_deleted_at == null ? t("transcript.audio.deleted") : t("transcript.audio.deleted_on", { date: day(call.audio_deleted_at) });
   if (call.audio_kept_until == null || !prefs) return null;

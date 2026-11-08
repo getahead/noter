@@ -2,8 +2,7 @@
 // the store or draws.
 import type { CallOutputs, CallRow, OutputSection, OutputsProgress, RuntimeChoice, SectionKind, UiPrefs, VersionMeta } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
-import { t } from "../../i18n/format";
-import { clock } from "./logic";
+import { clock, t } from "../../i18n/format";
 
 // @cpt-algo:cpt-noter-algo-ui-call-page-outputs-project:p1
 /** PRD order of the sections the Summary view shows; role reviews belong to the M4 view. */
