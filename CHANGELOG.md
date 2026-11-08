@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.22.0](https://github.com/getahead/noter/compare/v0.21.0...v0.22.0) (2026-11-08)
+
+
+### Features
+
+* **core:** add Open Last Summary to the menu bar (2.18) ([#447](https://github.com/getahead/noter/issues/447)) ([2e1dc04](https://github.com/getahead/noter/commit/2e1dc0421ac1d3de80d6fcd5fe42e24db73a9d98))
+* **ui:** add Fix Term to the native Edit menu (2.19) ([#422](https://github.com/getahead/noter/issues/422)) ([52cd0bb](https://github.com/getahead/noter/commit/52cd0bb54cd02a99f8b0e1d265ec39f510c2a6a2))
+* **ui:** close today 2.20 markers and tick the feature ([#386](https://github.com/getahead/noter/issues/386)) ([10e5dbc](https://github.com/getahead/noter/commit/10e5dbc052fd42a640a10c1a942e9ddbbc2f301c))
+* **ui:** count the rejected suggestions a regeneration will not suggest again (2.18) ([#420](https://github.com/getahead/noter/issues/420)) ([1b51bb3](https://github.com/getahead/noter/commit/1b51bb30d62dd806e59352b51ee9a20c0285e0fb))
+* **ui:** mark the remaining 2.21 instruction blocks and tick the covered flows ([#437](https://github.com/getahead/noter/issues/437)) ([4cb482e](https://github.com/getahead/noter/commit/4cb482e77a96b247114912d6c5865ddfb89c1da1))
+* **ui:** mount the naming panel on summary and show names updated (2.19) ([#388](https://github.com/getahead/noter/issues/388)) ([fba4ff3](https://github.com/getahead/noter/commit/fba4ff3669753b197722623afb08660980dcf57f))
+* **ui:** trace the regenerate flow, show the local-model and names-updated notices (2.18) ([#379](https://github.com/getahead/noter/issues/379)) ([802454e](https://github.com/getahead/noter/commit/802454ee9dcb44adc21309e95df9df4849c67831))
+
+
+### Bug fixes
+
+* **mcp:** a closed run's connection answers nothing, not a racing refusal ([#442](https://github.com/getahead/noter/issues/442)) ([50f9e97](https://github.com/getahead/noter/commit/50f9e97781694bf5b705624227f9159a14afea3e))
+* **mcp:** hybrid search on the socket path and one sign-in per run for live sources ([#419](https://github.com/getahead/noter/issues/419)) ([cd5cf83](https://github.com/getahead/noter/commit/cd5cf8398e91ea35b5b72823b25ce9ffbab24d40))
+* **ui:** apply buffered channel messages before an entity write so Undo's restored rows stay ([#429](https://github.com/getahead/noter/issues/429)) ([762f060](https://github.com/getahead/noter/commit/762f0601a62bcaadf841215b50d8b8efbd39157c))
+* **ui:** re-read the line when undo reverses a term fix (2.19) ([#444](https://github.com/getahead/noter/issues/444)) ([9056f8b](https://github.com/getahead/noter/commit/9056f8be8e13984bccc642064b2de28378bc47b1))
+
+
+### Performance
+
+* **ci:** cache the pinned WebKit for the browser test jobs ([#432](https://github.com/getahead/noter/issues/432)) ([8574edd](https://github.com/getahead/noter/commit/8574edddbc70c902d605d4cca5695f31ae8a21fc))
+* **ci:** cache the Swift engine build in the macOS job ([#426](https://github.com/getahead/noter/issues/426)) ([1db49e0](https://github.com/getahead/noter/commit/1db49e0cb973b8edec4e5c156a470811908a25ef))
+* **conformance:** probe the commands a few at a time, each in its own core ([#449](https://github.com/getahead/noter/issues/449)) ([48ef5b4](https://github.com/getahead/noter/commit/48ef5b4a0426fc888b029b97464d59bdbdccbd72))
+* **conformance:** replace archive fixture delays with explicit completion handshakes ([#441](https://github.com/getahead/noter/issues/441)) ([9839451](https://github.com/getahead/noter/commit/98394511ebdf64c6fd719276dca38a1bfd5b5193))
+
 ## [0.21.0](https://github.com/getahead/noter/compare/v0.20.0...v0.21.0) (2026-11-08)
 
 
