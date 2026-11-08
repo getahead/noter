@@ -140,6 +140,9 @@ export const INITIAL_LOCAL: PanelLocal = { dontAsk: false, refused: null, closin
 
 export const isHeld = (s: PanelLocal): boolean => s.pointer || s.focus;
 
+/** Whether keyboard focus is inside `panel`: a focused button that was removed (Back from Don't Ask) sends no blur, so the flag is re-read from the page. */
+export const focusInside = (panel: Element | null, active: Element | null): boolean => panel !== null && active !== null && panel.contains(active);
+
 // @cpt-state:cpt-noter-state-ui-record-prompt-panel:p1
 export function localReduce(s: PanelLocal, e: PanelEvent): PanelLocal {
   switch (e.type) {
