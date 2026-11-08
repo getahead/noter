@@ -1,6 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { closeOnOutside, measure, placeFloating, Popover } from "./popover";
+import { closeOnOutside, measure, placeFloating, Popover, returnFocus } from "./popover";
 
 describe("Popover (cpt-noter-dod-ui-primitives-controls)", () => {
   it("renders the prototype's popover as a dialog", () => {
@@ -83,5 +83,24 @@ describe("Popover Esc", () => {
     expect(onClose).not.toHaveBeenCalled();
     key(false);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe("returnFocus", () => {
+  it("goes to a focusable anchor", () => {
+    const anchor = { tabIndex: 0, focus: vi.fn() };
+    const restore = vi.fn();
+    returnFocus(anchor, restore);
+    expect(anchor.focus).toHaveBeenCalledOnce();
+    expect(restore).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the previous focus when the anchor is no control (tabIndex -1) or absent", () => {
+    const anchor = { tabIndex: -1, focus: vi.fn() };
+    const restore = vi.fn();
+    returnFocus(anchor, restore);
+    returnFocus(null, restore);
+    expect(anchor.focus).not.toHaveBeenCalled();
+    expect(restore).toHaveBeenCalledTimes(2);
   });
 });

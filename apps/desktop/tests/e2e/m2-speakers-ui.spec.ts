@@ -284,6 +284,30 @@ test("cpt-noter-flow-ui-live-transcript-stored — the stored transcript is one 
   await expect(lines.first()).toBeFocused();
 });
 
+test("cpt-noter-flow-ui-speakers-fix-term — Esc on the Fix Term menu and on the popover returns focus to the line", async ({ page }) => {
+  await openWindow(page, "main");
+  await navigate(page, "transcript", S.CALL);
+  const line = page.locator('[data-region="PC-R5"] .cw-seg').filter({ has: page.locator('.cw-seg__text') }).first();
+  await line.locator(".cw-seg__text").dblclick();
+  await line.focus();
+  await page.keyboard.press("Shift+F10");
+  const menu = page.getByRole("menu", { name: "Fix Term…" });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(line).toBeFocused();
+  await line.locator(".cw-seg__text").dblclick(); // the click moved the selection and focus
+  await line.focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Fix Term…", exact: true }).click();
+  const fix = page.getByRole("dialog", { name: "Fix term", exact: true });
+  await expect(fix).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(fix).toHaveCount(0);
+  await expect(line).toBeFocused();
+});
+
 test("cpt-noter-seq-call-page-name-speakers — the native Edit menu's Fix Term… follows the selected words", async ({ page }) => {
   await openWindow(page, "main");
   await navigate(page, "transcript", S.CALL);
