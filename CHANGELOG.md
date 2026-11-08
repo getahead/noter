@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.22.4](https://github.com/getahead/noter/compare/v0.22.3...v0.22.4) (2026-11-08)
+
+
+### Bug fixes
+
+* **ui:** a superseded transcript subscribe no longer clears the newer one's slow mark ([#548](https://github.com/getahead/noter/issues/548)) ([8ad5af9](https://github.com/getahead/noter/commit/8ad5af9eb31196d9516a632511022ef2094c4ac5))
+* **ui:** the capture notice is a labelled group, not an alert dialog ([#553](https://github.com/getahead/noter/issues/553)) ([363501d](https://github.com/getahead/noter/commit/363501dcaae540c5b6febe301935ac6776b17ffc))
+* **ui:** the live log stops following while a rename popover is open ([#550](https://github.com/getahead/noter/issues/550)) ([55f99bd](https://github.com/getahead/noter/commit/55f99bd6d2ff36e7d9ca891c0cdfb75b4225214c))
+* **ui:** the main window opens at 1280x820 and cannot shrink below 900x600 ([#556](https://github.com/getahead/noter/issues/556)) ([c919b88](https://github.com/getahead/noter/commit/c919b88b1b229d569e4723027cf9e788a920f2ae))
+* **ui:** the new person name field takes focus when it opens ([#551](https://github.com/getahead/noter/issues/551)) ([569f9f2](https://github.com/getahead/noter/commit/569f9f2f36a2bc062a877654f6369b477fb1b03b))
+
 ## [0.22.3](https://github.com/getahead/noter/compare/v0.22.2...v0.22.3) (2026-11-08)
 
 
