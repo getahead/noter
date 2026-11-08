@@ -10,6 +10,7 @@
 import type { Page } from "@playwright/test";
 
 import type { CoreError } from "../../src/core/bindings";
+import { isLaterMilestone } from "../support/milestones";
 import { calls, openWindow, type Steer } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
@@ -65,7 +66,8 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     try {
       steer = await openWindow(page, "settings", { world: (w) => (w.copilot.card_keys.conflicts = ["Ctrl+Alt+Super+3"]) });
     } catch (e) {
-      if ((e as CoreError | null)?.code === "not_implemented") return; // card keys are the copilot's (M4); changeAhead's rule after D-4
+      // card keys are the copilot's (M4): skipped (and reported so) only while M4 is later than the current milestone
+      test.skip((e as CoreError | null)?.code === "not_implemented" && isLaterMilestone("M4"), "card keys are delivered in M4");
       throw e;
     }
     await openHotkeys(page);
