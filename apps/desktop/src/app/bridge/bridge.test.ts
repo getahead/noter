@@ -158,6 +158,24 @@ describe("streams", () => {
     expect(state().streams.transcript_subscribe?.data?.segments.some((s) => s.id === "lost")).toBe(false);
   });
 
+  it("a resync keeps the lines the script already confirmed and plays each one once", async () => {
+    vi.useFakeTimers();
+    const { b, fake, state } = setup();
+    fake.setWorld((w) => {
+      w.live_script = ["s1", "s2", "s3"].map((id) => ({ type: "confirmed" as const, segment: segment(id) }));
+      w.script_interval_ms = 100;
+    });
+    await b.open();
+    await b.subscribe("transcript_subscribe", { call_id: "call_live" });
+    await vi.advanceTimersByTimeAsync(100); // s1 came with the snapshot, s2 now
+    fake.push("transcript_subscribe", { seq: 999, event: { type: "confirmed", segment: segment("lost") } });
+    await vi.waitFor(() => expect(state().status).toBe("READY"));
+    const ids = () => (state().streams.transcript_subscribe?.data?.segments ?? []).map((x) => x.id).filter((id) => /^s\d$/.test(id));
+    expect(ids().slice(0, 2)).toEqual(["s1", "s2"]); // not the pre-stream snapshot (waitFor may already have played s3)
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(ids()).toEqual(["s1", "s2", "s3"]); // the script is not played again from event 1
+  });
+
   it("ended with lagged resubscribes; any other reason ends the stream", async () => {
     vi.useFakeTimers();
     const { b, fake, count, state } = setup();

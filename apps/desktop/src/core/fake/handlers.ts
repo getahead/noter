@@ -115,7 +115,7 @@ function namingState(world: World, callId: string) {
 }
 
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
-function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"]): void {
+function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"], fake: FakeCore): void {
   rows.forEach((r) => {
     if (r.field === "naming" && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
@@ -141,6 +141,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     if (fixed && fix) {
       fixed.text = fixed.text.slice(0, fix.range.start) + r.before + fixed.text.slice(fix.range.end);
       fixed.corrections.splice(fixed.corrections.indexOf(fix), 1);
+      fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [fixed] } }); // the stream carries the restored words
     }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
@@ -347,6 +348,9 @@ const skills = new Map<string, { rev: number; body: string }>();
 const defaultSkill = (a: AgentView) => `---\nname: ${a.name}\n---\n\nYou are the ${a.name} of the council. Ask one question at a time; cite the call.`;
 
 /** The call a scripted transcript event belongs to, if it names one. */
+/** How many events of the live script each transcript snapshot has had streamed into it. */
+const scriptPlayed = new WeakMap<object, number>();
+
 function scriptCall(e: World["live_script"][number]): string | undefined {
   if ("segment" in e) return e.segment.call_id;
   if ("gap" in e) return e.gap.call_id;
@@ -556,11 +560,21 @@ export const defaultHandlers: Handlers = {
     // snapshot already contains (seq = last_seq) and the first new one. The client drops the
     // first and holds the second until the snapshot is in (R23).
     // The script is the fixture call's speech: a call started at runtime waits for its own (D-37).
-    const [first, ...rest] = world.live_script.filter((e) => scriptCall(e) === undefined || scriptCall(e) === a.call_id);
+    const played = scriptPlayed.get(snap) ?? 0; // a resubscribe carries on where the script was, like the real core's snapshot
+    const [first, ...rest] = world.live_script.filter((e) => scriptCall(e) === undefined || scriptCall(e) === a.call_id).slice(played);
     send({ seq: snap.last_seq, event: { type: "segments_updated", segments: snap.segments.slice(-1) } });
-    if (first) fake.push(sub, { event: first });
-    rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => fake.push(sub, { event })));
-    return { ...snap, subscription_id: sub };
+    // what the stream sends joins the snapshot, so the next subscribe returns everything up to `last_seq`
+    const play = (event: (typeof rest)[number]) => {
+      const seq = fake.push(sub, { event });
+      if (seq === null) return;
+      if (event.type === "confirmed") snap.segments.push(event.segment);
+      snap.last_seq = seq;
+      scriptPlayed.set(snap, (scriptPlayed.get(snap) ?? 0) + 1);
+    };
+    const snapshot = { ...snap, segments: [...snap.segments], subscription_id: sub }; // taken before the first new message, which the client holds (R23)
+    if (first) play(first);
+    rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => play(event)));
+    return snapshot;
   },
   levels_subscribe: (_a, { fake, send }) => {
     const sub = newId("sub");
@@ -1297,7 +1311,7 @@ export const defaultHandlers: Handlers = {
     );
     return { rows: historyRows(world, rows), next_cursor: null, total: rows.length };
   },
-  change_undo: (a, { world, emit }) => {
+  change_undo: (a, { world, emit, fake }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
@@ -1308,11 +1322,11 @@ export const defaultHandlers: Handlers = {
     const undo = open.filter((r) => !editedLater(world, r));
     if (!undo.length) throw coreError("edited_later");
     undo.forEach((r) => Object.assign(r, { status: "undone", undoable: false, redoable: true }));
-    replayChanges(world, undo, "before", emit);
+    replayChanges(world, undo, "before", emit, fake);
     return { undone: undo.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: open.length - undo.length };
   },
   // Redo by target, at any time, while the rows were not edited later; writes new change rows.
-  change_redo: (a, { world, emit }) => {
+  change_redo: (a, { world, emit, fake }) => {
     const target = a.target;
     const rows = world.changes.filter((c) => (target.type === "change" ? c.id === target.change_id : c.batch_id === target.batch_id));
     if (!rows.length) throw coreError("not_found");
@@ -1323,7 +1337,7 @@ export const defaultHandlers: Handlers = {
       JSON.stringify(namingState(world, (JSON.parse(r.before!) as ReturnType<typeof namingState>).callId)) === r.before));
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
-    replayChanges(world, redoable, "after", emit);
+    replayChanges(world, redoable, "after", emit, fake);
     redoable.forEach((r) => logChange(world, { entity: r.entity, summary: `Redid: ${r.summary}`, field: r.field, before: r.before, after: r.after }));
     return { undone: redoable.reduce((n, r) => n + r.batch_size, 0), skipped_edited_later: undone.length - redoable.length };
   },
