@@ -355,7 +355,9 @@ impl Core {
         let now = self.deps.clock.now();
         for source in list.sources {
             if noter_knowledge::due(&source, now) {
-                let _ = self.enqueue_sync(&source.id);
+                // No mark: a sync already open for it is this work, and a mark would only make
+                // that run be followed by another one.
+                let _ = self.trigger_sync(&source.id);
             }
         }
     }
