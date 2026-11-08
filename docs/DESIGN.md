@@ -4197,7 +4197,7 @@ The recording indicator shows the capture state in colour and words inside Noter
 | Dot and text | CS-R5 status strip | Dot, state word and elapsed time |
 | Dot with a VoiceOver-only label | CS-R1 and FP-R1 headers, FP-C1 | Dot and clock only; the word is in the accessibility label |
 | Button | TD-R1, replacing **Record** while capturing (● 23:14) | Push-button frame; Space or Return brings the call window forward |
-| Live row | Sidebar live call row in MW-R2 (**● Planning · 23:14**) | Red-tinted capsule at the top of the source list: dot, the call title up to its first colon, and the elapsed time; **Paused** instead of the time while paused; a click shows the call window without taking focus (PM-59) |
+| Live row | Sidebar live call row in MW-R2 (**● Planning · 23:14**) | Red-tinted capsule at the top of the source list: dot, the call title up to its first ": " (colon and space, so **1:1 with Anna** stays whole), and the elapsed time; **Paused** instead of the time while paused; a click shows the call window without taking focus (PM-59) |
 
 **States.**
 
