@@ -14,6 +14,7 @@ import { isWriting, mergeSection, orderSections } from "./outputs-logic";
 import { useRegenerate } from "./RegenerateSheet";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-read-edit:p1
+// @cpt-dod:cpt-noter-dod-ui-call-page-outputs-content:p1
 export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string }) {
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
