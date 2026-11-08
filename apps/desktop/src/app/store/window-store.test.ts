@@ -106,6 +106,11 @@ describe("window store", () => {
     expect(t.whole.callWindow?.version).toBe(1);
   });
 
+  it("leaves the state alone for an entity:changed type the bindings do not know", () => {
+    const s = initialState("main");
+    expect(applyEvent(s, { event: "entity:changed", payload: { type: "future" } as never })).toBe(s);
+  });
+
   it("keys entities by identity and removes them", () => {
     const call = { id: "call_1", rev: 1, title: "A" };
     let s = applyEvent(initialState("main"), {
