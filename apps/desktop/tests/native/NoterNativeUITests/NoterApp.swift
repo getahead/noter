@@ -31,6 +31,7 @@ class NoterTestCase: XCTestCase {
         self.home = home
         app.launchEnvironment["HOME"] = home.path
         app.launchEnvironment["TMPDIR"] = home.path + "/"
+        app.launchEnvironment["NOTER_TEST_HOTKEY_FILE"] = hotkeyFile(in: home).path
     }
 
     /// Launches the app on the fixture world (a live call recording, the call “Backend sync” in the library) in
@@ -189,4 +190,22 @@ class NoterTestCase: XCTestCase {
 
     /// A global hotkey, typed while `other` is in front so it reaches Noter as a global shortcut.
     func hotkey(_ key: String) { other.typeKey(key, modifierFlags: [.control, .option, .command]) }
+
+    /// The file `press` writes a chord to; the app (NOTER_TEST_HOTKEY_FILE) removes it when it takes the chord.
+    private func hotkeyFile(in home: URL) -> URL { home.appendingPathComponent("noter-test-hotkey") }
+
+    /// The same hotkey, pressed through the app's test hook instead of typed: typing goes through Finder and waits for
+    /// it to be idle (about 10 s a key). The app takes the chord from the file and runs it like a registered global
+    /// shortcut; `hotkey` keeps one typed test of the delivery itself. Like a typed chord, it is pressed with the other
+    /// app in front (typing activates it): Noter's windows leave its accessibility tree only once the app is no longer
+    /// frontmost. It returns once the app has taken the chord, so a press the app never saw fails here, not later.
+    func press(_ key: String, file: StaticString = #filePath, line: UInt = #line) {
+        if other.state != .runningForeground { other.activate() }
+        guard let home else { return XCTFail("the app has no temp folder", file: file, line: line) }
+        let trigger = hotkeyFile(in: home)
+        XCTAssertNoThrow(try "Ctrl+Alt+Super+\(key.uppercased())".write(to: trigger, atomically: true, encoding: .utf8),
+                         file: file, line: line)
+        XCTAssertTrue(waitUntil(5) { !FileManager.default.fileExists(atPath: trigger.path) },
+                      "the app did not take the hotkey ⌃⌥⌘\(key.uppercased())", file: file, line: line)
+    }
 }
