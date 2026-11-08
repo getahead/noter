@@ -2,11 +2,10 @@
 // Esc cancels; Return runs the default button (⌘Return in a multi-line field); focus stays inside and goes back
 // to where it was when the sheet closes.
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { FOCUSABLE } from "../../app/a11y/focus";
 import { base } from "./attrs";
 
-const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
-
-/** Keys of a modal surface: Esc, Return to the default button, and Tab kept inside. */
+/** Keys of a modal surface: Esc and Return to the default button. Tab is kept inside by the window's handler (`aria-modal`). */
 export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, onDefault?: () => void) {
   if (e.defaultPrevented) return; // an inner control handled it: a search field's Esc clears, a menu's Esc closes the menu
   const tag = (e.target as HTMLElement).tagName;
@@ -14,13 +13,6 @@ export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, on
   else if (e.key === "Enter" && onDefault && (tag === "TEXTAREA" ? e.metaKey : tag !== "BUTTON" && tag !== "A")) {
     e.preventDefault();
     onDefault();
-  } else if (e.key === "Tab") {
-    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE));
-    const edge = e.shiftKey ? items[0] : items[items.length - 1];
-    if (edge && e.target === edge) {
-      e.preventDefault();
-      (e.shiftKey ? items[items.length - 1] : items[0]).focus();
-    }
   }
 }
 
