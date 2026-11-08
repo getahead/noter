@@ -222,7 +222,9 @@ export async function openWindow(page: Page, label: WindowLabel | string, plan: 
   return steer;
 }
 
-/** Every command and event subscription the window made, in order. */
+/** The page has its core (the fake or the Tauri bridge) to call. */
+export const coreReady = (page: Page) => page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+
 /** Wheel the transcript `log` up until `row` is in view: Linux Chromium animates a wheel scroll and the log's row-height
  *  correction cuts it short (CI), so one wheel may not get there. */
 export async function wheelUpTo(log: Locator, row: Locator) {
@@ -233,6 +235,7 @@ export async function wheelUpTo(log: Locator, row: Locator) {
   }).toPass({ timeout: 10_000 });
 }
 
+/** Every command and event subscription the window made, in order. */
 export function calls(page: Page): Promise<Call[]> {
   return page.evaluate(() => (globalThis as unknown as { __noterCalls?: Call[] }).__noterCalls ?? []);
 }

@@ -3,13 +3,13 @@
 // is the system's: both are XCUITest / macOS checklist steps. Here the call page, the library
 // list and the Settings window are driven through their commands (docs/TEST-PLAN.md › M1).
 import type { Core, EntityChanged } from "../../src/core/bindings";
-import { ahead, ok, pending, refused, until } from "../support/results";
+import { ahead, ok, refused, until } from "../support/results";
 import * as W from "../support/world-presets";
-import { changeAhead, expect, given, test } from "./support/fixtures";
+import { expect, given, test } from "./support/fixtures";
 
-/** The ids in the Calls list, or null while calls_list (M1) is not implemented. */
+/** The ids in the Calls list. */
 const listIds = async (main: Core) =>
-  ahead(await main.callsList({ filter: {}, sort: "newest", page: {} }))?.rows.map((r) => r.id) ?? null;
+  ok(await main.callsList({ filter: {}, sort: "newest", page: {} })).rows.map((r) => r.id);
 
 test.describe("cpt-noter-seq-dialogs-delete-call", () => {
   test("happy path: Delete Call… (⌘⌫), Delete, the call and everything in it gone, Calls list in its place", async ({ scenario }) => {
@@ -17,12 +17,10 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
     const main = scenario.core("main");
     const entities = await scenario.events("entity:changed");
 
-    const page = ahead(await main.callGet({ call_id: W.LIVE_CALL })); // the call's page is open
-    if (!page) return; // call_get (M1)
+    const page = ok(await main.callGet({ call_id: W.LIVE_CALL })); // the call's page is open
     expect(page.call.title).toBe(W.LIVE_TITLE); // Delete “Planning: VHI 8.0 drawer redesign”?
     ahead(await main.windowReportView({ call_id: W.LIVE_CALL })); // M1 command
-    const deleted = ahead(await main.callsDelete({ call_ids: [W.LIVE_CALL] })); // Delete
-    if (!deleted) return; // calls_delete (M1)
+    const deleted = ok(await main.callsDelete({ call_ids: [W.LIVE_CALL] })); // Delete
     expect(deleted.deleted).toBe(1);
 
     await until(() => entities.all.some((e: EntityChanged) => e.type === "removed" && e.kind === "call" && e.id === W.LIVE_CALL), "entity:changed removed");
@@ -37,10 +35,8 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
     expect(refused(await scenario.core("record-prompt").callsDelete({ call_ids: [W.PAST_CALL] })).code).toBe("window_not_allowed");
     const main = scenario.core("main");
     const before = await listIds(main);
-    if (!before) return; // calls_list (M1)
     // Return chooses Cancel: no command is sent. The live call cannot be deleted while it records either.
     const live = await main.callsDelete({ call_ids: [W.LIVE_CALL] });
-    if (pending(live)) return; // calls_delete (M1)
     expect(refused(live).code).toBe("already_recording");
     expect(await listIds(main)).toEqual(before);
     const past = ahead(await main.callGet({ call_id: W.PAST_CALL }));
@@ -50,17 +46,15 @@ test.describe("cpt-noter-seq-dialogs-delete-call", () => {
 
   test("other path — Several calls selected: Delete 3 calls?, Delete 3 Calls, the list without them", async ({ scenario }) => {
     let extra: string[] = [];
-    if (!(await changeAhead(scenario, "M1", (w) => (extra = W.morePastCalls(w, 2))))) return; // calls (M1)
+    await given(scenario, (w) => (extra = W.morePastCalls(w, 2)));
     const main = scenario.core("main");
     const three = [W.PAST_CALL, ...extra];
     const ids = await listIds(main);
-    if (!ids) return; // calls_list (M1)
     expect(ids).toEqual(expect.arrayContaining(three)); // three rows selected with ⌘-click
 
-    const deleted = ahead(await main.callsDelete({ call_ids: three }));
-    if (!deleted) return; // calls_delete (M1)
+    const deleted = ok(await main.callsDelete({ call_ids: three }));
     expect(deleted.deleted).toBe(3);
-    const after = (await listIds(main))!;
+    const after = await listIds(main);
     three.forEach((id) => expect(after).not.toContain(id));
     expect(after).toContain(W.LIVE_CALL);
   });
@@ -87,7 +81,7 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
     const denied = refused(await main.permissionRequest({ kind: "notifications" })); // Don't Allow
     expect(denied.code).toBe("permission_denied");
     expect(denied.detail).toEqual({ type: "permission", kind: "notifications" });
-    if (!ahead(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } }))) return; // Open Last Summary — … (window_navigate, M1)
+    ok(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } })); // Open Last Summary — … (window_navigate, M1)
     await until(() => nav.latest()?.type === "call_page", "that call's outputs");
   });
 

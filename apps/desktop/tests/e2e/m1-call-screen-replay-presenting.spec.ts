@@ -7,13 +7,12 @@ import { ahead, ok, pending, refused, until } from "../support/results";
 import { isLaterMilestone } from "../support/milestones";
 import type { Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { changeAhead, expect, given, test, versionsGrow } from "./support/fixtures";
+import { expect, given, test, versionsGrow } from "./support/fixtures";
 
-/** Anna K.'s line in the live transcript, or null while transcript_subscribe (M1) is not implemented. */
+/** Anna K.'s line in the live transcript. */
 async function annasLine(scenario: Scenario) {
   const screen = scenario.core("call-screen");
-  const snap = ahead(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
-  if (!snap) return null;
+  const snap = ok(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
   const line = snap.segments.find((s) => s.speaker.speaker_id === "spk_anna");
   expect(line).toBeDefined();
   return line!;
@@ -24,7 +23,6 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     const screen = scenario.core("call-screen");
     const playback = await scenario.events("playback:state");
     const line = await annasLine(scenario);
-    if (!line) return; // transcript_subscribe (M1)
 
     const span = ahead(await screen.transcriptSpan({ span: { call_id: W.LIVE_CALL, t0_ms: line.t0_ms, t1_ms: line.t1_ms } }));
     if (span) {
@@ -32,8 +30,7 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
       expect(span.audio_available).toBe(true);
     }
 
-    const playing = ahead(await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms, to_ms: line.t1_ms }));
-    if (!playing) return; // audio_play (M1)
+    const playing = ok(await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms, to_ms: line.t1_ms }));
     expect(playing).toMatchObject({ playing: true, call_id: W.LIVE_CALL, route: "headphones" }); // Replaying while recording · headphones
     await until(() => playback.latest()?.playing === true, "playback:state playing");
     const stopped = ahead(await screen.audioStop({}));
@@ -46,7 +43,6 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await given(scenario, (w) => (w.app.environment.output_route = "speakers"));
     const screen = scenario.core("call-screen");
     const line = await annasLine(scenario);
-    if (!line) return; // transcript_subscribe (M1)
 
     const play = await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms, to_ms: line.t1_ms });
     if (!pending(play)) {
@@ -62,9 +58,8 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     const screen = scenario.core("call-screen");
     const playback = await scenario.events("playback:state");
     const line = await annasLine(scenario);
-    if (!line) return; // transcript_subscribe (M1)
 
-    if (!ahead(await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms, to_ms: line.t1_ms }))) return; // audio_play (M1)
+    ok(await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms, to_ms: line.t1_ms })); // audio_play (M1)
     await scenario.change((w) => (w.app.environment.output_route = "speakers")); // headphones unplugged
     // The real core stops at once with `output_switched_to_speakers`; the fake's playback ends on its own.
     await until(() => playback.latest()?.playing === false, "playback stopped");
@@ -80,10 +75,8 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     });
     const screen = scenario.core("call-screen");
     const line = await annasLine(scenario);
-    if (!line) return; // transcript_subscribe (M1)
 
     const unknown = await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms });
-    if (pending(unknown)) return; // audio_play (M1)
     expect(refused(unknown).code).toBe("output_route_unknown");
     const settings = scenario.core("settings");
     const current = ok(await settings.settingsGet({}));
@@ -99,7 +92,6 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await given(scenario, (w) => (w.settings.audio.exclude_own_sounds = false));
     const screen = scenario.core("call-screen");
     const line = await annasLine(scenario);
-    if (!line) return; // transcript_subscribe (M1)
 
     const own = await screen.audioPlay({ call_id: W.LIVE_CALL, from_ms: line.t0_ms });
     if (!pending(own)) expect(refused(own).code).toBe("own_sounds_not_excluded"); // audio_play (M1)
@@ -123,11 +115,9 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
     const screen = scenario.core("call-screen");
     const presenting = await scenario.events("app:presenting");
     const copilot = await scenario.events("copilot:status");
-    const before = ahead(await screen.windowCallState({}));
-    if (!before) return; // window_call_state (M1)
+    const before = ok(await screen.windowCallState({}));
 
-    const hidden = ahead(await screen.appSetHiddenForPresenting({ hidden: true }));
-    if (!hidden) return; // app_set_hidden_for_presenting (M1)
+    const hidden = ok(await screen.appSetHiddenForPresenting({ hidden: true }));
     expect(hidden.hidden).toBe(true);
     await until(() => presenting.latest()?.hidden === true, "app:presenting hidden");
     // copilot:status is the copilot's (M4): the real core sends it from then on.
@@ -143,8 +133,8 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("empty path — Call detected while hidden: no prompt, Call Detected · Start Recording, nothing drawn until Show Noter", async ({ scenario }) => {
     await given(scenario, W.idle);
     const main = scenario.core("main");
-    if (!ahead(await main.appSetHiddenForPresenting({ hidden: true }))) return; // app_set_hidden_for_presenting (M1)
-    if (!(await changeAhead(scenario, "M1", (w) => W.detect(w, W.APPS.teams)))) return; // a second call starts; detection (M1)
+    ok(await main.appSetHiddenForPresenting({ hidden: true })); // app_set_hidden_for_presenting (M1)
+    await given(scenario, (w) => W.detect(w, W.APPS.teams));
 
     expect(ok(await main.appSnapshot({})).detection.detection?.app_name).toBe("Microsoft Teams"); // Call Detected · Start Recording
     const started = ahead(await main.captureStart({ source: "menu_bar", sensitive: false }));
@@ -156,11 +146,11 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("error path — Notification while hidden: Summary ready held back, delivered after ⌃⌥⌘0, opens the Summary", async ({ scenario }) => {
     const main = scenario.core("main");
     const nav = await scenario.events("nav:request");
-    if (!ahead(await main.appSetHiddenForPresenting({ hidden: true }))) return; // app_set_hidden_for_presenting (M1)
+    ok(await main.appSetHiddenForPresenting({ hidden: true })); // app_set_hidden_for_presenting (M1)
     ahead(await main.windowReportView({ call_id: null })); // no call page frontmost: the core may notify once shown (M1 command)
     expect(ok(await main.appSetHiddenForPresenting({ hidden: false })).hidden).toBe(false);
     // Clicking Summary ready opens that call's Summary.
-    if (!ahead(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } }))) return; // window_navigate (M1)
+    ok(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } })); // window_navigate (M1)
     await until(() => nav.latest()?.type === "call_page", "the call's Summary");
     ok(await main.windowReportView({ call_id: W.PAST_CALL }));
   });
@@ -172,8 +162,7 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
       expect(share.capture_test.type).toBe("blocked_by_call"); // Run the test when no call is being recorded.
       expect(share.rows.find((r) => r.surface === "main_window")).toBeDefined(); // Visible for the main window on a whole-display share
     }
-    const hidden = ahead(await scenario.core("call-screen").appSetHiddenForPresenting({ hidden: true }));
-    if (!hidden) return; // app_set_hidden_for_presenting (M1)
+    const hidden = ok(await scenario.core("call-screen").appSetHiddenForPresenting({ hidden: true }));
     expect(hidden.hidden).toBe(true);
     expect(ok(await settings.appSnapshot({})).capture.phase).toBe("recording");
   });
@@ -181,8 +170,7 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("other path — Share warning in the floating panel: laptop only, floating layout, recording dot and clock", async ({ scenario }) => {
     await given(scenario, W.idle, W.laptopOnly);
     const screen = scenario.core("call-screen");
-    const started = ahead(await screen.captureStart({ source: "call_window", sensitive: false }));
-    if (!started) return; // capture_start (M1)
+    const started = ok(await screen.captureStart({ source: "call_window", sensitive: false }));
     expect(started.phase).toBe("recording");
 
     const panel = ahead(await screen.windowSetCallLayout({ preference: "auto" }));

@@ -5,7 +5,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { openWindow } from "../e2e/support/app";
-import { hold } from "./hold";
+import { fakeReady, hold } from "./hold";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -37,7 +37,7 @@ async function open(page: Page, world: (w: World) => void, holdCmd?: string) {
   await openWindow(page, "main", { world });
   await ready(page);
   if (holdCmd) await hold(page, holdCmd);
-  await page.waitForFunction(() => (globalThis as unknown as { __noterFake?: Fake }).__noterFake);
+  await fakeReady(page);
   await page.evaluate((id) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: { type: "call_page", call_id: id, tab: "transcript" } }), W.PAST_CALL);
 }
 const shot = async (page: Page, name: string, timeout?: number) => {

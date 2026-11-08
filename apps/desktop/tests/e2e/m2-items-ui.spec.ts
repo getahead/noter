@@ -7,7 +7,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { calls, openWindow } from "./support/app";
+import { calls, coreReady, openWindow } from "./support/app";
 import * as O from "./support/outputs-world";
 import { expect, test } from "./support/fixtures";
 
@@ -61,7 +61,7 @@ async function openCall(page: Page, world: (w: World) => void, tab: "summary" | 
     await page.keyboard.press("Meta+Digit3");
     await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  await page.waitForFunction(() => "__noterFake" in globalThis || "__TAURI_INTERNALS__" in globalThis);
+  await coreReady(page);
   await page.evaluate(
     async ([id, view]) => {
       const args = { target: { type: "call_page", call_id: id, tab: view } };

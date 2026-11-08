@@ -6,46 +6,43 @@
 import type { CaptureState, TranscriptMsg } from "../../src/core/bindings";
 import { ahead, ok, pending, refused, until } from "../support/results";
 import * as W from "../support/world-presets";
-import { changeAhead, expect, given, seqContiguous, test, versionsGrow } from "./support/fixtures";
+import { expect, given, seqContiguous, test, versionsGrow } from "./support/fixtures";
 
 const states = (s: { states: Array<{ type: string }> }) => s.states.map((d) => d.type);
 
 test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
   test("happy path: Slack is also playing audio → Exclude Slack, banner closes, one clean recording", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "second_audio_source", call_id: W.LIVE_CALL, ...W.APPS.slack, since: Date.now() })))) return; // degraded (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "second_audio_source", call_id: W.LIVE_CALL, ...W.APPS.slack, since: Date.now() }));
     const screen = scenario.core("call-screen");
     const degraded = await scenario.events("degraded:changed");
 
     expect(states(ok(await screen.appSnapshot({})).degraded)).toContain("second_audio_source");
-    const after = ahead(await screen.captureExcludeSource({ call_id: W.LIVE_CALL, bundle_id: W.APPS.slack.bundle_id }));
-    if (!after) return; // capture_exclude_source (M1)
+    const after = ok(await screen.captureExcludeSource({ call_id: W.LIVE_CALL, bundle_id: W.APPS.slack.bundle_id }));
     expect(after.phase).toBe("recording"); // nothing lost
     await until(() => degraded.latest() && !states(degraded.latest()!).includes("second_audio_source"), "the banner closes");
     expect(versionsGrow(degraded.all)).toBe(true);
   });
 
   test("other path — Keep: the second source stays in the tap and its banner is not shown again", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "second_audio_source", call_id: W.LIVE_CALL, ...W.APPS.slack, since: Date.now() })))) return; // degraded (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "second_audio_source", call_id: W.LIVE_CALL, ...W.APPS.slack, since: Date.now() }));
     const screen = scenario.core("call-screen");
 
-    const kept = ahead(await screen.captureKeepSource({ call_id: W.LIVE_CALL, bundle_id: W.APPS.slack.bundle_id }));
-    if (!kept) return; // capture_keep_source (M1)
+    const kept = ok(await screen.captureKeepSource({ call_id: W.LIVE_CALL, bundle_id: W.APPS.slack.bundle_id }));
     expect(kept.phase).toBe("recording");
     expect(states(ok(await screen.appSnapshot({})).degraded)).not.toContain("second_audio_source");
     expect(refused(await screen.captureKeepSource({ call_id: W.LIVE_CALL, bundle_id: W.APPS.slack.bundle_id })).code).toBe("notice_expired");
   });
 
   test("error path — System audio silent: Recording · mic only, Open System Settings…, both sides back with the gap shown", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "system_audio_silent", call_id: W.LIVE_CALL, since: Date.now(), confidence: 0.9 })))) return; // degraded (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "system_audio_silent", call_id: W.LIVE_CALL, since: Date.now(), confidence: 0.9 }));
     const screen = scenario.core("call-screen");
 
     expect(states(ok(await screen.appSnapshot({})).degraded)).toContain("system_audio_silent");
     ahead(await screen.openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // M1 command
-    const recovered = await changeAhead(scenario, "M1", (w) => {
+    await given(scenario, (w) => {
       W.recover(w, "system_audio_silent"); // Noter ticked in the system audio list
       w.transcripts.find((t) => t.call_id === W.LIVE_CALL)!.gaps.push({ call_id: W.LIVE_CALL, t0_ms: 1_802_000, t1_ms: 1_840_000, reason: "system_audio_silent" });
     });
-    if (!recovered) return; // transcripts (M1)
     const snap = ok(await screen.appSnapshot({}));
     expect(states(snap.degraded)).not.toContain("system_audio_silent");
     expect(snap.capture.phase).toBe("recording");
@@ -57,11 +54,10 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
     await given(scenario, W.idle, (w) => W.permission(w, "microphone", "denied"));
     const screen = scenario.core("call-screen");
 
-    const started = ahead(await screen.captureStart({ source: "call_window", sensitive: false })); // O1: not gated on permissions
-    if (!started) return; // capture_start (M1)
+    const started = ok(await screen.captureStart({ source: "call_window", sensitive: false })); // O1: not gated on permissions
     expect(started.phase).toBe("recording");
     ahead(await screen.windowShowCall({})); // M1 command
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "microphone_off", call_id: started.call_id! })))) return; // degraded (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "microphone_off", call_id: started.call_id! }));
     expect(states(ok(await screen.appSnapshot({})).degraded)).toContain("microphone_off");
     ahead(await screen.openExternal({ target: { type: "system_settings", permission: "microphone" } })); // M1 command
     await scenario.change((w) => {
@@ -74,16 +70,14 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
   });
 
   test("error path — Engine stopped: Not recording · engine stopped, Try Again continues the same call with a gap row", async ({ scenario }) => {
-    const failed = await changeAhead(scenario, "M1", (w) => {
+    await given(scenario, (w) => {
       w.app.capture.phase = "failed";
       W.degrade(w, { type: "capture_failed", call_id: W.LIVE_CALL, since: Date.now() });
     });
-    if (!failed) return; // capture and degraded (M1)
     const screen = scenario.core("call-screen");
 
     expect(states(ok(await screen.appSnapshot({})).degraded)).toContain("capture_failed");
-    const resumed = ahead(await screen.captureResumeInterrupted({ call_id: W.LIVE_CALL })); // Try Again
-    if (!resumed) return; // capture_resume_interrupted (M1)
+    const resumed = ok(await screen.captureResumeInterrupted({ call_id: W.LIVE_CALL })); // Try Again
     expect(resumed).toMatchObject({ phase: "recording", call_id: W.LIVE_CALL });
     expect(states(ok(await screen.appSnapshot({})).degraded)).not.toContain("capture_failed");
     const transcript = ahead(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, () => {}));
@@ -93,11 +87,10 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
   test("error path — Headphones connected: Microphone changed · 2 s lost, the recording carries on", async ({ scenario }) => {
     const screen = scenario.core("call-screen");
     const got: TranscriptMsg[] = [];
-    const sub = ahead(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => got.push(m)));
-    if (!sub) return; // transcript_subscribe (M1)
+    const sub = ok(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => got.push(m)));
     expect(sub.live).toBe(true);
 
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "device_changed", call_id: W.LIVE_CALL, device_name: "AirPods Pro", gap_ms: 2000 })))) return; // degraded (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "device_changed", call_id: W.LIVE_CALL, device_name: "AirPods Pro", gap_ms: 2000 }));
     await scenario.push("transcript_subscribe", { event: { type: "gap", gap: { call_id: W.LIVE_CALL, t0_ms: 1_420_000, t1_ms: 1_422_000, reason: "device_changed" } } });
     await until(() => got.some((m) => m.event.type === "gap" && m.event.gap.reason === "device_changed"), "the marker row in the transcript");
     expect(seqContiguous(got, sub.last_seq)).toBe(true);
@@ -107,10 +100,9 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
   test("error path — Transcription stalled: restarting, then new lines again and the banner closes", async ({ scenario }) => {
     const screen = scenario.core("call-screen");
     const got: TranscriptMsg[] = [];
-    const sub = ahead(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => got.push(m)));
-    if (!sub) return; // transcript_subscribe (M1)
+    const sub = ok(await screen.transcriptSubscribe({ call_id: W.LIVE_CALL }, (m) => got.push(m)));
 
-    if (!(await changeAhead(scenario, "M1", (w) => W.degrade(w, { type: "transcription_stalled", call_id: W.LIVE_CALL, since: Date.now() })))) return; // degraded (M1)
+    await given(scenario, (w) => W.degrade(w, { type: "transcription_stalled", call_id: W.LIVE_CALL, since: Date.now() }));
     expect(states(ok(await screen.appSnapshot({})).degraded)).toContain("transcription_stalled");
     const seen = got.length;
     await scenario.change((w) => W.recover(w, "transcription_stalled"));
@@ -122,32 +114,28 @@ test.describe("cpt-noter-seq-call-screen-recover-capture", () => {
   test("empty path — Nothing heard yet: Keep Recording closes the notice; Discard Recording deletes it", async ({ scenario }) => {
     await given(scenario, W.idle);
     const screen = scenario.core("call-screen");
-    const started = ahead(await screen.captureStart({ source: "call_window", sensitive: false }));
-    if (!started) return; // capture_start (M1)
+    const started = ok(await screen.captureStart({ source: "call_window", sensitive: false }));
     const id = started.call_id!;
     let levels = 0;
     if (ahead(await screen.levelsSubscribe({ call_id: id }, () => levels++))) await until(() => levels >= 2, "the two meters"); // Waiting for speech… with You and Others (M1 command)
 
-    if (!(await changeAhead(scenario, "M1", (w) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN })))) return; // capture notice (M1)
-    const kept = ahead(await screen.captureKeepRecording({ call_id: id })); // Keep Recording
-    if (!kept) return; // capture_keep_recording (M1)
+    await given(scenario, (w) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN }));
+    const kept = ok(await screen.captureKeepRecording({ call_id: id })); // Keep Recording
     expect(kept.notice).toBeNull();
     expect(refused(await screen.captureKeepRecording({ call_id: id })).code).toBe("notice_expired");
 
     await scenario.change((w) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN }));
-    const discarded = ahead(await screen.captureDiscard({ call_id: id })); // Discard Recording → Discard
-    if (!discarded) return; // capture_discard (M1)
+    const discarded = ok(await screen.captureDiscard({ call_id: id })); // Discard Recording → Discard
     expect(discarded).toMatchObject({ phase: "idle", call_id: null }); // Noter — Not recording
     const gone = await scenario.core("main").callGet({ call_id: id });
     if (!pending(gone)) expect(refused(gone).code).toBe("not_found"); // call_get (M1)
   });
 
   test("error path — Disk nearly full: 2 GB free, Recording continues, Delete Old Audio… in the main window", async ({ scenario }) => {
-    const low = await changeAhead(scenario, "M1", (w) => {
+    await given(scenario, (w) => {
       w.app.environment.disk_free_mb = 2_000;
       W.degrade(w, { type: "disk_low", free_mb: 2_000 });
     });
-    if (!low) return; // degraded (M1)
     const screen = scenario.core("call-screen");
 
     const snap = ok(await screen.appSnapshot({}));
@@ -169,20 +157,18 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
   const callEnded = (w: Parameters<typeof W.notice>[0]) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 });
 
   test("happy path: The call seems to have ended, countdown held while pointed at, Stop Now, Saved with Continue Recording", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, "M1", callEnded))) return; // capture notice (M1)
+    await given(scenario, callEnded);
     const screen = scenario.core("call-screen");
     const captures = await scenario.events("capture:state");
 
     const shown = ok(await screen.appSnapshot({})).capture.notice;
     expect(shown).toMatchObject({ type: "call_ended" });
-    const held = ahead(await screen.captureHoldNotice({ call_id: W.LIVE_CALL, held: true })); // pointer on the notice
-    if (!held) return; // capture_hold_notice (M1)
+    const held = ok(await screen.captureHoldNotice({ call_id: W.LIVE_CALL, held: true })); // pointer on the notice
     expect(held.notice).toEqual({ type: "call_ended", stops_at: null });
     const released = ok(await screen.captureHoldNotice({ call_id: W.LIVE_CALL, held: false }));
     expect(released.notice?.type === "call_ended" && typeof released.notice.stops_at === "number").toBe(true); // 10 s again
 
-    const stopped = ahead(await screen.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "stop_now" }));
-    if (!stopped) return; // capture_answer_call_end (M1)
+    const stopped = ok(await screen.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "stop_now" }));
     expect(stopped.phase).toBe("stopped"); // Saved · 48 min · Summary in about 2 minutes
     expect(stopped.notice).toBeNull();
     expect(stopped.continue_until! - Date.now()).toBeGreaterThan(4 * W.MIN); // Continue Recording works for 5 minutes
@@ -193,7 +179,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
   });
 
   test("error path — Next meeting starts straight away: Start as New Call saves the planning call and records the 1:1", async ({ scenario }) => {
-    const notified = await changeAhead(scenario, "M1", (w) =>
+    await given(scenario, (w) =>
       W.notice(w, {
         type: "new_meeting",
         event: { id: "evt_anna", title: "1:1 with Anna K.", starts_at: Date.now(), ends_at: Date.now() + 30 * W.MIN },
@@ -203,11 +189,9 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
         default_choice: "start_as_new_call",
       }),
     );
-    if (!notified) return; // capture notice (M1)
     const screen = scenario.core("call-screen");
 
-    const next = ahead(await screen.captureAnswerNewMeeting({ call_id: W.LIVE_CALL, choice: "start_as_new_call" }));
-    if (!next) return; // capture_answer_new_meeting (M1)
+    const next = ok(await screen.captureAnswerNewMeeting({ call_id: W.LIVE_CALL, choice: "start_as_new_call" }));
     expect(next.call_id).not.toBe(W.LIVE_CALL); // two calls, each with its own title
     expect(next).toMatchObject({ phase: "recording", title: "1:1 with Anna K.", notice: null });
     expect(next.recorded_ms).toBeLessThan(60_000); // the clock restarts near 00:00:12
@@ -217,8 +201,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
   test("error path — Stopped by mistake: ⌃⌥⌘R by mistake, Continue Recording resumes the same call", async ({ scenario }) => {
     const screen = scenario.core("call-screen");
 
-    const stopped = ahead(await screen.captureStop({ call_id: W.LIVE_CALL })); // ⌃⌥⌘R
-    if (!stopped) return; // capture_stop (M1)
+    const stopped = ok(await screen.captureStop({ call_id: W.LIVE_CALL })); // ⌃⌥⌘R
     expect(stopped.phase).toBe("stopped");
     const unpause = await screen.captureSetPaused({ call_id: W.LIVE_CALL, paused: false });
     if (!pending(unpause)) expect(refused(unpause).code).toBe("not_recording"); // un-pausing is not Continue (capture_set_paused, M1)
@@ -227,7 +210,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
   });
 
   test("empty path — No answer to the notice: stopped when the countdown runs out, Continue Recording", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, "M1", (w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 })))) return; // capture notice (M1)
+    await given(scenario, (w) => W.notice(w, { type: "call_ended", stops_at: Date.now() + 10_000 }));
     const screen = scenario.core("call-screen");
     // The countdown runs out unanswered: the core stops the call by itself.
     await scenario.change((w) =>
@@ -243,19 +226,16 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
   });
 
   test("error path — Call window hidden: the notice in the small panel, Stop Now there, recording saved", async ({ scenario }) => {
-    if (!(await changeAhead(scenario, "M1", callEnded))) return; // capture notice (M1)
+    await given(scenario, callEnded);
     const screen = scenario.core("call-screen");
-    const hidden = ahead(await screen.windowHideCall({}));
-    if (!hidden) return; // window_hide_call (M1)
+    const hidden = ok(await screen.windowHideCall({}));
     expect(hidden.visible).toBe(false);
 
     const panel = scenario.core("record-prompt"); // the small panel where Record this call? appears
     expect(ok(await panel.appSnapshot({})).capture.notice?.type).toBe("call_ended");
-    const held = ahead(await panel.captureHoldNotice({ call_id: W.LIVE_CALL, held: false }));
-    if (!held) return; // capture_hold_notice (M1)
+    const held = ok(await panel.captureHoldNotice({ call_id: W.LIVE_CALL, held: false }));
     expect(held.notice?.type).toBe("call_ended"); // Stopping in 10 s.
-    const stopped: CaptureState | null = ahead(await panel.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "stop_now" }));
-    if (!stopped) return; // capture_answer_call_end (M1)
+    const stopped: CaptureState | null = ok(await panel.captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "stop_now" }));
     expect(stopped.phase).toBe("stopped");
     const call = ahead(await screen.windowCallState({}));
     if (call) expect(call.visible).toBe(false); // Teams keeps focus, nothing reopened (window_call_state, M1)
@@ -263,8 +243,8 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
 
   test("error path — Hidden for presenting: no countdown on screen, Stop Recording from the menu, windows back after ⌃⌥⌘0", async ({ scenario }) => {
     const main = scenario.core("main");
-    if (!ahead(await main.appSetHiddenForPresenting({ hidden: true }))) return; // app_set_hidden_for_presenting (M1)
-    if (!(await changeAhead(scenario, "M1", (w) => W.notice(w, { type: "call_ended", stops_at: null })))) return; // Call seems to have ended, no countdown; capture notice (M1)
+    ok(await main.appSetHiddenForPresenting({ hidden: true })); // app_set_hidden_for_presenting (M1)
+    await given(scenario, (w) => W.notice(w, { type: "call_ended", stops_at: null }));
 
     const snap = ok(await main.appSnapshot({}));
     expect(snap.presenting.hidden).toBe(true);
