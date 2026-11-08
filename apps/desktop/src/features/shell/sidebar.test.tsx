@@ -53,22 +53,22 @@ describe("Sidebar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
   });
 
   it("shows the live-call row while capturing, with Paused instead of the time while paused", () => {
-    const live = renderToString(<Sidebar {...props({ live: { title: "Planning", paused: false, seconds: 1394 } })} />);
+    const live = renderToString(<Sidebar {...props({ live: { title: "Planning", paused: false, seconds: () => 1394 } })} />);
     expect(live).toContain('data-variant="live-row"');
     expect(live).toContain("Planning");
     expect(live).toContain("00:23:14");
-    const paused = renderToString(<Sidebar {...props({ live: { title: "Planning", paused: true, seconds: 1394 } })} />);
+    const paused = renderToString(<Sidebar {...props({ live: { title: "Planning", paused: true, seconds: () => 1394 } })} />);
     expect(paused).toContain("Paused");
     expect(paused).toContain("np-recdot is-paused");
     expect(paused).not.toContain("00:23:14");
   });
 
   it("runs the owner's handlers: select a section, show the call, toggle, open privacy", () => {
-    const p = props({ live: { title: "Planning", paused: false, seconds: 0 } });
+    const p = props({ live: { title: "Planning", paused: false, seconds: () => 0 } });
     const tree = rendered(Sidebar, p);
     (find(tree, (x) => x.label === "Calls").props.onSelect as () => void)();
     expect(p.onSelect).toHaveBeenCalledWith("library");
-    (find(tree, (x) => x["data-variant"] === "live-row" && typeof x.onClick === "function").props.onClick as () => void)();
+    (find(tree, (x) => x.live === p.live && typeof x.onShowCall === "function").props.onShowCall as () => void)();
     expect(p.onShowCall).toHaveBeenCalledOnce();
     expect(p.onSelect).toHaveBeenCalledOnce(); // the live row shows the call window and leaves the sidebar selection alone
     (find(tree, (x) => x.cls === "np-sidebar__toggle").props.onAction as () => void)();

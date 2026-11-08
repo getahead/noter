@@ -1,5 +1,5 @@
 // diff-view: the words inserted and deleted between two texts, unchanged runs folded (prototype C.diffView).
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { t } from "../../i18n/format";
 import { Icon } from "../icons";
 import { changedWords, diffWords, fold, toLines } from "./diff";
@@ -15,9 +15,10 @@ export interface DiffViewProps {
 // @cpt-component:cpt-noter-component-ui-diff-view:p1
 export function DiffView({ before, after, title, lang }: DiffViewProps) {
   const [open, setOpen] = useState<Set<number>>(new Set());
-  const parts = diffWords(before, after);
-  const changed = changedWords(parts);
-  const blocks = fold(toLines(parts));
+  const { changed, blocks } = useMemo(() => {
+    const parts = diffWords(before, after);
+    return { changed: changedWords(parts), blocks: fold(toLines(parts)) };
+  }, [before, after]);
   return (
     <div data-component="cpt-noter-component-ui-diff-view" data-variant="inline" data-state={changed ? "changes" : "no-changes"} className="pc-diff" lang={lang}>
       <div className="pc-diff__head">
