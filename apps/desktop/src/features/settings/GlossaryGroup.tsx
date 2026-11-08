@@ -46,14 +46,7 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
           </tr>
         </thead>
         <tbody>
-          {terms.map((g, i) => (
-            <tr key={g.id} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => setSelected(g.id)} onFocus={() => setSelected(g.id)}>
-              <td lang="und">{g.term}</td>
-              <td lang="und">{cell(g.variants_latin)}</td>
-              <td lang="ru">{cell(g.variants_cyrillic)}</td>
-              <td lang="und">{cell(g.spoken_forms)}</td>
-            </tr>
-          ))}
+          <TermRows terms={terms} selected={selected} onSelect={setSelected} />
         </tbody>
       </Table>
       {form && (
@@ -67,5 +60,21 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
         </div>
       )}
     </Group>
+  );
+}
+
+/** The table's one Tab stop is the selected term, else the first; the others are reached with ↑/↓. */
+export function TermRows({ terms, selected, onSelect }: { terms: GlossaryTerm[]; selected: string | null; onSelect: (id: string) => void }) {
+  return (
+    <>
+      {terms.map((g, i) => (
+        <tr key={g.id} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => onSelect(g.id)} onFocus={() => onSelect(g.id)}>
+          <td lang="und">{g.term}</td>
+          <td lang="und">{cell(g.variants_latin)}</td>
+          <td lang="ru">{cell(g.variants_cyrillic)}</td>
+          <td lang="und">{cell(g.spoken_forms)}</td>
+        </tr>
+      ))}
+    </>
   );
 }
