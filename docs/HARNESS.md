@@ -129,24 +129,46 @@ Codex has no hooks; it gets the same rules from `AGENTS.md`, the pre-commit hook
 
 ## CI on GitHub
 
-`.github/workflows/ci.yml` runs on every pull request to `main` (opened, pushed to, reopened; never for a label or a title edit), on every push to `main` and on demand: `lint-rust`, `lint-ui`, `contract`, `arch` (with trace coverage), `unit-rust`, `unit-ui`, `e2e-core`, `e2e-ui`, `e2e-coverage`, `visual` (in the pinned Playwright container), `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. The unit tests run per side: `unit-rust` (`just cov-unit-rust`, cargo llvm-cov) and `unit-ui` (`just cov-unit-ui`, Vitest), each judging its own side at 80% and on its own changed lines. The E2E suites run per core. `e2e-core` builds `noter-core-harness` and runs the conformance suite and the Playwright UI flows against the real core (`just e2e-core`), and uploads their logs as `e2e-logs`. `e2e-ui` runs the same suites against the fake world (`just e2e-ui`), which the coverage gate never counts. When `e2e-core` does not run, `e2e-ui` also runs the real-core UI flows (`NOTER_E2E_REAL=1`) and uploads them as `e2e-logs-ui`. `e2e-coverage` waits for both E2E jobs and `macos`, downloads the logs (and `coverage-native` when the native suite exists) and judges E2E coverage over all of them (see *UI flows a pull request re-runs* below). The `gate` job is the harness's one required check. The `Default ruleset` on `main` also requires `hygiene` (PR title, the owner's approval labels, dependency review, cargo-deny, workflow lint) and CodeQL, which are about the change as a delivery unit rather than the quality bars; builds, releases and the rest of the delivery pipeline are in [DELIVERY.md](DELIVERY.md). `nightly.yml` runs the full gate on `main` every night.
+`.github/workflows/ci.yml` runs on every pull request to `main` (opened, pushed to, reopened; never for a label or a title edit), on every push to `main` and on demand: `lint-rust`, `lint-ui`, `contract`, `arch` (with trace coverage), `unit-rust`, `unit-ui`, `e2e-core`, `e2e-ui`, `e2e-coverage`, `visual` (in the pinned Playwright container), `docs` and, once `engine/` or `src-tauri` exist, `macos`. The `macos` job runs the engine tests, the Tauri host tests and, once `src-tauri` exists, the step "Native UI tests (XCUITest)" (`just native`), and uploads `coverage/native` as the artifact `coverage-native`. The unit tests run per side: `unit-rust` (`just cov-unit-rust`, cargo llvm-cov) and `unit-ui` (`just cov-unit-ui`, Vitest), each judging its own side at 80% and on its own changed lines. The E2E suites run per core. `e2e-core` builds `noter-core-harness` and runs the conformance suite and the Playwright UI flows against the real core (`just e2e-core`), and uploads their logs as `e2e-logs`. `e2e-ui` runs the same suites against the fake world (`just e2e-ui`), which the coverage gate never counts. When `e2e-core` does not run, `e2e-ui` also runs the real-core UI flows (`NOTER_E2E_REAL=1`) and uploads them as `e2e-logs-ui`. `e2e-coverage` waits for both E2E jobs and `macos`, downloads the logs (and `coverage-native` when the native suite exists: from `macos`, or from `main`'s latest successful run when `macos` did not run) and judges E2E coverage over all of them (see *UI flows a pull request re-runs* below). The `gate` job is the harness's one required check. The `Default ruleset` on `main` also requires `hygiene` (PR title, the owner's approval labels, dependency review, cargo-deny, workflow lint) and CodeQL, which are about the change as a delivery unit rather than the quality bars; builds, releases and the rest of the delivery pipeline are in [DELIVERY.md](DELIVERY.md). `nightly.yml` runs the full gate on `main` every night.
 
 ### What a pull request runs
 
-On a pull request each job runs only if the change can affect what it checks (owner decision, 18 Oct 2026: PRs spent hours re-running checks that had nothing to check). The first job, `changes` (`scripts/harness/ci_changes.py`), diffs the PR's merge commit against `main` and matches the files against the areas in `harness.toml [ci]`:
+On a pull request each job runs only if the change can affect what it checks (owner decision, 18 Oct 2026: PRs spent hours re-running checks that had nothing to check). The first job, `changes` (`scripts/harness/ci_changes.py`), diffs the PR's merge commit against `main` and matches the files against the areas in `harness.toml [ci]`. Each job runs when a changed file is one it reads (owner decision, 8 Nov 2026: a screenshot-only PR ran the macOS job; run a job only when the change can alter its result). The areas are in `harness.toml [ci.areas]`, and each job's list is in `[ci.jobs.ci]`:
+
+| Job | reads (a change here runs it) |
+| --- | --- |
+| `lint-rust` | `crates/**`, `Cargo.*`, `perf/**`, `scripts/models/**` (`noter-llm` compiles in its manifest) |
+| `lint-ui` | the UI app (`apps/desktop/src/**`, `index.html`, `vite.config.ts`, `tsconfig*.json`, `package.json`, the pnpm lockfile and workspace), every `.ts`/`.tsx` under `apps/desktop/tests`, `apps/desktop/*.config.ts`, `contracts/**` |
+| `contract` | `crates/noter-protocol/**`, `Cargo.*`, `contracts/**`, `apps/desktop/src/core/bindings.ts` |
+| `arch` (and trace coverage) | source files (`*.rs`, `*.ts`, `*.tsx`, `*.swift`), `Cargo.toml` files, `*.entitlements`, documentation |
+| `unit-rust` | the Rust crates (as `lint-rust`), `contracts/**`, `bindings.ts` (`noter-contract-export --check`) |
+| `unit-ui` | the UI app, `vitest.unit.config.ts`, `apps/desktop/tests/support/**`, `contracts/**` |
+| `e2e-core` | the Rust crates, the contract (`noter-protocol`, `contracts/`, `apps/desktop/src/core/`, the lockfiles), the suites that also run against the real core (`tests/conformance`, `tests/e2e`, `tests/support`, their configs) |
+| `e2e-ui` | the UI app, the contract, those suites |
+| `e2e-coverage`, `e2e-report` | everything `e2e-core` and `e2e-ui` read, `docs/DESIGN.md` (its stories set the bar), and every run of `macos` (its XCUITest results count) |
+| `visual` | the UI app, `apps/desktop/tests/visual/**` (specs, fixtures, baselines), the test helpers it imports (`tests/support`, `tests/e2e/support`, `playwright.config.ts`), `contracts/**` |
+| `docs` (`cfs validate`) | source files (their `@cpt-*` markers), `docs/**`, `.cf-studio/**`, Markdown |
+| `macos` | the Rust crates, the UI app (the XCUITests drive the built app, and the Tauri host compiles in `src/i18n/en.ts`), `apps/desktop/src-tauri/**`, `apps/desktop/tests/native/**`, `engine/**` |
+
+So, for example:
 
 | A PR that changes only | runs |
 | --- | --- |
-| UI code (`apps/desktop/**` outside `src-tauri` and `tests/native`) | `lint-ui`, `arch`, `unit-ui`, `e2e-ui`, `e2e-coverage`, `visual`, `docs`; a change to the suites that also run against the real core (`tests/conformance`, `tests/e2e`, `tests/support`, their configs) adds `e2e-core` |
-| Rust crates, `Cargo.*` | `lint-rust`, `arch`, `unit-rust`, `e2e-core`, `e2e-coverage`, `docs`, `macos` |
-| the contract (`noter-protocol`, `contracts/`, `apps/desktop/src/core/`) | both sides (`unit-rust`, `unit-ui`, `e2e-core`, `e2e-ui`, `e2e-coverage`), plus `contract`; `visual` only for `contracts/` and the UI files |
-| the Tauri host or the engine | `arch`, `docs`, `macos` |
-| documentation (`docs/`, `.cf-studio/`, Markdown) | `arch` (trace coverage) and `docs` (`cfs validate`); `docs/DESIGN.md` also `e2e-coverage`, since its stories set the E2E bar (judged on `main`'s real-core logs) |
+| screenshot baselines | `visual` |
+| a screenshot spec | `visual`, `lint-ui`, `arch`, `docs` |
+| a UI flow spec (`tests/e2e/*.spec.ts`) | `e2e-core`, `e2e-ui`, `e2e-coverage`, `lint-ui`, `arch`, `docs` |
+| UI code (`apps/desktop/src/**`) | `lint-ui`, `arch`, `unit-ui`, `e2e-ui`, `e2e-coverage`, `visual`, `docs`, `macos` |
+| Rust crates | `lint-rust`, `arch`, `unit-rust`, `e2e-core`, `e2e-coverage`, `docs`, `macos` |
+| the generated contract (`contracts/`, `bindings.ts`) | both sides (`unit-rust`, `unit-ui`, `e2e-core`, `e2e-ui`, `e2e-coverage`), plus `contract` and `visual` |
+| the Tauri host, the native tests or the engine | `macos`, `e2e-coverage`, `arch`, `docs` |
+| documentation (`docs/`, `.cf-studio/`, Markdown) | `arch` and `docs`; `docs/DESIGN.md` also `e2e-coverage` (judged on `main`'s logs) |
 | another workflow file, `deny.toml`, Dependabot config, plans | nothing in `ci.yml` (`hygiene` checks them) |
 | the Release PR's bump: `CHANGELOG.md`, `.release-please-manifest.json` and a `package.json` whose only change is its own `"version"` | nothing but the title and the approvals; a `package.json` change to anything else, a dependency too, runs what that file runs |
 | CI itself, `justfile`, `harness/`, the gate scripts, the toolchain, or a file no rule knows | everything |
 
-CodeQL follows the same rules per language, and carries `main`'s result forward for a language the PR does not touch (DELIVERY.md). Once the XCUITest suite exists, any E2E job brings `e2e-coverage` and `macos` with it, because the E2E bar is judged over both platforms and the XCUITests drive the built app.
+`scripts/harness/tests` holds a table of example changes and the jobs each must run (`CiChangesTests.PLANS`); a rule change that runs a job less often must update it.
+
+CodeQL follows the same rules per language, and carries `main`'s result forward for a language the PR does not touch (DELIVERY.md). The E2E bar counts the XCUITest results of the built app: a PR that does not run `macos` is judged on the XCUITest results of `main`'s latest successful run (`native_baseline`), the way a skipped real-core run is judged on `main`'s logs. Only when `main` has no successful run does every E2E judgement bring `macos` with it.
 
 Why a skipped side still counts (owner decision, 1 Nov 2026: split by backend and frontend to cut CI time). The bars are judged over the whole picture: a side the change does not touch is either unchanged from `main`, where every push runs every job, or its result is `main`'s:
 

@@ -7,7 +7,7 @@
 1. Work happens on a branch (`lane/<lane>/<topic>` for agents) and goes to `main` only through a pull request.
 2. The PR title is a Conventional Commit (`feat(ui): show the speaker split`). It becomes the squash commit on `main` and the changelog line.
 3. Required to merge: `gate` (the harness, `ci.yml`), `hygiene` (`pr.yml`), `review` (the delivering agent's Constructor Studio self-review, `review.yml`) and CodeQL with no new error-level or high/critical security alert, and review threads resolved. The branch does not have to be up to date with `main`: GitHub asks for an update only when the PR conflicts, so a merge does not send every other open PR back through CI (owner decision, 18 Oct 2026). Each PR runs only the checks its changes can affect (HARNESS.md › What a pull request runs), and every push to `main` runs all of them, so a problem between two PRs that passed separately shows up on `main` within one run and is fixed first. No approving GitHub review is required: the owner and the agents work under one account. The agent self-reviews with `/cf-sdlc-pr-review <N>`, fixes and repeats until the verdict passes, and `just review-publish <N>` turns on auto-merge, so GitHub merges when everything is green (HARNESS.md › The agent loop).
-4. Every commit on `main` builds a preview DMG (`preview.yml`) once the app exists.
+4. Every commit on `main` that can change the app builds a preview DMG (`preview.yml`) once the app exists; a commit of only tests, harness or docs does not.
 5. release-please keeps a Release PR open with the next version and its changelog. Merging it tags `vX.Y.Z`, creates the GitHub release and attaches the signed (or ad-hoc signed) DMG, the updater archive and `latest.json`, the contracts bundle and an SBOM, each with build provenance.
 
 ## Rules on GitHub
@@ -47,7 +47,7 @@ When the Tauri host lands (M0), it needs: `@tauri-apps/cli` in `apps/desktop` de
 
 | Where | Trigger | Result |
 | --- | --- | --- |
-| `preview.yml` | every commit on `main`; a PR with the label `build-preview`; by hand | DMG and archive attached to the workflow run for 14 days |
+| `preview.yml` | every commit on `main` that can change the app; a PR with the label `build-preview`; by hand | DMG and archive attached to the workflow run for 14 days |
 | `release.yml` | a release created by release-please | the same files on the GitHub release, plus `latest.json` when the updater archive is signed |
 
 Release builds start from an empty cache: nothing from an earlier run reaches a shipped binary.
