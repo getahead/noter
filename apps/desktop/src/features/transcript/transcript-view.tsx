@@ -1,7 +1,7 @@
 // Transcript view (DESIGN › Transcript view; prototype src/js/20-b-components.js C.transcriptView): the virtualised log
 // of a call in its live, tail and stored variants. It follows live speech while the user is at the end, detaches with
 // Jump to Live when they scroll up, and draws only the rows in view. It owns no segments and never announces lines.
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import type { SegmentView, SpeakerView, TextRange } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -28,6 +28,8 @@ export interface TranscriptViewProps {
   /** Nothing loaded yet, and it has taken longer than 300 ms: skeleton rows. */
   loading?: boolean;
   loaded: boolean;
+  /** A popover is anchored to a row (the live rename): the log stops following while it is open and resumes after. */
+  holdFollow?: boolean;
   /** A live call before its first speech: the two meters and **Waiting for speech…**. */
   waiting?: boolean;
   levels?: { mic_db: number | null; sys_db: number | null } | null;
@@ -64,6 +66,15 @@ export function TranscriptView(p: TranscriptViewProps) {
   const [pos, setPos] = useState({ top: 0, height: 800 });
   const confirmed = segments(rows);
   const [follow, setFollow] = useState<Follow>({ following: live, base: confirmed });
+  const following = useRef(follow.following);
+  following.current = follow.following;
+  const confirmedNow = useRef(confirmed);
+  confirmedNow.current = confirmed;
+  useEffect(() => {
+    if (!p.holdFollow || !following.current) return;
+    setFollow({ following: false, base: confirmedNow.current });
+    return () => setFollow({ following: true, base: confirmedNow.current });
+  }, [p.holdFollow]);
   const [find, setFind] = useState<{ query: string; at: number } | null>(null);
   const [lastFocus, setLastFocus] = useState<string | null>(null);
   const [status, setStatus] = useState<{ key: string; text: string } | null>(null);

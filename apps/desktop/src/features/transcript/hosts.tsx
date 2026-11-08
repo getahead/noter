@@ -268,6 +268,7 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
       key={tr.callId}
       variant={variant}
       rows={rows}
+      holdFollow={variant === "live" && !!renaming}
       speakers={tr.data?.speakers ?? []}
       loaded={!!tr.data}
       loading={tr.loading}
