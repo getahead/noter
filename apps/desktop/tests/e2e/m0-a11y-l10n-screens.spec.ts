@@ -187,7 +187,7 @@ test("the reachability check fails on a two-control trap with an unreachable thi
   expect(r.missed).toEqual(['button "C"']);
 });
 
-test.describe("cpt-noter-flow-ui-accessibility-l10n-pseudo", () => {
+test.describe("cpt-noter-dod-ui-accessibility-l10n-strings — pseudo-localisation", () => {
   for (const mode of ["cyrillic", "german"] as const) {
     test(`UI — main window in ${mode} pseudo-localisation: no truncated sidebar label, group header or toolbar button`, async ({ page }) => {
       await openWindow(page, `main&pseudo=${mode}`);
@@ -242,7 +242,7 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-pseudo", () => {
   });
 });
 
-test.describe("cpt-noter-flow-ui-accessibility-l10n-lang", () => {
+test.describe("cpt-noter-dod-ui-accessibility-l10n-strings — lang", () => {
   test("UI — Settings: the document is English and every content cell of the glossary carries a lang", async ({ page }) => {
     await openWindow(page, "settings");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
