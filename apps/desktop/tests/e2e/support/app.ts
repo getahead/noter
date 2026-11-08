@@ -17,8 +17,6 @@ import type { World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
 
 export interface CorePlan {
-  /** Use the fixture clock for calendar scenarios instead of the host time (real core only). */
-  fixedClock?: boolean;
   /** The window's next calls of `cmd` fail with `code`, in order (FakeCore.failNext). */
   fail?: Array<{ cmd: CommandName; code: ErrorCode }>;
   /** The snapshot reports this contract version instead of the fixture's. */
