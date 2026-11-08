@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.22.3](https://github.com/getahead/noter/compare/v0.22.2...v0.22.3) (2026-11-08)
+
+
+### Bug fixes
+
+* **ui:** a busy sheet ignores Return ([#516](https://github.com/getahead/noter/issues/516)) ([2169e01](https://github.com/getahead/noter/commit/2169e01c5b28680b096860b9b97db8637c02775f))
+* **ui:** clock times follow the 12/24-hour and time-zone preferences from the core ([#530](https://github.com/getahead/noter/issues/530)) ([1609b2b](https://github.com/getahead/noter/commit/1609b2b80f9a84a65e627ce2af63d0a7107f8603))
+* **ui:** closing the fix term popover returns focus to the line ([#528](https://github.com/getahead/noter/issues/528)) ([786f6d5](https://github.com/getahead/noter/commit/786f6d52b046122308e02a0498c237b828391919))
+* **ui:** grant the message dialog to the windows that raise alerts ([#522](https://github.com/getahead/noter/issues/522)) ([77680bb](https://github.com/getahead/noter/commit/77680bb9fcc5305b375869026ed4cd79200abbe7))
+* **ui:** keep only successful people reads and read again when the people change ([#547](https://github.com/getahead/noter/issues/547)) ([3dd138d](https://github.com/getahead/noter/commit/3dd138dee85b3406d35130a6b00ffd8b9faa9f9b))
+* **ui:** manage on person pages is disabled with the reason instead of doing nothing ([#525](https://github.com/getahead/noter/issues/525)) ([39b0f31](https://github.com/getahead/noter/commit/39b0f31d00f402160ab112ae0b8cafeacfc1b6f3))
+* **ui:** re-read keyboard focus after a view change that removes the focused button ([#540](https://github.com/getahead/noter/issues/540)) ([40060a5](https://github.com/getahead/noter/commit/40060a56ea162faca2446541dfd49f6fbf32d55e))
+* **ui:** show noter skips surfaces the core closed and restores in a fixed order ([#523](https://github.com/getahead/noter/issues/523)) ([63fe7d4](https://github.com/getahead/noter/commit/63fe7d470684bfc48e40b968969134b196abd0a6))
+* **ui:** the calls and glossary tables are one tab stop ([#520](https://github.com/getahead/noter/issues/520)) ([79e6d9d](https://github.com/getahead/noter/commit/79e6d9d778a03345ae171c345110ae4801d6497a))
+* **ui:** the Calls subtitle shows hours and since only when every call is loaded ([#526](https://github.com/getahead/noter/issues/526)) ([908ca33](https://github.com/getahead/noter/commit/908ca3318d94c657c2a0ea1fb0ddfd578a748e83))
+* **ui:** the evidence highlight expires after 3 s however often the window re-renders ([#538](https://github.com/getahead/noter/issues/538)) ([88bb45b](https://github.com/getahead/noter/commit/88bb45bb4683cba67e0cca865b41688dcc643d4b))
+* **ui:** the transcript is one tab stop with up/down roving focus ([#543](https://github.com/getahead/noter/issues/543)) ([5709b2a](https://github.com/getahead/noter/commit/5709b2a866c580013c52553484e2f7d6e005c824))
+
+
+### Performance
+
+* **ui:** the live row owns the recording clock and diffview memoises its word diff ([#524](https://github.com/getahead/noter/issues/524)) ([cd74373](https://github.com/getahead/noter/commit/cd7437371cd06af976546cb4d2a6c2e88304b886))
+
 ## [0.22.2](https://github.com/getahead/noter/compare/v0.22.1...v0.22.2) (2026-11-08)
 
 
