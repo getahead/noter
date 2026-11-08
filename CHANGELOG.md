@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.21.0](https://github.com/getahead/noter/compare/v0.20.0...v0.21.0) (2026-11-08)
+
+
+### Features
+
+* **contract:** add suppressed_count to output sections ([#380](https://github.com/getahead/noter/issues/380)) ([9856408](https://github.com/getahead/noter/commit/98564081929ffa33cbaa36dd8a7b54eceaccffb3))
+* **contract:** archive old-vs-new text in spanpreview and the transcript_upgraded case ([#359](https://github.com/getahead/noter/issues/359)) ([ee80fa3](https://github.com/getahead/noter/commit/ee80fa33d4a1fa8444f92a76d73bf24c5ce18127))
+* **fake:** switch the section writer to the local model ([#381](https://github.com/getahead/noter/issues/381)) ([d723638](https://github.com/getahead/noter/commit/d72363873dec8a1686d2fd8a5f302cc9faddb7a7))
+* **harness:** advance_clock control moves the core clock ([#360](https://github.com/getahead/noter/issues/360)) ([21e25cd](https://github.com/getahead/noter/commit/21e25cd6df7afe8857d7f7c0cdea43d4fe1dbb21))
+* **harness:** hold the index rebuild and script the next ask-answer output ([#415](https://github.com/getahead/noter/issues/415)) ([e088d23](https://github.com/getahead/noter/commit/e088d2329f162f0d23778650dcded55ab32ffc81))
+* **knowledge:** document hits in search through the source policy ([#362](https://github.com/getahead/noter/issues/362)) ([7f71fbd](https://github.com/getahead/noter/commit/7f71fbdef28d895099708863a9cf8deebdf7eb89))
+* **knowledge:** real indexed-MCP transport over the egress gate with OAuth ([#376](https://github.com/getahead/noter/issues/376)) ([b319a20](https://github.com/getahead/noter/commit/b319a201a0f4a9b9e82b19adbb61afe67038e670))
+* **mcp:** cloud result gate, staged pins and corrections, and the router's tool server ([#356](https://github.com/getahead/noter/issues/356)) ([f0628cb](https://github.com/getahead/noter/commit/f0628cbab031ea3c1d8a6cf56271a569c06d4624))
+* **mcp:** search tools over shared retrieval and the D1 live-source relay ([#372](https://github.com/getahead/noter/issues/372)) ([5f969d3](https://github.com/getahead/noter/commit/5f969d31b72163e89f60d2fbc019d254654ab4fa))
+* **retrieval:** ask threads, cited streamed answers, stop and delete ([#361](https://github.com/getahead/noter/issues/361)) ([7b944ab](https://github.com/getahead/noter/commit/7b944ab9f844de1c65d2dc98947516ee794f4392))
+* **retrieval:** topics, post-call attachment and Ask tool refinement ([#375](https://github.com/getahead/noter/issues/375)) ([fc666a4](https://github.com/getahead/noter/commit/fc666a4ed8e1531d33b5f14fe9fafb01715cb0b3))
+* **ui:** show/hide archive changes diff and archive-upgraded/pending evidence (2.17 archive) ([#369](https://github.com/getahead/noter/issues/369)) ([3419df0](https://github.com/getahead/noter/commit/3419df0abd8b09fb919d846f2f2e7f997897fd8c))
+* **ui:** trace the audio sheet submit and the delete-audio return (2.18) ([#391](https://github.com/getahead/noter/issues/391)) ([011b1a8](https://github.com/getahead/noter/commit/011b1a83b8d6e75e1041404639981febdf48aee5))
+* **ui:** trace the output section state machine and the share scope return (2.18) ([#383](https://github.com/getahead/noter/issues/383)) ([e66b4d6](https://github.com/getahead/noter/commit/e66b4d6dcc8fb1b33a2feacba94c1ca04b182a54))
+* **ui:** trace the outputs notification flow steps (2.18 gaps) ([#358](https://github.com/getahead/noter/issues/358)) ([d18a641](https://github.com/getahead/noter/commit/d18a641259e30ece970e793ebc28b6bc2cb11292))
+
+
+### Bug fixes
+
+* **library:** count open items on call rows and filter calls by them ([#382](https://github.com/getahead/noter/issues/382)) ([e5e7080](https://github.com/getahead/noter/commit/e5e70804ff4bcbe7a1d75b92571c1d76ae4a9d27))
+* **test:** settle first-run screenshots before interaction ([#390](https://github.com/getahead/noter/issues/390)) ([fd2052d](https://github.com/getahead/noter/commit/fd2052de841458abbe4c3970b6f7b33439a4a3e7))
+* **ui:** inspector screenshots, Share/(i) kept together, deletion day in the Transcript header (2.17 gaps) ([#357](https://github.com/getahead/noter/issues/357)) ([d544ed7](https://github.com/getahead/noter/commit/d544ed7e94fb849dd6da22e668ae83b4a2c5a29a))
+
+
+### Performance
+
+* **ci:** cache the standalone Tauri target in the macOS job ([#425](https://github.com/getahead/noter/issues/425)) ([304430f](https://github.com/getahead/noter/commit/304430f98b1b47253bdfa0e9667af5bfd4f39324))
+* **test:** avoid the native pause reminder wall-clock wait ([#417](https://github.com/getahead/noter/issues/417)) ([ad0cae8](https://github.com/getahead/noter/commit/ad0cae8f2b9a7d9fd6634ae343f175af104dccb0))
+
 ## [0.20.0](https://github.com/getahead/noter/compare/v0.19.0...v0.20.0) (2026-11-07)
 
 
