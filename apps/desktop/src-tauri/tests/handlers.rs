@@ -190,6 +190,31 @@ fn each_window_capability_allows_exactly_its_commands() {
 }
 
 #[test]
+fn only_the_windows_that_raise_alerts_may_open_the_native_message_dialog() {
+    for w in WINDOWS {
+        let path = format!("{}/capabilities/{}.json", env!("OUT_DIR"), w.as_str());
+        let cap: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let perms: Vec<&str> = cap["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|p| p.as_str())
+            .filter(|p| p.starts_with("dialog:"))
+            .collect();
+        let alerts = matches!(
+            w,
+            WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
+        );
+        let expected: &[&str] = if alerts {
+            &["dialog:allow-message"]
+        } else {
+            &[]
+        };
+        assert_eq!(perms, expected, "{}", w.as_str());
+    }
+}
+
+#[test]
 fn commands_before_the_core_started_are_not_ready() {
     let app = builder(mock_builder())
         .build(mock_context(noop_assets()))

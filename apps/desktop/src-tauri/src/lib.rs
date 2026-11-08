@@ -31,14 +31,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 pub use native::{Mac, MacOps, Windows};
 
-const WINDOWS: [WindowLabel; 5] = [
-    WindowLabel::Main,
-    WindowLabel::CallScreen,
-    WindowLabel::RecordPrompt,
-    WindowLabel::Settings,
-    WindowLabel::FirstRun,
-];
-
 /// The core, or why it did not start (then every command answers `internal`).
 pub struct Booted(pub Result<Arc<Core>, String>);
 
@@ -337,7 +329,7 @@ pub async fn handle<R: Runtime>(
 
 /// The app's windows by label; any other webview (devtools, a stray page) is no window.
 fn window_label(label: &str) -> Option<WindowLabel> {
-    WINDOWS.into_iter().find(|w| w.as_str() == label)
+    WindowLabel::ALL.into_iter().find(|w| w.as_str() == label)
 }
 
 /// A webview loaded a page or closed: its subscriptions end and the page subscribes again.
