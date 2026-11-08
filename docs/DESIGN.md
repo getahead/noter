@@ -5969,7 +5969,7 @@ The items are also in the app menu: **Edit › Copy for Slack**, **Copy for Jira
 
 #### Component — Handoff drawer
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-handoff-drawer`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-handoff-drawer`
 
 ##### Why this component exists
 
@@ -6065,7 +6065,7 @@ On opening, focus moves to the target control.
 
 #### Component — Prompt editor
 
-- [ ] `p1` - **ID**: `cpt-noter-component-ui-prompt-editor`
+- [x] `p1` - **ID**: `cpt-noter-component-ui-prompt-editor`
 
 ##### Why this component exists
 

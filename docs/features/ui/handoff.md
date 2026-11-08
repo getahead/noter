@@ -33,11 +33,11 @@ milestone: M2
 
 <!-- /toc -->
 
-- [ ] `p3` - **ID**: `cpt-noter-featstatus-ui-handoff`
+- [x] `p3` - **ID**: `cpt-noter-featstatus-ui-handoff`
 
 ## 1. Feature Context
 
-- [ ] `p3` - `cpt-noter-feature-ui-handoff`
+- [x] `p3` - `cpt-noter-feature-ui-handoff`
 
 ### 1.1 Overview
 
@@ -203,7 +203,7 @@ It implements `cpt-noter-component-ui-handoff-drawer` and `cpt-noter-component-u
 
 ### Prompt lifecycle and delivery
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-handoff-drawer`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-handoff-drawer`
 
 The system **MUST** render HD-R1–HD-R7, generation/cancellation, revision-safe edits, generated/current diff, target choice and the core launch plan. Footer defaults follow the owner; a successful copy or open marks the item Handed off (and accepts a suggested item); copy never launches a tool; a failed launch marks nothing. Failure always leaves a path to Copy Prompt.
 
@@ -221,7 +221,7 @@ The system **MUST** render HD-R1–HD-R7, generation/cancellation, revision-safe
 
 ### Repository mappings
 
-- [ ] `p3` - **ID**: `cpt-noter-dod-ui-handoff-mappings`
+- [x] `p3` - **ID**: `cpt-noter-dod-ui-handoff-mappings`
 
 The system **MUST** share the repository list between Settings and the drawer, prefill the source project, persist add/edit/remove through the core and refresh launch eligibility after each change. Folder cancellation and invalid keys never invent a mapping.
 
@@ -238,12 +238,12 @@ The system **MUST** share the repository list between Settings and the drawer, p
 
 ## 6. Acceptance Criteria
 
-- [ ] Draft edits persist before launch/copy, remain separate from item text and survive conflicts for explicit retry
-- [ ] The current target, repository, launch line and default button agree before every action
-- [ ] Others' items default to Copy; suggestions accept only after a successful copy/open
-- [ ] Automation denial never marks Handed off; a successful launch records target, time and cwd
-- [ ] Cancellation stops generation; a stale event cannot replace the restored prompt
-- [ ] Mapping changes persist and revalidate the drawer; unavailable prompt versions or repositories are never fabricated
+- [x] Draft edits persist before launch/copy, remain separate from item text and survive conflicts for explicit retry
+- [x] The current target, repository, launch line and default button agree before every action
+- [x] Others' items default to Copy; suggestions accept only after a successful copy/open
+- [x] Automation denial never marks Handed off; a successful launch records target, time and cwd
+- [x] Cancellation stops generation; a stale event cannot replace the restored prompt
+- [x] Mapping changes persist and revalidate the drawer; unavailable prompt versions or repositories are never fabricated
 
 ## 7. Additional Context
 
