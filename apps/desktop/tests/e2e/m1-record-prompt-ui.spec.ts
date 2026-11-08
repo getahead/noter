@@ -225,6 +225,22 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     expect(await sent(page, "capture_dismiss_detection")).toEqual([{ detection_id: `det_${W.APPS.zoom.bundle_id}`, reason: "timed_out" }]);
   });
 
+  test("UI — empty path: Prompt closed unanswered — Back from Don't Ask under the pointer starts a timer that stays paused", async ({ page }) => {
+    await page.clock.install();
+    await openWindow(page, "record-prompt", { world: detected(W.APPS.teams) });
+    await notNow(page).click();
+    await page.getByRole("menuitem", { name: "Don't Ask for Microsoft Teams…" }).click();
+    await button(page, "Back").hover(); // the pointer rests on the panel while the buttons come back (a fresh 15 s timer)
+    await button(page, "Back").click();
+    await expect(notNow(page)).toBeVisible();
+    await notNow(page).hover();
+    await page.clock.fastForward(20_000);
+    expect(await sent(page, "capture_dismiss_detection")).toEqual([]);
+    await page.mouse.move(0, 0);
+    await page.clock.fastForward(16_000);
+    expect(await sent(page, "capture_dismiss_detection")).toEqual([{ detection_id: TEAMS, reason: "timed_out" }]);
+  });
+
   test("UI — empty path: Setup incomplete — no prompt is drawn", async ({ page }) => {
     await openWindow(page, "record-prompt", { world: (w) => (W.idle(w), W.selfTestSkipped(w)) });
     await settled(page);

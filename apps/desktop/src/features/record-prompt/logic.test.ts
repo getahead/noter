@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CallDetection, CaptureNotice, CaptureState, ModelBundle } from "../../core/bindings";
-import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptInput } from "./logic";
+import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, focusInside, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptInput } from "./logic";
 
 const detection = (o: Partial<CallDetection> = {}): CallDetection => ({ id: "det_teams", app_name: "Microsoft Teams", bundle_id: "com.microsoft.teams2", matched_event: null, detected_at: 0, prompt_until: 30_000, blocked: null, ...o });
 const capture = (o: Partial<CaptureState> = {}): CaptureState => ({ phase: "idle", notice: null, ...o }) as CaptureState;
@@ -174,5 +174,17 @@ describe("meetingTitle", () => {
     expect(meetingTitle(meeting({}))).toBe("");
     expect(meetingTitle(null)).toBe("");
     expect(meetingTitle({ type: "call_ended", stops_at: 1 })).toBe("");
+  });
+});
+
+describe("focusInside", () => {
+  const node = (inside: Element[] = []) => ({ contains: (e: Element) => inside.includes(e) }) as unknown as Element;
+  it("is true only for an element the panel contains, false for no panel or no focus", () => {
+    const a = node();
+    const b = node();
+    expect(focusInside(node([a]), a)).toBe(true);
+    expect(focusInside(node([a]), b)).toBe(false);
+    expect(focusInside(null, a)).toBe(false);
+    expect(focusInside(node([a]), null)).toBe(false);
   });
 });

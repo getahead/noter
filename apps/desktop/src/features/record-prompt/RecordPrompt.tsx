@@ -14,7 +14,7 @@ import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { leaveTimer, tickWhile } from "../shell/shell-effects";
 import { announce, answerCallEnd, answerNewMeeting, dismiss, fitPanel, holdNotice, ignoreApp, openDeleteOldAudio, openSystemSettings, startRecording } from "./actions";
-import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptTimer } from "./logic";
+import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, focusInside, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptTimer } from "./logic";
 import "./record-prompt.css";
 
 // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-fade
@@ -119,6 +119,8 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     sentHold.current = held;
     void holdNotice(bridge, callId, held);
   }, [held, variant, callId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the focused button can be removed by the view change itself (Back): its blur never comes, so read where focus is after each change
+  useEffect(() => dispatch({ type: "focus", on: focusInside(panel.current, document.activeElement) }), [variant, view?.state]);
   // where the pointer is, read from every move: an enter or leave the browser dispatches late must not leave the panel held
   useEffect(() => {
     const where = (e: MouseEvent) => dispatch({ type: "pointer", on: !!panel.current?.contains(e.target as Node) });
