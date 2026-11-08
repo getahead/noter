@@ -11,8 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use noter_core::{
-    BoxFuture, Clock, Core, CoreDeps, EventEmitter, HttpMcp, McpSource, MemorySecrets, NativeOps,
-    SaveKind, ScriptedMcp, ScriptedPage, ScriptedServer, SecretStore,
+    BoxFuture, Clock, Core, CoreDeps, EventEmitter, HttpMcp, Listing, McpAudit, McpError, McpPage,
+    McpRemote, McpSource, MemorySecrets, NativeOps, SaveKind, ScriptedMcp, ScriptedPage,
+    ScriptedServer, SecretStore,
 };
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_llm::mcp_stub::{StubRequest, StubResponse, StubServer};
@@ -1002,6 +1003,109 @@ async fn the_hourly_pass_syncs_an_indexed_source_once_its_schedule_has_passed() 
     noter_core::testing::jobs_tick(&rig.core);
     let done = rig.synced_at(later).await;
     assert_eq!(done.id, row.id);
+}
+
+/// The scripted servers with the listing held while `held` is set.
+struct Held {
+    inner: Arc<ScriptedMcp>,
+    held: Arc<AtomicBool>,
+    listed: Arc<AtomicBool>,
+}
+
+impl McpSource for Held {
+    fn oauth<'a>(
+        &'a self,
+        server: &'a str,
+        audit: McpAudit<'a>,
+    ) -> BoxFuture<'a, Result<String, McpError>> {
+        self.inner.oauth(server, audit)
+    }
+
+    fn list_resources<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        remote: &'a McpRemote<'a>,
+    ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
+        Box::pin(async move {
+            self.listed.store(true, Ordering::SeqCst);
+            while self.held.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            self.inner.list_resources(server, token, remote).await
+        })
+    }
+
+    fn read_resource<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        uri: &'a str,
+        remote: &'a McpRemote<'a>,
+    ) -> BoxFuture<'a, Result<McpPage, McpError>> {
+        self.inner.read_resource(server, token, uri, remote)
+    }
+
+    fn seed_query<'a>(
+        &'a self,
+        server: &'a str,
+        token: &'a str,
+        query: &'a str,
+        remote: &'a McpRemote<'a>,
+    ) -> BoxFuture<'a, Result<Listing, McpError>> {
+        self.inner.seed_query(server, token, query, remote)
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_hourly_pass_does_not_queue_a_source_whose_first_sync_is_still_open() {
+    let inner = Arc::new(ScriptedMcp::new(Arc::new(|| TimestampMs(T0))));
+    inner.set("notion", server(vec![page(1, "h1"), page(2, "h2")]));
+    let (held, listed) = (
+        Arc::new(AtomicBool::new(true)),
+        Arc::new(AtomicBool::new(false)),
+    );
+    let rig = open_over(Some(Arc::new(Held {
+        inner,
+        held: held.clone(),
+        listed: listed.clone(),
+    })))
+    .await;
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), mcp_args(SourceMode::Indexed))
+        .await
+        .unwrap();
+    while !listed.load(Ordering::SeqCst) {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    // The sync is open and the source has never synced, so the pass finds it due: that is the
+    // same work, not a request for another run after this one.
+    let later = T0 + 2 * 3_600_000;
+    rig.clock.0.store(later, Ordering::SeqCst);
+    noter_core::testing::jobs_tick(&rig.core);
+    let pass = "SELECT COUNT(*) FROM job_runs WHERE subject IS NULL AND started_at = ";
+    for _ in 0..1500 {
+        if count(
+            &rig.core,
+            format!("{pass}{later} AND status = 'succeeded'").leak(),
+        ) == 1
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    held.store(false, Ordering::SeqCst);
+    rig.until(|r| r.status == SourceStatus::Idle && r.last_sync_at.is_some())
+        .await;
+    // A second run would be queued once the first has closed.
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let runs = format!(
+        "SELECT COUNT(*) FROM job_runs WHERE subject = '{}'",
+        row.id.as_str()
+    );
+    assert_eq!(count(&rig.core, runs.leak()), 1);
+    assert_eq!(lookups(&rig.core), 3);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
