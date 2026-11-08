@@ -45,6 +45,9 @@ export interface PopoverProps {
   children?: ReactNode;
 }
 
+/** Closing hands focus back to the anchor when it can take it (a span that is no control cannot), else to what had it before. */
+export const returnFocus = (anchor: { tabIndex: number; focus(): void } | null | undefined, restore: () => void): void => (anchor && anchor.tabIndex >= 0 ? anchor.focus() : restore());
+
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 export function Popover({ variant, anchor, align, width, label, onClose, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -56,7 +59,7 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
     if (!placed) return;
     const restore = focusInside(ref.current);
     // focus goes back to the anchor: after a click WebKit leaves no focused element to go back to
-    return () => (anchor ? anchor.focus() : restore());
+    return () => returnFocus(anchor, restore);
   }, [placed]); // once per opening
   useEffect(() => closeOnOutside(ref, anchor, onClose), [anchor, onClose]);
   return (
