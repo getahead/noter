@@ -16,6 +16,9 @@ final class WebViewRecoveryTests: NoterTestCase {
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
         XCTAssertTrue(FileManager.default.createFile(atPath: stalled.path, contents: nil), "could not ask the hook to stall the page")
         XCTAssertTrue(waitUntil(10) { (try? String(contentsOf: stalled, encoding: .utf8)) == "stalled" }, "the hook did not stall the page")
+        // The watch restarts the page 10 s after the stall (`webview_watch::BOUND`, checked once a second) and the
+        // reload then takes a few seconds: more than openCall's 10 s, which is for a live page.
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 30), "the stalled page did not recover")
         openCall("Backend sync")
     }
 }
