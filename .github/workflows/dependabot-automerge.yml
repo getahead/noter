@@ -1,0 +1,55 @@
+# Dependabot auto-merge (docs/DELIVERY.md › Dependencies). Turns auto-merge on for a Dependabot PR
+# whose every update is semver-compatible (scripts/harness/dependabot.py), and off when a later
+# push makes it breaking. Nothing is exempt: the PR merges only once gate, hygiene, review and
+# CodeQL pass (Default ruleset), and an action update still waits for `harness-change-approved`.
+# Breaking updates (a major, or a 0.x minor) wait for the owner.
+name: Dependabot
+
+on:
+  pull_request:
+    branches: [main]
+    # edited: a retitled PR is judged again
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  automerge:
+    name: Auto-merge compatible updates
+    # The PR's author, not the actor: anyone can push to a Dependabot branch with write access.
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # gh pr merge --auto
+      pull-requests: write
+    steps:
+      # Fails when a commit on the branch is not Dependabot's; then DEPS is empty and auto-merge goes
+      # off, so a hand-pushed change (which `review` would pass as a bot PR) never merges by itself.
+      - id: meta
+        continue-on-error: true
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      # The rule always comes from main, never from the PR.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Auto-merge on when every update is compatible, off otherwise
+        env:
+          DEPS: ${{ steps.meta.outputs.updated-dependencies-json }}
+          # A merge done under the workflow token starts no workflows on main (release-please, main's CI).
+          # With the owner's fine-grained token or GitHub App token saved as the Dependabot secret
+          # AUTOMERGE_TOKEN (contents and pull requests: write), the merge does start them.
+          GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          if python3 scripts/harness/dependabot.py compatible; then
+            gh pr merge --auto --squash "$PR"
+          else
+            echo "::notice::A breaking update, or a commit that is not Dependabot's: the owner decides."
+            gh pr merge --disable-auto "$PR" 2>/dev/null || true
+          fi

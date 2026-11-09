@@ -19,6 +19,7 @@ import ci_changes  # noqa: E402
 import common  # noqa: E402
 import config_guard  # noqa: E402
 import coverage_gate  # noqa: E402
+import dependabot  # noqa: E402
 import e2e_coverage  # noqa: E402
 import flaky_native  # noqa: E402
 import lane_guard  # noqa: E402
@@ -1074,6 +1075,28 @@ class CiChangesTests(unittest.TestCase):
         self.assertEqual(files, ["b.rs"], "the merge commit against main as merged, not main's own changes")
         self.assertIsNone(ci_changes.changed_files("push", "main", "origin/main", root)[0])
         self.assertIsNone(ci_changes.changed_files("workflow_dispatch", "main", "origin/main", root)[0])
+
+
+class DependabotTests(unittest.TestCase):
+    def test_semver_compatible_as_cargo_and_npm_read_it(self):
+        self.assertTrue(dependabot.compatible("0.41.0", "0.41.1"))    # #566 rusqlite
+        self.assertTrue(dependabot.compatible("2.8.3", "2.8.4"))      # #564
+        self.assertTrue(dependabot.compatible("2.87.32", "2.89.1"))   # #567 install-action
+        self.assertTrue(dependabot.compatible("v4.1.0", "v4.2.0"))
+        self.assertFalse(dependabot.compatible("0.10.1", "0.11.0"))   # #563 chacha20poly1305
+        self.assertFalse(dependabot.compatible("0.15.5", "0.17.4"))   # #565 html2text
+        self.assertFalse(dependabot.compatible("1.9.0", "2.0.0"))
+        self.assertFalse(dependabot.compatible("0.0.3", "0.0.4"))
+
+    def test_unreadable_or_downgrade_is_not_compatible(self):
+        for prev, new in [(None, "1.0.1"), ("1.0.0", ""), ("abc", "1.0.0"), ("1.2.0", "1.1.0")]:
+            self.assertFalse(dependabot.compatible(prev, new), (prev, new))
+
+    def test_every_update_in_a_group_must_be_compatible(self):
+        ok = {"prevVersion": "1.0.0", "newVersion": "1.1.0"}
+        self.assertTrue(dependabot.all_compatible([ok]))
+        self.assertFalse(dependabot.all_compatible([ok, {"prevVersion": "0.1.0", "newVersion": "0.2.0"}]))
+        self.assertFalse(dependabot.all_compatible([]))  # no metadata: the owner decides
 
 
 class FlakyNativeTests(unittest.TestCase):
