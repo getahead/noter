@@ -43,7 +43,7 @@ tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", rev = "ef6e30
 
 [dev-dependencies]
 # A throwaway key signs the local feed's update in tests; no key is ever committed.
-base64 = "0.22"
+base64 = "0.23"
 minisign = "0.10"
 tauri = { version = "2", features = ["test"] }
 tempfile = "3"
