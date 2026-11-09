@@ -28,8 +28,10 @@ jobs:
       contents: write       # gh pr merge --auto
       pull-requests: write
     steps:
-      # Fails when a commit on the branch is not Dependabot's, so a hand-pushed change never auto-merges.
+      # Fails when a commit on the branch is not Dependabot's; then DEPS is empty and auto-merge goes
+      # off, so a hand-pushed change (which `review` would pass as a bot PR) never merges by itself.
       - id: meta
+        continue-on-error: true
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
       # The rule always comes from main, never from the PR.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,6 +50,6 @@ jobs:
           if python3 scripts/harness/dependabot.py compatible; then
             gh pr merge --auto --squash "$PR"
           else
-            echo "::notice::Breaking update: the owner decides."
+            echo "::notice::A breaking update, or a commit that is not Dependabot's: the owner decides."
             gh pr merge --disable-auto "$PR" 2>/dev/null || true
           fi
