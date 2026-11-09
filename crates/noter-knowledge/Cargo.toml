@@ -13,7 +13,7 @@ noter-engine-client = { path = "../noter-engine-client" }
 noter-jobs = { path = "../noter-jobs" }
 noter-llm = { path = "../noter-llm" }
 noter-protocol = { path = "../noter-protocol" }
-html2text = "0.15"
+html2text = "0.17"
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
 pdf-extract = "0.12"
 quick-xml = "0.42"
