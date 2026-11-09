@@ -76,10 +76,15 @@ pub fn watch_hotkey_trigger<R: Runtime>(app: AppHandle<R>) {
     });
 }
 
-/// With `NOTER_TEST_STALL_FILE`, stalls the main window's page once, a few seconds after it loaded:
-/// its web process is stopped and the page reloaded, so the load hangs like the CI runner's (#521)
-/// until the watch (`webview_watch`) gives the page a new process. The file is written once the
-/// page is stalled. The path is given whole, like `NOTER_TEST_HOTKEY_FILE`.
+/// How long a debug app waits for a test to ask for the stall.
+const STALL_ASK_WINDOW: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// With `NOTER_TEST_STALL_FILE`, stalls the main window's page once, when the test creates that
+/// file (after it has seen the page; a timer was too short on a slow runner, #578): its web process
+/// is stopped and the page reloaded, so the load hangs like the CI runner's (#521) until the watch
+/// (`webview_watch`) gives the page a new process. "stalled" is written into the file once the page
+/// is stalled. The path is given whole, like `NOTER_TEST_HOTKEY_FILE`. Nothing is stalled if the
+/// file never appears: the polling stops after `STALL_ASK_WINDOW`.
 pub fn stall_after_load<R: Runtime>(webview: &Webview<R>) {
     static STALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
     let Some(file) = std::env::var_os("NOTER_TEST_STALL_FILE").map(PathBuf::from) else {
@@ -90,8 +95,13 @@ pub fn stall_after_load<R: Runtime>(webview: &Webview<R>) {
     }
     let webview = webview.clone();
     std::thread::spawn(move || {
-        // Long enough for a test to see the page first.
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        let deadline = std::time::Instant::now() + STALL_ASK_WINDOW;
+        while !file.exists() {
+            if std::time::Instant::now() >= deadline {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
         // The reload never reports its start from a stopped process: it is reported here.
         if let Some(watch) = webview.try_state::<crate::webview_watch::Watch>() {
             crate::webview_watch::lock(&watch).started(webview.label(), std::time::Instant::now());
