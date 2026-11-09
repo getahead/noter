@@ -65,6 +65,8 @@ const states: { id: string; world: (w: World) => void; ready?: (page: Page) => P
       await startSelfTest(page);
       await expect(win(page).getByRole("status").filter({ hasText: "Self-test passed" })).toBeVisible({ timeout: 10_000 });
       await expect(page.getByRole("button", { name: "Run Test", exact: true })).toBeEnabled();
+      // Running the test can leave the step scrolled a few pixels (#570); the baseline is the step at its top.
+      await page.locator('[data-region="FR-R2"]').evaluate((step) => (step.scrollTop = 0));
     },
   },
   { id: "skipped", world: (w) => (W.firstRun(w), at("call_display")(w), (w.app.setup.steps.find((s) => s.step === "permissions")!.state = "skipped")) },
