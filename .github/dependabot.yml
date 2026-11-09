@@ -6,7 +6,9 @@ version: 2
 
 updates:
   - package-ecosystem: cargo
-    directory: /
+    # The Tauri host is its own workspace (apps/desktop/src-tauri/Cargo.toml) with its own lockfile;
+    # a grouped update then moves both lockfiles in one PR, or the macOS job's --locked build fails (#565).
+    directories: ["/", "/apps/desktop/src-tauri"]
     schedule:
       interval: weekly
       day: monday
