@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.6](https://github.com/getahead/noter/compare/v0.22.5...v0.22.6) (2026-11-09)
+
+
+### Bug fixes
+
+* **deps:** bump @tauri-apps/plugin-dialog from 2.8.3 to 2.8.4 in the npm-minor group across 1 directory ([#564](https://github.com/getahead/noter/issues/564)) ([4817dc6](https://github.com/getahead/noter/commit/4817dc640d4b8a9a33a9404763fdbeae766224a2))
+* **deps:** bump base64 from 0.22.1 to 0.23.1 in /apps/desktop/src-tauri ([#573](https://github.com/getahead/noter/issues/573)) ([2dd8996](https://github.com/getahead/noter/commit/2dd89966fd89b396a433d8e0f770a695c278f029))
+* **deps:** bump chacha20poly1305 from 0.10.1 to 0.11.0 ([#563](https://github.com/getahead/noter/issues/563)) ([885ea77](https://github.com/getahead/noter/commit/885ea77b43db9e62cb0dd990a7f1ba03742e74e6))
+* **deps:** bump html2text from 0.15.5 to 0.17.4 ([#565](https://github.com/getahead/noter/issues/565)) ([8420c49](https://github.com/getahead/noter/commit/8420c4917b7b8d203c3de2a4e3a5c7ebf2fe0d5a))
+* **deps:** bump minisign from 0.7.9 to 0.10.0 in /apps/desktop/src-tauri ([#574](https://github.com/getahead/noter/issues/574)) ([85c9c8c](https://github.com/getahead/noter/commit/85c9c8c31b2a0860fd260fa07b32a0439df4eb86))
+* **deps:** bump the cargo-minor group across 2 directories with 6 updates ([#571](https://github.com/getahead/noter/issues/571)) ([76b6e52](https://github.com/getahead/noter/commit/76b6e5290e310e3cff1a07de3f25dba1e63e12b6))
+
 ## [0.22.5](https://github.com/getahead/noter/compare/v0.22.4...v0.22.5) (2026-11-08)
 
 
