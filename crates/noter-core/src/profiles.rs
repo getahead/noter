@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng};
+use chacha20poly1305::aead::{Aead, Generate, KeyInit};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use noter_db::rusqlite::{params, Connection, OptionalExtension};
 use noter_protocol::engine::EngineSpan;
@@ -66,7 +66,7 @@ fn unhex(text: &str) -> Option<Key> {
     let bytes = (0..32)
         .map(|i| u8::from_str_radix(&text[2 * i..2 * i + 2], 16).ok())
         .collect::<Option<Vec<u8>>>()?;
-    Some(*Key::from_slice(&bytes))
+    Key::try_from(bytes.as_slice()).ok()
 }
 
 fn locked(_: KeychainLocked) -> CoreError {
@@ -279,7 +279,7 @@ impl Core {
         if !create {
             return Ok(None);
         }
-        let fresh = ChaCha20Poly1305::generate_key(&mut OsRng);
+        let fresh = Key::generate();
         self.deps
             .secrets
             .set(KEY_ACCOUNT, &Secret::new(hex(&fresh)))
@@ -290,7 +290,7 @@ impl Core {
     /// `nonce || ciphertext` of the little-endian floats.
     fn seal(key: &SecretKey, vector: &[f32]) -> Result<Vec<u8>, CoreError> {
         let cipher = ChaCha20Poly1305::new(&key.0);
-        let nonce = ChaCha20Poly1305::generate_nonce(&mut OsRng);
+        let nonce = Nonce::generate();
         let mut plain: Vec<u8> = vector.iter().flat_map(|x| x.to_le_bytes()).collect();
         let sealed = cipher.encrypt(&nonce, plain.as_slice());
         plain.fill(0);
@@ -307,7 +307,7 @@ impl Core {
         }
         let cipher = ChaCha20Poly1305::new(&key.0);
         let mut plain = cipher
-            .decrypt(Nonce::from_slice(&blob[..NONCE]), &blob[NONCE..])
+            .decrypt(&Nonce::try_from(&blob[..NONCE]).ok()?, &blob[NONCE..])
             .ok()?;
         let vector: Vec<f32> = plain
             .chunks_exact(4)
@@ -805,4 +805,39 @@ impl Core {
         }
     }
     // @cpt-end:cpt-noter-algo-core-people-profile-match:p1:inst-match-used
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Sealed by chacha20poly1305 0.10.1 (key 00..1f, nonce 64..6f): centroids stored before the
+    // 0.11 update must still open.
+    const SEALED_BY_0_10: &str = include_str!("../tests/data/centroid-chacha20poly1305-0.10.hex");
+
+    fn golden_key() -> SecretKey {
+        SecretKey(unhex(&hex(&(0u8..32).collect::<Vec<_>>())).unwrap())
+    }
+
+    #[test]
+    fn a_centroid_sealed_before_the_update_still_opens() {
+        let text = SEALED_BY_0_10.trim();
+        let blob: Vec<u8> = (0..text.len() / 2)
+            .map(|i| u8::from_str_radix(&text[2 * i..2 * i + 2], 16).unwrap())
+            .collect();
+        let expected: Vec<f32> = (0..DIMS).map(|i| i as f32 / 256.0 - 0.5).collect();
+        assert_eq!(Core::open_blob(&golden_key(), &blob), Some(expected));
+    }
+
+    #[test]
+    fn a_sealed_centroid_opens_and_each_seal_takes_a_new_nonce() {
+        let key = golden_key();
+        let vector: Vec<f32> = (0..DIMS).map(|i| i as f32 + 1.0).collect();
+        let (a, b) = (
+            Core::seal(&key, &vector).unwrap(),
+            Core::seal(&key, &vector).unwrap(),
+        );
+        assert_ne!(a[..NONCE], b[..NONCE]);
+        assert_eq!(Core::open_blob(&key, &a), Some(vector));
+    }
 }
