@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.7](https://github.com/getahead/noter/compare/v0.22.6...v0.22.7) (2026-11-10)
+
+
+### Bug fixes
+
+* **deps:** regenerate Cargo.lock after concurrent Dependabot merges ([#684](https://github.com/getahead/noter/issues/684)) ([de36d0c](https://github.com/getahead/noter/commit/de36d0c20dff4f2ae5fe710cfbbe09d705b30138))
+
 ## [0.22.6](https://github.com/getahead/noter/compare/v0.22.5...v0.22.6) (2026-11-09)
 
 

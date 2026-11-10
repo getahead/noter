@@ -1,6 +1,6 @@
 {
   "name": "noter",
-  "version": "0.22.6",
+  "version": "0.22.7",
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "engines": {
