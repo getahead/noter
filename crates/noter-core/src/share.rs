@@ -254,7 +254,7 @@ fn markdown(blocks: &[Block]) -> String {
                 format!(
                     "- {check}{}{}{links}",
                     escape(&l.text, "\\`*_[]<>"),
-                    facts_of(l)
+                    escape(&facts_of(l), "\\`*_[]<>")
                 )
             }
         });
