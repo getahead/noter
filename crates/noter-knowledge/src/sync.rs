@@ -1,7 +1,7 @@
-//! The sync job of an indexed source (`cpt-noter-algo-core-knowledge-sync`): enumerate a folder
+//! The sync job of an indexed source (`cpt-noter-algo-core-knowledge-sync-v2`): enumerate a folder
 //! or list an MCP server, skip what did not change, extract, chunk, embed outside any
 //! transaction, then replace each changed document in one writer transaction. The source's
-//! status follows `cpt-noter-state-core-knowledge-source`; progress never carries document text
+//! status follows `cpt-noter-state-core-knowledge-source-v2`; progress never carries document text
 //! and nothing here logs a token.
 
 use std::collections::{HashMap, HashSet};
@@ -56,6 +56,7 @@ struct Counts {
     added: u32,
     changed: u32,
     removed: u32,
+    skipped: u32,
 }
 
 impl Counts {
@@ -64,6 +65,7 @@ impl Counts {
             ("added", self.added),
             ("changed", self.changed),
             ("removed", self.removed),
+            ("skipped", self.skipped),
         ]
         .into_iter()
         .map(|(label, n)| CountEntry {
@@ -168,8 +170,8 @@ impl<L: EngineLauncher> SyncEnv<'_, L> {
 }
 
 // @cpt-dod:cpt-noter-dod-core-knowledge-ingestion:p1
-// @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
-// @cpt-state:cpt-noter-state-core-knowledge-source:p1
+// @cpt-algo:cpt-noter-algo-core-knowledge-sync-v2:p1
+// @cpt-state:cpt-noter-state-core-knowledge-source-v2:p1
 /// Syncs the indexed source `id` within the job run `ctx`. A removed source ends the run as
 /// cancelled with nothing written; a live source is refused.
 pub async fn sync<L: EngineLauncher>(
@@ -177,7 +179,7 @@ pub async fn sync<L: EngineLauncher>(
     ctx: &mut RunCtx,
     id: &SourceId,
 ) -> Result<(), Stop> {
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-start
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-start
     let source = {
         let id = id.clone();
         env.store.read(move |c| get(c, &id))?
@@ -193,8 +195,8 @@ pub async fn sync<L: EngineLauncher>(
     }
     let run = format!("syn_{}", ulid::Ulid::generate());
     let started = (env.now)().0;
-    // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-start
-    // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-retry
+    // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-start
+    // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-retry
     let indexing = SourceStatus::Indexing {
         done: 0,
         total: None,
@@ -227,9 +229,9 @@ pub async fn sync<L: EngineLauncher>(
             _ => Stop::Failed(e),
         })?;
     (env.published)(row.value);
-    // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-retry
-    // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-start
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-start
+    // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-retry
+    // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-start
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-start
     let mut counts = Counts::default();
     let outcome = match source.kind {
         SourceKind::Folder => passes(env, ctx, id, Path::new(&source.location), &mut counts).await,
@@ -243,18 +245,18 @@ pub async fn sync<L: EngineLauncher>(
     };
     match outcome {
         Ok(()) => {
-            // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-return
-            // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-done
+            // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-return
+            // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-done
             let meta = ctx.change_meta("sync finished");
             env.finish(meta, id, SourceStatus::Idle, end(None, true))?;
             ctx.commit_batch(vec![], counts.entries(), Some(1.0))
                 .await?;
             Ok(())
-            // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-done
-            // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-return
+            // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-done
+            // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-return
         }
         Err(Stop::Cancelled) => {
-            // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-cancel
+            // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-cancel
             let meta = ctx.change_meta("sync cancelled");
             env.finish(
                 meta,
@@ -263,12 +265,12 @@ pub async fn sync<L: EngineLauncher>(
                 end(Some("cancelled".into()), false),
             )?;
             Err(Stop::Cancelled)
-            // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-cancel
+            // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-cancel
         }
         Err(Stop::Failed(e)) => {
-            // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-failure
-            // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-failed
-            // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-expired
+            // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-failure
+            // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-failed
+            // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-expired
             let status = match e.code {
                 ErrorCode::SourceSignInExpired => SourceStatus::SignInExpired,
                 code => SourceStatus::Failed {
@@ -276,12 +278,12 @@ pub async fn sync<L: EngineLauncher>(
                     at: (env.now)(),
                 },
             };
-            // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-expired
+            // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-expired
             let meta = ctx.change_meta("sync failed");
             env.finish(meta, id, status, end(Some(text(&e.code)), false))?;
             Err(Stop::Failed(e))
-            // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-failed
-            // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-failure
+            // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-failed
+            // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-failure
         }
     }
 }
@@ -348,19 +350,19 @@ async fn pass<L: EngineLauncher>(
     dir: &Path,
     counts: &mut Counts,
 ) -> Result<(), Stop> {
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-folder
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-folder
     // TL-29: no bookmark to enter; the folder is read by path.
     let files = enumerate(dir)
         .map_err(|_| failed(ErrorCode::SourceSyncFailed, "the folder could not be read"))?;
     let known = known(env, id)?;
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-folder
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-folder
     let total = files.len() as u32;
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-each
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-each
     for (n, file) in files.iter().enumerate() {
         ctx.checkpoint().await?;
         let uri = file.path.to_string_lossy().into_owned();
         let before = known.get(&uri);
-        // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-hash
+        // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-hash
         // shortcut: an unchanged modification time skips the file unhashed; a file replaced
         // under the same time (`cp -p`, `rsync -t`) keeps its chunks until a full reindex.
         if before.is_some_and(|k| k.modified.is_some() && k.modified == file.modified) {
@@ -371,11 +373,20 @@ async fn pass<L: EngineLauncher>(
         // Reading and parsing can take seconds (a large PDF): off the async workers.
         let read = tokio::task::spawn_blocking(move || read_file(&path, format, stored))
             .await
-            .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))??;
+            .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))?;
+        // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-failure
+        let read = match read {
+            Ok(read) => read,
+            Err(_) => {
+                counts.skipped += 1;
+                continue;
+            }
+        };
+        // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-failure
         let Some((hash, doc, chunks)) = read else {
             continue;
         };
-        // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-hash
+        // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-hash
         let replace = Replace {
             source: id.clone(),
             document: before.map(|k| k.id.clone()),
@@ -393,7 +404,7 @@ async fn pass<L: EngineLauncher>(
         };
         persist(env, ctx, replace, chunks, counts).await?;
     }
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-each
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-each
     let present: HashSet<String> = files
         .iter()
         .map(|f| f.path.to_string_lossy().into_owned())
@@ -434,11 +445,11 @@ async fn persist<L: EngineLauncher>(
     chunks: Vec<Chunk>,
     counts: &mut Counts,
 ) -> Result<(), Stop> {
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-embed
     let vectors = embed(env, &chunks).await?;
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-embed
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-embed
     ctx.checkpoint().await?;
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-persist
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-persist
     replace.chunks = chunks.into_iter().zip(vectors).collect();
     replace.indexed = (env.now)().0;
     let progress = match replace.status {
@@ -463,13 +474,13 @@ async fn persist<L: EngineLauncher>(
     } else {
         counts.added += 1;
     }
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-persist
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-progress
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-persist
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-progress
     (env.published)(row.value);
     ctx.commit_batch(vec![], counts.entries(), Some(progress))
         .await?;
     Ok(())
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-progress
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-progress
 }
 
 /// Deletes the documents of a complete enumeration that are no longer `present`.
@@ -481,7 +492,7 @@ fn prune<L: EngineLauncher>(
     present: &HashSet<String>,
     counts: &mut Counts,
 ) -> Result<(), Stop> {
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-deleted
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-deleted
     let vanished: Vec<String> = known
         .into_iter()
         .filter(|(uri, _)| !present.contains(uri))
@@ -512,7 +523,7 @@ fn prune<L: EngineLauncher>(
             Ok(((), vec![logged]))
         })?;
     }
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-deleted
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-deleted
     Ok(())
 }
 
@@ -572,7 +583,7 @@ async fn remote<L: EngineLauncher>(
 ) -> Result<(), Stop> {
     // A request made while the run is open is answered by the run after it, not by a mark.
     (env.changed)();
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-remote
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-remote
     let token = env
         .secrets
         .get(&token_account(id))
@@ -600,7 +611,7 @@ async fn remote<L: EngineLauncher>(
         }
     };
     let listing = listed.map_err(|e| lookups.failed(e))?;
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-remote
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-remote
     let total = listing.items.len() as u32;
     for (n, item) in listing.items.iter().enumerate() {
         ctx.checkpoint().await?;
@@ -703,7 +714,7 @@ fn read_file(
     if stored.as_deref() == Some(hash.as_str()) {
         return Ok(None);
     }
-    // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
+    // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-extract
     let doc = extract::extract(path, &bytes, format).map_err(|_| {
         failed(
             ErrorCode::SourceSyncFailed,
@@ -711,7 +722,7 @@ fn read_file(
         )
     })?;
     let chunks = chunk::chunks(&doc);
-    // @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
+    // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-extract
     Ok(Some((hash, doc, chunks)))
 }
 

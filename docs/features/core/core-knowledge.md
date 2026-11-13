@@ -2,8 +2,8 @@
 title: "Feature: Knowledge sources"
 description: "Folder and indexed MCP ingestion, source privacy and scope, sync jobs and source removal."
 status: PROPOSED
-version: "0.1"
-date: "2026-10-18"
+version: "0.2"
+date: "2026-11-13"
 milestone: M3
 lane: core
 decomposition: docs/DECOMPOSITION-core.md
@@ -41,6 +41,8 @@ design: docs/DESIGN-core.md
 - [x] `p4` - **ID**: `cpt-noter-featstatus-core-knowledge`
 
 - [x] `p4` - `cpt-noter-feature-core-knowledge`
+
+**Change log**: Version 0.2 isolates unreadable local files, counts skipped attempts and preserves complete-listing pruning; sync algorithm and source state IDs advance to v2.
 
 ## 1. Feature Context
 
@@ -108,7 +110,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 2. [x] - `p1` - Resolve and validate the directory and its security-scoped bookmark; do not treat a supplied path as a permission grant (TL-29: the app is unsandboxed, so no bookmark; the path is resolved and checked on every add) - `inst-folder-validate`
 3. [x] - `p1` - DB: INSERT an indexed folder `sources` row with revision, bookmark, privacy and scope through the change-log writer (TL-29: `bookmark` stays NULL) - `inst-folder-store`
 4. [x] - `p1` - Register FSEvents and enqueue an initial sync; emit `entity:changed` after commit and **RETURN** `SourceRow` - `inst-folder-return`
-5. [x] - `p1` - Run `cpt-noter-algo-core-knowledge-sync`; publish per-source progress and then document count and last sync time - `inst-folder-index`
+5. [x] - `p1` - Run `cpt-noter-algo-core-knowledge-sync-v2`; publish per-source progress and then document count and last sync time - `inst-folder-index`
 
 ### Add an MCP source
 
@@ -176,7 +178,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 ### Sync an indexed source
 
-- [x] `p4` - **ID**: `cpt-noter-algo-core-knowledge-sync`
+- [x] `p4` - **ID**: `cpt-noter-algo-core-knowledge-sync-v2`
 
 **Input**: Existing indexed source, job id, stored bookmark or Keychain token reference, local engine and current policy.
 
@@ -193,8 +195,8 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
    4. [x] - `p1` - Recheck source existence, revision and privacy; in a writer transaction replace this document's canonical chunks, normalized FTS entries and `doc_vec` rows with a change row - `inst-sync-persist`
    5. [x] - `p1` - Publish committed source progress without file contents or tokens in logs - `inst-sync-progress`
 5. [x] - `p1` - After a complete enumeration, delete vanished documents and their indexes; never infer mass deletion from a failed or partial remote listing - `inst-sync-deleted`
-6. [x] - `p1` - Store added, changed and removed counts, successful last-sync time and idle status; release bookmark access and **RETURN** success - `inst-sync-return`
-7. [x] - `p1` - **IF** a read, extraction, embedding or remote step fails, finish the run with its typed error, retain previous successful last-sync time and publish failed or sign-in-expired status; cancellation releases resources without publishing late chunks - `inst-sync-failure`
+6. [x] - `p1` - Store added, changed and removed counts, successful last-sync time and idle status; publish skipped local-file attempts in job counts; release bookmark access and **RETURN** success - `inst-sync-return`
+7. [x] - `p1` - **IF** a local file cannot be read or extracted, count the skipped attempt and continue with later files; retain any previously indexed version, keep the file present for pruning and retry it on later syncs. Folder enumeration, embedding, store or remote failures finish the run with their typed error, retain previous successful last-sync time and publish failed or sign-in-expired status; cancellation releases resources without publishing late chunks - `inst-sync-failure`
 
 ### Enforce source policy on indexed evidence
 
@@ -230,7 +232,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 ### Indexed source status
 
-- [x] `p4` - **ID**: `cpt-noter-state-core-knowledge-source`
+- [x] `p4` - **ID**: `cpt-noter-state-core-knowledge-source-v2`
 
 **States**: idle, indexing, failed, sign_in_expired
 
@@ -239,7 +241,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 **Transitions**:
 1. [x] - `p1` - **FROM** idle **TO** indexing **WHEN** an initial, scheduled, watched or requested sync starts - `inst-status-start`
 2. [x] - `p1` - **FROM** indexing **TO** idle **WHEN** sync succeeds and counts and last-sync time commit - `inst-status-done`
-3. [x] - `p1` - **FROM** indexing **TO** failed **WHEN** extraction, folder access, embedding or transport fails; keep error code and time - `inst-status-failed`
+3. [x] - `p1` - **FROM** indexing **TO** failed **WHEN** folder enumeration, embedding, store or transport fails; keep error code and time - `inst-status-failed`
 4. [x] - `p1` - **FROM** indexing **TO** sign_in_expired **WHEN** the server rejects an expired or revoked token - `inst-status-expired`
 5. [x] - `p1` - **FROM** idle **TO** sign_in_expired **WHEN** the user revokes the indexed token; also from failed or indexing - `inst-status-revoked`
 6. [x] - `p1` - **FROM** failed **TO** indexing **WHEN** the cause is resolved and retry starts - `inst-status-retry`
@@ -258,8 +260,8 @@ The system **MUST** add watched folders with bookmarks and indexed MCP sources w
 **Implements**:
 - `cpt-noter-flow-core-knowledge-folder`
 - `cpt-noter-flow-core-knowledge-mcp`
-- `cpt-noter-algo-core-knowledge-sync`
-- `cpt-noter-state-core-knowledge-source`
+- `cpt-noter-algo-core-knowledge-sync-v2`
+- `cpt-noter-state-core-knowledge-source-v2`
 
 **Touches**:
 - API: `source_add_folder`, `source_add_mcp`, `entity:changed`, `jobs:progress`
@@ -305,4 +307,6 @@ The system **MUST** revoke indexed tokens, stop authenticated work, and remove a
 - [x] A cancelled picker writes nothing; inaccessible bookmarks and failed jobs retain typed errors and previous last-sync time; reconnect and retry succeed.
 - [x] Removal rolls back on a forced writer failure; after successful removal, no index row remains and late jobs cannot restore the source.
 - [x] Each of the seven commands succeeds at least once in real-core E2E runs; stale `source_update` returns `conflict` without a write or event.
+- [ ] Real-core regression in `crates/noter-core/tests/knowledge.rs`: a folder containing malformed PDF, empty Word and Word lock files still indexes later valid files, counts skipped attempts, retains the previous index for a newly unreadable file, prunes vanished documents and succeeds on subsequent syncs. The unreadable-folder regression retains fatal enumeration error coverage.
+- [x] Unit extraction fixtures remain in `crates/noter-knowledge/src/extract.rs`; real-core command conformance and story E2E remain in `apps/desktop/tests/conformance/m3-stories-knowledge.test.ts` (`cpt-noter-seq-settings-add-knowledge-source`).
 - [x] `just gate-fast` and `just gate` pass.
