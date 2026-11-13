@@ -51,12 +51,18 @@ export function statusOf(c: CallRow): CellStatus | null {
 }
 
 // "15 Nov": en-US supplies the short month ("Sep", where en-GB says "Sept"); the day goes first, as in the prototype
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
 const day = (ms: number, tz?: string) => {
-  const p = new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "short",
-    timeZone: tz,
-  }).formatToParts(ms);
+  let fmt = dayFormatters.get(tz ?? "");
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+      timeZone: tz,
+    });
+    dayFormatters.set(tz ?? "", fmt);
+  }
+  const p = fmt.formatToParts(ms);
   return `${p.find((x) => x.type === "day")!.value} ${p.find((x) => x.type === "month")!.value}`;
 };
 

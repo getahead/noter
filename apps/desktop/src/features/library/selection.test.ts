@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extend, press, selectAll, type Selection } from "./selection";
+import { extend, press, retain, selectAll, type Selection } from "./selection";
 
 const order = ["a", "b", "c", "d"];
 const none: Selection = { ids: [], anchor: null };
@@ -41,5 +41,12 @@ describe("selection (cpt-noter-flow-ui-library-calls-delete)", () => {
     const s = press(press(none, order, "a", {}), order, "b", { meta: true });
     expect(ids(press(s, order, "a", { context: true }))).toEqual(["a", "b"]);
     expect(ids(press(s, order, "d", { context: true }))).toEqual(["d"]);
+  });
+
+  it("prunes ids and anchor that are no longer listed", () => {
+    expect(retain({ ids: ["a", "b", "c"], anchor: "b" }, ["a", "c"])).toEqual({
+      ids: ["a", "c"],
+      anchor: "a",
+    });
   });
 });

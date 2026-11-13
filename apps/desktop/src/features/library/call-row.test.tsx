@@ -33,8 +33,14 @@ const call = (o: Partial<CallRow> = {}) =>
     review_waiting: 0,
     ...o,
   }) as CallRow;
+const rowTree = (props: Parameters<typeof CallRowView>[0]) =>
+  rendered(CallRowView.type, props);
 
 describe("call row (cpt-noter-component-ui-call-row)", () => {
+  it("memoizes rows so stable rows can skip unrelated list updates", () => {
+    expect(CallRowView).toHaveProperty("$$typeof", Symbol.for("react.memo"));
+  });
+
   it("names the people, the user last, with +N past three", () => {
     expect(
       peopleOf(
@@ -91,7 +97,7 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
 
   it("names an untitled call and shows the status link that opens the call", () => {
     const onOpen = vi.fn();
-    const tree = rendered(CallRowView, {
+    const tree = rowTree({
       call: call({
         title: "",
         unnamed_speakers: 2,
@@ -115,7 +121,7 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
   it("opens on Return and on a double-click, and reports a press and a context click", () => {
     const [onPress, onOpen, onContext] = [vi.fn(), vi.fn(), vi.fn()];
     const tr = find(
-      rendered(CallRowView, { call: call(), onPress, onOpen, onContext }),
+      rowTree({ call: call(), onPress, onOpen, onContext }),
       (p) => p["data-lib-row"] === "c1",
     );
     const prevent = vi.fn();

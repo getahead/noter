@@ -42,6 +42,7 @@ const state = (o: Partial<CallsState> = {}): CallsState => ({
 const props = (o: Partial<CallsViewProps> = {}): CallsViewProps => ({
   state: state(),
   selection: NONE,
+  selected: new Set(o.selection?.ids ?? []),
   slow: false,
   failed: null,
   selfTestPassed: true,
@@ -87,6 +88,15 @@ describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
     const h = html({ selection: { ids: ["a", "b"], anchor: "a" } });
     expect(h).toContain("· 2 selected");
     expect(h).toContain('aria-selected="true"');
+  });
+
+  it("counts only selected calls that are on the current page", () => {
+    const h = html({
+      selection: { ids: ["page-2-only"], anchor: "page-2-only" },
+      selected: new Set(),
+    });
+    expect(h).not.toContain("· 1 selected");
+    expect(h).not.toContain('aria-selected="true"');
   });
 
   it("shows No calls yet, with the self-test action only while it has not passed", () => {

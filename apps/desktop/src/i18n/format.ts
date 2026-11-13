@@ -122,11 +122,22 @@ export const quote = (text: string, lang: string): Quoted => ({
 
 // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
 /** `o` in the user's zone; a zone this WebView does not know falls back to the system zone. */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+const formatter = (loc: string, o: Intl.DateTimeFormatOptions, timeZone?: string) => {
+  const key = JSON.stringify([loc, o, timeZone]);
+  let value = formatters.get(key);
+  if (!value) {
+    value = new Intl.DateTimeFormat(loc, { ...o, timeZone });
+    formatters.set(key, value);
+  }
+  return value;
+};
+
 export const zoned = (ms: number, o: Intl.DateTimeFormatOptions, prefs: UiPrefs | undefined, loc = locale()): string => {
   try {
-    return new Intl.DateTimeFormat(loc, { ...o, timeZone: prefs?.time_zone || undefined }).format(ms);
+    return formatter(loc, o, prefs?.time_zone || undefined).format(ms);
   } catch {
-    return new Intl.DateTimeFormat(loc, o).format(ms);
+    return formatter(loc, o).format(ms);
   }
 };
 const hourCycle = (prefs: UiPrefs | undefined) => (prefs?.time_format === "h12" ? "h12" : "h23");
