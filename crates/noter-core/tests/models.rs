@@ -200,6 +200,22 @@ async fn until(core: &Core, what: &str, test: impl Fn(&SetupStatus) -> bool) -> 
     panic!("timed out waiting for {what}");
 }
 
+async fn wait_for_model_run_to_stop(core: &Core) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if model_runs(core)
+                .last()
+                .is_some_and(|run| run.status != JobRunStatus::Running)
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the model download job leaves Running");
+}
+
 fn state(s: &SetupStatus, name: &str) -> BundleState {
     s.models
         .bundles
@@ -325,6 +341,7 @@ async fn a_checksum_mismatch_deletes_the_partial_file_and_retry_downloads_again(
         state(st, "whisper-turbo") == BundleState::ChecksumFailed
     })
     .await;
+    wait_for_model_run_to_stop(&s.core).await;
     assert_eq!(failed.models.error, Some(ErrorCode::ChecksumFailed));
     assert!(!dir.path().join("models").join("whisper-turbo").exists());
     assert!(!dir
@@ -339,6 +356,7 @@ async fn a_checksum_mismatch_deletes_the_partial_file_and_retry_downloads_again(
             && st.models.error == Some(ErrorCode::ChecksumFailed)
     })
     .await;
+    wait_for_model_run_to_stop(&s.core).await;
     let fetches = s.source.fetches.lock().unwrap().clone();
     assert_eq!(
         fetches,
@@ -363,12 +381,14 @@ async fn offline_pauses_with_the_partial_file_and_resume_continues_from_it() {
         state(st, "whisper-turbo") == BundleState::Paused
     })
     .await;
+    wait_for_model_run_to_stop(&s.core).await;
     assert_eq!(paused.models.error, Some(ErrorCode::Offline));
     download(&s.core, DownloadAction::Resume).await.unwrap();
     until(&s.core, "ready after resume", |st| {
         state(st, "whisper-turbo") == BundleState::Ready
     })
     .await;
+    wait_for_model_run_to_stop(&s.core).await;
     let fetches = s.source.fetches.lock().unwrap().clone();
     let speech: Vec<u64> = fetches
         .iter()
@@ -732,6 +752,7 @@ async fn a_download_cut_off_by_the_network_resumes_by_itself() {
         st.models.error == Some(ErrorCode::Offline)
     })
     .await;
+    wait_for_model_run_to_stop(&core).await;
     network.set_online(false);
     network.set_online(true);
     until(&core, "ready after the network came back", |st| {
@@ -741,6 +762,7 @@ async fn a_download_cut_off_by_the_network_resumes_by_itself() {
             .all(|b| b.state == BundleState::Ready)
     })
     .await;
+    wait_for_model_run_to_stop(&core).await;
     assert!(source
         .fetches
         .lock()
@@ -756,9 +778,17 @@ async fn a_pause_the_user_asked_for_stays_paused_when_the_network_comes_back() {
     let network = Arc::new(Network(false.into(), Mutex::new(None)));
     let core = open_on(dir.path(), source.clone(), network.clone());
     download(&core, DownloadAction::Start).await.unwrap_err();
+    wait_for_model_run_to_stop(&core).await;
     download(&core, DownloadAction::Pause).await.unwrap();
     network.set_online(true);
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    until(&core, "the requested pause remains in effect", |status| {
+        status
+            .models
+            .bundles
+            .iter()
+            .all(|bundle| bundle.state != BundleState::Downloading)
+    })
+    .await;
     assert!(source.fetches.lock().unwrap().is_empty());
 }
 
@@ -953,7 +983,6 @@ async fn a_live_call_pauses_the_download_job_and_it_goes_on_when_the_call_ends()
         })
         .unwrap();
     download(&s.core, DownloadAction::Start).await.unwrap();
-    tokio::time::sleep(Duration::from_millis(100)).await;
     assert_ne!(
         model_runs(&s.core).last().map(|r| r.status),
         Some(JobRunStatus::Running),

@@ -32,7 +32,6 @@ async function ready(seed?: (w: FakeCore["world"]) => void) {
   await loadSettings(bridge);
 }
 const stored = () => bridge.store.getState().whole.settings!;
-const settle = () => new Promise((r) => setTimeout(r));
 type Tree = ReturnType<typeof rendered>;
 /** The handler of the control that has this label (or aria-label) and a handler under `prop`. */
 const on = (tree: Tree, label: string, prop = "onAction") => find(tree, (p) => (p.label === label || p.ariaLabel === label) && typeof p[prop] === "function").props[prop] as (v?: unknown) => void;
@@ -53,8 +52,7 @@ describe("General", () => {
     on(tree, "Ranking")("due_then_owed_to_you");
     on(tree, "Open System Settings…")();
     on(tree, "Run Setup Again…")();
-    await settle();
-    expect(stored().general.summary_language).toBe("ru");
+    await vi.waitFor(() => expect(stored().general.summary_language).toBe("ru"));
     expect(stored().today.horizon).toBe("today");
     expect(stored().today.ranking).toBe("due_then_owed_to_you");
     expect(seen).toEqual(expect.arrayContaining(["open_external", "window_navigate"]));
@@ -77,8 +75,7 @@ describe("General", () => {
   it("offer to record saves once the self-test passed", async () => {
     await ready((w) => (w.app.setup.self_test = { type: "passed", at: 1 }));
     on(rendered(GeneralPane, { bridge, settings: stored() }), "Offer to record when a call starts")(false);
-    await settle();
-    expect(stored().general.offer_to_record).toBe(false);
+    await vi.waitFor(() => expect(stored().general.offer_to_record).toBe(false));
   });
 });
 
@@ -92,8 +89,7 @@ describe("Audio", () => {
     (mic.onAllow as () => void)();
     (mic.onOpenSettings as () => void)();
     (find(tree, (p) => p.id === "sys" && typeof p.onOpenSettings === "function").props.onOpenSettings as () => void)();
-    await settle();
-    expect(stored().audio.offline_backend).toBe("whisper_large_v3");
+    await vi.waitFor(() => expect(stored().audio.offline_backend).toBe("whisper_large_v3"));
     expect(seen.filter((c) => c === "open_external")).toHaveLength(2);
     expect(seen).toContain("permission_request");
     expect(on(tree, "Run Audio Self-Test…")).toBeTypeOf("function");
@@ -123,8 +119,7 @@ describe("Call screen", () => {
     await ready();
     const seen = calls();
     (find(rendered(CallScreenPane, { bridge, settings: stored() }), (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
-    await settle();
-    expect(seen).toContain("setup_set_call_display");
+    await vi.waitFor(() => expect(seen).toContain("setup_set_call_display"));
   });
 
   it("shows a refused display change and a refused Run Setup command", async () => {
@@ -132,12 +127,10 @@ describe("Call screen", () => {
     fake.failNext("setup_set_call_display", "offline");
     const tree = rendered(CallScreenPane, { bridge, settings: stored() });
     (find(tree, (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
-    await settle();
-    expect(renderToString(<CallScreenPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change");
+    await vi.waitFor(() => expect(renderToString(<CallScreenPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change"));
     fake.failNext("window_navigate", "offline");
     on(rendered(GeneralPane, { bridge, settings: stored() }), "Run Setup Again…")();
-    await settle();
-    expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change");
+    await vi.waitFor(() => expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change"));
   });
 });
 
@@ -149,8 +142,7 @@ describe("Privacy", () => {
     const cal = find(tree, (p) => p.id === "cal").props;
     (cal.onAllow as () => void)();
     (cal.onOpenSettings as () => void)();
-    await settle();
-    expect(seen).toEqual(expect.arrayContaining(["permission_request", "open_external"]));
+    await vi.waitFor(() => expect(seen).toEqual(expect.arrayContaining(["permission_request", "open_external"])));
     expect(seen).not.toContain("window_navigate"); // the voice-profiles button is disabled until Person Pages land
   });
 });
@@ -170,8 +162,7 @@ describe("Hotkeys, Performance, Updates, Models", () => {
     near(80);
     const over = find(tree, (p) => p.label === "Over" && typeof p.onCommit === "function").props.onCommit as (n: number) => void;
     over(120);
-    await settle();
-    expect(stored().performance.near_pct).toBe(80);
+    await vi.waitFor(() => expect(stored().performance.near_pct).toBe(80));
     expect(stored().performance.over_pct).toBe(120);
   });
 
@@ -182,16 +173,14 @@ describe("Hotkeys, Performance, Updates, Models", () => {
     const banner = find(tree, (p) => p.banner !== undefined).props.banner as { actions: { onAction: () => void }[] };
     banner.actions[0]!.onAction();
     on(tree, "Check Now")();
-    await settle();
-    expect(seen).toEqual(expect.arrayContaining(["update_install", "app_snapshot"]));
+    await vi.waitFor(() => expect(seen).toEqual(expect.arrayContaining(["update_install", "app_snapshot"])));
   });
 
   it("a pending model offers Download and runs models_download", async () => {
     await ready((w) => (w.app.setup.models.bundles[0]!.state = "pending"));
     const seen = calls();
     on(rendered(ModelsGroup, { bridge }), "Download")();
-    await settle();
-    expect(seen).toContain("models_download");
+    await vi.waitFor(() => expect(seen).toContain("models_download"));
     expect(renderToString(<ModelsGroup bridge={bridge} />)).toContain("Download");
   });
 });
@@ -223,8 +212,7 @@ describe("glossary commands", () => {
     const retryTree = rendered(GlossaryGroup, { bridge });
     expect(renderToString(retryTree)).toContain("Couldn’t read the glossary.");
     (find(retryTree, (p) => p.label === "Try Again").props.onAction as () => void)();
-    await settle();
-    expect(bridge.store.getState().commands["glossary:list"]?.state).toBe("DONE");
+    await vi.waitFor(() => expect(bridge.store.getState().commands["glossary:list"]?.state).toBe("DONE"));
 
     const save = vi.fn();
     const cancel = vi.fn();
@@ -247,8 +235,7 @@ describe("share test sheet", () => {
     const tree = rendered(ShareTestFailure, { failedCapture: false, onCaptureRetry: captureRetry, onReadRetry: readRetry });
     expect(renderToString(tree)).toContain("Couldn’t load the Screen Share Test.");
     (find(tree, (p) => p.label === "Try Again").props.onAction as () => void)();
-    await settle();
-    expect(readRetry).toHaveBeenCalledWith(false);
+    await vi.waitFor(() => expect(readRetry).toHaveBeenCalledWith(false));
     expect(captureRetry).not.toHaveBeenCalled();
   });
 });
@@ -355,9 +342,8 @@ describe("share test sheet actions", () => {
     await a.run(false);
     expect(s.results).toHaveLength(1);
     a.start();
-    await settle();
-    expect(s.events).toContainEqual({ type: "run", screenRecording: "granted" });
-    expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) });
+    await vi.waitFor(() => expect(s.events[0]).toEqual({ type: "run", screenRecording: "granted" }));
+    await vi.waitFor(() => expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) }));
   });
 
   it("asks first without it, and runs once Continue is granted", async () => {
@@ -366,9 +352,8 @@ describe("share test sheet actions", () => {
     a.start();
     expect(s.events).toEqual([{ type: "run", screenRecording: "not_asked" }]);
     await a.answer();
-    await settle();
-    expect(s.events).toContainEqual({ type: "answered", granted: true });
-    expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) });
+    await vi.waitFor(() => expect(s.events).toContainEqual({ type: "answered", granted: true }));
+    await vi.waitFor(() => expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) }));
   });
 
   it("does not run when Continue is refused", async () => {

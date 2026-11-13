@@ -131,10 +131,13 @@ impl RangeFetcher {
     /// dev-dependency only: never in the app).
     #[cfg(any(test, feature = "local-tests"))]
     pub fn for_local_tests() -> Self {
-        Self::with_allow(
-            |u| u.host_str() == Some("127.0.0.1"),
-            Duration::from_millis(500),
-        )
+        Self::for_local_tests_with_stall(Duration::from_secs(30))
+    }
+
+    /// Local server fetcher with an explicit inactivity deadline for stall tests.
+    #[cfg(any(test, feature = "local-tests"))]
+    pub fn for_local_tests_with_stall(stall: Duration) -> Self {
+        Self::with_allow(|u| u.host_str() == Some("127.0.0.1"), stall)
     }
 
     /// `stall`: how long a connection may send nothing before the fetch ends offline.

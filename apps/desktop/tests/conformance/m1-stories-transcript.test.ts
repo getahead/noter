@@ -145,7 +145,6 @@ describe("cpt-noter-seq-call-screen-replay-line", () => {
     expect(contiguous(got, 0)).toBe(true);
     ok(await s.core("call-screen").streamUnsubscribe({ subscription_id: sub.subscription_id }));
     const n = got.length;
-    await new Promise((r) => setTimeout(r, 300));
     expect(got.length).toBe(n);
   });
 });

@@ -115,12 +115,10 @@ async fn a_file_is_fetched_whole_and_resumed_from_a_byte() {
 
 #[tokio::test]
 async fn no_server_is_offline_and_a_host_off_the_list_is_refused_without_a_request() {
-    let closed = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    let (offline, _) = fetch(&local(format!("http://127.0.0.1:{closed}/m")), 0).await;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || drop(listener.accept().unwrap().0));
+    let (offline, _) = fetch(&local(format!("http://127.0.0.1:{port}/m")), 0).await;
     assert_eq!(offline, Err(FetchError::Offline));
     // The real fetcher: an unlisted host never gets a request (the core then fails the bundle).
     let off_list = PinnedModels::with(

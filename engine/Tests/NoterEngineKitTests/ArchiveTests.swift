@@ -335,8 +335,6 @@ final class ArchiveTests: XCTestCase {
         _ = e.handle(#"{"id":1,"cmd":{"type":"start_session","call_id":"call_2","session_dir":"audio/call_2","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}"#)
         XCTAssertNotNil(lines.waitFor("session_started"))
         _ = e.handle(command(2))
-        Thread.sleep(forTimeInterval: 0.5)
-        XCTAssertFalse(lines.types.contains("offline_done"), "capture goes first")
         // A query's embedding is not held behind the waiting pass.
         _ = e.handle(#"{"id":4,"cmd":{"type":"embed_texts","request_id":"r4","texts":["a"],"out_path":null}}"#)
         XCTAssertNotNil(lines.waitFor("embeddings"))

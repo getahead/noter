@@ -44,8 +44,22 @@ async fn open(dir: &std::path::Path) -> Arc<Core> {
         .with_engine(Arc::new(ScriptedEngine::new().with_container(dir)));
     let core = Arc::new(Core::open(dir, deps).unwrap());
     core.start_first_run();
-    tokio::time::sleep(Duration::from_millis(10)).await;
     core
+}
+
+async fn wait_for_rebuild(core: &Core) {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if core.scheduler().runs().unwrap().iter().any(|run| {
+                run.kind == JobKind::IndexRebuild && run.status == JobRunStatus::Succeeded
+            }) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the index rebuild finishes");
 }
 
 fn ins(table: &'static str, values: Vec<(&'static str, Value)>) -> Insert {
@@ -253,17 +267,15 @@ async fn a_library_without_vectors_is_rebuilt_at_start() {
     drop(core);
     // The item has no vector yet: the next start is keyword-only until the rebuild ends.
     let core = open(dir.path()).await;
-    let mut mode = SearchMode::KeywordOnly {
-        rebuild_progress: 0.0,
-    };
-    for _ in 0..200 {
-        let args = search_args("websockets", CallFilter::default(), None);
-        mode = core.search(&main_window(), args).await.unwrap().mode;
-        if mode == SearchMode::Hybrid {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    wait_for_rebuild(&core).await;
+    let mode = core
+        .search(
+            &main_window(),
+            search_args("websockets", CallFilter::default(), None),
+        )
+        .await
+        .unwrap()
+        .mode;
     assert_eq!(mode, SearchMode::Hybrid);
     let vectors: i64 = core
         .store()
@@ -294,7 +306,6 @@ async fn a_failed_query_embedding_reports_keyword_only() {
         CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents)).with_engine(Arc::new(engine));
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
-    tokio::time::sleep(Duration::from_millis(10)).await;
     seed(&core);
     let r = core
         .search(

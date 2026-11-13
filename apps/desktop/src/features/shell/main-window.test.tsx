@@ -39,7 +39,10 @@ afterEach(async () => {
   effects.length = 0;
   refs.length = 0;
   vi.unstubAllGlobals();
+  unregisterPeople?.();
+  unregisterPeople = null;
 });
+let unregisterPeople: (() => void) | null = null;
 
 async function open(mutate: (w: World["app"]) => void = () => {}, label: "main" | "settings" = "main") {
   const fake = new FakeCore({ window: label });
@@ -215,7 +218,7 @@ describe("pages", () => {
   it("falls back to an empty state naming the section, and lets a later feature register its page", () => {
     expect(pageFor("people").title({ section: "people", key: "root" })).toBe("People");
     expect(renderToString(<>{pageFor("people").render({ section: "people", key: "root" })}</>)).toContain("People is not built yet");
-    registerPage("people", { title: () => "People!", render: () => <p>real</p> });
+    unregisterPeople = registerPage("people", { title: () => "People!", render: () => <p>real</p> });
     expect(pageFor("people").title({ section: "people", key: "root" })).toBe("People!");
   });
 });

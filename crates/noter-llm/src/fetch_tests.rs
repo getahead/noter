@@ -97,6 +97,27 @@ async fn get(port: u16, path: &str, from: u64) -> (Result<(), FetchError>, Vec<u
     (r, got)
 }
 
+async fn get_with_stall(
+    port: u16,
+    path: &str,
+    from: u64,
+    stall: Duration,
+) -> (Result<(), FetchError>, Vec<u8>) {
+    let fetcher = RangeFetcher::for_local_tests_with_stall(stall);
+    let mut got = Vec::new();
+    let result = fetcher
+        .fetch(
+            &format!("http://127.0.0.1:{port}{path}"),
+            from,
+            &mut |bytes| {
+                got.extend_from_slice(bytes);
+                true
+            },
+        )
+        .await;
+    (result, got)
+}
+
 #[tokio::test]
 async fn fetches_the_whole_file_and_resumes_from_a_byte() {
     let port = server(BODY);
@@ -129,12 +150,10 @@ async fn http_errors_offline_and_an_already_complete_file() {
     assert_eq!(get(port, "/missing", 0).await.0, Err(FetchError::Http(404)));
     assert_eq!(get(port, "/done", 36).await, (Ok(()), vec![]));
     // Nothing listens on this port any more.
-    let closed = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    assert_eq!(get(closed, "/file", 0).await.0, Err(FetchError::Offline));
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    thread::spawn(move || drop(listener.accept().unwrap().0));
+    assert_eq!(get(port, "/file", 0).await.0, Err(FetchError::Offline));
 }
 
 #[tokio::test]
@@ -214,7 +233,7 @@ async fn a_206_from_an_earlier_byte_is_skipped_to_the_asked_one_and_a_later_one_
 #[tokio::test]
 async fn a_transfer_that_stalls_mid_body_ends_offline() {
     let port = server(BODY);
-    let (r, got) = get(port, "/stall", 0).await;
+    let (r, got) = get_with_stall(port, "/stall", 0, Duration::from_millis(500)).await;
     assert_eq!((r, got), (Err(FetchError::Offline), BODY[..5].to_vec()));
 }
 

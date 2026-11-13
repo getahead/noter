@@ -569,7 +569,7 @@ async fn a_recheck_that_still_hears_nothing_keeps_the_row_denied_and_says_so() {
     p.run.core.app_activated();
     until_probes(&p, 1).await;
     p.run.core.app_activated();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!noter_core::testing::system_audio_probing(&p.run.core));
     assert_eq!(probes(&p.run.engine), 1, "once per activation");
     assert_eq!(
         system_audio_row(&status(&p.run).await),
@@ -605,7 +605,7 @@ async fn no_recheck_unless_first_run_shows_system_audio_denied() {
     let dir = tempfile::tempdir().unwrap();
     let p = open_probing(dir.path(), ScriptedEngine::new());
     p.run.core.app_activated();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!noter_core::testing::system_audio_probing(&p.run.core));
     assert_eq!(probes(&p.run.engine), 0, "not asked yet");
 
     denied_by_a_self_test(&p).await;
@@ -631,7 +631,7 @@ async fn no_recheck_unless_first_run_shows_system_audio_denied() {
     }
     assert!(status(&p.run).await.complete);
     p.run.core.app_activated();
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!noter_core::testing::system_audio_probing(&p.run.core));
     assert_eq!(probes(&p.run.engine), 0, "setup complete");
 }
 

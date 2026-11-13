@@ -56,8 +56,10 @@ const pages = new Map<SectionKey, Registered[]>();
 
 // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
 /** Later features register their page for a section, or for the routes of it `when` accepts; the last registration wins. */
-export function registerPage(section: SectionKey, def: PageDef, when?: (route: Route) => boolean): void {
-  pages.set(section, [...(pages.get(section) ?? []).filter((r) => r.when !== when), { def, when }]);
+export function registerPage(section: SectionKey, def: PageDef, when?: (route: Route) => boolean): () => void {
+  const registration = { def, when };
+  pages.set(section, [...(pages.get(section) ?? []).filter((r) => r.when !== when), registration]);
+  return () => pages.set(section, (pages.get(section) ?? []).filter((r) => r !== registration));
 }
 
 /** A section whose feature has not landed: an empty state naming it, never a blank area. */

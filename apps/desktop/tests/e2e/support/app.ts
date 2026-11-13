@@ -13,7 +13,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import fixture from "../../../../../contracts/fixtures/world.json" with { type: "json" };
 import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type HotkeyAction, type WindowLabel } from "../../../src/core/bindings";
 import type { ChannelBody } from "../../../src/core/fake/fake-core";
-import type { World } from "../../support/scenario";
+import type { EngineFact, World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
 
 export interface CorePlan {
@@ -44,6 +44,9 @@ export interface Steer {
   releaseDownload(): Promise<void>;
   /** Hold the next self-test script for manually injected events. */
   holdNextSelfTest(): Promise<void>;
+  captureStart(): Promise<{ call_id: string }>;
+  captureStop(callId: string): Promise<void>;
+  engineFact(event: EngineFact): Promise<boolean>;
 }
 
 export interface Call {
@@ -170,6 +173,9 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     push: async (cmd, body) => void (await control("harness.push", { cmd, body })),
     releaseDownload: async () => void (await control("harness.release_download", {})),
     holdNextSelfTest: async () => void (await control("harness.hold_next_self_test", {})),
+    captureStart: async () => (await control("capture_start", { source: "menu_bar", sensitive: false })) as { call_id: string },
+    captureStop: async (call_id) => void (await control("capture_stop", { call_id })),
+    engineFact: async (event) => Boolean((await control("harness.engine_fact", { event }) as { delivered: boolean }).delivered),
   };
   if (plan.world) await steer.change(plan.world);
   if (plan.corruptNextDownload) await control("harness.corrupt_next_download", {});
@@ -220,6 +226,9 @@ function fakeSteer(page: Page): Steer {
     push: (cmd, body) => page.evaluate(([c, b]) => void (globalThis as unknown as PageFake).__noterFake.push(c, b), [cmd, body] as const),
     releaseDownload: async () => {},
     holdNextSelfTest: () => page.evaluate(() => { (globalThis as unknown as PageFake).__noterFake.holdSelfTest = true; }),
+    captureStart: async () => { throw new Error("the fake core does not start native capture in E2E steering"); },
+    captureStop: async () => {},
+    engineFact: async () => false,
   };
 }
 

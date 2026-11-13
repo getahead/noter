@@ -156,8 +156,7 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     const on = (label: string) => find(tree, (p) => p.label === label && typeof p.onAction === "function").props.onAction as () => void;
     on("Not Now")();
     on("Install Ollama…")();
-    await new Promise((r) => setTimeout(r, 5));
-    expect(seen).toContain("cli_install");
+    await vi.waitFor(() => expect(seen).toContain("cli_install"));
   });
 
   it("shows a refused local runtime install", async () => {

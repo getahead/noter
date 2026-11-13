@@ -365,7 +365,8 @@ final class EngineASRTests: XCTestCase {
         func selfTest() throws -> [[String: Any]] {
             lines = Lines()
             _ = e.handle(#"{"id":1,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":3000}}"#)
-            Thread.sleep(forTimeInterval: 0.2)
+            source.push(ms: 300)
+            XCTAssertNotNil(lines.waitFor("levels"), "the capture loop is running")
             for _ in 0..<20 { source.push(mic: speech(), sys: speech()) }
             _ = try XCTUnwrap(lines.waitFor("self_test_result"))
             return lines.events.filter { $0["type"] as? String == "self_test_line" }

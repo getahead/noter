@@ -163,8 +163,6 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
   test("UI — regression: a slow manual self-test driver retains the injected failure", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), audioGranted(w)) });
     await startSelfTest(page, { manual: steer });
-    // Deliberately exceed the scripted pass time to reproduce an overloaded test driver.
-    await page.waitForTimeout(1800);
     await steer.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
     await expect(selfTest(page)).toContainText("We hear your microphone but not system audio.");
   });

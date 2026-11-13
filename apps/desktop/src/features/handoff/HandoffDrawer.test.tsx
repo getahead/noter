@@ -152,7 +152,8 @@ describe("HandoffDrawer (cpt-noter-component-ui-handoff-drawer)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("opening fills the inspector override and closing returns focus to the row's Handoff button", () => {
+  it("opening fills the inspector override and closing returns focus to the row's Handoff button", async () => {
+    await ready();
     const focus = vi.fn();
     vi.stubGlobal("document", { getElementById: (id: string) => (id === handoffButtonId(ID) ? { focus } : null) });
     slots.openHandoff!(bridge, ID);

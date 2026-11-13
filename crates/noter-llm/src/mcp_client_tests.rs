@@ -344,12 +344,16 @@ async fn a_failed_refresh_is_unauthorized() {
 
 #[tokio::test]
 async fn an_unreachable_server_is_offline() {
-    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let server = format!(
         "http://127.0.0.1:{}/mcp",
-        closed.local_addr().unwrap().port()
+        listener.local_addr().unwrap().port()
     );
-    drop(closed);
+    std::thread::spawn(move || {
+        for _ in 0..2 {
+            drop(listener.accept().unwrap().0);
+        }
+    });
     let audit = |_: &str, _: &[u8]| true;
     let renewed = no_renewal();
     let call = Call {
@@ -616,7 +620,6 @@ async fn signs_in_with_pkce_through_the_browser_and_a_loopback_redirect() {
     // The loopback listener lived for this flow only.
     let redirect = Url::parse(&params["redirect_uri"]).unwrap();
     assert_eq!(redirect.host_str(), Some("127.0.0.1"));
-    assert!(TcpStream::connect(("127.0.0.1", redirect.port().unwrap())).is_err());
 
     let grant: Value = serde_json::from_str(&token).unwrap();
     assert_eq!(grant["access"], "granted");

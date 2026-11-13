@@ -29,7 +29,6 @@ async function ready(seed?: (w: FakeCore["world"]) => void) {
 }
 const accounts = () => bridge.store.getState().whole.accounts!;
 const keyOf = (provider: "anthropic" | "codex") => accounts().keys.find((k) => k.provider === provider)!;
-const settle = () => new Promise((r) => setTimeout(r, 5));
 type Tree = ReturnType<typeof rendered>;
 const on = (tree: Tree, label: string, prop = "onAction") => find(tree, (p) => (p.label === label || p.ariaLabel === label) && typeof p[prop] === "function").props[prop] as (v?: unknown) => unknown;
 const sentCommands = () => {
@@ -95,8 +94,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
     const props = await ready();
     const seen = sentCommands();
     on(rendered(ModelsRuntimesPane, props), "Post-call analysis")("local");
-    await settle();
-    expect(seen).toContain("settings_update");
+    await vi.waitFor(() => expect(seen).toContain("settings_update"));
     expect(bridge.store.getState().whole.settings!.runtimes.post_call).toBe("local");
   });
 
@@ -107,8 +105,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
     });
     const seen = sentCommands();
     on(rendered(ModelsRuntimesPane, props), "Install Ollama…")();
-    await settle();
-    expect(seen).toContain("cli_install");
+    await vi.waitFor(() => expect(seen).toContain("cli_install"));
   });
 });
 

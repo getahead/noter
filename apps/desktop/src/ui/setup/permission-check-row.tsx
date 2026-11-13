@@ -65,12 +65,14 @@ export function PermissionCheckRow({ id, label, allowLabel, state, variant = "se
         </div>
         {variant !== "status" && why && <div className="fr-perm__why">{why}</div>}
         {variant !== "status" && howto && state !== "GRANTED" && <div className="fr-perm__how">{howto}</div>}
-        {variant !== "status" && hearing && (
+        {variant !== "status" && (hearing || id === "mic") && (
           <span className="fr-perm__meter">
-            <LevelMeter level={hearing.level} label={t("permission.mic_level")} />
-            <span className="fr-perm__hear">
-              <Msg id="permission.hearing" />
-            </span>
+            {hearing ? (
+              <>
+                <LevelMeter level={hearing.level} label={t("permission.mic_level")} />
+                <span className="fr-perm__hear"><Msg id="permission.hearing" /></span>
+              </>
+            ) : <span aria-hidden="true" />}
           </span>
         )}
       </div>

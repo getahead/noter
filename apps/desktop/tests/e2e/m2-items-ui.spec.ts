@@ -328,21 +328,31 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
 
   test("UI — the evidence highlight expires after 3 s even while store events keep arriving", async ({ page }) => {
     const steer = await openCall(page, suggest());
+    const real = process.env.NOTER_CORE === "stdio";
+    await page.clock.install();
+    const liveCall = real ? (await steer.captureStart()).call_id : null;
+    if (liveCall) {
+      await expect.poll(() => steer.engineFact({ type: "levels", call_id: liveCall, mic_db: -30, sys_db: -30 })).toBe(true);
+    }
     await button(rowOf(page, DECISION), TIME).click();
     const lit = page.locator('[data-component="cpt-noter-component-ui-transcript-segment-row"].np-hl-evidence');
     await expect(lit.first()).toBeVisible();
     const spans = (await sent(page, "transcript_span")).length;
-    // each event re-renders the main window; the span prop must not restart the timer. The real core refuses to
-    // change world state from a test (harness.world_set), so there the highlight is checked without events.
-    const real = process.env.NOTER_CORE === "stdio";
+    // Update the fake world or drive live engine events; both make the visible app state change
+    // while the evidence highlight's original timer keeps running.
     const busy = (async () => {
-      for (let i = 0; i < 12 && !real; i++) {
-        await steer.change((w) => (w.app.setup.detection_enabled = i % 2 === 0));
-        await page.waitForTimeout(400);
+      for (let i = 0; i < 12; i++) {
+        if (liveCall) {
+          expect(await steer.engineFact({ type: "levels", call_id: liveCall, mic_db: -30 + (i % 2), sys_db: -30 })).toBe(true);
+        } else {
+          await steer.change((w) => (w.app.setup.detection_enabled = i % 2 === 0));
+        }
+        await page.clock.runFor(400);
       }
     })();
     await expect(lit).toHaveCount(0, { timeout: 4_500 });
     await busy;
+    if (liveCall) await steer.captureStop(liveCall);
     expect((await sent(page, "transcript_span")).length).toBe(spans); // no new read for the same span
   });
 

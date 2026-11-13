@@ -71,10 +71,11 @@ describe("Tooltip wiring", () => {
     expect(own).toHaveBeenCalledTimes(7);
   });
 
-  it("uses the real timers by default", async () => {
+  it("shows the help tag after the hover delay", async () => {
+    vi.useFakeTimers();
     const show = vi.fn();
     helpTag(show).hover();
-    await new Promise((r) => setTimeout(r, HELP_TAG_MS + 20));
+    await vi.advanceTimersByTimeAsync(HELP_TAG_MS);
     expect(show).toHaveBeenCalledWith(true);
   });
 });

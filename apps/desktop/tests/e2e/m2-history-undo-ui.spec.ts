@@ -86,7 +86,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
 
   test("UI — Other — Return while the export runs does not start a second one", async ({ page }) => {
     const real = process.env.NOTER_CORE === "stdio"; // only the fake can park one command; the real core answers after a latency
-    await openCall(page, "history", real ? { latency: 500 } : {});
+    await openCall(page, "history", real ? { latency: 5_000 } : {});
     const release = real ? undefined : await hold(page, "history_export");
     await page.getByRole("button", { name: "Export Log…" }).click();
     const sheet = page.getByRole("dialog", { name: /Export Log/ });

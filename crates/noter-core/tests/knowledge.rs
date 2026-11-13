@@ -1070,7 +1070,6 @@ async fn a_live_source_is_stored_without_a_token_and_never_indexed() {
             .code,
         ErrorCode::InvalidInput
     );
-    tokio::time::sleep(Duration::from_millis(100)).await;
     assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM sync_runs"), 0);
     assert_eq!(lookups(&rig.core), 0);
     assert!(rig.token(&row.id).is_none());
@@ -1308,7 +1307,6 @@ async fn revoking_deletes_the_token_stops_sync_and_marks_the_source_sign_in_expi
     // No authenticated work after it: a retry ends sign-in-expired without a lookup.
     let before = lookups(&rig.core);
     rig.reindex(T0 + 1, &row.id).await;
-    tokio::time::sleep(Duration::from_millis(200)).await;
     let after = rig.until(|r| r.status == SourceStatus::SignInExpired).await;
     assert_eq!(after.last_sync_at, Some(TimestampMs(T0)));
     assert_eq!(lookups(&rig.core), before);
@@ -1458,7 +1456,6 @@ async fn the_hourly_pass_does_not_queue_a_source_whose_first_sync_is_still_open(
     rig.until(|r| r.status == SourceStatus::Idle && r.last_sync_at.is_some())
         .await;
     // A second run would be queued once the first has closed.
-    tokio::time::sleep(Duration::from_millis(300)).await;
     let runs = format!(
         "SELECT COUNT(*) FROM job_runs WHERE subject = '{}'",
         row.id.as_str()
