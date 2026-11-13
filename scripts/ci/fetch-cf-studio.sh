@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fetch the Constructor Studio core pinned in .cf-studio/version.toml into
-# .cf-studio/.core (gitignored locally, so CI has to fetch it).
+# .cf-studio/.core, preferring the temporary vendored archive for offline CI.
 set -euo pipefail
 if [ -f .cf-studio/.core/skills/studio/scripts/studio.py ]; then exit 0; fi
 ver=$(python3 -c 'import tomllib; print(tomllib.load(open(".cf-studio/version.toml","rb"))["cfs"]["version"])')
@@ -15,7 +15,10 @@ else
   url="https://github.com/${repo}/archive/refs/tags/${ver}.tar.gz"
   get() { curl -fsSL "$url" -o "$tmp/cfs.tgz"; }
 fi
-if ! get; then
+vendor=".cf-studio/vendor/constructor-studio-${ver}.tar.gz"
+if [ -f "$vendor" ]; then
+  cp "$vendor" "$tmp/cfs.tgz"
+elif ! get; then
   echo "::error::Could not download Constructor Studio ${ver} from github.com/${repo}. If the repository is private, add a CF_STUDIO_TOKEN secret; or commit .cf-studio/.core."
   exit 1
 fi
