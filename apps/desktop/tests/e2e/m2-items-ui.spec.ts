@@ -75,6 +75,44 @@ async function openCall(page: Page, world: (w: World) => void, tab: "summary" | 
 }
 
 test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
+  test("UI — repeated checkbox clicks and Space wait for completion before an untick", async ({ page }) => {
+    await openCall(page, three);
+    await page.evaluate(() => {
+      type Host = { invoke(cmd: string, ...args: unknown[]): Promise<unknown> };
+      const g = globalThis as unknown as { __noterFake?: Host; __TAURI_INTERNALS__?: Host; releaseCompletion?: () => void; completionAttempts: number };
+      const host = g.__noterFake ?? g.__TAURI_INTERNALS__!;
+      const invoke = host.invoke.bind(host);
+      g.completionAttempts = 0;
+      host.invoke = async (cmd, ...args) => {
+        if (cmd === "item_set_done") {
+          g.completionAttempts++;
+          await new Promise<void>((resolve) => { g.releaseCompletion = resolve; });
+          host.invoke = invoke;
+        }
+        return invoke(cmd, ...args);
+      };
+    });
+    const row = byId(page, "itm_a0");
+    const box = row.getByRole("checkbox");
+    await row.locator(".np-check").dblclick();
+    await expect(box).toBeDisabled();
+    await page.keyboard.press("Space");
+    expect(await page.evaluate(() => (globalThis as unknown as { completionAttempts: number }).completionAttempts)).toBe(1);
+    await expect(row.getByText("Accepted and done", { exact: true })).toHaveCount(0);
+    await page.evaluate(() => (globalThis as unknown as { releaseCompletion: () => void }).releaseCompletion());
+    await expect(row.getByText("Accepted and done", { exact: true })).toBeVisible();
+    await expect(box).toBeEnabled();
+    await expect(box).toBeChecked();
+    await row.locator(".np-check").click();
+    await expect(box).not.toBeChecked();
+    await expect(row.getByRole("alert")).toHaveCount(0);
+    const mutations = await sent(page, "item_set_done");
+    expect(mutations).toHaveLength(2);
+    expect(mutations[0]).toMatchObject({ item_id: "itm_a0", done: true });
+    expect(mutations[1]).toMatchObject({ item_id: "itm_a0", done: false });
+    expect(Number(mutations[1]!.rev)).toBeGreaterThan(Number(mutations[0]!.rev));
+  });
+
   test("UI — happy path: the banner counts the suggested items, Start Review focuses the first one, A accepts it and moves on", async ({ page }) => {
     await openCall(page, three);
     await expect(banner(page)).toContainText("3 suggested items to review before sharing");
