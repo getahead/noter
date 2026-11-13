@@ -179,6 +179,51 @@ fn an_ack_never_moves_back() {
     assert!(!hub.ack(&id, Seq(3000)), "an ended subscription is gone");
 }
 
+// cpt-noter-algo-core-ipc-host-ack: future acks cannot break publishing or bypass lag detection.
+#[tokio::test]
+async fn a_future_ack_is_bounded_by_its_streams_current_seq() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = core(dir.path());
+    let hub = core.stream_hub::<TestMsg>(None);
+    let main = from(WindowLabel::Main);
+    // A different stream's higher sequence must not affect the bound.
+    for n in 0..100 {
+        hub.publish("other", value(n));
+    }
+    for initial in [0, 10] {
+        for future in [5000, u64::MAX] {
+            let key = format!("call_{initial}_{future}");
+            for n in 0..initial {
+                hub.publish(&key, value(n));
+            }
+            let w = Window::default();
+            let sub = hub.subscribe(&key, MAIN, w.sink(), || Ok(())).unwrap();
+            assert_eq!(sub.last_seq, Seq(initial.into()));
+            assert_eq!(
+                core.stream_ack(
+                    &main,
+                    StreamAckArgs {
+                        subscription_id: sub.subscription_id.clone(),
+                        seq: Seq(future),
+                    },
+                )
+                .await
+                .unwrap(),
+                Ack {}
+            );
+            for n in 1..LAG_LIMIT {
+                assert_eq!(hub.publish(&key, value(0)), Seq(u64::from(initial) + n));
+            }
+            assert_eq!(w.ended(), None, "future ack must not end the stream early");
+            assert_eq!(w.seqs().len(), (LAG_LIMIT - 1) as usize);
+            hub.publish(&key, value(0));
+            assert_eq!(w.ended(), Some(StreamEndReason::Lagged));
+            assert!(!hub.ack(&sub.subscription_id, Seq(future)));
+        }
+    }
+    core.shutdown().await;
+}
+
 #[test]
 fn unsubscribe_ends_one_subscription() {
     let (hub, _) = hub(None);

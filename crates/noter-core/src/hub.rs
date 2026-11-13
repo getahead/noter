@@ -236,12 +236,17 @@ impl<M: StreamMsg> StreamHub<M> {
     /// `stream_ack`: false when no live subscription has this id.
     pub fn ack(&self, id: &SubscriptionId, seq: Seq) -> bool {
         let mut streams = self.lock();
-        let sub = streams
-            .values_mut()
-            .flat_map(|s| s.subs.iter_mut())
-            .find(|s| &s.id == id);
         // @cpt-begin:cpt-noter-algo-core-ipc-host-ack:p1:inst-ack-update
-        sub.map(|sub| sub.acked = sub.acked.max(seq.0)).is_some()
+        let sub = streams.values_mut().find_map(|stream| {
+            let seq = seq.0.min(stream.seq);
+            stream
+                .subs
+                .iter_mut()
+                .find(|sub| &sub.id == id)
+                .map(|sub| (sub, seq))
+        });
+        sub.map(|(sub, seq)| sub.acked = sub.acked.max(seq))
+            .is_some()
         // @cpt-end:cpt-noter-algo-core-ipc-host-ack:p1:inst-ack-update
     }
 
