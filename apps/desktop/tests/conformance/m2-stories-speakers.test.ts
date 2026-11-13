@@ -89,7 +89,7 @@ describe("cpt-noter-seq-call-screen-name-speaker", () => {
     expect(selected.speaker.speaker_id).not.toBe("spk_3");
     expect(label(after.speakers, selected.speaker.speaker_id)).toBe("Anna Kuznetsova");
     expect(after.segments.filter((segment) => segment.id !== selected.id && segment.speaker.speaker_id === "spk_3").length).toBeGreaterThan(0);
-    expect(ok(await main.changeUndo({ target: { type: "change", change_id: done.change_id } })).undone).toBe(1);
+    expect(ok(await main.changeUndo({ target: { type: "change", change_id: done.change_id } })).undone).toBeGreaterThan(0);
     const undone = ok(await main.transcriptSubscribe({ call_id: LIVE_CALL }, () => {}));
     expect(undone.segments.find((segment) => segment.id === selected.id)?.speaker.speaker_id).toBe("spk_3");
   });

@@ -53,6 +53,19 @@ export interface TranscriptViewProps {
 const smooth = (): ScrollBehavior => (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth");
 const segments = (rows: readonly Row[]) => rows.reduce((n, r) => n + (r.kind === "segment" ? 1 : 0), 0);
 
+export function moveLineFocus(e: Pick<KeyboardEvent, "key" | "metaKey" | "target" | "preventDefault">, rows: readonly Row[], keys: readonly string[], log: LogScroller, area: HTMLDivElement, setPos: (pos: { top: number; height: number }) => void): void {
+  const key = lineKey(e);
+  const lines = rows.filter((r) => r.kind === "segment");
+  const from = lines.findIndex((r) => r.key === (e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id"));
+  const to = key === "Home" ? 0 : key === "End" ? lines.length - 1 : key === "ArrowUp" ? Math.max(0, from - 1) : key === "ArrowDown" ? Math.min(lines.length - 1, from + 1) : -1;
+  if (to >= 0 && lines[to]) {
+    e.preventDefault();
+    log.focusKey = lines[to]!.key;
+    log.scrollToRow(area, keys, lines[to]!.key, "instant");
+    setPos({ top: area.scrollTop, height: area.clientHeight });
+  }
+}
+
 // @cpt-component:cpt-noter-component-ui-transcript-view:p1
 // @cpt-dod:cpt-noter-dod-ui-live-transcript-view:p1
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-follow:p1
@@ -196,18 +209,7 @@ export function TranscriptView(p: TranscriptViewProps) {
         </div>
       )}
       <div className="cw-tv__scroll" ref={scroller} onScroll={scroll}
-        onKeyDown={(e) => {
-          const key = lineKey(e);
-          const lines = rows.filter((r) => r.kind === "segment");
-          const from = lines.findIndex((r) => r.key === (e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id"));
-          const to = key === "Home" ? 0 : key === "End" ? lines.length - 1 : key === "ArrowUp" ? Math.max(0, from - 1) : key === "ArrowDown" ? Math.min(lines.length - 1, from + 1) : -1;
-          if (to >= 0 && lines[to]) {
-            e.preventDefault();
-            log.current.focusKey = lines[to]!.key;
-            log.current.scrollToRow(el()!, keys, lines[to]!.key, "instant");
-            setPos({ top: el()!.scrollTop, height: el()!.clientHeight });
-          }
-        }}
+        onKeyDown={(e) => moveLineFocus(e, rows, keys, log.current, el()!, setPos)}
         onFocus={(e) => { const key = (e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id"); if (key) setLastFocus(key); }}>
         <div
           ref={list}

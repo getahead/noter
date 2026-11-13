@@ -87,6 +87,19 @@ export async function spanArchiveNote(bridge: Pick<Bridge, "core">, span: TimeSp
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-archive
 }
 
+export function evidenceSpanEffect(bridge: Pick<Bridge, "core">, span: TimeSpan | null | undefined, loaded: boolean, rows: readonly Row[], highlight: (keys: string[]) => void): () => void {
+  let current = true;
+  if (span && loaded) showSpan(bridge, span, rows, highlight, () => current);
+  return () => { current = false; };
+}
+
+export function spanArchiveEffect(bridge: Pick<Bridge, "core">, span: TimeSpan | null | undefined, set: (note: ArchiveNote | null) => void): () => void {
+  let current = true;
+  if (span) { set(null); void spanArchiveNote(bridge, span, set, () => current); }
+  else set(null);
+  return () => { current = false; };
+}
+
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-replay-line:p1
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-stored:p1
 /**
@@ -130,17 +143,8 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   const span = o.span;
   const loaded = !!data;
   const [archive, setArchive] = useState<ArchiveNote | null>(null);
-  useEffect(() => {
-    let current = true;
-    if (span && loaded) showSpan(bridge, span, rows, setHighlight, () => current);
-    return () => { current = false; };
-  }, [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
-  useEffect(() => {
-    let current = true;
-    if (span) { setArchive(null); void spanArchiveNote(bridge, span, setArchive, () => current); }
-    else setArchive(null);
-    return () => { current = false; };
-  }, [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => evidenceSpanEffect(bridge, span, loaded, rows, setHighlight), [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
+  useEffect(() => spanArchiveEffect(bridge, span, setArchive), [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => (highlight.length ? after(HIGHLIGHT_MS, () => setHighlight([])) : undefined), [highlight]);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
 

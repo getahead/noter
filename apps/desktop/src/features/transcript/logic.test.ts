@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CaptureState, PlaybackState } from "../../core/bindings";
 import { atEnd, holdFollow, LogScroller, measure, newLines, onScroll, viewState, windowOf } from "./follow";
-import { after, holdChannel, showSpan, spanArchiveNote } from "./hosts";
+import { after, evidenceSpanEffect, holdChannel, showSpan, spanArchiveEffect, spanArchiveNote } from "./hosts";
 import { buildRows, lineKey, tabStop } from "./model";
 import { barState, scrubRange, type Replay } from "./playback";
 import { capturing, playControl, REFUSED } from "./play-control";
@@ -194,6 +194,30 @@ describe("LogScroller (the view's scroll bookkeeping)", () => {
 });
 
 describe("host effects", () => {
+  it("cancels pending evidence effects when their span is replaced or removed", async () => {
+    const span = { call_id: "call_1", t0_ms: 0, t1_ms: 1000 };
+    let resolve!: (value: unknown) => void;
+    const pending = new Promise((r) => { resolve = r; });
+    const bridge = { core: { transcriptSpan: () => pending } } as never;
+    const highlight = vi.fn();
+    const stopHighlight = evidenceSpanEffect(bridge, span, true, [], highlight);
+    stopHighlight();
+    resolve({ status: "ok", data: { segments: [seg("old", 0)], archive_change: { before: "A", after: "B" } } });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(highlight).not.toHaveBeenCalled();
+
+    const set = vi.fn();
+    const stopArchive = spanArchiveEffect(bridge, span, set);
+    stopArchive();
+    const noSpan = spanArchiveEffect(bridge, null, set);
+    noSpan();
+    await Promise.resolve();
+    expect(set).toHaveBeenCalledTimes(2);
+    expect(set).toHaveBeenNthCalledWith(1, null);
+    expect(set).toHaveBeenNthCalledWith(2, null);
+  });
+
   afterEach(() => vi.useRealTimers());
   it("holds one Channel through StrictMode's second run and ends it a tick after unmount", () => {
     vi.useFakeTimers();
