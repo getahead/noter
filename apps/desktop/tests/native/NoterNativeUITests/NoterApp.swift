@@ -5,6 +5,18 @@
 // Story tests are named after the DESIGN story they prove (`cpt-noter-seq-…` with underscores, docs/HARNESS.md).
 import XCTest
 
+final class PermissionBundleTests: XCTestCase {
+    // @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1
+    func test_cpt_noter_seq_first_run_complete_setup__bundle_permission_descriptions() throws {
+        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["NOTER_APP_PATH"])
+        let bundle = try XCTUnwrap(Bundle(path: path), "the built Noter app bundle")
+        for key in ["NSMicrophoneUsageDescription", "NSCalendarsFullAccessUsageDescription"] {
+            let description = try XCTUnwrap(bundle.object(forInfoDictionaryKey: key) as? String, "missing \(key)")
+            XCTAssertFalse(description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "empty \(key)")
+        }
+    }
+}
+
 class NoterTestCase: XCTestCase {
     var app: XCUIApplication!
     /// The app a test brings to the front to prove Noter does not take focus; hotkeys are typed on it.

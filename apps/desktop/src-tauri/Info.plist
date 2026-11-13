@@ -3,6 +3,11 @@
 <!-- Merged into the bundle's Info.plist by Tauri. -->
 <plist version="1.0">
 <dict>
+    <!-- @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1 -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Noter records your microphone to transcribe your calls on this Mac.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Noter reads your calendar to show today's meetings and detect upcoming calls.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Noter opens a handoff prompt in Terminal or iTerm, pre-filled for you to review; it never runs the command.</string>
 </dict>
