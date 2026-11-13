@@ -165,7 +165,9 @@ fn a_core_that_did_not_boot_answers_internal() {
 }
 
 #[test]
-fn each_window_capability_allows_exactly_its_commands() {
+fn each_window_capability_allows_only_listening_dialogs_and_its_commands() {
+    // cpt-noter-algo-core-ipc-host-scope-check: a window cannot bypass command scope
+    // by emitting events that appear to come from the core.
     for w in WINDOWS {
         let path = format!("{}/capabilities/{}.json", env!("OUT_DIR"), w.as_str());
         let cap: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
@@ -174,17 +176,23 @@ fn each_window_capability_allows_exactly_its_commands() {
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|p| {
-                p.as_str()?
-                    .strip_prefix("allow-")
-                    .map(|n| n.replace('-', "_"))
-            })
+            .map(|p| p.as_str().unwrap().to_string())
             .collect();
-        let expected: BTreeSet<String> = COMMANDS
+        let mut expected: BTreeSet<String> = COMMANDS
             .iter()
             .filter(|c| c.allows(w))
-            .map(|c| c.name.to_string())
+            .map(|c| format!("allow-{}", c.name.replace('_', "-")))
             .collect();
+        expected.extend([
+            "core:event:allow-listen".to_string(),
+            "core:event:allow-unlisten".to_string(),
+        ]);
+        if matches!(
+            w,
+            WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
+        ) {
+            expected.insert("dialog:allow-message".to_string());
+        }
         assert_eq!(allowed, expected, "{}", w.as_str());
     }
 }
