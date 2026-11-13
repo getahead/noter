@@ -1,0 +1,288 @@
+"""
+Walk-Up Layer Discovery
+
+Discovers ``manifest.toml`` files at each layer boundary (kit, master repo, repo)
+by walking up the filesystem from the repo root.
+
+@cpt-algo:cpt-studio-algo-project-extensibility-walk-up-discovery:p1
+@cpt-dod:cpt-studio-dod-project-extensibility-walk-up-discovery:p1
+"""
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-imports
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import List, Optional
+
+from ._tomllib_compat import tomllib
+from .manifest import ManifestLayer, ManifestLayerState, parse_manifest_v2, _rewrite_component_paths
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-imports
+
+logger = logging.getLogger(__name__)
+
+_MANIFEST_TOML = "manifest.toml"
+
+
+def _resolve_registered_kit_path(
+    studio_root: Path,
+    trusted_root: Path,
+    kit_path_raw: object,
+) -> Optional[Path]:
+    """Resolve a kit registration path using adapter-first semantics."""
+    raw_path = Path(str(kit_path_raw))
+    if raw_path.is_absolute():
+        return raw_path.resolve()
+
+    kit_path = (studio_root / raw_path).resolve()
+    project_relative_path = (trusted_root / raw_path).resolve()
+    if not kit_path.is_dir() and project_relative_path.is_dir():
+        kit_path = project_relative_path
+    if not kit_path.is_relative_to(trusted_root):
+        logger.warning(
+            "Kit path '%s' resolves outside project root, skipping",
+            kit_path_raw,
+        )
+        return None
+    return kit_path
+
+
+def _load_manifest_layer(scope: str, manifest_path: Path) -> ManifestLayer:
+    """Load a manifest layer, preserving parse errors as layer state."""
+    try:
+        manifest = parse_manifest_v2(manifest_path)
+        return ManifestLayer(
+            scope=scope,
+            path=manifest_path,
+            manifest=manifest,
+            state=ManifestLayerState.LOADED,
+        )
+    except (ValueError, OSError) as exc:
+        logger.warning("Failed to parse manifest layer %s: %s", manifest_path, exc)
+        return ManifestLayer(
+            scope=scope,
+            path=manifest_path,
+            manifest=None,
+            state=ManifestLayerState.PARSE_ERROR,
+        )
+
+# ---------------------------------------------------------------------------
+# Boundary Detection
+# ---------------------------------------------------------------------------
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-is-boundary
+def _is_master_repo_boundary(dir_path: Path) -> bool:
+    """Return True if *dir_path* is a master repo boundary.
+
+    Detection criteria (either):
+    - ``CLAUDE.md`` file AND ``skills/`` subdirectory present at the same level.
+    - ``.git/`` subdirectory present.
+    """
+    git_marker = dir_path / ".git"
+    if git_marker.is_dir() or git_marker.is_file():
+        return True
+    if (dir_path / "CLAUDE.md").is_file() and (dir_path / "skills").is_dir():
+        return True
+    return False
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-is-boundary
+
+
+# ---------------------------------------------------------------------------
+# Walk-Up Detection
+# ---------------------------------------------------------------------------
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-detect-master
+def _detect_master_repo(start_dir: Path) -> Optional[Path]:
+    """Walk up from *start_dir* parent, returning the first master repo root found.
+
+    Walk starts from ``start_dir.parent`` (not *start_dir* itself) and stops
+    as soon as a boundary marker is detected.
+
+    Returns the boundary directory ``Path`` if found, else ``None``.
+    """
+    current = start_dir.parent
+    # Walk up until we hit the filesystem root
+    while True:
+        if _is_master_repo_boundary(current):
+            return current
+        parent = current.parent
+        if parent == current:
+            # Reached filesystem root without finding a boundary
+            return None
+        current = parent
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-detect-master
+
+
+# ---------------------------------------------------------------------------
+# Layer Loaders
+# ---------------------------------------------------------------------------
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-load-repo-layer
+def _load_repo_layer(studio_root: Path) -> Optional[ManifestLayer]:
+    """Load the repo manifest from ``{studio_root}/config/manifest.toml``.
+
+    Returns ``None`` if the file does not exist (silently omitted).
+    Returns a ``ManifestLayer`` with ``PARSE_ERROR`` state if parsing fails.
+    """
+    manifest_path = studio_root / "config" / _MANIFEST_TOML
+    if not manifest_path.is_file():
+        return None
+
+    try:
+        manifest = parse_manifest_v2(manifest_path)
+        return ManifestLayer(
+            scope="repo",
+            path=manifest_path,
+            manifest=manifest,
+            state=ManifestLayerState.LOADED,
+        )
+    except (ValueError, OSError):
+        return ManifestLayer(
+            scope="repo",
+            path=manifest_path,
+            manifest=None,
+            state=ManifestLayerState.PARSE_ERROR,
+        )
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-load-repo-layer
+
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-load-kit-layers
+def _load_kit_layers(studio_root: Path, project_root: Optional[Path] = None) -> List[ManifestLayer]:
+    """Load kit manifest layers from kit registrations in ``core.toml``.
+
+    Reads ``{studio_root}/config/core.toml``, iterates over ``[kits]``
+    entries, and loads ``manifest.toml`` from each kit path.
+
+    Kits without a ``manifest.toml`` are silently omitted.
+    Kits with a parse error return a ``PARSE_ERROR`` state layer.
+    """
+    core_toml = studio_root / "config" / "core.toml"
+    trusted_root = (project_root or studio_root).resolve()
+    if not core_toml.is_file():
+        return []
+
+    try:
+        with open(core_toml, "rb") as f:
+            data = tomllib.load(f)
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        logger.warning("Failed to read core manifest layer config %s: %s", core_toml, exc)
+        return []
+
+    kits_section = data.get("kits")
+    if not isinstance(kits_section, dict):
+        return []
+
+    layers: List[ManifestLayer] = []
+    for _slug, kit_entry in kits_section.items():
+        if not isinstance(kit_entry, dict):
+            continue
+        kit_path_raw = kit_entry.get("path", "")
+        if not kit_path_raw:
+            continue
+
+        kit_path = _resolve_registered_kit_path(studio_root, trusted_root, kit_path_raw)
+        if kit_path is None:
+            continue
+
+        manifest_path = kit_path / _MANIFEST_TOML
+        if not manifest_path.is_file():
+            # Silently omit kits without a manifest
+            continue
+
+        layers.append(_load_manifest_layer("kit", manifest_path))
+
+    return layers
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-load-kit-layers
+
+
+# ---------------------------------------------------------------------------
+# Master Repo Layer Loader
+# ---------------------------------------------------------------------------
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-load-master-layer
+def _load_master_layer(master_root: Path) -> Optional[ManifestLayer]:
+    """Load the master repo manifest from ``{master_root}/manifest.toml``.
+
+    Returns ``None`` if the file does not exist (silently omitted).
+    Returns a ``ManifestLayer`` with ``PARSE_ERROR`` state if parsing fails.
+    """
+    manifest_path = master_root / _MANIFEST_TOML
+    if not manifest_path.is_file():
+        return None
+
+    try:
+        from dataclasses import replace as dc_replace
+        manifest = parse_manifest_v2(manifest_path)
+        manifest_dir = manifest_path.parent
+        trusted_root = manifest_dir.resolve()
+        rewritten_agents = [_rewrite_component_paths(c, manifest_dir, trusted_root) for c in manifest.agents]
+        rewritten_skills = [_rewrite_component_paths(c, manifest_dir, trusted_root) for c in manifest.skills]
+        manifest = dc_replace(manifest, agents=rewritten_agents, skills=rewritten_skills)
+        return ManifestLayer(
+            scope="master",
+            path=manifest_path,
+            manifest=manifest,
+            state=ManifestLayerState.LOADED,
+        )
+    except (ValueError, OSError):
+        return ManifestLayer(
+            scope="master",
+            path=manifest_path,
+            manifest=None,
+            state=ManifestLayerState.PARSE_ERROR,
+        )
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-load-master-layer
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+# @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-discover-layers
+def discover_layers(repo_root: Path, studio_root: Path) -> List[ManifestLayer]:
+    """Discover manifest layers in resolution order.
+
+    Resolution order (outermost to innermost):
+    1. Kit layers — from ``core.toml`` kit registrations
+    2. Master Repo layer — discovered via walk-up (if found)
+    3. Repo layer — from ``{studio_root}/config/manifest.toml``
+
+    Missing layers (no ``manifest.toml``) are silently omitted.
+    Parse errors result in ``ManifestLayerState.PARSE_ERROR`` layers.
+
+    Args:
+        repo_root: Root of the current repo.
+        studio_root: Studio adapter directory (e.g. ``{repo}/.bootstrap``).
+
+    Returns:
+        List of ``ManifestLayer`` in resolution order.
+    """
+    # Step 1: Load kit layers from core.toml
+    # @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:step-1-kit-layers
+    layers: List[ManifestLayer] = []
+    kit_layers = _load_kit_layers(studio_root, repo_root)
+    layers.extend(kit_layers)
+    # @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:step-1-kit-layers
+
+    # Step 3-6: Load master manifest — walk up from the project root parent
+    # @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:step-3-6-walkup
+    # The current kit-based extensibility model treats project-root
+    # manifest.toml files as ordinary repository files unless they are
+    # explicitly registered as a kit. Project-scoped manifest layers live under
+    # {studio_root}/config/manifest.toml.
+    master_root = _detect_master_repo(repo_root)
+    if master_root is not None:
+        master_layer = _load_master_layer(master_root)
+        if master_layer is not None:
+            layers.append(master_layer)
+    # @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:step-3-6-walkup
+
+    # Step 2: Load repo layer from {studio_root}/config/manifest.toml
+    # @cpt-begin:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:step-2-repo-layer
+    repo_layer = _load_repo_layer(studio_root)
+    if repo_layer is not None:
+        layers.append(repo_layer)
+    # @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:step-2-repo-layer
+
+    return layers
+# @cpt-end:cpt-studio-algo-project-extensibility-walk-up-discovery:p1:inst-discover-layers

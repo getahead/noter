@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/constructor-studio/core-config.schema.json",
+  "title": "Constructor Studio Project Configuration (core.toml)",
+  "description": "Schema for the project-level configuration file that defines kit registrations, resource bindings, and optional path overrides. Located at {cf-studio-path}/config/core.toml. System identity is defined in artifacts.toml (see ADR-0014).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "project_root", "kits"],
+  "examples": [
+    {
+      "version": "1.0",
+      "project_root": "..",
+      "kits": {
+        "sdlc": {
+          "format": "CFS",
+          "path": "config/kits/sdlc",
+          "version": "1.0.0",
+          "source": "github:constructorfabric/studio-kit-sdlc"
+        }
+      }
+    },
+    {
+      "version": "1.0",
+      "project_root": "..",
+      "kits": {
+        "sdlc": {
+          "format": "CFS",
+          "path": "config/kits/sdlc",
+          "version": "1.0.0",
+          "resources": {
+            "adr_artifacts": { "path": "config/kits/sdlc/artifacts/ADR" },
+            "constraints": { "path": "config/kits/sdlc/constraints.toml" }
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Schema version (e.g. '1.0')."
+    },
+    "project_root": {
+      "type": "string",
+      "minLength": 1,
+      "default": "..",
+      "description": "Relative path from the studio config directory to the project root. All artifact and codebase paths are resolved relative to this. Default: '..' (one level up from {cf-studio-path}/config/)."
+    },
+    "kits": {
+      "$ref": "#/$defs/kits",
+      "description": "Map of kit ID to kit configuration. Kits registered here are merged into artifacts.toml at load time."
+    },
+    "paths": {
+      "$ref": "#/$defs/paths",
+      "description": "Optional path overrides for non-standard layouts."
+    },
+    "ui": {
+      "$ref": "#/$defs/ui",
+      "description": "Optional UI/output preferences for skill and workflow runs."
+    },
+    "validation": {
+      "$ref": "#/$defs/validation",
+      "description": "Optional project validation policy. A project may raise any rule's severity freely, and may lower any rule the kit has not marked `locked`; every lowering is listed under `severity_overrides` in the report. No CLI flag may lower a rule."
+    }
+  },
+  "$defs": {
+    "kits": {
+      "type": "object",
+      "description": "Map of kit ID → kit configuration.",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/kit_entry"
+      }
+    },
+    "kit_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "path"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kit format identifier. Use 'CFS' for full Constructor Studio tooling support (validation, traceability, code generation). Other values are treated as custom formats with LLM-only semantic processing."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path from the studio directory to the kit package root (e.g. '.core/kits/sdlc')."
+        },
+        "version": {
+          "type": "string",
+          "description": "Kit version string, set during kit installation or update."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source identifier for the kit (e.g. 'github:owner/repo' or 'git:<encoded-url>'). Set during installation."
+        },
+        "source_provenance": {
+          "$ref": "#/$defs/source_provenance",
+          "description": "Optional structured source provenance for remote-backed kit registrations."
+        },
+        "content_identity": {
+          "$ref": "#/$defs/content_identity",
+          "description": "Optional immutable content identity for remote-backed kit registrations."
+        },
+        "artifacts": {
+          "type": "object",
+          "description": "Optional per-kind artifact path overrides.",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/kit_artifact_override"
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource bindings for manifest-driven kits. Maps resource identifiers (from manifest.toml) to resolved filesystem paths. Written during kit installation; used by the resource resolution API to resolve {identifier} template variables.",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/resource_binding"
+          }
+        }
+      }
+    },
+    "source_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_type": { "type": "string", "enum": ["github", "git", "local", "unknown"] },
+        "resolver_mode": { "type": "string" },
+        "resolution_basis": { "type": "string" },
+        "requested_ref": { "type": "string" },
+        "resolved_ref": { "type": "string" },
+        "canonical_source": { "type": "string" },
+        "effective_source": { "type": "string" },
+        "original_source": { "type": "string" },
+        "decoded_remote_url": { "type": "string" },
+        "decoded_remote_url_hash": { "type": "string" },
+        "selected_subdirectory": { "type": "string" },
+        "kit_identity": { "type": "string" },
+        "transport": { "type": "string" },
+        "cache_remote_hash": { "type": "string" },
+        "cache_requested_ref_hash": { "type": "string" },
+        "cache_subdir_hash": { "type": "string" },
+        "cache_kit_hash": { "type": "string" },
+        "verified": { "type": "string" },
+        "freshness": { "type": "string" }
+      }
+    },
+    "content_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vcs": { "type": "string" },
+        "commit_sha": { "type": "string" },
+        "resolved_ref": { "type": "string" },
+        "subdirectory": { "type": "string" },
+        "identity": { "type": "string" }
+      }
+    },
+    "resource_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Resolved filesystem path for this resource, relative to the studio directory. Written during manifest-driven installation."
+        }
+      }
+    },
+    "kit_artifact_override": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template", "examples"],
+      "properties": {
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the template file for this artifact kind. Supports {project_root} token."
+        },
+        "examples": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path to the examples directory for this artifact kind. Supports {project_root} token."
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "core": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path to the studio core directory. Used when the core is not at the default location."
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skill_invocation_art_enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to draw the decorative ASCII-art picture (plus label) at cf/cf-* skill and workflow entry. Default-off: the picture costs nothing unless explicitly enabled."
+        }
+      }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["error", "warning", "off"],
+      "description": "error gates the run, warning is reported without gating, off suppresses the rule (and is counted in the report's suppressed_count). An unrecognised value fails the run rather than resolving to no opinion."
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fail_on_warnings": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, a run with warnings and no errors reports status FAIL, exit 2, and failed_on: \"warnings\"."
+        },
+        "severity": {
+          "type": "object",
+          "description": "Rule code to severity. A value that is itself a table names an artifact kind, and its keys are rule codes scoped to that kind — the more specific of the two wins.",
+          "propertyNames": { "type": "string", "minLength": 1 },
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "#/$defs/severity" },
+              {
+                "type": "object",
+                "description": "Per-artifact-kind overrides: rule code to severity.",
+                "propertyNames": { "type": "string", "minLength": 1 },
+                "additionalProperties": { "$ref": "#/$defs/severity" }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

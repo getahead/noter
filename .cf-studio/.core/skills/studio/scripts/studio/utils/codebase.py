@@ -1,0 +1,1129 @@
+"""Codebase parsing/validation for Studio traceability markers.
+
+This module provides a deterministic, stdlib-only parser for code files with
+Studio traceability markers. Similar interface to template.py but for code.
+
+Marker types supported:
+- Scope markers: @cpt-{kind}:{id}:p{N}
+- Block markers: @cpt-begin:{id}:p{N}:inst-{local} / @cpt-end:...
+
+Key difference from artifacts: code can only REFERENCE IDs (not define them).
+IDs in code that don't exist in artifacts = validation FAIL.
+"""
+# @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-datamodel
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Set, Tuple
+
+from . import document
+from . import error_codes as EC
+from .severity import default_severity, reject_caller_severity
+
+logger = logging.getLogger(__name__)
+
+
+def _warn_codebase(message: str) -> None:
+    logger.warning("codebase: %s", message)
+
+# Scope marker: @cpt-{kind}:{full-id}:p{N}
+# {kind} is kit-defined; parser accepts any lowercase slug.
+_SCOPE_MARKER_RE = re.compile(
+    r"@cpt-(?!begin:)(?!end:)(?P<kind>[a-z][a-z0-9-]*):(?P<id>cpt-[a-z0-9][a-z0-9-]+):(?:p|ph-)(?P<phase>\d+)"
+)
+
+# Block begin marker: @cpt-begin:{full-id}:ph-{N}:inst-{local}
+_BLOCK_BEGIN_RE = re.compile(
+    r"@cpt-begin:(?P<id>cpt-[a-z0-9][a-z0-9-]+):(?:p|ph-)(?P<phase>\d+):inst-(?P<inst>[a-z0-9-]+)"
+)
+
+# Block end marker: @cpt-end:{full-id}:ph-{N}:inst-{local}
+_BLOCK_END_RE = re.compile(
+    r"@cpt-end:(?P<id>cpt-[a-z0-9][a-z0-9-]+):(?:p|ph-)(?P<phase>\d+):inst-(?P<inst>[a-z0-9-]+)"
+)
+
+# Generic SID reference (backticked or in markers)
+_SID_RE = re.compile(r"cpt-[a-z0-9][a-z0-9-]+")
+
+def error(
+    kind: str,
+    message: str,
+    *,
+    path: Path,
+    line: int = 1,
+    code: Optional[str] = None,
+    **extra,
+) -> Dict[str, object]:
+    """Uniform error factory for code validation."""
+    path_s = str(path)
+    out: Dict[str, object] = {
+        "type": kind,
+        "message": message,
+        "line": int(line),
+        "path": path_s,
+    }
+    if code:
+        out["code"] = code
+    out["severity"] = default_severity(code)
+    reject_caller_severity(extra)
+    out["location"] = f"{path_s}:{int(line)}" if (path_s and not path_s.startswith("<")) else path_s
+    extra = {k: v for k, v in extra.items() if v is not None}
+    out.update(extra)
+    return out
+
+@dataclass(frozen=True)
+class ScopeMarker:
+    """A scope marker like @cpt-flow:{id}:p{N}."""
+    kind: str  # flow, algo, state, req, test
+    id: str  # full Studio ID
+    phase: int
+    line: int
+    raw: str  # original line content
+
+@dataclass(frozen=True)
+class BlockMarker:
+    """A block marker pair @cpt-begin/end:{id}:p{N}:inst-{local}."""
+    id: str  # full Studio ID
+    phase: int
+    inst: str  # instruction slug
+    start_line: int
+    end_line: int
+    content: Tuple[str, ...]  # lines between begin/end
+
+@dataclass(frozen=True)
+class CodeReference:
+    """A reference to an Studio ID found in code."""
+    id: str
+    line: int
+    kind: Optional[str]  # flow, algo, state, req, test, or None for generic
+    phase: Optional[int]
+    inst: Optional[str]
+    marker_type: str  # "scope", "block", "inline"
+
+@dataclass
+class CodeFile:
+    """Parsed code file with Studio traceability markers.
+
+    Similar interface to Artifact from template.py but for code files.
+    Code can only REFERENCE IDs (not define them).
+    """
+    path: Path
+    scope_markers: List[ScopeMarker] = field(default_factory=list)
+    block_markers: List[BlockMarker] = field(default_factory=list)
+    references: List[CodeReference] = field(default_factory=list)
+    _errors: List[Dict[str, object]] = field(default_factory=list)
+    _loaded: bool = False
+
+    @classmethod
+    def from_path(cls, code_path: Path) -> Tuple[Optional["CodeFile"], List[Dict[str, object]]]:
+        """Load and parse a code file, returning (CodeFile, errors)."""
+        cf = cls(path=code_path)
+        errs = cf.load()
+        if errs:
+            return None, errs
+        return cf, []
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-from-text
+    @classmethod
+    def from_text(cls, code_path: Path, text: str) -> Tuple[Optional["CodeFile"], List[Dict[str, object]]]:
+        """Parse already-read text as ``code_path``, returning (CodeFile, errors).
+
+        For a caller that holds the file's content — because it read it once under a
+        size ceiling, or needs a second parser to see the *same* bytes — so the file is
+        not opened again between two reads that are meant to describe one state.
+        """
+        cf = cls(path=code_path)
+        cf._parse_markers(text.splitlines())
+        cf._loaded = True
+        if cf._errors:
+            return None, list(cf._errors)
+        return cf, []
+    # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-from-text
+    # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-datamodel
+
+    def load(self) -> List[Dict[str, object]]:
+        """Load and parse the code file."""
+        if self._loaded:
+            return list(self._errors)
+
+        # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-read-code
+        try:
+            text = self.path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            err = error("file", f"Failed to read `{self.path}`: {e}", code=EC.FILE_READ_ERROR, path=self.path, line=1)
+            self._errors.append(err)
+            return [err]
+
+        lines = text.splitlines()
+        # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-read-code
+        # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-return-code
+        self._parse_markers(lines)
+        self._loaded = True
+        return list(self._errors)
+        # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-return-code
+
+    # @cpt-algo:cpt-studio-algo-traceability-validation-scan-code:p1
+    def _parse_markers(self, lines: List[str]) -> None:
+        """Parse all Studio markers from code lines."""
+        # Track open block markers for pairing
+        open_blocks: Dict[str, Tuple[int, str, int, str]] = {}  # key -> (line, id, phase, inst)
+
+        for idx, line in enumerate(lines):
+            line_no = idx + 1
+
+            # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-match-scope
+            # Check for scope markers
+            for m in _SCOPE_MARKER_RE.finditer(line):
+                marker = ScopeMarker(
+                    kind=m.group("kind"),
+                    id=m.group("id"),
+                    phase=int(m.group("phase")),
+                    line=line_no,
+                    raw=line,
+                )
+                self.scope_markers.append(marker)
+                self._append_scope_reference(m, line_no)
+            # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-match-scope
+
+            # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-match-begin
+            # Check for block begin markers
+            for m in _BLOCK_BEGIN_RE.finditer(line):
+                key = f"{m.group('id')}:{m.group('phase')}:{m.group('inst')}"
+                if key in open_blocks:
+                    self._errors.append(
+                        error(
+                            "marker",
+                            f"Duplicate @cpt-begin for `{m.group('id')}` inst "
+                            f"`{m.group('inst')}` at line {line_no} in "
+                            f"`{self.path.name}` — previous @cpt-begin not closed",
+                            code=EC.MARKER_DUP_BEGIN,
+                            path=self.path,
+                            line=line_no,
+                            id=m.group("id"),
+                            inst=m.group("inst"),
+                        )
+                    )
+                else:
+                    # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-push-block
+                    open_blocks[key] = (line_no, m.group("id"), int(m.group("phase")), m.group("inst"))
+                    # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-push-block
+            # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-match-begin
+
+            # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-match-end
+            # Check for block end markers
+            for m in _BLOCK_END_RE.finditer(line):
+                key = f"{m.group('id')}:{m.group('phase')}:{m.group('inst')}"
+                # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-pop-block
+                # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-if-mismatch
+                if key not in open_blocks:
+                    self._errors.append(
+                        error(
+                            "marker",
+                            f"@cpt-end for `{m.group('id')}` inst "
+                            f"`{m.group('inst')}` at line {line_no} in "
+                            f"`{self.path.name}` has no matching @cpt-begin",
+                            code=EC.MARKER_END_NO_BEGIN,
+                            path=self.path,
+                            line=line_no,
+                            id=m.group("id"),
+                            inst=m.group("inst"),
+                        )
+                    )
+                else:
+                    start_line, cpt, phase, inst = open_blocks.pop(key)
+                    content = tuple(lines[start_line:idx])  # lines between begin/end
+
+                    if not content or all(not ln.strip() for ln in content):
+                        self._errors.append(
+                            error(
+                                "marker",
+                                f"Empty block for `{cpt}` inst `{inst}` "
+                                f"(lines {start_line}–{line_no}) in "
+                                f"`{self.path.name}` — no code between markers",
+                                code=EC.MARKER_EMPTY_BLOCK,
+                                path=self.path,
+                                line=start_line,
+                                id=cpt,
+                                inst=inst,
+                            )
+                        )
+
+                    block = BlockMarker(
+                        id=cpt,
+                        phase=phase,
+                        inst=inst,
+                        start_line=start_line,
+                        end_line=line_no,
+                        content=content,
+                    )
+                    self.block_markers.append(block)
+                    self.references.append(CodeReference(
+                        id=cpt,
+                        line=start_line,
+                        kind=None,
+                        phase=phase,
+                        inst=inst,
+                        marker_type="block",
+                    ))
+                # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-if-mismatch
+                # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-pop-block
+            # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-match-end
+
+        # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-if-unclosed
+        # Report unclosed blocks
+        for key, (start_line, cpt, phase, inst) in open_blocks.items():
+            self._errors.append(
+                error(
+                    "marker",
+                    f"@cpt-begin for `{cpt}` inst `{inst}` at line {start_line} "
+                    f"in `{self.path.name}` was never closed with @cpt-end",
+                    code=EC.MARKER_BEGIN_NO_END,
+                    path=self.path,
+                    line=start_line,
+                    id=cpt,
+                    inst=inst,
+                )
+            )
+        # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-if-unclosed
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-query-validate
+    def list_ids(self) -> List[str]:
+        """List all unique Studio IDs referenced in this code file."""
+        ids: Set[str] = set()
+        for ref in self.references:
+            ids.add(ref.id)
+        return sorted(ids)
+
+    def get(self, id_value: str) -> Optional[str]:
+        """Get the code content associated with an Studio ID.
+
+        Returns the content of the first matching scope or block marker.
+        """
+        # Check block markers first (they have content)
+        for block in self.block_markers:
+            if block.id == id_value:
+                return "\n".join(block.content)
+
+        # For scope markers, return the line
+        for scope in self.scope_markers:
+            if scope.id == id_value:
+                return scope.raw
+
+        return None
+
+    def list(self, ids: Sequence[str]) -> List[Optional[str]]:
+        """Get content for multiple IDs."""
+        return [self.get(i) for i in ids]
+
+    def get_by_inst(self, id_value: str, inst: str) -> Optional[str]:
+        """Get the content of *id_value*'s block for instruction *inst*.
+
+        The ID is required: instruction names repeat across IDs in one file, so a lookup
+        by name alone returns whichever ID's block comes first. *inst* is accepted with
+        or without its ``inst-`` prefix, since the marker parser stores it without.
+        """
+        wanted = inst.removeprefix("inst-")
+        for block in self.block_markers:
+            if block.id == id_value and block.inst == wanted:
+                return "\n".join(block.content)
+        return None
+
+    def validate(self) -> Dict[str, List[Dict[str, object]]]:
+        """Validate the code file structure (marker pairing, etc).
+
+        Note: Does NOT validate against artifacts - use cross_validate_code for that.
+        """
+        errors = list(self._errors)
+        warnings: List[Dict[str, object]] = []
+
+        # Check for duplicate scope markers with same ID
+        seen_scopes: Dict[str, int] = {}
+        for scope in self.scope_markers:
+            key = f"{scope.kind}:{scope.id}:{scope.phase}"
+            if key in seen_scopes:
+                errors.append(
+                    error(
+                        "marker",
+                        f"Duplicate scope marker `{scope.kind}:{scope.id}:p{scope.phase}` "
+                        f"in `{self.path.name}` at line {scope.line} — first seen "
+                        f"at line {seen_scopes[key]}",
+                        code=EC.MARKER_DUP_SCOPE,
+                        path=self.path,
+                        line=scope.line,
+                        id=scope.id,
+                        first_occurrence=seen_scopes[key],
+                    )
+                )
+            else:
+                seen_scopes[key] = scope.line
+
+        return {"errors": errors, "warnings": warnings}
+    # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-query-validate
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-extract-scope
+    def _append_scope_reference(self, marker_match: re.Match[str], line_no: int) -> None:
+        """Record a scope-marker reference extracted from the current line."""
+        reference = CodeReference(
+            id=marker_match.group("id"),
+            line=line_no,
+            kind=marker_match.group("kind"),
+            phase=int(marker_match.group("phase")),
+            inst=None,
+            marker_type="scope",
+        )
+        self.references.append(reference)
+    # @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-extract-scope
+
+# @cpt-algo:cpt-studio-algo-traceability-validation-cross-validate-code:p1
+def cross_validate_code(
+    code_files: Sequence[CodeFile],
+    artifact_ids: Set[str],
+    to_code_ids: Set[str],
+    forbidden_code_ids: Optional[Set[str]] = None,
+    traceability: str = "FULL",
+    artifact_instances: Optional[Dict[str, Set[str]]] = None,
+    artifact_instances_all: Optional[Dict[str, Set[str]]] = None,
+) -> Dict[str, List[Dict[str, object]]]:
+    """Cross-validate code files against artifact IDs.
+
+    Args:
+        code_files: Parsed code files to validate
+        artifact_ids: All IDs defined in artifacts
+        to_code_ids: IDs with to_code="true" that MUST have code markers
+        traceability: "FULL" or "DOCS-ONLY"
+        artifact_instances: Mapping of ID -> set of checked instruction slugs from CDSL steps
+        artifact_instances_all: Mapping of ID -> set of ALL instruction slugs (checked + unchecked)
+
+    Returns:
+        Dict with "errors" and "warnings" lists
+    """
+    errors: List[Dict[str, object]] = []
+    warnings: List[Dict[str, object]] = []
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-if-docs-only
+    if traceability == "DOCS-ONLY":
+        _collect_docs_only_errors(code_files, errors)
+        return {"errors": errors, "warnings": warnings}
+    # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-if-docs-only
+
+    # FULL traceability mode
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-collect-code-ids
+    # Collect all IDs referenced in code
+    code_ids: Set[str] = set()
+    for cf in code_files:
+        code_ids.update(cf.list_ids())
+    # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-collect-code-ids
+
+    first_forbidden = _collect_code_reference_errors(
+        code_files,
+        artifact_ids,
+        forbidden_code_ids,
+        errors,
+    )
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-forbidden
+    if forbidden_code_ids:
+        _collect_forbidden_code_errors(
+            code_files,
+            first_forbidden,
+            artifact_instances,
+            artifact_instances_all,
+            errors,
+        )
+    # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-forbidden
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-missing
+    # Check for missing markers (to_code IDs without code markers)
+    missing_ids = to_code_ids - code_ids
+    for missing_id in sorted(missing_ids):
+        errors.append(_build_missing_code_marker_error(missing_id))
+    # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-missing
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-inst
+    # Instruction-level cross-validation
+    if artifact_instances:
+        _collect_instruction_errors(code_files, artifact_instances, errors)
+    # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-inst
+
+    # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-return-code-cross
+    return {"errors": errors, "warnings": warnings}
+    # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-return-code-cross
+
+
+def _collect_docs_only_errors(
+    code_files: Sequence[CodeFile],
+    errors: List[Dict[str, object]],
+) -> None:
+    """Record DOCS-ONLY violations for files that still contain markers."""
+    for cf in code_files:
+        if cf.scope_markers or cf.block_markers:
+            errors.append(
+                error(
+                    "traceability",
+                    f"@cpt markers found in `{cf.path.name}` but traceability mode "
+                    "is DOCS-ONLY — remove all markers or switch to FULL",
+                    code=EC.CODE_DOCS_ONLY,
+                    path=cf.path,
+                    line=1,
+                )
+            )
+
+
+ # @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-orphan
+def _collect_code_reference_errors(
+    code_files: Sequence[CodeFile],
+    artifact_ids: Set[str],
+    forbidden_code_ids: Optional[Set[str]],
+    errors: List[Dict[str, object]],
+) -> Dict[str, Tuple[Path, int]]:
+    """Collect orphaned code reference errors and first forbidden locations."""
+    first_forbidden: Dict[str, Tuple[Path, int]] = {}
+    for cf in code_files:
+        for ref in cf.references:
+            if forbidden_code_ids and ref.id in forbidden_code_ids and ref.id not in first_forbidden:
+                first_forbidden[ref.id] = (cf.path, int(ref.line))
+            if ref.id not in artifact_ids:
+                errors.append(_build_orphan_reference_error(cf.path, cf.path.name, ref.id, ref.line))
+    return first_forbidden
+ # @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-foreach-orphan
+
+
+def _build_code_inst_lookup(
+    code_files: Sequence[CodeFile],
+) -> Dict[str, Set[str]]:
+    """Return block-marker instruction IDs grouped by artifact ID."""
+    code_inst_lookup: Dict[str, Set[str]] = {}
+    for cf in code_files:
+        for bm in cf.block_markers:
+            code_inst_lookup.setdefault(bm.id, set()).add(bm.inst)
+    return code_inst_lookup
+
+
+def _collect_forbidden_code_errors(
+    code_files: Sequence[CodeFile],
+    first_forbidden: Dict[str, Tuple[Path, int]],
+    artifact_instances: Optional[Dict[str, Set[str]]],
+    artifact_instances_all: Optional[Dict[str, Set[str]]],
+    errors: List[Dict[str, object]],
+) -> None:
+    """Record code references that require a checked artifact task."""
+    code_inst_lookup = _build_code_inst_lookup(code_files)
+    all_instances = artifact_instances_all or artifact_instances
+    for fid in sorted(first_forbidden.keys()):
+        path, line = first_forbidden[fid]
+        if all_instances and fid in all_instances and all_instances[fid] - code_inst_lookup.get(fid, set()):
+            continue
+        errors.append(_build_forbidden_code_error(fid, path, line))
+
+
+def _collect_instruction_errors(
+    code_files: Sequence[CodeFile],
+    artifact_instances: Dict[str, Set[str]],
+    errors: List[Dict[str, object]],
+) -> None:
+    """Record instruction-level code/artifact mismatches."""
+    code_inst_by_id: Dict[str, Dict[str, Tuple[Path, int]]] = {}
+    for cf in code_files:
+        for bm in cf.block_markers:
+            code_inst_by_id.setdefault(bm.id, {})[bm.inst] = (cf.path, bm.start_line)
+
+    for cid, art_insts in sorted(artifact_instances.items()):
+        code_insts = set(code_inst_by_id.get(cid, {}).keys())
+        for inst in sorted(art_insts - code_insts):
+            errors.append(_build_missing_instruction_error(cid, inst))
+        for inst in sorted(code_insts - art_insts):
+            loc_path, loc_line = code_inst_by_id[cid][inst]
+            errors.append(_build_orphan_instruction_error(cid, inst, loc_path, loc_line))
+
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-emit-missing
+def _build_missing_code_marker_error(missing_id: str) -> Dict[str, object]:
+    """Build the error emitted when a to_code artifact has no code marker."""
+    message = (
+        f"`{missing_id}` is marked to_code=\"true\" but no @cpt marker "
+        "referencing it exists in the codebase"
+    )
+    return error(
+        "coverage",
+        message,
+        code=EC.CODE_NO_MARKER,
+        path=Path("."),
+        line=1,
+        id=missing_id,
+    )
+# @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-emit-missing
+
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-emit-orphan
+def _build_orphan_reference_error(
+    path: Path,
+    path_name: str,
+    ref_id: str,
+    line: int,
+) -> Dict[str, object]:
+    """Build the orphan-reference error for a code marker missing in artifacts."""
+    message = (
+        f"Code marker references `{ref_id}` in `{path_name}` at line {line} "
+        "but this ID is not defined in any artifact"
+    )
+    return error(
+        "traceability",
+        message,
+        code=EC.CODE_ORPHAN_REF,
+        path=path,
+        line=line,
+        id=ref_id,
+    )
+# @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-emit-orphan
+
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-emit-forbidden
+def _build_forbidden_code_error(fid: str, path: Path, line: int) -> Dict[str, object]:
+    """Build the error emitted for code linked to an unchecked artifact task."""
+    message = (
+        f"`{fid}` is marked to_code=\"true\" and referenced in code at line {line} "
+        "but its task checkbox is not checked in the artifact"
+    )
+    return error(
+        "structure",
+        message,
+        code=EC.CODE_TASK_UNCHECKED,
+        path=path,
+        line=line,
+        id=fid,
+    )
+# @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-emit-forbidden
+
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-if-inst-missing
+def _build_missing_instruction_error(cid: str, inst: str) -> Dict[str, object]:
+    """Build the error emitted when an artifact instruction has no code block."""
+    message = (
+        f"CDSL instruction `{inst}` of `{cid}` is defined in artifact "
+        "but has no @cpt-begin/@cpt-end block in code"
+    )
+    return error(
+        "coverage",
+        message,
+        code=EC.CODE_INST_MISSING,
+        path=Path("."),
+        line=1,
+        id=cid,
+        inst=inst,
+    )
+# @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-if-inst-missing
+
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-if-inst-orphan
+def _build_orphan_instruction_error(
+    cid: str,
+    inst: str,
+    loc_path: Path,
+    loc_line: int,
+) -> Dict[str, object]:
+    """Build the error emitted when code contains an instruction absent from CDSL."""
+    message = (
+        f"Code block `inst-{inst}` of `{cid}` in `{loc_path.name}` "
+        f"at line {loc_line} has no matching CDSL step in the artifact"
+    )
+    return error(
+        "traceability",
+        message,
+        code=EC.CODE_INST_ORPHAN,
+        path=loc_path,
+        line=loc_line,
+        id=cid,
+        inst=inst,
+    )
+# @cpt-end:cpt-studio-algo-traceability-validation-cross-validate-code:p1:inst-if-inst-orphan
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-wrappers
+def load_code_file(
+    code_path: Path,
+    *,
+    max_bytes: Optional[int] = None,
+) -> Tuple[Optional[CodeFile], List[Dict[str, object]]]:
+    """Convenience wrapper returning (CodeFile|None, errors).
+
+    Applies the same size ceiling the bulk-scan path enforces. Without it a caller
+    reaching this directly reads an arbitrarily large file whole into memory, while the
+    same file routed through ``_scan_code_file_references`` would be skipped — one
+    entry point honouring a limit the other ignores. ``max_bytes`` of 0 or less
+    disables the check for callers that genuinely want the whole file; ``None`` selects
+    the module default. See :func:`read_code_text` for how the ceiling is applied.
+    """
+    text, errors = read_code_text(code_path, max_bytes=max_bytes)
+    if text is None:
+        return None, errors
+    return CodeFile.from_text(code_path, text)
+
+def validate_code_file(code_path: Path) -> Dict[str, List[Dict[str, object]]]:
+    """Validate a single code file's marker structure."""
+    cf, errs = CodeFile.from_path(code_path)
+    if errs or cf is None:
+        return {
+            "errors": errs
+            or [
+                error(
+                    "file",
+                    f"Failed to load code file `{code_path}`",
+                    code=EC.FILE_LOAD_ERROR,
+                    path=code_path,
+                    line=1,
+                )
+            ],
+            "warnings": [],
+        }
+    return cf.validate()
+# @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-wrappers
+
+
+# @cpt-begin:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-read-bounded
+def read_code_text(
+    code_path: Path,
+    *,
+    max_bytes: Optional[int] = None,
+) -> Tuple[Optional[str], List[Dict[str, object]]]:
+    """Read a code file's text with the size ceiling applied to the bytes actually read.
+
+    Returns ``(text, [])`` or ``(None, [error])``. The ceiling bounds what is *read*,
+    not what a prior ``stat`` reported: the first version measured the file and then
+    read it whole, and a file growing in between slipped past the limit it was just
+    checked against. Reading ``limit + 1`` bytes needs no second look at the file and
+    cannot be raced.
+
+    Too large is :data:`EC.FILE_TOO_LARGE`, distinct from :data:`EC.FILE_READ_ERROR`, so
+    a caller can branch on the code instead of re-measuring the file or parsing the
+    message. ``max_bytes`` of 0 or less disables the ceiling; ``None`` selects the module
+    default, resolved here because the constant is defined further down this module.
+    """
+    limit = _MAX_CODE_FILE_BYTES if max_bytes is None else max_bytes
+    try:
+        with code_path.open("rb") as handle:
+            data = handle.read(limit + 1) if limit > 0 else handle.read()
+    except OSError as exc:
+        return None, [error(
+            "file", f"Failed to read `{code_path}`: {exc}",
+            code=EC.FILE_READ_ERROR, path=code_path, line=1,
+        )]
+    if 0 < limit < len(data):
+        return None, [error(
+            "file", f"`{code_path}` exceeds the {limit}-byte scan limit",
+            code=EC.FILE_TOO_LARGE, path=code_path, line=1,
+        )]
+    if document.is_binary(data):
+        # Binary, by the one predicate `document.read_text_safe` applies too, so the
+        # two readers cannot drift apart on what is text.
+        return None, [error(
+            "file", f"`{code_path}` is binary (contains NUL bytes)",
+            code=EC.FILE_READ_ERROR, path=code_path, line=1,
+        )]
+    try:
+        return data.decode("utf-8"), []
+    except UnicodeDecodeError as exc:
+        return None, [error(
+            "file", f"Failed to read `{code_path}`: {exc}",
+            code=EC.FILE_READ_ERROR, path=code_path, line=1,
+        )]
+# @cpt-end:cpt-studio-algo-traceability-validation-scan-code:p1:inst-code-read-bounded
+
+# @cpt-begin:cpt-studio-flow-traceability-validation-query:p1:inst-query-load-context
+# Conventional non-source directories excluded from every scan, independent of
+# the project's own `artifacts.toml` `ignore` config.
+_DEFAULT_IGNORED_DIR_NAMES = frozenset(
+    {"node_modules", ".git", ".venv", "venv", "build", "dist", "vendor", ".tox", "__pycache__"}
+)
+
+#: What `Path.resolve()` raises on a path it cannot follow. A symlink loop is a
+#: `RuntimeError` up to Python 3.12 and an `OSError` from 3.13 on; CI runs 3.11
+#: to 3.14, and catching `OSError` alone let one loop in a registered tree abort
+#: the whole scan on half of them (#236 review, measured on 3.12.3).
+_UNRESOLVABLE = (OSError, RuntimeError)
+
+# Files larger than this are skipped (with a warning) rather than fully read. A
+# consumer learns that a file was declined from `read_code_file`'s FILE_TOO_LARGE
+# error code, so no public alias of the number is needed.
+_MAX_CODE_FILE_BYTES = 2_000_000
+
+
+def _is_in_default_ignored_dir(resolved_file: Path, resolved_root: Path) -> bool:
+    """Return whether *resolved_file* sits under a conventional non-source directory.
+
+    Both arguments are already resolved. They used to be resolved here, which
+    made this the second of three walks of the same path in the only loop that
+    calls it -- and re-resolved the unchanging root once per candidate
+    (#236 review).
+    """
+    try:
+        rel_parts = resolved_file.relative_to(resolved_root).parts
+    except ValueError as exc:
+        _warn_codebase(f"failed to place {resolved_file} relative to {resolved_root}: {exc}")
+        return False
+    return any(part in _DEFAULT_IGNORED_DIR_NAMES for part in rel_parts[:-1])
+
+
+# @cpt-end:cpt-studio-flow-traceability-validation-query:p1:inst-query-load-context
+
+
+# @cpt-begin:cpt-studio-flow-traceability-validation-query:p1:inst-query-resolve-entry-files
+def resolve_entry_code_files(
+    code_path: Path,
+    extensions: List[str],
+    *,
+    project_root: Path,
+    seen: Optional[Set[Path]] = None,
+) -> Tuple[List[Path], int]:
+    """Code files one registry codebase entry covers, and how many were excluded.
+
+    Every consumer of a codebase entry resolves it through here, so that a
+    directory the policy excludes cannot be skipped by one command and scanned
+    by another. Three rules apply:
+
+    * conventional non-source directory names, at any depth -- a registered
+      parent root otherwise re-admits the `vendor/` and `dist/` trees that
+      registration itself refuses;
+    * symlinked candidates, so one link cannot re-open an excluded tree or reach
+      outside the project under a name that looks local;
+    * resolved containment, because a symlinked *directory* escapes the project
+      by a different route than a symlinked file.
+
+    ``seen`` makes the count honest across *several* entries. Deduplication was
+    within one entry's walk only, so a caller iterating overlapping entries -- one
+    registered directory inside another -- counted every file in the overlap once per
+    covering entry, in the file list *and* in the excluded total. Pass a set shared
+    across the loop and each path is decided once, wherever it is first reached; the
+    set is updated in place. Omit it and behaviour is exactly as before.
+
+    Here rather than in the caller because this function is the single shared exclusion
+    policy, and the first fix for this put the dedupe in one caller and left the
+    excluded tally double-counting (constructorfabric/studio#236 review).
+
+    The excluded count is returned rather than logged so the caller can report
+    its own denominator: "scanned N, excluded M" is checkable where a bare file
+    count is not.
+    """
+    root = project_root.resolve()
+    if not code_path.exists():
+        return [], 0
+    # The entry itself is judged before anything is read, so a `../..` entry is
+    # refused rather than walked and then discarded file by file. Checking only
+    # the candidates meant an external tree was traversed first, and every file
+    # in it counted separately toward a total describing this project.
+    #
+    # This also covers the single-file case, which previously returned the path
+    # unconditionally: an entry resolving to a file outside the project was
+    # refused by `list-ids` and read by `validate` and `spec-coverage`.
+    #
+    # Resolved once, here, and handed on: to the containment test, to the
+    # single-file identity, and to the walk as the base it measures against. Each
+    # used to resolve the entry for itself (#236 review).
+    try:
+        resolved_entry = code_path.resolve()
+    except _UNRESOLVABLE as exc:
+        _warn_codebase(f"failed to resolve {code_path}: {exc}")
+        return [], 1
+    if _escapes_project(code_path, root, resolved=resolved_entry):
+        return [], 1
+    if code_path.is_file():
+        # The single-file entry goes through `seen` like any other candidate.
+        # It used to return unconditionally, so a file registered in its own right
+        # *and* covered by a directory entry was counted under both -- which is the
+        # double count `seen` was added to end, surviving in the one branch that
+        # skipped it. It has to work both ways round, too: registering it here is
+        # what makes a later directory entry skip it, and the entries are walked in
+        # whatever order the registry lists them (#236 review).
+        if not _claim(seen, resolved_entry):
+            return [], 0              # decided under an earlier entry; neither file nor skip
+        return [code_path], 0
+    return _walk_directory_entry(code_path, resolved_entry, extensions, root, seen)
+
+
+# @cpt-end:cpt-studio-flow-traceability-validation-query:p1:inst-query-resolve-entry-files
+
+
+# @cpt-begin:cpt-studio-flow-traceability-validation-query:p1:inst-query-dedupe-across-entries
+def _claim(seen: Optional[Set[Path]], identity: Path) -> bool:
+    """Record *identity* as decided; False if an earlier entry already decided it.
+
+    With no shared set every path is new, which is the single-entry behaviour.
+    """
+    if seen is None:
+        return True
+    if identity in seen:
+        return False
+    seen.add(identity)
+    return True
+
+
+# @cpt-end:cpt-studio-flow-traceability-validation-query:p1:inst-query-dedupe-across-entries
+
+
+# @cpt-begin:cpt-studio-flow-traceability-validation-query:p1:inst-query-walk-directory-entry
+def _walk_directory_entry(
+    code_path: Path,
+    resolved_code_path: Path,
+    extensions: List[str],
+    root: Path,
+    seen: Optional[Set[Path]],
+) -> Tuple[List[Path], int]:
+    """The directory half of :func:`resolve_entry_code_files`: every candidate under
+    *code_path* with one of *extensions*, judged once, against the shared *seen*."""
+    # Candidates are collected before they are judged, so each one is decided
+    # once. Judging inside the extension loop counted a single excluded file
+    # once per matching extension, which made the excluded total disagree with
+    # the file list it is meant to be the denominator of.
+    candidates: Set[Path] = set()
+    for ext in extensions:
+        candidates.update(code_path.rglob(f"*{ext}"))
+
+    files: Set[Path] = set()
+    excluded = 0
+    # Resolved once per candidate and handed to both checks below. Each of the
+    # three -- the dedup identity, the ignored-directory test, the containment
+    # test -- used to resolve the same path independently, so every scanned file
+    # paid three walks and two of the results were thrown away.
+    #
+    # It also puts the failure in one place. The dedup's `candidate.resolve()`
+    # was the only unguarded one of the three, so an unresolvable candidate -- a
+    # symlink loop, which is a `RuntimeError` up to Python 3.12 and an `OSError`
+    # after -- propagated out of a function whose other two resolutions both
+    # treat that as an ordinary skip. Now it is a skip here too, warned once
+    # instead of twice (#236 review).
+    for candidate in candidates:
+        try:
+            is_link = candidate.is_symlink()
+            resolved = candidate.resolve()
+        except _UNRESOLVABLE as exc:
+            _warn_codebase(f"failed to resolve {candidate}: {exc}")
+            excluded += 1
+            continue
+        # A symlink is registered under its own path, never under its target's.
+        # Resolving one yields the file it points at, and claiming that identity
+        # made the *real* file -- reached later in this walk or under another
+        # entry -- look already-decided, so it silently left the scan while the
+        # link that displaced it was excluded anyway. `candidates` is a set, so
+        # which of the two came first moved with `PYTHONHASHSEED`: the same tree
+        # scanned twice could report different files (#236 review).
+        if not _claim(seen, candidate.absolute() if is_link else resolved):
+            continue              # decided under an earlier entry; neither file nor skip
+        if _is_in_default_ignored_dir(resolved, resolved_code_path):
+            excluded += 1
+            continue
+        if _escapes_project(candidate, root, resolved=resolved):
+            excluded += 1
+            continue
+        files.add(candidate)
+    return sorted(files, key=str), excluded
+
+
+# @cpt-end:cpt-studio-flow-traceability-validation-query:p1:inst-query-walk-directory-entry
+
+
+# @cpt-begin:cpt-studio-flow-traceability-validation-query:p1:inst-query-escapes-project
+def _escapes_project(candidate: Path, root: Path, *, resolved: Optional[Path] = None) -> bool:
+    """Whether *candidate* is a symlink or resolves outside *root*.
+
+    Checked on the resolved path: refusing symlinked files alone still lets a
+    symlinked directory inside a registered root carry the scan outside the
+    project.
+
+    The symlink test has to run against *candidate* itself -- resolving first is
+    exactly what hides a link -- so a caller that already resolved the path
+    passes it as *resolved* rather than making this resolve it a second time.
+    """
+    try:
+        if candidate.is_symlink():
+            return True
+        if resolved is None:
+            resolved = candidate.resolve()
+    except _UNRESOLVABLE as exc:
+        _warn_codebase(f"failed to resolve {candidate}: {exc}")
+        return True
+    if resolved == root:
+        return False
+    return root not in resolved.parents
+
+
+
+
+# @cpt-end:cpt-studio-flow-traceability-validation-query:p1:inst-query-escapes-project
+
+
+# @cpt-begin:cpt-studio-flow-traceability-validation-query:p1:inst-query-load-context
+def _is_ignored_code_file(file_path: Path, ctx) -> bool:
+    """Return whether *file_path* is registry-ignored and should be skipped.
+
+    Fails closed: when containment under the project root can't be
+    established, the file is treated as ignored rather than scanned.
+    """
+    try:
+        rel = file_path.resolve().relative_to(ctx.project_root).as_posix()
+    except (*_UNRESOLVABLE, ValueError) as exc:
+        _warn_codebase(f"failed to resolve {file_path} relative to {ctx.project_root}: {exc}")
+        return True
+    return ctx.meta.is_ignored(rel)
+
+
+def _code_reference_hit(ref: CodeReference, file_path: Path) -> Dict[str, object]:
+    """Build a list-ids/where-used hit dict from one parsed code reference."""
+    hit: Dict[str, object] = {
+        "id": ref.id,
+        "kind": ref.kind or "code",
+        "type": "code_reference",
+        "artifact_type": "CODE",
+        "line": ref.line,
+        "artifact": str(file_path),
+        "marker_type": ref.marker_type,
+    }
+    if ref.phase is not None:
+        hit["phase"] = ref.phase
+    if ref.inst:
+        hit["inst"] = ref.inst
+    return hit
+
+
+def _scan_code_file_references(file_path: Path, ctx) -> Optional[List[Dict[str, object]]]:
+    """Parse one code file for marker references, or None if skipped/unparsable.
+
+    Read through :func:`read_code_text`, so the size ceiling bounds the bytes actually
+    read. A ``stat`` followed by an unbounded read measured the file and then trusted the
+    measurement: a file that grew between the two was read whole however large it had
+    become, and never declined.
+    """
+    if _is_ignored_code_file(file_path, ctx):
+        return None
+    text, errs = read_code_text(file_path)
+    if text is None:
+        if any(err.get("code") == EC.FILE_TOO_LARGE for err in errs):
+            _warn_codebase(f"skipping {file_path}: exceeds {_MAX_CODE_FILE_BYTES}-byte scan limit")
+        else:
+            _warn_codebase(f"failed to read {file_path}: {errs[0].get('code') if errs else 'unknown'}")
+        return None
+    cf, errs = CodeFile.from_text(file_path, text)
+    if errs or cf is None:
+        return None
+    return [_code_reference_hit(ref, file_path) for ref in cf.references]
+
+
+@dataclass
+class _SourceScanContext:
+    """Minimal ctx shim exposing project_root/meta for a workspace source scan."""
+
+    project_root: Path
+    meta: object
+
+
+def _note_entry_overlap(code_path: Path, name: str,
+                        seen_entries: List[Tuple[Path, str]]) -> None:
+    """Warn when a registered entry covers ground an earlier one already covers.
+
+    Named, because the registry is what wants correcting: deduplicating quietly would
+    leave the overlap in place for the next reader to rediscover. Both halves are named
+    -- "b overlaps a" is actionable where "b" alone is not (#236 review).
+
+    Appends to *seen_entries* so the next entry is compared against this one.
+    """
+    for earlier_path, earlier_name in seen_entries:
+        if (code_path == earlier_path or earlier_path in code_path.parents
+                or code_path in earlier_path.parents):
+            _warn_codebase(
+                f"codebase entries overlap: {name} overlaps {earlier_name}; files covered "
+                "by both are scanned once")
+    seen_entries.append((code_path, name))
+
+
+def _scan_codebase_entries(scan_ctx) -> Tuple[List[Dict[str, object]], int, int]:
+    """Scan all codebase entries reachable from *scan_ctx* (primary or a workspace source).
+
+    Returns (hits, files_scanned, files_skipped). A codebase entry whose
+    configured path resolves outside *scan_ctx.project_root* is skipped
+    entirely (fail closed on a misconfigured/escaping entry) rather than
+    walked.
+    """
+    hits: List[Dict[str, object]] = []
+    scanned = 0
+    skipped = 0
+    root = scan_ctx.project_root.resolve()
+    # One identity set across every entry, handed to the shared resolver so a file in
+    # an overlap is decided once -- in the file list and in the excluded tally alike.
+    # Deduplicating in this caller instead left `skipped` double-counting, which is
+    # exactly what the first version of this fix did (#236 review).
+    seen_files: Set[Path] = set()
+    # Overlap is reported between *entries*, not between files: with the resolver
+    # deduplicating, a repeated file never reaches this loop twice, and the containment
+    # of one registered path in another is the thing worth reporting anyway -- it names
+    # both halves, and the registry is what wants correcting.
+    seen_entries: List[Tuple[Path, str]] = []
+    for cb_entry, _system_node in scan_ctx.meta.iter_all_codebase():
+        code_path = (root / cb_entry.path).resolve()
+        try:
+            code_path.relative_to(root)
+        except ValueError:
+            _warn_codebase(f"codebase entry {cb_entry.path!r} resolves outside {root}; skipping")
+            continue
+        _note_entry_overlap(code_path, str(cb_entry.path), seen_entries)
+        entry_files, entry_excluded = resolve_entry_code_files(
+            code_path, cb_entry.extensions or [".py"], project_root=root,
+            seen=seen_files,
+        )
+        # Counted as skipped: that total already means "ignored, oversized, or
+        # unparsable", and a policy exclusion is the first of those.
+        skipped += entry_excluded
+        for file_path in entry_files:
+            file_hits = _scan_code_file_references(file_path, scan_ctx)
+            if file_hits is None:
+                skipped += 1
+                continue
+            scanned += 1
+            hits.extend(file_hits)
+    return hits, scanned, skipped
+
+
+def scan_registered_codebase_references(ctx) -> Tuple[List[Dict[str, object]], int, int]:
+    """Scan registered codebase entries for Studio marker references.
+
+    Shared by `list-ids --include-code` and `where-used --include-code` so
+    both commands see the same code-marker parser. In a multi-repo workspace
+    with cross-repo resolution enabled, also fans out to each reachable
+    workspace source's own registered codebase entries, mirroring how
+    `collect_artifacts_to_scan` fans out artifact scanning.
+
+    Returns (hits, files_scanned, files_skipped) — *files_skipped* lets a
+    caller tell "no --include-code" apart from "--include-code found nothing
+    because every candidate file was ignored, oversized, or unparsable".
+    """
+    from .context import WorkspaceContext, get_expanded_meta
+
+    hits, code_files_scanned, code_files_skipped = _scan_codebase_entries(ctx)
+
+    if isinstance(ctx, WorkspaceContext) and ctx.cross_repo and ctx.resolve_remote_ids:
+        for sc in ctx.sources.values():
+            if not sc.reachable or sc.path is None or sc.role not in ("codebase", "full"):
+                continue
+            meta = get_expanded_meta(sc)
+            if meta is None:
+                continue
+            source_hits, source_scanned, source_skipped = _scan_codebase_entries(
+                _SourceScanContext(project_root=sc.path, meta=meta)
+            )
+            hits.extend(source_hits)
+            code_files_scanned += source_scanned
+            code_files_skipped += source_skipped
+
+    return hits, code_files_scanned, code_files_skipped
+# @cpt-end:cpt-studio-flow-traceability-validation-query:p1:inst-query-load-context
+
+__all__ = [
+    "CodeFile",
+    "ScopeMarker",
+    "BlockMarker",
+    "CodeReference",
+    "load_code_file",
+    "validate_code_file",
+    "cross_validate_code",
+    "scan_registered_codebase_references",
+]

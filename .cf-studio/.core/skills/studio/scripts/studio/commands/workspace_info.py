@@ -1,0 +1,336 @@
+"""
+workspace-info: Display workspace configuration and per-source status.
+"""
+# @cpt-flow:cpt-studio-flow-workspace-info:p1
+# @cpt-algo:cpt-studio-feature-workspace:p1
+# @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-helpers
+import argparse
+from pathlib import Path
+from typing import List, Optional
+
+from ..utils.git_utils import _redact_url, peek_git_source_path
+from ..utils.stderr_logging import emit_stderr_message
+from ..utils.ui import ui
+from ..utils.workspace import ResolveConfig, WorkspaceConfig
+
+
+_LEGACY_WORKSPACE_WARNING = (
+    "Legacy .studio-workspace.toml was discovered automatically; rename it to "
+    ".cf-workspace.toml or configure workspace = \"<path>\" in config/core.toml."
+)
+
+
+def _warn_legacy_workspace_fallback(ws_cfg: WorkspaceConfig) -> None:
+    """Emit the migration warning only for automatic legacy-file discovery."""
+    if ws_cfg.is_legacy_fallback:
+        emit_stderr_message(
+            f"WARNING: {_LEGACY_WORKSPACE_WARNING}\n",
+            logger_name=f"{__name__}.stderr",
+        )
+
+
+def _source_warning_for_result(info: dict) -> Optional[str]:
+    """Return a normalized top-level warning string for a source info record."""
+    warning = info.get("warning")
+    if not warning:
+        return None
+    return f"{info.get('name', '?')}: {warning}"
+
+
+def _collect_workspace_warnings(sources_info: List[dict], config_warnings: List[str]) -> List[str]:
+    """Collect top-level workspace warnings from source and config degradation."""
+    warnings = [_source_warning_for_result(source) for source in sources_info]
+    warnings.extend(f"config: {warning}" for warning in config_warnings)
+    warnings.extend(
+        f"{source.get('name', '?')}: metadata: {source['metadata_error']}"
+        for source in sources_info
+        if source.get("metadata_error")
+    )
+    return [warning for warning in warnings if warning]
+
+
+def _probe_source_adapter(resolved: Path, explicit_adapter: Optional[Path]) -> Optional[Path]:
+    """Find the adapter directory for a reachable source.
+
+    Prioritizes the explicit adapter path from workspace config over
+    auto-discovery to avoid finding a wrong nested adapter.
+    """
+    if explicit_adapter is not None:
+        if explicit_adapter.is_dir() and (explicit_adapter / "config").is_dir():
+            return explicit_adapter
+        return None  # explicit path declared but invalid
+
+    from ..utils.files import find_studio_directory
+    return find_studio_directory(resolved)
+
+
+def _build_source_info(ws_cfg: WorkspaceConfig, name: str) -> dict:
+    """Build status dict for a single workspace source."""
+    src = ws_cfg.sources[name]
+    if src.url:
+        base = ws_cfg.get_resolution_base()
+        resolved = (
+            peek_git_source_path(src, ws_cfg.resolve or ResolveConfig(), base)
+            if base is not None
+            else None
+        )
+    else:
+        resolved = ws_cfg.resolve_source_path(name)
+    reachable = resolved is not None and resolved.is_dir()
+
+    info: dict = {
+        "name": name,
+        "path": src.path,
+        "resolved_path": str(resolved) if resolved else None,
+        "role": src.role,
+        "adapter": src.adapter,
+        "reachable": reachable,
+    }
+    if src.url is not None:
+        info["url"] = _redact_url(src.url)
+    if src.branch is not None:
+        info["branch"] = src.branch
+
+    if not reachable:
+        if src.url:
+            info["warning"] = (
+                f"Source not cloned — run 'workspace-sync' to fetch: {_redact_url(src.url)}"
+            )
+        else:
+            identifier = src.path or name
+            info["warning"] = f"Source directory not reachable: {identifier}"
+        return info
+
+    explicit_adapter = (resolved / src.adapter).resolve() if src.adapter else None
+    found_adapter = _probe_source_adapter(resolved, explicit_adapter)
+    info["adapter_found"] = found_adapter is not None
+    if found_adapter is not None:
+        _enrich_with_artifact_counts(info, found_adapter)
+    elif src.adapter:
+        info["warning"] = f"Configured adapter not found: {src.adapter}"
+
+    return info
+
+
+def _enrich_with_artifact_counts(info: dict, adapter_dir: Path) -> None:
+    """Add artifact/system counts to source info dict."""
+    try:
+        from ..utils.artifacts_meta import load_artifacts_meta
+
+        meta, err = load_artifacts_meta(adapter_dir)
+        if err:
+            info["metadata_error"] = err
+            return
+        if meta:
+            info["artifact_count"] = sum(1 for _ in meta.iter_all_artifacts())
+            info["system_count"] = len(meta.systems)
+    except (OSError, ValueError, RuntimeError) as exc:
+        info["metadata_error"] = str(exc)
+
+
+def _load_workspace_info_context():
+    from ..utils.workspace import find_workspace_config, require_project_root
+
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-load-context
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-find-root
+    project_root = require_project_root()
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-if-no-root
+    if project_root is None:
+        return None, None
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-if-no-root
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-find-root
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-find-ws
+    ws_cfg, ws_err = find_workspace_config(project_root)
+    if ws_cfg is not None:
+        return project_root, ws_cfg
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-find-ws
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-if-no-ws
+    if ws_err:
+        ui.result({
+            "status": "ERROR",
+            "message": ws_err,
+            "project_root": str(project_root),
+        })
+    else:
+        ui.result({
+            "status": "ERROR",
+            "message": "No workspace configuration found",
+            "project_root": str(project_root),
+            "hint": (
+                "Run 'workspace-init' to scan and create a workspace, add "
+                "[workspace] to config/core.toml, set workspace = "
+                '"<path>" in core.toml, or place .cf-workspace.toml at '
+                "project root"
+            ),
+        })
+    return project_root, None
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-if-no-ws
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-load-context
+
+
+def _build_workspace_info_result(
+    project_root: Path,
+    ws_cfg: WorkspaceConfig,
+    sources_info: List[dict],
+) -> tuple[dict, list[str]]:
+    config_warnings = ws_cfg.validate()
+    warnings = _collect_workspace_warnings(sources_info, config_warnings)
+    result: dict = {
+        "status": "OK",
+        "version": ws_cfg.version,
+        "config_path": str(ws_cfg.workspace_file) if ws_cfg.workspace_file else None,
+        "is_inline": ws_cfg.is_inline,
+        "project_root": str(project_root),
+        "sources_count": len(ws_cfg.sources),
+        "sources": sources_info,
+        "traceability": {
+            "cross_repo": ws_cfg.traceability.cross_repo,
+            "resolve_remote_ids": ws_cfg.traceability.resolve_remote_ids,
+        },
+        "degraded": bool(warnings),
+        "warning_count": len(warnings),
+    }
+    if config_warnings:
+        result["config_warnings"] = config_warnings
+    if warnings:
+        result["warnings"] = warnings
+    return result, warnings
+
+
+def _augment_workspace_context(result: dict, warnings: list[str]) -> None:
+    from ..utils.context import WorkspaceContext, get_context, get_workspace_upgrade_error
+
+    ctx = get_context()
+    workspace_upgrade_error = get_workspace_upgrade_error()
+    if workspace_upgrade_error:
+        warnings.append(f"context: {workspace_upgrade_error}")
+        result["workspace_context_error"] = workspace_upgrade_error
+        result["degraded"] = True
+        result["warning_count"] = len(warnings)
+        result["warnings"] = warnings
+    if isinstance(ctx, WorkspaceContext):
+        reachable_count = sum(1 for sc in ctx.sources.values() if sc.reachable)
+        result["context_loaded"] = True
+        result["reachable_sources"] = reachable_count
+        result["total_registered_systems"] = len(ctx.get_all_registered_systems())
+        return
+    result["context_loaded"] = False
+# @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-helpers
+
+
+def cmd_workspace_info(argv: List[str]) -> int:
+    """Display workspace config, list sources, show per-source status."""
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-user-workspace-info
+    p = argparse.ArgumentParser(
+        prog="workspace-info",
+        description="Display workspace configuration and per-source status",
+    )
+    p.parse_args(argv)
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-user-workspace-info
+
+    project_root, ws_cfg = _load_workspace_info_context()
+    if project_root is None or ws_cfg is None:
+        return 1
+    _warn_legacy_workspace_fallback(ws_cfg)
+
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-foreach-source
+    sources_info = [_build_source_info(ws_cfg, name) for name in ws_cfg.sources]
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-foreach-source
+
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-build-result
+    result, warnings = _build_workspace_info_result(project_root, ws_cfg, sources_info)
+    _augment_workspace_context(result, warnings)
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-build-result
+
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-if-error
+    # status already encodes degraded/error conditions for the final payload
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-if-error
+    # @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-return-ok
+    ui.result(result, human_fn=_human_workspace_info)
+    return 0
+    # @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-return-ok
+
+
+# ---------------------------------------------------------------------------
+# Human-friendly formatter
+# ---------------------------------------------------------------------------
+# @cpt-begin:cpt-studio-flow-workspace-info:p1:inst-info-human-fmt
+
+def _fmt_source(src: dict) -> None:
+    """Format a single source entry for human output."""
+    name = src.get("name", "?")
+    role = src.get("role", "full")
+    reachable = src.get("reachable", False)
+    marker = "OK" if reachable else "UNREACHABLE"
+    ui.substep(f"  {name}  ({role})  [{marker}]")
+    if src.get("url"):
+        ui.substep(f"    url: {src['url']}")
+    if src.get("path"):
+        ui.substep(f"    path: {src['path']}")
+    if src.get("adapter"):
+        ui.substep(f"    adapter: {src['adapter']}")
+    if src.get("artifact_count") is not None:
+        ui.substep(f"    artifacts: {src['artifact_count']}  systems: {src.get('system_count', 0)}")
+    if src.get("metadata_error"):
+        ui.substep(f"    metadata_error: {src['metadata_error']}")
+    if src.get("warning"):
+        ui.substep(f"    warning: {src['warning']}")
+
+
+def _fmt_traceability(traceability: dict) -> None:
+    """Format the traceability section for human output."""
+    cross = traceability.get("cross_repo", True)
+    resolve = traceability.get("resolve_remote_ids", True)
+    ui.detail("Cross-repo traceability", "on" if cross else "off")
+    ui.detail("Resolve remote IDs", "on" if resolve else "off")
+
+
+def _fmt_status(data: dict) -> None:
+    """Format the final status/warnings block for human output."""
+    warnings = data.get("config_warnings", [])
+    if warnings:
+        ui.blank()
+        for w in warnings:
+            ui.substep(f"  config warning: {w}")
+
+    ui.blank()
+    status = data.get("status", "")
+    if status == "OK" and data.get("degraded"):
+        ui.warn(f"Workspace is degraded ({data.get('warning_count', 0)} warnings)")
+    elif status == "OK":
+        ui.success("Workspace is configured")
+    elif status == "ERROR":
+        ui.error(data.get("message", ""))
+    else:
+        ui.info(f"Status: {status}")
+    ui.blank()
+
+
+def _human_workspace_info(data: dict) -> None:
+    sources = data.get("sources", [])
+    config_path = data.get("config_path", "")
+    is_inline = data.get("is_inline", False)
+    traceability = data.get("traceability", {})
+
+    ui.header("Workspace Info")
+
+    if config_path:
+        ui.detail("Config", ui.relpath(config_path))
+    ui.detail("Version", data.get("version", "?"))
+    ui.detail("Type", "inline" if is_inline else "standalone")
+    ui.detail("Sources", str(data.get("sources_count", len(sources))))
+
+    if traceability:
+        _fmt_traceability(traceability)
+
+    if data.get("context_loaded"):
+        ui.detail("Reachable sources", str(data.get("reachable_sources", 0)))
+        ui.detail("Registered systems", str(data.get("total_registered_systems", 0)))
+
+    if sources:
+        ui.blank()
+        for src in sources:
+            _fmt_source(src)
+
+    _fmt_status(data)
+# @cpt-end:cpt-studio-flow-workspace-info:p1:inst-info-human-fmt
