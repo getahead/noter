@@ -1730,6 +1730,41 @@ async fn silence_notice_is_rechecked_after_a_call_ended_notice_is_kept() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn pausing_a_call_with_a_silence_notice_hides_it_until_resume() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.state().await.notice, None);
+    r.pass(60_000).await;
+    assert_eq!(r.state().await.notice, None);
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id,
+                paused: false,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(1_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_heard_segment_means_no_nothing_heard_notice() {
     let r = rig();
     let call_id = r.recording().await;

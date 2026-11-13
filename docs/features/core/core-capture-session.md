@@ -154,7 +154,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Actor**: Primary user (call window, main window, menu bar, hotkey)
 
 **Success Scenarios**:
-- Pause stops both streams and records a `paused` gap; resume continues the same call and re-arms the silence notice using the existing last-heard time; a mark records a moment at the current offset with an optional note.
+- Pause stops both streams, records a `paused` gap and clears a visible silence notice; resume continues the same call and re-arms the silence notice using the existing last-heard time; a mark records a moment at the current offset with an optional note.
 
 **Error Scenarios**:
 - Resume of a stopped call: `not_recording`.

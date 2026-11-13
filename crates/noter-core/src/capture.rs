@@ -688,6 +688,9 @@ impl Core {
                 c.phase = CapturePhase::Paused;
                 c.pause = Some(pause);
                 c.recorded_ms = recorded;
+                if matches!(c.notice.as_ref(), Some(CaptureNotice::NothingHeard { .. })) {
+                    c.notice = None;
+                }
             }));
             // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-pause
         }
