@@ -198,7 +198,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 **Success Scenarios**:
 - Stop ends the call at the last audio, phase `stopped`, `continue_until` = now + 5 minutes; the call is handed to the post-call queue (a no-op hand-off in M1, the `PostCall` job in M2).
-- **Continue Recording** within 5 minutes appends to the same call with a `continued` gap and cancels the queued post-call work.
+- **Continue Recording** within 5 minutes appends to the same call with a `continued` gap, invalidates any installed archive pass and cancels queued or running post-call work so the next stop processes all continued audio.
 - **Discard Recording** after the nothing-heard notice ends capture with nothing kept.
 
 **Error Scenarios**:
@@ -210,7 +210,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 2. [x] - `p1` - Phase `stopping`; tell the engine `stop`; on `session_stopped` store the file paths and `ended_at` - `inst-engine-stop`
 3. [x] - `p1` - DB: UPDATE `calls` status `processing` through the change-log write path; end the transcript and levels streams with `call_stopped` - `inst-update-call`
 4. [x] - `p1` - Phase `stopped`, `continue_until` = now + 5 minutes; hand the call to the post-call queue - `inst-phase-stopped`
-5. [x] - `p1` - API: `capture_continue { call_id }` before `continue_until`: cancel the queued post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
+5. [x] - `p1` - API: `capture_continue { call_id }` before `continue_until`: atomically return archive state to pending and remove installed archive rows, cancel queued or running post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
 6. [x] - `p1` - API: `capture_discard { call_id }` while `NothingHeard` shows: stop the engine, delete the call's rows and files (logged, not undoable), end streams with `discarded`, phase `idle` - `inst-discard`
 7. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-stop`
 
@@ -243,6 +243,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 **Success Scenarios**:
 - Noter quit or crashed during a recording: at the next start the `RecordingInterruptedByQuit` banner offers **Resume Recording**, which continues the same call with an `interrupted` gap.
+- Older interrupted calls and interrupted calls ended by dismissing the banner are finalized through the same post-call/archive pipeline as a normal stop, and their transcript file is refreshed.
 - The engine could not be restarted (phase `failed`, "Not recording · engine stopped"): **Try Again** restarts it and continues the same call with an `engine_restart` gap.
 
 **Error Scenarios**:
@@ -250,12 +251,13 @@ Capture is the release-blocking function, and its rules must live in one machine
 - The engine still cannot start: phase stays `failed`, `engine_unavailable`.
 
 **Steps**:
-1. [x] - `p1` - At core start, find calls left with status `recording` or `paused`; mark them interrupted and show the banner (`banners:changed`) - `inst-find-interrupted`
+1. [x] - `p1` - At core start, find calls left with status `recording` or `paused`; mark older calls ended and hand each to post-call finalization, then show the banner (`banners:changed`) for the newest - `inst-find-interrupted`
 2. [x] - `p1` - API: `capture_resume_interrupted { call_id }` - `inst-resume-call`
 3. [x] - `p1` - **IF** the call is interrupted and the banner still shows, start the engine session for the same call with an `interrupted` gap - `inst-resume-interrupted`
 4. [x] - `p1` - **ELSE IF** the phase is `failed` for this call, restart the engine and resume with an `engine_restart` gap - `inst-try-again`
 5. [x] - `p1` - **ELSE RETURN** `notice_expired` - `inst-else-expired`
 6. [x] - `p1` - **RETURN** `CaptureState` with phase `recording` - `inst-return-resume`
+7. [x] - `p1` - When the interrupted call is ended instead of resumed, write its final transcript file and enqueue PostCall then ArchivePass - `inst-end-interrupted`
 
 ### Make a call sensitive
 

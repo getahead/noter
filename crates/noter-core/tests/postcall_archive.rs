@@ -10,7 +10,7 @@ use noter_core::{
     Scripted, Surfaces, TrayModel,
 };
 use noter_db::Insert;
-use noter_engine_client::scripted::ScriptedEngine;
+use noter_engine_client::scripted::{Script, ScriptedEngine};
 use noter_jobs::{Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
@@ -77,6 +77,7 @@ struct Rig {
     events: Arc<Events>,
     posted: Arc<Posted>,
     dir: tempfile::TempDir,
+    engine: ScriptedEngine,
 }
 
 fn main_window() -> CommandCtx {
@@ -90,6 +91,14 @@ fn main_window() -> CommandCtx {
 /// A core whose router answers from `script` and whose engine is scripted, with an App Group
 /// container (`engine: true`) or without one.
 async fn open(script: &str, engine: bool) -> Rig {
+    open_with_offline_script(script, engine, None).await
+}
+
+async fn open_with_offline_script(
+    script: &str,
+    engine_enabled: bool,
+    offline_script: Option<Script>,
+) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let events = Arc::new(Events::default());
     let posted = Arc::new(Posted::default());
@@ -97,8 +106,13 @@ async fn open(script: &str, engine: bool) -> Rig {
     let mut deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
         .with_llm(Adapters::scripted(&scripted))
         .with_surfaces(posted.clone());
-    if engine {
-        deps = deps.with_engine(Arc::new(ScriptedEngine::new().with_container(dir.path())));
+    let mut engine = ScriptedEngine::new();
+    if let Some(offline_script) = offline_script {
+        engine = engine.with_script(offline_script);
+    }
+    if engine_enabled {
+        engine = engine.with_container(dir.path());
+        deps = deps.with_engine(Arc::new(engine.clone()));
     }
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
@@ -108,7 +122,116 @@ async fn open(script: &str, engine: bool) -> Rig {
         events,
         posted,
         dir,
+        engine,
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn archive_install_keeps_speaker_and_term_edits_made_during_the_offline_pass() {
+    use noter_protocol::engine::{EngineSegment, EngineSegmentState};
+
+    let fixture = tempfile::tempdir().unwrap();
+    let result_path = fixture.path().join("archive.json");
+    let result = noter_protocol::engine::ArchiveResult {
+        call_id: CallId::new(CALL),
+        backend: noter_protocol::engine::AsrBackend::WhisperLargeV3,
+        segments: vec![EngineSegment {
+            id: "archive_0".into(),
+            call_id: CallId::new(CALL),
+            channel: AudioChannel::Sys,
+            t0_ms: OffsetMs(0),
+            t1_ms: OffsetMs(5_000),
+            state: EngineSegmentState::Confirmed,
+            lang: Lang::En,
+            lang_p: 0.99,
+            speaker_label: "spk_1".into(),
+            text: "We agree on step 0.".into(),
+            words_path: None,
+            avg_logprob: -0.1,
+            no_speech_p: 0.0,
+            corrections: vec![],
+            crosstalk_labels: vec![],
+        }],
+    };
+    std::fs::write(&result_path, serde_json::to_vec(&result).unwrap()).unwrap();
+    let script = serde_json::json!({
+        "on": "offline_pass",
+        "after_ms": 500,
+        "event": {
+            "type": "offline_done",
+            "call_id": CALL,
+            "result_path": result_path
+        }
+    })
+    .to_string();
+    let r = open_with_offline_script("", true, Some(Script::parse(&script).unwrap())).await;
+    seed_call(&r.core, CALL, 3);
+    let run = trigger(&r.core, JobKind::ArchivePass, CALL);
+    for _ in 0..100 {
+        if r.engine.commands().iter().any(|command| {
+            matches!(
+                command,
+                noter_protocol::engine::EngineCommand::OfflinePass { .. }
+            )
+        }) {
+            break;
+        }
+        tokio::task::yield_now().await;
+    }
+    r.core
+        .transcript_rename_speaker(
+            &main_window(),
+            RenameSpeakerArgs {
+                call_id: CallId::new(CALL),
+                speaker_id: SpeakerId::new(format!("{CALL}_spk")),
+                person: PersonRef::New {
+                    display_name: "Grace Hopper".into(),
+                    email: None,
+                },
+                scope: RenameScope::WholeCall,
+            },
+        )
+        .await
+        .unwrap();
+    r.core
+        .transcript_fix_term(
+            &main_window(),
+            FixTermArgs {
+                call_id: CallId::new(CALL),
+                segment_id: SegmentId::new(format!("{CALL}_seg_0")),
+                range: TextRange { start: 3, end: 8 },
+                replacement: "concur".into(),
+                add_to_glossary: false,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(settle(&r.core, &run).await.status, JobRunStatus::Succeeded);
+    assert_eq!(
+        rows(
+            &r.core,
+            &format!("SELECT name FROM speakers WHERE call_id = '{CALL}' AND pass = 'archive'")
+        ),
+        vec![vec![json!("Grace Hopper")]]
+    );
+    assert_eq!(
+        rows(
+            &r.core,
+            &format!("SELECT text FROM segments WHERE call_id = '{CALL}' AND pass = 'archive'")
+        ),
+        vec![vec![json!("We concur on step 0.")]]
+    );
+    assert_eq!(
+        rows(
+            &r.core,
+            &format!(
+                "SELECT corrections FROM segments WHERE call_id = '{CALL}' AND pass = 'archive'"
+            )
+        ),
+        vec![vec![json!(
+            r#"[{"range":{"start":3,"end":9},"original":"agree"}]"#
+        )]]
+    );
 }
 
 fn ins(table: &'static str, values: Vec<(&'static str, Value)>) -> Insert {

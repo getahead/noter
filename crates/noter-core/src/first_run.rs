@@ -360,6 +360,13 @@ impl Core {
         self.start_playback();
         self.start_transcript();
         self.start_jobs();
+        // Recovery finalizes older interrupted calls through the same scheduler and transcript
+        // path as a normal stop, so it must run after both services are ready.
+        if let Err(e) = self.find_interrupted() {
+            self.log(crate::object(serde_json::json!({
+                "level": "error", "module": "capture", "code": e.code
+            })));
+        }
     }
 
     fn apply_login_item(&self, on: bool) {

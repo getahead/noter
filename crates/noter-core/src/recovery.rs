@@ -92,7 +92,12 @@ impl Core {
             "Ended interrupted recording",
             false,
             values,
-        )
+        )?;
+        // @cpt-begin:cpt-noter-flow-core-capture-session-resume:p1:inst-end-interrupted
+        self.call_ended(call_id, StreamEndReason::CallStopped);
+        self.trigger_post_call_jobs(call_id);
+        // @cpt-end:cpt-noter-flow-core-capture-session-resume:p1:inst-end-interrupted
+        Ok(())
     }
 
     /// The call's start and the offset of the last audio it kept (segments, marks, gaps).
