@@ -106,6 +106,10 @@ export function CallsView(p: CallsViewProps) {
 
 function Body(p: CallsViewProps) {
   const { state, selected } = p;
+  const groups = useMemo(
+    () => groupByMonth(state.rows, undefined, p.prefs?.time_zone || undefined),
+    [state.rows, p.prefs?.time_zone],
+  );
   if (state.status === "ERROR")
     return (
       <InlineBanner
@@ -160,10 +164,6 @@ function Body(p: CallsViewProps) {
         )}
       </div>
     );
-  const groups = useMemo(
-    () => groupByMonth(state.rows, undefined, p.prefs?.time_zone || undefined),
-    [state.rows, p.prefs?.time_zone],
-  );
   const stopId = state.rows.find((c) => selected.has(c.id))?.id ?? groups[0]?.rows[0]?.id;
   const head = (col: Column, width: string) => (
     <Th
