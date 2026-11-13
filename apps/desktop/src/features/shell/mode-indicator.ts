@@ -1,4 +1,5 @@
 import type { DegradedState, PrivacyMode } from "../../core/bindings";
+import type { AnnounceEvent } from "../../app/a11y/announce";
 
 export type ModeState = "CLOUD" | "CLOUD_REDACTED" | "LOCAL_ONLY" | "SENSITIVE_LOCAL" | "SWITCHED_TO_LOCAL" | "NO_ASSISTANT";
 
@@ -14,6 +15,11 @@ export interface ModeView {
   state: ModeState;
   /** Degraded: the warning glyph and word. */
   warning: boolean;
+}
+
+// @cpt-dod:cpt-noter-dod-ui-main-window-shell-mode-indicator:p1
+export function modeChangeAnnouncement(previous: ModeState | null, current: ModeState, text: string, key: string): AnnounceEvent | null {
+  return previous === null || previous === current ? null : { kind: "mode_change", text, key };
 }
 
 const BY_MODE: Record<PrivacyMode, ModeView> = {

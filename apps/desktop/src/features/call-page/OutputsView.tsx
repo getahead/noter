@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import { useAnnounce } from "../../app/a11y/announce";
 import { useWindow } from "../../app/use-window";
 import type { OutputSection as Section, SectionKind } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -25,6 +26,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
   const progress = useWindow(bridge, (s) => s.outputs);
   const openRegenerate = useRegenerate(bridge, callId);
   const read = useWindow(bridge, (s) => s.commands[outputsKey(callId)]);
+  const announce = useAnnounce(bridge);
 
   // once per call and instance: a development remount must not ask the core twice
   const asked = useRef<string | null>(null);
@@ -39,14 +41,13 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
     return p && p !== s.state.type && p !== "pending" && p !== "writing" ? [`${s.kind}:${p}`] : [];
   }).join();
   const lastSettled = useRef("");
-  const announced = useRef<string | null>(null);
   useEffect(() => {
     if (!settled) return void (lastSettled.current = "");
     if (lastSettled.current === settled) return;
     lastSettled.current = settled;
     void loadOutputs(bridge, callId);
-    announceSummaryOnce(bridge, callId, settled, announced);
-  }, [bridge, callId, settled]);
+    announceSummaryOnce(announce, callId, settled);
+  }, [announce, bridge, callId, settled]);
 
   if (!call || !prefs) return null;
   // naming does not wait for the outputs: a call whose outputs cannot be read still names its speakers

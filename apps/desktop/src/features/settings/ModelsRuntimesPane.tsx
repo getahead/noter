@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWindow } from "../../app/use-window";
 import type { KeyProvider } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { askAlert } from "../../ui/dialogs/alerts";
+import { useAlert } from "../../ui/dialogs/host";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { installCli, installKey, loadAccounts, removeKey } from "./accounts";
@@ -18,6 +18,7 @@ import type { PaneProps } from "./pane-props";
 
 // @cpt-dod:cpt-noter-dod-ui-accounts-keys:p1
 export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
+  const askAlert = useAlert();
   const accounts = useWindow(bridge, (s) => s.whole.accounts);
   const installing = useWindow(bridge, (s) => s.commands[installKey("ollama")]?.state);
   const rowError = useRowErrors(bridge);

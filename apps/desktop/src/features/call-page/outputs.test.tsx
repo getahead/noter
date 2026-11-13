@@ -1,7 +1,7 @@
 // The Summary view's components against the real bridge and the fake core: what each draws for held outputs, and what
 // its controls send.
 import { renderToString } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CallOutputs, ItemView, OutputSection as Section, SectionKind } from "../../core/bindings";
@@ -13,6 +13,7 @@ import { CallBanners } from "./CallBanners";
 import { loadCall } from "./actions";
 import { OutputSection } from "./OutputSection";
 import { OutputsView } from "./OutputsView";
+import { createAnnouncer } from "../../app/a11y/announce";
 import { announceSummaryOnce, commitDraft, loadOutputs, loadVersion, loadVersions, readVersion, regenerate, saveEdit } from "./outputs-actions";
 import { bodyOf, holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { RegenerateSheet } from "./RegenerateSheet";
@@ -352,14 +353,15 @@ describe("the action item row slot", () => {
 describe("announceSummaryOnce (inst-visible)", () => {
   it("announces Summary ready politely once per call, and only when the Summary itself settled", async () => {
     await open([sec("summary")]);
-    const seen = sent();
-    const done = { current: null as string | null };
-    expect(announceSummaryOnce(bridge, id, "decisions:ready", done)).toBe(false);
-    expect(announceSummaryOnce(bridge, id, "summary:failed", done)).toBe(false);
-    expect(announceSummaryOnce(bridge, id, "summary:ready", done)).toBe(true);
-    expect(announceSummaryOnce(bridge, id, "decisions:ready,summary:ready", done)).toBe(false);
+    const live = vi.fn();
+    const announce = createAnnouncer({ label: "main", isKey: () => true, native: bridge.core.windowAnnounce, live });
+    expect(announceSummaryOnce(announce, id, "decisions:ready")).toBe(false);
+    expect(announceSummaryOnce(announce, id, "summary:failed")).toBe(false);
+    expect(announceSummaryOnce(announce, id, "summary:ready")).toBe(true);
+    expect(announceSummaryOnce(announce, id, "decisions:ready,summary:ready")).toBe(true);
     await settle();
-    expect(seen.filter(([cmd]) => cmd === "window_announce")).toEqual([["window_announce", { text: "Summary ready", politeness: "polite" }]]);
-    expect(announceSummaryOnce(bridge, "another-call", "summary:ready", done)).toBe(true);
+    expect(live).toHaveBeenCalledWith("polite", "Summary ready");
+    expect(live).toHaveBeenCalledOnce();
+    expect(announceSummaryOnce(announce, "another-call", "summary:ready")).toBe(true);
   });
 });

@@ -177,7 +177,7 @@ describe("announcements (DESIGN › Keyboard and VoiceOver, announcement table)"
 
   it("announces a new notice assertively, Paused and Resumed, and the stop with its minutes", () => {
     const ended = { type: "call_ended" as const, stops_at: 1 };
-    expect(captureAnnouncements({ phase: "recording", notice: null }, cap({ notice: ended }), ended)).toEqual([{ kind: "call_ended", text: "The call seems to have ended", key: "call_live:1" }]);
+    expect(captureAnnouncements({ phase: "recording", notice: null }, cap({ notice: ended }), ended)).toEqual([{ kind: "call_ended", text: "The call seems to have ended. Noter stops recording in 10 seconds. Press Control-Option-Command-N, then Return, to keep recording.", key: "call_live:1" }]);
     expect(captureAnnouncements({ phase: "recording", notice: "call_ended" }, cap({ notice: ended }), ended)).toEqual([]);
     const meeting = { type: "new_meeting" as const, event: null, app_name: null, detected_at: 1, expires_at: 2, default_choice: "start_as_new_call" as const };
     expect(captureAnnouncements({ phase: "recording", notice: null }, cap(), meeting)[0]).toMatchObject({ kind: "new_meeting", text: "A new meeting may have started" });

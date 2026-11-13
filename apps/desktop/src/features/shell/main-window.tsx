@@ -3,6 +3,7 @@
 // and inspector slot MW-R4. It renders from the window store; the history, sidebar and zoom are view state.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 
+import { useAnnounce } from "../../app/a11y/announce";
 import { useWindowShortcuts } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -19,7 +20,7 @@ import { InspectorSlot } from "./inspector";
 import { closeInspector, inspectorOverride, useInspectorOverride } from "./inspector-override";
 import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
 import { elapsedSeconds, isLive, shortTitle } from "./live-row";
-import { modeIndicator } from "./mode-indicator";
+import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
 import { shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
@@ -41,6 +42,9 @@ const NO_NEED = { full: 0, singleColumn: 0, fewerColumns: 0 };
 // @cpt-flow:cpt-noter-flow-ui-main-window-shell-app-state:p1
 // @cpt-flow:cpt-noter-flow-ui-main-window-shell-resize:p1
 export function MainWindow({ bridge }: { bridge: Bridge }) {
+  const announce = useAnnounce(bridge);
+  const previousMode = useRef<ModeState | null>(null);
+  const modeEvent = useRef(0);
   const [shell, dispatch] = useReducer(shellReduce, INITIAL_SHELL);
   // Delete Call… on a call's page: the dialogs host's alert, then Library › Calls replaces the deleted page. Set while
   // rendering because the call page's toolbar, a child, reads it before any effect of this window runs.
@@ -167,6 +171,12 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-capture
 
   const mode = modeIndicator({ mode: privacy?.mode ?? "cloud_redacted", degraded: degraded?.states ?? [], sensitiveCall: false });
+  useEffect(() => {
+    const previous = previousMode.current;
+    previousMode.current = mode.state;
+    const event = modeChangeAnnouncement(previous, mode.state, t(MODE_MSG[mode.state].voice), String(++modeEvent.current));
+    if (event) void announce(event);
+  }, [announce, mode.state]);
   const word = mode.warning || mode.state === "LOCAL_ONLY";
   const footer = word ? t(MODE_MSG[mode.state].word) : live ? t("footer.recording", { name: live.title }) : t("footer.idle");
 

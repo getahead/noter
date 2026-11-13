@@ -6,6 +6,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { KeyCap } from "../../ui/primitives/key-cap";
 import type { HotkeyAnswer } from "./actions";
 import type { ChordModifiers } from "./chord";
+import { spokenChord } from "./accelerator";
 import { IDLE_RECORDER, recorderReduce, type RecorderState } from "./recorder";
 import { handleKeyDown, handleKeyUp } from "./recorder-key";
 
@@ -27,16 +28,19 @@ export interface HotkeyRecorderProps {
 
 const stateName = (s: RecorderState, caps: string) => (s.type === "IDLE" && !caps ? "CLEARED" : s.type).toLowerCase();
 
-// @cpt-component:cpt-noter-component-ui-hotkey-recorder:p1
 // @cpt-dod:cpt-noter-dod-ui-settings-hotkeys:p1
+export const hotkeyRecorderLabel = (label: string, caps: string, recording: boolean) =>
+  t(recording ? "settings.hotkeys.recording" : "settings.hotkeys.field", { label, chord: spokenChord(caps) || t("settings.hotkeys.none") });
+
+// @cpt-component:cpt-noter-component-ui-hotkey-recorder:p1
 export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, conflict, onRecord, onClear }: HotkeyRecorderProps) {
   const [state, dispatch] = useReducer(recorderReduce, IDLE_RECORDER);
   useEffect(() => dispatch({ type: disabled ? "disable" : "enable" }), [disabled]);
-  useEffect(() => dispatch(conflict ? { type: "refused", message: conflict } : { type: "dismiss" }), [conflict]);
+  useEffect(() => void (conflict ? dispatch({ type: "refused", message: conflict }) : dispatch({ type: "dismiss" })), [conflict]);
 
   const held = useRef<ChordModifiers | null>(null); // a modifier set collects its keys until they are released
   const recording = state.type === "RECORDING";
-  const message = state.type === "CONFLICT" || state.type === "INVALID" ? state.message : null;
+  const message = (state.type === "CONFLICT" || state.type === "INVALID" ? state.message : null) ?? conflict ?? null;
   const settle = async (answer: Promise<HotkeyAnswer> | undefined) => {
     const r = await answer;
     // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-if-conflict
@@ -67,7 +71,8 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
             id={id}
             className={recording ? "hk-field is-rec" : "hk-field"}
             disabled={disabled}
-            aria-label={t("settings.hotkeys.field", { label, chord: caps || t("settings.hotkeys.none") })}
+            aria-label={hotkeyRecorderLabel(label, caps, recording)}
+            aria-describedby={message ? `${id}-conflict` : undefined}
             // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-start-record
             // Safari does not focus a button on click, and the chord is read from the focused field
             onClick={(e) => ((held.current = null), e.currentTarget.focus(), dispatch({ type: "start" }))}
@@ -90,7 +95,7 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
       </span>
       <div className="hk-live" aria-live="polite">
         {message && !recording && (
-          <span className="hk-err">
+          <span className="hk-err" id={`${id}-conflict`}>
             <Icon name="warning" size={12} />
             {message}
           </span>

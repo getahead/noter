@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import { focusFirstAvailable } from "../../app/a11y/focus";
 import type { GlossaryTerm } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -21,22 +22,36 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
   const listFailed = commands["glossary:list"]?.state === "ERROR";
   const mutationFailed = commands["glossary:upsert"]?.state === "ERROR" || commands["glossary:remove"]?.state === "ERROR";
   const asked = useRef(false);
+  const focusAfterRemove = useRef<number | null>(null);
   useEffect(() => {
     if (asked.current) return;
     asked.current = true;
     void listTerms(bridge).then((list) => list && setTerms(list));
   }, [bridge]);
+  useEffect(() => {
+    const index = focusAfterRemove.current;
+    if (index === null) return;
+    focusAfterRemove.current = null;
+    const next = Math.min(index, terms.length - 1);
+    focusFirstAvailable(document, [...(next >= 0 ? [`glossary-row-${terms[next]!.id}`] : []), "glossary-add"]);
+  }, [terms]);
 
   const { add, remove } = createGlossaryActions(bridge, { form, selected, editing, setTerms, setForm, setSelected, setEditing });
   const edit = () => { const term = terms.find((item) => item.id === selected); if (!term) return; setEditing(term); setForm({ term: term.term, latin: term.variants_latin.join(", "), cyrillic: term.variants_cyrillic.join(", "), spoken: term.spoken_forms.join(", ") }); };
+  const removeSelected = async () => {
+    const index = terms.findIndex((term) => term.id === selected);
+    const restore = document.activeElement?.id === "glossary-remove";
+    if (restore && index >= 0) focusAfterRemove.current = index;
+    if (!(await remove())) focusAfterRemove.current = null;
+  };
   return (
     <Group
       title={t("settings.glossary.title")}
       foot={
         <>
-          <IconButton icon="plus" label={t("settings.glossary.add")} size="inline" onAction={() => setForm(EMPTY_FORM)} />
+          <IconButton id="glossary-add" icon="plus" label={t("settings.glossary.add")} size="inline" onAction={() => setForm(EMPTY_FORM)} />
           <PushButton label={t("settings.glossary.edit")} size="small" disabled={!selected} onAction={edit} />
-          <IconButton icon="minus" label={t("settings.glossary.remove")} size="inline" disabled={!selected} onAction={() => void remove()} />
+          <IconButton id="glossary-remove" icon="minus" label={t("settings.glossary.remove")} size="inline" disabled={!selected} onAction={() => void removeSelected()} />
           <span className="np-dim">{t("settings.glossary.note")}</span>
         </>
       }
@@ -83,7 +98,7 @@ export function TermRows({ terms, selected, onSelect, onEdit }: { terms: Glossar
   return (
     <>
       {terms.map((g, i) => (
-        <tr key={g.id} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => onSelect(g.id)} onFocus={() => onSelect(g.id)} onDoubleClick={onEdit} onKeyDown={(event) => { if (event.key === "Enter") onEdit?.(); }}>
+        <tr key={g.id} id={`glossary-row-${g.id}`} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => onSelect(g.id)} onFocus={() => onSelect(g.id)} onDoubleClick={onEdit} onKeyDown={(event) => { if (event.key === "Enter") onEdit?.(); }}>
           <td lang="und">{g.term}</td>
           <td lang="und">{cell(g.variants_latin)}</td>
           <td lang="ru">{cell(g.variants_cyrillic)}</td>

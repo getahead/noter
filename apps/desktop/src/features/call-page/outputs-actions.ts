@@ -3,7 +3,6 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { RegenerateArgs } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { announce } from "../record-prompt/actions";
 import { summaryReadyNow } from "./outputs-logic";
 import { bodyOf, holdBody, holdOutputs, holdVersions } from "./outputs-cache";
 
@@ -78,12 +77,11 @@ export async function readVersion(bridge: Bridge, summaryId: string, versionId: 
   return !!bodyOf(summaryId, versionId) || (await loadVersion(bridge, summaryId, versionId)).status === "ok";
 }
 
-/** Announce **Summary ready** (polite) when `settled` says the Summary finished; `done` holds the call already announced, so once per call. */
-export function announceSummaryOnce(bridge: Bridge, callId: string, settled: string, done: { current: string | null }) {
+/** Announce **Summary ready** (polite) when `settled` says the Summary finished; the shared service deduplicates this call. */
+export function announceSummaryOnce(announce: (event: { kind: "outputs_ready"; text: string; key: string }) => Promise<void>, callId: string, settled: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
-  if (!summaryReadyNow(settled) || done.current === callId) return false;
-  done.current = callId;
-  void announce(bridge, t("outputs.summary_ready"), "polite");
+  if (!summaryReadyNow(settled)) return false;
+  void announce({ kind: "outputs_ready", text: t("outputs.summary_ready"), key: callId });
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
   return true;
 }

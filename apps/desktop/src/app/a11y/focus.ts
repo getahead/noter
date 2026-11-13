@@ -5,6 +5,17 @@ import { useEffect, useRef, type RefObject } from "react";
 export type FocusTarget = { focus(): void; isConnected?: boolean };
 type FocusState = "IN_PAGE" | "IN_OVERLAY" | "RETURNED";
 
+// @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
+export function focusFirstAvailable(doc: Pick<Document, "getElementById">, ids: readonly string[]): boolean {
+  for (const id of ids) {
+    const target = doc.getElementById(id);
+    if (!target || target.hasAttribute("disabled")) continue;
+    target.focus();
+    return true;
+  }
+  return false;
+}
+
 // @cpt-state:cpt-noter-state-ui-accessibility-l10n-focus-return:p1
 export function createFocusReturn(getActive: () => FocusTarget | null) {
   let state: FocusState = "IN_PAGE";

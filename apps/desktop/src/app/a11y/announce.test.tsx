@@ -159,6 +159,18 @@ describe("writeLive", () => {
     expect(writes).toHaveLength(2);
     vi.useRealTimers();
   });
+
+  it("keeps same-tick announcements together in the live region", () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const el = { set textContent(v: string) { writes.push(v); }, get textContent() { return ""; } };
+    const write = writeLive({ querySelector: () => el } as never);
+    write("polite", "A");
+    write("polite", "B");
+    vi.advanceTimersByTime(50);
+    expect(writes).toEqual(["", "A B"]);
+    vi.useRealTimers();
+  });
 });
 
 describe("announcerFor", () => {

@@ -21,6 +21,12 @@ export function hotkeyRows(list: HotkeyList | undefined): HotkeyRow[] {
   return GLOBAL_ACTIONS.flatMap((a) => list?.bindings.filter((b) => b.action === a).map(row) ?? []);
 }
 
+// @cpt-flow:cpt-noter-flow-ui-settings-set-hotkeys:p1
+export function hotkeyCaps(list: HotkeyList | undefined, action: HotkeyAction, fallback: string): string {
+  const binding = list?.bindings.find((item) => item.action === action);
+  return binding ? capsOf(binding.shortcut) : fallback;
+}
+
 /** The **Undo last card action** row. */
 export const undoRow = (list: HotkeyList | undefined): HotkeyRow | null => {
   const b = list?.bindings.find((x) => x.action === "undo_card_action");

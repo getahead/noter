@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { capsOf, modifierCaps, toAccelerator } from "./accelerator";
+import { capsOf, modifierCaps, spokenChord, toAccelerator } from "./accelerator";
 
 const m = (over: object = {}) => ({ control: false, option: false, command: false, shift: false, ...over });
 const all = m({ control: true, option: true, command: true });
@@ -37,4 +37,8 @@ describe("modifierCaps", () => {
     expect(modifierCaps({ control: true, option: true, command: true })).toBe("⌃⌥⌘");
     expect(modifierCaps({ control: true, option: true, command: true, shift: true })).toBe("⌃⌥⇧⌘");
   });
+});
+
+it("speaks a rebound chord with words for its modifiers", () => {
+  expect(spokenChord("⌃⌥⌘N")).toBe("Control-Option-Command-N");
 });

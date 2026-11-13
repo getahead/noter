@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createFocusReturn,
+  focusFirstAvailable,
   FOCUSABLE,
   installTabNavigation,
   installUnobscure,
@@ -36,6 +37,15 @@ describe("createFocusReturn", () => {
     fr.close();
     expect(opener.focus).not.toHaveBeenCalled();
     createFocusReturn(() => null).open();
+  });
+});
+
+describe("focusFirstAvailable", () => {
+  it("uses the first replacement control that exists after the focused one unmounts", () => {
+    const focus = vi.fn();
+    const doc = { getElementById: (id: string) => id === "next" ? { focus: vi.fn(), hasAttribute: () => true } : id === "add" ? { focus, hasAttribute: () => false } : null } as unknown as Document;
+    expect(focusFirstAvailable(doc, ["next", "add"])).toBe(true);
+    expect(focus).toHaveBeenCalledOnce();
   });
 });
 
