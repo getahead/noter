@@ -478,7 +478,6 @@ impl<L: EngineLauncher> EngineClient<L> {
         // @cpt-end:cpt-noter-flow-core-engine-capture-recover:p1:inst-respawn
     }
 
-    // @cpt-algo:cpt-noter-algo-core-engine-capture-degraded:p1
     /// Session facts from one engine event (not replies); facts go out after the lock.
     pub(crate) fn on_capture_event(&self, event: &EngineEvent) {
         let mut out = Vec::new();
