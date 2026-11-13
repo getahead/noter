@@ -239,6 +239,76 @@ fn names(dir: &Path) -> Vec<String> {
 }
 
 #[tokio::test]
+// cpt-noter-algo-core-items-today-format: owners are data in clipboard and exported Markdown.
+async fn markdown_copy_and_export_escape_owner_markup() {
+    for (owner, escaped) in [
+        (
+            "[x](https://example.invalid)",
+            r"\[x\](https://example.invalid)",
+        ),
+        (
+            r#"<img src=x onerror="alert(1)">"#,
+            r#"\<img src=x onerror="alert(1)"\>"#,
+        ),
+        (
+            r"Anna \ `code` *bold* _name_",
+            r"Anna \\ \`code\` \*bold\* \_name\_",
+        ),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("out");
+        let (core, native) = open(dir.path(), Some(out.clone()));
+        world(&core);
+        let mut owned = item(
+            "itm_owned",
+            "call_a",
+            "action_item",
+            "Owned task",
+            "accepted",
+        );
+        owned.values.extend([
+            ("owner_person_id", json!("per_owner")),
+            ("due_date", json!("2026-10-16")),
+        ]);
+        core.store()
+            .insert_batch(vec![
+                row(
+                    "people",
+                    &[
+                        ("id", json!("per_owner")),
+                        ("rev", json!(1)),
+                        ("display_name", json!(owner)),
+                        ("short_name", json!(owner)),
+                    ],
+                ),
+                owned,
+            ])
+            .unwrap();
+        let expected = format!("Owned task — {escaped}, due 2026-10-16");
+        for format in [ShareFormat::Markdown, ShareFormat::Slack, ShareFormat::Jira] {
+            let result = core
+                .share_copy(&ctx(), args("call_a", format))
+                .await
+                .unwrap();
+            if format == ShareFormat::Markdown {
+                assert!(result.text.contains(&expected), "{}", result.text);
+            }
+            let board = native.clipboard.lock().unwrap();
+            let markdown = board.last().unwrap().markdown.as_ref().unwrap();
+            assert!(markdown.contains(&expected), "{markdown}");
+            assert!(!markdown.contains(owner), "{markdown}");
+        }
+        let result = export(&core, &["call_a"], (true, false, false))
+            .await
+            .unwrap();
+        assert_eq!(result.files, 1);
+        let markdown = std::fs::read_to_string(out.join(&names(&out)[0])).unwrap();
+        assert!(markdown.contains(&expected), "{markdown}");
+        assert!(!markdown.contains(owner), "{markdown}");
+    }
+}
+
+#[tokio::test]
 async fn share_copy_puts_plain_markdown_and_html_on_the_clipboard() {
     let dir = tempfile::tempdir().unwrap();
     let (core, native) = open(dir.path(), None);
