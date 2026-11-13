@@ -249,6 +249,7 @@ impl Core {
                 self.store()
                     .read(move |c| crate::library::speakers_of(c, &call_id))?
             };
+            self.refresh_live_speakers(&CallId::new(&call_id), &views);
             self.emit_entity_changed(&EntityChanged::Speakers {
                 call_id: CallId::new(call_id),
                 speakers: views,

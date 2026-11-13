@@ -213,6 +213,137 @@ async fn a_hypothesis_is_streamed_and_never_stored() {
 }
 
 #[tokio::test(start_paused = true)]
+// cpt-noter-flow-core-speakers-audio-name; cpt-noter-algo-core-live-transcript-speakers
+async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    new_call(&r.core, "recording");
+    let (_, got) = subscribe(&r).await;
+    engine_up(&r).await;
+    r.engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "hello"));
+    settle(500).await;
+    let first = events(&got)
+        .into_iter()
+        .find_map(|e| match e {
+            TranscriptEvent::Confirmed { segment } => Some(segment),
+            _ => None,
+        })
+        .unwrap();
+    assert!(matches!(first.speaker.label, SpeakerLabel::Unnamed { .. }));
+    r.engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_1", 2000, "other"));
+    settle(100).await;
+    let done = r
+        .core
+        .transcript_rename_speaker(
+            &call_window(),
+            RenameSpeakerArgs {
+                call_id: call_id(),
+                speaker_id: first.speaker.speaker_id.clone(),
+                person: PersonRef::New {
+                    display_name: "Dana".into(),
+                    email: None,
+                },
+                scope: RenameScope::WholeCall,
+            },
+        )
+        .await
+        .unwrap();
+    let named = done
+        .speakers
+        .iter()
+        .find(|s| s.id == first.speaker.speaker_id)
+        .unwrap();
+    assert!(
+        matches!(&named.label, SpeakerLabel::Person { person } if person.display_name == "Dana")
+    );
+    got.lock().unwrap().clear();
+    r.engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_0", 1000, "next"));
+    settle(100).await;
+    r.engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 1000, "next line"));
+    r.engine
+        .inject(confirmed(AudioChannel::Sys, "spk_1", 2000, "other voice"));
+    settle(500).await;
+    let heard = events(&got);
+    let later: Vec<_> = heard
+        .iter()
+        .filter_map(|e| match e {
+            TranscriptEvent::Hypothesis { segment } | TranscriptEvent::Confirmed { segment }
+                if segment.t0_ms == OffsetMs(1000) =>
+            {
+                Some(segment)
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(later.len(), 2);
+    for segment in later {
+        assert_eq!(segment.speaker.speaker_id, first.speaker.speaker_id);
+        assert_eq!(segment.speaker.label, named.label);
+    }
+    assert!(heard.iter().any(|e| matches!(e,
+        TranscriptEvent::Confirmed { segment }
+            if segment.t0_ms == OffsetMs(2000)
+                && matches!(segment.speaker.label, SpeakerLabel::Unnamed { n: 2 })
+    )));
+    assert_eq!(stored(&r.core, "SELECT id FROM speakers").len(), 2);
+
+    r.core
+        .change_undo(
+            &call_window(),
+            UndoArgs {
+                target: UndoTarget::Change {
+                    change_id: done.change_id,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    got.lock().unwrap().clear();
+    r.engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 3000, "after undo"));
+    settle(500).await;
+    assert!(events(&got).iter().any(|e| matches!(e,
+        TranscriptEvent::Confirmed { segment }
+            if segment.speaker.speaker_id == first.speaker.speaker_id
+                && segment.speaker.label == first.speaker.label
+    )));
+    r.core
+        .transcript_rename_speaker(
+            &call_window(),
+            RenameSpeakerArgs {
+                call_id: call_id(),
+                speaker_id: first.speaker.speaker_id.clone(),
+                person: PersonRef::New {
+                    display_name: "Omar".into(),
+                    email: None,
+                },
+                scope: RenameScope::OneSegment {
+                    segment_id: first.id,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    got.lock().unwrap().clear();
+    r.engine.inject(confirmed(
+        AudioChannel::Sys,
+        "spk_0",
+        4000,
+        "after line naming",
+    ));
+    settle(500).await;
+    assert!(events(&got).iter().any(|e| matches!(e,
+        TranscriptEvent::Confirmed { segment }
+            if segment.speaker.speaker_id == first.speaker.speaker_id
+                && segment.speaker.label == first.speaker.label
+    )));
+}
+
+#[tokio::test(start_paused = true)]
 async fn confirmed_segments_commit_in_one_batch_and_publish_after_it() {
     let dir = tempfile::tempdir().unwrap();
     let r = open(dir.path());
