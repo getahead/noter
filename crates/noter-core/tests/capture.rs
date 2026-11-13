@@ -1661,6 +1661,36 @@ async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn silence_notice_waits_while_paused_and_is_raised_after_resume() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(300_000).await;
+    assert_eq!(r.state().await.notice, None);
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id,
+                paused: false,
+            },
+        )
+        .await
+        .unwrap();
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_heard_segment_means_no_nothing_heard_notice() {
     let r = rig();
     let call_id = r.recording().await;

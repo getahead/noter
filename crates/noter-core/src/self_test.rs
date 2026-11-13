@@ -117,13 +117,30 @@ impl Core {
             ));
         }
         // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-if-model-missing
+        // @cpt-begin:cpt-noter-flow-core-first-run-self-test:p1:inst-serialize-runs
+        {
+            let mut first_run = lock(&self.first_run);
+            if first_run.self_test_running || first_run.probing {
+                return Err(CoreError::new(
+                    ErrorCode::Conflict,
+                    "a self-test or system-audio probe is already running",
+                ));
+            }
+            first_run.self_test_running = true;
+        }
+        // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-serialize-runs
         // @cpt-begin:cpt-noter-flow-core-first-run-self-test:p1:inst-register-stream
         let key = format!("self_test_{}", NEXT_RUN.fetch_add(1, Ordering::Relaxed));
-        let sub = self.subscribe(&self.self_test_hub(), &key, ctx, channel, || Ok(()))?;
+        let sub = match self.subscribe(&self.self_test_hub(), &key, ctx, channel, || Ok(())) {
+            Ok(sub) => sub,
+            Err(error) => {
+                lock(&self.first_run).self_test_running = false;
+                return Err(error);
+            }
+        };
         // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-register-stream
         // @cpt-begin:cpt-noter-state-core-first-run-self-test:p1:inst-st-run
         // @cpt-begin:cpt-noter-state-core-first-run-self-test:p1:inst-st-rerun
-        lock(&self.first_run).self_test_running = true;
         self.refresh_setup();
         // @cpt-end:cpt-noter-state-core-first-run-self-test:p1:inst-st-rerun
         // @cpt-end:cpt-noter-state-core-first-run-self-test:p1:inst-st-run

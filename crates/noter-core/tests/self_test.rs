@@ -184,6 +184,26 @@ async fn run_to_end(r: &Run, play_clip: bool) -> (SubscriptionHandle, Vec<SelfTe
     (handle, msgs.into_iter().map(|m| m.event).collect())
 }
 
+#[tokio::test]
+async fn concurrent_self_test_is_rejected_without_opening_another_stream() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = ScriptedEngine::new();
+    engine.hold_next_self_test();
+    let r = open(dir.path(), engine, PermissionState::Granted, None);
+    let (sink, _) = collecting();
+    r.core
+        .self_test_run(&first_run(), SelfTestArgs { play_clip: false }, sink)
+        .await
+        .unwrap();
+    let (second, _) = collecting();
+    let error = r
+        .core
+        .self_test_run(&first_run(), SelfTestArgs { play_clip: false }, second)
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Conflict);
+}
+
 async fn status(r: &Run) -> SetupStatus {
     r.core.setup_status(&first_run(), NoArgs {}).await.unwrap()
 }

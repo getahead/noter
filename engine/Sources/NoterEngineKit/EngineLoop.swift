@@ -307,10 +307,12 @@ public final class EngineLoop: @unchecked Sendable {
         // longer to load: lines come from a model already loaded; otherwise it starts loading now.
         if let model, !models.isEmpty {
             if let transcriber = model.ready {
-                for channel in [Channel.mic, .sys] where Date() < deadline {
-                    let heard = state.heard(channel)
-                    guard !heard.isEmpty, let d = try? transcriber.decode(heard, languages: []), LiveASR.keep(d) else { continue }
-                    writer.emit(.selfTestLine(channel: channel, text: d.text.trimmingCharacters(in: .whitespacesAndNewlines)))
+                asrQueue.sync {
+                    for channel in [Channel.mic, .sys] where Date() < deadline {
+                        let heard = state.heard(channel)
+                        guard !heard.isEmpty, let d = try? transcriber.decode(heard, languages: []), LiveASR.keep(d) else { continue }
+                        writer.emit(.selfTestLine(channel: channel, text: d.text.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    }
                 }
             } else {
                 asrQueue.async { _ = try? model.get() }

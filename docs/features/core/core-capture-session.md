@@ -154,7 +154,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Actor**: Primary user (call window, main window, menu bar, hotkey)
 
 **Success Scenarios**:
-- Pause stops both streams and records a `paused` gap; resume continues the same call; a mark records a moment at the current offset with an optional note.
+- Pause stops both streams and records a `paused` gap; resume continues the same call and re-arms the silence notice using the existing last-heard time; a mark records a moment at the current offset with an optional note.
 
 **Error Scenarios**:
 - Resume of a stopped call: `not_recording`.
@@ -317,7 +317,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Steps**:
 1. [x] - `p1` - Audio released for 20 s → `CallEnded { stops_at: now + 10 s }`; while hidden for presenting → `CallSeemsEnded { stops_at: now + 10 min }` - `inst-timer-call-end`
 2. [x] - `p1` - While the notice is held, clear `stops_at`; on release set it to now plus 10 s - `inst-timer-hold`
-3. [x] - `p1` - Silence for 5 minutes → `NothingHeard { since }`; **Keep Recording** restarts the 5 minutes - `inst-timer-nothing-heard`
+3. [x] - `p1` - Silence for 5 minutes while recording → `NothingHeard { since }`; pause defers the notice and resume re-arms it from the last-heard time, while another notice defers and re-arms it; **Keep Recording** restarts the 5 minutes - `inst-timer-nothing-heard`
 4. [x] - `p1` - Next calendar event starting, or the meeting app reporting a new meeting → `NewMeeting { detected_at, expires_at: +60 s, default_choice: start_as_new_call }`; at `expires_at` apply the default - `inst-timer-new-meeting`
 5. [x] - `p1` - A second source → the `SecondAudioSource` degraded state until kept or excluded - `inst-timer-second-source`
 6. [x] - `p1` - `continue_until` passes or another capture starts → the stopped call leaves Continue, phase `idle` - `inst-timer-continue`

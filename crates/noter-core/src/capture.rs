@@ -696,6 +696,11 @@ impl Core {
         let (t0, t1) = (session.offset(since), session.offset(now));
         self.insert_gap(&call_id, t0, t1, GapReason::Paused)?;
         session.away_ms += now - since;
+        session.heard_chain += 1;
+        let heard_chain = session.heard_chain;
+        self.after(0, move |core| async move {
+            core.nothing_heard_due(heard_chain).await;
+        });
         // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-recording
         let status = vec![("status", json!("recording"))];
         self.write_call(ctx, &call_id, "Resumed recording", false, status)?;

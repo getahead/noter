@@ -142,6 +142,7 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 
 **Success Scenarios**:
 - Both streams arrive, the user sees levels and a recognised line per channel, the test passes within 10 s, and call detection turns on if **Offer to record** is on.
+- A self-test cannot overlap another self-test or the automatic system-audio probe; the competing request returns `conflict` without subscribing or changing setup state.
 
 **Error Scenarios**:
 - The live model is not downloaded: `model_missing` before the Channel opens.
@@ -151,11 +152,12 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 **Steps**:
 1. [x] - `p1` - API: `self_test_run { play_clip }` with a Channel - `inst-self-test-call`
 2. [x] - `p1` - **IF** the live model is missing **RETURN** `model_missing` - `inst-if-model-missing`
-3. [x] - `p1` - Register a one-off subscription with the stream hub and **RETURN** its `SubscriptionHandle` - `inst-register-stream`
-4. [x] - `p1` - Run the engine self-test (`cpt-noter-flow-core-engine-foundation-self-test`) and map its events to `SelfTestMsg`: `stream_arrived`, `levels`, `line`, then `passed` or `failed { reason }`, then `ended` - `inst-map-events`
-5. [x] - `p1` - DB: store the `SelfTestState` (passed with its time, or failed with its reason) through the change-log write path - `inst-store-result`
-6. [x] - `p1` - Apply `cpt-noter-algo-core-first-run-detection-rule` and tell the engine `set_detection` - `inst-apply-detection`
-7. [x] - `p1` - Emit `setup:changed` - `inst-emit-setup`
+3. [x] - `p1` - Under the first-run lock, refuse with `conflict` if a self-test or system-audio probe is active, then reserve the self-test - `inst-serialize-runs`
+4. [x] - `p1` - Register a one-off subscription with the stream hub and **RETURN** its `SubscriptionHandle` - `inst-register-stream`
+5. [x] - `p1` - Run the engine self-test (`cpt-noter-flow-core-engine-foundation-self-test`) and map its events to `SelfTestMsg`: `stream_arrived`, `levels`, `line`, then `passed` or `failed { reason }`, then `ended` - `inst-map-events`
+6. [x] - `p1` - DB: store the `SelfTestState` (passed with its time, or failed with its reason) through the change-log write path - `inst-store-result`
+7. [x] - `p1` - Apply `cpt-noter-algo-core-first-run-detection-rule` and tell the engine `set_detection` - `inst-apply-detection`
+8. [x] - `p1` - Emit `setup:changed` - `inst-emit-setup`
 
 ### Choose call display, audio storage and step states
 

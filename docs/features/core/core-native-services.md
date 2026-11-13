@@ -196,7 +196,7 @@ The system **MUST** expose native rich/plain clipboard writes, core-owned save a
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-native-services-share-test`
 
-The system **MUST** answer `share_test_run` from Settings with actual per-surface visibility and an optional core-process probe. It must block the probe during capture, ask Screen Recording only for explicit testing, dispose of buffers and report failure without false success.
+The system **MUST** answer `share_test_run` from Settings with actual per-surface visibility and an optional core-process probe. Probe the registered surfaces that must be protected (including unprotected ones), block the probe during capture, ask Screen Recording only for explicit testing, dispose of buffers and report failure without false success.
 
 **Implements**:
 - `cpt-noter-flow-core-native-services-share-test`
