@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.22.8](https://github.com/getahead/noter/compare/v0.22.7...v0.22.8) (2026-11-13)
+
+
+### Bug fixes
+
+* **ci:** temporarily vendor pinned Constructor Studio runtime ([#771](https://github.com/getahead/noter/issues/771)) ([59f0d39](https://github.com/getahead/noter/commit/59f0d390a1553d29bfdc11aa290b6bae64fa76ab))
+* **core:** apply privacy changes to active model runs ([#763](https://github.com/getahead/noter/issues/763)) ([509f5e2](https://github.com/getahead/noter/commit/509f5e2ef965e60569dc158aa2b1eb0138a7f46d))
+* **core:** bound idle OAuth callback connections ([#764](https://github.com/getahead/noter/issues/764)) ([b2e7cab](https://github.com/getahead/noter/commit/b2e7cabd545c1e06dcace9bff95d5a3eb32da64c))
+* **core:** bound stream acknowledgements to published sequence ([#767](https://github.com/getahead/noter/issues/767)) ([61c8707](https://github.com/getahead/noter/commit/61c8707664b4f139a8435db4415450767074fcfa))
+* **core:** delete stopped-call M4A recordings ([#762](https://github.com/getahead/noter/issues/762)) ([b78582f](https://github.com/getahead/noter/commit/b78582f19ce86df48f4b4b54a4f2b6c1bee9d13a))
+* **core:** enforce people and call scopes for knowledge sources ([#765](https://github.com/getahead/noter/issues/765)) ([ef927eb](https://github.com/getahead/noter/commit/ef927eb40d91ddb3f8ba11fe7e047e337bbb6c2e))
+* **core:** escape owner facts in Markdown shares ([#766](https://github.com/getahead/noter/issues/766)) ([7c4bd7b](https://github.com/getahead/noter/commit/7c4bd7b31f9023a54f8ebdd2b4850bd17506b233))
+* **core:** match keyword words after punctuation ([#780](https://github.com/getahead/noter/issues/780)) ([c8bc3a6](https://github.com/getahead/noter/commit/c8bc3a65ef735b8e61e44458658b3df3acc8efc7))
+* **core:** populate call participants and review counts ([#777](https://github.com/getahead/noter/issues/777)) ([f21c4c6](https://github.com/getahead/noter/commit/f21c4c6d9a6ec7339933c22c8c061a16817ffc8e))
+* **core:** refresh live speaker names after corrections ([#775](https://github.com/getahead/noter/issues/775)) ([4a6b2ac](https://github.com/getahead/noter/commit/4a6b2acff4231600bfcc5be012430fbe93e6f914))
+* **engine:** clear capture ring on clean stop ([#768](https://github.com/getahead/noter/issues/768)) ([c5ea061](https://github.com/getahead/noter/commit/c5ea061c7eed8297c634f579891f77b566b0e93a))
+* **host:** declare microphone and calendar access in app bundle ([#773](https://github.com/getahead/noter/issues/773)) ([dbeb3c8](https://github.com/getahead/noter/commit/dbeb3c85467bbecd28dad3b8e52807c65ec6f983))
+* **ui:** prevent overlapping item completion actions ([#769](https://github.com/getahead/noter/issues/769)) ([1780ec7](https://github.com/getahead/noter/commit/1780ec723a798c86a49e579fe6c80145d79b77f0))
+
 ## [0.22.7](https://github.com/getahead/noter/compare/v0.22.6...v0.22.7) (2026-11-10)
 
 
