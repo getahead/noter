@@ -38,6 +38,8 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
 
   test("export sheet with Audio while it is kept", async ({ page }) => {
     await open(page);
+    await expect(page.locator('[data-region="PC-R1"]').getByRole("button", { name: /^Share/ })).toBeVisible();
+    await expect(page.locator('[data-region="PC-R3"]')).toBeVisible();
     await page.keyboard.press("Meta+KeyE");
     await expect(page.getByRole("dialog", { name: /Export/ })).toContainText("Scope: Whole call");
     await shot(page, "call-page-export-sheet");

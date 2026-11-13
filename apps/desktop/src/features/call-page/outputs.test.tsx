@@ -7,6 +7,7 @@ import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CallOutputs, ItemView, OutputSection as Section, SectionKind } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
+import { sheetKey } from "../../ui/primitives/sheet";
 import { holdDeleteError, holdExtras, resetCache } from "./cache";
 import { CallBanners } from "./CallBanners";
 import { loadCall } from "./actions";
@@ -208,6 +209,17 @@ describe("outputs commands", () => {
 });
 
 describe("RegenerateSheet", () => {
+  it("runs the default action on Return from a checkbox", async () => {
+    await open([]);
+    fake.world.app.capture = { ...fake.world.app.capture, phase: "idle" } as never;
+    const seen = sent();
+    const tree = rendered(RegenerateSheet, { bridge, callId: id, sections: ["summary"], close: () => {} });
+    const sheet = find(tree, (p) => typeof p.onCancel === "function");
+    sheetKey({ key: "Enter", target: { tagName: "INPUT" }, preventDefault: () => {} } as never, () => {}, sheet.props.onDefault as (() => void) | undefined);
+    await settle();
+    expect(seen.find(([c]) => c === "outputs_regenerate")?.[1]).toMatchObject({ call_id: id, sections: ["summary", "decisions", "action_items", "open_questions"] });
+  });
+
   it("sends the chosen sections, runtime and skill, and closes when the job is accepted", async () => {
     await open([]);
     fake.world.app.capture = { ...fake.world.app.capture, phase: "idle" } as never; // the fixture's 1:1 is recording

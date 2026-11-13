@@ -15,4 +15,9 @@ describe("MarkdownBody", () => {
     expect(out).not.toContain("<script");
     expect(out).toContain("&lt;img");
   });
+
+  it("renders wrapped paragraphs, nested and ordered lists, deeper headings and emphasis safely", () => {
+    expect(html("First line\nsoft wrapped.\n\n  - parent\n    - child\n\n1. first\n2. second\n\n### Risks\n\n*emphasis* and [*literal emphasis* link](https://example.test)"))
+      .toBe('<div class="pc-md"><p>First line soft wrapped.</p><ul><li>parent<ul><li>child</li></ul></li></ul><ol><li>first</li><li>second</li></ol><h5>Risks</h5><p><em>emphasis</em> and [*literal emphasis* link](https://example.test)</p></div>');
+  });
 });

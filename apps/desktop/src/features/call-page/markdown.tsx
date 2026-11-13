@@ -1,26 +1,75 @@
-// A small Markdown subset (paragraphs, `#`/`##` headings, `-`/`*` lists, **bold**, `code`) drawn as React nodes. Never
-// `innerHTML`: raw HTML in the text stays literal text (PM-08).
+// A small safe Markdown subset. Links and raw HTML stay literal text (PM-08).
 import type { ReactNode } from "react";
 
-const inline = (text: string): ReactNode[] =>
-  text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, i) => (p.startsWith("**") && p.endsWith("**") && p.length > 4 ? <strong key={i}>{p.slice(2, -2)}</strong> : p.startsWith("`") && p.endsWith("`") && p.length > 2 ? <code key={i}>{p.slice(1, -1)}</code> : p));
+type ListBlock = { type: "ul" | "ol"; items: Array<{ text: string; children: ListBlock[] }> };
 
+const inline = (text: string): ReactNode[] =>
+  text.split(/(\[[^\]\n]+\]\([^)]+\)|\*\*[^*]+\*\*|\*[^*\n]+\*|`[^`]+`)/g).map((p, i) =>
+    p.startsWith("**") && p.endsWith("**") && p.length > 4 ? <strong key={i}>{p.slice(2, -2)}</strong>
+      : p.startsWith("*") && p.endsWith("*") && p.length > 2 ? <em key={i}>{p.slice(1, -1)}</em>
+        : p.startsWith("`") && p.endsWith("`") && p.length > 2 ? <code key={i}>{p.slice(1, -1)}</code> : p,
+  );
+
+const renderList = (list: ListBlock, key: number): ReactNode => {
+  const Tag = list.type;
+  return <Tag key={key}>{list.items.map((item, i) => <li key={i}>{inline(item.text)}{item.children.map((child, j) => renderList(child, j))}</li>)}</Tag>;
+};
+
+// @cpt-component:cpt-noter-component-ui-output-section:p1
 export function MarkdownBody({ md, lang }: { md: string; lang?: string }) {
   const blocks: ReactNode[] = [];
-  let list: string[] = [];
-  const flush = () => {
-    if (list.length) blocks.push(<ul key={blocks.length}>{list.map((l, i) => <li key={i}>{inline(l)}</li>)}</ul>);
-    list = [];
+  let paragraph: string[] = [];
+  let lists: ListBlock[] = [];
+  let stack: Array<{ indent: number; list: ListBlock; item: ListBlock["items"][number] }> = [];
+  const flushParagraph = () => {
+    if (paragraph.length) blocks.push(<p key={blocks.length}>{inline(paragraph.join(" "))}</p>);
+    paragraph = [];
   };
-  for (const raw of md.split(/\n{2,}|\n(?=#|[-*] )/)) {
-    for (const line of raw.split("\n")) {
-      const item = /^[-*] (.*)/.exec(line);
-      const head = /^(#{1,2}) (.*)/.exec(line);
-      if (item) list.push(item[1]!);
-      else if (head) (flush(), blocks.push(head[1]!.length === 1 ? <h3 key={blocks.length}>{inline(head[2]!)}</h3> : <h4 key={blocks.length}>{inline(head[2]!)}</h4>));
-      else if (line.trim()) (flush(), blocks.push(<p key={blocks.length}>{inline(line)}</p>));
+  const flushLists = () => {
+    for (const list of lists) blocks.push(renderList(list, blocks.length));
+    lists = [];
+    stack = [];
+  };
+
+  for (const line of md.split("\n")) {
+    if (!line.trim()) {
+      flushParagraph();
+      flushLists();
+      continue;
     }
+    const item = /^(\s*)([-*]|\d+\.)\s+(.*)$/.exec(line);
+    if (item) {
+      flushParagraph();
+      const indent = item[1]!.replace(/\t/g, "    ").length;
+      const type = /^\d/.test(item[2]!) ? "ol" : "ul";
+      while (stack.length && indent <= stack[stack.length - 1]!.indent) stack.pop();
+      const parent = stack[stack.length - 1];
+      let list = parent?.item.children.at(-1);
+      if (parent && (!list || list.type !== type)) {
+        list = { type, items: [] };
+        parent.item.children.push(list);
+      } else if (!parent) {
+        list = lists.at(-1);
+        if (!list || list.type !== type) {
+          list = { type, items: [] };
+          lists.push(list);
+        }
+      }
+      const current = list!;
+      const node = { text: item[3]!, children: [] };
+      current.items.push(node);
+      stack.push({ indent, list: current, item: node });
+      continue;
+    }
+    flushLists();
+    const head = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (head) {
+      flushParagraph();
+      const Tag = `h${head[1]!.length + 2}` as "h3" | "h4" | "h5" | "h6";
+      blocks.push(<Tag key={blocks.length}>{inline(head[2]!)}</Tag>);
+    } else paragraph.push(line.trim());
   }
-  flush();
+  flushParagraph();
+  flushLists();
   return <div className="pc-md" lang={lang}>{blocks}</div>;
 }

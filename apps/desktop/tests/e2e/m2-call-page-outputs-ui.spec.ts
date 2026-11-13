@@ -158,6 +158,23 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await expect(summary).toContainText("Drawer events will ship behind a flag.");
     await expect(summary.getByRole("button", { name: "Try Again" })).toBeVisible();
   });
+
+  test("UI — other path: Hide Diff returns to the current regenerated summary", async ({ page }) => {
+    const current = "Edited current regenerated summary text.";
+    await openWindow(page, "main", { world: (w) => (O.written(w), Object.assign(O.sectionOf(w, "summary"), { regenerated_with_edits: true, version_count: 1 })) });
+    await openReady(page);
+    const summary = section(page, "Summary");
+    await summary.getByRole("button", { name: "Edit" }).click();
+    await summary.getByRole("textbox").fill(current);
+    await page.keyboard.press("Meta+Enter");
+    await expect(summary.locator(".pc-md")).toHaveText(current);
+    await summary.getByRole("button", { name: "Show Diff" }).click();
+    await expect(summary.locator(".pc-diff")).toBeVisible();
+    await summary.getByRole("button", { name: "Hide Diff" }).click();
+    await expect(summary.locator(".pc-md")).toHaveText(current);
+    await expect(summary.locator(".pc-diff")).toHaveCount(0);
+    await expect(summary).not.toContainText(/Showing v\d+/);
+  });
 });
 
 test.describe("cpt-noter-seq-notifications-open-outputs", () => {
