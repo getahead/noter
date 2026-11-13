@@ -5,6 +5,11 @@
      engine/scripts/sign.sh. -->
 <plist version="1.0">
 <dict>
+    <!-- @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1 -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <key>com.apple.security.personal-information.calendars</key>
+    <true/>
     <!-- Handoff's terminal fallback drives Terminal or iTerm with Apple Events (hardened runtime). -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
