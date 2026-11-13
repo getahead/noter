@@ -168,7 +168,13 @@ impl Retrieved {
     pub fn ranked(&self, n: usize) -> Vec<&Hit> {
         let mut rest: Vec<&Hit> = self.calls.iter().chain(&self.documents).collect();
         rest.sort_by(|a, b| b.score.total_cmp(&a.score));
-        self.items.iter().chain(rest).take(n).collect()
+        let item_limit = n / 3;
+        self.items
+            .iter()
+            .take(item_limit)
+            .chain(rest)
+            .take(n)
+            .collect()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -604,7 +610,7 @@ fn segment_keywords(
     let sql = format!(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, {CALL_COLUMNS}
          FROM segments_fts f JOIN segments s ON s.rowid = f.rowid JOIN calls c ON c.id = s.call_id
-         WHERE segments_fts MATCH {m} AND {ACTIVE_PASS} AND {pred}
+         WHERE segments_fts MATCH {m} AND {pred}
          ORDER BY bm25(segments_fts) LIMIT {limit}"
     );
     let mut stmt = conn.prepare(&sql)?;
@@ -669,6 +675,9 @@ fn knn(p: &Prepared, table: &str, key: &str, v: &[f32], fetch: usize, b: &mut Bi
     }
     if let Some(to) = p.to_ms {
         dates.push_str(&format!(" AND started_at < {}", b.bind(to)));
+    }
+    if let Some(call) = &p.query.scope.call_id {
+        dates.push_str(&format!(" AND call_id = {}", b.bind(call.0.clone())));
     }
     format!(
         "(SELECT {key}, distance FROM {table} WHERE embedding MATCH {vector} AND k = {k}{dates})"

@@ -33,12 +33,30 @@ impl DocumentSource for Documents {
         // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-scope
         let cloud = q.privacy == Privacy::Cloud;
         let keyword = noter_knowledge::keyword_chunks(conn, q.fts, q.fetch)?;
-        let semantic = match q.vector {
+        let (semantic, sensitive_semantic) = match q.vector {
             Some(v) => {
                 let far = 1.0 - noter_retrieval::MIN_SIMILARITY;
-                noter_knowledge::nearest_chunks(conn, v, q.fetch, far)?
+                let public = noter_knowledge::nearest_chunks(
+                    conn,
+                    v,
+                    q.fetch,
+                    far,
+                    cloud.then_some(PrivacyClass::Normal),
+                )?;
+                let sensitive = if cloud {
+                    noter_knowledge::nearest_chunks(
+                        conn,
+                        v,
+                        q.fetch,
+                        far,
+                        Some(PrivacyClass::Sensitive),
+                    )?
+                } else {
+                    vec![]
+                };
+                (public, sensitive)
             }
-            None => vec![],
+            None => (vec![], vec![]),
         };
         // The chunks a cloud request lost only because their source is sensitive.
         let mut skipped: HashSet<ChunkId> = HashSet::new();
@@ -55,6 +73,8 @@ impl DocumentSource for Documents {
         };
         let keyword = permit(keyword)?;
         let semantic = permit(semantic)?;
+        // Preserve sensitive-skip counts while normal candidates get their own KNN limit.
+        let _ = permit(sensitive_semantic)?;
         Ok(DocHits {
             keyword,
             semantic,

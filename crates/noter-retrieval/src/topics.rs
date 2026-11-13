@@ -113,9 +113,9 @@ impl Neighbours {
         let (_, _, own) = self.centroids.iter().find(|(t, ..)| t == id)?;
         self.centroids
             .iter()
-            .filter(|(t, ..)| t != id && !self.kept.contains(&pair_key(id, t)))
+            .filter(|(t, ..)| t != id)
             .map(|(t, name, c)| (cosine(own, c), t, name))
-            .filter(|(s, ..)| *s >= SUGGEST_SIMILARITY)
+            .filter(|(s, t, ..)| *s >= SUGGEST_SIMILARITY && !self.kept.contains(&pair_key(id, t)))
             .max_by(|a, b| a.0.total_cmp(&b.0))
             .map(|(_, t, name)| (t.clone(), name.clone()))
     }
@@ -128,9 +128,33 @@ impl Neighbours {
     }
 }
 
+fn refresh_suggestions(conn: &Connection) -> Db<()> {
+    let near = Neighbours::read(conn)?;
+    let ids: Vec<String> = conn
+        .prepare("SELECT id FROM topics ORDER BY id")?
+        .query_map([], |r| r.get(0))?
+        .collect::<Db<_>>()?;
+    conn.execute("DELETE FROM topic_suggestions", [])?;
+    for id in ids {
+        let target = near.suggestion(&id).map(|(target, _)| target);
+        conn.execute(
+            "INSERT INTO topic_suggestions (topic_id, target_id) VALUES (?1, ?2)",
+            params![id, target],
+        )?;
+    }
+    Ok(())
+}
+
+fn suggestions_cached(conn: &Connection) -> Db<bool> {
+    let topics: i64 = conn.query_row("SELECT count(*) FROM topics", [], |r| r.get(0))?;
+    let suggestions: i64 =
+        conn.query_row("SELECT count(*) FROM topic_suggestions", [], |r| r.get(0))?;
+    Ok(topics == suggestions)
+}
+
 /// A topic as lists show it: its aliases, the counts of its items (rejected ones count
 /// nowhere) and its merge suggestion.
-fn row(conn: &Connection, id: &str, near: &Neighbours) -> Db<Option<TopicRow>> {
+fn row(conn: &Connection, id: &str, near: Option<&Neighbours>) -> Db<Option<TopicRow>> {
     conn.query_row(
         "SELECT t.id, t.rev, t.name, t.last_seen,
                 (SELECT group_concat(alias, char(31)) FROM
@@ -140,8 +164,12 @@ fn row(conn: &Connection, id: &str, near: &Neighbours) -> Db<Option<TopicRow>> {
                 (SELECT count(*) FROM items WHERE topic_id = t.id AND kind = 'decision'
                    AND review_state != 'rejected'),
                 (SELECT count(*) FROM items WHERE topic_id = t.id AND status = 'open'
-                   AND review_state != 'rejected')
-         FROM topics t WHERE t.id = ?1",
+                   AND review_state != 'rejected'),
+                suggested.id, suggested.name
+         FROM topics t
+         LEFT JOIN topic_suggestions s ON s.topic_id = t.id
+         LEFT JOIN topics suggested ON suggested.id = s.target_id
+         WHERE t.id = ?1",
         params![id],
         |r| {
             let aliases: Option<String> = r.get(4)?;
@@ -156,10 +184,21 @@ fn row(conn: &Connection, id: &str, near: &Neighbours) -> Db<Option<TopicRow>> {
                 calls: r.get(5)?,
                 decisions: r.get(6)?,
                 open_items: r.get(7)?,
-                merge_suggestion: near.suggestion(id).map(|(id, name)| TopicChip {
-                    id: TopicId::new(id),
-                    name,
-                }),
+                merge_suggestion: match (
+                    r.get::<_, Option<String>>(8)?,
+                    r.get::<_, Option<String>>(9)?,
+                ) {
+                    (Some(id), Some(name)) => Some(TopicChip {
+                        id: TopicId::new(id),
+                        name,
+                    }),
+                    _ => near.and_then(|near| {
+                        near.suggestion(id).map(|(id, name)| TopicChip {
+                            id: TopicId::new(id),
+                            name,
+                        })
+                    }),
+                },
             })
         },
     )
@@ -171,14 +210,18 @@ fn row(conn: &Connection, id: &str, near: &Neighbours) -> Db<Option<TopicRow>> {
 /// `topics_list`: every topic, most recently seen first.
 pub fn topic_list(conn: &Connection) -> Db<Vec<TopicRow>> {
     // @cpt-begin:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-read
-    let near = Neighbours::read(conn)?;
+    let near = if suggestions_cached(conn)? {
+        None
+    } else {
+        Some(Neighbours::read(conn)?)
+    };
     let ids: Vec<String> = conn
         .prepare("SELECT id FROM topics ORDER BY last_seen DESC, id")?
         .query_map([], |r| r.get(0))?
         .collect::<Db<_>>()?;
     let mut out = Vec::with_capacity(ids.len());
     for id in ids {
-        out.extend(row(conn, &id, &near)?);
+        out.extend(row(conn, &id, near.as_ref())?);
     }
     Ok(out)
     // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-read
@@ -186,7 +229,28 @@ pub fn topic_list(conn: &Connection) -> Db<Vec<TopicRow>> {
 
 /// One topic as lists show it, or `None` when there is no such topic.
 pub fn topic_row(conn: &Connection, id: &str) -> Db<Option<TopicRow>> {
-    row(conn, id, &Neighbours::read(conn)?)
+    let near = if suggestions_cached(conn)? {
+        None
+    } else {
+        Some(Neighbours::read(conn)?)
+    };
+    row(conn, id, near.as_ref())
+}
+
+pub(crate) fn topic_rows(conn: &Connection, ids: &[String]) -> Db<Vec<TopicRow>> {
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let near = if suggestions_cached(conn)? {
+        None
+    } else {
+        Some(Neighbours::read(conn)?)
+    };
+    ids.iter()
+        .try_fold(Vec::with_capacity(ids.len()), |mut out, id| {
+            out.extend(row(conn, id, near.as_ref())?);
+            Ok(out)
+        })
 }
 
 /// The topic's thread: its items' ids, newest call first and in their order within a call;
@@ -368,6 +432,7 @@ pub fn merge(
     refresh(tx, target).map_err(internal)?;
     tx.execute("DELETE FROM topics WHERE id = ?1", [source])
         .map_err(internal)?;
+    refresh_suggestions(tx).map_err(internal)?;
     // The removed row, column by column: undo puts it back (its centroid is refreshed then).
     log.push(logged(
         "topic",
@@ -412,6 +477,7 @@ pub fn keep_separate(
         after: Some(KEEP_SEPARATE.into()),
         delta: None,
     };
+    refresh_suggestions(tx).map_err(internal)?;
     Ok(((), vec![row]))
     // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-separate
 }
@@ -444,7 +510,8 @@ fn refresh(conn: &Connection, id: &str) -> Db<Option<Vec<f32>>> {
 /// The centroids of these topics again from their items' vectors, after an undo moved links
 /// back; a topic that is gone is skipped.
 pub fn refresh_centroids(conn: &Connection, ids: &[String]) -> Db<()> {
-    ids.iter().try_for_each(|id| refresh(conn, id).map(drop))
+    ids.iter().try_for_each(|id| refresh(conn, id).map(drop))?;
+    refresh_suggestions(conn)
 }
 
 /// A new topic's local name: the item's first clause, at most six words.
@@ -501,6 +568,7 @@ pub fn attach_topics(
     let mut near = Neighbours::read(tx).map_err(internal)?;
     // The topics this call touched: name, seen dates, and the stored row of an existing one.
     let mut touched: BTreeMap<String, (String, i64, i64, Option<Stored>)> = BTreeMap::new();
+    let mut centroid_parts: BTreeMap<String, (Vec<f32>, usize)> = BTreeMap::new();
     let mut out = Attached::default();
     let mut log = vec![];
     for item in items {
@@ -589,8 +657,42 @@ pub fn attach_topics(
         };
         seen.1 = seen.1.min(started);
         seen.2 = seen.2.max(started);
-        let centroid = refresh(tx, &topic).map_err(internal)?;
-        near.set(&topic, &seen.0, centroid);
+        if !centroid_parts.contains_key(&topic) {
+            let vectors: Vec<Vec<u8>> = tx
+                .prepare(
+                    "SELECT v.embedding FROM items i JOIN item_vec v ON v.item_id = i.id
+                     WHERE i.topic_id = ?1 AND i.id != ?2",
+                )
+                .map_err(internal)?
+                .query_map(params![topic, item.id], |r| r.get(0))
+                .map_err(internal)?
+                .collect::<Db<_>>()
+                .map_err(internal)?;
+            let mut sum = vec![0.0; DIMS];
+            for vector in &vectors {
+                for (total, value) in sum.iter_mut().zip(floats(vector)) {
+                    *total += value;
+                }
+            }
+            centroid_parts.insert(topic.clone(), (sum, vectors.len()));
+        }
+        let Some((sum, count)) = centroid_parts.get_mut(&topic) else {
+            return Err(CoreError::new(
+                ErrorCode::Internal,
+                "topic centroid accumulator is missing",
+            ));
+        };
+        for (total, value) in sum.iter_mut().zip(&item.vector) {
+            *total += value;
+        }
+        *count += 1;
+        let centroid: Vec<f32> = sum.iter().map(|total| total / *count as f32).collect();
+        tx.execute(
+            "UPDATE topics SET centroid = ?1 WHERE id = ?2",
+            params![blob(&centroid), topic],
+        )
+        .map_err(internal)?;
+        near.set(&topic, &seen.0, Some(centroid));
         out.items.push(item.id.clone());
         // @cpt-end:cpt-noter-algo-core-retrieval-ask-attach-topic:p1:inst-attach-commit
     }
@@ -626,6 +728,9 @@ pub fn attach_topics(
     // @cpt-begin:cpt-noter-algo-core-retrieval-ask-attach-topic:p1:inst-attach-return
     out.topics = touched.into_keys().collect();
     out.suggestions = pairs.into_iter().collect();
+    if !out.items.is_empty() {
+        refresh_suggestions(tx).map_err(internal)?;
+    }
     Ok((out, log))
     // @cpt-end:cpt-noter-algo-core-retrieval-ask-attach-topic:p1:inst-attach-return
 }

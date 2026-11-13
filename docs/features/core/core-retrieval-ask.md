@@ -135,7 +135,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 2. [x] - `p1` - Validate a non-empty question, scope references and dates; an unknown thread returns `not_found` before opening the stream - `inst-ask-validate`
 3. [x] - `p1` - DB: create a thread if needed, with the first question as title, and record the turn through the writer and change log - `inst-ask-create`
 4. [x] - `p1` - Register the subscription and **RETURN** `AskHandle` with thread, turn and subscription ids before sending Channel messages - `inst-ask-handle`
-5. [x] - `p1` - Resolve the search-answer runtime and effective privacy; retrieve the top 30 permitted hits with `cpt-noter-algo-core-retrieval-ask-retrieve` - `inst-ask-context`
+5. [x] - `p1` - Resolve the search-answer runtime and effective privacy; retrieve the top 30 permitted hits with `cpt-noter-algo-core-retrieval-ask-retrieve`, leaving room for call and document evidence and avoiding duplicate item text in the packet - `inst-ask-context`
 6. [x] - `p1` - Emit `started`; run `ask-answer` through the router and gate, including prior thread context subject to the current privacy rules; refinements use noter-mcp (M3: the run asks for the read tools get_transcript_span, get_person, get_decisions and get_open_items, and the router registers it with the tool host, TL-36) - `inst-ask-run`
 7. [x] - `p1` - Run `cpt-noter-algo-core-retrieval-ask-citations`; stream answer `delta` and `citation` messages without claiming unvalidated evidence - `inst-ask-validate-answer`
 8. [x] - `p1` - DB: store the completed answer, citations, runtime and run id with the updated thread time; emit terminal `done` through the stream hub and release runtime and subscription resources - `inst-ask-finish`
@@ -176,7 +176,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 - Stale rename: `conflict` with `detail.current_rev`; missing topic: `not_found`; self-merge: `invalid_input`.
 
 **Steps**:
-1. [x] - `p1` - API: `topics_list` and `topic_get { topic_id }` read topic counts, aliases and merge suggestion, then items grouped by their call; return an empty thread when no calls remain - `inst-topic-read`
+1. [x] - `p1` - API: `topics_list` and `topic_get { topic_id }` read topic counts, aliases and cached merge suggestions, then items grouped by their call; refresh suggestions when centroids or Keep Separate pairs change; return an empty thread when no calls remain - `inst-topic-read`
 2. [x] - `p1` - API: `topic_rename { topic_id, rev, name }` validates a non-empty name and guards `rev`; write the name and change row in one transaction - `inst-topic-rename`
 3. [x] - `p1` - API: `topics_merge { source, target }` validates both ids; in one change batch move item links, preserve source names and aliases on target, update its centroid and date range, and remove source - `inst-topic-merge`
 4. [x] - `p1` - API: `topics_keep_separate { a, b }` stores the canonical unordered pair as a `topic_merge` suppression through the writer - `inst-topic-separate`
@@ -196,10 +196,10 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 1. [x] - `p1` - Normalize a shadow query as NFKC, lowercase, ё to е, ß to ss, and Snowball stems for English, Russian and German; retain raw text for display - `inst-retrieve-normalize`
 2. [x] - `p1` - Build parameterized SQL predicates for people, dates, call types, languages, tags and open items; apply source privacy and scope before any model receives evidence - `inst-retrieve-filters`
 3. [x] - `p1` - For cloud runs exclude sensitive calls and sources and count skips; for calls-only scope exclude documents - `inst-retrieve-privacy`
-4. [x] - `p1` - Run FTS5 BM25 on normalized shadow text with trigram matches for names and acronyms; every non-alphanumeric character is a word boundary, consistently with query terms, across segments, items, call chunks and document chunks; preserve original text for display and rebuild existing keyword shadows on upgrade - `inst-retrieve-keywords`
-5. [x] - `p1` - **IF** vector indexes are ready, embed locally through the engine and scan call, item and permitted document vectors; over-fetch four times the requested count and filter people and scope in SQL before fusion - `inst-retrieve-vectors`
+4. [x] - `p1` - Run FTS5 BM25 on normalized shadow text with trigram matches for names and acronyms; every non-alphanumeric character is a word boundary, consistently with query terms, across segments, items, call chunks and document chunks; keep only the active transcript pass indexed, preserve original text for display and rebuild existing keyword shadows on upgrade - `inst-retrieve-keywords`
+5. [x] - `p1` - **IF** vector indexes are ready, embed locally through the engine and scan call, item and permitted document vectors; push call/date and cloud privacy partitions into candidate selection, over-fetch four times the requested count and filter remaining people and scope in SQL before fusion - `inst-retrieve-vectors`
 6. [x] - `p1` - **ELSE** use keyword hits only and report `KeywordOnly` with rebuild progress - `inst-retrieve-keyword-only`
-7. [x] - `p1` - Fuse permitted keyword and vector ranks with reciprocal rank fusion, k = 60; rank matching items ahead of raw chunks and deduplicate evidence - `inst-retrieve-fuse`
+7. [x] - `p1` - Fuse permitted keyword and vector ranks with reciprocal rank fusion, k = 60; rank matching items first while reserving one third of the requested answer context for them, then rank call and document evidence and deduplicate - `inst-retrieve-fuse`
 8. [x] - `p1` - Mark literal keyword evidence strong and semantic-only evidence weak; preserve original quotes, segment spans, document headings and cross-language attribution - `inst-retrieve-evidence`
 9. [x] - `p1` - **RETURN** the requested top hits and explanation without logging query or source text - `inst-retrieve-return`
 

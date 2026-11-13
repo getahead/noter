@@ -282,6 +282,35 @@ async fn the_handle_comes_first_then_started_deltas_citations_and_done() {
     assert_eq!(w.thread(&handle.thread_id).await.unwrap().turns.len(), 2);
 }
 
+#[tokio::test(start_paused = true)]
+async fn ask_context_does_not_repeat_an_item_as_both_title_and_text() {
+    let w = world("").await;
+    w.core
+        .store()
+        .insert_batch(vec![ins(
+            "items",
+            vec![
+                ("id", json!("itm_amber")),
+                ("rev", json!(1)),
+                ("call_id", json!("call_ws")),
+                ("kind", json!("decision")),
+                ("text", json!("amber release date is Friday")),
+                ("lang", json!("en")),
+                ("status", json!("open")),
+                ("review_state", json!("accepted")),
+                ("created_by", json!("llm")),
+            ],
+        )])
+        .unwrap();
+
+    let (handle, _) = w.ask(None, "amber").await;
+    w.settle().await;
+
+    let packet = w.packets().join("\n");
+    assert_eq!(packet.matches("amber release date is Friday").count(), 1);
+    assert!(!handle.thread_id.as_str().is_empty());
+}
+
 // The refinements: the router registers the run with the tool host for noter-mcp's read tools.
 #[tokio::test(start_paused = true)]
 async fn the_answer_run_may_use_the_read_tools() {

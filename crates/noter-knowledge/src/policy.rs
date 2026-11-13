@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use noter_db::rusqlite::{self, params, Connection, OptionalExtension};
 use noter_protocol::model::{AskScope, SourceScope};
-use noter_protocol::{ChunkId, DocumentId, SourceId};
+use noter_protocol::{ChunkId, DocumentId, PrivacyClass, SourceId};
 
 /// A chunk retrieval may use, with its provenance.
 #[derive(Debug, Clone, PartialEq)]
@@ -213,13 +213,19 @@ pub fn nearest_chunks(
     vector: &[f32],
     fetch: usize,
     max_distance: f64,
+    privacy: Option<PrivacyClass>,
 ) -> rusqlite::Result<Vec<ChunkId>> {
     let blob: Vec<u8> = vector.iter().flat_map(|x| x.to_le_bytes()).collect();
-    let mut st = conn.prepare(
+    let privacy = match privacy {
+        Some(PrivacyClass::Normal) => " AND privacy_class = 'normal'",
+        Some(PrivacyClass::Sensitive) => " AND privacy_class = 'sensitive'",
+        None => "",
+    };
+    let mut st = conn.prepare(&format!(
         "SELECT chunk_id FROM (SELECT chunk_id, distance FROM doc_vec
-             WHERE embedding MATCH ?1 AND k = ?2)
-         WHERE distance <= ?3 ORDER BY distance",
-    )?;
+                 WHERE embedding MATCH ?1 AND k = ?2{privacy})
+             WHERE distance <= ?3 ORDER BY distance"
+    ))?;
     let rows = st.query_map(params![blob, fetch as i64, max_distance], |r| {
         r.get::<_, String>(0)
     })?;

@@ -65,6 +65,18 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "Unicode keyword word boundaries",
         sql: include_str!("../migrations/0004_keyword_boundaries.sql"),
     },
+    Migration {
+        owner: "noter-retrieval",
+        version: 5,
+        name: "index only active transcript segments",
+        sql: include_str!("../migrations/0005_active_transcript_index.sql"),
+    },
+    Migration {
+        owner: "noter-retrieval",
+        version: 6,
+        name: "cache topic merge suggestions",
+        sql: include_str!("../migrations/0006_topic_suggestions.sql"),
+    },
 ];
 
 #[cfg(test)]

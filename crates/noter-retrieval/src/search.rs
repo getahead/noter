@@ -127,7 +127,7 @@ fn topics_matching(
             r.get::<_, Option<String>>(2)?,
         ))
     })?;
-    let mut out = vec![];
+    let mut ids = vec![];
     for row in rows {
         let (id, name, aliases) = row?;
         let matches = |text: &str| {
@@ -137,11 +137,11 @@ fn topics_matching(
                 .any(|(s, e)| terms.iter().any(|t| text[s..e].starts_with(t.as_str())))
         };
         if matches(&name) || aliases.as_deref().is_some_and(matches) {
-            out.extend(crate::topics::topic_row(conn, &id)?);
+            ids.push(id);
         }
-        if out.len() == limit {
+        if ids.len() == limit {
             break;
         }
     }
-    Ok(out)
+    crate::topics::topic_rows(conn, &ids)
 }
