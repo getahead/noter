@@ -446,7 +446,7 @@ impl Core {
         });
     }
 
-    async fn nothing_heard_due(&self, chain: u64) {
+    pub(crate) async fn nothing_heard_due(&self, chain: u64) {
         loop {
             let session = self.capture.lock().await;
             let state = self.capture_now();
@@ -458,10 +458,16 @@ impl Core {
             let due = heard + Duration::from_millis(NOTHING_HEARD_MS as u64);
             if tokio::time::Instant::now() >= due {
                 // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-nothing-heard
-                if state.notice.is_none() {
-                    let since = TimestampMs(session.heard_since);
-                    self.set_notice(Some(CaptureNotice::NothingHeard { since }));
+                if state.phase == CapturePhase::Paused {
+                    return;
                 }
+                if state.notice.is_some() {
+                    drop(session);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+                let since = TimestampMs(session.heard_since);
+                self.set_notice(Some(CaptureNotice::NothingHeard { since }));
                 // @cpt-end:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-nothing-heard
                 return;
             }

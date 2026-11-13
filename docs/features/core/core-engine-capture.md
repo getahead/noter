@@ -180,6 +180,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Success Scenarios**:
 - The self-test of `cpt-noter-flow-core-engine-foundation-self-test` runs on the capture pipeline: both channels on one clock, and a recognised line per channel once the live model is present.
+- Self-test decoding is serialized on the same queue as live ASR because both use the cached transcriber.
 
 **Error Scenarios**:
 - The live model is not downloaded: no `self_test_line`; the result is judged on the buffers alone, as in M0.

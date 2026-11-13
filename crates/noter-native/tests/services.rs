@@ -544,3 +544,16 @@ fn the_probe_fails_when_a_protected_surface_would_be_captured() {
         Ok(())
     );
 }
+
+#[test]
+fn capture_probe_includes_call_and_record_prompt_even_when_unprotected() {
+    assert_eq!(
+        capture_probe_targets(&[
+            (NoterSurface::CallWindow, 11),
+            (NoterSurface::RecordPrompt, 12),
+            (NoterSurface::MainWindow, 13),
+            (NoterSurface::SettingsWindow, 14),
+        ]),
+        vec![11, 12]
+    );
+}

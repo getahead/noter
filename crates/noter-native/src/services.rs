@@ -417,6 +417,20 @@ const SURFACES: [NoterSurface; 5] = [
     NoterSurface::MenuBarTitle,
 ];
 
+/// Registered native windows whose capture protection the optional probe must verify.
+pub fn capture_probe_targets(windows: &[(NoterSurface, u32)]) -> Vec<u32> {
+    windows
+        .iter()
+        .filter(|(surface, _)| {
+            matches!(
+                surface,
+                NoterSurface::CallWindow | NoterSurface::RecordPrompt
+            )
+        })
+        .map(|(_, id)| *id)
+        .collect()
+}
+
 /// The row of one surface, `shown` and `protected` as the window server reports them.
 fn visibility(surface: NoterSurface, shown: bool, protected: bool) -> ShareTestRow {
     use ShareVisibility::*;
@@ -597,12 +611,7 @@ pub fn share_test(
     let facts = surface_facts(windows, menu_bar_title_shown);
     let rows = share_rows(&facts);
     // @cpt-end:cpt-noter-flow-core-native-services-share-test:p1:inst-test-rows
-    let protected: Vec<u32> = windows
-        .iter()
-        .zip(&facts)
-        .filter(|(_, f)| f.protected)
-        .map(|(&(_, id), _)| id)
-        .collect();
+    let protected = capture_probe_targets(windows);
     let capture_test = capture_outcome(args.run_capture_test, call_live, now, || {
         capture_probe(&protected)
     });

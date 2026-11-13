@@ -1661,6 +1661,110 @@ async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn silence_notice_waits_while_paused_and_is_raised_after_resume() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(300_000).await;
+    assert_eq!(r.state().await.notice, None);
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id,
+                paused: false,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(1_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn silence_notice_is_rechecked_after_a_call_ended_notice_is_kept() {
+    let r = rig();
+    r.detection_on().await;
+    let call_id = r.recording_detected(ZOOM, "Zoom").await;
+    r.fact(EngineEvent::CallAudioReleased {
+        bundle_id: ZOOM.into(),
+    });
+    tokio::time::sleep(Duration::from_millis(5)).await;
+    r.pass(20_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::CallEnded { .. })))
+        .await;
+    r.core
+        .capture_hold_notice(
+            &main_window(),
+            NoticeHoldArgs {
+                call_id: call_id.clone(),
+                held: true,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(280_000).await;
+    r.core
+        .capture_answer_call_end(
+            &main_window(),
+            CallEndAnswerArgs {
+                call_id,
+                choice: CallEndChoice::KeepRecording,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(1_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn pausing_a_call_with_a_silence_notice_hides_it_until_resume() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.state().await.notice, None);
+    r.pass(60_000).await;
+    assert_eq!(r.state().await.notice, None);
+    r.core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id,
+                paused: false,
+            },
+        )
+        .await
+        .unwrap();
+    r.pass(1_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_heard_segment_means_no_nothing_heard_notice() {
     let r = rig();
     let call_id = r.recording().await;
