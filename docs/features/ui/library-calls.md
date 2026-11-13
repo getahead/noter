@@ -174,7 +174,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 4. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
 5. [x] - `p1` - **FROM** LISTED **TO** SELECTED_SEVERAL **WHEN** more than one row is selected - `inst-listed-several`
 6. [x] - `p1` - **FROM** SELECTED_SEVERAL **TO** LISTED **WHEN** the selection drops to one or none, or the calls are deleted - `inst-several-listed`
-7. [x] - `p1` - **FROM** LISTED **TO** EMPTY **WHEN** the last call is deleted; when only the loaded page is deleted but the total is nonzero, go to LOADING and reread first - `inst-listed-empty`
+7. [x] - `p1` - **FROM** LISTED **TO** EMPTY **WHEN** the last call is deleted; when a deletion leaves a nonzero total, reread the relevant page and discard any in-flight read - `inst-listed-empty`
 8. [x] - `p1` - **FROM** EMPTY **TO** LISTED **WHEN** a recorded call arrives (`entity:changed`) - `inst-empty-listed`
 
 ## 5. Definitions of Done

@@ -173,7 +173,9 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
         ? null
         : Math.max(0, state.total - removed);
       const refresh = rows.length === 0 && (state.next || (total ?? 0) > 0);
-      if (refresh) {
+      const refreshFirst = refresh || (rows.length > 0 && !!reading);
+      const refreshPage = rows.length > 0 && !reading && !!more;
+      if (refresh || refreshFirst || refreshPage) {
         request++;
         reading = null;
         more = null;
@@ -187,7 +189,8 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
           ? { status: "LOADING" as const }
           : {}),
       });
-      if (refresh) void load();
+      if (refreshFirst) void load();
+      else if (refreshPage) void loadMore();
       // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-listed-empty
       // @cpt-end:cpt-noter-flow-ui-library-calls-delete:p1:inst-return-delete
     },

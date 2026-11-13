@@ -63,6 +63,26 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     expect(list.get().rows.map((r) => r.id)).toEqual(["a", "b"]);
   });
 
+  it("does not restore a deleted call in the total from an in-flight page response", async () => {
+    let finishPage: (value: unknown) => void = () => {};
+    const callsList = vi
+      .fn()
+      .mockResolvedValueOnce(page([row("a"), row("b")], "next", 4))
+      .mockReturnValueOnce(new Promise((resolve) => (finishPage = resolve)))
+      .mockResolvedValueOnce(page([row("c"), row("d")], null, 3));
+    const list = createCallsList({
+      act: (_k: string, _c: string, run: () => Promise<unknown>) => run(),
+      core: { callsList },
+    } as never);
+    await list.load();
+    const paging = list.more();
+    list.drop(["a"]);
+    finishPage(page([row("c"), row("d")], null, 4));
+    await paging;
+    expect(list.get().total).toBe(3);
+    expect(list.get().rows.map((r) => r.id)).toEqual(["b", "c", "d"]);
+  });
+
   it("reloads the first page when deleting the loaded page leaves more calls", async () => {
     const loaded = Array.from({ length: 2 }, (_, i) => row(`loaded-${i}`));
     const { list, callsList } = setup(
