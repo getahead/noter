@@ -647,7 +647,7 @@ fn documents(w: &World) {
                 ("location", json!("/notes")),
                 ("privacy_class", json!(privacy)),
                 ("scope", json!(r#"{"type":"all_calls"}"#)),
-                ("status", json!(r#"{"type":"ready"}"#)),
+                ("status", json!(r#"{"type":"idle"}"#)),
             ],
         ));
         let doc = format!("doc_{source}");
@@ -681,6 +681,112 @@ fn documents(w: &World) {
 
 const DOC_OPS: &str = r#"{"on": "ask-answer", "output": {"answer_md": "Behind a flag [1].", "citations": [{"n": 1, "segment_ids": [], "chunk_ids": ["dch_ops"], "quote": "q"}], "found": true}}"#;
 const DOC_HR: &str = r#"{"on": "ask-answer", "output": {"answer_md": "In the HR plan [1].", "citations": [{"n": 1, "segment_ids": [], "chunk_ids": ["dch_hr"], "quote": "q"}], "found": true}}"#;
+
+// cpt-noter-algo-core-knowledge-policy / inst-policy-scope (TL-45): exercise the
+// retrieval wiring, including the bytes released to the runtime, not just the policy helper.
+#[tokio::test(start_paused = true)]
+async fn limited_sources_follow_people_and_named_calls_in_search_and_ask_packets() {
+    for runtime in [RuntimeChoice::ClaudeAccount, RuntimeChoice::Local] {
+        let w = world("").await;
+        documents(&w);
+        w.core
+            .store()
+            .insert_batch(vec![
+                call("call_other", "Other person's call", "normal"),
+                speaker("call_other", "per_other"),
+                segment(
+                    "seg_other",
+                    "call_other",
+                    1_000,
+                    "WebSockets need a review.",
+                ),
+            ])
+            .unwrap();
+        w.set_search_runtime(runtime).await;
+        w.core
+            .source_update(
+                &window(WindowLabel::Settings),
+                SourceUpdateArgs {
+                    source_id: SourceId::new("src_ops"),
+                    rev: Rev(1),
+                    name: None,
+                    schedule: None,
+                    privacy: None,
+                    scope: Some(SourceScope::Limited {
+                        call_types: vec![],
+                        people: vec![PersonId::new("per_you")],
+                    }),
+                },
+            )
+            .await
+            .unwrap();
+        for (people, call_id, allowed) in [
+            (vec![], None, true),
+            (vec![PersonId::new("per_other")], None, false),
+            (vec![PersonId::new("per_you")], None, true),
+            (vec![], Some(CallId::new("call_other")), false),
+            (vec![], Some(CallId::new("call_ws")), true),
+        ] {
+            if call_id.is_none() {
+                let found = w
+                    .core
+                    .search(
+                        &main_window(),
+                        SearchArgs {
+                            query: "websockets".into(),
+                            filter: CallFilter {
+                                people: people.clone(),
+                                ..CallFilter::default()
+                            },
+                            limit: None,
+                        },
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    found.documents.iter().any(|h| matches!(
+                        &h.provenance,
+                        Provenance::Document { source_id, .. } if source_id.as_str() == "src_ops"
+                    )),
+                    allowed,
+                    "search people={people:?}"
+                );
+            }
+            let before = w.packets().len();
+            let (sink, got) = sink();
+            w.core
+                .ask_start(
+                    &main_window(),
+                    AskStartArgs {
+                        thread_id: None,
+                        question: "websockets".into(),
+                        scope: AskScope {
+                            people,
+                            call_id: call_id.clone(),
+                            include_documents: true,
+                            ..AskScope::default()
+                        },
+                    },
+                    sink,
+                )
+                .await
+                .unwrap();
+            w.settle().await;
+            let AskEvent::Done { answer } = terminal(&got) else {
+                panic!("not done: {:?}", kinds(&got));
+            };
+            assert_eq!(answer.runtime, runtime);
+            assert!(w.packets().len() > before, "Ask must reach the runtime");
+            assert_eq!(
+                w.packets()[before..]
+                    .iter()
+                    .any(|p| p.contains("behind a flag")),
+                allowed,
+                "Ask runtime={runtime:?} call={call_id:?}"
+            );
+        }
+    }
+}
 
 impl World {
     async fn ask_documents(&self, question: &str, include_documents: bool) -> AskAnswer {
