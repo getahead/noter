@@ -338,6 +338,31 @@ fn output() -> Value {
     .unwrap()
 }
 
+// cpt-noter-algo-core-credentials-privacy-check-account:inst-check-test
+#[tokio::test]
+async fn an_account_check_never_spends_a_key_when_its_cli_is_signed_out() {
+    for runtime in [RuntimeChoice::ClaudeAccount, RuntimeChoice::ChatgptAccount] {
+        let world = World::new();
+        let claude = Stub::new(CLAUDE_OK);
+        let codex = Stub::new(CODEX_OK);
+        let llm = world.llm(
+            world.claude_cli(Some(&claude), Some("sk-ant-working"), false),
+            world.codex_cli(Some(&codex), Some("sk-codex-working"), false),
+            no_ollama(),
+        );
+        let privacy = *world.privacy.borrow();
+        let result = llm.verify_account(runtime, privacy).await;
+        assert!(matches!(result, Err(Failure::Unavailable(_))));
+        assert!(claude.records().is_empty());
+        assert!(codex.records().is_empty());
+        let count: i64 = world
+            .store
+            .read(|c| c.query_row("SELECT COUNT(*) FROM audit_log", [], |r| r.get(0)))
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+}
+
 fn sha(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()

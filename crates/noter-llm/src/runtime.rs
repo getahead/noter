@@ -641,7 +641,11 @@ impl Llm {
         let mut req = RunRequest::new(Skill::AskAnswer, "key-check", packet, TaskKind::Ask, rx);
         req.settings.configured = Some(runtime);
         req.settings.effort = Effort::Low;
-        match self.0.run(req, None, Some((runtime, candidate))).await {
+        match self
+            .0
+            .run(req, None, Some((runtime, candidate)), None)
+            .await
+        {
             Ok(_) | Err(Failure::Invalid { .. }) => Ok(()),
             Err(failure) => Err(failure),
         }
@@ -666,7 +670,7 @@ impl Llm {
         let mut req = RunRequest::new(Skill::AskAnswer, "account-check", packet, TaskKind::Ask, rx);
         req.settings.configured = Some(runtime);
         req.settings.effort = Effort::Low;
-        match self.0.run(req, None, None).await {
+        match self.0.run(req, None, None, Some(runtime)).await {
             Ok(_) | Err(Failure::Invalid { .. }) => Ok(()),
             Err(failure) => Err(failure),
         }
@@ -735,7 +739,7 @@ impl Inner {
     }
 
     /// The adapters' availability, with an API-key runtime unavailable while its key cannot be
-    /// read. A verification sees only its own runtime, with the candidate standing for the key.
+    /// read. A verification sees only its own runtime; key checks supply a candidate key.
     fn availability(&self, verifying: Option<RuntimeChoice>) -> Vec<Availability> {
         let mut all = self.gate.availability();
         for a in all.iter_mut().filter(|a| a.unavailable.is_none()) {
@@ -813,6 +817,7 @@ impl Inner {
         req: RunRequest,
         session: Option<(RuntimeChoice, String)>,
         candidate: Candidate,
+        verifying: Option<RuntimeChoice>,
     ) -> RunOutcome {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-input
         let started = Instant::now();
@@ -824,7 +829,7 @@ impl Inner {
             return Err(Failure::Cancelled);
         }
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-route
-        let verifying = candidate.as_ref().map(|(runtime, _)| *runtime);
+        let verifying = verifying.or_else(|| candidate.as_ref().map(|(runtime, _)| *runtime));
         let routed = self
             .route(&req, 0.0, false, verifying)
             .and_then(|choice| match &session {
@@ -865,7 +870,14 @@ impl Inner {
         };
         let cli_session = session.as_ref().map(|(_, s)| s.as_str());
         let outcome = self
-            .attempts(&req, cli_session, &candidate, &mut tally, &mut state)
+            .attempts(
+                &req,
+                cli_session,
+                &candidate,
+                verifying,
+                &mut tally,
+                &mut state,
+            )
             .await;
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-usage
         let ended = self.record_end(&tally);
@@ -906,10 +918,10 @@ impl Inner {
         req: &RunRequest,
         session: Option<&str>,
         candidate: &Candidate,
+        verifying: Option<RuntimeChoice>,
         tally: &mut Tally,
         state: &mut RequestState,
     ) -> Result<Value, Failure> {
-        let verifying = candidate.as_ref().map(|(runtime, _)| *runtime);
         let map_id = format!("rmap_{}", ulid::Ulid::generate());
         let mut repair: Option<String> = None;
         let run_id = tally.run_id.clone();
@@ -1222,7 +1234,9 @@ impl Inner {
         };
         // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-reset
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-turn
-        let outcome = self.run(req, Some((runtime, cli_session)), None).await;
+        let outcome = self
+            .run(req, Some((runtime, cli_session)), None, None)
+            .await;
         // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-turn
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-close
         if matches!(
@@ -1254,7 +1268,7 @@ impl LlmRuntime for Llm {
     }
 
     fn run_once(&self, req: RunRequest) -> BoxFuture<'_, RunOutcome> {
-        Box::pin(self.0.run(req, None, None))
+        Box::pin(self.0.run(req, None, None, None))
     }
 
     fn open_session<'a>(
@@ -1301,7 +1315,7 @@ impl LlmRuntime for Llm {
                 .map_err(|code| Failure::Runtime { code })?;
             let outcome = self
                 .0
-                .run(req, Some((choice.runtime, resumed.clone())), None)
+                .run(req, Some((choice.runtime, resumed.clone())), None, None)
                 .await;
             self.0.gate.close_session(choice.runtime, &resumed);
             outcome
