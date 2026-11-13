@@ -2107,7 +2107,12 @@ async fn another_capture_ends_the_interrupted_call() {
     let next = r.recording().await;
     assert_ne!(next, call_id);
     assert!(r.banners().await.is_empty());
-    assert_eq!(r.call_row(&call_id).0, "processing");
+    let (status, ended_at) = r.call_row(&call_id);
+    assert!(matches!(status.as_str(), "processing" | "ready"));
+    assert_eq!(ended_at, Some(T0 + 60_000));
+    let jobs = r.core.scheduler().runs().unwrap();
+    assert!(jobs.iter().any(|job| job.kind == JobKind::PostCall));
+    assert!(jobs.iter().any(|job| job.kind == JobKind::ArchivePass));
 }
 
 #[tokio::test(start_paused = true)]
