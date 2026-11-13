@@ -210,6 +210,7 @@ public final class EngineLoop: @unchecked Sendable {
         // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
         case .stop:
             session.audio.stop()
+            session.capture.stopCapture()
             writer.emit(.ack(cmdId: command.id))
             facts.withLock {
                 detector.stopSession()

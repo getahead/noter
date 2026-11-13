@@ -50,6 +50,16 @@ public final class CaptureRing: @unchecked Sendable {
         close(fd)
     }
 
+    // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
+    /// Recovery audio belongs only to an interrupted call, never a cleanly stopped one.
+    func clear() {
+        lock.withLock {
+            memset(base, 0, size)
+            base.storeBytes(of: Int64(-1), toByteOffset: 88, as: Int64.self)
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
+
     private func counter(_ channel: Channel) -> Int { channel == .mic ? 72 : 80 }
     private func data(_ channel: Channel) -> Int {
         Self.headerSize + (channel == .mic ? 0 : Self.capacity * MemoryLayout<Float>.size)
@@ -383,10 +393,19 @@ final class CaptureSession: @unchecked Sendable {
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
 
     // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
+    /// Clear before a new session can reuse the mapping, while finalization runs behind it.
+    func stopCapture() {
+        lock.withLock {
+            live = false
+            ring.clear()
+        }
+    }
+    // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
+
+    // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
     /// Flushes the files, writes `timeline.json`; the `session_stopped` to send.
     func stop() -> EngineEvent {
         lock.withLock {
-            live = false
             encoders.values.forEach { $0.finish() }
             encoders = [:]
             try? save()
