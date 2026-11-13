@@ -49,18 +49,26 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await expect(log).toHaveAttribute("data-state", "following"); // and follows the call again once it closes
   });
 
-  test("UI — happy path: Return picks the highlighted person and renames without the mouse", async ({ page }) => {
-    await live(page);
-    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await expect.poll(async () => (await sent(page, "transcript_rename_speaker")).length).toBe(1);
-    expect(await sent(page, "transcript_rename_speaker")).toEqual([
-      expect.objectContaining({ call_id: S.CALL, speaker_id: "spk_3", person: expect.objectContaining({ type: "existing" }) }),
-    ]);
-    await expect(strip(page)).toContainText(new RegExp(`Named Speaker 3 as [^·]* · ${LINES.source}`));
-    await expect(transcript(page).getByText("Speaker 3")).toHaveCount(0);
-  });
+  for (const latency of [0, 250]) {
+    test(`UI — happy path: Return picks the highlighted person and renames without the mouse (IPC latency ${latency} ms)`, async ({ page }) => {
+      await openWindow(page, "call-screen", { latency });
+      await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+      const rename = popover(page, "Rename Speaker 3");
+      // Live Rename awaits window_show_call before mounting and focusing the picker.
+      await expect(rename.getByRole("combobox", { name: "Name…" })).toBeFocused();
+      const person = rename.getByRole("group", { name: "In this call", exact: true }).getByRole("option").first();
+      await expect(person).toBeVisible();
+      await page.keyboard.press("ArrowDown");
+      await expect(person).toHaveAttribute("aria-selected", "true");
+      await page.keyboard.press("Enter");
+      await expect.poll(async () => (await sent(page, "transcript_rename_speaker")).length).toBe(1);
+      expect(await sent(page, "transcript_rename_speaker")).toEqual([
+        expect.objectContaining({ call_id: S.CALL, speaker_id: "spk_3", person: expect.objectContaining({ type: "existing" }) }),
+      ]);
+      await expect(strip(page)).toContainText(new RegExp(`Named Speaker 3 as [^·]* · ${LINES.source}`));
+      await expect(transcript(page).getByText("Speaker 3")).toHaveCount(0);
+    });
+  }
 
   test("UI — empty path: No matching person — Zoya shows No one called “Zoya” and New Person “Zoya”…, the form has Name, Email, Role, Create and Name says You added Zoya and named Speaker 3 as Zoya", async ({ page }) => {
     await live(page);
