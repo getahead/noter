@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.22.9](https://github.com/getahead/noter/compare/v0.22.8...v0.22.9) (2026-11-13)
+
+
+### Bug fixes
+
+* **core:** keep folder sync running past unreadable files ([#778](https://github.com/getahead/noter/issues/778)) ([4497669](https://github.com/getahead/noter/commit/44976692395a201f8f181e0cfb90040426365ba1))
+* **core:** preserve levels sequence across subscriptions ([#787](https://github.com/getahead/noter/issues/787)) ([ef1f17e](https://github.com/getahead/noter/commit/ef1f17efdd69a2cfbd44a5f49316da21b284f96b))
+* **core:** reject conflicting tags and handle unchanged writes ([#782](https://github.com/getahead/noter/issues/782)) ([f62954d](https://github.com/getahead/noter/commit/f62954daaa6e3cf7a63be1a4337e4cb84983a482))
+* **core:** restrict account checks to their own runtime ([#774](https://github.com/getahead/noter/issues/774)) ([8deafa0](https://github.com/getahead/noter/commit/8deafa0e16ce8903894c721639719a4c2da6a851))
+* **engine:** confine capture and replay paths to container ([#779](https://github.com/getahead/noter/issues/779)) ([52c604f](https://github.com/getahead/noter/commit/52c604f36bed0ae2c25a7394e3d8e565c6108df9))
+* **engine:** preserve segments in other languages ([#776](https://github.com/getahead/noter/issues/776)) ([2197602](https://github.com/getahead/noter/commit/2197602689a7d7abf8127b815061269ddc531356))
+* **host:** restrict window capabilities to bridge permissions ([#781](https://github.com/getahead/noter/issues/781)) ([56420a4](https://github.com/getahead/noter/commit/56420a42934b08d046c7e4524bc7f68198d72de7))
+* **ui:** detach live transcript on the first upward pixel ([#784](https://github.com/getahead/noter/issues/784)) ([d6502ec](https://github.com/getahead/noter/commit/d6502ec118ee325bcb9a6009399fc428bd2e7693))
+
 ## [0.22.8](https://github.com/getahead/noter/compare/v0.22.7...v0.22.8) (2026-11-13)
 
 
