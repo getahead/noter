@@ -17,7 +17,7 @@ use objc2::{define_class, msg_send, ClassType, MainThreadMarker};
 use objc2_app_kit::{
     NSAccessibilityAnnouncementKey, NSAccessibilityAnnouncementRequestedNotification,
     NSAccessibilityNotificationUserInfoKey, NSAccessibilityPostNotificationWithUserInfo,
-    NSAccessibilityPriorityKey, NSApplication,
+    NSAccessibilityPriorityKey, NSApplication, NSScreen,
 };
 use objc2_av_foundation::{AVCaptureDevice, AVMediaTypeAudio};
 use objc2_core_audio::{
@@ -412,6 +412,38 @@ pub fn display_frame(id: &DisplayId) -> Option<Frame> {
         height: b.size.height,
     })
 }
+
+/// The display's AppKit visible frame, which excludes the menu bar and Dock.
+// @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+pub fn display_visible_frame(id: &DisplayId) -> Option<Frame> {
+    let display = active_displays()
+        .into_iter()
+        .find(|&display| display_id(display) == *id)?;
+    let mtm = MainThreadMarker::new()?;
+    let screen_number_key = NSString::from_str("NSScreenNumber");
+    let screen = NSScreen::screens(mtm).iter().find(|screen| {
+        screen
+            .deviceDescription()
+            .objectForKey(&screen_number_key)
+            .is_some_and(|number| {
+                number
+                    .downcast_ref::<NSNumber>()
+                    .is_some_and(|number| number.as_u32() == display)
+            })
+    })?;
+    let screen_frame = screen.frame();
+    let frame = screen.visibleFrame();
+    let bounds = CGDisplayBounds(display);
+    Some(Frame {
+        x: bounds.origin.x + frame.origin.x - screen_frame.origin.x,
+        y: bounds.origin.y + screen_frame.origin.y + screen_frame.size.height
+            - frame.origin.y
+            - frame.size.height,
+        width: frame.size.width,
+        height: frame.size.height,
+    })
+}
+// @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
 
 /// The `userInfo` key that holds the target.
 const TARGET_KEY: &str = "noter_target";

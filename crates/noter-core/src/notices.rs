@@ -121,7 +121,8 @@ impl Core {
         let shown = detection.is_some();
         self.set_detection(detection);
         if shown && !self.app().presenting.hidden {
-            self.deps.surfaces.show_record_prompt();
+            let placement = self.placement_for(&self.call_screen_now());
+            self.deps.surfaces.show_record_prompt(&placement);
         } else {
             self.deps.surfaces.close_record_prompt();
         }
@@ -178,7 +179,8 @@ impl Core {
         self.set_detection(Some(detection));
         // Hidden for presenting: nothing is drawn; the menu still offers the recording.
         if !self.app().presenting.hidden {
-            self.deps.surfaces.show_record_prompt();
+            let placement = self.placement_for(&self.call_screen_now());
+            self.deps.surfaces.show_record_prompt(&placement);
         }
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-show-prompt
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-if-prompt

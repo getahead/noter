@@ -97,7 +97,7 @@ struct Shown(
 );
 
 impl Surfaces for Shown {
-    fn show_record_prompt(&self) {
+    fn show_record_prompt(&self, _: &noter_core::Placement) {
         self.0.lock().unwrap().push("show_record_prompt");
     }
     fn close_record_prompt(&self) {

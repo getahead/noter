@@ -217,7 +217,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Steps**:
 1. [x] - `p1` - **IF** the chosen call display is connected, use it with the preferred layout (dedicated by default) - `inst-chosen-display`
 2. [x] - `p1` - **ELSE** use the display with the main window, the floating layout, and set `chosen_display_missing` - `inst-fallback-display`
-3. [x] - `p1` - Restore the saved frame for that display and layout, clamped to the visible frame - `inst-frame`
+3. [x] - `p1` - Use the display's AppKit visible frame (excluding menu bar and Dock); restore the saved frame for that display and layout, clamped to the visible frame - `inst-frame`
 4. [x] - `p1` - **RETURN** the placement - `inst-return-placement`
 
 ### Non-activating, content-protected panels
@@ -231,7 +231,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Steps**:
 1. [x] - `p1` - Convert the windows to NSPanel with the non-activating style through tauri-nspanel (pinned commit) - `inst-convert`
 2. [x] - `p1` - Set the sharing type so screen capture excludes them - `inst-content-protect`
-3. [x] - `p1` - Keep them above normal windows on every Space while a call runs - `inst-level`
+3. [x] - `p1` - Keep them above normal windows on every Space while a call runs, stationary, and visible beside another app's full-screen Space - `inst-level`
 4. [x] - `p1` - Draw the record prompt without a title bar on a transparent background, so the panel is its content - `inst-chrome`
 5. [x] - `p1` - Take the first click on a panel while another app is active: it acts at once instead of only making the panel key - `inst-first-click`
 6. [x] - `p1` - API: `window_fit { width, height }` from the record prompt: resize it to its content, 360 to 440 pt wide and at most 480 pt high, keeping its top-right corner; **IF** either is 0 **RETURN** `invalid_input` - `inst-fit`

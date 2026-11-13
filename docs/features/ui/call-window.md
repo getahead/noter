@@ -52,7 +52,7 @@ milestone: M1
 
 ### 1.1 Overview
 
-During a call Noter shows one window that is an NSPanel: it never makes Noter active, is hidden from window-filtered screen shares, and has two layouts of one React tree and one store. The dedicated layout (call screen) fills a second display; the floating layout (floating panel) sits beside the call app and can collapse to a 56-pt strip. The window shows the recording state and clock, capture decisions in the notice slot (call ended, new meeting, nothing heard, the closing state after any stop), degraded states in banners, the live transcript, and the capture controls with their global hotkeys. In M1 the copilot is off (`cpt-noter-constraint-copilot-flag`), so the window uses its **Copilot flag off** layout; the council column, cards and card keys arrive with `cpt-noter-feature-ui-copilot` in M4.
+During a call Noter shows one window that is an NSPanel: it never makes Noter active, joins all Spaces, stays put beside full-screen apps, is hidden from window-filtered screen shares, and has two layouts of one React tree and one store. The dedicated layout (call screen) fills a second display; the floating layout (floating panel) sits beside the call app, stays between 340 and 600 pt wide and at least 300 pt high, and can collapse to a 56-pt strip. The window shows the recording state and clock, capture decisions in the notice slot (call ended, new meeting, nothing heard, the closing state after any stop), degraded states in banners, the live transcript, and the capture controls with their global hotkeys. In M1 the copilot is off (`cpt-noter-constraint-copilot-flag`), so the window uses its **Copilot flag off** layout; the council column, cards and card keys arrive with `cpt-noter-feature-ui-copilot` in M4.
 
 ### 1.2 Purpose
 
@@ -202,7 +202,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 **Actor**: Primary user
 
 **Success Scenarios**:
-- Happy path of `cpt-noter-seq-floating-panel-collapse-strip`: **Collapse Panel** or a double-click on the header shows one line with the recording dot and **00:21:08** at the same snapped edge; **Expand Panel** brings the panel back
+- Happy path of `cpt-noter-seq-floating-panel-collapse-strip`: **Collapse Panel** or a double-click on the header shows one line with the recording dot and **00:21:08** at the same snapped edge and width; **Expand Panel** brings the panel back
 - Error — Capture notice while collapsed: the strip expands for the notice and collapses after the choice
 
 **Error Scenarios**:
@@ -398,7 +398,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 - [x] `p2` - **ID**: `cpt-noter-dod-ui-call-window-shell`
 
-The system **MUST** render the call window as one React tree with the dedicated layout (CS-R0 to CS-R5) and the floating layout (FP-R0 to FP-R6, FP-C1 to FP-C3) as `surface('call')` renders them in the **Copilot flag off** state, switch layouts from `window:call` without reloading, keep every view state across layout changes, hides and crashes, and never take focus except as the panel rules allow.
+The system **MUST** render the call window as one React tree with the dedicated layout (CS-R0 to CS-R5) and the floating layout (FP-R0 to FP-R6, FP-C1 to FP-C3) as `surface('call')` renders them in the **Copilot flag off** state, switch layouts from `window:call` without reloading, keep every view state across layout changes, hides and crashes, and never take focus except as the panel rules allow. The floating panel is resizable from 340 to 600 pt wide and at least 300 pt high; saved frames are clamped to those limits. Collapsing preserves its position and width while setting the height to 56 pt. The panel joins all Spaces, stays stationary, and appears beside full-screen apps.
 
 **Implements**:
 - `cpt-noter-flow-ui-call-window-display-change`
