@@ -153,6 +153,8 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
   const rowId = useId();
   const it = useItem(bridge, item);
+  // @cpt-state:cpt-noter-state-ui-core-bridge-command:p1
+  const completing = useWindow(bridge, (s) => s.commands["item:done:".concat(it.id)]?.state === "WAITING");
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const heldLocal = useLocal(it.id);
   const local: Local = variant === "read-only" ? {} : heldLocal;
@@ -218,7 +220,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
   );
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-tick
   const check =
-    variant === "read-only" ? <Icon name="check" size={12} /> : <Checkbox ariaLabel={t("items.done_aria", { text: quote(it.text, langOf(it.lang)) })} checked={done} onAction={tick1} />;
+    variant === "read-only" ? <Icon name="check" size={12} /> : <Checkbox ariaLabel={t("items.done_aria", { text: quote(it.text, langOf(it.lang)) })} checked={done} disabled={completing} onAction={tick1} />;
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-tick
   const question = asking && (
     <div className="it-row__landed" role="group" aria-label={t("items.landed.ask")}>
@@ -248,7 +250,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {tags}
           {prov}
           <span className="np-tb__spacer" />
-          {variant === "done" && <PushButton label={t(local.doneTarget ? "items.undo" : "items.reopen")} size="small" variant="quiet" onAction={() => void (local.doneTarget ? undoRow(bridge, it.id, local.doneTarget) : setDone(bridge, it, false))} />}
+          {variant === "done" && <PushButton label={t(local.doneTarget ? "items.undo" : "items.reopen")} size="small" variant="quiet" disabled={completing} onAction={() => void (local.doneTarget ? undoRow(bridge, it.id, local.doneTarget) : setDone(bridge, it, false))} />}
           {handoff}
           {suggested && variant === "compact" && <CompactReview it={it} bridge={bridge} />}
           {info}

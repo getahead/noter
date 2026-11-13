@@ -98,6 +98,8 @@ export async function reviewAll(bridge: Bridge, callId: string, kinds: ItemKind[
 // @cpt-flow:cpt-noter-flow-ui-items-status:p1
 /** The checkbox: the wanted state, never a toggle. Ticking a suggestion accepts it too. */
 export async function setDone(bridge: Bridge, item: ItemView, done: boolean) {
+  // @cpt-state:cpt-noter-state-ui-core-bridge-command:p1
+  if (bridge.store.getState().commands[`item:done:${item.id}`]?.state === "WAITING") return;
   const it = current(bridge, item);
   const suggested = it.review === "suggested"; // read before the command: a fake core mutates the very record
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-done

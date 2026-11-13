@@ -161,6 +161,18 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
     expect(seen).toContainEqual(["item_set_done", { item_id: "itm_spec", rev: 1, done: true }]);
   });
 
+  it.each(["full", "compact", "done"] as const)("cpt-noter-state-ui-core-bridge-command: disables %s completion controls only while their item is waiting", async (variant) => {
+    await ready();
+    const props = { bridge, item: item("itm_spec"), variant };
+    bridge.store.setState({ commands: { "item:done:itm_spec": { state: "WAITING", error: null } } });
+    const box = (tree: ReturnType<typeof rendered>) => find(tree, (p) => typeof p.ariaLabel === "string" && p.ariaLabel.startsWith("Done:"));
+    expect(box(rendered(ActionItemRow, props)).props.disabled).toBe(true);
+    if (variant === "done") expect(find(rendered(ActionItemRow, props), (p) => p.label === "Reopen").props.disabled).toBe(true);
+    expect(box(rendered(ActionItemRow, { ...props, item: item("itm_replay") })).props.disabled).not.toBe(true);
+    bridge.store.setState({ commands: { "item:done:itm_spec": { state: "DONE", error: null } } });
+    expect(box(rendered(ActionItemRow, props)).props.disabled).not.toBe(true);
+  });
+
   it("ticking a handed-off item asks Did the handoff land? with three answers; Keep Open keeps it handed off", async () => {
     await ready();
     const seen = sent();

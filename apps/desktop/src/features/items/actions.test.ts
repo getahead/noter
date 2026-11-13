@@ -143,6 +143,52 @@ describe("setDone, answerHandoff, reopen", () => {
     expect(localOf("itm_spec").outcome).toBeUndefined();
   });
 
+  it("cpt-noter-flow-ui-items-status: ignores a second completion while waiting, then permits an untick", async () => {
+    await ready();
+    const run = bridge.core.itemSetDone;
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const invoke = vi.spyOn(bridge.core, "itemSetDone").mockImplementation(async (args) => {
+      await waiting;
+      return run(args);
+    });
+    const completing = setDone(bridge, item("itm_spec"), true);
+    const duplicate = setDone(bridge, item("itm_spec"), false);
+    const submissions = invoke.mock.calls.length;
+    release();
+    await Promise.all([completing, duplicate]);
+    expect(submissions).toBe(1);
+    expect(localOf("itm_spec").outcome?.text).toBe("Done");
+    await setDone(bridge, item("itm_spec"), false);
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(item("itm_spec").status).toBe("open");
+    expect(localOf("itm_spec").outcome).toBeUndefined();
+  });
+
+  it("cpt-noter-flow-ui-items-status: a refused pending completion retains its conflict and allows a new attempt", async () => {
+    await ready();
+    const run = bridge.core.itemSetDone;
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(bridge.core, "itemSetDone").mockImplementationOnce(async (args) => {
+      await waiting;
+      fake.failNext("item_set_done", "conflict");
+      return run(args);
+    });
+    const completing = setDone(bridge, item("itm_spec"), true);
+    await setDone(bridge, item("itm_spec"), false);
+    await setDone(bridge, item("itm_replay"), true);
+    expect(item("itm_replay").status).toBe("done");
+    release();
+    await completing;
+    expect(localOf("itm_spec").error).toBe(CONFLICT);
+    expect(localOf("itm_spec").outcome).toBeUndefined();
+    expect(bridge.store.getState().commands["item:done:itm_spec"]?.state).toBe("ERROR");
+    await setDone(bridge, item("itm_spec"), true);
+    expect(localOf("itm_spec").error).toBeUndefined();
+    expect(item("itm_spec").status).toBe("done");
+  });
+
   it("Yes, Landed completes the item; Keep Open sends keep_open and keeps it handed off", async () => {
     await ready();
     const seen = sent();
