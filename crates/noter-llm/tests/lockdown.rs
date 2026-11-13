@@ -415,6 +415,7 @@ async fn claude_api_key_runs_bare_with_every_restriction() {
     assert!(session.starts_with("session-"));
 
     let run = stub.only();
+    assert_eq!(run.all("mode"), ["mcp:600", "run:700"]);
     assert!(run.has("-p") && run.has("--bare"));
     assert_eq!(run.flag("--output-format"), Some("json"));
     let schema: Value = serde_json::from_str(run.flag("--json-schema").unwrap()).unwrap();
@@ -683,19 +684,30 @@ async fn refreshing_reads_the_local_models_ollama_has_pulled() {
 
 #[tokio::test]
 async fn ollama_off_localhost_is_never_reached() {
-    let world = World::new();
-    let ollama = OllamaConfig {
-        url: "http://ollama.example.com:11434".into(),
-        models: vec!["qwen3:8b".into()],
-    };
-    let llm = world.llm(world.cli(None, false), world.cli(None, false), ollama);
-    let availability = llm.availability();
-    let local = availability
-        .iter()
-        .find(|a| a.runtime == RuntimeChoice::Local);
-    assert!(local.unwrap().unavailable.is_some());
-    let e = unavailable(llm.run_once(world.request(RuntimeChoice::Local)).await);
-    assert_eq!(e.code, ErrorCode::RuntimeUnavailable);
+    for url in [
+        "http://ollama.example.com:11434",
+        "http://localhost.evil.com:11434",
+        "http://127.0.0.1.evil.com:11434",
+        "http://192.168.1.2:11434",
+        "http://[::ffff:127.0.0.1]:11434",
+    ] {
+        let world = World::new();
+        let ollama = OllamaConfig {
+            url: url.into(),
+            models: vec!["qwen3:8b".into()],
+        };
+        let llm = world.llm(world.cli(None, false), world.cli(None, false), ollama);
+        let local = llm
+            .availability()
+            .into_iter()
+            .find(|a| a.runtime == RuntimeChoice::Local)
+            .unwrap();
+        assert_eq!(
+            local.unavailable,
+            Some(noter_protocol::error::RuntimeUnavailableReason::LocalModelNotReady),
+            "accepted hostile Ollama URL: {url}"
+        );
+    }
 }
 
 #[tokio::test]

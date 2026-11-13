@@ -1615,3 +1615,25 @@ async fn only_an_ask_or_post_call_run_under_cloud_allowed_without_sensitive_cont
         assert_eq!(started[0].live_ok, relay, "{task:?} {privacy:?}");
     }
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_cloud_tool_result_naming_one_normal_call_remains_releasable() {
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    let (id, run) = running(&f, &host, tool_request(&f)).await;
+    let released = f
+        .llm
+        .release_tool_result(
+            &noter_protocol::LlmRunId::new(&id),
+            &[],
+            json!({"call_id": "call_1", "text": "safe result"}),
+        )
+        .unwrap();
+    assert_eq!(released["call_id"], "call_1");
+    assert_eq!(released["text"], "safe result");
+    assert_eq!(
+        f.count("SELECT count(*) FROM audit_log WHERE kind = 'tool_result'"),
+        1
+    );
+    run.abort();
+}

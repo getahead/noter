@@ -186,11 +186,20 @@ fn world(script: &str) -> World {
                 ],
             ),
             row(
+                "people",
+                &[
+                    ("id", json!("per_anna")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Anna Koval")),
+                    ("short_name", json!("Anna")),
+                ],
+            ),
+            row(
                 "speakers",
                 &[
                     ("id", json!("spk_anna")),
                     ("call_id", json!("call_a")),
-                    ("label", json!("Anna Koval")),
+                    ("label", json!("spk_1")),
                     ("channel", json!("sys")),
                     ("person_id", json!("per_anna")),
                     ("pass", json!("live")),
@@ -412,6 +421,7 @@ async fn generate_answers_generating_then_ready_through_entity_changed_and_cache
     assert_eq!(received[0].skill, "handoff");
     let packet = String::from_utf8_lossy(&received[0].bytes);
     for part in [
+        "Anna Koval",
         "Focus must go back to the list",
         "1:04",
         "Keep the old API",
@@ -450,6 +460,41 @@ async fn cancel_restores_the_previous_state_and_writes_nothing() {
     assert_eq!(back.prompt_md, ready.prompt_md);
     w.settle().await;
     assert_eq!(w.get("itm_eng").await.unwrap().versions.len(), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn handoff_applies_the_enabled_name_pseudonym_policy_to_its_cloud_packet() {
+    let w = world(SLOW);
+    let settings_ctx = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Settings,
+        },
+    };
+    let mut settings = w
+        .core
+        .settings_get(&settings_ctx, noter_protocol::NoArgs {})
+        .await
+        .unwrap();
+    settings.privacy.pseudonymise_names = true;
+    w.core
+        .settings_update(
+            &settings_ctx,
+            SettingsUpdateArgs {
+                rev: settings.rev,
+                section: SettingsSection::Privacy(settings.privacy),
+            },
+        )
+        .await
+        .unwrap();
+    w.generate("itm_eng", false).await;
+    w.settle().await;
+    let received = w.llm.received();
+    assert_eq!(received.len(), 1);
+    let packet = String::from_utf8_lossy(&received[0].bytes);
+    assert!(
+        !packet.contains("Anna Koval"),
+        "name leaked in outgoing handoff bytes: {packet}"
+    );
 }
 
 #[tokio::test(start_paused = true)]

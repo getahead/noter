@@ -170,6 +170,61 @@ async fn privacy_changed_during_postcall_applies_to_every_later_section() {
     }
 }
 
+#[tokio::test(start_paused = true)]
+async fn postcall_applies_the_enabled_name_pseudonym_policy_to_its_cloud_packet() {
+    let dir = tempfile::tempdir().unwrap();
+    let events = Arc::new(Events::default());
+    let scripted = Scripted::parse("").unwrap();
+    let deps =
+        CoreDeps::new(Arc::new(FixedClock), events.clone()).with_llm(Adapters::scripted(&scripted));
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    let ctx = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Settings,
+        },
+    };
+    let mut settings = core
+        .settings_get(&ctx, noter_protocol::NoArgs {})
+        .await
+        .unwrap();
+    settings.privacy.pseudonymise_names = true;
+    core.settings_update(
+        &ctx,
+        noter_protocol::model::SettingsUpdateArgs {
+            rev: settings.rev,
+            section: noter_protocol::model::SettingsSection::Privacy(settings.privacy),
+        },
+    )
+    .await
+    .unwrap();
+    seed_call(&core, CALL, 1);
+    core.store()
+        .insert_batch(vec![ins(
+            "people",
+            vec![
+                ("id", json!("per_named")),
+                ("rev", json!(1)),
+                ("display_name", json!("Anna Example")),
+                ("short_name", json!("Anna")),
+            ],
+        )])
+        .unwrap();
+    noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+        .unwrap()
+        .execute("UPDATE speakers SET person_id = 'per_named', name = 'Anna Example' WHERE call_id = 'call_pc'", [])
+        .unwrap();
+    post_call(&core, CALL);
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    let sent = scripted.received();
+    assert!(!sent.is_empty());
+    let packet = String::from_utf8_lossy(&sent[0].bytes);
+    assert!(
+        !packet.contains("Anna Example"),
+        "name leaked in outgoing post-call bytes: {packet}"
+    );
+}
+
 fn ins(table: &'static str, values: Vec<(&'static str, Value)>) -> Insert {
     Insert { table, values }
 }

@@ -382,6 +382,8 @@ pub fn prior_turns(c: &Connection, thread: &AskThreadId, turn: &AskTurnId) -> Db
             if let Provenance::PastCall { call, .. } = &citation.provenance {
                 sensitive |= call_sensitive(c, call.id.as_str())?.unwrap_or(true);
                 calls.push(call.id.clone());
+            } else if let Provenance::Document { document_id, .. } = &citation.provenance {
+                sensitive |= document_sensitive(c, document_id.as_str())?.unwrap_or(true);
             }
         }
         out.push(Prior {
@@ -399,6 +401,15 @@ fn call_sensitive(c: &Connection, call: &str) -> Db<Option<bool>> {
     c.query_row(
         "SELECT privacy_class = 'sensitive' FROM calls WHERE id = ?1",
         [call],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+fn document_sensitive(c: &Connection, document: &str) -> Db<Option<bool>> {
+    c.query_row(
+        "SELECT s.privacy_class = 'sensitive' FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
+        [document],
         |r| r.get(0),
     )
     .optional()

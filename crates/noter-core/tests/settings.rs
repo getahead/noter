@@ -389,7 +389,7 @@ async fn older_or_broken_stored_sections_load_as_the_current_shape() {
     drop(core);
     let c = Connection::open(dir.path().join("noter.db")).unwrap();
     c.execute_batch(
-        r#"INSERT INTO settings (key, value) VALUES ('privacy', '{"mode":"local_only","retired_field":1}');
+        r#"INSERT INTO settings (key, value) VALUES ('privacy', '{"mode":"local_only","pseudonymise_names":"x"}');
            INSERT INTO settings (key, value) VALUES ('today', 'not json');
            INSERT INTO settings (key, value) VALUES ('rev', '4');"#,
     )

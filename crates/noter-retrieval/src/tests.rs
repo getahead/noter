@@ -546,8 +546,26 @@ fn bad_dates_are_invalid_input_before_any_read() {
 #[test]
 fn cloud_requests_skip_sensitive_calls_and_count_them() {
     let lib = library();
+    lib.item(
+        "itm_sensitive",
+        "call_c",
+        "decision",
+        "websocket budget approved",
+        "en",
+        "open",
+        "accepted",
+        None,
+    );
+    lib.db
+        .execute(
+            "INSERT INTO item_vec (item_id, embedding, call_id, started_at)
+             VALUES ('itm_sensitive', ?1, 'call_c', ?2)",
+            params![blob(&vector(3)), OCT_1 + 19 * DAY],
+        )
+        .unwrap();
     let local = lib.find(query("websocket budget"));
     assert!(ids(&local.calls).contains(&"seg_c1".to_owned()));
+    assert!(ids(&local.items).contains(&"itm_sensitive".to_owned()));
     assert_eq!(local.sensitive_skipped, 0);
     let cloud = lib.find(Query {
         privacy: Privacy::Cloud,
@@ -557,6 +575,7 @@ fn cloud_requests_skip_sensitive_calls_and_count_them() {
     assert!(!ids(&cloud.calls)
         .iter()
         .any(|id| id == "seg_c1" || id == "chk_c"));
+    assert!(!ids(&cloud.items).contains(&"itm_sensitive".to_owned()));
     // One sensitive call, however many of its rows matched.
     assert_eq!(cloud.sensitive_skipped, 1);
 }
@@ -1332,6 +1351,89 @@ fn ask_threads_keep_turns_in_order_and_mark_deleted_sources() {
         prior[0].sensitive,
         "a turn citing a call that is gone stays on the Mac"
     );
+}
+
+#[test]
+fn follow_up_rechecks_the_current_privacy_of_cited_documents() {
+    let lib = library();
+    lib.db
+        .execute_batch(
+            "CREATE TABLE sources (id TEXT PRIMARY KEY, privacy_class TEXT NOT NULL);
+         CREATE TABLE documents (id TEXT PRIMARY KEY, source_id TEXT NOT NULL);
+         INSERT INTO sources (id, privacy_class)
+         VALUES ('src_1', 'normal');
+         INSERT INTO documents (id, source_id) VALUES ('doc_1', 'src_1');",
+        )
+        .unwrap();
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_docs", "turn_1", true, "Plan?", OCT_1),
+    )
+    .unwrap();
+    let first = AskAnswer {
+        turn_id: AskTurnId::new("turn_1"),
+        question: "Plan?".into(),
+        answer_md: "Use the plan [1].".into(),
+        citations: vec![Citation {
+            n: 1,
+            provenance: Provenance::Document {
+                source_id: SourceId::new("src_1"),
+                document_id: DocumentId::new("doc_1"),
+                chunk_id: ChunkId::new("chk_1"),
+                title: "Plan".into(),
+                section: None,
+                source_name: "Docs".into(),
+            },
+            quote: "Use the plan".into(),
+            speaker: None,
+            strength: MatchStrength::Strong,
+            deleted: false,
+        }],
+        found: true,
+        runtime: RuntimeChoice::ClaudeAccount,
+        answered_locally: false,
+        sensitive_sources_skipped: 0,
+        keyword_only: true,
+        only_weak_evidence: false,
+        asked_at: TimestampMs(OCT_1),
+    };
+    finish_turn(
+        &lib.store,
+        you("answer"),
+        &AskThreadId::new("ask_docs"),
+        &first,
+        None,
+        Ending::Answered,
+        TimestampMs(OCT_1 + 1),
+    )
+    .unwrap();
+    begin_turn(
+        &lib.store,
+        you("ask"),
+        turn("ask_docs", "turn_2", false, "Follow up", OCT_1 + 2),
+    )
+    .unwrap();
+    let prior = || {
+        prior_turns(
+            &lib.db,
+            &AskThreadId::new("ask_docs"),
+            &AskTurnId::new("turn_2"),
+        )
+        .unwrap()
+    };
+    assert!(!prior()[0].sensitive);
+    lib.db
+        .execute(
+            "UPDATE sources SET privacy_class = 'sensitive' WHERE id = 'src_1'",
+            [],
+        )
+        .unwrap();
+    assert!(prior()[0].sensitive);
+    lib.db
+        .execute("DELETE FROM sources WHERE id = 'src_1'", [])
+        .unwrap();
+    assert!(prior()[0].sensitive, "a missing source fails closed");
 }
 
 #[test]

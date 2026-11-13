@@ -142,7 +142,21 @@ pub(crate) fn load(store: &Store) -> Result<Settings, CoreError> {
         let Ok(stored) = serde_json::from_str::<Value>(&value) else {
             continue;
         };
-        let current = merged(default, &stored);
+        let mut current = merged(default, &stored);
+        // A malformed optional privacy field must not erase a readable restrictive mode.
+        if key == "privacy" {
+            if let (Some(current), Some(default)) = (current.as_object_mut(), default.as_object()) {
+                if current
+                    .get("pseudonymise_names")
+                    .is_some_and(|v| !v.is_boolean())
+                {
+                    current.insert(
+                        "pseudonymise_names".into(),
+                        default["pseudonymise_names"].clone(),
+                    );
+                }
+            }
+        }
         // @cpt-end:cpt-noter-algo-core-settings-validate:p1:inst-migrate-shape
         // @cpt-begin:cpt-noter-algo-core-settings-validate:p1:inst-check-values
         let tagged = serde_json::json!({ "section": key, "value": current });

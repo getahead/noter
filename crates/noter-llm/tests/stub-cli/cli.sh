@@ -15,6 +15,7 @@ rec="$here/record.$$"
 out="$here/.record.$$"
 : >"$out"
 line() { printf '%s\t%s\n' "$1" "$2" >>"$out"; }
+file_mode() { stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"; }
 
 codex=no
 [ "$1" = "exec" ] && codex=yes
@@ -24,6 +25,7 @@ for a in "$@"; do
     line argv "$a"
     case "$prev" in
     --mcp-config | --append-system-prompt-file | --output-schema)
+        [ "$prev" = --mcp-config ] && line mode "mcp:$(file_mode "$a")"
         printf 'copy\t%s\t' "$a" >>"$out"
         tr '\n' ' ' <"$a" >>"$out"
         printf '\n' >>"$out"
@@ -41,7 +43,11 @@ for a in "$@"; do
 done
 env | while IFS= read -r e; do line env "$e"; done
 line cwd "$(pwd)"
-for f in $(ls -A .); do line cwd-file "$f"; done
+line mode "run:$(file_mode "$TMPDIR")"
+for f in * .[!.]* ..?*; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    line cwd-file "$f"
+done
 
 loads() { if [ -e "$1" ]; then line loaded "$1"; fi; }
 has() { case ",$sources," in *",$1,"*) return 0 ;; esac; return 1; }

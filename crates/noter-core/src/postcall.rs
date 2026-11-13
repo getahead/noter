@@ -777,6 +777,7 @@ impl Core {
             rx,
         );
         req.call_id = Some(call.clone());
+        req.settings.pseudonyms = lock(&self.settings).privacy.pseudonymise_names;
         req.settings.configured = if options.local {
             Some(RuntimeChoice::Local)
         } else {
