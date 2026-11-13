@@ -561,6 +561,7 @@ fn engine_example_lines_cover_every_command_and_event() {
             })
             .collect();
         t.sort();
+        t.dedup(); // More than one fixture may exercise the same variant.
         t
     }
     let (cmds, events) = (engine_lines::commands(), engine_lines::events());
