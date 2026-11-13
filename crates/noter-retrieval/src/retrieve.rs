@@ -108,8 +108,10 @@ pub struct DocQuery<'a> {
     pub fts: &'a str,
     pub vector: Option<&'a [f32]>,
     pub privacy: Privacy,
-    /// Sources scoped to call types only count where the question is about those types.
+    /// The request's scope, including the call whose type and participants policy resolves.
     pub call_types: &'a [CallTypeId],
+    pub people: &'a [PersonId],
+    pub call_id: Option<&'a CallId>,
     /// Candidates wanted from each ranking.
     pub fetch: usize,
 }
@@ -508,6 +510,8 @@ pub fn retrieve(
                 vector: q.vector.as_deref(),
                 privacy: q.privacy,
                 call_types: &q.filter.call_types,
+                people: &q.filter.people,
+                call_id: q.scope.call_id.as_ref(),
                 fetch,
             },
         )?,

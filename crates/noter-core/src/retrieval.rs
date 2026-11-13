@@ -20,12 +20,17 @@ use crate::{object, Core};
 pub(crate) struct Documents;
 
 impl DocumentSource for Documents {
+    // @cpt-algo:cpt-noter-algo-core-knowledge-policy:p1
     fn permitted_chunks(&self, conn: &Connection, q: &DocQuery<'_>) -> rusqlite::Result<DocHits> {
+        // @cpt-begin:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-scope
         let scope = AskScope {
             call_types: q.call_types.to_vec(),
+            people: q.people.to_vec(),
+            call_id: q.call_id.cloned(),
             include_documents: true,
             ..AskScope::default()
         };
+        // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-scope
         let cloud = q.privacy == Privacy::Cloud;
         let keyword = noter_knowledge::keyword_chunks(conn, q.fts, q.fetch)?;
         let semantic = match q.vector {
