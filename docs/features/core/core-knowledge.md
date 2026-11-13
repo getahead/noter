@@ -27,7 +27,7 @@ design: docs/DESIGN-core.md
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Sync an indexed source](#sync-an-indexed-source)
   - [Enforce source policy on indexed evidence](#enforce-source-policy-on-indexed-evidence)
-  - [Remove all indexed data atomically](#remove-all-indexed-data-atomically)
+  - [Remove all indexed data in bounded transactions](#remove-all-indexed-data-in-bounded-transactions)
 - [4. States (CDSL)](#4-states-cdsl)
   - [Indexed source status](#indexed-source-status)
 - [5. Definitions of Done](#5-definitions-of-done)
@@ -35,6 +35,7 @@ design: docs/DESIGN-core.md
   - [Current policy on every retrieval](#current-policy-on-every-retrieval)
   - [Revoke and remove without leftovers](#revoke-and-remove-without-leftovers)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [7. Change Log](#7-change-log)
 
 <!-- /toc -->
 
@@ -190,11 +191,11 @@ Previous revision, retained as a trace alias for `cpt-noter-algo-core-knowledge-
 
 **Steps**:
 1. [x] - `p1` - Read the current source; refuse a removed or live source; record the sync run and indexing status through the writer - `inst-sync-start`
-2. [x] - `p1` - **IF** it is a folder, resolve and enter its bookmark scope, enumerate supported files and coalesce FSEvents by changed file (TL-29: read by path; `notify` events mark the source changed and the run looks again) - `inst-sync-folder`
+2. [x] - `p1` - **IF** it is a folder, resolve and enter its bookmark scope, enumerate supported files on a blocking worker and coalesce FSEvents by changed file or containing directory (TL-29: read by path; `notify` events mark the source changed and the run looks again) - `inst-sync-folder`
 3. [x] - `p1` - **ELSE** read the token through Keychain, list server resources or crawl seed queries when resources are unavailable; each remote lookup passes the egress gate and is audited before forwarding - `inst-sync-remote`
 4. [x] - `p1` - **FOR EACH** file or page in bounded batches - `inst-sync-each`
-   1. [x] - `p1` - Read its identity, URI, metadata and content hash; skip unchanged content unless a full reindex is required - `inst-sync-hash`
-   2. [x] - `p1` - Extract Markdown, text, PDF, Word, HTML or code text; chunk by heading into 200–400 tokens with title and heading path prepended - `inst-sync-extract`
+   1. [x] - `p1` - Read its identity, URI, metadata and content hash; skip unchanged content unless a full reindex is required, and persist the new modification time when the content hash matches - `inst-sync-hash`
+   2. [x] - `p1` - Extract Markdown, text, PDF, Word, HTML or code text; chunk by heading into bounded 200–400 token estimates with title and heading path prepended, splitting long unbroken text at character boundaries - `inst-sync-extract`
    3. [x] - `p1` - Produce bge-m3 embeddings locally through the engine, outside writer transactions - `inst-sync-embed`
    4. [x] - `p1` - Recheck source existence, revision and privacy; in a writer transaction replace this document's canonical chunks, normalized FTS entries and `doc_vec` rows with a change row - `inst-sync-persist`
    5. [x] - `p1` - Publish committed source progress without file contents or tokens in logs - `inst-sync-progress`
@@ -214,22 +215,22 @@ Previous revision, retained as a trace alias for `cpt-noter-algo-core-knowledge-
 1. [x] - `p1` - Join document candidates to existing source rows; reject removed sources and reject documents when the query excludes them - `inst-policy-source`
 2. [x] - `p1` - Apply AllCalls or Limited rules against the request's people and call types before ranking or building a model packet - `inst-policy-scope`
 3. [x] - `p1` - Exclude sensitive sources for every cloud runtime, regardless of the global cloud mode - `inst-policy-sensitive`
-4. [x] - `p1` - Use current source policy even when a cached chunk or an old sync was created under older rules; the egress gate rechecks at release - `inst-policy-current`
+4. [x] - `p1` - Use current source policy even when a cached chunk or an old sync was created under older rules; exclude a source during bounded privacy repartition, resume only toward its recorded target class, and restore retrieval after commit - `inst-policy-current`
 5. [x] - `p1` - **RETURN** permitted chunks with document id, chunk id, source name and heading provenance - `inst-policy-return`
 
-### Remove all indexed data atomically
+### Remove all indexed data in bounded transactions
 
 - [x] `p4` - **ID**: `cpt-noter-algo-core-knowledge-remove-index`
 
 **Input**: Source id and cancelled work for that source.
 
-**Output**: Source and local index gone, or a rollback with no partial removal.
+**Output**: The source is excluded from retrieval while its index is removed in bounded writer transactions; after interruption it remains excluded and removal can resume.
 
 **Steps**:
-1. [x] - `p1` - Begin the writer transaction and read the source and document ids - `inst-drop-begin`
-2. [x] - `p1` - DB: DELETE its `doc_vec` and FTS entries, `doc_chunks`, `documents`, source-owned sync records and `sources` row; record the removal without copied document content - `inst-drop-delete`
-3. [x] - `p1` - **TRY** commit; **CATCH** failure, roll back and **RETURN** `internal` - `inst-drop-commit`
-4. [x] - `p1` - Invalidate cached hits and reject late workers by source existence; cleanup failures are retried without allowing the source back into retrieval - `inst-drop-invalidate`
+1. [x] - `p1` - Mark the source unavailable to indexed retrieval and read its document count - `inst-drop-begin`
+2. [x] - `p1` - Delete chunk rows and their keyword/vector indexes in bounded batches, then delete documents in bounded batches - `inst-drop-delete`
+3. [x] - `p1` - **IF** any batch fails, retain the retrieval exclusion so a later removal can resume - `inst-drop-commit`
+4. [x] - `p1` - Delete the source and its sync records after all batches; reject late workers by source existence and reclaim incremental free pages - `inst-drop-invalidate`
 5. [x] - `p1` - **RETURN** removed count - `inst-drop-return`
 
 ## 4. States (CDSL)
@@ -295,7 +296,7 @@ The system **MUST** expose complete source rows, revision-guarded edits and retr
 
 - [x] `p4` - **ID**: `cpt-noter-dod-core-knowledge-removal`
 
-The system **MUST** revoke indexed tokens, stop authenticated work, and remove a source's documents, chunks and vectors atomically without touching originals. Watchers, schedules, bookmark access and pending results are released. Removed chunks cannot appear in new answers; existing citations resolve as deleted. No token is returned or included in log or export data.
+The system **MUST** revoke indexed tokens, stop authenticated work, and exclude a source from retrieval while bounded transactions remove its documents, chunks and vectors without touching originals. An interrupted removal remains excluded and can resume. Watchers, schedules, bookmark access and pending results are released. Removed chunks cannot appear in new answers; existing citations resolve as deleted. No token is returned or included in log or export data.
 
 **Implements**:
 - `cpt-noter-flow-core-knowledge-remove`
@@ -313,8 +314,13 @@ The system **MUST** revoke indexed tokens, stop authenticated work, and remove a
 - [x] Scripted MCP covers resource listing, seed-query fallback, initial OAuth, expiry, offline retry and revoke; an incomplete listing never deletes previously indexed pages.
 - [x] A sensitive source and an out-of-scope source are excluded before cloud packet creation; edits during a sync or answer cannot publish old-policy chunks.
 - [x] A cancelled picker writes nothing; inaccessible bookmarks and failed jobs retain typed errors and previous last-sync time; reconnect and retry succeed.
-- [x] Removal rolls back on a forced writer failure; after successful removal, no index row remains and late jobs cannot restore the source.
+- [x] A forced writer failure during source cleanup leaves the source unavailable to retrieval; retry resumes and removes every index row without touching originals.
+- [x] Source cleanup removes chunk indexes in bounded writer transactions and reclaims incremental free pages after removal.
 - [x] Each of the seven commands succeeds at least once in real-core E2E runs; stale `source_update` returns `conflict` without a write or event.
 - [ ] Real-core regression in `crates/noter-core/tests/knowledge.rs`: a folder containing malformed PDF, empty Word and Word lock files still indexes later valid files, counts skipped attempts, retains the previous index for a newly unreadable file, prunes vanished documents and succeeds on subsequent syncs. The unreadable-folder regression retains fatal enumeration error coverage.
 - [x] Unit extraction fixtures remain in `crates/noter-knowledge/src/extract.rs`; real-core command conformance and story E2E remain in `apps/desktop/tests/conformance/m3-stories-knowledge.test.ts` (`cpt-noter-seq-settings-add-knowledge-source`).
 - [x] `just gate-fast` and `just gate` pass.
+
+## 7. Change Log
+
+- 2026-11-13: Folder events include directory changes; unchanged local hashes refresh stored modification times; folder enumeration stays off async workers; unbroken text is split into bounded character chunks. Source removal reclaims incremental free pages after its committed deletion.

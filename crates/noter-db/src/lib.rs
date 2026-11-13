@@ -242,6 +242,29 @@ impl Store {
         // @cpt-end:cpt-noter-algo-core-storage-snapshot-read:p2:inst-if-snapshot
     }
 
+    // @cpt-flow:cpt-noter-flow-core-storage-open:p1
+    /// Reclaim free pages after a large deletion, yielding to queued writer work between batches.
+    pub fn incremental_vacuum(&self) -> Result<(), CoreError> {
+        let mut previous = i64::MAX;
+        loop {
+            let remaining = self.on_writer(|conn| {
+                conn.execute_batch("PRAGMA incremental_vacuum(256)")
+                    .map_err(internal)?;
+                conn.query_row("PRAGMA freelist_count", [], |row| row.get::<_, i64>(0))
+                    .map_err(internal)
+            })?;
+            if remaining == 0 || remaining >= previous {
+                break;
+            }
+            previous = remaining;
+        }
+        // Publish the smaller database file outside the WAL. PASSIVE never waits for active readers.
+        self.on_writer(|conn| {
+            conn.query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |_| Ok(()))
+                .map_err(internal)
+        })
+    }
+
     /// Shut down: the writer drains its queue and checkpoints, then every connection closes.
     /// Later calls answer `internal`. Idempotent; also runs on drop.
     pub fn close(&self) {

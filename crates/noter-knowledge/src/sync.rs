@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 
-use noter_db::rusqlite::{params, Transaction};
+use noter_db::rusqlite::{params, OptionalExtension, Transaction};
 use noter_db::{ChangeMeta, Logged, Store};
 use noter_engine_client::{EngineClient, EngineLauncher};
 use noter_jobs::{RunCtx, Stop};
@@ -354,7 +354,10 @@ async fn pass<L: EngineLauncher>(
 ) -> Result<(), Stop> {
     // @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-folder
     // TL-29: no bookmark to enter; the folder is read by path.
-    let files = enumerate(dir)
+    let directory = dir.to_path_buf();
+    let files = tokio::task::spawn_blocking(move || enumerate(&directory))
+        .await
+        .map_err(|_| failed(ErrorCode::SourceSyncFailed, "the folder could not be read"))?
         .map_err(|_| failed(ErrorCode::SourceSyncFailed, "the folder could not be read"))?;
     let known = known(env, id)?;
     // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-folder
@@ -386,6 +389,44 @@ async fn pass<L: EngineLauncher>(
         };
         // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-failure
         let Some((hash, doc, chunks)) = read else {
+            if before.is_some_and(|known| known.modified != file.modified) {
+                let id = id.clone();
+                let uri = uri.clone();
+                let modified = file.modified;
+                let mut meta = ctx
+                    .change_meta("refresh unchanged file metadata")
+                    .ok_or(Stop::Cancelled)?;
+                meta.undoable = false;
+                env.store.write_with(meta, move |tx| {
+                    let before = tx
+                        .query_row(
+                            "SELECT id, modified_at FROM documents WHERE source_id = ?1 AND uri = ?2",
+                            params![id.as_str(), uri],
+                            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?)),
+                        )
+                        .optional()
+                        .map_err(internal)?;
+                    let Some((document, previous)) = before else {
+                        return Err(not_found());
+                    };
+                    tx.execute(
+                        "UPDATE documents SET modified_at = ?1 WHERE id = ?2",
+                        params![modified, document],
+                    )
+                    .map_err(internal)?;
+                    Ok((
+                        (),
+                        vec![Logged {
+                            entity_type: "document",
+                            entity_id: document,
+                            field: Some("modified_at".into()),
+                            before: previous.map(|value| value.to_string()),
+                            after: modified.map(|value| value.to_string()),
+                            delta: None,
+                        }],
+                    ))
+                })?;
+            }
             continue;
         };
         // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-hash
@@ -506,7 +547,7 @@ fn prune<L: EngineLauncher>(
         let meta = ctx
             .change_meta("documents removed")
             .ok_or(Stop::Cancelled)?;
-        env.store.write_with(meta, move |tx| {
+        match env.store.write_with(meta, move |tx| {
             for doc in &vanished {
                 tx.execute(
                     "DELETE FROM documents WHERE id = ?1 AND source_id = ?2",
@@ -523,7 +564,11 @@ fn prune<L: EngineLauncher>(
                 delta: None,
             };
             Ok(((), vec![logged]))
-        })?;
+        }) {
+            Ok(_) => {}
+            Err(error) if error.code == ErrorCode::NotFound => {}
+            Err(error) => return Err(Stop::Failed(error)),
+        }
     }
     // @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-deleted
     Ok(())
@@ -774,6 +819,19 @@ impl Replace {
     fn apply(self, tx: &Transaction<'_>) -> Result<(SourceRow, Vec<Logged>), CoreError> {
         // The source may have gone or changed its policy while this file was embedded: the
         // vector trigger reads its privacy class inside this transaction.
+        let removing: i64 = tx
+            .query_row(
+                "SELECT removing FROM sources WHERE id = ?1",
+                [self.source.as_str()],
+                |row| row.get(0),
+            )
+            .map_err(internal)?;
+        if removing != 0 {
+            return Err(CoreError::new(
+                ErrorCode::Conflict,
+                "the source is being removed or reclassified",
+            ));
+        }
         get(tx, &self.source)
             .map_err(internal)?
             .ok_or_else(not_found)?;

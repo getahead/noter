@@ -23,10 +23,11 @@ pub struct Watchers {
 }
 
 /// Whether an event is about a file the index reads under `root`, outside hidden entries.
+// @cpt-flow:cpt-noter-flow-core-knowledge-folder:p1
 fn relevant(event: &notify::Event, root: &Path) -> bool {
     !matches!(event.kind, EventKind::Access(_))
         && event.paths.iter().any(|p| {
-            Format::of(p).is_some()
+            (Format::of(p).is_some() || !p.is_file())
                 && p.strip_prefix(root).is_ok_and(|rel| {
                     !rel.iter()
                         .any(|part| part.to_string_lossy().starts_with('.'))
@@ -97,17 +98,21 @@ mod tests {
 
     #[test]
     fn only_changes_to_indexed_visible_files_count() {
-        let root = Path::new("/u/.config/f");
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let photo = root.join("photo.png");
+        std::fs::write(&photo, b"image").unwrap();
         let modify = EventKind::Modify(notify::event::ModifyKind::Any);
-        let seen = |kind, path| relevant(&event(kind, path), root);
-        assert!(seen(modify, "/u/.config/f/notes.md"));
-        assert!(seen(modify, "/u/.config/f/sub/notes.md"));
-        assert!(!seen(modify, "/u/.config/f/photo.png"));
-        assert!(!seen(modify, "/u/.config/f/.notes.md"));
-        assert!(!seen(modify, "/u/.config/f/.git/notes.md"));
-        assert!(!seen(modify, "/elsewhere/notes.md"));
+        let seen = |kind, path: &Path| relevant(&event(kind, &path.to_string_lossy()), root);
+        assert!(seen(modify, &root.join("notes.md")));
+        assert!(seen(modify, &root.join("sub/notes.md")));
+        assert!(seen(modify, &root.join("sub")));
+        assert!(!seen(modify, &photo));
+        assert!(!seen(modify, &root.join(".notes.md")));
+        assert!(!seen(modify, &root.join(".git/notes.md")));
+        assert!(!seen(modify, Path::new("/elsewhere/notes.md")));
         let access = EventKind::Access(notify::event::AccessKind::Any);
-        assert!(!seen(access, "/u/.config/f/notes.md"));
+        assert!(!seen(access, &root.join("notes.md")));
     }
 
     #[test]

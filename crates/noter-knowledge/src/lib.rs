@@ -2,7 +2,8 @@
 //! sources watched through `notify`, indexed MCP servers through the [`McpSource`] seam with
 //! their tokens in the Keychain, text extraction for the six formats, heading chunks, the
 //! sync job on the M2 scheduler with bge-m3 embeddings from the engine, the source policy that
-//! retrieval applies to document hits, and removal in one transaction. noter-core wires it to its
+//! retrieval applies to document hits, and source cleanup and privacy repartition in bounded
+//! writer transactions. noter-core wires it to its
 //! commands, the scheduler and the native folder panel; this crate touches SQLite only through
 //! noter-db.
 
@@ -53,6 +54,12 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 3,
         name: "Unicode keyword word boundaries",
         sql: include_str!("../migrations/0003_keyword_boundaries.sql"),
+    },
+    Migration {
+        owner: "noter-knowledge",
+        version: 4,
+        name: "bounded source cleanup state",
+        sql: include_str!("../migrations/0004_bounded_source_cleanup.sql"),
     },
 ];
 

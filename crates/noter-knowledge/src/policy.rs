@@ -79,7 +79,7 @@ pub fn permitted_chunks(
         "SELECT d.id, s.id, s.name, d.title, c.heading_path, c.text, s.privacy_class, s.scope
          FROM doc_chunks c JOIN documents d ON d.id = c.document_id
          JOIN sources s ON s.id = d.source_id
-         WHERE c.id = ?1 AND s.mode = 'indexed'",
+         WHERE c.id = ?1 AND s.mode = 'indexed' AND s.removing = 0",
     )?;
     // @cpt-end:cpt-noter-algo-core-knowledge-policy:p1:inst-policy-source
     let mut seen = HashSet::new();
@@ -165,7 +165,7 @@ pub fn live_sources(conn: &Connection, scope: &AskScope) -> rusqlite::Result<Vec
     let scoped = !types.is_empty() || !people.is_empty();
     let mut st = conn.prepare(
         "SELECT id, name, location, scope FROM sources
-         WHERE mode = 'live' AND privacy_class = 'normal' ORDER BY rowid",
+         WHERE mode = 'live' AND privacy_class = 'normal' AND removing = 0 ORDER BY rowid",
     )?;
     let rows = st.query_map([], |r| {
         Ok((

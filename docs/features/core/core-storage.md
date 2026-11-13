@@ -2,7 +2,7 @@
 title: "Feature: Storage and the change-log write path"
 description: "noter-db: one SQLite file with one writer, a read pool, numbered migrations, revisions and the write API that commits every mutation together with its change-log row."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M0
 lane: core
@@ -38,6 +38,7 @@ design: docs/DESIGN-core.md
   - [Capture data and deletions](#capture-data-and-deletions)
   - [Cold start measured](#cold-start-measured)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [7. Change Log](#7-change-log)
 
 <!-- /toc -->
 
@@ -322,5 +323,10 @@ The system **MUST** have the `core_cold_start` scenario of `harness/perf.toml` (
 - [x] Every write made through M0 commands produces exactly one `changes` row in the same transaction (each later feature extends the test with its own commands); a forced failure after the row write leaves neither.
 - [x] A write with a stale `rev` returns `conflict` with `detail.current_rev` and changes nothing.
 - [x] A capture batch stores all its rows with no `changes` row, or none of them when one row fails; deleting calls removes their capture rows with them and leaves one `changes` row per call, not undoable and without record content.
+- [x] Large source and call deletions reclaim a bounded amount of incremental free space on the serialized writer after deletion commits.
 - [x] `just arch` passes: no crate other than `noter-db` depends on an SQLite crate.
 - [x] `just gate` passes, with unit line coverage of `noter-db` at 80 % or more.
+
+## 7. Change Log
+
+- 2026-11-13: The writer exposes a bounded incremental-vacuum operation for source and call deletion flows.

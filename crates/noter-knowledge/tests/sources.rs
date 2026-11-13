@@ -223,12 +223,17 @@ fn a_privacy_edit_moves_the_vectors_and_applies_to_old_chunks_at_once() {
         SourceScope::AllCalls,
     );
     let c = raw(dir.path());
-    seed(
-        &c,
-        &row.id,
-        "doc_a",
-        &[("chk_1", "Websocket limits"), ("chk_2", "Retry rules")],
-    );
+    let mut chunks = vec![
+        ("chk_1".to_owned(), "Websocket limits".to_owned()),
+        ("chk_2".to_owned(), "Retry rules".to_owned()),
+    ];
+    chunks
+        .extend((0..600).map(|index| (format!("chk_extra_{index}"), "Extra evidence".to_owned())));
+    let chunks = chunks
+        .iter()
+        .map(|(id, text)| (id.as_str(), text.as_str()))
+        .collect::<Vec<_>>();
+    seed(&c, &row.id, "doc_a", &chunks);
     let partition = |class: &str| -> i64 {
         c.query_row(
             "SELECT COUNT(*) FROM doc_vec WHERE privacy_class = ?1",
@@ -237,7 +242,7 @@ fn a_privacy_edit_moves_the_vectors_and_applies_to_old_chunks_at_once() {
         )
         .unwrap()
     };
-    assert_eq!((partition("normal"), partition("sensitive")), (2, 0));
+    assert_eq!((partition("normal"), partition("sensitive")), (602, 0));
     let all = [ChunkId::new("chk_1"), ChunkId::new("chk_2")];
     let cloud = |c: &Connection| {
         noter_knowledge::permitted_chunks(c, &all, &documents(), true)
@@ -256,7 +261,7 @@ fn a_privacy_edit_moves_the_vectors_and_applies_to_old_chunks_at_once() {
     };
     let sensitive = noter_knowledge::update(&store, meta(), edit).unwrap();
     assert_eq!(sensitive.privacy, PrivacyClass::Sensitive);
-    assert_eq!((partition("normal"), partition("sensitive")), (0, 2));
+    assert_eq!((partition("normal"), partition("sensitive")), (0, 602));
     let delta: Vec<u8> = c
         .query_row(
             "SELECT delta FROM changes WHERE entity_type = 'source' ORDER BY rowid DESC LIMIT 1",
@@ -359,7 +364,7 @@ fn scope_rules_follow_the_request_and_the_call_it_names() {
 }
 
 #[test]
-fn removal_takes_the_whole_index_in_one_transaction_or_nothing() {
+fn removal_stays_excluded_after_a_failed_batch_and_can_resume() {
     let dir = tempfile::tempdir().unwrap();
     let store = open(dir.path());
     let row = folder(
@@ -403,7 +408,7 @@ fn removal_takes_the_whole_index_in_one_transaction_or_nothing() {
     assert_eq!(index(&c), [2, 2, 3, 3, 2, 1]);
     let before = changes(&c);
 
-    // A writer failure halfway through the cascade rolls the whole removal back.
+    // A chunk deletion failure leaves the source excluded from retrieval.
     c.execute_batch(
         "CREATE TRIGGER forced BEFORE DELETE ON doc_chunks
          BEGIN SELECT RAISE(ABORT, 'forced'); END",
@@ -412,7 +417,15 @@ fn removal_takes_the_whole_index_in_one_transaction_or_nothing() {
     let failed = noter_knowledge::remove(&store, meta(), &row.id).unwrap_err();
     assert_eq!(failed.code, ErrorCode::Internal);
     assert_eq!(index(&c), [2, 2, 3, 3, 2, 1]);
-    assert_eq!(changes(&c), before);
+    let removing: i64 = c
+        .query_row(
+            "SELECT removing FROM sources WHERE id = ?1",
+            [row.id.as_str()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(removing, 1);
+    assert!(changes(&c) > before);
 
     c.execute_batch("DROP TRIGGER forced").unwrap();
     let removed = noter_knowledge::remove(&store, meta(), &row.id).unwrap();

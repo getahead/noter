@@ -666,6 +666,7 @@ impl Core {
             ids,
             self.change_meta(ctx, "Deleted a call".into(), "calls_delete"),
         )?;
+        self.store().incremental_vacuum()?;
         // @cpt-end:cpt-noter-algo-core-library-calls-delete:p1:inst-del-tx
         for (id, _) in &deleted {
             // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-files
