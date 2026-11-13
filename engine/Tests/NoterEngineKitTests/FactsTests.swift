@@ -177,6 +177,41 @@ final class EngineFactsTests: XCTestCase {
         XCTAssertEqual(lines.events.filter { $0["type"] as? String == "ack" }.compactMap { $0["cmd_id"] as? Int }, [1, 2, 3])
     }
 
+    // cpt-noter-flow-core-engine-capture-replay: invalid paths never reach the player.
+    func testReplayPathsRejectTraversalAndSymlinkEscapesWithoutStoppingPlayback() throws {
+        let parent = try root()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("group")
+        let outside = parent.appendingPathComponent("outside")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("audio/valid"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        for dir in [parent, outside, root, root.appendingPathComponent("audio/valid")] {
+            XCTAssertTrue(FileManager.default.createFile(atPath: dir.appendingPathComponent("mic.m4a").path, contents: Data()))
+        }
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("audio/escape"), withDestinationURL: outside)
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("audio/file-escape"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("audio/file-escape/mic.m4a"), withDestinationURL: outside.appendingPathComponent("mic.m4a"))
+        let (lines, player) = (Lines(), FakePlayer())
+        let e = engine(lines, root: root, player: player, processes: Box([]))
+        _ = e.handle(#"{"id":1,"cmd":{"type":"play","call_id":"valid","from_ms":0,"to_ms":null,"channel":"mic"}}"#)
+        XCTAssertEqual(player.played.count, 1)
+        for callId in [
+            "../..", "..", ".", "", "/valid", "valid/", "valid//child", "valid/../valid", "\u{0}", "escape", "file-escape",
+        ] {
+            let command: [String: Any] = [
+                "id": 2, "cmd": ["type": "play", "call_id": callId, "from_ms": 0, "to_ms": NSNull(), "channel": "mic"],
+            ]
+            let data = try JSONSerialization.data(withJSONObject: command)
+            _ = e.handle(try XCTUnwrap(String(data: data, encoding: .utf8)))
+            XCTAssertEqual(lines.events.last?["type"] as? String, "error", callId)
+            XCTAssertEqual(lines.events.last?["code"] as? String, "bad_command", callId)
+            XCTAssertEqual(lines.events.last?["cmd_id"] as? Int, 2, callId)
+        }
+        XCTAssertEqual(player.played.count, 1)
+        XCTAssertEqual(player.stops, 0)
+    }
+
     func testReplayWithoutStoredAudioIsAnErrorForTheCommand() throws {
         let (lines, player) = (Lines(), FakePlayer())
         let e = engine(lines, root: try root(), player: player, processes: Box([]))

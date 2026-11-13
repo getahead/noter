@@ -56,6 +56,8 @@ The engine gains its main job: a global Core Audio process tap (excluding the en
 
 > **M1 decisions (Backend Teamlead, 21 Oct 2026).** There are two restart rules in `noter-engine-client`: the idle restart (3 in 60 s, M0) and the capture-first restart (3 in 30 s, then `CaptureFailed`); the supervisor picks one by whether a session is running (TL-8). The Swift protocol types stay hand-written for M1, without code generation (TL-9). The scripted engine follows `.plans/engine-script-format.md` (JSON Lines with `on`, `after_ms` and `event` or `kill`), so the Q7 kill drill is proven on it before the owner runs it on the Mac (TL-3). M1 live labels are per side (You and `spk_1`, one `speakers` row of pass `live`); diarization stays with the offline pass (D-32).
 
+> **0.2 clarification (13 Nov 2026).** Make the existing App Group path boundary explicit for capture and replay, and normalize the supervisor's single trailing session-directory slash in returned paths. No protocol or state transition changes.
+
 ### 1.2 Purpose
 
 Capture is the release blocker: 99 % of calls recorded end to end without dropouts, 0 bytes of audio off the Mac, hypothesis lag ≤ 2 s and confirmed lag ≤ 4 s (provisional). Everything the session manager and the transcript do in M1 stands on these facts arriving on time and the engine coming back after a crash.
@@ -92,15 +94,17 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Success Scenarios**:
 - `start_session` opens both streams, `session_started` names the devices, segments and levels flow; `pause` stops both streams; `resume` reopens them; `stop` flushes, writes `timeline.json` and reports `session_stopped` with the file paths.
 - A call that stores no audio runs the same pipeline without AAC writers.
+- A session directory with one trailing slash is accepted; returned timeline and audio paths have one separator between components.
 
 **Error Scenarios**:
 - The microphone is unavailable or access is off: the session still starts with the system channel; `error { device_unavailable }` or silent buffers let the core raise `MicrophoneOff`.
+- A session directory is absolute, contains empty, dot, parent or NUL components, or resolves through a symlink outside the App Group container: the command fails before any capture files are created or streams started. One trailing directory slash is removed before validation.
 - The disk fills: AAC writing stops (`disk_full` error event), transcription goes on.
 - The live model fails to load: `error { model_load_failed }`; the supervisor reports `engine_unavailable`.
 
 **Steps**:
 1. [x] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
-2. [x] - `p1` - Engine opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
+2. [x] - `p1` - Engine validates the session directory inside the App Group container, then opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
 5. [x] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
@@ -160,9 +164,10 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Error Scenarios**:
 - The audio was not stored or was deleted: `error` for the command; the core maps it to `audio_deleted`.
+- The derived audio path contains invalid components or resolves through a symlink outside the App Group container: `bad_command` for the command without opening audio or interrupting current replay.
 
 **Steps**:
-1. [x] - `p1` - Supervisor sends `play` - `inst-play`
+1. [x] - `p1` - Supervisor sends `play`; engine validates the derived audio directory and selected files inside the App Group container before playback - `inst-play`
 2. [x] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
 3. [x] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
 4. [x] - `p1` - **RETURN** - `inst-return-replay`
@@ -357,6 +362,8 @@ The system **MUST** play spans natively on `play` with positions reported and it
 
 **Touches**:
 - Entities: `PlaybackState` (engine half)
+
+**Path-boundary tests**: Swift `CaptureTests` exercises malformed session directories, directory symlink escapes and the trailing-slash success case through `EngineLoop.handle`; `EngineFactsTests` exercises malformed call IDs and directory/file symlink escapes without invoking the player. Existing `CaptureTests`, `EngineFactsTests`, real-core conformance and E2E recovery story `cpt-noter-seq-call-screen-recover-capture` continue to prove valid capture/replay and recovery. A malicious internal engine command has no UI entry point, so its refusal is proven at the engine protocol boundary rather than by a new UI story. Definition of done: these regressions and existing tests pass; `just gate` passes.
 
 ## 6. Acceptance Criteria
 

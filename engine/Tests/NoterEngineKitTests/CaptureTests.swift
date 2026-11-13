@@ -107,6 +107,52 @@ final class CaptureTests: XCTestCase {
         return e
     }
 
+    // cpt-noter-flow-core-engine-capture-session: paths are checked before capture writes.
+    func testSessionPathsRejectTraversalAndSymlinkEscapesBeforeStarting() throws {
+        let parent = try container()
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let root = parent.appendingPathComponent("group")
+        let outside = parent.appendingPathComponent("outside")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("escape"), withDestinationURL: outside)
+        for path in [
+            "../outside", "/absolute", "", ".", "audio/../outside", "audio//call", "audio/./call", "audio/call//",
+            "audio/\u{0}call", "escape/new",
+        ] {
+            let (lines, source) = (Lines(), FakeSource())
+            let e = engine(lines, source, root, TestClock())
+            var command = try XCTUnwrap(
+                JSONSerialization.jsonObject(with: Data(startLine(id: 1, store: false).utf8)) as? [String: Any])
+            var args = try XCTUnwrap(command["cmd"] as? [String: Any])
+            args["session_dir"] = path
+            command["cmd"] = args
+            let data = try JSONSerialization.data(withJSONObject: command)
+            _ = e.handle(try XCTUnwrap(String(data: data, encoding: .utf8)))
+            XCTAssertEqual(lines.events.last?["type"] as? String, "error", path)
+            XCTAssertEqual(lines.events.last?["cmd_id"] as? Int, 1, path)
+            XCTAssertEqual(source.starts, 0, path)
+            XCTAssertFalse(e.isCapturing, path)
+        }
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), [])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), ["escape"])
+    }
+
+    func testSessionPathsAcceptOneTrailingSlashAndReturnNormalizedFiles() throws {
+        let (lines, source, root) = (Lines(), FakeSource(), try container())
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = engine(lines, source, root, TestClock())
+        _ = e.handle(startLine(id: 1).replacingOccurrences(of: "audio/call_1", with: "audio/call_1/"))
+        XCTAssertEqual(source.starts, 1)
+        source.push(ms: 100)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        let stopped = try XCTUnwrap(lines.waitFor("session_stopped"))
+        for (key, file) in [("timeline_path", "timeline.json"), ("mic_path", "mic.m4a"), ("sys_path", "sys.m4a")] {
+            XCTAssertEqual(stopped[key] as? String, "audio/call_1/\(file)")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("audio/call_1/\(file)").path))
+        }
+    }
+
     func testASessionStartsCapturesWithLevelsAndStopsWithItsFiles() throws {
         let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
         let e = engine(lines, source, root, clock)

@@ -244,8 +244,13 @@ final class CaptureSession: @unchecked Sendable {
     ) throws {
         callId = start.callId
         asr = LiveASR(callId: start.callId, languages: start.languages, glossary: start.glossary, writer: writer, queue: asrQueue)
-        relative = start.sessionDir
-        dir = container.appendingPathComponent(start.sessionDir, isDirectory: true)
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
+        relative = start.sessionDir.hasSuffix("/") ? String(start.sessionDir.dropLast()) : start.sessionDir
+        guard let sessionDir = ContainerPath.resolve(relative, in: container) else {
+            throw LiveAudioSource.Failure(description: "session directory must stay inside the App Group container")
+        }
+        dir = sessionDir
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
         self.writer = writer
         self.now = now
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

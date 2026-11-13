@@ -244,10 +244,12 @@ public final class EngineLoop: @unchecked Sendable {
     // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-play
     /// Plays the call's stored files (`audio/<call_id>/`); a new `play` replaces the one before.
     private func replay(_ id: UInt64, _ callId: String, _ fromMs: Int, _ toMs: Int?, _ channel: Channel?) {
-        let dir = container?.appendingPathComponent("audio/\(callId)", isDirectory: true)
-        let files = (channel.map { [$0] } ?? [.mic, .sys]).compactMap { dir?.appendingPathComponent("\($0.rawValue).m4a") }
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
-        guard !files.isEmpty else {
+        let channels = channel.map { [$0] } ?? [.mic, .sys]
+        let resolved = channels.compactMap { channel in
+            container.flatMap { ContainerPath.resolve("audio/\(callId)/\(channel.rawValue).m4a", in: $0) }
+        }
+        let files = resolved.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard resolved.count == channels.count, !files.isEmpty else {
             // The core reads an error for `play` as `audio_deleted`.
             writer.emit(.error(cmdId: id, code: .badCommand, message: "no stored audio for \(callId)"))
             return
