@@ -801,6 +801,8 @@ pub fn remove(
         };
     }
 
+    // If maintenance cannot reclaim pages, keep the hidden source row so removal can resume.
+    store.incremental_vacuum()?;
     let id = source.clone();
     let removed = store.write_with(meta, move |tx| {
         // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-delete
@@ -827,7 +829,6 @@ pub fn remove(
         Err(e) if e.code == ErrorCode::NotFound => return Err(e),
         Err(e) => return Err(CoreError::new(ErrorCode::Internal, e.message)),
     };
-    store.incremental_vacuum()?;
     // @cpt-end:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-commit
     // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-return
     Ok(DeleteResult {
