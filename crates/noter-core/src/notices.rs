@@ -463,7 +463,7 @@ impl Core {
                 }
                 if state.notice.is_some() {
                     drop(session);
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
                 let since = TimestampMs(session.heard_since);
