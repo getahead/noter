@@ -236,7 +236,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 3. [x] - `p1` - User presses ⌃⌥⌘N or chooses **Open Call Screen** - `inst-user-reopen`
 4. [x] - `p1` - Core: shows the window without making it key (`window_show_call` from other windows; the core handles the hotkey); a second ⌃⌥⌘N makes it key with focus on the notice when one shows - `inst-core-show`
 5. [x] - `p1` - **IF** the window's WebView was recreated after a crash - `inst-if-crash`
-   1. [x] - `p1` - UI: open with `cpt-noter-flow-ui-core-bridge-open-window`: `app_snapshot`, `window_call_state`, then the transcript snapshot and stream - `inst-crash-restore`
+   1. [x] - `p1` - UI: open with `cpt-noter-flow-ui-core-bridge-open-window-v2`: `app_snapshot`, `window_call_state`, then the transcript snapshot and stream - `inst-crash-restore`
 6. [x] - `p1` - **RETURN** the panel back where it was, the call app still focused - `inst-return-reopen`
 
 ### Control the recording from the window

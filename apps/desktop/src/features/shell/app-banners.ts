@@ -29,6 +29,11 @@ export function commandFailures(commands: Record<string, { state: string; error:
   return FRAME_COMMANDS.flatMap((key) => (commands[key]?.state === "ERROR" ? [{ key, tryAgain: commands[key].error?.tryAgain === true }] : []));
 }
 
+/** A primitive selector value so unrelated command state changes do not rerender the shell. */
+export function commandFailuresKey(commands: Record<string, { state: string; error: { tryAgain: boolean } | null }>): string {
+  return JSON.stringify(commandFailures(commands));
+}
+
 export const isBannerKind = (id: string): id is BannerKind => id === "recording_interrupted_by_quit" || id === "update_ready" || id === "roll_up_failed";
 
 /** The title between “ ” in the quit banner, as DESIGN writes it. */

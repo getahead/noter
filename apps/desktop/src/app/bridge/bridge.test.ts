@@ -37,7 +37,7 @@ afterEach(async () => {
 });
 
 describe("open a window (snapshot, then stream)", () => {
-  it("cpt-noter-flow-ui-core-bridge-open-window: subscribes to all 21 events before asking for the snapshot, then is READY", async () => {
+  it("cpt-noter-flow-ui-core-bridge-open-window-v2: subscribes to all 21 events before asking for the snapshot, then is READY", async () => {
     const { b, calls, fake, state } = setup();
     const opening = b.open();
     expect(state().status).toBe("LOADING");
@@ -74,6 +74,31 @@ describe("open a window (snapshot, then stream)", () => {
     expect(count("listen:capture:state")).toBe(1);
   });
 
+  it("turns a rejected event listen into a retryable section error and retries the listeners", async () => {
+    const fake = new FakeCore({ window: "main" });
+    const calls: string[] = [];
+    let rejectOnce = true;
+    const transport: Transport = {
+      invoke: (cmd, args, onMessage) => (calls.push(cmd), fake.invoke(cmd, args, onMessage)),
+      listen: (event, handler) => {
+        calls.push(`listen:${event}`);
+        if (event === "setup:changed" && rejectOnce) {
+          rejectOnce = false;
+          return Promise.reject(new Error("listen denied"));
+        }
+        return fake.listen(event, handler);
+      },
+    };
+    bridge = createBridge("main", transport);
+    await bridge.open();
+    expect(bridge.store.getState().status).toBe("FAILED");
+    expect(bridge.store.getState().error).toEqual({ code: "window_not_allowed", state: "section", tryAgain: true });
+    expect(calls).not.toContain("app_snapshot");
+    await bridge.open();
+    expect(bridge.store.getState().status).toBe("READY");
+    expect(calls.filter((c) => c === "app_snapshot")).toHaveLength(1);
+  });
+
   it("refuses to start on a contract major version mismatch and logs it", async () => {
     const { b, logs, state } = setup("main", {}, (cmd, r) => (cmd === "app_snapshot" ? { ...(r as object), contract_version: "3.0" } : r));
     await b.open();
@@ -100,7 +125,7 @@ describe("open a window (snapshot, then stream)", () => {
 describe("streams", () => {
   const segment = (id: string) => ({ id, call_id: "call_live", channel: "mic", t0_ms: 0, t1_ms: 1, text: id }) as never;
 
-  it("cpt-noter-algo-ui-core-bridge-snapshot-then-stream: fills the slice from the snapshot, flushes every 100 ms in one update, loses and doubles nothing", async () => {
+  it("cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2: fills the slice from the snapshot, flushes every 100 ms in one update, loses and doubles nothing", async () => {
     vi.useFakeTimers();
     const { b, fake, state } = setup();
     await b.open();
@@ -255,6 +280,20 @@ describe("streams", () => {
     const st = state().streams.self_test_run!;
     expect(st.data?.messages.map((m) => m.event.type)).toEqual(["stream_arrived", "stream_arrived", "levels", "line", "passed", "ended"]);
     expect(st.ended).toBe("call_stopped");
+  });
+
+  it.each(["ask_start", "self_test_run"] as const)("does not rerun the %s action after a sequence gap", async (cmd) => {
+    vi.useFakeTimers();
+    const window = cmd === "ask_start" ? "main" : "first-run";
+    const { b, fake, count, state } = setup(window, { holdSelfTest: true });
+    await b.open();
+    if (cmd === "ask_start") await b.subscribe(cmd, { question: "What happened?", scope: { type: "all" }, thread_id: null });
+    else await b.subscribe(cmd, { play_clip: false });
+    expect(count(cmd)).toBe(1);
+
+    fake.push(cmd, { seq: 3, event: { type: "delta", text: "gap" } } as never);
+    expect(state().streams[cmd]?.ended).toBe("lagged");
+    expect(count(cmd)).toBe(1);
   });
 
   it("cards fill from the snapshot and follow the Channel", async () => {

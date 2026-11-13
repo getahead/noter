@@ -2,7 +2,7 @@
 title: "Feature — Main window shell and navigation"
 description: "The frame every Noter main-window page lives in: glass sidebar with the live-call row and badges, unified toolbar with one Back and Forward history, banner slot, inspector slot, app menu and collapse order."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-main-window-shell
 milestone: M0
@@ -328,6 +328,9 @@ The system **MUST** provide the mode indicator in its eight variants with glyph 
 - [x] Back and Forward return to the same query, filters and scroll position
 - [x] The live-call row shows the call window without taking focus from the call app
 - [x] No sidebar label, group header or toolbar button truncates in the pseudo-localised build
+- Removing a call clears its output and section progress, speakers, and related handoffs from the window store; the shell derives writing and command-failure state without subscribing to whole mutable store maps.
+
+**Changelog.** v1.1 (13 Nov 2026): record store cleanup and stable shell selector requirements for issues #728 and #732.
 
 ## 7. Additional Context
 

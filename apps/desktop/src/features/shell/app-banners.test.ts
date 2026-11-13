@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { orderBanners } from "../../ui/feedback/banners";
-import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
+import { appBanners, commandFailures, commandFailuresKey, isBannerKind, type BannerActions } from "./app-banners";
 
 const actions = (over: Partial<BannerActions> = {}): BannerActions => ({
   runSelfTest: vi.fn(),
@@ -99,5 +99,11 @@ describe("appBanners", () => {
       { key: "banner_dismiss", tryAgain: false },
     ]);
     expect(commandFailures({})).toEqual([]);
+  });
+
+  it("keeps the shell failure selector stable across unrelated command state changes", () => {
+    const failed = { window_navigate: { state: "ERROR", error: { tryAgain: true } } };
+    expect(commandFailuresKey({ ...failed, calls_list: { state: "WAITING", error: null } })).toBe(commandFailuresKey(failed));
+    expect(commandFailuresKey({ ...failed, window_navigate: { state: "ERROR", error: { tryAgain: false } } })).not.toBe(commandFailuresKey(failed));
   });
 });
