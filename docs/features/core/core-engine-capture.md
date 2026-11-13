@@ -2,7 +2,7 @@
 title: "Feature: Engine capture, live ASR and capture-first restart"
 description: "Both channels on one clock into a crash-safe ring, live transcription with language ID and filters, the facts the session manager needs, replay playback, and a capture-first restart with at most a 2 s gap."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M1
 lane: engine
@@ -40,6 +40,7 @@ design: docs/DESIGN-core.md
   - [Silence, stall and device facts](#silence-stall-and-device-facts)
   - [Replay and footprint](#replay-and-footprint)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [Change log](#change-log)
 
 <!-- /toc -->
 
@@ -106,7 +107,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 6. [x] - `p1` - **IF** the supervisor sends `pause` - `inst-if-pause`
    1. [x] - `p1` - Engine stops both streams (no audio kept while paused) until `resume` - `inst-pause-streams`
 7. [x] - `p1` - **IF** the supervisor sends `stop` - `inst-if-stop`
-   1. [x] - `p1` - Engine flushes the decoder and writers, writes `timeline.json`, emits `session_stopped { call_id, timeline_path, mic_path, sys_path }` - `inst-stop`
+   1. [x] - `p1` - Engine stops accepting audio and clears both channels and recovery metadata from the capture ring before another session may start, then flushes the decoder and writers, writes `timeline.json`, emits `session_stopped { call_id, timeline_path, mic_path, sys_path }` - `inst-stop`
 8. [x] - `p1` - **RETURN** - `inst-return-session`
 
 ### Detect a call
@@ -260,7 +261,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
 
-The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container, write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop.
+The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container, write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-session`
@@ -364,3 +365,7 @@ The system **MUST** play spans natively on `play` with positions reported and it
 - [ ] Muting the system channel to exact zeros yields `system_audio_silent`; unplugging the microphone yields `device_changed` and a gap.
 - [ ] Replay never appears in the recording (the tap excludes the engine and app PIDs).
 - [ ] Engine tests pass on the macOS runner; `just gate` passes.
+
+## Change log
+
+- **0.2 (13 Nov 2026)**: Clarify clean-stop ring cleanup under the existing capture-session stop instruction and pipeline DoD. `CaptureTests` verifies both storage modes through `EngineLoop`, inspecting both mapped channels and the on-disk PCM; `CaptureTests` also verifies a successor session survives the previous session finishing. Existing crash-recovery tests retain their recovery guarantee. No IPC or UI story changes; conformance and E2E coverage remain the existing capture-session suites (`cpt-noter-seq-call-screen-recover-capture`). Completion requires `just gate` passes.

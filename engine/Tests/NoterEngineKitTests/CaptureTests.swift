@@ -149,6 +149,69 @@ final class CaptureTests: XCTestCase {
         XCTAssertEqual(files, ["timeline.json"])
     }
 
+    // cpt-noter-dod-core-engine-capture-pipeline: a clean stop retains no recovery audio.
+    func testCleanStopClearsBothRingChannelsWhetherOrNotAudioIsStored() throws {
+        for store in [false, true] {
+            let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
+            defer { try? FileManager.default.removeItem(at: root) }
+            let url = root.appendingPathComponent(CaptureRing.fileName)
+            do {
+                let previous = try CaptureRing(url: url, callId: "previous_call")
+                previous.write(.mic, Array(repeating: 0.5, count: CaptureRing.capacity))
+                previous.write(.sys, Array(repeating: -0.5, count: CaptureRing.capacity))
+            }
+            let e = engine(lines, source, root, clock)
+            _ = e.handle(startLine(id: 1, store: store))
+            source.push(ms: 500)
+            let ring = try CaptureRing(url: url, callId: "call_1")
+            for channel in [Channel.mic, .sys] {
+                XCTAssertEqual(ring.written(channel), 8_000)
+                XCTAssertTrue(ring.read(channel, last: 8_000).contains { $0 != 0 })
+            }
+            _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+            _ = try XCTUnwrap(lines.waitFor("session_stopped"))
+            for channel in [Channel.mic, .sys] {
+                XCTAssertEqual(ring.written(channel), 0)
+                XCTAssertTrue(ring.read(channel, last: 8_000).isEmpty)
+            }
+            XCTAssertNil(ring.last)
+            let disk = try Data(contentsOf: url)
+            XCTAssertTrue(
+                disk.suffix(2 * CaptureRing.capacity * MemoryLayout<Float>.size).allSatisfy { $0 == 0 },
+                "both PCM regions, including an earlier call's tail, must be cleared")
+        }
+    }
+
+    // cpt-noter-flow-core-engine-capture-session: cleanup precedes asynchronous finalization.
+    func testFinishingAStoppedCallDoesNotClearTheNextCallsRing() throws {
+        let (lines, source, root, loading) = (Lines(), FakeSource(), try container(), DispatchSemaphore(value: 0))
+        defer { try? FileManager.default.removeItem(at: root) }
+        defer { loading.signal() }
+        let e = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false,
+            container: root, transcriber: {
+                loading.wait()
+                return FakeTranscriber("last words")
+            }, source: { _ in source })
+        _ = e.handle(startLine(id: 1, store: false))
+        source.push(ms: 500)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        let url = root.appendingPathComponent(CaptureRing.fileName)
+        let disk = try Data(contentsOf: url)
+        XCTAssertTrue(disk.suffix(2 * CaptureRing.capacity * MemoryLayout<Float>.size).allSatisfy { $0 == 0 })
+        XCTAssertFalse(lines.types.contains("session_stopped"), "the decoder is still loading")
+        _ = e.handle(startLine(id: 3, store: false).replacingOccurrences(of: "call_1", with: "call_2"))
+        source.push(ms: 500)
+        loading.signal()
+        _ = try XCTUnwrap(lines.waitFor("session_stopped"))
+        let ring = try CaptureRing(url: url, callId: "call_2")
+        for channel in [Channel.mic, .sys] {
+            XCTAssertEqual(ring.written(channel), 8_000)
+            XCTAssertTrue(ring.read(channel, last: 8_000).contains { $0 != 0 })
+        }
+        XCTAssertEqual(ring.last?.callMs, 500)
+    }
+
     func testPauseStopsBothStreamsAndTheTimelineKeepsTheGap() throws {
         let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
         let e = engine(lines, source, root, clock)
