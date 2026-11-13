@@ -7,7 +7,7 @@ import type { CallDetail, WindowLabel } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
-import { audioLine, evidenceSpanEffect, holdFix, readNaming, spanArchiveEffect, StoredTranscript, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
+import { audioLine, holdFix, readNaming, StoredTranscript, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
 import { LogScroller } from "./follow";
