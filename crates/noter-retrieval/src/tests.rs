@@ -1902,6 +1902,47 @@ fn topics_read_counts_aliases_threads_and_merge_suggestions() {
 }
 
 #[test]
+fn topic_suggestion_migration_caches_existing_neighbours() {
+    let lib = library_with_migrations(&MIGRATIONS[..5]);
+    let ws = noise(71);
+    let twin = plus(&ws, 72, 0.2);
+    lib.topic("top_ws", "Drawer notifications", Some(&ws), 0, 1);
+    lib.topic("top_notif", "Notification service", Some(&twin), 0, 1);
+    lib.topic("top_empty", "No centroid", None, 0, 1);
+
+    let path = lib.path();
+    let Library { dir, store, db } = lib;
+    drop(db);
+    drop(store);
+    let store = Store::open(
+        &path,
+        &[noter_db::MIGRATIONS, noter_core::MIGRATIONS, MIGRATIONS],
+    )
+    .unwrap();
+    let db = Connection::open(&path).unwrap();
+    let lib = Library {
+        dir,
+        store: Arc::new(store),
+        db,
+    };
+
+    assert_eq!(
+        topic_row(&lib.db, "top_ws")
+            .unwrap()
+            .unwrap()
+            .merge_suggestion
+            .unwrap()
+            .id
+            .as_str(),
+        "top_notif"
+    );
+    assert_eq!(
+        lib.count("SELECT count(*) FROM topic_suggestions"),
+        lib.count("SELECT count(*) FROM topics")
+    );
+}
+
+#[test]
 fn topic_rename_checks_the_name_and_the_revision() {
     let lib = library();
     lib.topic("top_ws", "Drawer notifications", None, 0, 5);
