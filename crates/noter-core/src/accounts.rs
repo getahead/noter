@@ -324,6 +324,31 @@ impl Accounts {
             .map(drop)
     }
 
+    /// A provider confirmed that the same connected identity is active again.
+    pub(crate) fn revived(
+        &self,
+        meta: ChangeMeta,
+        provider: AccountProvider,
+    ) -> Result<(), CoreError> {
+        let mut state = lock(&self.state);
+        let Some(connection) = state.connections.get(&provider) else {
+            return Ok(());
+        };
+        if connection.ended_at.is_none() {
+            return Ok(());
+        }
+        let mut connections = state.connections.clone();
+        connections.insert(
+            provider,
+            Connection {
+                ended_at: None,
+                ..connection.clone()
+            },
+        );
+        self.write_connections(&mut state, meta, connections)
+            .map(drop)
+    }
+
     /// One undoable change: the account's `default_for_new_agents`.
     pub(crate) fn set_default(
         &self,

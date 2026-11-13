@@ -1198,11 +1198,17 @@ impl Inner {
 
     /// The runtime a session opens or resumes on, with its CLI version read again: the CLI may
     /// have been updated since startup. The caller then creates the isolated environment.
-    fn open_route(&self, req: &RunRequest) -> Result<Choice, Failure> {
+    async fn open_route(self: &Arc<Self>, req: &RunRequest) -> Result<Choice, Failure> {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-open
-        let first = self.route(req, 0.0, false, None)?;
-        self.gate.refresh(first.runtime);
-        self.route(req, 0.0, false, None)
+        let inner = Arc::clone(self);
+        let route_req = req.clone();
+        tokio::task::spawn_blocking(move || {
+            let first = inner.route(&route_req, 0.0, false, None)?;
+            inner.gate.refresh(first.runtime);
+            inner.route(&route_req, 0.0, false, None)
+        })
+        .await
+        .map_err(|_| Failure::Timeout)?
         // @cpt-end:cpt-noter-flow-core-llm-gate-session:p1:inst-session-open
     }
 
@@ -1276,7 +1282,7 @@ impl LlmRuntime for Llm {
         req: &'a RunRequest,
     ) -> BoxFuture<'a, Result<SessionId, Failure>> {
         Box::pin(async move {
-            let choice = self.0.open_route(req)?;
+            let choice = self.0.open_route(req).await?;
             let cli_session = self
                 .0
                 .gate
@@ -1307,7 +1313,7 @@ impl LlmRuntime for Llm {
 
     fn resume<'a>(&'a self, cli_session: &'a str, req: RunRequest) -> BoxFuture<'a, RunOutcome> {
         Box::pin(async move {
-            let choice = self.0.open_route(&req)?;
+            let choice = self.0.open_route(&req).await?;
             let resumed = self
                 .0
                 .gate

@@ -13,6 +13,7 @@ use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::model::{AccountIdentity, AccountProvider, CliTool};
@@ -23,6 +24,8 @@ use tokio::process::Command;
 use super::{Invocation, Reply};
 use crate::account_cli::{AccountCli, CliError, CliStatus, LoginStart};
 use crate::runtime::{lock, Availability, BoxFuture, Tested};
+
+const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// How Noter runs one CLI. A missing sign-in makes the own-account runtime unavailable; the
 /// API-key runtime takes its key from the router's `SecretStore` on each call.
@@ -67,9 +70,13 @@ impl Cli {
     }
 
     pub fn availability(&self, runtime: RuntimeChoice, api_key: bool) -> Availability {
-        let version = lock(&self.version)
-            .get_or_insert_with(|| self.probe())
-            .clone();
+        let version = if let Some(version) = lock(&self.version).clone() {
+            version
+        } else {
+            let detected = self.probe();
+            let mut cached = lock(&self.version);
+            cached.get_or_insert(detected).clone()
+        };
         let unavailable = if version.is_none() {
             Some(RuntimeUnavailableReason::CliMissing)
         } else if api_key {
@@ -98,11 +105,26 @@ impl Cli {
         if let Some(path) = std::env::var_os("PATH") {
             probe.env("PATH", path);
         }
-        let out = probe
+        probe
             .stdin(Stdio::null())
-            .stderr(Stdio::null())
-            .output()
-            .ok()?;
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        let mut child = probe.spawn().ok()?;
+        let started = Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) if started.elapsed() < PROBE_TIMEOUT => {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Ok(None) | Err(_) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return None;
+                }
+            }
+        }
+        let out = child.wait_with_output().ok()?;
         let text = String::from_utf8_lossy(&out.stdout).trim().to_owned();
         if !out.status.success() || text.is_empty() {
             return None;
@@ -289,14 +311,18 @@ impl CliAccounts {
 }
 
 async fn run_text(program: &Path, args: &[&str]) -> Option<String> {
-    let out = Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .output()
-        .await
-        .ok()?;
+    let out = tokio::time::timeout(
+        PROBE_TIMEOUT,
+        Command::new(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .output(),
+    )
+    .await
+    .ok()?
+    .ok()?;
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
@@ -317,6 +343,14 @@ pub(crate) fn claude_identity(text: &str) -> Option<AccountIdentity> {
     })
 }
 
+fn claude_auth_status(text: &str) -> Option<Option<AccountIdentity>> {
+    let v: serde_json::Value = serde_json::from_str(text).ok()?;
+    match v["loggedIn"].as_bool()? {
+        false => Some(None),
+        true => claude_identity(text).map(Some),
+    }
+}
+
 impl AccountCli for CliAccounts {
     fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus> {
         Box::pin(async move {
@@ -335,11 +369,15 @@ impl AccountCli for CliAccounts {
             };
             // shortcut: `codex login status` prints no email, so a signed-in Codex shows no
             // identity until the owner-Mac check reads it from the CLI's own files.
-            let identity = match tool {
-                CliTool::ClaudeCode => run_text(program, &["auth", "status"])
+            let (identity, auth_known) = match tool {
+                CliTool::ClaudeCode => match run_text(program, &["auth", "status"])
                     .await
-                    .and_then(|t| claude_identity(&t)),
-                CliTool::Codex | CliTool::Ollama => None,
+                    .and_then(|text| claude_auth_status(&text))
+                {
+                    Some(identity) => (identity, true),
+                    None => (None, false),
+                },
+                CliTool::Codex | CliTool::Ollama => (None, false),
             };
             CliStatus {
                 installed: true,
@@ -347,6 +385,7 @@ impl AccountCli for CliAccounts {
                 supported: tested.map_or(true, |t| t.admits(&version)),
                 version: Some(version),
                 identity,
+                auth_known,
             }
         })
     }
@@ -428,5 +467,91 @@ mod account_tests {
         );
         assert_eq!(claude_identity(r#"{"loggedIn":false}"#), None);
         assert_eq!(claude_identity("not json"), None);
+        assert_eq!(claude_auth_status(r#"{"loggedIn":false}"#), Some(None));
+        assert_eq!(claude_auth_status("not json"), None);
+    }
+
+    #[test]
+    fn a_hung_version_probe_is_killed_within_its_deadline() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("claude");
+        std::fs::write(&program, "#!/bin/sh\nexec sleep 30\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let cli = Cli::new(
+            CliConfig {
+                program,
+                home: dir.path().join("home"),
+                run_root: dir.path().join("runs"),
+                signed_in: false,
+                models: vec![],
+            },
+            super::super::claude_code::TESTED,
+        );
+        let started = Instant::now();
+        assert!(cli.probe().is_none());
+        assert!(started.elapsed() < PROBE_TIMEOUT + Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn shipped_account_adapter_keeps_placeholder_login_and_logout_visible() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let marker = dir.path().join("invoked");
+        let program = dir.path().join("claude");
+        std::fs::write(&program, format!("#!/bin/sh\ntouch {}\n", marker.display())).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let cli = CliAccounts {
+            claude: program.clone(),
+            codex: program.clone(),
+            ollama: program,
+        };
+        assert!(matches!(
+            cli.login(AccountProvider::Claude).await,
+            Err(CliError::Failed(_))
+        ));
+        cli.cancel(AccountProvider::Claude);
+        assert!(matches!(
+            cli.logout(AccountProvider::Claude).await,
+            Err(CliError::Failed(_))
+        ));
+        assert!(!marker.exists(), "placeholder methods must not run the CLI");
+    }
+
+    #[tokio::test]
+    async fn failed_and_malformed_auth_probes_are_unknown_but_logged_out_is_explicit() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let auth = dir.path().join("auth.json");
+        let exit = dir.path().join("exit");
+        let program = dir.path().join("claude");
+        std::fs::write(
+            &program,
+            format!(
+                "#!/bin/sh\ncase \"$*\" in\n  --version) echo '2.1.296' ;;\n  'auth status') cat {}; exit $(cat {}) ;;\nesac\n",
+                auth.display(),
+                exit.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let cli = CliAccounts {
+            claude: program.clone(),
+            codex: program.clone(),
+            ollama: program,
+        };
+        std::fs::write(&auth, "{}").unwrap();
+        std::fs::write(&exit, "1").unwrap();
+        assert!(!cli.status(CliTool::ClaudeCode).await.auth_known);
+        std::fs::write(&auth, "not json").unwrap();
+        std::fs::write(&exit, "0").unwrap();
+        assert!(!cli.status(CliTool::ClaudeCode).await.auth_known);
+        std::fs::write(&auth, r#"{"loggedIn":false}"#).unwrap();
+        let status = cli.status(CliTool::ClaudeCode).await;
+        assert!(status.auth_known);
+        assert!(status.identity.is_none());
     }
 }

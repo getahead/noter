@@ -476,6 +476,14 @@ async fn a_confirmed_sign_in_lets_a_later_reuse_of_claude_through() {
     ));
     bare(
         &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296","auth_known":false}"#,
+    );
+    assert!(matches!(
+        status(&view(&w).await, CLAUDE),
+        AccountStatus::SignedOutByProvider { .. }
+    ));
+    bare(
+        &w,
         r#"{"tool":"claude_code","installed":true,"version":"2.1.296",
             "identity":{"email":"ann@example.com","plan":"Max"}}"#,
     );
@@ -686,4 +694,31 @@ async fn a_provider_ended_session_pauses_the_roles_and_keeps_the_binding() {
     ));
     wait(1_000).await;
     assert!(is_signed_in(&view(&w).await, CHATGPT));
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_unknown_probe_preserves_sign_in_and_a_confirmed_identity_recovers_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    claude(&w, "Max", 0);
+    connect(&w, CLAUDE, true).await;
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296","auth_known":false}"#,
+    );
+    assert!(is_signed_in(&view(&w).await, CLAUDE));
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296","auth_known":true}"#,
+    );
+    assert!(matches!(
+        status(&view(&w).await, CLAUDE),
+        AccountStatus::SignedOutByProvider { .. }
+    ));
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296","auth_known":true,
+            "identity":{"email":"ann@example.com","plan":"Max"}}"#,
+    );
+    assert!(is_signed_in(&view(&w).await, CLAUDE));
 }
