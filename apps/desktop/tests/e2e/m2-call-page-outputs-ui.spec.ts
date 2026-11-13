@@ -137,7 +137,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     const real = process.env.NOTER_CORE === "stdio";
     if (!real) {
       const now = new Date("2026-11-07T10:00:00Z");
-      await page.clock.install({ time: now });
+      await page.clock.setFixedTime(now); // keep the pause target stable across clock calls
       await page.clock.pauseAt(now);
     }
     await toolbar(page).getByRole("button", { name: "More" }).click();
@@ -182,7 +182,7 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     const real = process.env.NOTER_CORE === "stdio";
     if (!real) {
       const now = new Date("2026-11-07T10:00:00Z");
-      await page.clock.install({ time: now });
+      await page.clock.setFixedTime(now); // keep the pause target stable across clock calls
       await page.clock.pauseAt(now);
     }
     await failed.getByRole("button", { name: "Try Again" }).click();
