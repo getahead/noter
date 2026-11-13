@@ -48,6 +48,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "document keywords at word starts",
         sql: include_str!("../migrations/0002_doc_keywords.sql"),
     },
+    Migration {
+        owner: "noter-knowledge",
+        version: 3,
+        name: "Unicode keyword word boundaries",
+        sql: include_str!("../migrations/0003_keyword_boundaries.sql"),
+    },
 ];
 
 fn internal(e: impl std::fmt::Display) -> noter_protocol::CoreError {

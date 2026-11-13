@@ -33,15 +33,15 @@ fn blob(v: &[f32]) -> Vec<u8> {
 }
 
 fn library() -> Library {
+    library_with_migrations(crate::MIGRATIONS)
+}
+
+fn library_with_migrations(migrations: &[noter_db::Migration]) -> Library {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("noter.db");
     let store = Store::open(
         &path,
-        &[
-            noter_db::MIGRATIONS,
-            noter_core::MIGRATIONS,
-            crate::MIGRATIONS,
-        ],
+        &[noter_db::MIGRATIONS, noter_core::MIGRATIONS, migrations],
     )
     .unwrap();
     let db = Connection::open(&path).unwrap();
@@ -327,6 +327,57 @@ fn the_triggers_keep_keyword_shadows_and_vectors_current() {
         )
         .unwrap();
     assert_eq!(ids(&lib.find(query("sse")).items), ["itm_ws"]);
+}
+
+// cpt-noter-algo-core-retrieval-ask-retrieve: inst-retrieve-keywords
+#[test]
+fn keywords_find_words_after_punctuation() {
+    let lib = library();
+    for (i, (text, term)) in [
+        ("**Kubernetes** rollout", "kubernetes"),
+        ("`websocket`", "websocket"),
+        ("[Runbook](url)", "runbook"),
+        ("noter.db", "db"),
+        ("'quoted'", "quoted"),
+        ("noter_db::Store", "store"),
+        ("noter_db::Store", "db"),
+        ("user@example.com", "example"),
+        ("\tindented", "indented"),
+        ("—Überblick", "überblick"),
+        ("🙂Решили", "решили"),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let segment = format!("seg_punctuation_{i}");
+        let item = format!("itm_punctuation_{i}");
+        let chunk = format!("chk_punctuation_{i}");
+        lib.segment(&segment, "call_a", "spk_anna", 20_000, text, "en");
+        lib.item(
+            &item, "call_a", "decision", text, "en", "open", "accepted", None,
+        );
+        lib.chunk(&chunk, "call_a", 20_000, 23_000, text, None);
+        let found = lib.find(query(term));
+        assert!(ids(&found.items).contains(&item), "item: {text:?} / {term}");
+        for (table, index, id) in [
+            ("segments", "segments_fts", &segment),
+            ("chunks", "chunks_fts", &chunk),
+        ] {
+            let expression = crate::normalize::match_expr(&terms(&normalize(term))).unwrap();
+            let hits: i64 = lib
+                .db
+                .query_row(
+                    &format!(
+                        "SELECT count(*) FROM {index} WHERE {index} MATCH ?1
+                           AND rowid = (SELECT rowid FROM {table} WHERE id = ?2)"
+                    ),
+                    params![expression, id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(hits, 1, "{index}: {text:?} / {term}");
+        }
+    }
 }
 
 #[test]
@@ -1869,4 +1920,82 @@ fn new_topic_names_are_the_first_clause_in_six_words() {
     assert_eq!(topic_name("  Бюджет: утвердить до пятницы"), "Бюджет");
     assert_eq!(topic_name("Ship it."), "Ship it");
     assert_eq!(topic_name(" … "), "Untitled topic");
+}
+
+// cpt-noter-algo-core-retrieval-ask-retrieve: inst-retrieve-keywords
+#[test]
+fn keyword_upgrade_rebuilds_existing_rows_and_keeps_edits_current() {
+    let lib = library_with_migrations(&crate::MIGRATIONS[..3]);
+    lib.segment(
+        "seg_upgrade",
+        "call_a",
+        "spk_anna",
+        20_000,
+        "**Kubernetes**",
+        "en",
+    );
+    lib.item(
+        "itm_upgrade",
+        "call_a",
+        "decision",
+        "**Kubernetes**",
+        "en",
+        "open",
+        "accepted",
+        None,
+    );
+    lib.chunk(
+        "chk_upgrade",
+        "call_a",
+        20_000,
+        23_000,
+        "**Kubernetes**",
+        Some(9),
+    );
+    assert!(lib.find(query("kubernetes")).items.is_empty());
+    let path = lib.path();
+    let Library { dir, store, db } = lib;
+    drop(db);
+    drop(store);
+    let store = Store::open(
+        &path,
+        &[
+            noter_db::MIGRATIONS,
+            noter_core::MIGRATIONS,
+            crate::MIGRATIONS,
+        ],
+    )
+    .unwrap();
+    let lib = Library {
+        dir,
+        store: Arc::new(store),
+        db: Connection::open(path).unwrap(),
+    };
+    assert_eq!(ids(&lib.find(query("kubernetes")).items), ["itm_upgrade"]);
+    for index in ["segments_fts", "items_fts", "chunks_fts"] {
+        assert_eq!(
+            lib.count(&format!(
+                r#"SELECT count(*) FROM {index} WHERE {index} MATCH '" kubernet"'"#
+            )),
+            1
+        );
+    }
+    assert_eq!(lib.count("SELECT count(*) FROM chunk_vec"), 4);
+    assert_eq!(
+        lib.db
+            .query_row(
+                "SELECT text FROM segments WHERE id = 'seg_upgrade'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+        "**Kubernetes**"
+    );
+    lib.db.execute_batch("UPDATE segments SET text = '`Replacement`', text_norm = '`replacement`' WHERE id = 'seg_upgrade';
+                          UPDATE items SET text = '`Replacement`' WHERE id = 'itm_upgrade';
+                          DELETE FROM chunks WHERE id = 'chk_upgrade';").unwrap();
+    assert!(lib.find(query("kubernetes")).items.is_empty());
+    assert_eq!(ids(&lib.find(query("replacement")).calls), ["seg_upgrade"]);
+    assert_eq!(ids(&lib.find(query("replacement")).items), ["itm_upgrade"]);
+    assert_eq!(lib.count("SELECT count(*) FROM chunk_vec"), 3);
 }

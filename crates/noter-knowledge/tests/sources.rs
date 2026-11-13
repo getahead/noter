@@ -555,3 +555,91 @@ async fn a_failed_insert_deletes_the_new_keychain_token() {
     assert!(calls[0].starts_with("set source:src_"));
     assert_eq!(calls[1], calls[0].replacen("set", "remove", 1));
 }
+
+// cpt-noter-algo-core-retrieval-ask-retrieve: inst-retrieve-keywords
+#[test]
+fn document_keywords_find_words_after_punctuation() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(dir.path());
+    let source = folder(
+        &store,
+        dir.path(),
+        "Specs",
+        PrivacyClass::Normal,
+        SourceScope::AllCalls,
+    );
+    let c = raw(dir.path());
+    seed(&c, &source.id, "doc_punctuation", &[("chk_punctuation",
+        "**Kubernetes** `websocket` [Runbook](url) noter.db 'quoted' noter_db::Store user@example.com\tindented —Überblick 🙂Решили")]);
+    for term in [
+        "kubernet",
+        "websocket",
+        "runbook",
+        "db",
+        "quoted",
+        "store",
+        "example",
+        "indented",
+        "überblick",
+        "реш",
+    ] {
+        let hits = noter_knowledge::keyword_chunks(&c, &format!("\" {term}\""), 20).unwrap();
+        assert_eq!(hits.len(), 1, "document term: {term}");
+    }
+}
+
+// cpt-noter-algo-core-retrieval-ask-retrieve: inst-retrieve-keywords
+#[test]
+fn document_keyword_upgrade_rebuilds_existing_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(
+        &dir.path().join("noter.db"),
+        &[
+            noter_db::MIGRATIONS,
+            CALLS,
+            &noter_knowledge::MIGRATIONS[..2],
+        ],
+    )
+    .unwrap();
+    let source = folder(
+        &store,
+        dir.path(),
+        "Specs",
+        PrivacyClass::Normal,
+        SourceScope::AllCalls,
+    );
+    let c = raw(dir.path());
+    seed(
+        &c,
+        &source.id,
+        "doc_upgrade",
+        &[("chk_upgrade", "**Kubernetes**")],
+    );
+    assert!(noter_knowledge::keyword_chunks(&c, "\" kubernet\"", 20)
+        .unwrap()
+        .is_empty());
+    drop(c);
+    drop(store);
+    let _store = open(dir.path());
+    let c = raw(dir.path());
+    assert_eq!(
+        noter_knowledge::keyword_chunks(&c, "\" kubernet\"", 20).unwrap(),
+        [ChunkId::new("chk_upgrade")]
+    );
+    assert_eq!(count(&c, "SELECT count(*) FROM doc_vec"), 1);
+    assert_eq!(
+        c.query_row(
+            "SELECT text FROM doc_chunks WHERE id = 'chk_upgrade'",
+            [],
+            |r| r.get::<_, String>(0)
+        )
+        .unwrap(),
+        "**Kubernetes**"
+    );
+    c.execute("DELETE FROM doc_chunks WHERE id = 'chk_upgrade'", [])
+        .unwrap();
+    assert!(noter_knowledge::keyword_chunks(&c, "\" kubernet\"", 20)
+        .unwrap()
+        .is_empty());
+    assert_eq!(count(&c, "SELECT count(*) FROM doc_vec"), 0);
+}
