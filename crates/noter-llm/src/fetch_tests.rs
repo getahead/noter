@@ -149,11 +149,15 @@ async fn http_errors_offline_and_an_already_complete_file() {
     let port = server(BODY);
     assert_eq!(get(port, "/missing", 0).await.0, Err(FetchError::Http(404)));
     assert_eq!(get(port, "/done", 36).await, (Ok(()), vec![]));
-    // Nothing listens on this port any more.
+    // Keep the ephemeral port reserved while the unanswered request times out.
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
-    thread::spawn(move || drop(listener.accept().unwrap().0));
-    assert_eq!(get(port, "/file", 0).await.0, Err(FetchError::Offline));
+    assert_eq!(
+        get_with_stall(port, "/file", 0, Duration::from_millis(500))
+            .await
+            .0,
+        Err(FetchError::Offline)
+    );
 }
 
 #[tokio::test]
