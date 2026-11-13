@@ -636,6 +636,23 @@ impl Harness {
                     ),
                 ],
             ));
+            for participant in call["participants"].as_array().unwrap_or(&empty) {
+                rows.push(ins(
+                    "call_participants",
+                    vec![
+                        (
+                            "id",
+                            json!(format!(
+                                "cp_{}_{}",
+                                id.as_str().unwrap_or_default(),
+                                participant["id"].as_str().unwrap_or_default()
+                            )),
+                        ),
+                        ("call_id", id.clone()),
+                        ("person_id", participant["id"].clone()),
+                    ],
+                ));
+            }
             for tag in call["tags"].as_array().unwrap_or(&empty) {
                 let text = tag.as_str().unwrap_or_default();
                 rows.push(ins(

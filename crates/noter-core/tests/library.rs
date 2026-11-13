@@ -235,6 +235,144 @@ async fn the_list_shows_the_newest_call_first_with_its_derived_fields() {
     assert_eq!(page.rows[0].status, CallStatus::Recording);
 }
 
+// Regression for cpt-noter-algo-core-library-calls-row, inst-row-later (#605).
+#[tokio::test]
+async fn call_rows_include_current_participants_and_only_their_suggested_items() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let mut rows = vec![row(
+        "people",
+        &[
+            ("id", json!("per_anna")),
+            ("rev", json!(1)),
+            ("display_name", json!("Anna Koval")),
+            ("short_name", json!("Anna K.")),
+        ],
+    )];
+    // Insert out of order; another call's participant must not leak into call_a.
+    for (id, call, person) in [
+        ("cp_you", "call_a", "per_you"),
+        ("cp_anna", "call_a", "per_anna"),
+        ("cp_other", "call_b", "per_you"),
+    ] {
+        rows.push(row(
+            "call_participants",
+            &[
+                ("id", json!(id)),
+                ("call_id", json!(call)),
+                ("person_id", json!(person)),
+            ],
+        ));
+    }
+    for (id, call, status, review) in [
+        ("itm_s1", "call_a", "open", "suggested"),
+        ("itm_s2", "call_a", "done", "suggested"),
+        ("itm_s3", "call_a", "carried", "suggested"),
+        ("itm_accepted", "call_a", "open", "accepted"),
+        ("itm_rejected", "call_a", "open", "rejected"),
+        ("itm_other", "call_b", "open", "suggested"),
+    ] {
+        rows.push(row(
+            "items",
+            &[
+                ("id", json!(id)),
+                ("rev", json!(1)),
+                ("call_id", json!(call)),
+                ("kind", json!("action_item")),
+                ("text", json!(id)),
+                ("lang", json!("en")),
+                ("status", json!(status)),
+                ("review_state", json!(review)),
+                ("created_by", json!("llm")),
+            ],
+        ));
+    }
+    core.store().insert_batch(rows).unwrap();
+    let expected = vec![
+        PersonChip {
+            id: PersonId::new("per_anna"),
+            display_name: "Anna Koval".into(),
+            short_name: "Anna K.".into(),
+            initials: "AK".into(),
+            is_you: false,
+        },
+        PersonChip {
+            id: PersonId::new("per_you"),
+            display_name: "You".into(),
+            short_name: "You".into(),
+            initials: "Y".into(),
+            is_you: true,
+        },
+    ];
+    let page = core
+        .calls_list(
+            &main_window(),
+            list_args(CallFilter::default(), CallSort::Newest, None, None),
+        )
+        .await
+        .unwrap();
+    let a = page
+        .rows
+        .iter()
+        .find(|r| r.id.as_str() == "call_a")
+        .unwrap();
+    assert_eq!(a.review_waiting, 3);
+    assert_eq!(a.participants, expected);
+    let b = page
+        .rows
+        .iter()
+        .find(|r| r.id.as_str() == "call_b")
+        .unwrap();
+    assert_eq!(b.review_waiting, 1);
+    assert_eq!(b.participants, expected[1..]);
+    let empty = &page.rows[0];
+    assert!(empty.participants.is_empty());
+    assert_eq!(empty.review_waiting, 0);
+    let detail = core
+        .call_get(
+            &main_window(),
+            CallIdArgs {
+                call_id: a.id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(detail.call, *a);
+    let person = core
+        .person_get(
+            &main_window(),
+            PersonIdArgs {
+                person_id: PersonId::new("per_anna"),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(person.calls, vec![a.clone()]);
+    // A mutation response uses call_row; current people fields are read afresh.
+    Connection::open(dir.path().join("noter.db")).unwrap().execute(
+        "UPDATE people SET display_name = 'Anna Petrova', short_name = 'Anna P.' WHERE id = 'per_anna'", [],
+    ).unwrap();
+    let updated = core
+        .call_update(
+            &main_window(),
+            CallUpdateArgs {
+                call_id: a.id.clone(),
+                rev: a.rev,
+                title: Some("Renamed".into()),
+                call_type: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.call.review_waiting, 3);
+    let mut renamed = expected;
+    renamed[0].display_name = "Anna Petrova".into();
+    renamed[0].short_name = "Anna P.".into();
+    renamed[0].initials = "AP".into();
+    assert_eq!(updated.call.participants, renamed);
+}
+
 #[tokio::test]
 async fn sorts_and_cursor_pages_cover_every_call_once() {
     let dir = tempfile::tempdir().unwrap();
