@@ -283,10 +283,16 @@ fn select_sql(filter: &str, tail: &str) -> String {
                             AND d.rowid > c.rowid AND d.undoable = 0 AND d.field IS NULL AND d.delta IS NULL)
                  OR (c.entity_type = 'segment' AND NOT EXISTS (SELECT 1 FROM segments s WHERE s.id = c.entity_id))
                  OR (c.entity_type = 'speaker' AND NOT EXISTS (SELECT 1 FROM speakers s WHERE s.id = c.entity_id)))
-                , j.kind, lr.runtime_choice, lr.model
+                , j.kind, lr.runtime_choice, lr.model,
+                CASE c.entity_type
+                    WHEN 'call' THEN cl.title
+                    WHEN 'glossary' THEN g.term
+                END
          FROM changes c
          LEFT JOIN jobs j ON c.actor = 'job:' || j.id
          LEFT JOIN llm_runs lr ON c.actor = 'llm_run:' || lr.id
+         LEFT JOIN calls cl ON c.entity_type = 'call' AND c.entity_id = cl.id
+         LEFT JOIN glossary g ON c.entity_type = 'glossary' AND c.entity_id = g.id
          WHERE {filter} {tail}"
     )
 }
@@ -305,6 +311,7 @@ fn raw_rows(
             let entity_type: String = r.get(6)?;
             let entity_id: String = r.get(7)?;
             let gone: bool = r.get(17)?;
+            let label: Option<String> = r.get(21)?;
             Ok(Raw {
                 rowid: r.get(0)?,
                 batch_id: r.get(2)?,
@@ -323,7 +330,8 @@ fn raw_rows(
                 confidence: r.get(14)?,
                 undoable: r.get(16)?,
                 redoable: compute_redoable && status == "undone" && noter_db::redoable(c, &id),
-                label: label_of(c, &entity_type, &entity_id, gone),
+                label: label
+                    .or_else(|| (entity_type == "call" && gone).then(|| "Deleted call".into())),
                 id,
                 status,
                 entity_type,
@@ -381,27 +389,6 @@ fn filter_of(args: &HistoryListArgs) -> (String, Vec<Sql>) {
         binds.push(Sql::Integer(to.0));
     }
     (clauses.join(" AND "), binds)
-}
-
-/// What the row's entity is called now; a deleted record keeps no name.
-fn label_of(
-    c: &noter_db::rusqlite::Connection,
-    entity_type: &str,
-    id: &str,
-    gone: bool,
-) -> Option<String> {
-    let lookup = |sql: &str| {
-        c.query_row(sql, [id], |r| r.get::<_, String>(0))
-            .optional()
-            .ok()
-            .flatten()
-    };
-    match entity_type {
-        "call" => lookup("SELECT title FROM calls WHERE id = ?1")
-            .or_else(|| gone.then(|| "Deleted call".to_string())),
-        "glossary" => lookup("SELECT term FROM glossary WHERE id = ?1"),
-        _ => None,
-    }
 }
 
 fn change_row(r: Raw) -> Result<ChangeRow, CoreError> {
