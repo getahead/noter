@@ -750,6 +750,36 @@ async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn stopping_while_the_engine_restarts_stops_the_engine_session() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let starts = r.sessions().len();
+    r.engine.kill_current();
+    r.sent_n(starts + 1, |command| {
+        matches!(command, EngineCommand::StartSession(_))
+    })
+    .await;
+
+    let stopped = r
+        .core
+        .capture_stop(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(stopped.phase, CapturePhase::Stopped);
+    assert_eq!(stopped.call_id.as_ref(), Some(&call_id));
+    assert!(r.engine.commands().iter().any(|command| matches!(
+        command,
+        EngineCommand::Stop { call_id: stopped_call } if stopped_call == &call_id
+    )));
+}
+
+#[tokio::test(start_paused = true)]
 async fn continue_appends_to_the_same_call_within_the_window() {
     let r = rig();
     let call_id = r.recording().await;
