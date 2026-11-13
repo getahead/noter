@@ -56,8 +56,6 @@ impl StreamMsg for LevelsMsg {
 
 /// The transcript service's state, owned by [`Core`].
 pub(crate) struct Transcript {
-    /// The data folder: `transcript.jsonl` goes to `audio/<call_id>/` in it.
-    dir: PathBuf,
     hub: OnceLock<Arc<StreamHub<TranscriptMsg>>>,
     levels: OnceLock<Arc<StreamHub<LevelsMsg>>>,
     state: Mutex<State>,
@@ -66,9 +64,8 @@ pub(crate) struct Transcript {
 }
 
 impl Transcript {
-    pub(crate) fn new(dir: PathBuf) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            dir,
             hub: OnceLock::new(),
             levels: OnceLock::new(),
             state: Mutex::new(State::default()),
@@ -445,7 +442,7 @@ impl Core {
     pub(crate) fn write_transcript_file(&self, call_id: &CallId) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
         let segments = self.store.read(|c| segments_of(c, call_id, None))?;
-        let dir = self.transcript.dir.join("audio").join(call_id.as_str());
+        let dir = self.call_dir(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
         let tmp = dir.join("transcript.jsonl.tmp");
         let mut file = std::fs::OpenOptions::new()
@@ -465,9 +462,9 @@ impl Core {
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
     }
 
-    /// The call's folder under the data folder: its transcript, constraints and audio.
+    /// The call's folder beside the configured models directory, shared with the engine.
     pub(crate) fn call_dir(&self, call_id: &CallId) -> PathBuf {
-        self.transcript.dir.join("audio").join(call_id.as_str())
+        self.audio_dir.join(call_id.as_str())
     }
 
     fn log_error(&self, what: &str, e: &CoreError) {

@@ -14,7 +14,7 @@ use noter_protocol::*;
 use serde_json::{json, Value};
 
 use crate::settings::invalid;
-use crate::{lock, object, Core};
+use crate::{internal, lock, object, Core};
 
 /// The call types Noter ships (D-25); the ids are the fixture's.
 const BUILT_IN_TYPES: [&str; 8] = [
@@ -657,6 +657,29 @@ impl Core {
             }
         }
         // @cpt-end:cpt-noter-flow-core-library-calls-delete:p1:inst-delete-live
+        let prompt_files = self.store().read(|c| {
+            let mut paths = Vec::new();
+            for id in &ids {
+                let mut q = c.prepare("SELECT pv.file_path FROM prompt_versions pv JOIN items i ON i.id = pv.item_id WHERE i.call_id = ?1")?;
+                paths.extend(q.query_map([id], |r| r.get::<_, String>(0))?.collect::<Result<Vec<_>, _>>()?);
+            }
+            Ok(paths)
+        })?;
+        for relative in prompt_files {
+            let path = Path::new(&relative);
+            if !path.starts_with("handoffs")
+                || !path
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_)))
+            {
+                return Err(internal("stored handoff prompt path is invalid"));
+            }
+            if let Err(error) = std::fs::remove_file(self.data_dir.join(path)) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    return Err(internal(error));
+                }
+            }
+        }
         // @cpt-begin:cpt-noter-flow-core-library-calls-delete:p1:inst-delete-run
         // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-for
         // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-tx
@@ -677,7 +700,7 @@ impl Core {
         for (id, _) in &deleted {
             // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-files
             // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-catch
-            if !remove_call_files(&self.data_dir, id) {
+            if !remove_call_files(&self.audio_dir, id) {
                 self.log(object(
                     json!({ "level": "warn", "module": "library", "code": "audio_not_removed", "id": id }),
                 ));
@@ -713,7 +736,7 @@ impl Core {
         };
         let left: Vec<&str> = text
             .lines()
-            .filter(|id| !id.is_empty() && !remove_call_files(&self.data_dir, id))
+            .filter(|id| !id.is_empty() && !remove_call_files(&self.audio_dir, id))
             .collect();
         let _ = if left.is_empty() {
             std::fs::remove_file(&file)
@@ -732,11 +755,11 @@ fn plain_id(id: &str) -> bool {
 }
 
 /// Removes `audio/<call_id>/`; `true` when it is gone (or never was).
-fn remove_call_files(data_dir: &Path, id: &str) -> bool {
+fn remove_call_files(audio_dir: &Path, id: &str) -> bool {
     if !plain_id(id) {
         return true;
     }
-    let dir = data_dir.join("audio").join(id);
+    let dir = audio_dir.join(id);
     match std::fs::symlink_metadata(&dir) {
         Err(e) => e.kind() == std::io::ErrorKind::NotFound,
         Ok(_) => std::fs::remove_dir_all(&dir).is_ok(),
@@ -745,7 +768,6 @@ fn remove_call_files(data_dir: &Path, id: &str) -> bool {
 
 fn note_pending(data_dir: &Path, id: &str) {
     use std::io::Write;
-    let _ = std::fs::create_dir_all(data_dir.join("audio"));
     if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)

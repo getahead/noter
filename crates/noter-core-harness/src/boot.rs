@@ -9,7 +9,7 @@
 //! (permissions, displays, reachability, disk, update) lives in the scripted seams.
 
 use std::collections::{HashMap, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -371,7 +371,12 @@ impl Harness {
         });
         let deps = CoreDeps::new(
             clock.clone(),
-            Arc::new(EventLines(events, seeding.clone(), engine.clone())),
+            Arc::new(EventLines(
+                events,
+                seeding.clone(),
+                engine.clone(),
+                dir.clone(),
+            )),
         )
         .with_shortcuts(Arc::new(ScriptedShortcuts(options.hotkey_conflict.clone())))
         .with_native(native.clone())
@@ -604,7 +609,24 @@ impl Harness {
             let id = &call["id"];
             // The call's folder exists, as capture leaves it, so **Show in Finder** finds it.
             let folder = self.dir.join("audio").join(id.as_str().unwrap_or_default());
-            std::fs::create_dir_all(folder).map_err(crate::internal)?;
+            std::fs::create_dir_all(&folder).map_err(crate::internal)?;
+            if call["audio_deleted"] != true && call["audio_not_stored"] != true {
+                std::fs::write(folder.join("mic.m4a"), b"scripted microphone recording")
+                    .map_err(crate::internal)?;
+                std::fs::write(folder.join("sys.m4a"), b"scripted system recording")
+                    .map_err(crate::internal)?;
+                std::fs::write(
+                    folder.join("timeline.json"),
+                    serde_json::to_vec(&json!({
+                        "call_id": id,
+                        "duration_ms": call["duration_ms"],
+                        "gaps": [],
+                        "parts": 1
+                    }))
+                    .map_err(crate::internal)?,
+                )
+                .map_err(crate::internal)?;
+            }
             let detail = wanted["call_details"]
                 .as_array()
                 .unwrap_or(&empty)
@@ -1730,14 +1752,19 @@ impl EventEmitter for Lines {
 }
 
 /// Core events to the wire (or the app's windows), once seeding is over.
-struct EventLines(Arc<dyn EventEmitter>, Arc<AtomicBool>, ScriptedEngine);
+struct EventLines(
+    Arc<dyn EventEmitter>,
+    Arc<AtomicBool>,
+    ScriptedEngine,
+    PathBuf,
+);
 
 impl EventEmitter for EventLines {
     fn emit(&self, event: &'static str, payload: Value) {
-        if event == noter_protocol::ipc::event_names::CAPTURE_STATE {
-            answer_session(&self.2, &payload);
-        }
         // @cpt-begin:cpt-noter-flow-core-harness-session:p1:inst-write-events
+        if event == noter_protocol::ipc::event_names::CAPTURE_STATE {
+            answer_session(&self.2, &payload, &self.3);
+        }
         if !self.1.load(Ordering::SeqCst) {
             self.0.emit(event, payload);
         }
@@ -1749,7 +1776,7 @@ impl EventEmitter for EventLines {
 /// `start_session`, `session_stopped` once it has the `stop`.
 // shortcut: stands in for the engine script's default answers (TL-3); drop it when the
 // harness boots with a script that answers sessions.
-fn answer_session(engine: &ScriptedEngine, state: &Value) {
+fn answer_session(engine: &ScriptedEngine, state: &Value, dir: &Path) {
     let Some(call_id) = state["call_id"].as_str().map(CallId::new) else {
         return;
     };
@@ -1762,15 +1789,34 @@ fn answer_session(engine: &ScriptedEngine, state: &Value) {
                 output_device: "Scripted Speakers".into(),
             },
         ),
-        Some("stopping") => (
-            |c| matches!(c, EngineCommand::Stop { .. }),
-            EngineEvent::SessionStopped {
-                timeline_path: format!("audio/{call_id}/timeline.json"),
-                call_id,
-                mic_path: None,
-                sys_path: None,
-            },
-        ),
+        Some("stopping") => {
+            let folder = dir.join("audio").join(call_id.as_str());
+            std::fs::create_dir_all(&folder).expect("scripted capture folder can be created");
+            std::fs::write(folder.join("mic.m4a"), b"scripted microphone recording")
+                .expect("scripted microphone file can be written");
+            std::fs::write(folder.join("sys.m4a"), b"scripted system recording")
+                .expect("scripted system file can be written");
+            std::fs::write(
+                folder.join("timeline.json"),
+                serde_json::to_vec(&json!({
+                    "call_id": call_id,
+                    "duration_ms": 1,
+                    "gaps": [],
+                    "parts": 1
+                }))
+                .expect("scripted timeline can be encoded"),
+            )
+            .expect("scripted timeline can be written");
+            (
+                |c| matches!(c, EngineCommand::Stop { .. }),
+                EngineEvent::SessionStopped {
+                    timeline_path: format!("audio/{call_id}/timeline.json"),
+                    call_id: call_id.clone(),
+                    mic_path: Some(format!("audio/{call_id}/mic.m4a")),
+                    sys_path: Some(format!("audio/{call_id}/sys.m4a")),
+                },
+            )
+        }
         _ => return,
     };
     let count = move |e: &ScriptedEngine| e.commands().iter().filter(|c| asked(c)).count();

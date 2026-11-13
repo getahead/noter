@@ -2,6 +2,8 @@
 // rejected item, in each of its three formats; audio_delete and audio_delete_older remove the audio and keep the
 // transcript and the outputs. An item section copies the call's items as they are now, not the text written with it.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 import type { Core, ShareScope } from "../../src/core/bindings";
 import { exercised } from "../support/core";
@@ -12,6 +14,13 @@ import { LIVE_CALL, PAST_CALL } from "../support/world-presets";
 const SUMMARY = "Backend and QA aligned on the websocket notifications";
 const TOKEN = "Rotate the staging Jira token";
 const everything: ShareScope = { sections: [], item_ids: [], include_unreviewed: true };
+
+async function storedAudioFolder(callId: string): Promise<string | null> {
+  if (s.target !== "stdio") return null;
+  const wire = (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<{ path: string }> } }).process;
+  const { path } = await wire.invoke("main", "harness.data_dir", {});
+  return join(path, "audio", callId);
+}
 
 let s: Scenario;
 let main: Core;
@@ -75,21 +84,26 @@ describe("audio_delete and audio_delete_older", () => {
   }
 
   it("audio_delete removes a stored call's audio once and keeps its transcript and Summary", async () => {
+    const folder = await storedAudioFolder(PAST_CALL);
     const before = await stored(PAST_CALL);
     expect(before.segments).toBeGreaterThan(0);
+    if (folder) expect(existsSync(join(folder, "mic.m4a"))).toBe(true);
     expect(ok(await main.audioDelete({ call_ids: [PAST_CALL] })).calls).toBe(1);
     expect(ok(await main.callGet({ call_id: PAST_CALL })).call.audio_deleted).toBe(true);
     expect(await stored(PAST_CALL)).toEqual({ ...before, audio: false });
+    if (folder) expect(existsSync(join(folder, "mic.m4a"))).toBe(false);
     expect(ok(await main.audioDelete({ call_ids: [PAST_CALL] })).calls).toBe(0);
   });
 
   it("audio_delete_older removes the audio of calls older than the cutoff, never the live call's, and refuses no days", async () => {
     expect(refused(await main.audioDeleteOlder({ older_than_days: 0 })).code).toBe("invalid_input");
+    const folder = await storedAudioFolder(PAST_CALL);
     const before = await stored(PAST_CALL);
     expect(ok(await main.audioDeleteOlder({ older_than_days: 1 })).calls).toBe(1);
     expect(ok(await main.callGet({ call_id: PAST_CALL })).call.audio_deleted).toBe(true);
     expect(ok(await main.callGet({ call_id: LIVE_CALL })).call.audio_deleted).toBe(false);
     expect(await stored(PAST_CALL)).toEqual({ ...before, audio: false });
+    if (folder) expect(existsSync(join(folder, "mic.m4a"))).toBe(false);
     expect(ok(await main.audioDeleteOlder({ older_than_days: 1 })).calls).toBe(0);
   });
 });

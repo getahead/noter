@@ -1137,7 +1137,7 @@ impl Core {
                     Some(format!("## {}\n\n{md}\n\n", heading(s.kind)))
                 })
                 .collect();
-            let dir = self.data_dir.join("audio").join(call.as_str());
+            let dir = self.call_dir(call);
             let internal = |e: std::io::Error| CoreError::new(ErrorCode::Internal, e.to_string());
             std::fs::create_dir_all(&dir).map_err(internal)?;
             let tmp = dir.join("summary.md.tmp");

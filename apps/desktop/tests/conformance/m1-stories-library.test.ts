@@ -4,7 +4,7 @@
 // data folder, which the harness names (`harness.data_dir`); the fake has none, so those steps are
 // skipped on it. All five library commands are called here: calls_list, call_get, call_update,
 // call_types_list and calls_delete.
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -57,22 +57,19 @@ const deletions = (id: string) =>
     id,
   );
 
-/** Puts a file in the call's audio folder, the way capture does; null where there is no folder. */
-async function withAudio(id: string): Promise<string | null> {
-  const dir = await dataDir();
-  if (!dir) return null;
-  const audio = join(dir, "audio", id);
-  mkdirSync(audio, { recursive: true });
-  writeFileSync(join(audio, "mic.caf"), "x");
-  return audio;
-}
-
 describe("cpt-noter-seq-dialogs-delete-call", () => {
   it("happy path: Delete removes the call and everything recorded in it — list, snapshot, rows, files, one change row", async () => {
     open();
     const main = s.core("main");
     const removed = await s.events("entity:changed");
-    const audio = await withAudio(PAST_CALL);
+    const data = await dataDir();
+    const audio = data ? join(data, "audio", PAST_CALL) : null;
+    if (data) {
+      const folder = audio!;
+      expect(existsSync(join(folder, "mic.m4a"))).toBe(true);
+      expect(existsSync(join(folder, "sys.m4a"))).toBe(true);
+      expect(existsSync(join(folder, "timeline.json"))).toBe(true);
+    }
     expect(await listed()).toContain(PAST_CALL);
     expect(ok(await main.callGet({ call_id: PAST_CALL })).call.id).toBe(PAST_CALL);
 

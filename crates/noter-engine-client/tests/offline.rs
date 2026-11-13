@@ -607,6 +607,19 @@ async fn malformed_speaker_vectors_fail() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn wrong_speaker_output_path_still_removes_the_plain_scratch_file() {
+    let dir = tempfile::tempdir().unwrap();
+    write_f32(dir.path(), "engine-io/s.f32", &[0.5; 256]);
+    let engine = scripted(
+        dir.path(),
+        r#"{"on":"speaker_embedding","after_ms":10,"event":{"type":"speaker_embedding_done","request_id":"req_1","out_path":"engine-io/other.f32"}}"#,
+    );
+    let result = speaker(&client(&engine), "req_1", "engine-io/s.f32").await;
+    assert!(matches!(result, Err(OfflineError::BadResult(_))));
+    assert!(!dir.path().join("engine-io/s.f32").exists());
+}
+
+#[tokio::test(start_paused = true)]
 async fn one_query_comes_back_inline_with_1024_values() {
     let dir = tempfile::tempdir().unwrap();
     let c = client(&engine(dir.path()));

@@ -4,6 +4,8 @@
 // (`Scenario.engineFact` / `engineKill`) and the windows the core asked for from its scripted
 // `Surfaces` log. The fake has no engine: there a story stops at its first engine fact.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 import type { CallId, CaptureState, DegradedState } from "../../src/core/bindings";
 import { exercised } from "../support/core";
@@ -28,6 +30,7 @@ afterEach(async () => {
 
 const TEAMS = { bundle_id: "com.microsoft.teams2", app_name: "Microsoft Teams" };
 const SLACK = { bundle_id: "com.tinyspeck.slackmacgap", app_name: "Slack" };
+const wire = () => (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<{ path: string }> } }).process;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The engine reports `event` once it runs; false on the fake (the story stops there). */
@@ -274,6 +277,13 @@ describe("cpt-noter-seq-menu-bar-control-recording", () => {
     await sleep(20); // a pause that lasts no time leaves no gap (and the real core's clock counts milliseconds)
     expect(ok(await main.captureSetPaused({ call_id: callId, paused: false })).phase).toBe("recording");
     expect(ok(await main.captureStop({ call_id: callId })).phase).toBe("stopped");
+    await ready(callId);
+    if (s.target !== "fake") {
+      const { path } = await wire().invoke("main", "harness.data_dir", {});
+      expect(existsSync(join(path, "audio", callId, "mic.m4a"))).toBe(true);
+      expect(existsSync(join(path, "audio", callId, "sys.m4a"))).toBe(true);
+      expect(existsSync(join(path, "audio", callId, "timeline.json"))).toBe(true);
+    }
     await until(() => states.latest()?.phase === "stopped", "capture:state stopped");
     expect(states.all.map((c) => c.phase)).toEqual(expect.arrayContaining(["paused", "recording", "stopping", "stopped"]));
     const transcript = ahead(await s.core("call-screen").transcriptSubscribe({ call_id: callId }, () => {}));

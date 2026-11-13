@@ -2,7 +2,7 @@
 title: "Feature: Speaker naming, term fixes and audio deletion"
 description: "Logged transcript corrections that survive the archive pass, post-call naming and permanent audio deletion."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M2
 lane: core
@@ -11,6 +11,8 @@ design: docs/DESIGN-core.md
 ---
 
 # Feature: Speaker naming, term fixes and audio deletion
+
+> **Change log (v0.2):** Call folder reads and deletion now share the engine container root.
 
 <!-- toc -->
 
@@ -213,7 +215,7 @@ The system **MUST** delete stored audio explicitly or by age through a non-undoa
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-tests`
 
-The system **MUST** pass unit tests for line scope, call scope, Unicode term ranges, constraint persistence, undo, partial filesystem failure and idempotent deletion; conformance for all five commands; and real-core E2E for both naming stories. `just gate` passes.
+The system **MUST** pass unit tests for line scope, call scope, Unicode term ranges, constraint persistence, undo, partial filesystem failure and idempotent deletion; conformance for all five commands; and real-core E2E for both naming stories. Call folder lookup and physical removal use the same configured container root as the engine. `just gate` passes.
 
 **Implements**:
 - `cpt-noter-flow-core-speakers-audio-name`

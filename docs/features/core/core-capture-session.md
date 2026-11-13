@@ -12,6 +12,8 @@ design: docs/DESIGN-core.md
 
 # Feature: Capture session manager
 
+> **Change log (v0.2):** Discard removes recordings from the configured audio container.
+
 <!-- toc -->
 
 - [1. Feature Context](#1-feature-context)
@@ -214,7 +216,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 3. [x] - `p1` - DB: UPDATE `calls` status `processing` through the change-log write path; end the transcript and levels streams with `call_stopped` - `inst-update-call`
 4. [x] - `p1` - Phase `stopped`, `continue_until` = now + 5 minutes; hand the call to the post-call queue - `inst-phase-stopped`
 5. [x] - `p1` - API: `capture_continue { call_id }` before `continue_until`: atomically return archive state to pending and remove installed archive rows, cancel queued or running post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
-6. [x] - `p1` - API: `capture_discard { call_id }` while `NothingHeard` shows: stop the engine, delete the call's rows and files (logged, not undoable), end streams with `discarded`, phase `idle` - `inst-discard`
+6. [x] - `p1` - API: `capture_discard { call_id }` while `NothingHeard` shows: stop the engine, delete the call's rows and files from the configured audio container (logged, not undoable), end streams with `discarded`, phase `idle` - `inst-discard`
 7. [x] - `p1` - **RETURN** `CaptureState`; emit `capture:state` - `inst-return-stop`
 
 ### Answer notices during a call

@@ -111,6 +111,7 @@ public final class EngineLoop: @unchecked Sendable {
             writer.emit(.pong)
         case .shutdown:
             writer.emit(.ack(cmdId: command.id))
+            flushStops()
             return false
         case let .setDetection(enabled, known):
             facts.withLock { detector.rule(enabled: enabled, known: known) }
@@ -149,6 +150,9 @@ public final class EngineLoop: @unchecked Sendable {
         }
         return true
     }
+
+    /// Waits for accepted stop finalizers before the process exits.
+    public func flushStops() { stops.sync {} }
 
     // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
     private func startSession(_ id: UInt64, _ start: StartSession) {
@@ -251,9 +255,9 @@ public final class EngineLoop: @unchecked Sendable {
     private func replay(_ id: UInt64, _ callId: String, _ fromMs: Int, _ toMs: Int?, _ channel: Channel?) {
         let channels = channel.map { [$0] } ?? [.mic, .sys]
         let resolved = channels.compactMap { channel in
-            container.flatMap { ContainerPath.resolve("audio/\(callId)/\(channel.rawValue).m4a", in: $0) }
+            container.flatMap { ContainerPath.resolve("audio/\(callId)", in: $0) }.map { SessionAudio.url(channel, in: $0) }
         }
-        let files = resolved.filter { FileManager.default.fileExists(atPath: $0.path) }
+        let files = resolved.compactMap { $0 }
         guard resolved.count == channels.count, !files.isEmpty else {
             // The core reads an error for `play` as `audio_deleted`.
             writer.emit(.error(cmdId: id, code: .badCommand, message: "no stored audio for \(callId)"))

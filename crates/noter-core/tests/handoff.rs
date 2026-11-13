@@ -734,6 +734,38 @@ async fn open_writes_the_prompt_file_launches_and_hands_the_item_off() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn deleting_a_call_removes_its_handoff_prompt_file_and_versions() {
+    let w = world("");
+    w.ready("itm_eng").await;
+    w.map_repo("VSTOR").await;
+    w.core.handoff_open(&ctx(), id("itm_eng")).await.unwrap();
+    let file = w.dir.path().join("handoffs/itm_eng.md");
+    assert!(file.exists());
+
+    w.core
+        .calls_delete(
+            &ctx(),
+            CallsDeleteArgs {
+                call_ids: vec![CallId::new("call_a")],
+            },
+        )
+        .await
+        .unwrap();
+
+    assert!(!file.exists());
+    let count = w
+        .core
+        .store()
+        .read(|c| {
+            c.query_row("SELECT COUNT(*) FROM prompt_versions", [], |r| {
+                r.get::<_, i64>(0)
+            })
+        })
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_failed_launch_claims_nothing_and_the_link_falls_back_to_the_terminal() {
     let w = world("");
     w.ready("itm_eng").await;

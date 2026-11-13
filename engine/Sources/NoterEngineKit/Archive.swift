@@ -143,8 +143,39 @@ struct CallTime {
 /// The stored channels of a call: `<channel>.m4a` after capture, `<channel>.wav` in file mode.
 enum SessionAudio {
     static func url(_ channel: Channel, in session: URL) -> URL? {
-        ["m4a", "wav"].map { session.appendingPathComponent("\(channel.rawValue).\($0)") }
-            .first { FileManager.default.fileExists(atPath: $0.path) }
+        let m4a = session.appendingPathComponent("\(channel.rawValue).m4a")
+        let wave = session.appendingPathComponent("\(channel.rawValue).wav")
+        let prefix = "\(channel.rawValue)."
+        let parts = (((try? FileManager.default.contentsOfDirectory(at: session, includingPropertiesForKeys: nil)) ?? [])
+            .compactMap { url -> (Int, URL)? in
+                guard url.lastPathComponent.hasPrefix(prefix), url.pathExtension == "aac",
+                    let index = Int(url.deletingPathExtension().lastPathComponent.dropFirst(prefix.count)), index >= 0
+                else { return nil }
+                return (index, url)
+            })
+            .sorted { $0.0 < $1.0 }
+            .map(\.1)
+        if parts.isEmpty {
+            return [m4a, wave].first { FileManager.default.fileExists(atPath: $0.path) }
+        }
+        let previous = FileManager.default.fileExists(atPath: m4a.path) ? m4a : nil
+        guard CaptureSession.remux(parts, appending: previous, to: m4a) else { return previous }
+        parts.forEach { try? FileManager.default.removeItem(at: $0) }
+        if let data = try? Data(contentsOf: session.appendingPathComponent("timeline.json")),
+            var timeline = try? JSONDecoder().decode(Timeline.self, from: data)
+        {
+            if let file = try? AVAudioFile(forReading: m4a) {
+                let audioMs = Int((Double(file.length) * 1000 / file.processingFormat.sampleRate).rounded())
+                let recoveredDuration = audioMs + timeline.gaps.reduce(0) { $0 + max(0, $1.t1Ms - $1.t0Ms) }
+                if recoveredDuration > timeline.durationMs {
+                    timeline.durationMs = recoveredDuration
+                    if let updated = try? JSONEncoder().encode(timeline) {
+                        try? updated.write(to: session.appendingPathComponent("timeline.json"), options: .atomic)
+                    }
+                }
+            }
+        }
+        return m4a
     }
 
     static func stored(in session: URL) -> Bool { [Channel.mic, .sys].contains { url($0, in: session) != nil } }

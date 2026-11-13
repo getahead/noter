@@ -22,9 +22,9 @@ let offline = container.map { LocalOfflineWork.installed(models: $0.appendingPat
 /// file replay runs to its end.
 func serve(_ engine: EngineLoop, exitAtEndOfInput: Bool) {
     while let line = readLine() {
-        if !engine.handle(line) { exit(0) }
+        if !engine.handle(line) { engine.flushStops(); exit(0) }
     }
-    if exitAtEndOfInput { exit(0) }
+    if exitAtEndOfInput { engine.flushStops(); exit(0) }
 }
 
 switch Arguments.parse(Array(CommandLine.arguments.dropFirst())) {

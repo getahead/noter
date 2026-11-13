@@ -362,6 +362,59 @@ final class CaptureTests: XCTestCase {
         try assertAudio(root.appendingPathComponent("audio/call_1/mic.m4a"), 4.0, parts: 2)
     }
 
+    func testContinueAfterACompletedStopPreservesTheFirstRecording() throws {
+        let root = try container()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let clock = TestClock()
+        do {
+            let (lines, source) = (Lines(), FakeSource())
+            let e = engine(lines, source, root, clock)
+            _ = e.handle(startLine(id: 1))
+            source.push(ms: 1000)
+            _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+            _ = try XCTUnwrap(lines.waitFor("session_stopped"))
+        }
+        let (lines, source) = (Lines(), FakeSource())
+        let e = engine(lines, source, root, clock)
+        _ = e.handle(startLine(id: 1, resumeFrom: 1000))
+        _ = try XCTUnwrap(lines.waitFor("session_started"))
+        source.push(ms: 1000)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        let stopped = try XCTUnwrap(lines.waitFor("session_stopped"))
+        XCTAssertEqual(stopped["mic_path"] as? String, "audio/call_1/mic.m4a")
+        try assertAudio(root.appendingPathComponent("audio/call_1/mic.m4a"), 2.0)
+        XCTAssertEqual(try timeline(root)["duration_ms"] as? Int, 2000)
+    }
+
+    func testStoredAudioCanRecoverPartsWithoutALaterStop() throws {
+        let root = try container()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dir = root.appendingPathComponent("audio/call_1")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let encoder = try ADTSEncoder(url: dir.appendingPathComponent("mic.0.aac"))
+        try encoder.append(Array(repeating: Float(0.2), count: 12_000))
+        encoder.finish()
+        try JSONEncoder().encode(Timeline(callId: "call_1")).write(to: dir.appendingPathComponent("timeline.json"))
+        let file = try XCTUnwrap(SessionAudio.url(.mic, in: dir))
+        XCTAssertEqual(file.lastPathComponent, "mic.m4a")
+        try assertAudio(file, 0.75)
+        XCTAssertGreaterThan(try timeline(root)["duration_ms"] as? Int ?? 0, 0)
+    }
+
+    func testShutdownWaitsForQueuedStopFinalization() throws {
+        let (lines, source, root) = (Lines(), FakeSource(), try container())
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = engine(lines, source, root, TestClock())
+        _ = e.handle(startLine(id: 1))
+        source.push(ms: 500)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+
+        XCTAssertFalse(e.handle(#"{"id":3,"cmd":{"type":"shutdown"}}"#))
+
+        XCTAssertTrue(lines.events.contains { $0["type"] as? String == "session_stopped" })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("audio/call_1/mic.m4a").path))
+    }
+
     func testTheRingIsAMappedFileInTheContainerThatSurvivesTheEngine() throws {
         let root = try container()
         let url = root.appendingPathComponent(CaptureRing.fileName)
