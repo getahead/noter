@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChangeRow, UiPrefs } from "../../core/bindings";
-import { actorLabel, groupByDay, historyKey, historyState, jobsOf, sameTarget, undoTarget } from "./history";
+import { actorLabel, groupByDay, historyKey, historyState, jobsOf, readHistoryPages, sameTarget, undoTarget } from "./history";
 
 const prefs: UiPrefs = { time_format: "h24", first_weekday: 1, time_zone: "UTC" };
 const NOW = Date.UTC(2026, 10, 5, 12);
@@ -18,6 +18,25 @@ describe("history (cpt-noter-flow-ui-history-undo-read)", () => {
     expect(k("all", null)).not.toBe(k("you", null));
     expect(k("all", null)).not.toBe(k("all", "job_1"));
     expect(historyKey({ type: "all" }, "all", null)).toBe("history:all:all:");
+  });
+
+  it("reads each cursor and discards a superseded filter answer", async () => {
+    const calls: (string | undefined)[] = [];
+    const pages = await readHistoryPages(async (cursor) => {
+      calls.push(cursor);
+      return calls.length === 1
+        ? { status: "ok" as const, data: { rows: [row("new", NOW)], next_cursor: "older" } }
+        : { status: "ok" as const, data: { rows: [row("old", NOW - 1)], next_cursor: null } };
+    }, () => true);
+    expect(calls).toEqual([undefined, "older"]);
+    expect(pages?.rows.map((r) => r.id)).toEqual(["new", "old"]);
+
+    let release!: (value: { status: "ok"; data: { rows: ChangeRow[]; next_cursor: string | null } }) => void;
+    let current = 1;
+    const stale = readHistoryPages(() => new Promise<{ status: "ok"; data: { rows: ChangeRow[]; next_cursor: string | null } }>((resolve) => (release = resolve)), () => current === 1);
+    current = 2;
+    release({ status: "ok", data: { rows: [row("stale", NOW)], next_cursor: null } });
+    expect(await stale).toBeNull();
   });
 
   it("names the read state", () => {

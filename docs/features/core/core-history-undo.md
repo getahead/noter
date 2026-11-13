@@ -99,7 +99,7 @@ The user can inspect and reverse a correction, review or job batch without losin
 **Steps**:
 1. [x] - `p1` - API: `history_list { target, actor, job_id, from, to, page }`; validate the target and period - `inst-read-request`
 2. [x] - `p1` - DB: SELECT `changes` on a read-only connection with target, actor, job and date filters and stable page ordering - `inst-read-select`
-3. [x] - `p1` - Assemble `ChangeRow` values with actor labels, batch sizes, evidence, undoable and redoable state; return an empty page when no rows match - `inst-read-assemble`
+3. [x] - `p1` - Assemble `ChangeRow` values with accurate runtime/model and job names, batch sizes, evidence and undoable state; compute redoable state with indexed replay lookups; return an empty page when no rows match - `inst-read-assemble`
 4. [x] - `p1` - **IF** the user calls `history_export { scope, format }` - `inst-export-request`
    1. [x] - `p1` - Resolve whole-call or local-date period scope; show the native save panel - `inst-export-panel`
    2. [x] - `p1` - **IF** cancelled, **RETURN** `cancelled` without creating a file - `inst-export-cancel`
@@ -199,6 +199,8 @@ The system **MUST** reverse changes or whole batches through the single writer, 
 - API: `change_undo`, `change_redo`, `entity:changed`
 - DB: `changes` and the eligible target tables
 - Entities: `UndoTarget`, `UndoResult`
+
+History read regressions cover runtime/model and job attribution, bounded page export, and indexed redo lineage lookup.
 
 ### Tests and gate
 

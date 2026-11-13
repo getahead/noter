@@ -32,6 +32,25 @@ fn open(path: &Path) -> Store {
     Store::open(path, &[MIGRATIONS, TABLES]).expect("store opens")
 }
 
+#[test]
+fn redo_lineage_lookup_uses_the_partial_index() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&path(&dir));
+    let plan = store
+        .read(|c| {
+            let mut stmt = c.prepare(
+                "EXPLAIN QUERY PLAN SELECT id FROM changes WHERE id = ?1 OR redo_of = ?1",
+            )?;
+            let rows = stmt.query_map(["change"], |r| r.get::<_, String>(3))?;
+            rows.collect::<Result<Vec<_>, _>>()
+        })
+        .unwrap();
+    assert!(
+        plan.iter().any(|line| line.contains("changes_redo_of")),
+        "query plan: {plan:?}"
+    );
+}
+
 fn raw(path: &Path) -> Connection {
     Connection::open(path).unwrap()
 }

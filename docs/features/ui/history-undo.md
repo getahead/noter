@@ -90,7 +90,7 @@ Read changes, undo or redo them, and export a call’s log.
 
 **Steps**:
 1. [x] - `p1` - User opens Call page › **History**, Item inspector › **History**, or the delivered person host - `inst-open`
-2. [x] - `p1` - API: `history_list` with the record target, actor **all**, no job and the first page; show skeleton rows after 300 ms - `inst-read`
+2. [x] - `p1` - API: `history_list` with the record target, actor **all**, no job and the first page; follow every returned cursor until exhausted; show skeleton rows after 300 ms - `inst-read`
 3. [x] - `p1` - **IF** the read fails - `inst-error`
    1. [x] - `p1` - Show the section error; **Try Again** repeats this read only - `inst-retry`
    2. [x] - `p1` - **RETURN** the retryable history error - `inst-end-error`
@@ -121,7 +121,7 @@ Read changes, undo or redo them, and export a call’s log.
 4. [x] - `p1` - **IF** the command fails - `inst-failed`
    1. [x] - `p1` - Keep the current records; show the named error, refresh History and enable an explicit retry only when still valid - `inst-keep`
    2. [x] - `p1` - **RETURN** the unchanged view - `inst-return-failure`
-5. [x] - `p1` - Refresh the affected core views and `history_list`; do not locally reconstruct inverse writes - `inst-refresh`
+5. [x] - `p1` - Refresh the affected core views and re-read every History page when call revision changes or a strip command settles; discard superseded reads and do not locally reconstruct inverse writes - `inst-refresh`
 6. [x] - `p1` - UI: **Undone 37 changes · Redo**, or the single-change message, using the returned counts; partial result offers **Show** for kept records when available - `inst-strip`
 7. [x] - `p1` - **RETURN** the core’s restored records and append-only history - `inst-finish`
 
@@ -216,7 +216,7 @@ The system **MUST** render all three timeline variants, actor and job filters, e
 
 **Touches**:
 - Commands: `history_list`, `history_export`
-- Tests: unit filter, stale-response, paging and date-group tests; conformance for targets, actor/job filters, cursors, export and cancellation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (No changes yet, Export log), `cpt-noter-seq-call-page-check-evidence` (Item History); screenshots of each timeline variant
+- Tests: unit filter, stale-response, multi-page and date-group tests; conformance for targets, actor/job filters, cursors, export and cancellation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (No changes yet, Export log), `cpt-noter-seq-call-page-check-evidence` (Item History); screenshots of each timeline variant
 
 ### Shared reversible actions
 

@@ -215,6 +215,13 @@ async fn history_pages_newest_first_and_filters_by_actor_job_and_period() {
             .await
             .unwrap();
     }
+    noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+        .unwrap()
+        .execute(
+            "INSERT INTO jobs (id, kind, trigger) VALUES ('job_1', 'post_call', 'after_call')",
+            [],
+        )
+        .unwrap();
     let mut by_job = meta("Tidied");
     by_job.actor = Actor::Job {
         job_id: JobId::new("job_1"),
@@ -247,7 +254,9 @@ async fn history_pages_newest_first_and_filters_by_actor_job_and_period() {
     jobs.actor = ActorFilter::Jobs;
     let page = history(&core, jobs.clone()).await;
     assert_eq!(page.rows.len(), 1);
-    assert!(matches!(&page.rows[0].actor, Actor::Job { job_id, .. } if job_id.as_str() == "job_1"));
+    assert!(
+        matches!(&page.rows[0].actor, Actor::Job { job_id, name } if job_id.as_str() == "job_1" && name == "Post-call analysis")
+    );
     assert_eq!(page.rows[0].reason.as_deref(), Some("nightly"));
     jobs.job_id = Some(JobId::new("job_2"));
     assert!(history(&core, jobs).await.rows.is_empty());
@@ -783,6 +792,30 @@ async fn export_json_carries_every_field_of_the_rows_in_the_period() {
 }
 
 #[tokio::test]
+async fn export_json_reads_and_writes_more_than_one_page() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("out.json");
+    let (core, _) = open_with_panel(dir.path(), Some(target.clone()));
+    seed(&core, &["call_a"]);
+    let mut db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+    let tx = db.transaction().unwrap();
+    for n in 0..501 {
+        tx.execute(
+            "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, summary, reason, status, undoable)
+             VALUES (?1, ?2, 'you', 'call', 'call_a', 'title', 'before', 'after', 'Changed call info', 'test', 'applied', 1)",
+            noter_db::rusqlite::params![format!("chg_{n}"), AFTERNOON + n],
+        ).unwrap();
+    }
+    tx.commit().unwrap();
+
+    export(&core, call_scope("call_a"), LogFormat::Json)
+        .await
+        .unwrap();
+    let rows: Vec<ChangeRow> = serde_json::from_slice(&std::fs::read(&target).unwrap()).unwrap();
+    assert_eq!(rows.len(), 501);
+}
+
+#[tokio::test]
 async fn a_cancelled_panel_is_cancelled_and_leaves_no_file() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open_with_panel(dir.path(), None);
@@ -895,6 +928,24 @@ async fn model_bookkeeping_rows_stay_out_of_history_and_export() {
             },
         )
         .unwrap();
+
+    noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+        .unwrap()
+        .execute(
+            "INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, before, after, summary, reason, status, undoable)
+             VALUES ('staged_pin', ?1, 'llm_run:llm_one', 'call', 'call_a', 'title', 'a', 'b', 'Staged pin', 'mcp', 'proposed', 0)",
+            [NOW],
+        )
+        .unwrap();
+    let staged = history(&core, list_args(HistoryTarget::All))
+        .await
+        .rows
+        .into_iter()
+        .find(|row| row.summary == "Staged pin")
+        .unwrap();
+    assert!(
+        matches!(staged.actor, Actor::Model { runtime: RuntimeChoice::Local, model, .. } if model == "m")
+    );
 
     for actor in [ActorFilter::All, ActorFilter::Models] {
         let mut args = list_args(HistoryTarget::All);

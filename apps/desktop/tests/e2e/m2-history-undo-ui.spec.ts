@@ -46,6 +46,26 @@ async function navigate(page: Page, tab: "summary" | "history") {
 }
 
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
+  test("UI — paging and refresh — History reads older pages and call changes while it is open", async ({ page }) => {
+    await openCall(page, "history");
+    await page.evaluate(async (callId) => {
+      const g = globalThis as unknown as {
+        __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> };
+        __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> };
+      };
+      const invoke = (name: string, args: unknown) => g.__noterFake
+        ? g.__noterFake.invoke(name, args)
+        : g.__TAURI_INTERNALS__!.invoke(name, { args });
+      const page = await invoke("calls_list", { filter: {}, sort: "newest", page: {} }) as { rows: { id: string; rev: number }[] };
+      let call = page.rows.find((row) => row.id === callId)!;
+      for (let i = 0; i < 101; i++) {
+        const changed = await invoke("call_update", { call_id: callId, rev: call.rev, title: `History revision ${i}` }) as { call: typeof call };
+        call = changed.call;
+      }
+    }, W.PAST_CALL);
+    await expect(page.locator(CHANGE)).toHaveCount(101, { timeout: 15_000 });
+  });
+
   test("UI — empty path — No changes yet: a call nobody changed shows the empty History", async ({ page }) => {
     await openCall(page, "history");
     await expect(page.locator(TIMELINE)).toBeVisible();

@@ -99,6 +99,8 @@ struct Run {
     ctx: McpRunContext,
     tools: Vec<String>,
     live: bool,
+    runtime: RuntimeChoice,
+    model: String,
     state: State,
     /// `true` ends the run's connections and in-flight work.
     cancel: watch::Sender<bool>,
@@ -139,15 +141,33 @@ impl McpRuns {
 
 impl ToolHost for CoreTools {
     fn start(&self, run: ToolStart) -> Result<ToolLaunch, String> {
+        let runtime = if run.cloud {
+            RuntimeChoice::ClaudeAccount
+        } else {
+            RuntimeChoice::Local
+        };
+        self.start_with_runtime(run, runtime, String::new())
+    }
+
+    fn start_with_runtime(
+        &self,
+        run: ToolStart,
+        runtime: RuntimeChoice,
+        model: String,
+    ) -> Result<ToolLaunch, String> {
         let core = self.0.get().and_then(Weak::upgrade).ok_or("no_socket")?;
         let (token, config) = core
-            .register_mcp_run(McpRegistration {
-                llm_run_id: run.llm_run_id.as_str().to_owned(),
-                call_id: run.call_id,
-                cloud: run.cloud,
-                tools: run.tools,
-                live: run.live_ok,
-            })
+            .register_mcp_run_with_model(
+                McpRegistration {
+                    llm_run_id: run.llm_run_id.as_str().to_owned(),
+                    call_id: run.call_id,
+                    cloud: run.cloud,
+                    tools: run.tools,
+                    live: run.live_ok,
+                },
+                runtime,
+                model,
+            )
             .map_err(|e| e.message)?;
         Ok(ToolLaunch { token, config })
     }
@@ -165,6 +185,8 @@ struct Trusted {
     call: Option<CallId>,
     live: bool,
     cloud: bool,
+    runtime: RuntimeChoice,
+    model: String,
     cancel: watch::Receiver<bool>,
 }
 
@@ -221,6 +243,20 @@ impl Core {
     // @cpt-flow:cpt-noter-flow-core-mcp-start:p1
     // @cpt-state:cpt-noter-state-core-mcp-session:p1
     pub fn register_mcp_run(&self, reg: McpRegistration) -> Result<(String, PathBuf), CoreError> {
+        let runtime = if reg.cloud {
+            RuntimeChoice::ClaudeAccount
+        } else {
+            RuntimeChoice::Local
+        };
+        self.register_mcp_run_with_model(reg, runtime, String::new())
+    }
+
+    fn register_mcp_run_with_model(
+        &self,
+        reg: McpRegistration,
+        runtime: RuntimeChoice,
+        model: String,
+    ) -> Result<(String, PathBuf), CoreError> {
         let valid = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';
         if reg.llm_run_id.is_empty() || !reg.llm_run_id.chars().all(valid) {
             return Err(CoreError::new(ErrorCode::InvalidInput, "bad run id"));
@@ -278,6 +314,8 @@ impl Core {
                 ctx,
                 tools,
                 live: reg.live,
+                runtime,
+                model,
                 state: State::Registered,
                 cancel: watch::channel(false).0,
                 config: config.clone(),
@@ -478,6 +516,8 @@ impl Core {
             call: run.ctx.call_id.clone(),
             live: run.live,
             cloud: run.ctx.cloud,
+            runtime: run.runtime,
+            model: run.model.clone(),
             cancel: run.cancel.subscribe(),
         })
         // @cpt-end:cpt-noter-algo-core-mcp-authorize:p1:inst-auth-return
@@ -593,12 +633,8 @@ impl Core {
         ChangeMeta {
             actor: Actor::Model {
                 llm_run_id: LlmRunId::new(&t.run_id),
-                runtime: if t.cloud {
-                    RuntimeChoice::ClaudeAccount
-                } else {
-                    RuntimeChoice::Local
-                },
-                model: String::new(),
+                runtime: t.runtime,
+                model: t.model.clone(),
             },
             summary,
             reason: reason.to_owned(),
@@ -1727,6 +1763,8 @@ mod tests {
             call: None,
             live: false,
             cloud,
+            runtime: RuntimeChoice::Local,
+            model: "test".into(),
             cancel: watch::channel(false).1,
         };
         let read = |cloud, method: &str, params: Value| {
@@ -1767,6 +1805,8 @@ mod tests {
             call: None,
             live: false,
             cloud,
+            runtime: RuntimeChoice::Local,
+            model: "test".into(),
             cancel: watch::channel(false).1,
         };
         // The run is not registered, so a cloud release is refused at the liveness check first:

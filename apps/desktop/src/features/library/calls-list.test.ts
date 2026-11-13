@@ -144,6 +144,26 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     await list.sort("title");
     list.merge({ other: row("other") }, new Set());
     expect(list.get().rows.map((r) => r.id)).toEqual(["a"]);
+  it("drops a next page superseded by a sort change", async () => {
+    let release: (value: unknown) => void = () => {};
+    const callsList = vi.fn()
+      .mockResolvedValueOnce(page([row("a")], "c1"))
+      .mockImplementationOnce(() => new Promise((resolve) => (release = resolve)))
+      .mockResolvedValueOnce(page([row("z")], null));
+    const list = createCallsList({ act: (_k: string, _c: string, run: () => Promise<unknown>) => run(), core: { callsList } } as never);
+    await list.load();
+    const pending = list.more();
+    await list.sort("oldest");
+    release(page([row("stale")]));
+    await pending;
+    expect(list.get().rows.map((r) => r.id)).toEqual(["z"]);
+  });
+
+  it("keeps the loaded page when the next page fails", async () => {
+    const { list } = setup(page([row("a")], "c1"), { status: "error", error: { code: "internal" } });
+    await list.load();
+    await list.more();
+    expect(list.get()).toMatchObject({ rows: [row("a")], next: "c1", status: "LISTED" });
   });
 
   it("a new sort replaces the rows and an older answer cannot overwrite it", async () => {
@@ -182,5 +202,21 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     expect(list.get()).toMatchObject({ status: "LISTED" });
     expect(list.get().rows.map((r) => r.id)).toEqual(["n"]);
     expect(list.get().total).toBe(1);
+  });
+
+  it("keeps a newer held row when an older entity snapshot arrives", async () => {
+    const { list } = setup(page([row("a", 3)]));
+    await list.load();
+    list.merge({ a: row("a", 2) }, new Set());
+    expect(list.get().rows[0]!.rev).toBe(3);
+  });
+
+  it("does not add fresh entity rows while loading or after a failed read", async () => {
+    const { list } = setup({ status: "error", error: { code: "internal" } });
+    list.merge({ fresh: row("fresh") }, new Set());
+    expect(list.get().rows).toEqual([]);
+    await list.load();
+    list.merge({ fresh: row("fresh") }, new Set());
+    expect(list.get()).toMatchObject({ status: "ERROR", rows: [] });
   });
 });

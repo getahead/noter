@@ -14,7 +14,7 @@ import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { moveFocus } from "../../ui/primitives/roving";
 import { afterTimer } from "../call-page/logic";
 import { ChangeRow } from "./ChangeRow";
-import { groupByDay, historyKey, historyState, jobsOf, sameTarget, undoTarget, type HistoryState } from "./history";
+import { groupByDay, historyKey, historyState, jobsOf, readHistoryPages, sameTarget, undoTarget, type HistoryState } from "./history";
 import { holdUndo, runUndo, undoWorking, useUndo } from "./undo";
 import "./history.css";
 
@@ -40,6 +40,8 @@ export function HistoryTimeline({ bridge, target, variant, callId, callTitle }: 
   const sheets = useSheet();
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const strip = useUndo();
+  const callRev = useWindow(bridge, (s) => callId ? s.entities.call[callId]?.rev : undefined);
+  const observedCallRev = useRef(callRev);
   const [actor, setActor] = useState<ActorFilter>("all");
   const [jobId, setJobId] = useState<string | null>(null);
   const [data, setData] = useState<{ key: string; rows: Change[]; jobs: { id: string; name: string }[] } | null>(null);
@@ -52,11 +54,14 @@ export function HistoryTimeline({ bridge, target, variant, callId, callTitle }: 
   // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-read
   const load = useCallback(async () => {
     const mine = ++token.current;
-    const res = await bridge.act(key, "history_list", () => bridge.core.historyList({ target, actor, job_id: jobId, page: {} }), { named: { change_log_unreadable: "history_unreadable" }, screen: "history" });
+    const result = await readHistoryPages(
+      (cursor) => bridge.act(key, "history_list", () => bridge.core.historyList({ target, actor, job_id: jobId, page: cursor ? { cursor } : {} }), { named: { change_log_unreadable: "history_unreadable" }, screen: "history" }),
+      () => mine === token.current,
+    );
     // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-filter
-    if (mine !== token.current || res.status !== "ok") return; // a newer read superseded this one
+    if (!result || result.failed) return; // a newer read superseded this one, or the core named an error
     // @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-filter
-    setData((old) => ({ key, rows: res.data.rows, jobs: actor === "all" && !jobId ? jobsOf(res.data.rows) : (old?.jobs ?? jobsOf(res.data.rows)) }));
+    setData((old) => ({ key, rows: result.rows, jobs: actor === "all" && !jobId ? jobsOf(result.rows) : (old?.jobs ?? jobsOf(result.rows)) }));
   }, [bridge, key]);
   // @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-read
   const reload = useRef(load);
@@ -70,6 +75,12 @@ export function HistoryTimeline({ bridge, target, variant, callId, callTitle }: 
     if (asked.current !== key) void load();
     asked.current = key;
   }, [load, key]);
+  useEffect(() => {
+    if (observedCallRev.current !== callRev) {
+      observedCallRev.current = callRev;
+      if (asked.current === key) void load();
+    }
+  }, [callRev, key, load]);
   // @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-open
 
   // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-error

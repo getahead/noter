@@ -1102,7 +1102,9 @@ impl Inner {
             live_ok: matches!(req.task, TaskKind::Ask | TaskKind::PostCall)
                 && req.privacy.borrow().allows_live(),
         };
-        let Ok(launch) = host.start(start) else {
+        let Ok(launch) =
+            host.start_with_runtime(start, tally.choice.runtime, tally.choice.model.clone())
+        else {
             self.log(json!({"module": "llm", "event": "tools_unavailable",
                 "llm_run_id": tally.run_id.as_str()}));
             return (None, None);

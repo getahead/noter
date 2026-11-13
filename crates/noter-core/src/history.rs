@@ -26,6 +26,9 @@ struct Raw {
     batch_size: u32,
     ts: i64,
     actor: String,
+    job_name: Option<String>,
+    runtime: Option<String>,
+    model: Option<String>,
     entity_type: String,
     entity_id: String,
     field: Option<String>,
@@ -81,7 +84,7 @@ impl Core {
         );
         let mut found = self
             .store()
-            .read(move |c| raw_rows(c, &sql, binds))
+            .read(move |c| raw_rows(c, &sql, binds, true))
             .map_err(|e| unreadable(e.message))?;
         // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-read-select
         // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-read-return
@@ -280,7 +283,11 @@ fn select_sql(filter: &str, tail: &str) -> String {
                             AND d.rowid > c.rowid AND d.undoable = 0 AND d.field IS NULL AND d.delta IS NULL)
                  OR (c.entity_type = 'segment' AND NOT EXISTS (SELECT 1 FROM segments s WHERE s.id = c.entity_id))
                  OR (c.entity_type = 'speaker' AND NOT EXISTS (SELECT 1 FROM speakers s WHERE s.id = c.entity_id)))
-         FROM changes c WHERE {filter} {tail}"
+                , j.kind, lr.runtime_choice, lr.model
+         FROM changes c
+         LEFT JOIN jobs j ON c.actor = 'job:' || j.id
+         LEFT JOIN llm_runs lr ON c.actor = 'llm_run:' || lr.id
+         WHERE {filter} {tail}"
     )
 }
 
@@ -288,6 +295,7 @@ fn raw_rows(
     c: &noter_db::rusqlite::Connection,
     sql: &str,
     binds: Vec<Sql>,
+    compute_redoable: bool,
 ) -> noter_db::rusqlite::Result<Vec<Raw>> {
     let mut stmt = c.prepare(sql)?;
     let rows = stmt
@@ -303,6 +311,9 @@ fn raw_rows(
                 batch_size: r.get(3)?,
                 ts: r.get(4)?,
                 actor: r.get(5)?,
+                job_name: r.get(18)?,
+                runtime: r.get(19)?,
+                model: r.get(20)?,
                 field: r.get(8)?,
                 before: r.get(9)?,
                 after: r.get(10)?,
@@ -311,7 +322,7 @@ fn raw_rows(
                 reason: r.get(13)?,
                 confidence: r.get(14)?,
                 undoable: r.get(16)?,
-                redoable: status == "undone" && noter_db::redoable(c, &id),
+                redoable: compute_redoable && status == "undone" && noter_db::redoable(c, &id),
                 label: label_of(c, &entity_type, &entity_id, gone),
                 id,
                 status,
@@ -398,14 +409,19 @@ fn change_row(r: Raw) -> Result<ChangeRow, CoreError> {
         None if r.actor == "you" => Actor::You,
         Some(("job", id)) => Actor::Job {
             job_id: JobId::new(id),
-            name: id.to_string(),
+            name: r
+                .job_name
+                .and_then(|kind| noter_jobs::name_for_id(&format!("job_{kind}")))
+                .unwrap_or_else(|| id.to_string()),
         },
-        // shortcut: the runtime and model live in `llm_runs` (2.15); until it lands a model's
-        // change names the run only.
         Some(("llm_run", id)) => Actor::Model {
             llm_run_id: LlmRunId::new(id),
-            runtime: RuntimeChoice::Local,
-            model: id.to_string(),
+            runtime: r
+                .runtime
+                .as_deref()
+                .and_then(runtime_choice)
+                .unwrap_or(RuntimeChoice::Local),
+            model: r.model.unwrap_or_else(|| id.to_string()),
         },
         _ => return Err(unreadable(format!("unknown actor {:?}", r.actor))),
     };
@@ -463,6 +479,17 @@ fn change_row(r: Raw) -> Result<ChangeRow, CoreError> {
         status,
         undoable: r.undoable && replayable && status == ChangeStatus::Applied,
         redoable: r.redoable,
+    })
+}
+
+fn runtime_choice(value: &str) -> Option<RuntimeChoice> {
+    Some(match value {
+        "claude_api_key" => RuntimeChoice::ClaudeApiKey,
+        "claude_account" => RuntimeChoice::ClaudeAccount,
+        "codex_api_key" => RuntimeChoice::CodexApiKey,
+        "chatgpt_account" => RuntimeChoice::ChatgptAccount,
+        "local" => RuntimeChoice::Local,
+        _ => return None,
     })
 }
 
@@ -562,22 +589,98 @@ impl Core {
                 limit: None,
             },
         };
-        let (filter, binds) = filter_of(&list);
-        let sql = select_sql(&filter, "ORDER BY c.rowid ASC");
-        // One statement on a read connection: the rows are one snapshot.
-        let raw = self
-            .store()
-            .read(move |c| raw_rows(c, &sql, binds))
-            .map_err(|e| unreadable(e.message))?;
-        let rows = raw
-            .into_iter()
-            .map(change_row)
-            .collect::<Result<Vec<_>, _>>()?;
-        let text = match args.format {
-            LogFormat::Json => serde_json::to_string_pretty(&rows).map_err(crate::internal)?,
-            LogFormat::Markdown => markdown_of(&selection.name, &rows),
-        };
-        write_file(&path, &text)?;
+        let tmp = path.with_extension("noter-tmp");
+        let mut file = tokio::fs::File::create(&tmp)
+            .await
+            .map_err(export_write_error)?;
+        let result: Result<(), CoreError> = async {
+            use tokio::io::AsyncWriteExt;
+            let mut cursor = None;
+            let mut first = true;
+            loop {
+                let (mut filter, mut binds) = filter_of(&list);
+                if let Some(rowid) = cursor {
+                    filter.push_str(" AND c.rowid > ?");
+                    binds.push(Sql::Integer(rowid));
+                }
+                binds.push(Sql::Integer(501));
+                let sql = select_sql(&filter, "ORDER BY c.rowid ASC LIMIT ?");
+                let mut raw = self
+                    .store()
+                    .read(move |c| raw_rows(c, &sql, binds, args.format == LogFormat::Json))
+                    .map_err(|e| unreadable(e.message))?;
+                let more = raw.len() > 500;
+                if more {
+                    raw.truncate(500);
+                }
+                cursor = raw.last().map(|row| row.rowid);
+                let rows = raw
+                    .into_iter()
+                    .map(change_row)
+                    .collect::<Result<Vec<_>, _>>()?;
+                if rows.is_empty() {
+                    break;
+                }
+                let mut text = String::new();
+                match args.format {
+                    LogFormat::Json => {
+                        if first {
+                            text.push_str("[\n");
+                        }
+                        for row in rows {
+                            if !first {
+                                text.push_str(",\n");
+                            }
+                            let pretty =
+                                serde_json::to_string_pretty(&row).map_err(crate::internal)?;
+                            text.push_str("  ");
+                            text.push_str(&pretty.replace('\n', "\n  "));
+                            first = false;
+                        }
+                        if !more {
+                            text.push_str("\n]");
+                        }
+                    }
+                    LogFormat::Markdown => {
+                        let page = markdown_of(&selection.name, &rows);
+                        if first {
+                            text.push_str(&page);
+                            first = false;
+                        } else if let Some(body) =
+                            page.strip_prefix(&format!("# Noter history: {}\n\n", selection.name))
+                        {
+                            text.push_str(body);
+                        }
+                    }
+                }
+                file.write_all(text.as_bytes())
+                    .await
+                    .map_err(export_write_error)?;
+                if !more {
+                    break;
+                }
+            }
+            if first {
+                let empty = match args.format {
+                    LogFormat::Json => "[]".to_owned(),
+                    LogFormat::Markdown => format!("# Noter history: {}\n\n", selection.name),
+                };
+                file.write_all(empty.as_bytes())
+                    .await
+                    .map_err(export_write_error)?;
+            }
+            file.flush().await.map_err(export_write_error)
+        }
+        .await;
+        drop(file);
+        if let Err(error) = result {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(error);
+        }
+        if let Err(error) = tokio::fs::rename(&tmp, &path).await {
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(export_write_error(error));
+        }
         // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-write
         // @cpt-begin:cpt-noter-flow-core-history-undo-read:p1:inst-export-result
         Ok(ExportResult {
@@ -667,13 +770,9 @@ fn markdown_of(scope: &str, rows: &[ChangeRow]) -> String {
     out
 }
 
-/// Complete or absent: written beside the target, then renamed over it.
-fn write_file(path: &std::path::Path, text: &str) -> Result<(), CoreError> {
-    let tmp = path.with_extension("noter-tmp");
-    std::fs::write(&tmp, text)
-        .and_then(|()| std::fs::rename(&tmp, path))
-        .map_err(|e| {
-            let _ = std::fs::remove_file(&tmp);
-            CoreError::new(ErrorCode::Internal, format!("cannot write the export: {e}"))
-        })
+fn export_write_error(error: std::io::Error) -> CoreError {
+    CoreError::new(
+        ErrorCode::Internal,
+        format!("cannot write the export: {error}"),
+    )
 }
