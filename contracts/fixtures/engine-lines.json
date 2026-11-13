@@ -36,7 +36,9 @@
             "spk_2"
           ],
           "id": "aseg_2",
-          "lang": "en",
+          "lang": {
+            "code": "uk"
+          },
           "lang_p": 0.875,
           "no_speech_p": 0.125,
           "speaker_label": "spk_1",
@@ -423,13 +425,39 @@
     {
       "at": 1790000000000,
       "event": {
+        "segment": {
+          "avg_logprob": -0.25,
+          "call_id": "call_1",
+          "channel": "sys",
+          "corrections": [],
+          "crosstalk_labels": [],
+          "id": "eseg_2",
+          "lang": {
+            "code": "uk"
+          },
+          "lang_p": 0.875,
+          "no_speech_p": 0.125,
+          "speaker_label": "spk_1",
+          "state": "confirmed",
+          "t0_ms": 3000,
+          "t1_ms": 4500,
+          "text": "hello",
+          "words_path": "audio/call_1/words/eseg_2.json"
+        },
+        "type": "segment"
+      },
+      "seq": 11
+    },
+    {
+      "at": 1790000000000,
+      "event": {
         "at_ms": 4000,
         "call_id": "call_1",
         "channel": "sys",
         "speaker_label": "spk_3",
         "type": "speaker_turn"
       },
-      "seq": 11
+      "seq": 12
     },
     {
       "at": 1790000000000,
@@ -439,7 +467,7 @@
         "sys_db": -160.0,
         "type": "levels"
       },
-      "seq": 12
+      "seq": 13
     },
     {
       "at": 1790000000000,
@@ -448,7 +476,7 @@
         "since_ms": 8000,
         "type": "no_segments"
       },
-      "seq": 13
+      "seq": 14
     },
     {
       "at": 1790000000000,
@@ -457,7 +485,7 @@
         "since_ms": 12000,
         "type": "silence"
       },
-      "seq": 14
+      "seq": 15
     },
     {
       "at": 1790000000000,
@@ -468,7 +496,7 @@
         "timeline_path": "audio/call_1/timeline.json",
         "type": "session_stopped"
       },
-      "seq": 15
+      "seq": 16
     },
     {
       "at": 1790000000000,
@@ -477,7 +505,7 @@
         "progress": 0.5,
         "type": "offline_progress"
       },
-      "seq": 16
+      "seq": 17
     },
     {
       "at": 1790000000000,
@@ -486,7 +514,7 @@
         "result_path": "audio/call_1/offline.json",
         "type": "offline_done"
       },
-      "seq": 17
+      "seq": 18
     },
     {
       "at": 1790000000000,
@@ -495,7 +523,7 @@
         "code": "model_load_failed",
         "type": "offline_failed"
       },
-      "seq": 18
+      "seq": 19
     },
     {
       "at": 1790000000000,
@@ -504,7 +532,7 @@
         "request_id": "req_1",
         "type": "speaker_embedding_done"
       },
-      "seq": 19
+      "seq": 20
     },
     {
       "at": 1790000000000,
@@ -518,7 +546,7 @@
         "request_id": "req_2",
         "type": "embeddings"
       },
-      "seq": 20
+      "seq": 21
     },
     {
       "at": 1790000000000,
@@ -526,7 +554,7 @@
         "channel": "sys",
         "type": "self_test_stream"
       },
-      "seq": 21
+      "seq": 22
     },
     {
       "at": 1790000000000,
@@ -535,7 +563,7 @@
         "text": "one two three",
         "type": "self_test_line"
       },
-      "seq": 22
+      "seq": 23
     },
     {
       "at": 1790000000000,
@@ -545,7 +573,7 @@
         "passed": false,
         "type": "self_test_result"
       },
-      "seq": 23
+      "seq": 24
     },
     {
       "at": 1790000000000,
@@ -555,14 +583,14 @@
         "playing": true,
         "type": "playback_position"
       },
-      "seq": 24
+      "seq": 25
     },
     {
       "at": 1790000000000,
       "event": {
         "type": "pong"
       },
-      "seq": 25
+      "seq": 26
     }
   ],
   "words": [

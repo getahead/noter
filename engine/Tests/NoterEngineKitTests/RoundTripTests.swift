@@ -246,7 +246,7 @@ final class RoundTripTests: XCTestCase {
         }
         // Every case of `EngineEvent` has a fixture line.
         XCTAssertEqual(
-            written.sorted(),
+            Set(written).sorted(),
             [
                 "ack", "audio_source_added", "call_audio_released", "call_detected", "device_changed", "embeddings", "error",
                 "levels", "no_segments", "offline_done", "offline_failed", "offline_progress", "playback_position", "pong",
@@ -273,6 +273,32 @@ final class RoundTripTests: XCTestCase {
             XCTAssertEqual(constraints.mustLink.first?.b, Span(t0Ms: 5_000, t1Ms: 6_500))
             XCTAssertEqual(constraints.speakerNames["spk_1"], "Anna K.")
             XCTAssertEqual(LiveASR.codes(constraints.languages), ["en", "fr"])
+        }
+    }
+
+    // cpt-noter-dod-core-engine-foundation-package
+    func testSegmentLanguageDecodesBothShapesAndPreservesKnownLanguageStrings() throws {
+        let line = try XCTUnwrap(fixture["events"]?.first { typeOf($0, "event") == "segment" })
+        let example = try XCTUnwrap(line["event"] as? [String: Any])
+        let original = try XCTUnwrap(example["segment"] as? [String: Any])
+        for code in ["en", "ru", "de", "uk", "fr"] {
+            for lang: Any in [code, ["code": code]] {
+                var json = original
+                json["lang"] = lang
+                let segment = try JSONDecoder().decode(Segment.self, from: JSONSerialization.data(withJSONObject: json))
+                XCTAssertEqual(segment.lang, code)
+                let encoded = try object(JSONEncoder().encode(segment))
+                if ["en", "ru", "de"].contains(code) {
+                    XCTAssertEqual(encoded["lang"] as? String, code)
+                } else {
+                    XCTAssertEqual(encoded["lang"] as? [String: String], ["code": code])
+                }
+            }
+        }
+        for lang: Any in [NSNull(), 42, [:], ["code": 42]] {
+            var json = original
+            json["lang"] = lang
+            XCTAssertThrowsError(try JSONDecoder().decode(Segment.self, from: JSONSerialization.data(withJSONObject: json)))
         }
     }
 

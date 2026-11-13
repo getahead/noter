@@ -561,11 +561,17 @@ fn engine_example_lines_cover_every_command_and_event() {
             })
             .collect();
         t.sort();
+        t.dedup(); // More than one fixture may exercise the same variant.
         t
     }
     let (cmds, events) = (engine_lines::commands(), engine_lines::events());
     assert_eq!(tags(&cmds), variant_tags::<EngineCommand>());
     assert_eq!(tags(&events), variant_tags::<EngineEvent>());
+    assert!(events.iter().any(|line| matches!(
+        &line.event,
+        EngineEvent::Segment { segment }
+            if segment.lang == noter_protocol::Lang::Other { code: "uk".into() }
+    )));
     for l in &cmds {
         let back: EngineCommandLine =
             serde_json::from_str(&serde_json::to_string(l).unwrap()).unwrap();
@@ -597,6 +603,10 @@ fn archive_result_examples_round_trip() {
         assert_eq!(channels.len(), 2, "both channels");
         assert!(r.segments.iter().all(|s| s.words_path.is_some()));
         assert!(r.segments.iter().any(|s| s.crosstalk_labels.len() == 2));
+        assert!(r
+            .segments
+            .iter()
+            .any(|s| s.lang == noter_protocol::Lang::Other { code: "uk".into() }));
     }
     let words = engine_lines::words();
     let back: Vec<EngineWord> =

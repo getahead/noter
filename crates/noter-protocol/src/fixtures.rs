@@ -2131,6 +2131,13 @@ pub mod engine_lines {
                     crosstalk_labels: vec!["spk_1".into(), "spk_2".into()],
                 },
             },
+            EngineEvent::Segment {
+                segment: {
+                    let mut segment = archive_segment("eseg_2", AudioChannel::Sys, 3_000, "spk_1");
+                    segment.lang = Lang::Other { code: "uk".into() };
+                    segment
+                },
+            },
             EngineEvent::SpeakerTurn {
                 call_id: call(),
                 channel: AudioChannel::Sys,
@@ -2231,6 +2238,7 @@ pub mod engine_lines {
     /// Examples of the archive result file `offline_done` names.
     pub fn archive_results() -> Vec<ArchiveResult> {
         let mut overlap = archive_segment("aseg_2", AudioChannel::Sys, 2_000, "spk_1");
+        overlap.lang = Lang::Other { code: "uk".into() };
         overlap.crosstalk_labels = vec!["spk_1".into(), "spk_2".into()];
         overlap.corrections = vec![EngineCorrection {
             from: "notter".into(),
