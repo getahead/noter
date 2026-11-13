@@ -10,7 +10,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 
 | Issue | Check | Seen | Fix | State |
 | --- | --- | ---: | --- | --- |
-| [#667](https://github.com/getahead/noter/issues/667) | MCP tool router reads the launch before the adapter receives it | 4 / 80 under 16-process local load | pending PR | fixed in branch |
+| [#667](https://github.com/getahead/noter/issues/667) | MCP tool router reads the launch before the adapter receives it | 4 / 80 under 16-process local load | pending PR | [#799](https://github.com/getahead/noter/pull/799) |
 | [#392](https://github.com/getahead/noter/issues/392) | First-run self-test lifecycle (E2E, visual) | 83 / 33 | [#423](https://github.com/getahead/noter/pull/423) | open |
 | [#398](https://github.com/getahead/noter/issues/398) | Call-page navigation, missing-call Back | 36 / 4 | [#430](https://github.com/getahead/noter/pull/430) | open |
 | [#396](https://github.com/getahead/noter/issues/396) | Native menu and record prompt | 33 / 14 | #374, #389 | closed |
