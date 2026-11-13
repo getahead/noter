@@ -1,26 +1,28 @@
 // The controls of every pane run their commands: each handler a pane gives its controls is called and the
 // core's answer is read back from the store or the fake's world.
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { loadSettings } from "./actions";
-import { AudioPane } from "./AudioPane";
+import { AudioPane, registerSystemAudioReturn } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
+import { GlossaryForm, GlossaryGroup } from "./GlossaryGroup";
 import { addTerm, listTerms, newTermArgs, removeTerm } from "./glossary";
 import { HotkeysPane } from "./HotkeysPane";
 import { ModelsGroup } from "./ModelsGroup";
 import { PerformancePane } from "./PerformancePane";
 import { PrivacyPane } from "./PrivacyPane";
 import { askScreenRecording, runShareTest } from "./share-test";
+import { ShareTestFailure } from "./ShareTestSheet";
 import { UpdatesPane } from "./UpdatesPane";
 
 let bridge: Bridge;
 let fake: FakeCore;
-afterEach(() => bridge.close());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); return bridge.close(); });
 
 async function ready(seed?: (w: FakeCore["world"]) => void) {
   fake = new FakeCore({ window: "settings" });
@@ -95,6 +97,24 @@ describe("Audio", () => {
     expect(seen.filter((c) => c === "open_external")).toHaveLength(2);
     expect(seen).toContain("permission_request");
     expect(on(tree, "Run Audio Self-Test…")).toBeTypeOf("function");
+  });
+
+  it("rechecks system audio and refreshes the snapshot after returning from System Settings", async () => {
+    await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "not_asked")));
+    const listeners = new Map<string, () => void>();
+    const browserWindow = {
+      addEventListener: (name: string, listener: () => void) => listeners.set(name, listener),
+      removeEventListener: (name: string) => listeners.delete(name),
+    };
+    vi.stubGlobal("window", browserWindow);
+    const pending = { current: true };
+    const stop = registerSystemAudioReturn(bridge, pending);
+    await listeners.get("focus")!();
+    await listeners.get("focus")!();
+    expect(bridge.store.getState().commands["permission:system_audio"]?.state).toBe("DONE");
+    expect(fake.world.app.setup.permissions.find((p) => p.kind === "system_audio")?.state).toBe("granted");
+    (stop as () => void)();
+    expect(listeners.has("focus")).toBe(false);
   });
 });
 
@@ -194,6 +214,43 @@ describe("glossary commands", () => {
     fake.failNext("glossary_list", "offline");
     expect(await listTerms(bridge)).toBeNull();
   });
+
+  it("shows a refused list read with a working retry and exposes the edit form actions", async () => {
+    await ready();
+    const term = fake.world.glossary.terms[0]!;
+    fake.failNext("glossary_list", "offline");
+    expect(await listTerms(bridge)).toBeNull();
+    const retryTree = rendered(GlossaryGroup, { bridge });
+    expect(renderToString(retryTree)).toContain("Couldn’t read the glossary.");
+    (find(retryTree, (p) => p.label === "Try Again").props.onAction as () => void)();
+    await settle();
+    expect(bridge.store.getState().commands["glossary:list"]?.state).toBe("DONE");
+
+    const save = vi.fn();
+    const cancel = vi.fn();
+    const editTree = rendered(GlossaryForm, { form: { term: term.term, latin: "", cyrillic: "", spoken: "" }, editing: term, mutationFailed: false, onChange: () => {}, onSave: save, onCancel: cancel });
+    expect(renderToString(editTree)).toContain('aria-label="Edit Term"');
+    (find(editTree, (p) => p.label === "Save").props.onAction as () => void)();
+    (find(editTree, (p) => p.label === "Cancel").props.onAction as () => void)();
+    expect(save).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe("share test sheet", () => {
+  it("retries a refused table read from its visible error", async () => {
+    await ready();
+    fake.failNext("share_test_run", "offline");
+    expect((await runShareTest(bridge, false)).result).toBeNull();
+    const readRetry = vi.fn(async () => {});
+    const captureRetry = vi.fn();
+    const tree = rendered(ShareTestFailure, { failedCapture: false, onCaptureRetry: captureRetry, onReadRetry: readRetry });
+    expect(renderToString(tree)).toContain("Couldn’t load the Screen Share Test.");
+    (find(tree, (p) => p.label === "Try Again").props.onAction as () => void)();
+    await settle();
+    expect(readRetry).toHaveBeenCalledWith(false);
+    expect(captureRetry).not.toHaveBeenCalled();
+  });
 });
 
 describe("share test commands", () => {
@@ -225,8 +282,6 @@ describe("share test commands", () => {
     }
   });
 });
-
-import { vi } from "vitest";
 
 import { createGlossaryActions } from "./glossary";
 import { handleKeyDown, handleKeyUp, type KeyEvent, type RecorderCtx } from "./recorder-key";

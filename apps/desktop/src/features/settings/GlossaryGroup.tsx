@@ -29,8 +29,6 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
 
   const { add, remove } = createGlossaryActions(bridge, { form, selected, editing, setTerms, setForm, setSelected, setEditing });
   const edit = () => { const term = terms.find((item) => item.id === selected); if (!term) return; setEditing(term); setForm({ term: term.term, latin: term.variants_latin.join(", "), cyrillic: term.variants_cyrillic.join(", "), spoken: term.spoken_forms.join(", ") }); };
-
-  const field = (key: keyof TermForm, label: string) => <TextField ariaLabel={label} placeholder={label} value={form![key]} onChange={(v) => setForm({ ...form!, [key]: v })} onEnter={() => void add()} />;
   return (
     <Group
       title={t("settings.glossary.title")}
@@ -57,19 +55,26 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
         </tbody>
       </Table>
       {form && (
-          <div className="st-inline st-glossary-form" role="group" aria-label={t(editing ? "settings.glossary.edit" : "settings.glossary.add")}>
-          {field("term", t("settings.glossary.term"))}
-          {field("latin", t("settings.glossary.latin"))}
-          {field("cyrillic", t("settings.glossary.cyrillic"))}
-          {field("spoken", t("settings.glossary.spoken"))}
-          <PushButton label={t(editing ? "settings.glossary.edit_save" : "settings.glossary.save")} size="small" variant="primary" disabled={!newTermArgs(form, editing ?? undefined)} onAction={() => void add()} />
-          <PushButton label={t("settings.glossary.cancel")} size="small" onAction={() => { setEditing(null); setForm(null); }} />
-          {mutationFailed && <p className="hd__err" role="alert">{t("settings.glossary.update_failed")}</p>}
-        </div>
+        <GlossaryForm form={form} editing={editing} mutationFailed={mutationFailed} onChange={(key, value) => setForm({ ...form, [key]: value })} onSave={() => void add()} onCancel={() => { setEditing(null); setForm(null); }} />
       )}
       {mutationFailed && !form && <p className="hd__err" role="alert">{t("settings.glossary.update_failed")}</p>}
       {listFailed && <p className="hd__err" role="alert">{t("settings.glossary.read_failed")} <PushButton label={t("action.try_again")} size="small" onAction={() => void listTerms(bridge).then((list) => list && setTerms(list))} /></p>}
     </Group>
+  );
+}
+
+export function GlossaryForm({ form, editing, mutationFailed, onChange, onSave, onCancel }: { form: TermForm; editing: GlossaryTerm | null; mutationFailed: boolean; onChange: (key: keyof TermForm, value: string) => void; onSave: () => void; onCancel: () => void }) {
+  const field = (key: keyof TermForm, label: string) => <TextField ariaLabel={label} placeholder={label} value={form[key]} onChange={(value) => onChange(key, value)} onEnter={onSave} />;
+  return (
+    <div className="st-inline st-glossary-form" role="group" aria-label={t(editing ? "settings.glossary.edit" : "settings.glossary.add")}>
+      {field("term", t("settings.glossary.term"))}
+      {field("latin", t("settings.glossary.latin"))}
+      {field("cyrillic", t("settings.glossary.cyrillic"))}
+      {field("spoken", t("settings.glossary.spoken"))}
+      <PushButton label={t(editing ? "settings.glossary.edit_save" : "settings.glossary.save")} size="small" variant="primary" disabled={!newTermArgs(form, editing ?? undefined)} onAction={onSave} />
+      <PushButton label={t("settings.glossary.cancel")} size="small" onAction={onCancel} />
+      {mutationFailed && <p className="hd__err" role="alert">{t("settings.glossary.update_failed")}</p>}
+    </div>
   );
 }
 

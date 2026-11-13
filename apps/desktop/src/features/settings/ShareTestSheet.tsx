@@ -119,12 +119,7 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
         )}
         {/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-share-result */}
         {state === "FAILED" && (
-          <div className="dlg-perm dlg-warn" role="alert">
-            <Icon name="warning" size={13} />
-            <span>{t(failedCapture.current ? "settings.share.failed" : "settings.share.read_failed")}</span>
-            <span className="np-tb__spacer" />
-            <PushButton label={t("settings.share.try_again")} size="small" onAction={() => failedCapture.current ? start() : void run(false)} />
-          </div>
+          <ShareTestFailure failedCapture={failedCapture.current} onCaptureRetry={start} onReadRetry={run} />
         )}
         <InlineBanner banner={{ id: "share-limits", severity: "info", dismissible: false, text: t("settings.share.limits", { chord: capsOf(hide) }) }} />
       </div>
@@ -137,5 +132,16 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
         {/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-capture-disabled */}
       </SheetFooter>
     </Sheet>
+  );
+}
+
+export function ShareTestFailure({ failedCapture, onCaptureRetry, onReadRetry }: { failedCapture: boolean; onCaptureRetry: () => void; onReadRetry: (capture: boolean) => Promise<unknown> }) {
+  return (
+    <div className="dlg-perm dlg-warn" role="alert">
+      <Icon name="warning" size={13} />
+      <span>{t(failedCapture ? "settings.share.failed" : "settings.share.read_failed")}</span>
+      <span className="np-tb__spacer" />
+      <PushButton label={t("settings.share.try_again")} size="small" onAction={() => failedCapture ? onCaptureRetry() : void onReadRetry(false)} />
+    </div>
   );
 }
