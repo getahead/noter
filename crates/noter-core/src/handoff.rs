@@ -9,7 +9,7 @@ use std::sync::Arc;
 use noter_db::rusqlite::OptionalExtension;
 use noter_db::ChangeMeta;
 use noter_handoff::{Begin, Facts, NewVersion, Quote};
-use noter_llm::{Cancel, Failure, LlmRuntime, Privacy, Provenance, RunRequest, Skill, TaskKind};
+use noter_llm::{Cancel, Failure, LlmRuntime, Provenance, RunRequest, Skill, TaskKind};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::CommandCtx;
 use noter_protocol::model::*;
@@ -18,7 +18,7 @@ use noter_protocol::*;
 use serde_json::Value;
 
 use crate::settings::invalid;
-use crate::{internal, lock, Core};
+use crate::{internal, Core};
 
 /// The handoff skill's version, recorded in `llm_runs`.
 const SKILL_VERSION: &str = "1";
@@ -192,14 +192,7 @@ impl Core {
         let view = self.handoff_view(item_id)?;
         let facts = self.handoff_facts(&view)?;
         // @cpt-begin:cpt-noter-algo-core-handoff-build:p1:inst-build-route
-        let mode = lock(&self.settings).privacy.mode;
-        // shortcut: `offline` stays false until the core reads reachability for the router; the
-        // route still falls back to local when the target's runtime is unavailable.
-        let (_privacy, rx) = tokio::sync::watch::channel(Privacy {
-            mode,
-            sensitive: facts.sensitive,
-            offline: false,
-        });
+        let rx = self.run_privacy(vec![view.item.call.id.clone()])?;
         let mut req = RunRequest::new(
             Skill::Handoff,
             SKILL_VERSION,

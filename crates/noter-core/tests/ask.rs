@@ -356,6 +356,85 @@ async fn an_unknown_citation_is_retried_then_not_found() {
     );
 }
 
+// cpt-noter-algo-core-llm-gate-egress: inst-egress-recheck, through the real Ask caller.
+#[tokio::test(start_paused = true)]
+async fn privacy_changed_during_an_ask_blocks_the_cloud_repair_packet() {
+    let mut invalid: Value = serde_json::from_str(UNKNOWN).unwrap();
+    invalid["after_ms"] = json!(10_000);
+    let w = world(&invalid.to_string()).await;
+    let (_, got) = w.ask(None, "websockets").await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_eq!(w.llm.received().len(), 1);
+    assert_ne!(w.llm.received()[0].runtime, RuntimeChoice::Local);
+    let ctx = window(WindowLabel::Settings);
+    let mut settings = w.core.settings_get(&ctx, NoArgs {}).await.unwrap();
+    settings.privacy.mode = PrivacyMode::LocalOnly;
+    w.core
+        .settings_update(
+            &ctx,
+            SettingsUpdateArgs {
+                rev: settings.rev,
+                section: SettingsSection::Privacy(settings.privacy),
+            },
+        )
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    w.settle().await;
+    let received = w.llm.received();
+    assert!(received.len() > 1, "the invalid answer needs a repair");
+    assert!(
+        received[1..]
+            .iter()
+            .all(|r| r.runtime == RuntimeChoice::Local),
+        "every repair or fallback after the privacy commit stays local"
+    );
+    assert!(matches!(terminal(&got), AskEvent::Done { .. }));
+}
+
+// cpt-noter-algo-core-llm-gate-egress: a call in prior thread context is still protected.
+#[tokio::test(start_paused = true)]
+async fn sensitivity_changed_during_a_followup_applies_to_prior_thread_context() {
+    let w = world("").await;
+    w.core
+        .capture_set_sensitive(
+            &main_window(),
+            SensitiveArgs {
+                call_id: CallId::new("call_hr"),
+                sensitive: false,
+            },
+        )
+        .await
+        .unwrap();
+    let (first, _) = w.ask(None, "budget").await;
+    w.settle().await;
+    assert_eq!(w.llm.received().len(), 1);
+    let mut invalid: Value = serde_json::from_str(UNKNOWN).unwrap();
+    invalid["after_ms"] = json!(10_000);
+    w.llm.answer_next(invalid).unwrap();
+    let (_, got) = w.ask(Some(&first.thread_id), "polling").await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_eq!(w.llm.received().len(), 2);
+    w.core
+        .capture_set_sensitive(
+            &main_window(),
+            SensitiveArgs {
+                call_id: CallId::new("call_hr"),
+                sensitive: true,
+            },
+        )
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    w.settle().await;
+    let received = w.llm.received();
+    assert!(received.len() > 2);
+    assert!(received[2..]
+        .iter()
+        .all(|r| r.runtime == RuntimeChoice::Local));
+    assert!(matches!(terminal(&got), AskEvent::Done { .. }));
+}
+
 #[tokio::test(start_paused = true)]
 async fn nothing_to_cite_is_not_found_without_a_model_run() {
     let w = world("").await;

@@ -364,6 +364,8 @@ pub struct Prior {
     pub answer_md: String,
     /// Answered on the Mac or citing a sensitive call: never part of a cloud packet.
     pub sensitive: bool,
+    /// Calls whose sensitivity must still be checked while a follow-up is running.
+    pub calls: Vec<CallId>,
 }
 
 /// The answered turns of a thread before `turn`, oldest first.
@@ -375,9 +377,11 @@ pub fn prior_turns(c: &Connection, thread: &AskThreadId, turn: &AskTurnId) -> Db
         .filter(|t| t.found)
     {
         let mut sensitive = t.answered_locally;
+        let mut calls = vec![];
         for citation in &t.citations {
             if let Provenance::PastCall { call, .. } = &citation.provenance {
                 sensitive |= call_sensitive(c, call.id.as_str())?.unwrap_or(true);
+                calls.push(call.id.clone());
             }
         }
         out.push(Prior {
@@ -385,6 +389,7 @@ pub fn prior_turns(c: &Connection, thread: &AskThreadId, turn: &AskTurnId) -> Db
             question: t.question,
             answer_md: t.answer_md,
             sensitive,
+            calls,
         });
     }
     Ok(out)

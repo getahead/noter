@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use noter_db::ChangeMeta;
 use noter_llm::{
-    Cancel, Failure, LlmRuntime, Packet, PacketContext, PacketItem, Privacy, RunRequest, Skill,
-    SourceClass, TaskKind,
+    Cancel, Failure, LlmRuntime, Packet, PacketContext, PacketItem, RunRequest, Skill, SourceClass,
+    TaskKind,
 };
 use noter_protocol::ipc::{CommandCtx, Sink};
 use noter_protocol::model::settings::AuditWhat;
@@ -121,7 +121,6 @@ struct Job {
 struct Route {
     /// The runtime the answer is expected on (the router may still fall back to local).
     runtime: RuntimeChoice,
-    privacy: Privacy,
     pseudonyms: bool,
     /// The run stays on the Mac: sensitive calls may be retrieved and cited.
     local: bool,
@@ -266,8 +265,8 @@ impl Core {
             // Nothing permitted to cite: no model run, never an answer from model knowledge.
             (None, None)
         } else {
-            let packet = self.ask_packet(job, &hits)?;
-            let (_privacy, rx) = tokio::sync::watch::channel(route.privacy);
+            let (packet, calls) = self.ask_packet(job, &hits)?;
+            let rx = self.run_privacy(calls)?;
             let mut req =
                 RunRequest::new(Skill::AskAnswer, SKILL_VERSION, packet, TaskKind::Ask, rx);
             req.cancel = cancel;
@@ -379,11 +378,6 @@ impl Core {
             } else {
                 configured
             },
-            privacy: Privacy {
-                mode,
-                sensitive: false,
-                offline,
-            },
             pseudonyms: settings.privacy.pseudonymise_names,
             local,
         }
@@ -391,7 +385,7 @@ impl Core {
 
     /// The evidence, the thread's earlier turns and the question. Sensitive evidence and turns
     /// are marked so: the gate never lets them reach a cloud runtime.
-    fn ask_packet(&self, job: &Job, hits: &[Hit]) -> Result<Packet, CoreError> {
+    fn ask_packet(&self, job: &Job, hits: &[Hit]) -> Result<(Packet, Vec<CallId>), CoreError> {
         let class = |sensitive: bool| {
             if sensitive {
                 SourceClass::Sensitive
@@ -401,6 +395,10 @@ impl Core {
         };
         let mut items = vec![];
         let mut people = vec![];
+        let mut calls: Vec<CallId> = hits
+            .iter()
+            .filter_map(|hit| hit.call.as_ref().map(|call| call.id.clone()))
+            .collect();
         for hit in hits {
             let (sensitive, speaker) = self.store().read(|c| {
                 let sensitive = noter_retrieval::sensitive(c, hit)?.unwrap_or(true);
@@ -423,14 +421,19 @@ impl Core {
         // shortcut: the last 5 turns only, so a long thread stays within the deadline and the
         // model's context; a summary of older turns is for when threads grow long.
         let recent = prior.len().saturating_sub(PRIOR_TURNS);
-        items.extend(prior.into_iter().skip(recent).map(|p| PacketItem {
-            id: p.turn_id.as_str().to_owned(),
-            source: class(p.sensitive),
-            text: format!(
-                "Earlier question: {}\nEarlier answer: {}",
-                p.question, p.answer_md
-            ),
-        }));
+        for p in prior.into_iter().skip(recent) {
+            if !p.sensitive {
+                calls.extend(p.calls);
+            }
+            items.push(PacketItem {
+                id: p.turn_id.as_str().to_owned(),
+                source: class(p.sensitive),
+                text: format!(
+                    "Earlier question: {}\nEarlier answer: {}",
+                    p.question, p.answer_md
+                ),
+            });
+        }
         items.push(PacketItem {
             id: "question".into(),
             source: SourceClass::Normal,
@@ -438,12 +441,15 @@ impl Core {
         });
         people.sort();
         people.dedup();
-        Ok(Packet {
-            what: AuditWhat::SearchQuestion,
-            items,
-            people,
-            context: PacketContext::default(),
-        })
+        Ok((
+            Packet {
+                what: AuditWhat::SearchQuestion,
+                items,
+                people,
+                context: PacketContext::default(),
+            },
+            calls,
+        ))
     }
 
     /// Moves a running turn on; `Cancelled` when it ended meanwhile.

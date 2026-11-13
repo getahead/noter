@@ -1786,6 +1786,121 @@ async fn forwarding_stops_when_the_runs_privacy_changes() {
     );
 }
 
+// cpt-noter-algo-core-mcp-release-result and cpt-noter-flow-core-mcp-live-relay:
+// use the production Ask caller and settings command, with no harness privacy sender.
+#[tokio::test(flavor = "multi_thread")]
+async fn changing_settings_during_a_real_ask_blocks_tools_and_live_lookups() {
+    use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
+    use noter_protocol::model::*;
+    use noter_protocol::NoArgs;
+
+    let (rig, spy) = relay_rig().await;
+    rig.core.start_first_run();
+    rig.scripted
+        .answer_next(json!({ "on": "ask-answer", "after_ms": 600000 }))
+        .unwrap();
+    let settings_ctx = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Settings,
+        },
+    };
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let mut settings = rig
+        .core
+        .settings_get(&settings_ctx, NoArgs {})
+        .await
+        .unwrap();
+    settings.privacy.mode = PrivacyMode::CloudAllowed;
+    rig.core
+        .settings_update(
+            &settings_ctx,
+            SettingsUpdateArgs {
+                rev: settings.rev,
+                section: SettingsSection::Privacy(settings.privacy),
+            },
+        )
+        .await
+        .unwrap();
+    let ask = rig
+        .core
+        .ask_start(
+            &main,
+            AskStartArgs {
+                thread_id: None,
+                question: "importer".into(),
+                scope: AskScope::default(),
+            },
+            Sink::new(|_: AskMsg| true),
+        )
+        .await
+        .unwrap();
+    let launch = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            if let Some(launch) = rig
+                .scripted
+                .received()
+                .iter()
+                .find(|r| r.skill == "ask-answer")
+                .and_then(|r| r.mcp.clone())
+            {
+                break launch;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let mut mcp = Mcp::start(&launch.config, launch.token.expose()).await;
+    mcp.tool("get_decisions", json!({})).await.unwrap();
+    mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+        .await
+        .unwrap();
+    let results = rig
+        .sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+        .len();
+    let mut settings = rig
+        .core
+        .settings_get(&settings_ctx, NoArgs {})
+        .await
+        .unwrap();
+    settings.privacy.mode = PrivacyMode::LocalOnly;
+    rig.core
+        .settings_update(
+            &settings_ctx,
+            SettingsUpdateArgs {
+                rev: settings.rev,
+                section: SettingsSection::Privacy(settings.privacy),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(mcp.tool("get_decisions", json!({})).await, Err(-32001));
+    assert_eq!(
+        mcp.tool("live_work_tracker_search", json!({ "query": "importer" }))
+            .await,
+        Err(-32001)
+    );
+    assert_eq!(spy.seen.lock().unwrap().len(), 1);
+    assert_eq!(
+        rig.sql("SELECT id FROM audit_log WHERE kind = 'tool_result'")
+            .len(),
+        results
+    );
+    rig.core
+        .ask_stop(
+            &main,
+            AskTurnArgs {
+                turn_id: ask.turn_id,
+            },
+        )
+        .await
+        .unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_lookup_in_flight_when_the_run_is_cancelled_returns_nothing() {
     let (rig, spy) = relay_rig().await;

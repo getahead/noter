@@ -32,6 +32,7 @@ mod notify;
 mod people;
 mod playback;
 mod postcall;
+mod privacy;
 mod profiles;
 mod recovery;
 mod retrieval;
@@ -306,6 +307,8 @@ pub struct Core {
     hubs: Mutex<Vec<Arc<dyn AnyHub>>>,
     /// The settings as stored; writes hold this lock, so they apply one at a time.
     settings: Mutex<Settings>,
+    /// Live policy for model requests; completed requests are pruned on the next update.
+    privacy_watches: Mutex<Vec<privacy::Watch>>,
     /// App hotkeys and their registration status; writes hold this lock, then `settings`.
     hotkeys: Mutex<HotkeyList>,
     settings_hooks: Hooks<SettingsSection>,
@@ -508,6 +511,7 @@ impl Core {
             app: Mutex::new(snapshot),
             hubs: Mutex::new(vec![]),
             settings: Mutex::new(settings),
+            privacy_watches: Mutex::new(vec![]),
             hotkeys: Mutex::new(hotkeys::fresh_list()),
             settings_hooks: Mutex::new(vec![]),
             glossary_hooks: Mutex::new(vec![]),

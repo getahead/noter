@@ -76,6 +76,100 @@ async fn open(script: &str) -> (Arc<Core>, Arc<Events>, tempfile::TempDir) {
     (core, events, dir)
 }
 
+// cpt-noter-algo-core-llm-gate-egress: inst-egress-recheck, through section generation.
+#[tokio::test(start_paused = true)]
+async fn privacy_changed_during_postcall_applies_to_every_later_section() {
+    for (regenerate, sensitive) in [(false, false), (false, true), (true, false), (true, true)] {
+        let mut lines = if regenerate {
+            vec![r#"{"on":"post-call"}"#; 7]
+        } else {
+            vec![]
+        };
+        lines.push(r#"{"on":"post-call","after_ms":10000}"#);
+        let (core, _, _dir) = open(&lines.join("\n")).await;
+        seed_call(&core, CALL, 3);
+        let mut run = post_call(&core, CALL);
+        if regenerate {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            assert_eq!(run_status(&core, &run).0, JobRunStatus::Succeeded);
+            run = core
+                .outputs_regenerate(
+                    &main_window(),
+                    RegenerateArgs {
+                        call_id: CallId::new(CALL),
+                        sections: vec![],
+                        runtime: None,
+                        model: None,
+                        skill: None,
+                        local: false,
+                    },
+                )
+                .await
+                .unwrap()
+                .job_run_id;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let cloud_rows = || {
+            core.store()
+                .read(|c| {
+                    c.query_row(
+                        "SELECT count(*) FROM audit_log WHERE kind = 'run'",
+                        [],
+                        |r| r.get::<_, i64>(0),
+                    )
+                })
+                .unwrap()
+        };
+        let before = if regenerate { 8 } else { 1 };
+        assert_eq!(cloud_rows(), before, "first section is in flight");
+        if sensitive {
+            core.capture_set_sensitive(
+                &main_window(),
+                noter_protocol::model::SensitiveArgs {
+                    call_id: CallId::new(CALL),
+                    sensitive: true,
+                },
+            )
+            .await
+            .unwrap();
+        } else {
+            let ctx = CommandCtx {
+                caller: Caller::Window {
+                    label: WindowLabel::Settings,
+                },
+            };
+            let mut settings = core
+                .settings_get(&ctx, noter_protocol::NoArgs {})
+                .await
+                .unwrap();
+            settings.privacy.mode = noter_protocol::PrivacyMode::LocalOnly;
+            core.settings_update(
+                &ctx,
+                noter_protocol::model::SettingsUpdateArgs {
+                    rev: settings.rev,
+                    section: noter_protocol::model::SettingsSection::Privacy(settings.privacy),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        assert_eq!(run_status(&core, &run).0, JobRunStatus::Succeeded);
+        assert_eq!(
+            cloud_rows(),
+            before,
+            "no later transcript release after tightening privacy"
+        );
+        let out = outputs(&core, CALL).await;
+        for section in &out.sections[1..] {
+            assert_eq!(
+                section.writer.as_ref().unwrap().runtime,
+                RuntimeChoice::Local
+            );
+        }
+    }
+}
+
 fn ins(table: &'static str, values: Vec<(&'static str, Value)>) -> Insert {
     Insert { table, values }
 }
