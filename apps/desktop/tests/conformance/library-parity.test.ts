@@ -21,12 +21,14 @@ type Row = FakeWorld["calls"][number];
 type Detail = FakeWorld["call_details"][number];
 type Transcript = FakeWorld["transcripts"][number];
 
-// What M1 owns of a row. Participants, open items and reviews arrive with the people and items
-// features (M2, M3); a call still recording lasts until the real clock's now, so only its lower
-// bound is checked.
-function owned(row: Row): Omit<Row, "participants" | "open_items" | "review_waiting" | "duration_ms"> {
-  const { participants: _p, open_items: _o, review_waiting: _r, duration_ms: _d, ...rest } = row;
-  return rest;
+// Open-item semantics are covered by the items feature. Participant chips and review counts
+// are now populated by the shared call-row assembler; compare participant order independently.
+// A recording call lasts until the real clock's now, so only its lower bound is checked.
+function owned(row: Row): Omit<Row, "open_items" | "duration_ms"> {
+  const { open_items: _o, duration_ms: _d, ...rest } = row;
+  // The fixture labels the self avatar "You"; people::chip_of derives its initial "Y".
+  const participants = rest.participants.map((p) => ({ ...p, initials: p.is_you ? "Y" : p.initials }));
+  return { ...rest, participants: participants.sort((a, b) => a.id.localeCompare(b.id)) };
 }
 
 // Speakers: a named speaker's chip comes from the people table (M2) and name suggestions from

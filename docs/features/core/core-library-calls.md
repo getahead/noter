@@ -2,8 +2,8 @@
 title: "Feature: Library call list and call records"
 description: "The Library list with filters, sort and pages; the call detail read model; call edits with a revision; call types from the built-in list and skill folders; deleting calls for good with everything recorded in them; fixture parity for the M1 read models."
 status: PROPOSED
-version: "0.1"
-date: "2026-10-18"
+version: "0.2"
+date: "2026-11-13"
 milestone: M1
 lane: core
 decomposition: docs/DECOMPOSITION-core.md
@@ -191,7 +191,7 @@ After M1 the user can record calls and find them again. The list and the call re
 **Steps**:
 1. [x] - `p1` - Copy the stored fields (title, type, start, duration, privacy, status, archive status, audio retention and deletion) - `inst-row-fields`
 2. [x] - `p1` - Derive languages from the call's segments and count unnamed speakers - `inst-row-derive`
-3. [x] - `p1` - Leave participants, tags, open items and reviews empty or zero until their features land (M2, M3) - `inst-row-later`
+3. [x] - `p1` - With M2 and M3 landed, read the call's participants from `call_participants` as current person chips in person-id order, tags and open-item count; count its items with `review_state = suggested` as reviews waiting, regardless of item status. Missing related rows yield empty lists or zero; propagate database read failures - `inst-row-later`
 4. [x] - `p1` - **RETURN** the row - `inst-row-return`
 
 ### Delete calls and their files
@@ -308,6 +308,10 @@ The system **MUST** run the fixture-parity test for `calls_list`, `call_get` and
 - [x] E2E against the real core, story `cpt-noter-seq-dialogs-delete-call`: after the alert the call disappears from the Library and from every open window, its files are gone, and a non-undoable change row without content is written (History shows it from M2).
 - [x] A recorded call (scripted engine) appears in `calls_list` and opens with `call_get` with its marks and gaps.
 - [x] `call_update` with a stale `rev` returns `conflict`; deleting the live call returns `already_recording`.
+- Unit/integration regression in `crates/noter-core/tests/library.rs` proves populated and empty participant/review fields through the real list, detail, person page and call mutation paths, including call isolation and accepted/rejected items.
+- Conformance and fixture parity (including participant chips and review counts) in `apps/desktop/tests/conformance/library-parity.test.ts` and `apps/desktop/tests/conformance/m1-stories-library.test.ts` continue to prove the read models; existing real-core E2E story `cpt-noter-seq-dialogs-delete-call` covers the Library lifecycle.
 - [x] The fixture-parity test passes for the M1 read models.
 - [x] Each of the five commands succeeds at least once in E2E runs against the real core.
 - [x] `just gate` passes.
+
+Version 0.2 (2026-11-13, #605): clarify the existing deferred row step now that M2/M3 have landed; preserve its algorithm and instruction IDs because the conditional behavior was already specified.

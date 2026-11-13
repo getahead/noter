@@ -118,7 +118,6 @@ pub(crate) const SHOWN_PASS: &str =
     "(CASE WHEN EXISTS (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive') \
     THEN 'archive' ELSE 'live' END)";
 
-// @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
 /// Days the audio is kept under the stored retention setting (30 until one is saved); 0 for
 /// forever and never store.
 fn retention_days(c: &Connection) -> noter_db::rusqlite::Result<u32> {
@@ -141,6 +140,7 @@ fn retention_days(c: &Connection) -> noter_db::rusqlite::Result<u32> {
 /// An item a call still has open: not done or handed off, and not rejected in review.
 const OPEN_ITEM: &str = "i.status = 'open' AND i.review_state != 'rejected'";
 
+// @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
 fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<CallRow> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     let mut languages = c.prepare(
@@ -168,8 +168,23 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         |r| r.get(0),
     )?;
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
-    // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-fields
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
+    let participants = c
+        .prepare("SELECT person_id FROM call_participants WHERE call_id = ?1 ORDER BY person_id")?
+        .query_map([&s.id], |r| {
+            crate::people::chip_of(c, &r.get::<_, String>(0)?)
+        })?
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+    let review_waiting: u32 = c.query_row(
+        "SELECT count(*) FROM items WHERE call_id = ?1 AND review_state = 'suggested'",
+        [&s.id],
+        |r| r.get(0),
+    )?;
+    // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
+    // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-fields
     let row = CallRow {
         id: CallId::new(s.id),
         rev: Rev(s.rev),
@@ -181,7 +196,7 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
             (s.ended_at.unwrap_or(now) - s.started_at).clamp(0, u32::MAX.into()) as u32,
         ),
         platform: s.platform,
-        participants: vec![],
+        participants,
         unnamed_speakers,
         languages,
         tags,
@@ -194,9 +209,8 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         audio_deleted_at: s.audio_deleted_at.map(TimestampMs),
         audio_retention_days: retention_days(c)?,
         open_items,
-        review_waiting: 0,
+        review_waiting,
     };
-    // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-fields
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-return
     Ok(row)
