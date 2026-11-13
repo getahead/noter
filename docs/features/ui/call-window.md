@@ -2,7 +2,7 @@
 title: "Feature — Call window: call screen and floating panel"
 description: "One non-activating, content-protected call window with a dedicated layout on a second display and a floating layout beside the call app: recording state, capture notices, degraded banners, capture controls, layout switch, collapse, hide and hide for presenting, in the copilot-off layout of M1."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-call-window
 milestone: M1
@@ -229,6 +229,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 **Error Scenarios**:
 - Error — Capture problem while hidden: NT-3 (`cpt-noter-feature-ui-notifications`); its click shows the window with the banner
 - Error — Panel closed by a crash: ⌃⌥⌘N brings the window back with the same transcript, pins and marks (snapshot, then stream)
+- Error — Web content process terminates after loading: the page reloads, then restores from the snapshot before resuming its stream
 
 **Steps**:
 1. [x] - `p1` - User clicks **Hide** - `inst-user-hide-panel`
@@ -412,7 +413,7 @@ The system **MUST** render the call window as one React tree with the dedicated 
 
 **Touches**:
 - Commands: `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_navigate`
-- Tests: E2E `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen` (copilot-off variant); XCUITest for non-activation and ⌃⌥⌘N; screenshot specs `copilot-off`, `collapsed`, `unplugged`, `paused`, `presenting`
+- Tests: E2E `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen` (copilot-off variant); XCUITest for non-activation, ⌃⌥⌘N and loaded WebView process recovery (`test_cpt_noter_seq_floating_panel_hide_and_reopen__loaded_web_process_terminates`); screenshot specs `copilot-off`, `collapsed`, `unplugged`, `paused`, `presenting`
 
 ### Capture notices, closing state and controls
 
@@ -506,6 +507,8 @@ The system **MUST** show a person chip per participant in CS-R1 (with **You** an
 | Device changed | not in the prototype (listed in `docs/DECOMPOSITION.md`); rendered with the gap-row style |
 | No card yet, Card too late, Cards held, Pinned by key, Card key taken, Card keys released, No card with that number, Catch-up being written, Asked about the call, Switched to local, Budget near the cap, Sensitive call (copilot), Copilot muted, Single-agent copilot, Screen context, Degraded copilot banners | `listening`, `held`, `carry`, `single`, `muted`, `switched-local`, `budget`, `sensitive-off`, `key-taken`, `default` — `cpt-noter-feature-ui-copilot` (M4) |
 | No matching person | `cpt-noter-feature-ui-speakers` (M2) |
+
+**Changes in 1.1.** A loaded call window whose WebKit content process terminates is reloaded and reconnects through the existing snapshot-then-stream bridge.
 
 **Milestone notes.** The M1 stories `cpt-noter-seq-floating-panel-display-unplugged` (step 4 pins card 2) and `cpt-noter-seq-floating-panel-collapse-strip` (card line, **Pin** from the strip, Copilot muted while collapsed) contain copilot steps whose commands are M4 and draft; M1 proves them in the copilot-off layout, and `cpt-noter-feature-ui-copilot` proves the card steps in M4 (discrepancy 4). The **Summary ready** steps of the stop and presenting stories are proven in M2 (discrepancy 6). Owner decision A (28 Oct 2026): the M4 card-height step of the layout algorithm (`inst-floating-heights`) moved to `cpt-noter-feature-ui-copilot` (`cpt-noter-algo-ui-copilot-card-stream`, `inst-capacity`); the XCUITest-only criterion (no click moves focus) is proven by the native suite.
 

@@ -8,6 +8,18 @@ final class WebViewRecoveryTests: NoterTestCase {
     /// before its first query was answered, #578). From then on every query that reaches the page waits on the
     /// stopped process, until the host's watch (10 s) restarts it. The window then answers again: Calls opens and
     /// lists the library.
+    func test_cpt_noter_seq_floating_panel_hide_and_reopen__loaded_web_process_terminates() {
+        let terminated = FileManager.default.temporaryDirectory.appendingPathComponent("noter-terminated-\(UUID().uuidString)")
+        app.launchEnvironment["NOTER_TEST_TERMINATE_WEB_PROCESS_FILE"] = terminated.path
+        defer { try? FileManager.default.removeItem(at: terminated) }
+        launch()
+        hotkey("n")
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 10), "the call page did not load")
+        XCTAssertTrue(FileManager.default.createFile(atPath: terminated.path, contents: nil), "could not request web process termination")
+        XCTAssertTrue(waitUntil(10) { (try? String(contentsOf: terminated, encoding: .utf8)) == "terminated" }, "the test hook did not terminate the loaded page process")
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call page did not recover")
+    }
+
     func test_a_stalled_page_reloads_in_a_new_web_process() {
         let stalled = FileManager.default.temporaryDirectory.appendingPathComponent("noter-stalled-\(UUID().uuidString)")
         app.launchEnvironment["NOTER_TEST_STALL_FILE"] = stalled.path

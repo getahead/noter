@@ -2,7 +2,7 @@
 title: "Feature — Dialogs, sheets and alerts"
 description: "How Noter asks before what cannot be undone: native alerts with the safe button as default, window-modal sheets, anchored popovers and the call window's inline confirmation, with the M1 delete and quit alerts."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-dialogs-host
 milestone: M1
@@ -108,13 +108,14 @@ It implements `cpt-noter-component-screen-dialogs` as the catalogue and host; ea
 **Actor**: Primary user
 
 **Success Scenarios**:
-- **Quit Noter** (menu bar or ⌘Q) while recording shows **Noter is recording “Planning: VHI 8.0 drawer redesign”** · **Quitting stops the recording. The transcript so far is kept.** · **Cancel** (default) · **Stop and Quit**; **Stop and Quit** saves and quits
+- **Quit Noter** (menu bar, ⌘Q, Dock › Quit, Log Out or Shut Down) while recording shows **Noter is recording “Planning: VHI 8.0 drawer redesign”** · **Quitting stops the recording. The transcript so far is kept.** · **Cancel** (default) · **Stop and Quit**; **Stop and Quit** saves and quits
 
 **Error Scenarios**:
 - Return chooses **Cancel**; the recording goes on
+- Repeated quit requests while the alert is visible keep one alert open; Cancel returns to the recording
 
 **Steps**:
-1. [x] - `p1` - User chooses **Quit Noter** or presses ⌘Q - `inst-user-quit`
+1. [x] - `p1` - User chooses **Quit Noter**, presses ⌘Q, or requests termination from macOS (Dock › Quit, Log Out or Shut Down) - `inst-user-quit`
 2. [x] - `p1` - **IF** nothing is recording - `inst-if-idle`
    1. [x] - `p1` - **RETURN** Noter quits at once (the core) - `inst-return-quit`
 3. [x] - `p1` - Core: shows the native alert with **Cancel** as the default; the UI supplies its strings from the catalogue - `inst-quit-alert`
@@ -243,7 +244,7 @@ The system **MUST** ask before deleting one or several calls with the prototype'
 
 **Touches**:
 - Commands: `calls_delete`
-- Tests: E2E `cpt-noter-seq-dialogs-delete-call` (Happy path, Error — Return pressed by habit, Other — Several calls selected) against `noter-core-harness`; XCUITest `test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording` for the native quit alert
+- Tests: E2E `cpt-noter-seq-dialogs-delete-call` (Happy path, Error — Return pressed by habit, Other — Several calls selected) against `noter-core-harness`; XCUITests `test_cpt_noter_seq_menu_bar_control_recording__quit_while_recording` and `test_cpt_noter_seq_menu_bar_control_recording__macos_terminate_uses_quit_alert` for the native quit paths; repeated quit requests leave a single alert open
 
 ### Inline confirmation in the call window
 
@@ -276,6 +277,8 @@ The system **MUST** confirm discarding a recording inline in the capture notice,
 **States coverage (M1 rows of DESIGN's Dialogs States table).** Delete asked → `al-del-call`; Return pressed by habit → the same alert with **Cancel** as primary; Several calls selected → `al-del-3` and Library › State ▾ › Several calls selected; Quit while recording → `al-quit`; Sheet busy → `data-state="busy"`; Inline discard asked → Call window › State ▾ › Nothing heard yet, then **Discard Recording**; Old audio deleted → `sh-old-audio` (its deletion is M2); Call deleted → `dlg.deleteCallGo` (back to Calls). The other rows belong to the features that own those sheets.
 
 **DESIGN versus prototype.** DESIGN's Library entry words the delete alert differently (**Their audio, transcripts, summaries and items are deleted from this Mac. This can't be undone.** with **Delete** and **Cancel**); this feature uses the prototype's wording, which matches DESIGN's Dialogs entry (listed in `docs/DECOMPOSITION.md`).
+
+**Changes in 1.1.** macOS termination requests use the same quit flow, and repeated requests do not stack alerts.
 
 **Milestone notes.** The happy path of `cpt-noter-seq-dialogs-delete-call` starts on a call's page, which `cpt-noter-feature-ui-call-page-frame` ships in M1 (discrepancy 1). The **Delete Old Audio…** sheet opens in M1; `audio_delete_older` is M2 (discrepancy 5). Owner decision A (28 Oct 2026): the sheet submit steps (`inst-user-submit`, `inst-if-invalid`, `inst-invalid`, `inst-return-sheet`) and the BUSY/INVALID transitions (`inst-open-busy`, `inst-busy-invalid`, `inst-invalid-busy`, `inst-busy-closed`) moved to `cpt-noter-feature-ui-call-page-outputs` (M2), where the first sheet with a command lives.
 

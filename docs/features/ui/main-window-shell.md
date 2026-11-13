@@ -321,6 +321,8 @@ The system **MUST** provide the mode indicator in its eight variants with glyph 
 - Commands: `window_navigate` (M1)
 - Tests: screenshot specs of each variant and degraded form; VoiceOver label "Mode: cloud with redaction"
 
+**Changes in 1.1.** Closing the main window hides it without exiting the app; **Open Noter** restores its configured 1280×820 frame and 900×600 minimum. XCUITest: `test_cpt_noter_seq_menu_bar_control_recording__main_window_close_reopen_keeps_running_and_size`.
+
 ## 6. Acceptance Criteria
 
 - [ ] A shell shortcut with no applicable action does not fall through to opening search; only the focus-search action opens and focuses it

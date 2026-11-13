@@ -9,6 +9,8 @@ pub mod e2e_log;
 mod keychain;
 mod native;
 pub mod surfaces;
+#[cfg(target_os = "macos")]
+mod termination;
 // @cpt-dod:cpt-noter-dod-core-harness-fixture:p1
 #[cfg(all(debug_assertions, feature = "test-hooks"))]
 mod test_hooks;
@@ -51,15 +53,25 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 let mut loads = webview_watch::lock(&watch);
                 match event {
                     PageLoadEvent::Started => loads.started(label, std::time::Instant::now()),
-                    PageLoadEvent::Finished => loads.finished(label),
+                    PageLoadEvent::Finished => {
+                        loads.finished(label, std::time::Instant::now())
+                    }
                 }
             }
             #[cfg(all(debug_assertions, feature = "test-hooks"))]
             if event == PageLoadEvent::Finished {
                 test_hooks::stall_after_load(webview);
+                test_hooks::terminate_after_load(webview);
             }
         })
         .on_window_event(|window, event| match event {
+            // @cpt-topology:cpt-noter-topology-ui-windows:p1
+            WindowEvent::CloseRequested { api, .. }
+                if window.label() == WindowLabel::Main.as_str() =>
+            {
+                api.prevent_close();
+                let _ = window.hide();
+            }
             WindowEvent::Destroyed => {
                 reset(window.label(), window.try_state::<Booted>().as_deref());
                 if let Some(watch) = window.try_state::<webview_watch::Watch>() {
@@ -110,6 +122,8 @@ pub fn run() {
         .setup(move |app| {
             let _ = events.0.set(app.handle().clone());
             alert_keys::return_chooses_cancel();
+            #[cfg(target_os = "macos")]
+            termination::install(app.handle());
             // Once, before the event loop: noter-native runs the handler on the main thread.
             let clicked = app.handle().clone();
             noter_native::on_notification_click(Box::new(move |target| {
@@ -126,6 +140,8 @@ pub fn run() {
             app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
             #[cfg(all(debug_assertions, feature = "test-hooks"))]
             test_hooks::watch_hotkey_trigger(app.handle().clone());
+            #[cfg(all(debug_assertions, feature = "test-hooks", target_os = "macos"))]
+            test_hooks::watch_termination_trigger(app.handle().clone());
             // Without a feed (M0) the check ends at once and nothing is ever ready.
             tauri::async_runtime::spawn(async move {
                 let _ = updater.check().await;
