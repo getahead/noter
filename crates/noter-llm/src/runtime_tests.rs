@@ -1001,10 +1001,7 @@ async fn an_account_check_cannot_fall_back_to_local_when_cloud_is_forbidden() {
             },
         ] {
             let result = f.llm.verify_account(runtime, privacy).await;
-            assert!(
-                matches!(result, Err(Failure::Unavailable(_))),
-                "{runtime:?}: {result:?}"
-            );
+            assert!(matches!(result, Err(Failure::Unavailable(_))));
         }
         assert!(f.scripted.received().is_empty());
         assert_eq!(f.count("SELECT COUNT(*) FROM llm_runs"), 0);

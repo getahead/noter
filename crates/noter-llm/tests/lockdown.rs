@@ -352,10 +352,7 @@ async fn an_account_check_never_spends_a_key_when_its_cli_is_signed_out() {
         );
         let privacy = *world.privacy.borrow();
         let result = llm.verify_account(runtime, privacy).await;
-        assert!(
-            matches!(result, Err(Failure::Unavailable(_))),
-            "{runtime:?}: {result:?}"
-        );
+        assert!(matches!(result, Err(Failure::Unavailable(_))));
         assert!(claude.records().is_empty());
         assert!(codex.records().is_empty());
         let count: i64 = world
