@@ -142,9 +142,24 @@ struct CallTime {
 
 /// The stored channels of a call: `<channel>.m4a` after capture, `<channel>.wav` in file mode.
 enum SessionAudio {
-    static func url(_ channel: Channel, in session: URL) -> URL? {
+    static func url(_ channel: Channel, in session: URL, within container: URL? = nil) -> URL? {
         let m4a = session.appendingPathComponent("\(channel.rawValue).m4a")
         let wave = session.appendingPathComponent("\(channel.rawValue).wav")
+        let sessionPath: String?
+        if let container {
+            let root = container.standardizedFileURL.path
+            let path = session.standardizedFileURL.path
+            guard path.hasPrefix(root + "/") else { return nil }
+            let relative = String(path.dropFirst(root.count + 1))
+            guard ContainerPath.resolve(relative, in: container) != nil else { return nil }
+            sessionPath = relative
+        } else {
+            sessionPath = nil
+        }
+        let isSafe: (URL) -> Bool = { file in
+            guard let container, let sessionPath else { return true }
+            return ContainerPath.resolve("\(sessionPath)/\(file.lastPathComponent)", in: container) != nil
+        }
         let prefix = "\(channel.rawValue)."
         let parts = (((try? FileManager.default.contentsOfDirectory(at: session, includingPropertiesForKeys: nil)) ?? [])
             .compactMap { url -> (Int, URL)? in
@@ -156,9 +171,14 @@ enum SessionAudio {
             .sorted { $0.0 < $1.0 }
             .map(\.1)
         if parts.isEmpty {
-            return [m4a, wave].first { FileManager.default.fileExists(atPath: $0.path) }
+            for file in [m4a, wave] where FileManager.default.fileExists(atPath: file.path) {
+                guard isSafe(file) else { return nil }
+                return file
+            }
+            return nil
         }
         let previous = FileManager.default.fileExists(atPath: m4a.path) ? m4a : nil
+        guard parts.allSatisfy(isSafe), previous.map(isSafe) ?? true else { return nil }
         guard CaptureSession.remux(parts, appending: previous, to: m4a) else { return previous }
         parts.forEach { try? FileManager.default.removeItem(at: $0) }
         if let data = try? Data(contentsOf: session.appendingPathComponent("timeline.json")),
@@ -178,7 +198,9 @@ enum SessionAudio {
         return m4a
     }
 
-    static func stored(in session: URL) -> Bool { [Channel.mic, .sys].contains { url($0, in: session) != nil } }
+    static func stored(in session: URL, within container: URL? = nil) -> Bool {
+        [Channel.mic, .sys].contains { url($0, in: session, within: container) != nil }
+    }
 
     /// 16 kHz mono samples of a file, from `fromMs` to `toMs` (its end when nil).
     static func read(_ url: URL, fromMs: Int = 0, toMs: Int? = nil) throws -> [Float] {

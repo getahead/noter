@@ -254,11 +254,15 @@ public final class EngineLoop: @unchecked Sendable {
     /// Plays the call's stored files (`audio/<call_id>/`); a new `play` replaces the one before.
     private func replay(_ id: UInt64, _ callId: String, _ fromMs: Int, _ toMs: Int?, _ channel: Channel?) {
         let channels = channel.map { [$0] } ?? [.mic, .sys]
-        let resolved = channels.compactMap { channel in
-            container.flatMap { ContainerPath.resolve("audio/\(callId)", in: $0) }.map { SessionAudio.url(channel, in: $0) }
+        let resolved = channels.map { channel in
+            container.flatMap { root in
+                ContainerPath.resolve("audio/\(callId)", in: root).flatMap {
+                    SessionAudio.url(channel, in: $0, within: root)
+                }
+            }
         }
         let files = resolved.compactMap { $0 }
-        guard resolved.count == channels.count, !files.isEmpty else {
+        guard container != nil, !files.isEmpty else {
             // The core reads an error for `play` as `audio_deleted`.
             writer.emit(.error(cmdId: id, code: .badCommand, message: "no stored audio for \(callId)"))
             return

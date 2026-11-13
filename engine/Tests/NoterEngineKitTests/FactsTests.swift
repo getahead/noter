@@ -192,12 +192,20 @@ final class EngineFactsTests: XCTestCase {
         try FileManager.default.createDirectory(at: root.appendingPathComponent("audio/file-escape"), withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(
             at: root.appendingPathComponent("audio/file-escape/mic.m4a"), withDestinationURL: outside.appendingPathComponent("mic.m4a"))
+        let outsidePart = outside.appendingPathComponent("mic.0.aac")
+        let encoder = try ADTSEncoder(url: outsidePart)
+        try encoder.append(Array(repeating: Float(0.2), count: 12_000))
+        encoder.finish()
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("audio/part-escape"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: root.appendingPathComponent("audio/part-escape/mic.0.aac"), withDestinationURL: outsidePart)
         let (lines, player) = (Lines(), FakePlayer())
         let e = engine(lines, root: root, player: player, processes: Box([]))
         _ = e.handle(#"{"id":1,"cmd":{"type":"play","call_id":"valid","from_ms":0,"to_ms":null,"channel":"mic"}}"#)
         XCTAssertEqual(player.played.count, 1)
         for callId in [
             "../..", "..", ".", "", "/valid", "valid/", "valid//child", "valid/../valid", "\u{0}", "escape", "file-escape",
+            "part-escape",
         ] {
             let command: [String: Any] = [
                 "id": 2, "cmd": ["type": "play", "call_id": callId, "from_ms": 0, "to_ms": NSNull(), "channel": "mic"],

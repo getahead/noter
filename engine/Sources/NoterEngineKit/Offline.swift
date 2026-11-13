@@ -112,7 +112,7 @@ extension EngineLoop {
         // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-paths
         guard let container,
             let session = ContainerPath.resolve(pass.sessionDir, in: container), Self.isDirectory(session),
-            SessionAudio.stored(in: session), let result = ContainerPath.resolve(pass.resultPath, in: container)
+            SessionAudio.stored(in: session, within: container), let result = ContainerPath.resolve(pass.resultPath, in: container)
         else {
             return refuse(id, "offline_pass: an unsafe path or no stored audio")
         }
@@ -167,6 +167,7 @@ extension EngineLoop {
         guard let container, !request.spans.isEmpty,
             request.spans.allSatisfy({ $0.t0Ms >= 0 && $0.t0Ms < $0.t1Ms }),
             let session = ContainerPath.resolve("audio/\(request.callId)", in: container), Self.isDirectory(session),
+            SessionAudio.url(request.channel, in: session, within: container) != nil,
             let out = ContainerPath.resolve(request.outPath, in: container)
         else {
             return refuse(id, "speaker_embedding: invalid spans, an unknown call or an unsafe path")
