@@ -715,11 +715,16 @@ fn random(bytes: usize) -> Result<String, McpClientError> {
 /// Waits on the loopback listener for the redirect of the flow with `state`: its code, or
 /// `Cancelled` when the user refused. Anything else (another path, another state) is answered
 /// 404 and the wait goes on.
+// @cpt-flow:cpt-noter-flow-core-knowledge-mcp:p1
 async fn redirected(listener: &TcpListener, state: &str) -> Result<String, McpClientError> {
     loop {
         let (mut stream, _) = listener.accept().await.map_err(|_| Cancelled)?;
         let mut head = vec![0; 8192];
-        let n = stream.read(&mut head).await.unwrap_or(0);
+        // A speculative browser socket must not hold up the actual callback.
+        let n = match tokio::time::timeout(Duration::from_secs(2), stream.read(&mut head)).await {
+            Ok(read) => read.unwrap_or(0),
+            Err(_) => continue,
+        };
         let head = String::from_utf8_lossy(&head[..n]);
         let target = (head.lines().next())
             .and_then(|l| l.split_whitespace().nth(1))
