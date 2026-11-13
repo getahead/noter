@@ -778,7 +778,6 @@ async fn a_pause_the_user_asked_for_stays_paused_when_the_network_comes_back() {
     let network = Arc::new(Network(false.into(), Mutex::new(None)));
     let core = open_on(dir.path(), source.clone(), network.clone());
     download(&core, DownloadAction::Start).await.unwrap_err();
-    wait_for_model_run_to_stop(&core).await;
     download(&core, DownloadAction::Pause).await.unwrap();
     network.set_online(true);
     until(&core, "the requested pause remains in effect", |status| {
