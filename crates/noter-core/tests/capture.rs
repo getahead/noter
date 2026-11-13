@@ -780,6 +780,43 @@ async fn stopping_while_the_engine_restarts_stops_the_engine_session() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn discarding_while_the_engine_restarts_removes_the_call() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+
+    let starts = r.sessions().len();
+    r.engine.kill_current();
+    r.sent_n(starts + 1, |command| {
+        matches!(command, EngineCommand::StartSession(_))
+    })
+    .await;
+
+    let stops = r.stops();
+    let discard = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_discard(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.answer_stop(&call_id, stops).await;
+    let idle = discard.await.unwrap().unwrap();
+
+    assert_eq!(idle.phase, CapturePhase::Idle);
+    assert_eq!(idle.call_id, None);
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+    assert_eq!(
+        r.sessions().len(),
+        starts + 1,
+        "discarded call did not restart again"
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn continue_appends_to_the_same_call_within_the_window() {
     let r = rig();
     let call_id = r.recording().await;
