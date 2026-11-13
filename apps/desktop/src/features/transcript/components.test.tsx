@@ -246,6 +246,31 @@ describe("holdFix (the Undo of a term fix)", () => {
   });
 });
 
+describe("fake transcript corrections", () => {
+  it("shifts later correction ranges when an earlier term grows and rejects invalid ranges", async () => {
+    const { fake, bridge: b } = await open("main", (w) => {
+      const transcript = w.transcripts[0]!;
+      transcript.segments[0]!.text = "abcdefghijklmno";
+      transcript.segments[0]!.corrections = [];
+    });
+    const transcript = fake.world.transcripts[0]!;
+    const line = transcript.segments[0]!;
+    const first = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 10, end: 12 }, replacement: "XYZ", add_to_glossary: false });
+    expect(first.status).toBe("ok");
+    const earlier = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 0, end: 2 }, replacement: "longer", add_to_glossary: false });
+    expect(earlier.status).toBe("ok");
+    expect(line.text).toBe("longercdefghijXYZmno");
+    expect(line.corrections.map((c) => c.range)).toEqual([{ start: 0, end: 6 }, { start: 14, end: 17 }]);
+    if (earlier.status === "ok") await b.core.changeUndo({ target: { type: "change", change_id: earlier.data.change_id } });
+    expect(line.text).toBe("abcdefghijXYZmno");
+    expect(line.corrections).toHaveLength(1);
+    expect(line.corrections[0]!.range).toEqual({ start: 10, end: 13 });
+    const invalid = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 9000, end: 9005 }, replacement: "oops", add_to_glossary: false });
+    expect(invalid.status).toBe("error");
+    expect(line.text).toBe("abcdefghijXYZmno");
+  });
+});
+
 describe("readNaming (the Summary's naming panel)", () => {
   it("reads the call's speakers and lines once, or nothing for a call the core does not know", async () => {
     const { bridge: b } = await open("main");

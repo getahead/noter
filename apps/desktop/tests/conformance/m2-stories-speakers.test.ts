@@ -43,6 +43,15 @@ const unnamedVoice = (w: World) => {
   snap.segments.push(line);
 };
 
+const anotherLineForSpeaker3 = (w: World) => {
+  const transcript = w.transcripts.find((t) => t.call_id === LIVE_CALL)!;
+  const source = transcript.segments.find((segment) => segment.speaker.speaker_id === "spk_3")!;
+  transcript.segments.push({ ...structuredClone(source), id: "seg_live_999", t0_ms: source.t0_ms + 5000, t1_ms: source.t1_ms + 5000 });
+  transcript.speakers.find((speaker) => speaker.id === "spk_3")!.segment_count += 1;
+  const detail = w.call_details.find((row) => row.call.id === LIVE_CALL)!;
+  detail.speakers = transcript.speakers;
+};
+
 describe("cpt-noter-seq-call-screen-name-speaker", () => {
   it("happy path: renaming an unnamed speaker live writes the name, publishes it and rewrites constraints.json", async () => {
     open();
@@ -72,10 +81,17 @@ describe("cpt-noter-seq-call-screen-name-speaker", () => {
   });
 
   it("other — one line only: naming a single line returns the change and undo takes it back", async () => {
-    open();
+    open(anotherLineForSpeaker3);
     const done = ok(await main.transcriptRenameSpeaker({ call_id: LIVE_CALL, speaker_id: "spk_3", person: { type: "existing", person_id: "per_anna" }, scope: { type: "one_segment", segment_id: "seg_live_004" } }));
     expect(done.change_id).toBeTruthy();
+    const after = ok(await main.transcriptSubscribe({ call_id: LIVE_CALL }, () => {}));
+    const selected = after.segments.find((segment) => segment.id === "seg_live_004")!;
+    expect(selected.speaker.speaker_id).not.toBe("spk_3");
+    expect(label(after.speakers, selected.speaker.speaker_id)).toBe("Anna Kuznetsova");
+    expect(after.segments.filter((segment) => segment.id !== selected.id && segment.speaker.speaker_id === "spk_3").length).toBeGreaterThan(0);
     expect(ok(await main.changeUndo({ target: { type: "change", change_id: done.change_id } })).undone).toBe(1);
+    const undone = ok(await main.transcriptSubscribe({ call_id: LIVE_CALL }, () => {}));
+    expect(undone.segments.find((segment) => segment.id === selected.id)?.speaker.speaker_id).toBe("spk_3");
   });
 });
 

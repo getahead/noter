@@ -423,6 +423,13 @@ test.describe("cpt-noter-flow-ui-live-transcript-stored", () => {
     await openWindow(page, "main", { world: stored(120, 3) });
     await openCall(page, "Backend sync");
     await expect(rows(page).first()).toBeVisible();
+    await rows(page).first().focus();
+    await page.keyboard.press("Meta+ArrowDown");
+    await expect(rows(page).last()).toBeFocused();
+    await page.locator('[data-region="PC-R5"] .cw-tv__scroll').evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event("scroll")); });
+    await expect(rows(page).last()).toBeFocused(); // a focused row remains mounted outside the drawn window
+    await page.keyboard.press("Meta+ArrowUp");
+    await expect(rows(page).first()).toBeFocused();
     await page.keyboard.press("Meta+KeyF");
     const find = page.getByPlaceholder("Find in transcript");
     await expect(find).toBeFocused();
@@ -433,6 +440,7 @@ test.describe("cpt-noter-flow-ui-live-transcript-stored", () => {
     await expect(page.getByText("3 of 120 lines")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(find).toHaveCount(0);
+    await expect(rows(page).first()).toBeFocused();
   });
 
   test("UI — error path: the read fails, the view body shows its inline banner with Try Again", async ({ page }) => {
