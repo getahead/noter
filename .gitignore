@@ -547,9 +547,9 @@ apps/desktop/blob-report/
 __pycache__/
 
 # Constructor Studio local state (outside its managed block above, which `cfs` may rewrite)
-# Temporarily vendor the pinned runtime so CI does not need the upstream download.
-# Keep this override outside the generated block; validation cache stays local.
-!.cf-studio/.core/
+# .core is a directory in the main checkout and a symlink to it in worktrees; the cache
+# (decisions.jsonl and its lock) changes on every `cfs validate`.
+.cf-studio/.core
 .cf-studio/.cache/
 
 # pnpm store, if pnpm ever puts it inside the checkout (e.g. in a container)
