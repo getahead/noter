@@ -20,12 +20,14 @@ final class WebViewRecoveryTests: NoterTestCase {
         XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call page did not recover")
     }
 
-    func test_a_stalled_page_reloads_in_a_new_web_process() {
+    func test_cpt_noter_seq_call_screen_recover_capture__a_stalled_page_reloads_in_a_new_web_process() {
         let stalled = FileManager.default.temporaryDirectory.appendingPathComponent("noter-stalled-\(UUID().uuidString)")
         app.launchEnvironment["NOTER_TEST_STALL_FILE"] = stalled.path
         defer { try? FileManager.default.removeItem(at: stalled) }
         launch("idle")
-        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        // A first-frame WebKit hang is restarted by the host after 10 s. Leave time for the watchdog's
+        // one-second poll and the replacement process to load before treating the initial page as lost.
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 30), "the main window did not load after WebView recovery")
         XCTAssertTrue(FileManager.default.createFile(atPath: stalled.path, contents: nil), "could not ask the hook to stall the page")
         XCTAssertTrue(waitUntil(10) { (try? String(contentsOf: stalled, encoding: .utf8)) == "stalled" }, "the hook did not stall the page")
         // The watch restarts the page 10 s after the stall (`webview_watch::BOUND`, checked once a second) and the

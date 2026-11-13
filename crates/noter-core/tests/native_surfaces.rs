@@ -4,6 +4,7 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use noter_core::{
     Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, Placement, Surfaces, TrayAction,
@@ -47,6 +48,7 @@ impl Clock for FixedClock {
 struct Rec {
     calls: Mutex<Vec<String>>,
     tray: Mutex<Option<TrayModel>>,
+    during_hide: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
 
 impl Rec {
@@ -75,6 +77,9 @@ impl Surfaces for Rec {
     }
     fn hide_all(&self) {
         self.note("hide_all");
+        if let Some(probe) = self.during_hide.lock().unwrap().clone() {
+            probe();
+        }
     }
     fn restore_all(&self) {
         self.note("restore_all");
@@ -102,6 +107,43 @@ impl Surfaces for Rec {
     fn set_fix_term_enabled(&self, enabled: bool) {
         self.note(format!("set_fix_term_enabled {enabled}"));
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn presenting_does_not_hold_window_lock_while_hiding_native_surfaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _, rec) = open(dir.path());
+    let core = Arc::new(core);
+    displays(&core, vec![display("d_main", true)]);
+    let call = window(WindowLabel::CallScreen);
+    core.window_show_call(&call, NoArgs {}).await.unwrap();
+
+    let runtime = tokio::runtime::Handle::current();
+    let core_for_probe = core.clone();
+    let completed_before_hide_returned = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let completed = completed_before_hide_returned.clone();
+    *rec.during_hide.lock().unwrap() = Some(Arc::new(move || {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let core = core_for_probe.clone();
+        runtime.spawn(async move {
+            let _ = core
+                .window_call_state(&window(WindowLabel::CallScreen), NoArgs {})
+                .await;
+            let _ = tx.send(());
+        });
+        completed.store(
+            rx.recv_timeout(Duration::from_secs(2)).is_ok(),
+            std::sync::atomic::Ordering::SeqCst,
+        );
+    }));
+
+    core.app_set_hidden_for_presenting(&call, HiddenArgs { hidden: true })
+        .await
+        .unwrap();
+    assert!(
+        completed_before_hide_returned.load(std::sync::atomic::Ordering::SeqCst),
+        "native hiding can rendezvous with main-thread focus handling, so the window lock must be free"
+    );
 }
 
 fn open(dir: &Path) -> (Core, Arc<Events>, Arc<Rec>) {

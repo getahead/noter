@@ -331,6 +331,9 @@ pub struct Core {
     capture_hooks: Hooks<CaptureEvent>,
     /// The call window's state, the presenting memory and the tray the native layer shows.
     windows: Mutex<surfaces::Windows>,
+    /// Serializes hide/restore transitions without blocking native focus callbacks on `windows`.
+    // @cpt-flow:cpt-noter-flow-core-native-surfaces-presenting:p1
+    presenting_transition: Mutex<()>,
     /// The capture phase as last published, for commands that wait on the engine.
     capture_phase: tokio::sync::watch::Sender<CapturePhase>,
     /// The call the main window reports it shows (`window_report_view`).
@@ -524,6 +527,7 @@ impl Core {
             capture: tokio::sync::Mutex::new(capture::Session::default()),
             capture_hooks: Mutex::new(vec![]),
             windows: Mutex::new(surfaces::Windows::default()),
+            presenting_transition: Mutex::new(()),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
             viewed: Mutex::new(None),
             held: Mutex::new(Vec::new()),
