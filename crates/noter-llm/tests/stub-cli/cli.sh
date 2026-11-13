@@ -15,7 +15,7 @@ rec="$here/record.$$"
 out="$here/.record.$$"
 : >"$out"
 line() { printf '%s\t%s\n' "$1" "$2" >>"$out"; }
-file_mode() { stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"; }
+file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 
 codex=no
 [ "$1" = "exec" ] && codex=yes
