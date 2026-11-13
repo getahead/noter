@@ -1,4 +1,4 @@
-//! The native UI tests' launch hooks, compiled into debug builds only: launched with
+//! The native UI tests' launch hooks, compiled into debug builds with `test-hooks` only: launched with
 //! `NOTER_TEST_FIXTURE` (`noter_core_harness::boot::Options::from_env`), the app's core runs on
 //! the harness's scripted Mac, engine and models, seeded with the fixture world and put in the
 //! scenario the test names, behind the app's real windows, menu bar and notifications.
