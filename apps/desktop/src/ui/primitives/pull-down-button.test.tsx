@@ -16,7 +16,9 @@ describe("pull-down-button", () => {
   it("is an icon button (⋯) whose label names the menu", () => {
     const html = renderToString(<PullDownButton label="More" iconOnly ariaLabel="More actions for Standup" help="More" />);
     expect(html).toContain('class="np-ibtn np-ibtn--inline"');
-    expect(html).toContain('data-primitive="pull-down-button" data-variant="item-menu" data-size="inline" title="More"');
+    expect(html).toContain('data-primitive="pull-down-button" data-variant="item-menu" data-size="inline" aria-label="More actions for Standup"');
+    expect(html).toContain('data-help-tag="More"');
+    expect(html).toContain('role="tooltip"');
     expect(html).toContain('aria-label="More actions for Standup"');
     expect(html).toContain('aria-haspopup="menu" aria-expanded="false"');
     expect(renderToString(<PullDownButton label="Mute" iconOnly icon="mute" size="toolbar" open />)).toContain('np-ibtn--toolbar');

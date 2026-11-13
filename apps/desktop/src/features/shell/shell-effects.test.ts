@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { dockQuietly, inspectorDefinitionFocus, inspectorFocus, returnTarget, layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
+import { dockQuietly, inspectorDefinitionFocus, inspectorFocus, returnTarget, layoutFor, exitMs, leaveTimer, openFocus, actionEvent, runShellAction, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
 
 describe("shell actions", () => {
   it("turns each action into its view-state event", () => {
@@ -21,6 +21,22 @@ describe("shell actions", () => {
   it("Esc closes the inspector first, then the overlay sidebar", () => {
     expect(escapeEvent({ inspectorOpen: true })).toEqual({ type: "close-inspector" });
     expect(escapeEvent({ inspectorOpen: false })).toEqual({ type: "close-overlay" });
+  });
+});
+
+describe("runShellAction", () => {
+  it("does not turn an unavailable inspector shortcut into search", () => {
+    const effects = { dispatch: vi.fn(), openSettings: vi.fn(), focusSearch: vi.fn() };
+    runShellAction({ type: "toggle-inspector" }, false, false, effects);
+    expect(effects.focusSearch).not.toHaveBeenCalled();
+    expect(effects.dispatch).not.toHaveBeenCalled();
+  });
+  it("only focuses search for the search action and keeps Settings separate", () => {
+    const effects = { dispatch: vi.fn(), openSettings: vi.fn(), focusSearch: vi.fn() };
+    runShellAction({ type: "focus-search" }, false, false, effects);
+    runShellAction({ type: "open-settings" }, false, false, effects);
+    expect(effects.focusSearch).toHaveBeenCalledOnce();
+    expect(effects.openSettings).toHaveBeenCalledOnce();
   });
 });
 

@@ -1,7 +1,7 @@
 // tooltip (help tag): DESIGN 3.2 asks for a tag after 500 ms of hover or at once on keyboard focus, which
 // becomes the control's description. The prototype carries help tags as title/data-help-tag only (README).
 import { cloneElement, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactElement, type SyntheticEvent } from "react";
-import { base } from "./attrs";
+import { base, zoomFactor } from "./attrs";
 import "./tooltip.css";
 
 export const HELP_TAG_MS = 500;
@@ -39,6 +39,7 @@ const focusVisible = (el: Element) => {
 };
 
 type ChildProps = {
+  "aria-describedby"?: string;
   onPointerEnter?: Handler<SyntheticEvent>;
   onPointerLeave?: Handler<SyntheticEvent>;
   onFocus?: Handler<FocusEvent>;
@@ -53,12 +54,14 @@ export function Tooltip({ text, children }: { text: string; children: ReactEleme
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const target = useRef<Element | null>(null);
   const tag = useMemo(() => helpTag((on) => {
-    const r = on ? target.current?.getBoundingClientRect() : null;
-    setAt(r ? { left: r.left, top: r.bottom + 6 } : null);
+    const el = target.current;
+    const r = on ? el?.getBoundingClientRect() : null;
+    const zoom = zoomFactor(el);
+    setAt(r ? { left: r.left / zoom, top: r.bottom / zoom + 6 } : null);
   }), []);
   const p = children.props;
   const control = cloneElement(children, {
-    "aria-describedby": id,
+    "aria-describedby": [p["aria-describedby"], id].filter(Boolean).join(" "),
     "data-help-tag": text,
     onPointerEnter: chain(p.onPointerEnter, (e) => ((target.current = e.currentTarget as Element), tag.hover())),
     onPointerLeave: chain(p.onPointerLeave, () => tag.hide()),

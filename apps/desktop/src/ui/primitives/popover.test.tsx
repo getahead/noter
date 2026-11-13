@@ -64,11 +64,22 @@ describe("Popover behaviour", () => {
   it("measures itself against its anchor and the window", () => {
     vi.stubGlobal("innerWidth", 1000);
     vi.stubGlobal("innerHeight", 800);
-    const el = { offsetWidth: 300, offsetHeight: 200 } as HTMLElement;
+    const el = { offsetWidth: 300, offsetHeight: 200, closest: () => null } as unknown as HTMLElement;
     const anchor = { getBoundingClientRect: () => ({ left: 100, right: 180, top: 40, bottom: 60 }) } as unknown as HTMLElement;
     expect(measure(el, anchor)).toEqual({ left: 100, top: 66 });
     expect(measure(el, null)).toEqual({ left: 350, top: 80 });
     expect(measure(null, anchor)).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("uses the zoomed shell's visible layout coordinates for anchors and viewport bounds", () => {
+    const shell = { style: { zoom: "2" } } as HTMLElement;
+    vi.stubGlobal("innerWidth", 820);
+    vi.stubGlobal("innerHeight", 820);
+    vi.stubGlobal("getComputedStyle", () => shell.style);
+    const el = { offsetWidth: 100, offsetHeight: 100, closest: () => shell } as unknown as HTMLElement;
+    const anchor = { closest: () => shell, getBoundingClientRect: () => ({ left: 40, right: 100, top: 760, bottom: 795 }) } as unknown as HTMLElement;
+    expect(measure(el, anchor)).toEqual({ left: 20, top: 274 });
     vi.unstubAllGlobals();
   });
 });

@@ -266,6 +266,7 @@ The system **MUST** confirm discarding a recording inline in the capture notice,
 - [x] No alert or sheet ever appears in the call window
 - [x] Deleting from a call's page lands on Library › **Calls** without the call
 - [x] Sheets keep focus inside until they close and return it to the opener
+- [x] Sheet keyboard handling ignores composing and already-handled events; Escape cancels only the sheet, and page or shell shortcuts do not act behind a modal sheet
 - [x] Plural titles and buttons follow the plural rules (**Delete 3 calls?**, **Delete 3 Calls**)
 
 ## 7. Additional Context

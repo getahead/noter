@@ -25,6 +25,7 @@ export interface SearchFieldProps extends Common {
   onChange?: (value: string) => void;
   /** Return runs the search. */
   onEnter?: (value: string) => void;
+  onBlur?: () => void;
   /** Return or a comma in a token field adds the typed tag. */
   onAddToken?: (text: string) => void;
   onRemoveToken?: (index: number) => void;
@@ -44,7 +45,7 @@ export function searchKey(key: string, f: { value: string; caret: number; tokens
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 /** search-field: a capsule with the search glyph, optional capsule tokens and a native search input. */
-export function SearchField({ variant: v, state, value = "", tokens = [], placeholder, ariaLabel, list, invalid, onChange, onEnter, onAddToken, onRemoveToken, id, ...o }: SearchFieldProps) {
+export function SearchField({ variant: v, state, value = "", tokens = [], placeholder, ariaLabel, list, invalid, onChange, onEnter, onBlur, onAddToken, onRemoveToken, id, ...o }: SearchFieldProps) {
   const variant = v || (tokens.length ? "tokens" : "plain");
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return; // Return and Esc belong to the input method while it composes
@@ -71,7 +72,7 @@ export function SearchField({ variant: v, state, value = "", tokens = [], placeh
           </button>
         </span>
       ))}
-      <input type="search" id={id} placeholder={placeholder} value={value} list={list} aria-label={ariaLabel || placeholder} aria-invalid={invalid || undefined} autoComplete="off" onChange={(e) => onChange?.(e.target.value)} onKeyDown={onKeyDown} />
+      <input type="search" id={id} placeholder={placeholder} value={value} list={list} aria-label={ariaLabel || placeholder} aria-invalid={invalid || undefined} autoComplete="off" onChange={(e) => onChange?.(e.target.value)} onKeyDown={onKeyDown} onBlur={onBlur} />
     </label>
   );
 }

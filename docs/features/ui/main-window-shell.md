@@ -323,6 +323,9 @@ The system **MUST** provide the mode indicator in its eight variants with glyph 
 
 ## 6. Acceptance Criteria
 
+- [x] A shell shortcut with no applicable action does not fall through to opening search; only the focus-search action opens and focuses it
+- [x] At Narrow width, an empty search field returns to its icon when it loses focus; a non-empty query remains available
+
 - [x] Every main-window state of DESIGN's States table that M0 and M1 can reach renders as in the prototype (App-level banner, Switched to local, No assistant, Capturing, Hidden for presenting, Update ready, Reopened after a quit, Window reloaded); Calendar access denied, Keyword-only search, Outputs being written and Proposals waiting render once their features land
 - [x] The mode indicator shows the same glyph and word on every surface for the same mode, with the warning form for degraded modes
 - [x] Back and Forward return to the same query, filters and scroll position

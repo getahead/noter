@@ -285,6 +285,8 @@ The system **MUST** render transcript, document, model and user text as plain te
 - [x] Every hit area is at least 24 by 24 pt, including 20-pt buttons and 22-pt inline icon buttons
 - [x] A banner slot never shows two banners at once; **+2 More** lists the rest by severity
 - [x] Hostile strings render as text in every primitive
+- [x] Icon and push button help tags use the tooltip primitive: shown after 500 ms hover or immediately on keyboard focus, and exposed as the control description without a native-title duplicate
+- [x] Popovers and tooltips use the zoomed shell's visible layout coordinates, including at 200 %
 - [x] The primitives page renders identically to the prototype's light, dark and Increase Contrast renderings in the four appearance states of `cpt-noter-state-ui-tokens-theming-appearance` (screenshot match ≥ 98 % in the pinned container); the harness self-test fixture `apps/desktop/tests/visual/fixtures/primitives.html` becomes this page. Moved here from `cpt-noter-feature-ui-tokens-theming`, which checks the tokens themselves against the prototype
 
 ## 7. Additional Context

@@ -126,6 +126,17 @@ describe("handleShortcut", () => {
     expect(handleShortcut(ev("KeyA", { defaultPrevented: true }), [{ KeyA: run }])).toBe(false);
     expect(run).not.toHaveBeenCalled();
   });
+  it("does not run window shortcuts behind a modal surface", () => {
+    vi.stubGlobal("document", { querySelector: vi.fn(() => ({})) });
+    const run = vi.fn();
+    const e = ev("KeyE", { metaKey: true });
+    expect(handleShortcut(e, [{ "Meta+KeyE": run }])).toBe(false);
+    const escape = ev("Escape");
+    expect(handleShortcut(escape, [{ Escape: run }])).toBe(false);
+    expect(run).not.toHaveBeenCalled();
+    expect(e.preventDefault).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
   it("useShortcuts returns a handler over the table", () => {
     const run = vi.fn();
     useShortcuts({ KeyA: run })(ev("KeyA"));

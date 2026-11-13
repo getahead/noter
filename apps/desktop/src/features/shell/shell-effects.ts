@@ -28,6 +28,18 @@ export function actionEvent(a: ShellAction, overlay: boolean, hasInspector: bool
   }
 }
 
+// @cpt-flow:cpt-noter-flow-ui-main-window-shell-navigate:p1
+export function runShellAction(a: ShellAction, overlay: boolean, hasInspector: boolean, effects: {
+  dispatch: (event: ShellEvent) => void;
+  openSettings: () => void;
+  focusSearch: () => void;
+}): void {
+  const event = actionEvent(a, overlay, hasInspector);
+  if (event) effects.dispatch(event);
+  else if (a.type === "open-settings") effects.openSettings();
+  else if (a.type === "focus-search") effects.focusSearch();
+}
+
 /** Esc closes the inspector first, then the overlay sidebar (a popover has already taken its own Esc). */
 export const escapeEvent = (h: Pick<History, "inspectorOpen">): ShellEvent => ({ type: h.inspectorOpen ? "close-inspector" : "close-overlay" });
 
