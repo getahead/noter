@@ -406,7 +406,15 @@ impl Core {
             bump_rev: true,
             values,
         };
-        self.store().write(mutation, meta).map(drop)
+        let sensitivity_changed = mutation
+            .values
+            .iter()
+            .any(|(key, _)| *key == "privacy_class");
+        self.store().write(mutation, meta)?;
+        if sensitivity_changed {
+            self.refresh_run_privacy(lock(&self.settings).privacy.mode);
+        }
+        Ok(())
     }
 
     // @cpt-algo:cpt-noter-algo-core-capture-session-degraded:p1

@@ -14,8 +14,8 @@ use noter_db::rusqlite::{params, Connection, OptionalExtension};
 use noter_db::{Logged, Mutation};
 use noter_jobs::{BoxFuture, JobHandler, Request, RunCtx, Stop, Trigger};
 use noter_llm::{
-    Failure, LlmRuntime, Packet, PacketContext, PacketItem, Privacy, RunRequest, Skill,
-    SourceClass, TaskKind,
+    Failure, LlmRuntime, Packet, PacketContext, PacketItem, RunRequest, Skill, SourceClass,
+    TaskKind,
 };
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
@@ -743,7 +743,6 @@ impl Core {
         call: &CallId,
         kind: SectionKind,
         packet: &Packet,
-        privacy: Privacy,
         options: &Options,
     ) -> Result<Generated, Option<ErrorCode>> {
         if packet.items.is_empty() {
@@ -758,11 +757,22 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-model
         // One run per section, so one failure leaves the others and a section can be retried
         // alone; the gate validates schema, HTML and citations before anything is kept.
-        let (_privacy, rx) = tokio::sync::watch::channel(privacy);
+        let rx = self
+            .run_privacy(vec![call.clone()])
+            .map_err(|e| Some(e.code))?;
+        let mut packet = packet.clone();
+        let source = if rx.borrow().sensitive {
+            SourceClass::Sensitive
+        } else {
+            SourceClass::Normal
+        };
+        for item in &mut packet.items {
+            item.source = source;
+        }
         let mut req = RunRequest::new(
             Skill::PostCall,
             SKILL_VERSION,
-            packet.clone(),
+            packet,
             TaskKind::PostCall,
             rx,
         );
@@ -1184,7 +1194,6 @@ impl Core {
         self.rechunk(ctx, call).await?;
         let packet = self.packet(call, head.sensitive, &head.call_type)?;
         // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-packet
-        let privacy = self.privacy_of(head.sensitive);
         self.postcall.clear(call);
         let mut first_failure: Option<ErrorCode> = None;
         let mut committed = 0;
@@ -1196,7 +1205,7 @@ impl Core {
             self.postcall.set(call, kind, SectionState::Writing);
             self.progress(call, kind, SectionState::Writing);
             let generated = self
-                .generate(call, kind, &packet, privacy, &Options::default())
+                .generate(call, kind, &packet, &Options::default())
                 .await;
             // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-validate
             let g = match generated {
@@ -1285,14 +1294,6 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-return
     }
 
-    fn privacy_of(&self, sensitive: bool) -> Privacy {
-        Privacy {
-            mode: lock(&self.settings).privacy.mode,
-            sensitive,
-            offline: !self.app().environment.online,
-        }
-    }
-
     fn section_failed(&self, call: &CallId, kind: SectionKind, code: ErrorCode) {
         let failed = SectionState::Failed {
             code,
@@ -1350,14 +1351,13 @@ impl Core {
             local: r.local,
         });
         let packet = self.packet(call, head.sensitive, &call_type)?;
-        let privacy = self.privacy_of(head.sensitive);
         let total = kinds.len();
         let mut first_failure = None;
         for (n, kind) in kinds.into_iter().enumerate() {
             ctx.checkpoint().await?;
             self.postcall.set(call, kind, SectionState::Writing);
             self.progress(call, kind, SectionState::Writing);
-            let g = match self.generate(call, kind, &packet, privacy, &options).await {
+            let g = match self.generate(call, kind, &packet, &options).await {
                 Ok(g) => g,
                 Err(None) => return Err(Stop::Cancelled),
                 Err(Some(code)) => {

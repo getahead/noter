@@ -408,6 +408,9 @@ impl Core {
     ) -> Settings {
         apply(settings, section.clone());
         settings.rev = rev;
+        if matches!(section, SettingsSection::Privacy(_)) {
+            self.refresh_run_privacy(settings.privacy.mode);
+        }
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-side-effects
         for hook in lock(&self.settings_hooks).iter() {
             hook(&section);

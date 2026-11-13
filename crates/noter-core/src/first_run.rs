@@ -468,6 +468,7 @@ impl Core {
             self.playback_route_changed(app.environment.output_route);
         }
         drop(app);
+        self.refresh_run_privacy(lock(&self.settings).privacy.mode);
         self.disk_changed(reading.disk_free_mb);
     }
 

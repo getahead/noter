@@ -1263,6 +1263,7 @@ fn ask_threads_keep_turns_in_order_and_mark_deleted_sources() {
     .unwrap();
     assert_eq!(prior.len(), 1);
     assert!(!prior[0].sensitive);
+    assert_eq!(prior[0].calls, vec![CallId::new("call_a")]);
 
     lib.db.execute("PRAGMA foreign_keys = OFF", []).unwrap();
     lib.db

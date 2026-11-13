@@ -163,6 +163,7 @@ impl Core {
         for (kind, id) in touched {
             match kind.as_str() {
                 "call" => {
+                    self.refresh_run_privacy(lock(&self.settings).privacy.mode);
                     if let Some(call) = self.call_row(id)? {
                         self.emit_entity_changed(&EntityChanged::Call { call });
                     }

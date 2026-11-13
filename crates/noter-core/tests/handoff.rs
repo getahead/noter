@@ -340,6 +340,33 @@ impl World {
 
 const SLOW: &str = r#"{"on": "handoff", "after_ms": 1000, "output": {"goal": "Fix the drawer focus", "context": "Anna said focus must go back to the list.", "constraints": ["Keep the old API"], "acceptance": ["Focus returns to the list"], "links": ["VSTOR-12", "https://made.up/x"], "repo": null, "guardrails": "Touch only the drawer."}}"#;
 
+// cpt-noter-algo-core-llm-gate-egress: repairs use the call's current sensitivity.
+#[tokio::test(start_paused = true)]
+async fn a_handoff_repair_stays_local_after_the_call_becomes_sensitive() {
+    let w = world(r#"{"on":"handoff","after_ms":1000,"output":{}}"#);
+    w.generate("itm_eng", false).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(w.llm.received().len(), 1);
+    assert_ne!(w.llm.received()[0].runtime, RuntimeChoice::Local);
+    w.core
+        .capture_set_sensitive(
+            &ctx(),
+            SensitiveArgs {
+                call_id: CallId::new("call_a"),
+                sensitive: true,
+            },
+        )
+        .await
+        .unwrap();
+    w.settle().await;
+    let received = w.llm.received();
+    assert!(received.len() > 1);
+    assert!(received[1..]
+        .iter()
+        .all(|r| r.runtime == RuntimeChoice::Local));
+    assert_eq!(w.get("itm_eng").await.unwrap().state, PromptState::Ready);
+}
+
 #[tokio::test(start_paused = true)]
 async fn generate_answers_generating_then_ready_through_entity_changed_and_caches() {
     let w = world(SLOW);
