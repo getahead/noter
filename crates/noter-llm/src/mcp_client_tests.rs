@@ -444,6 +444,7 @@ async fn a_server_that_needs_no_sign_in_gets_an_empty_grant() {
 #[derive(Clone, Copy, PartialEq)]
 enum Browser {
     Approve,
+    IdleThenApprove,
     Deny,
     /// Comes back with another flow's state, then never again.
     WrongState,
@@ -561,18 +562,24 @@ impl OAuthWorld {
             *lock(&challenge) = Some(param("code_challenge"));
             let redirect = Url::parse(&param("redirect_uri")).unwrap();
             let query = match browser {
-                Browser::Approve => format!("code=the-code&state={}", param("state")),
+                Browser::Approve | Browser::IdleThenApprove => {
+                    format!("code=the-code&state={}", param("state"))
+                }
                 Browser::Deny => format!("error=access_denied&state={}", param("state")),
                 Browser::WrongState => "code=the-code&state=another".to_owned(),
             };
             let target = format!("{}?{query}", redirect.path());
             let addr = format!("127.0.0.1:{}", redirect.port().unwrap());
             thread::spawn(move || {
+                // Keep the first connection silent and open until the callback is answered.
+                let idle = (browser == Browser::IdleThenApprove)
+                    .then(|| TcpStream::connect(&addr).unwrap());
                 let mut stream = TcpStream::connect(addr).unwrap();
                 let request = format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
                 stream.write_all(request.as_bytes()).unwrap();
                 let mut answer = String::new();
                 let _ = stream.read_to_string(&mut answer);
+                drop(idle);
             });
         };
         // Long enough for a loaded runner to come back; the wrong-state test waits it out.
@@ -615,6 +622,32 @@ async fn signs_in_with_pkce_through_the_browser_and_a_loopback_redirect() {
     assert_eq!(grant["access"], "granted");
     assert_eq!(grant["refresh"], "r1");
     assert_eq!(grant["client_id"], "noter-cid");
+    let renewed = no_renewal();
+    let call = Call {
+        server: &server,
+        token: &token,
+        audit: &audit,
+        renewed: &renewed,
+    };
+    assert!(client.list(&call).await.unwrap().is_some());
+    audited_before_each(&audits, &servers);
+}
+
+// cpt-noter-flow-core-knowledge-mcp: inst-mcp-oauth
+#[tokio::test]
+async fn a_silent_connection_does_not_stall_the_oauth_callback() {
+    let world = OAuthWorld::new(None);
+    let audits = Audits::new(true);
+    let servers = [&world.resource, &world.auth];
+    let audit = audit_of(&audits, &servers);
+    let server = world.resource.url("/mcp");
+    let client = world
+        .client(Browser::IdleThenApprove)
+        .sign_in_deadline(Duration::from_secs(6));
+
+    let token = client.sign_in(&server, &audit).await.unwrap();
+    let grant: Value = serde_json::from_str(&token).unwrap();
+    assert_eq!(grant["access"], "granted");
     let renewed = no_renewal();
     let call = Call {
         server: &server,
