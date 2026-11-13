@@ -115,15 +115,18 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 
 **Success Scenarios**:
 - During a call the window gets microphone and system levels at most every 100 ms.
+- A later subscriber or a reloaded window receives the retained stream's next sample after the returned `last_seq`, without restarting the sequence or resubscribing on a false gap.
 
 **Error Scenarios**:
 - No call and no self-test running: the subscription stays open with no messages until one starts or the window unsubscribes.
 
 **Steps**:
 1. [x] - `p1` - API: `levels_subscribe { call_id? }` with a Channel - `inst-levels-call`
-2. [x] - `p1` - **RETURN** a `SubscriptionHandle` - `inst-levels-handle`
+2. [x] - `p1` - **RETURN** a `SubscriptionHandle { subscription_id, last_seq }`, with `last_seq` read under the hub's subscription lock - `inst-levels-handle`
 3. [x] - `p1` - Forward engine `levels` as `LevelsMsg { seq, at_ms, mic_db, sys_db }`, coalesced to one per 100 ms per stream, before a `seq` is assigned - `inst-levels-forward`
 4. [x] - `p1` - End with `stream_unsubscribe` or a webview reload - `inst-levels-end`
+
+**Tests**: `crates/noter-core/tests/transcript.rs` checks the retained baseline with overlapping subscribers and after unsubscribe; `apps/desktop/src/app/bridge/bridge.test.ts` checks samples arriving before the response. Conformance covers gapless levels in `m0-m1-rules.test.ts` and `m1-stories-transcript.test.ts`. The real-core reload regression in `apps/desktop/tests/e2e/m0-first-run-ui.spec.ts` proves the microphone meter for `cpt-noter-seq-first-run-complete-setup`.
 
 ### Preview a span
 

@@ -81,6 +81,7 @@ impl CoreApi for Stub {
         });
         Ok(SubscriptionHandle {
             subscription_id: SubscriptionId::new("sub_1"),
+            last_seq: Seq(0),
         })
     }
 }

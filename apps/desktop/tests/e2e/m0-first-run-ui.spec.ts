@@ -169,6 +169,15 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     await expect(selfTest(page)).toContainText("We hear your microphone but not system audio.");
   });
 
+  test("UI — regression: microphone levels continue after reloading first run", async ({ page }) => {
+    await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), audioGranted(w)) });
+    const meter = permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" });
+    await expect(meter).toBeVisible(); // The retained stream has published at least one sample.
+    await page.reload();
+    await expect(meter).toBeVisible();
+    await expect(meter).toHaveAttribute("aria-valuenow", /-?\d+/);
+  });
+
   test("UI — empty path: Self-test skipped — Skip for Now marks Permissions with a dash and moves on", async ({ page }) => {
     await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), audioGranted(w)) });
 

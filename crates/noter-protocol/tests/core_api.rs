@@ -77,6 +77,7 @@ impl CoreApi for Answering {
         self.delivered.lock().unwrap().push(delivered);
         Ok(SubscriptionHandle {
             subscription_id: SubscriptionId::new("sub_selftest"),
+            last_seq: Seq(0),
         })
     }
 }
@@ -248,7 +249,10 @@ fn a_subscribing_command_streams_its_channel_messages_as_json() {
         Some(sink),
     ))
     .unwrap();
-    assert_eq!(out, json!({"subscription_id": "sub_selftest"}));
+    assert_eq!(
+        out,
+        json!({"subscription_id": "sub_selftest", "last_seq": 0})
+    );
     assert_eq!(
         *got.lock().unwrap(),
         vec![json!({"seq": 1, "event": {"type": "stream_arrived", "channel": "mic"}})]

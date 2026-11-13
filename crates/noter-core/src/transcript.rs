@@ -587,6 +587,7 @@ impl Core {
         let subscribed = self.subscribe(&self.levels_hub(), key, ctx, channel, || Ok(()))?;
         Ok(SubscriptionHandle {
             subscription_id: subscribed.subscription_id,
+            last_seq: subscribed.last_seq,
         })
         // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-handle
         // @cpt-end:cpt-noter-flow-core-live-transcript-levels:p2:inst-levels-end

@@ -630,6 +630,75 @@ async fn a_crash_between_commit_and_publish_loses_and_doubles_nothing() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn levels_resubscribe_returns_the_sequence_before_its_first_sample() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    let (sink, first) = collecting::<LevelsMsg>();
+    let handle = r
+        .core
+        .levels_subscribe(&call_window(), SubscribeLevelsArgs { call_id: None }, sink)
+        .await
+        .unwrap();
+    engine_up(&r).await;
+    for seq in 1..=3 {
+        r.clock.0.store(seq * 200, Ordering::SeqCst);
+        r.engine.inject(EngineEvent::Levels {
+            call_id: None,
+            mic_db: -20.0,
+            sys_db: -50.0,
+        });
+        settle(1).await;
+    }
+    assert_eq!(first.lock().unwrap().last().unwrap().seq, Seq(3));
+    // An overlapping subscriber, then a remount after both subscriptions end, use the same stream.
+    for (baseline, unsubscribe_first) in [(3, false), (4, true)] {
+        if unsubscribe_first {
+            r.core
+                .stream_unsubscribe(
+                    &call_window(),
+                    UnsubscribeArgs {
+                        subscription_id: handle.subscription_id.clone(),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+        let (sink, got) = collecting::<LevelsMsg>();
+        let next = r
+            .core
+            .levels_subscribe(&call_window(), SubscribeLevelsArgs { call_id: None }, sink)
+            .await
+            .unwrap();
+        let last_seq = serde_json::to_value(&next).unwrap()["last_seq"].clone();
+        assert_eq!(
+            last_seq,
+            json!(baseline),
+            "the bridge needs the retained stream baseline"
+        );
+        r.clock.0.store(baseline * 200 + 200, Ordering::SeqCst);
+        r.engine.inject(EngineEvent::Levels {
+            call_id: None,
+            mic_db: -22.0,
+            sys_db: -50.0,
+        });
+        settle(1).await;
+        assert_eq!(
+            got.lock().unwrap().first().unwrap().seq,
+            Seq(baseline as u64 + 1)
+        );
+        r.core
+            .stream_unsubscribe(
+                &call_window(),
+                UnsubscribeArgs {
+                    subscription_id: next.subscription_id,
+                },
+            )
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn levels_are_coalesced_to_one_per_100_ms() {
     let dir = tempfile::tempdir().unwrap();
     let r = open(dir.path());

@@ -3,10 +3,9 @@ import { expect, type Page } from "@playwright/test";
 
 import { calls, type Steer } from "./app";
 
-const FAKE = process.env.NOTER_CORE !== "stdio";
 const permissionRow = (page: Page, name: string) => page.locator('[data-component="cpt-noter-component-ui-permission-check-row"]').filter({ hasText: name });
 
-/** Complete the real system-audio probe and wait for the fake's initial meter layout. */
+/** Complete the system-audio probe and wait for the microphone's initial meter layout. */
 export async function confirmSystemAudio(page: Page): Promise<void> {
   const sys = permissionRow(page, "System audio recording");
   const open = sys.getByRole("button", { name: "Open System Settings…" });
@@ -17,7 +16,7 @@ export async function confirmSystemAudio(page: Page): Promise<void> {
   }
   await expect(sys).toContainText("Granted", { timeout: 15_000 });
   // This meter inserts a row and moves Run Test; wait before placing the pointer.
-  if (FAKE) await expect(permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" })).toBeVisible();
+  await expect(permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" })).toBeVisible();
 }
 
 /** Start through the UI and wait for the core's response, rather than its command log entry. */

@@ -235,6 +235,8 @@ pub struct SubscribeLevelsArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SubscriptionHandle {
     pub subscription_id: SubscriptionId,
+    /// The Channel starts strictly after this stream sequence, including on resubscribe.
+    pub last_seq: Seq,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
