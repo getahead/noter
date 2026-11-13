@@ -49,7 +49,6 @@ impl Loads {
         );
     }
 
-    // @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
     pub fn finished(&mut self, label: &str, now: Instant) {
         let restarts = match self.0.get(label) {
             Some(Load::Loading { restarts, .. }) | Some(Load::Loaded { restarts, .. }) => *restarts,
@@ -70,7 +69,6 @@ impl Loads {
 
     /// The webviews to restart now: each load older than `BOUND`, at most `ATTEMPTS` times in a
     /// row. A restarted page is loading again from `now`; one out of attempts is left alone.
-    // @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
     pub fn due(&mut self, now: Instant) -> Vec<String> {
         let mut due = Vec::new();
         for (label, load) in self.0.iter_mut() {
@@ -99,7 +97,6 @@ impl Loads {
     }
 
     /// A loaded webview's content process exited; reload it within the same retry budget.
-    // @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
     pub fn process_terminated(&mut self, label: &str, now: Instant) -> bool {
         let Some(Load::Loaded { since, restarts }) = self.0.get(label).copied() else {
             return false;
@@ -123,7 +120,6 @@ impl Loads {
         true
     }
 
-    // @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
     fn loaded_labels(&self) -> Vec<String> {
         self.0
             .iter()
@@ -156,7 +152,6 @@ pub fn start<R: Runtime>(app: &AppHandle<R>) -> Watch {
         for label in due {
             restart(&app, &label);
         }
-        // @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
         for label in loaded {
             recover_terminated(&app, &polled, &label);
         }
@@ -200,7 +195,6 @@ fn restart<R: Runtime>(app: &AppHandle<R>, label: &str) {
 /// `_killWebContentProcessAndResetState`, each checked with respondsToSelector:): WebKit has no
 /// public call that ends a web view's content process; switch when one appears. WebKit only
 /// detaches the process, which a hung one never notices, so it is also killed.
-// @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
 pub(crate) fn web_process_id(webview: *mut std::ffi::c_void) -> Option<i32> {
     use objc2::runtime::AnyObject;
     use objc2::{msg_send, sel};
