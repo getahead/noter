@@ -338,10 +338,16 @@ async fn redaction_and_pseudonyms_are_consistent_and_names_come_back_inside_the_
 // cpt-noter-algo-core-llm-gate-egress: inst-egress-pseudonyms
 async fn pseudonyms_cover_overlapping_and_punctuated_names_without_changing_identity() {
     let cases = [
+        (vec![], "Ann Lee agreed.", "Ann Lee agreed."),
         (
             vec!["Ann", "Ann Lee"],
             "Ann Lee agreed; Ann replied; Annette watched.",
             "Person 2 agreed; Person 1 replied; Annette watched.",
+        ),
+        (
+            vec!["Person", "Ann Lee"],
+            "Ann Lee agreed; Person replied.",
+            "Person 2 agreed; Person 1 replied.",
         ),
         (
             vec![
@@ -1288,18 +1294,18 @@ async fn tool_result_pseudonyms_cover_overlapping_and_punctuated_names() {
     req.packet.people = vec!["Ann".into(), "Ann Lee".into()];
     let (id, run) = running(&f, &host, req).await;
     let run_id = noter_protocol::LlmRunId::new(&id);
-    let people = ["Ann", "Ann Lee", "Anna K.", "(Anna)", ".Anna"].map(str::to_owned);
+    let people = ["Ann", "Ann Lee", "Anna K.", "(Anna)", ".Anna", "Person"].map(str::to_owned);
     let released = f
         .llm
         .release_tool_result(
             &run_id,
             &people,
-            json!({"text": "Ann Lee and Ann met Anna K., (Anna) and .Anna; Annette watched."}),
+            json!({"text": "Ann Lee and Ann met Anna K., (Anna) and .Anna; Annette watched. Person replied."}),
         )
         .unwrap();
     assert_eq!(
         released["text"],
-        "Person 2 and Person 1 met Person 3, Person 4 and Person 5; Annette watched."
+        "Person 2 and Person 1 met Person 3, Person 4 and Person 5; Annette watched. Person 6 replied."
     );
     let done = run.await.unwrap().unwrap();
     assert_eq!(done.output["review_md"], "Ann Lee owes Ann.");

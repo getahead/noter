@@ -336,22 +336,18 @@ impl Gate {
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-pseudonyms
         let mut names = Vec::new();
         if r.pseudonyms {
-            let mut people: Vec<_> = packet
+            names = packet
                 .people
                 .iter()
                 .filter(|n| !n.trim().is_empty())
                 .enumerate()
+                .map(|(n, name)| (format!("Person {}", n + 1), name.clone()))
                 .collect();
-            // Replace full names before their prefixes, keeping the original numbering.
-            people.sort_by_key(|(_, name)| std::cmp::Reverse(name.len()));
-            for (n, name) in people {
-                let pseudonym = format!("Person {}", n + 1);
-                let whole = name_pattern(name);
+            if let Some(whole) = name_pattern(&names) {
                 let texts = items.iter_mut().map(|(_, t)| t).chain(glossary.iter_mut());
                 for text in texts {
-                    *text = whole.replace_all(text, pseudonym.as_str()).into_owned();
+                    pseudonymize(text, &whole, &names);
                 }
-                names.push((pseudonym, name.clone()));
             }
             // "Person 10" before "Person 1" when mapping back.
             names.sort_by_key(|(p, _)| std::cmp::Reverse(p.len()));
@@ -440,17 +436,14 @@ impl Gate {
             each_string(&mut result, &mut |t| *t = map.placeholders.redact(t));
         }
         if map.pseudonyms {
-            // Longest name first, so "Ann Lee" goes before "Ann".
-            let mut named: Vec<(String, &String)> = people
+            let named: Vec<(String, String)> = people
                 .iter()
                 .filter(|n| !n.trim().is_empty())
-                .map(|n| (map.pseudonym(n), n))
+                .map(|n| (map.pseudonym(n), n.clone()))
                 .collect();
-            named.sort_by_key(|(_, n)| std::cmp::Reverse(n.len()));
-            for (pseudonym, name) in named {
-                let whole = name_pattern(name);
+            if let Some(whole) = name_pattern(&named) {
                 each_string(&mut result, &mut |t| {
-                    *t = whole.replace_all(t, pseudonym.as_str()).into_owned();
+                    pseudonymize(t, &whole, &named);
                 });
             }
         }
@@ -577,8 +570,11 @@ fn payload(r: &Release, items: &[(&str, String)], context: Option<Value>) -> Vec
     serde_json::to_vec(&packet).expect("a JSON value serializes")
 }
 
-/// Punctuation at a name's edge has no word boundary against surrounding whitespace.
-fn name_pattern(name: &str) -> Regex {
+/// Longest alternatives win; a single pass cannot replace names inside generated pseudonyms.
+fn name_pattern(names: &[(String, String)]) -> Option<Regex> {
+    if names.is_empty() {
+        return None;
+    }
     static EDGES: OnceLock<(Regex, Regex)> = OnceLock::new();
     let (start, end) = EDGES.get_or_init(|| {
         (
@@ -586,13 +582,33 @@ fn name_pattern(name: &str) -> Regex {
             Regex::new(r"\w$").expect("a valid pattern"),
         )
     });
-    Regex::new(&format!(
-        "{}{}{}",
-        if start.is_match(name) { r"\b" } else { "" },
-        regex::escape(name),
-        if end.is_match(name) { r"\b" } else { "" },
-    ))
-    .expect("an escaped name is a valid pattern")
+    let mut ordered: Vec<_> = names.iter().collect();
+    ordered.sort_by_key(|(_, name)| std::cmp::Reverse(name.len()));
+    let alternatives: Vec<_> = ordered
+        .iter()
+        .map(|(_, name)| {
+            format!(
+                "{}{}{}",
+                if start.is_match(name) { r"\b" } else { "" },
+                regex::escape(name),
+                if end.is_match(name) { r"\b" } else { "" },
+            )
+        })
+        .collect();
+    Some(Regex::new(&alternatives.join("|")).expect("escaped names form a valid pattern"))
+}
+
+fn pseudonymize(text: &mut String, whole: &Regex, names: &[(String, String)]) {
+    *text = whole
+        .replace_all(text, |matched: &regex::Captures<'_>| {
+            names
+                .iter()
+                .find(|(_, name)| name == &matched[0])
+                .expect("a name alternative matched")
+                .0
+                .as_str()
+        })
+        .into_owned();
 }
 
 /// Regex redaction (TL-19): credentials first, then e-mail addresses, then phone numbers.
