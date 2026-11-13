@@ -6,6 +6,12 @@ import { t } from "../../i18n/format";
 export type Variant = "default" | "disk-full" | "model-missing" | "system-audio-off" | "call-ended" | "new-meeting";
 export type PanelState = "default" | "disabled" | "not-a-call" | "countdown-running" | "countdown-paused";
 
+// @cpt-flow:cpt-noter-flow-ui-record-prompt-notice:p1
+export function promptAnnouncement(previous: { key: string | null; variant: Variant | null }, key: string, variant: Variant): "appearance" | "notice" | null {
+  if (previous.key !== key) return variant === "call-ended" || variant === "new-meeting" ? "notice" : "appearance";
+  return previous.variant !== variant && (variant === "call-ended" || variant === "new-meeting") ? "notice" : null;
+}
+
 export interface PromptInput {
   setupComplete: boolean;
   /** Hidden for presenting: no panel on the shared screen. */

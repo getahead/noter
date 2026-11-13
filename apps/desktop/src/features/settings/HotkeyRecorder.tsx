@@ -32,6 +32,9 @@ const stateName = (s: RecorderState, caps: string) => (s.type === "IDLE" && !cap
 export const hotkeyRecorderLabel = (label: string, caps: string, recording: boolean) =>
   t(recording ? "settings.hotkeys.recording" : "settings.hotkeys.field", { label, chord: spokenChord(caps) || t("settings.hotkeys.none") });
 
+export const hotkeyConflictDescription = (id: string, message: string | null, recording: boolean) =>
+  message && !recording ? `${id}-conflict` : undefined;
+
 // @cpt-component:cpt-noter-component-ui-hotkey-recorder:p1
 export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, conflict, onRecord, onClear }: HotkeyRecorderProps) {
   const [state, dispatch] = useReducer(recorderReduce, IDLE_RECORDER);
@@ -72,7 +75,7 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
             className={recording ? "hk-field is-rec" : "hk-field"}
             disabled={disabled}
             aria-label={hotkeyRecorderLabel(label, caps, recording)}
-            aria-describedby={message ? `${id}-conflict` : undefined}
+            aria-describedby={hotkeyConflictDescription(id, message, recording)}
             // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-start-record
             // Safari does not focus a button on click, and the chord is read from the focused field
             onClick={(e) => ((held.current = null), e.currentTarget.focus(), dispatch({ type: "start" }))}
