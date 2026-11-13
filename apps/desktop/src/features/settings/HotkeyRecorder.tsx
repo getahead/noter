@@ -33,7 +33,7 @@ export const hotkeyRecorderLabel = (label: string, caps: string, recording: bool
   t(recording ? "settings.hotkeys.recording" : "settings.hotkeys.field", { label, chord: spokenChord(caps) || t("settings.hotkeys.none") });
 
 export const hotkeyConflictDescription = (id: string, message: string | null, recording: boolean) =>
-  message && !recording ? `${id}-conflict` : undefined;
+  message && !recording ? `${id}c` : undefined;
 
 // @cpt-component:cpt-noter-component-ui-hotkey-recorder:p1
 export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, conflict, onRecord, onClear }: HotkeyRecorderProps) {
@@ -98,7 +98,7 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
       </span>
       <div className="hk-live" aria-live="polite">
         {message && !recording && (
-          <span className="hk-err" id={`${id}-conflict`}>
+          <span className="hk-err" id={`${id}c`}>
             <Icon name="warning" size={12} />
             {message}
           </span>

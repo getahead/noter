@@ -47,6 +47,11 @@ describe("focusFirstAvailable", () => {
     expect(focusFirstAvailable(doc, ["next", "add"])).toBe(true);
     expect(focus).toHaveBeenCalledOnce();
   });
+
+  it("reports when every replacement target is missing or disabled", () => {
+    const doc = { getElementById: () => null } as unknown as Document;
+    expect(focusFirstAvailable(doc, ["missing"])).toBe(false);
+  });
 });
 
 describe("nextFocusable", () => {

@@ -42,8 +42,8 @@ export interface KeyRowProps {
 /** Row variant: name, use line, state tag, the Keychain line and **Add…** / **Replace…** / **Remove…**. */
 export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove, locked }: KeyRowProps) {
   const state = keyRowState(view);
-  const removeId = `credential-remove-${view.provider}`;
-  const addId = `credential-add-${view.provider}`;
+  const removeId = view.provider === "anthropic" ? "credential-remove-anthropic" : "credential-remove-codex";
+  const addId = view.provider === "anthropic" ? "credential-add-anthropic" : "credential-add-codex";
   const returnFocus = useRef(false);
   const previousState = useRef(state);
   useEffect(() => {
@@ -84,8 +84,8 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
 export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: KeyView; onRemove: () => void }) {
   const draft = useKeyDraft(bridge, view.provider);
   const stored = view.status.type === "configured";
-  const fieldId = `fr-key-${view.provider}`;
-  const removeId = `first-run-key-remove-${view.provider}`;
+  const fieldId = view.provider === "anthropic" ? "fr-key-anthropic" : "fr-key-codex";
+  const removeId = view.provider === "anthropic" ? "first-run-key-remove-anthropic" : "first-run-key-remove-codex";
   const returnFocus = useRef(false);
   const previousStored = useRef(stored);
   useEffect(() => {

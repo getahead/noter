@@ -15,14 +15,14 @@ describe("HotkeyRecorder", () => {
   it("describes the field's recording state and exposes a conflict as its description", () => {
     const html = renderToString(<HotkeyRecorder id="hk-a" label="Catch me up" caps="⌃⌥⌘C" conflict="Used by VoiceOver" />);
     expect(html).toContain('aria-label="Catch me up: shortcut Control-Option-Command-C"');
-    expect(html).toContain('aria-describedby="hk-a-conflict"');
-    expect(html).toContain('id="hk-a-conflict"');
+    expect(html).toContain('aria-describedby="hk-ac"');
+    expect(html).toContain('id="hk-ac"');
   });
 
   it("announces the instructions while recording instead of the idle chord label", () => {
     expect(hotkeyRecorderLabel("Catch me up", "⌃⌥⌘C", true)).toBe("Catch me up: Recording shortcut, type a shortcut");
     expect(hotkeyConflictDescription("hk-a", "Used by VoiceOver", true)).toBeUndefined();
-    expect(hotkeyConflictDescription("hk-a", "Used by VoiceOver", false)).toBe("hk-a-conflict");
+    expect(hotkeyConflictDescription("hk-a", "Used by VoiceOver", false)).toBe("hk-ac");
   });
 
   it("reads None and is cleared when the row has no chord", () => {

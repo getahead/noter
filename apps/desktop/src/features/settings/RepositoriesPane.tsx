@@ -29,7 +29,7 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
     if (index === null || !list || busy) return;
     focusAfterRemove.current = null;
     const next = Math.min(index, list.mappings.length - 1);
-    focusFirstAvailable(document, [...(next >= 0 ? [`repo-row-${list.mappings[next]!.id}`] : []), "repo-add"]);
+    focusFirstAvailable(document, [...(next >= 0 ? [`r${next}`] : []), "repo-add"]);
   }, [busy, list]);
   const mapping = list?.mappings.find((repo) => repo.id === selected);
   const edit = (repo?: RepoMapping) => sheets.open("add-mapping", { bridge, mapping: repo });
@@ -70,7 +70,7 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
           <Table label={t("settings.pane.repositories")} cls="hd-repositories">
             <thead><tr><Th label={t("mapping.project")} /><Th label={t("mapping.local_path")} /><Th label={t("mapping.tool")} /></tr></thead>
             <tbody>{list?.mappings.map((repo, i) => (
-              <tr key={repo.id} id={`repo-row-${repo.id}`} tabIndex={selected === repo.id || (!selected && i === 0) ? 0 : -1} aria-selected={selected === repo.id} onClick={() => select(repo.id)} onFocus={() => select(repo.id)} onDoubleClick={() => !busy && edit(repo)}>
+              <tr key={repo.id} id={`r${i}`} tabIndex={selected === repo.id || (!selected && i === 0) ? 0 : -1} aria-selected={selected === repo.id} onClick={() => select(repo.id)} onFocus={() => select(repo.id)} onDoubleClick={() => !busy && edit(repo)}>
                 <td>{repo.key}</td>
                 <td title={repo.local_path}><span className="np-mono">{repo.local_path}</span>{!repo.path_exists && <span className="hd__warn"><Icon name="warning" size={12} />{t("mapping.missing")}</span>}</td>
                 <td><PopupButton label={t("mapping.tool")} variant="inline" value={repo.default_tool} disabled={busy} options={(["claude_code", "codex"] as const).map((value) => ({ value, label: toolLabel(value) }))} onAction={(target) => void changeTool(repo, target as HandoffTarget)} /></td>
