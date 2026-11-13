@@ -854,7 +854,6 @@ async fn continuing_after_archive_completion_removes_the_stale_archive_pass() {
             },
         ])
         .unwrap();
-
     r.core
         .capture_continue(
             &main_window(),
@@ -877,6 +876,52 @@ async fn continuing_after_archive_completion_removes_the_stale_archive_pass() {
         r.query::<i64>("SELECT count(*) FROM speakers WHERE pass = 'archive'"),
         0
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn continued_engine_gaps_are_already_relative_to_the_original_call() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.advance(100_000);
+    r.stop(&main_window(), &call_id).await;
+    r.advance(60_000);
+    r.core
+        .capture_continue(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    r.session_started(&call_id);
+
+    r.inject(EngineEvent::DeviceChanged {
+        call_id: call_id.clone(),
+        device_name: "Headset".into(),
+        gap_from_ms: OffsetMs(162_000),
+        gap_to_ms: OffsetMs(162_500),
+    });
+    r.inject(EngineEvent::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since_ms: OffsetMs(163_000),
+        confidence: 0.8,
+    });
+    r.degraded_until(|states| {
+        states
+            .iter()
+            .any(|state| matches!(state, DegradedState::SystemAudioSilent { .. }))
+    })
+    .await;
+
+    assert_eq!(
+        r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'device_changed'"),
+        "162000-162500"
+    );
+    assert!(r.degraded().await.iter().any(|state| matches!(state,
+        DegradedState::SystemAudioSilent { call_id: id, since, .. }
+            if id == &call_id && *since == TimestampMs(T0 + 163_000)
+    )));
 }
 
 #[tokio::test(start_paused = true)]

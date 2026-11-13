@@ -281,6 +281,31 @@ final class CaptureTests: XCTestCase {
         try assertAudio(root.appendingPathComponent("audio/call_1/mic.m4a"), 3.0)
     }
 
+    func testResumeFailureLeavesThePauseGapOpenUntilAudioStarts() throws {
+        let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
+        let e = engine(lines, source, root, clock)
+        _ = e.handle(startLine(id: 1))
+        source.push(ms: 2000)
+        clock.advance(2000)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"pause","call_id":"call_1"}}"#)
+
+        source.failStart = true
+        clock.advance(5000)
+        _ = e.handle(#"{"id":3,"cmd":{"type":"resume","call_id":"call_1"}}"#)
+        XCTAssertEqual(lines.events.last?["type"] as? String, "error")
+        source.failStart = false
+        clock.advance(2000)
+        _ = e.handle(#"{"id":4,"cmd":{"type":"resume","call_id":"call_1"}}"#)
+        source.push(ms: 1000)
+        _ = e.handle(#"{"id":5,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        _ = try XCTUnwrap(lines.waitFor("session_stopped"))
+
+        let t = try timeline(root)
+        XCTAssertEqual(gaps(t).first?["t0_ms"] as? Int, 2000)
+        XCTAssertEqual(gaps(t).first?["t1_ms"] as? Int, 9000)
+        XCTAssertEqual(t["duration_ms"] as? Int, 10_000)
+    }
+
     func testAfterACrashTheNextEngineResumesFromTheRingInCallTime() throws {
         let (root, clock) = (try container(), TestClock())
         // The first engine captures 3 s, then dies without `stop`.

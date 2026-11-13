@@ -2,7 +2,7 @@
 title: "Feature: Capture session manager"
 description: "The capture state machine every surface drives the same way: detection and the record prompt, start, pause, stop, notices and their timers, Continue Recording, resume after a quit or crash, the back-to-back split, the sensitive flag and when notifications go out."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M1
 lane: core
@@ -44,12 +44,15 @@ design: docs/DESIGN-core.md
   - [Sensitive calls and notifications](#sensitive-calls-and-notifications)
   - [Same function from every surface](#same-function-from-every-surface)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [Change log](#change-log)
 
 <!-- /toc -->
 
 - [x] `p2` - **ID**: `cpt-noter-featstatus-core-capture-session`
 
 - [x] `p2` - `cpt-noter-feature-core-capture-session`
+
+> **0.2 (13 Nov 2026).** Version the stop and degraded-capture contracts for engine restart races. Stop, pause and discard during restart preserve user intent, and supervisor facts remain call-relative across continue/recovery. IPC and DESIGN stories remain unchanged.
 
 ## 1. Feature Context
 
@@ -207,7 +210,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 
 **Steps**:
 1. [x] - `p1` - API: `capture_stop { call_id }` (or the countdown, or a native caller) - `inst-stop-call`
-2. [x] - `p1` - Phase `stopping`; tell the engine `stop`; on `session_stopped` store the file paths and `ended_at` - `inst-engine-stop`
+2. [x] - `p1` - Phase `stopping`; tell the engine `stop`; if it is restarting, cancel its pending restart; on `session_stopped` store the file paths and `ended_at` - `inst-engine-stop`
 3. [x] - `p1` - DB: UPDATE `calls` status `processing` through the change-log write path; end the transcript and levels streams with `call_stopped` - `inst-update-call`
 4. [x] - `p1` - Phase `stopped`, `continue_until` = now + 5 minutes; hand the call to the post-call queue - `inst-phase-stopped`
 5. [x] - `p1` - API: `capture_continue { call_id }` before `continue_until`: atomically return archive state to pending and remove installed archive rows, cancel queued or running post-call work, start the engine session for the same call with a `continued` gap, phase `recording` - `inst-continue`
@@ -349,9 +352,9 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Output**: The capture rows of `degraded:changed`, `CaptureState.audio_writing`, gap rows.
 
 **Steps**:
-1. [x] - `p1` - Publish engine-derived states for the live call (`MicrophoneOff`, `SystemAudioSilent`, `TranscriptionStalled`, `DeviceChanged`, `SecondAudioSource`, `CaptureFailed`) - `inst-publish-engine-states`
+1. [x] - `p1` - Publish engine-derived states for the live call (`MicrophoneOff`, `SystemAudioSilent`, `TranscriptionStalled`, `DeviceChanged`, `SecondAudioSource`, `CaptureFailed`) at the call-relative `since` supplied by the supervisor - `inst-publish-engine-states`
 2. [x] - `p1` - Free disk under 2 GB → `DiskLow` (never a refusal); disk full → `DiskFull`, stop audio writing (`audio_writing: false`), keep the transcript - `inst-disk`
-3. [x] - `p1` - DB: write a `gaps` row for every gap reason the engine or the session produces - `inst-write-gaps`
+3. [x] - `p1` - DB: write a `gaps` row for every gap reason the engine or the session produces using call-relative offsets; do not add the call offset a second time - `inst-write-gaps`
 4. [x] - `p1` - **RETURN** the new `DegradedSet` with a new version - `inst-degraded-return`
 
 ## 4. States (CDSL)
@@ -480,3 +483,7 @@ The system **MUST** expose start, pause, mark and stop to menu items and hotkeys
 - [x] `capture_start` is never refused with nothing set up except for a missing live model; `disk_full` carries `detail.needed_mb`.
 - [x] Every one of the 16 capture commands succeeds at least once in E2E runs against the real core.
 - [x] `just gate` passes.
+
+## Change log
+
+- **0.2 (13 Nov 2026)**: Version stop and degraded-state requirements for engine restart consistency. No IPC or DESIGN story changes; completion requires `just gate` passes.

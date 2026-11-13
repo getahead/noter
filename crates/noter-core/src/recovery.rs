@@ -176,7 +176,6 @@ impl Core {
                 }
             });
             self.listen_for_speech(&mut session);
-            session.engine_base = None;
             if self.engine.start_session(start).await.is_err() {
                 session.failed_at = Some(now);
                 return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
@@ -203,7 +202,6 @@ impl Core {
             self.engine.try_again().await?;
         } else {
             let start = self.session_for(&call_id, Some(t1))?;
-            session.engine_base = None;
             self.engine.start_session(start).await?;
             self.insert_gap(&call_id, t0, t1, GapReason::EngineRestart)?;
             // The engine runs again: the failure it reported is over for this call.
@@ -244,7 +242,6 @@ impl Core {
     pub(crate) async fn capture_fact(&self, fact: CaptureFact) {
         let mut session = self.capture.lock().await;
         let state = self.capture_now();
-        let base = session.engine_base.unwrap_or(0);
         let ours = |call_id: &CallId| {
             state.call_id.as_ref() == Some(call_id)
                 && !matches!(state.phase, CapturePhase::Idle | CapturePhase::Stopped)
@@ -252,7 +249,7 @@ impl Core {
         match fact {
             CaptureFact::Gap(gap) if ours(&gap.call_id) => {
                 // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-write-gaps
-                let (t0, t1) = (base + i64::from(gap.t0_ms.0), base + i64::from(gap.t1_ms.0));
+                let (t0, t1) = (i64::from(gap.t0_ms.0), i64::from(gap.t1_ms.0));
                 if let Err(e) = self.insert_gap(&gap.call_id, t0, t1, gap.reason) {
                     self.log(crate::object(json!({
                         "level": "error", "module": "capture", "code": e.code
@@ -266,7 +263,7 @@ impl Core {
                 since_ms,
             } if ours(&call_id) => {
                 // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-publish-engine-states
-                let since = TimestampMs(session.at(base + i64::from(since_ms.0)));
+                let since = TimestampMs(session.at(i64::from(since_ms.0)));
                 let failed = degraded == Degraded::CaptureFailed;
                 let new = degraded_state(&call_id, degraded, since);
                 // @cpt-end:cpt-noter-algo-core-capture-session-degraded:p1:inst-publish-engine-states
