@@ -170,7 +170,9 @@ impl<L: EngineLauncher> SyncEnv<'_, L> {
 }
 
 // @cpt-dod:cpt-noter-dod-core-knowledge-ingestion:p1
+// @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
 // @cpt-algo:cpt-noter-algo-core-knowledge-sync-v2:p1
+// @cpt-state:cpt-noter-state-core-knowledge-source:p1
 // @cpt-state:cpt-noter-state-core-knowledge-source-v2:p1
 /// Syncs the indexed source `id` within the job run `ctx`. A removed source ends the run as
 /// cancelled with nothing written; a live source is refused.

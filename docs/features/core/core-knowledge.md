@@ -178,6 +178,10 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 ### Sync an indexed source
 
+- [x] `p4` - **ID**: `cpt-noter-algo-core-knowledge-sync`
+
+Previous revision, retained as a trace alias for `cpt-noter-algo-core-knowledge-sync-v2`.
+
 - [x] `p4` - **ID**: `cpt-noter-algo-core-knowledge-sync-v2`
 
 **Input**: Existing indexed source, job id, stored bookmark or Keychain token reference, local engine and current policy.
@@ -231,6 +235,10 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 ## 4. States (CDSL)
 
 ### Indexed source status
+
+- [x] `p4` - **ID**: `cpt-noter-state-core-knowledge-source`
+
+Previous revision, retained as a trace alias for `cpt-noter-state-core-knowledge-source-v2`.
 
 - [x] `p4` - **ID**: `cpt-noter-state-core-knowledge-source-v2`
 
