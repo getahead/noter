@@ -33,17 +33,36 @@ impl Clock for StepClock {
 }
 
 #[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
+struct Events {
+    recorded: Mutex<Vec<(&'static str, Value)>>,
+    idle_pause: Mutex<Option<IdlePause>>,
+}
+
+struct IdlePause {
+    reached: Arc<tokio::sync::Notify>,
+    release: std::sync::mpsc::Receiver<()>,
+}
 
 impl EventEmitter for Events {
     fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
+        // Hold successful Idle publication before the scheduler closes the run.
+        if event == "entity:changed"
+            && payload["source"]["status"]["type"] == "idle"
+            && payload["source"]["last_sync_at"].is_number()
+        {
+            let pause = self.idle_pause.lock().unwrap().take();
+            if let Some(pause) = pause {
+                pause.reached.notify_one();
+                let _ = pause.release.recv();
+            }
+        }
+        self.recorded.lock().unwrap().push((event, payload));
     }
 }
 
 impl Events {
     fn named(&self, name: &str) -> Vec<Value> {
-        let all = self.0.lock().unwrap();
+        let all = self.recorded.lock().unwrap();
         all.iter()
             .filter(|(e, _)| *e == name)
             .map(|(_, p)| p.clone())
@@ -189,13 +208,34 @@ impl Rig {
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        panic!("the source never settled: {:?}", self.source().await);
+        panic!(
+            "the source never settled: {:?}; scheduler runs: {:?}",
+            self.source().await,
+            self.core.scheduler().runs()
+        );
     }
 
-    /// Waits for a successful sync at `at` on the clock.
+    /// Waits for a successful sync at `at` and its scheduler run to finish before reindexing.
     async fn synced_at(&self, at: i64) -> SourceRow {
-        self.until(|r| r.status == SourceStatus::Idle && r.last_sync_at == Some(TimestampMs(at)))
-            .await
+        self.until(|r| {
+            if r.status != SourceStatus::Idle || r.last_sync_at != Some(TimestampMs(at)) {
+                return false;
+            }
+            // Idle is committed before the handler returns; reindexing then can resend work.
+            let id = r.id.clone();
+            read(&self.core, move |c| {
+                c.query_row(
+                    "SELECT NOT EXISTS (
+                        SELECT 1 FROM job_runs r JOIN jobs j ON j.id = r.job_id
+                        WHERE j.kind = 'source_sync' AND r.subject = ?1
+                          AND r.finished_at IS NULL
+                    )",
+                    [id.as_str()],
+                    |r| r.get(0),
+                )
+            })
+        })
+        .await
     }
 
     async fn add(&self) -> SourceRow {
@@ -683,7 +723,7 @@ async fn an_indexed_mcp_source_signs_in_keeps_only_a_token_reference_and_indexes
         )
     });
     assert_eq!(leaked, 0);
-    let events = format!("{:?}", rig.events.0.lock().unwrap());
+    let events = format!("{:?}", rig.events.recorded.lock().unwrap());
     assert!(!events.contains(token.expose()));
 }
 
@@ -805,6 +845,54 @@ async fn an_indexed_source_needs_a_known_schedule() {
     };
     let err = rig.core.source_update(&ctx(), update).await.unwrap_err();
     assert_eq!(err.code, ErrorCode::InvalidInput);
+}
+
+// cpt-noter-algo-core-knowledge-sync / inst-sync-return: Idle precedes job completion.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn synced_at_waits_for_the_source_job_after_idle_is_published() {
+    let rig = open().await;
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let (release, wait) = std::sync::mpsc::channel();
+    *rig.events.idle_pause.lock().unwrap() = Some(IdlePause {
+        reached: reached.clone(),
+        release: wait,
+    });
+    rig.mcp
+        .set("notion", server(vec![page(1, "h1"), page(2, "h2")]));
+    let row = rig
+        .core
+        .source_add_mcp(&ctx(), mcp_args(SourceMode::Indexed))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(15), reached.notified())
+        .await
+        .expect("the source sync did not publish successful Idle");
+    let idle = rig.source().await.unwrap();
+    assert_eq!(idle.status, SourceStatus::Idle);
+    assert_eq!(idle.last_sync_at, Some(TimestampMs(T0)));
+    assert!(rig
+        .core
+        .scheduler()
+        .runs()
+        .unwrap()
+        .iter()
+        .any(|run| { run.kind == JobKind::SourceSync && run.status == JobRunStatus::Running }));
+
+    let mut synced = std::pin::pin!(rig.synced_at(T0));
+    let first_poll = std::future::poll_fn(|cx| {
+        std::task::Poll::Ready(std::future::Future::poll(synced.as_mut(), cx))
+    })
+    .await;
+    assert!(
+        first_poll.is_pending(),
+        "sync returned before its job closed: {first_poll:?}"
+    );
+    // Dropping this sender also releases the worker if an assertion above fails.
+    drop(release);
+    let done = synced.await;
+    assert_eq!(done.id, row.id);
+    assert_eq!(done.documents, 2);
+    assert_eq!(last_run(&rig.core), (2, 0, 0, None));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
