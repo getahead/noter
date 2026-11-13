@@ -335,6 +335,42 @@ async fn redaction_and_pseudonyms_are_consistent_and_names_come_back_inside_the_
 }
 
 #[tokio::test(start_paused = true)]
+// cpt-noter-algo-core-llm-gate-egress: inst-egress-pseudonyms
+async fn pseudonyms_cover_overlapping_and_punctuated_names_without_changing_identity() {
+    let cases = [
+        (
+            vec!["Ann", "Ann Lee"],
+            "Ann Lee agreed; Ann replied; Annette watched.",
+            "Person 2 agreed; Person 1 replied; Annette watched.",
+        ),
+        (
+            vec![
+                "Anna K.", "(Anna)", ".Anna", "Éva", "李", "_Ann_", "A\u{301}",
+            ],
+            "Anna K. said (Anna) met .Anna, Éva, 李, _Ann_ and A\u{301}.",
+            "Person 1 said Person 2 met Person 3, Person 4, Person 5, Person 6 and Person 7.",
+        ),
+    ];
+    for (people, input, expected) in cases {
+        let script = serde_json::to_string(&json!({"on": "role-review", "output": {
+            "agent": "pm", "review_md": expected, "evidence_segment_ids": ["seg_1"]
+        }}))
+        .unwrap();
+        let f = fixture(Some(&script));
+        let mut req = f.request(Skill::RoleReview, TaskKind::PostCall);
+        req.settings.pseudonyms = true;
+        req.packet.people = people.iter().map(|n| (*n).into()).collect();
+        req.packet.items[0].text = input.into();
+        req.packet.context.glossary = vec![input.into()];
+        let done = f.llm.run_once(req).await.unwrap();
+        let sent: Value = serde_json::from_slice(&f.scripted.received()[0].bytes).unwrap();
+        assert_eq!(sent["items"][0]["text"], expected);
+        assert_eq!(sent["context"]["glossary"][0], expected);
+        assert_eq!(done.output["review_md"], input);
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_call_context_goes_out_with_the_lines_through_the_same_redaction() {
     let f = fixture(None);
     f.privacy.send_replace(Privacy {
@@ -1241,6 +1277,32 @@ async fn a_cloud_tool_result_uses_the_runs_pseudonyms_and_its_audit_row_commits_
     let done = run.await.unwrap().unwrap();
     assert_eq!(done.output["review_md"], "Bob Stone owes Ann Lee.");
     assert!(!f.log_text().contains("Ann Lee") && !f.log_text().contains("Bob Stone"));
+}
+
+#[tokio::test(start_paused = true)]
+// cpt-noter-algo-core-mcp-release-result: inst-release-redact
+async fn tool_result_pseudonyms_cover_overlapping_and_punctuated_names() {
+    let host = Arc::new(Host::default());
+    let f = with_host(Some(SLOW), &host);
+    let mut req = tool_request(&f);
+    req.packet.people = vec!["Ann".into(), "Ann Lee".into()];
+    let (id, run) = running(&f, &host, req).await;
+    let run_id = noter_protocol::LlmRunId::new(&id);
+    let people = ["Ann", "Ann Lee", "Anna K.", "(Anna)", ".Anna"].map(str::to_owned);
+    let released = f
+        .llm
+        .release_tool_result(
+            &run_id,
+            &people,
+            json!({"text": "Ann Lee and Ann met Anna K., (Anna) and .Anna; Annette watched."}),
+        )
+        .unwrap();
+    assert_eq!(
+        released["text"],
+        "Person 2 and Person 1 met Person 3, Person 4 and Person 5; Annette watched."
+    );
+    let done = run.await.unwrap().unwrap();
+    assert_eq!(done.output["review_md"], "Ann Lee owes Ann.");
 }
 
 #[tokio::test(start_paused = true)]

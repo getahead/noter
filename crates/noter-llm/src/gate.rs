@@ -336,11 +336,17 @@ impl Gate {
         // @cpt-begin:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-pseudonyms
         let mut names = Vec::new();
         if r.pseudonyms {
-            let people = packet.people.iter().filter(|n| !n.trim().is_empty());
-            for (n, name) in people.enumerate() {
+            let mut people: Vec<_> = packet
+                .people
+                .iter()
+                .filter(|n| !n.trim().is_empty())
+                .enumerate()
+                .collect();
+            // Replace full names before their prefixes, keeping the original numbering.
+            people.sort_by_key(|(_, name)| std::cmp::Reverse(name.len()));
+            for (n, name) in people {
                 let pseudonym = format!("Person {}", n + 1);
-                let whole = Regex::new(&format!(r"\b{}\b", regex::escape(name)))
-                    .expect("an escaped name is a valid pattern");
+                let whole = name_pattern(name);
                 let texts = items.iter_mut().map(|(_, t)| t).chain(glossary.iter_mut());
                 for text in texts {
                     *text = whole.replace_all(text, pseudonym.as_str()).into_owned();
@@ -442,8 +448,7 @@ impl Gate {
                 .collect();
             named.sort_by_key(|(_, n)| std::cmp::Reverse(n.len()));
             for (pseudonym, name) in named {
-                let whole = Regex::new(&format!(r"\b{}\b", regex::escape(name)))
-                    .expect("an escaped name is a valid pattern");
+                let whole = name_pattern(name);
                 each_string(&mut result, &mut |t| {
                     *t = whole.replace_all(t, pseudonym.as_str()).into_owned();
                 });
@@ -570,6 +575,24 @@ fn payload(r: &Release, items: &[(&str, String)], context: Option<Value>) -> Vec
         packet["repair"] = json!(repair);
     }
     serde_json::to_vec(&packet).expect("a JSON value serializes")
+}
+
+/// Punctuation at a name's edge has no word boundary against surrounding whitespace.
+fn name_pattern(name: &str) -> Regex {
+    static EDGES: OnceLock<(Regex, Regex)> = OnceLock::new();
+    let (start, end) = EDGES.get_or_init(|| {
+        (
+            Regex::new(r"^\w").expect("a valid pattern"),
+            Regex::new(r"\w$").expect("a valid pattern"),
+        )
+    });
+    Regex::new(&format!(
+        "{}{}{}",
+        if start.is_match(name) { r"\b" } else { "" },
+        regex::escape(name),
+        if end.is_match(name) { r"\b" } else { "" },
+    ))
+    .expect("an escaped name is a valid pattern")
 }
 
 /// Regex redaction (TL-19): credentials first, then e-mail addresses, then phone numbers.
