@@ -9,7 +9,8 @@ pub mod e2e_log;
 mod keychain;
 mod native;
 pub mod surfaces;
-#[cfg(debug_assertions)]
+// @cpt-dod:cpt-noter-dod-core-harness-fixture:p1
+#[cfg(all(debug_assertions, feature = "test-hooks"))]
 mod test_hooks;
 pub mod updater;
 pub mod webview_watch;
@@ -53,7 +54,7 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                     PageLoadEvent::Finished => loads.finished(label),
                 }
             }
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, feature = "test-hooks"))]
             if event == PageLoadEvent::Finished {
                 test_hooks::stall_after_load(webview);
             }
@@ -123,7 +124,7 @@ pub fn run() {
             app.manage(surfaces.clone());
             app.manage(webview_watch::start(app.handle()));
             app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, feature = "test-hooks"))]
             test_hooks::watch_hotkey_trigger(app.handle().clone());
             // Without a feed (M0) the check ends at once and nothing is ever ready.
             tauri::async_runtime::spawn(async move {
@@ -152,8 +153,8 @@ fn boot<R: Runtime>(
     updater: Arc<dyn noter_core::Updater>,
     surfaces: Arc<surfaces::TauriSurfaces<R>>,
 ) -> Booted {
-    // The native UI tests launch a debug build on the harness's scripted Mac (test_hooks).
-    #[cfg(debug_assertions)]
+    // The native UI tests opt in to a debug build on the harness's scripted Mac.
+    #[cfg(all(debug_assertions, feature = "test-hooks"))]
     if let Some(booted) = test_hooks::boot(events.clone(), shortcuts.clone(), &surfaces) {
         return booted;
     }

@@ -8,7 +8,7 @@ description = "The Noter core's composition root: implements CoreApi, owns the a
 publish = false
 
 [features]
-# For noter-core-harness only (`noter_core::testing`); src-tauri never enables it.
+# For noter-core-harness (`noter_core::testing`), including the host's opt-in native-test app.
 harness = []
 
 [dependencies]

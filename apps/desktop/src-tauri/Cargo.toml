@@ -13,15 +13,18 @@ publish = false
 [lib]
 name = "noter_desktop"
 
+[features]
+# Opt in only when building the native UI tests' debug app.
+test-hooks = ["dep:noter-core-harness"]
+
 [build-dependencies]
 noter-protocol = { path = "../../../crates/noter-protocol" }
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 noter-core = { path = "../../../crates/noter-core" }
-# The native UI tests' launch hooks (src/test_hooks.rs): only a debug build references it, so a
-# release binary links none of its code.
-noter-core-harness = { path = "../../../crates/noter-core-harness" }
+# Optional so normal app builds do not enable noter-core's harness feature through Cargo unification.
+noter-core-harness = { path = "../../../crates/noter-core-harness", optional = true }
 noter-engine-client = { path = "../../../crates/noter-engine-client" }
 noter-native = { path = "../../../crates/noter-native" }
 noter-protocol = { path = "../../../crates/noter-protocol" }

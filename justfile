@@ -141,7 +141,7 @@ native:
     if [ ! -f apps/desktop/src-tauri/Cargo.toml ]; then echo "GATE FAILED: native: $project exists but there is no app (apps/desktop/src-tauri) to drive" >&2; exit 1; fi
     if ! xcodebuild -version >/dev/null 2>&1; then echo "GATE FAILED: native: xcodebuild needs Xcode, not only the Command Line Tools (install Xcode, then: sudo xcode-select -s /Applications/Xcode.app)" >&2; exit 1; fi
     # `exec`: pnpm 10.28 reads `pnpm --dir <d> tauri` as the command "<d>"; src-tauri is its own cargo package, so its bundle lands under its own target/
-    if [ -z "${NOTER_APP_PATH:-}" ]; then pnpm --dir apps/desktop exec tauri build --debug --bundles app; fi
+    if [ -z "${NOTER_APP_PATH:-}" ]; then pnpm --dir apps/desktop exec tauri build --debug --features test-hooks --bundles app; fi
     app="${NOTER_APP_PATH:-$PWD/apps/desktop/src-tauri/target/debug/bundle/macos/Noter.app}"
     [ -d "$app" ] || { echo "GATE FAILED: native: no app bundle at $app (set NOTER_APP_PATH)" >&2; exit 1; }
     mkdir -p coverage/native
