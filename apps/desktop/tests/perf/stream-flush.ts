@@ -19,7 +19,7 @@ const seg = (n: number, channel: string, state: SegmentView["state"]): SegmentVi
   ({ ...row, id: `seg_${n}`, channel, state, t0_ms: n * 3000, t1_ms: n * 3000 + 2900, text: `${row.text} ${n}` }) as SegmentView;
 
 let transcript: TranscriptSnapshot = { ...base, subscription_id: "sub_perf", segments: [], hypotheses: [], marks: [], gaps: [] };
-let levels = { subscription_id: "sub_perf_levels", levels: null as LevelsMsg | null };
+let levels = { subscription_id: "sub_perf_levels", last_seq: 0, levels: null as LevelsMsg | null };
 let cards: CardsData = { subscription_id: "sub_perf_cards", call_id: base.call_id, visible: [], earlier: [], pinned: [], status: undefined as never, last_seq: 0, feedback: null };
 let seq = 0;
 let confirmed = 0;

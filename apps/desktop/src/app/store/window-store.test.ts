@@ -329,7 +329,7 @@ describe("stream flush", () => {
   it("levels: keeps only the newest message", () => {
     const out = reduceStream(
       "levels_subscribe",
-      { subscription_id: "s", levels: null },
+      { subscription_id: "s", last_seq: 0, levels: null },
       [
         { seq: 1, at_ms: 0, mic_db: -40, sys_db: null },
         { seq: 2, at_ms: 100, mic_db: -30, sys_db: -20 },
@@ -409,7 +409,7 @@ describe("stream flush", () => {
   it("ask and self-test: messages kept in order as sent", () => {
     const out = reduceStream(
       "self_test_run",
-      { subscription_id: "s", messages: [] },
+      { subscription_id: "s", last_seq: 0, messages: [] },
       [
         { seq: 1, event: { type: "levels", mic_db: -20, sys_db: null } },
         { seq: 2, event: { type: "passed" } as never },
