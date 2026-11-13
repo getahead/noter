@@ -73,6 +73,18 @@ describe("follow output (cpt-noter-algo-ui-live-transcript-follow-output)", () =
     const shrunk = { scrollTop: 1400, clientHeight: 500, scrollHeight: 1900 }; // a correction shortened the log: clamped to the end
     expect(onScroll(following, shrunk, 1500, 32, 10)).toBe(following);
   });
+  it("detaches on a one-pixel wheel frame before a render can pull it back to the end", () => {
+    const log = new LogScroller(32);
+    const following = { following: true, base: 60 };
+    log.scrolled(following, pos(1500), 60);
+    const detached = log.scrolled(following, pos(1499), 60);
+    expect(detached).toEqual({ following: false, base: 60 });
+    const el = { ...pos(1499), scrollTo: vi.fn() };
+    log.afterRender(el, { children: [] }, [], detached.following, "smooth");
+    expect(el.scrollTo).not.toHaveBeenCalled();
+    expect(newLines(detached, 61)).toBe(1);
+    expect(log.scrolled(detached, pos(1498), 61)).toBe(detached);
+  });
   it("names the view's state", () => {
     const s = { error: false, loaded: true, waiting: false, follow: { following: true, base: 0 }, find: false };
     expect(viewState({ ...s, error: true })).toBe("ERROR");

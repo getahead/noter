@@ -23,7 +23,7 @@ export const atEnd = (p: ScrollPos, row: number) => p.scrollHeight - p.scrollTop
  * confirmed rows from now; a smooth scroll on its way down leaves it as it was.
  */
 export function onScroll(f: Follow, p: ScrollPos, prevTop: number, row: number, confirmed: number): Follow {
-  const up = p.scrollTop < prevTop && !atEnd(p, 1); // a log shortened by a correction clamps up to the very end: not the user
+  const up = p.scrollTop < prevTop && !atEnd(p, 0); // a log shortened by a correction clamps up to the very end: not the user
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-if-end
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-following
   if (!up && atEnd(p, row)) return f.following ? f : { following: true, base: confirmed };
