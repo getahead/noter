@@ -262,7 +262,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
         <UndoStrip bridge={bridge} />
         <div className="np-body">
           <div ref={contentRef} className="np-content" data-region="MW-R3" role="main" tabIndex={0} aria-label={page.title(route)} data-width={layout.widthClass} data-grid={layout.grid} data-columns={layout.columns} onScroll={scrollSaver(scrolls.current, routeId)}>
-            {/* @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-skeleton */}
+            {/* @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
             {frame === "LOADING" && slow ? (
               <div className="np-skel" role="status" aria-label={t("shell.loading")}>
                 {[0, 1, 2, 3, 4].map((i) => (
@@ -276,7 +276,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
                 {/* @cpt-end:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-return-page */}
               </div>
             )}
-            {/* @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-skeleton */}
+            {/* @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
           </div>
           <InspectorSlot def={inspector} route={route} bridge={bridge} overlay={layout.inspector === "overlay"} onClose={() => (override ? closeInspector() : dispatch({ type: "close-inspector" }))} quietOpen={quietOpen} />
         </div>

@@ -24,6 +24,7 @@ milestone: M0
   - [Close a window](#close-a-window)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Snapshot, then stream](#snapshot-then-stream)
+  - [Snapshot, then stream (command-aware)](#snapshot-then-stream-command-aware)
   - [Apply whole state](#apply-whole-state)
   - [Flush stream buffers](#flush-stream-buffers)
   - [Map a typed error to a named state](#map-a-typed-error-to-a-named-state)
@@ -85,7 +86,7 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 
 ### Open or reload a window
 
-- [x] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-open-window-v2`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-core-bridge-open-window`
 
 **Actor**: Primary user
 
@@ -160,6 +161,19 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 ## 3. Processes / Business Logic (CDSL)
 
 ### Snapshot, then stream
+
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-snapshot-then-stream`
+
+This stable read-stream algorithm remains the contract for `transcript_subscribe`, `levels_subscribe` and `cards_subscribe`: it fills the snapshot, applies ordered messages, and resubscribes after a sequence gap or a `lagged` end.
+
+**Steps**:
+1. [x] - `p1` - Call the read subscription and retain its snapshot and `last_seq` - `inst-store-snapshot`
+2. [x] - `p1` - **FOR EACH** delivered message, append it in sequence order - `inst-for-each-msg`
+   1. [x] - `p1` - **IF** a sequence is missing or the stream ends as `lagged`, close it and resubscribe from a fresh snapshot - `inst-resubscribe`
+   2. [x] - `p1` - **ELSE** add the message to the flush buffer - `inst-buffer`
+3. [x] - `p1` - Flush buffered messages every 100 ms and return the live slice - `inst-flush`
+
+### Snapshot, then stream (command-aware)
 
 - [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2`
 
@@ -274,7 +288,7 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 The system **MUST** give each window one bridge built on `createCore()` with the Tauri transport in the app and `FakeCore` in tests, stories and the browser dev loop; only `apps/desktop/src/core/tauri-transport.ts` imports `@tauri-apps/*`, and only `main.tsx`, tests and stories import the fake core (`just arch`).
 
 **Implements**:
-- `cpt-noter-flow-ui-core-bridge-open-window-v2`
+- `cpt-noter-flow-ui-core-bridge-open-window`
 - `cpt-noter-flow-ui-core-bridge-close-window`
 - `cpt-noter-state-ui-core-bridge-window-store`
 
@@ -292,6 +306,7 @@ The system **MUST** give each window one bridge built on `createCore()` with the
 The system **MUST** keep one in-memory store per window with entity slices keyed by identity, whole-state slices kept by highest `version`, a 100 ms flush of the transcript, levels and card Channels, and no persistent browser storage.
 
 **Implements**:
+- `cpt-noter-algo-ui-core-bridge-snapshot-then-stream`
 - `cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2`
 - `cpt-noter-algo-ui-core-bridge-apply-whole-state`
 - `cpt-noter-algo-ui-core-bridge-flush-buffer`
@@ -344,4 +359,4 @@ The system **MUST** map every `ErrorCode` of the contract to the calling screen'
 
 **Not applicable.** Authentication and authorization: Noter has one macOS user; least privilege is the per-window command scope that Tauri capabilities enforce (PM-08), which this feature surfaces as `window_not_allowed`. Database access: the UI never opens the database. Network: the WebView makes no request (`cpt-noter-constraint-local-only-ui`).
 
-**Testing.** Unit tests with `FakeCore` (`failNext`, `setWorld`, `push` with explicit `seq` for gaps); the conformance suite runs the same checks against the real core through `noter-core-harness` from M0. Trace markers: `@cpt-flow:cpt-noter-flow-ui-core-bridge-open-window-v2:p1` and the other IDs of this file on the implementing modules.
+**Testing.** Unit tests with `FakeCore` (`failNext`, `setWorld`, `push` with explicit `seq` for gaps); the conformance suite runs the same checks against the real core through `noter-core-harness` from M0. Trace markers: `@cpt-flow:cpt-noter-flow-ui-core-bridge-open-window:p1` and the other IDs of this file on the implementing modules.

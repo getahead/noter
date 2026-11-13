@@ -37,7 +37,7 @@ afterEach(async () => {
 });
 
 describe("open a window (snapshot, then stream)", () => {
-  it("cpt-noter-flow-ui-core-bridge-open-window-v2: subscribes to all 21 events before asking for the snapshot, then is READY", async () => {
+  it("cpt-noter-flow-ui-core-bridge-open-window: subscribes to all 21 events before asking for the snapshot, then is READY", async () => {
     const { b, calls, fake, state } = setup();
     const opening = b.open();
     expect(state().status).toBe("LOADING");
@@ -77,6 +77,7 @@ describe("open a window (snapshot, then stream)", () => {
   it("turns a rejected event listen into a retryable section error and retries the listeners", async () => {
     const fake = new FakeCore({ window: "main" });
     const calls: string[] = [];
+    let activeListeners = 0;
     let rejectOnce = true;
     const transport: Transport = {
       invoke: (cmd, args, onMessage) => (calls.push(cmd), fake.invoke(cmd, args, onMessage)),
@@ -86,7 +87,13 @@ describe("open a window (snapshot, then stream)", () => {
           rejectOnce = false;
           return Promise.reject(new Error("listen denied"));
         }
-        return fake.listen(event, handler);
+        return fake.listen(event, handler).then((unlisten) => {
+          activeListeners++;
+          return () => {
+            activeListeners--;
+            unlisten();
+          };
+        });
       },
     };
     bridge = createBridge("main", transport);
@@ -94,9 +101,11 @@ describe("open a window (snapshot, then stream)", () => {
     expect(bridge.store.getState().status).toBe("FAILED");
     expect(bridge.store.getState().error).toEqual({ code: "window_not_allowed", state: "section", tryAgain: true });
     expect(calls).not.toContain("app_snapshot");
+    expect(activeListeners).toBe(0);
     await bridge.open();
     expect(bridge.store.getState().status).toBe("READY");
     expect(calls.filter((c) => c === "app_snapshot")).toHaveLength(1);
+    expect(activeListeners).toBe(Object.keys(EVENTS).length);
   });
 
   it("refuses to start on a contract major version mismatch and logs it", async () => {
@@ -285,9 +294,10 @@ describe("streams", () => {
   it.each(["ask_start", "self_test_run"] as const)("does not rerun the %s action after a sequence gap", async (cmd) => {
     vi.useFakeTimers();
     const window = cmd === "ask_start" ? "main" : "first-run";
-    const { b, fake, count, state } = setup(window, { holdSelfTest: true });
+    const { b, fake, count, state } = setup(window);
+    fake.holdSelfTest = true;
     await b.open();
-    if (cmd === "ask_start") await b.subscribe(cmd, { question: "What happened?", scope: { type: "all" }, thread_id: null });
+    if (cmd === "ask_start") await b.subscribe(cmd, { question: "What happened?", scope: {}, thread_id: null });
     else await b.subscribe(cmd, { play_clip: false });
     expect(count(cmd)).toBe(1);
 

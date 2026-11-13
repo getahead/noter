@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FakeCore } from "./fake-core";
-import type { AskMsg, CaptureState, ItemView, LevelsMsg, PlaybackState, TranscriptMsg } from "../bindings";
+import { createCore, type AskMsg, type CaptureState, type ItemView, type LevelsMsg, type PlaybackState, type TranscriptMsg } from "../bindings";
 
 const cores: FakeCore[] = [];
 const core = (window: "main" | "call-screen" | "settings" = "call-screen") => {
@@ -18,12 +18,14 @@ afterEach(() => {
 describe("fake core stream and record parity", () => {
   it("creates a call row and live transcript on capture start, then stops the row and transcript", async () => {
     const fake = core();
+    const other = new FakeCore({ window: "main", world: fake.world });
+    cores.push(other);
     fake.world.app.capture.phase = "idle";
     fake.world.app.capture.call_id = null;
     const capture = await fake.invoke("capture_start", { source: "menu_bar", sensitive: false }) as CaptureState;
     expect(fake.world.calls.find((c) => c.id === capture.call_id)?.status).toBe("recording");
     const messages: TranscriptMsg[] = [];
-    await fake.invoke("transcript_subscribe", { call_id: capture.call_id }, (m) => messages.push(m as TranscriptMsg));
+    await other.invoke("transcript_subscribe", { call_id: capture.call_id }, (m) => messages.push(m as TranscriptMsg));
     await fake.invoke("capture_stop", { call_id: capture.call_id });
     expect(fake.world.calls.find((c) => c.id === capture.call_id)?.status).not.toBe("recording");
     expect(messages.at(-1)?.event).toEqual({ type: "ended", reason: "call_stopped" });
@@ -50,7 +52,7 @@ describe("fake core stream and record parity", () => {
     expect(fake.world.transcripts.some((t) => t.call_id === row.id)).toBe(false);
     expect(fake.world.call_details.some((d) => d.call.id === row.id)).toBe(false);
     expect(fake.world.items.some((i) => i.call.id === row.id)).toBe(false);
-    expect(messages.at(-1)?.event).toEqual({ type: "ended", reason: "call_deleted" });
+    expect(messages.at(-1)?.event).toEqual({ type: "ended", reason: "discarded" });
     expect(await fake.invoke("stream_unsubscribe", { subscription_id: subscription.subscription_id })).toEqual({});
     expect(removed).toHaveBeenCalledWith("entity:changed", { type: "removed", kind: "call", id: row.id });
   });
@@ -88,14 +90,24 @@ describe("fake core stream and record parity", () => {
     expect(levels).toHaveLength(count);
   });
 
-  it("runs a call's live script once across direct duplicate subscriptions", async () => {
+  it("keeps one live script across windows while each transcript subscriber continues after its snapshot", async () => {
     vi.useFakeTimers();
     const fake = core();
+    const other = new FakeCore({ window: "main", world: fake.world });
+    cores.push(other);
     fake.world.live_script = ["s1", "s2", "s3"].map((id) => ({ type: "confirmed" as const, segment: { id, call_id: "call_live", channel: "mic", t0_ms: 1, t1_ms: 2, text: id } as never }));
     fake.world.script_interval_ms = 100;
-    await fake.invoke("transcript_subscribe", { call_id: "call_live" }, () => {});
-    await fake.invoke("transcript_subscribe", { call_id: "call_live" }, () => {});
-    await vi.advanceTimersByTimeAsync(500);
+    const firstMessages: TranscriptMsg[] = [];
+    const secondMessages: TranscriptMsg[] = [];
+    const first = await createCore(fake).transcriptSubscribe({ call_id: "call_live" }, (m) => firstMessages.push(m));
+    const second = await createCore(other).transcriptSubscribe({ call_id: "call_live" }, (m) => secondMessages.push(m));
+    expect(first.status).toBe("ok");
+    expect(second.status).toBe("ok");
+    if (first.status !== "ok" || second.status !== "ok") return;
+    expect(second.data.last_seq).toBe(first.data.last_seq + 1);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(firstMessages.map((m) => m.seq)).toEqual([first.data.last_seq + 1, first.data.last_seq + 2, first.data.last_seq + 3]);
+    expect(secondMessages.map((m) => m.seq)).toEqual([second.data.last_seq + 1, second.data.last_seq + 2]);
     const ids = fake.world.transcripts.find((t) => t.call_id === "call_live")!.segments.map((s) => s.id);
     expect(ids.filter((id) => /^s\d$/.test(id))).toEqual(["s1", "s2", "s3"]);
   });

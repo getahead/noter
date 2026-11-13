@@ -21,22 +21,22 @@ import { setPseudo, type Pseudo } from "./i18n/format";
 
 const LABELS = COMMANDS.app_snapshot.windows as readonly WindowLabel[];
 
-// @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-read-label
+// @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-read-label
 // The host opens each window at index.html?window=<label>; a plain browser defaults to the main window.
 const asked = new URLSearchParams(location.search).get(
   "window",
 ) as WindowLabel | null;
 const label: WindowLabel = asked && LABELS.includes(asked) ? asked : "main";
-// @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-read-label
+// @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-read-label
 
-// @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-build-bridge
+// @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-build-bridge
 const bridge = createBridge(
   label,
   import.meta.env.VITE_FAKE_CORE
     ? new FakeCore({ window: label })
     : tauriTransport,
 );
-// @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-build-bridge
+// @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-build-bridge
 
 // @cpt-begin:cpt-noter-flow-ui-core-bridge-close-window:p1:inst-user-closes
 addEventListener("pagehide", () => void bridge.close());

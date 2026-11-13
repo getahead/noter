@@ -82,9 +82,9 @@ async function slowAfter<T>(
   p: Promise<T>,
   mark: (slow: boolean) => void,
 ): Promise<T> {
-  // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-if-slow
+  // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-slow
   const timer = setTimeout(() => mark(true), SLOW_MS);
-  // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-if-slow
+  // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-slow
   try {
     return await p;
   } finally {
@@ -99,9 +99,9 @@ async function slowAfter<T>(
 // @cpt-dod:cpt-noter-dod-ui-core-bridge-errors:p1
 export function createBridge(label: WindowLabel, transport: Transport) {
   const core = createCore(transport);
-  // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-create-store
+  // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-create-store
   const store = createWindowStore(label);
-  // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-create-store
+  // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-create-store
   const set = store.setState;
   const subscribers: { [K in ChannelCommand]: Subscribe<K> } = {
     transcript_subscribe: core.transcriptSubscribe,
@@ -181,7 +181,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
   const setCommand = (key: string, c: CommandState) =>
     set((s) => ({ commands: { ...s.commands, [key]: c } }));
 
-  // @cpt-flow:cpt-noter-flow-ui-core-bridge-open-window-v2:p1
+  // @cpt-flow:cpt-noter-flow-ui-core-bridge-open-window:p1
   async function open(): Promise<void> {
     if (closed) return;
     // @cpt-begin:cpt-noter-state-ui-core-bridge-window-store:p1:inst-empty-loading
@@ -189,7 +189,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     set({ status: "LOADING", error: null });
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-failed-loading
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-empty-loading
-    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-subscribe-events
+    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-subscribe-events
     listening ??= (async () => {
       const attached = await Promise.allSettled(
         (Object.keys(EVENTS) as EventName[]).map((event) =>
@@ -200,10 +200,12 @@ export function createBridge(label: WindowLabel, transport: Transport) {
         ),
       );
       const failures = attached.filter((result) => result.status === "rejected");
+      const unlisteners = attached.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
       if (failures.length) {
-        await Promise.all(attached.flatMap((result) => result.status === "fulfilled" ? [result.value()] : []));
+        await Promise.all(unlisteners.map((unlisten) => unlisten()));
         throw failures[0]!.reason;
       }
+      return unlisteners;
     })();
     try {
       await listening;
@@ -211,39 +213,40 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       listening = null;
       return failWindow({ code: "window_not_allowed", state: "section", tryAgain: true });
     }
-    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-subscribe-events
-    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-api-snapshot
+    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-subscribe-events
+    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-api-snapshot
     const res = await slowAfter(core.appSnapshot({}), (slow) => set({ slow }));
-    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-api-snapshot
+    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-api-snapshot
     if (closed) return;
     if (res.status === "error")
       return failWindow(mapError(res.error, "app_snapshot"));
-    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-if-version
+    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-version
     const theirs = res.data.contract_version;
     if (major(theirs) !== major(CONTRACT_VERSION)) {
-      // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-version-stop
+      // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-version-stop
       log(
         "error",
         null,
         `app_snapshot: contract ${theirs}, bindings ${CONTRACT_VERSION}`,
       );
       return failWindow({ code: null, state: "section", tryAgain: false });
-      // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-version-stop
+      // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-version-stop
     }
-    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-if-version
-    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-apply-snapshot
+    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-if-version
+    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-apply-snapshot
     // @cpt-begin:cpt-noter-state-ui-core-bridge-window-store:p1:inst-loading-ready
-    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-return-window
+    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-return-window
     set((s) => ({ ...applySnapshot(s, res.data), status: "READY" }));
-    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-return-window
+    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-return-window
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-loading-ready
-    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-apply-snapshot
+    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-apply-snapshot
   }
 
   function flush(): void {
     flushTimer = null;
     const batch = [...buffers];
     buffers.clear();
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-commit
     set((s) => {
       const streams = { ...s.streams } as Record<
@@ -265,6 +268,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       return { streams: streams as WindowState["streams"] };
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-return-flush
     });
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
     // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-commit
   }
 
@@ -275,14 +279,17 @@ export function createBridge(label: WindowLabel, transport: Transport) {
   }
 
   function buffer(cmd: ChannelCommand, m: StreamMsg): void {
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-buffer
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-buffer
     buffers.set(cmd, [...(buffers.get(cmd) ?? []), m]);
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-buffer
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-flush
     flushTimer ??= setTimeout(flush, FLUSH_MS);
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-flush
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-buffer
   }
 
+  // @cpt-algo:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1
   function resync<K extends ChannelCommand>(
     cmd: K,
     args: CommandArgs[K],
@@ -320,6 +327,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       if (!current()) return;
       // Messages the generated client releases before the result is ours wait for `last_seq`.
       if (lastSeq === null) return void early.push(m);
+      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-for-each-msg
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-for-each-msg
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-gap
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-ended
@@ -337,8 +345,10 @@ export function createBridge(label: WindowLabel, transport: Transport) {
           // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-no-retry-actions
           return;
         }
+        // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-resubscribe
         // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-resubscribe
         return resync(cmd, args, named);
+        // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-resubscribe
         // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-resubscribe
       }
       // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-gap
@@ -346,6 +356,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       if (m.event?.type === "ended") subs.delete(cmd); // the core ended it: nothing to unsubscribe
       buffer(cmd, m);
       // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-for-each-msg
+      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-for-each-msg
     };
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-call-subscribing
     const subscribing = (subscribers[cmd] as Subscribe<K>)(
@@ -371,6 +382,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-sub-error
     }
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-sub-error
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-store-snapshot
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-store-snapshot
     subs.set(cmd, { token: mine, id: res.data.subscription_id });
     lastSeq = (res.data as { last_seq?: number }).last_seq ?? 0;
@@ -380,6 +392,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       error: null,
     });
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-store-snapshot
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-store-snapshot
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-live
     early.splice(0).forEach(receive);
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-live
@@ -482,9 +495,9 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     core,
     store,
     open,
-    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-screen-reads
+    // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-screen-reads
     subscribe,
-    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window-v2:p1:inst-screen-reads
+    // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-screen-reads
     unsubscribe,
     act,
     retry,

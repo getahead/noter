@@ -525,7 +525,7 @@ export const defaultHandlers: Handlers = {
   },
   capture_discard: (a, { world, fake, emit }) => {
     requireLive(world.app.capture, a.call_id);
-    fake.closeChannels("transcript_subscribe", a.call_id, "call_deleted");
+    fake.closeChannels("transcript_subscribe", a.call_id, "discarded");
     world.calls = world.calls.filter((c) => c.id !== a.call_id);
     world.transcripts = world.transcripts.filter((t) => t.call_id !== a.call_id);
     world.call_details = world.call_details.filter((d) => d.call.id !== a.call_id);
@@ -1302,7 +1302,7 @@ export const defaultHandlers: Handlers = {
       fake.push(run.subscription, { event: { type: "failed", error: coreError("answer_stopped", `turn ${a.turn_id} stopped`) } });
       fake.push(run.subscription, { event: { type: "ended", reason: "unsubscribed" } });
       fake.closeChannel(run.subscription);
-      runs.delete(a.turn_id);
+      runs?.delete(a.turn_id);
     }
     return ack;
   },

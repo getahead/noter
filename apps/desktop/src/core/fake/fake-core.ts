@@ -99,6 +99,14 @@ interface OpenChannel {
   scope?: string;
 }
 
+const coresByWorld = new WeakMap<World, Set<FakeCore>>();
+
+function registerCore(core: FakeCore, world: World): void {
+  let cores = coresByWorld.get(world);
+  if (!cores) coresByWorld.set(world, (cores = new Set()));
+  cores.add(core);
+}
+
 type Versioned = { version: number };
 
 /** A message of any Channel, without its `seq` (the fake stamps it). */
@@ -125,6 +133,7 @@ export class FakeCore implements Transport {
   constructor(opts: FakeCoreOptions) {
     this.window = opts.window;
     this.world = opts.world ?? structuredClone(worldJson as unknown as World);
+    registerCore(this, this.world);
     this.latency = opts.latency ?? 0;
     this.handlers = { ...defaultHandlers, ...opts.handlers };
     const cap = this.world.app.capture;
@@ -210,7 +219,11 @@ export class FakeCore implements Transport {
     const before = new Map(events.map((e) => [e, strip(this.slice(e))]));
     const versions = new Map(events.map((e) => [e, this.slice(e).version]));
     if (typeof change === "function") change(this.world);
-    else this.world = structuredClone(change);
+    else {
+      coresByWorld.get(this.world)?.delete(this);
+      this.world = structuredClone(change);
+      registerCore(this, this.world);
+    }
     for (const e of events) {
       const s = this.slice(e);
       if (s.version < versions.get(e)!) s.version = versions.get(e)!;
@@ -236,8 +249,9 @@ export class FakeCore implements Transport {
   }
 
   closeChannels(cmd: ChannelCommand, scope: string, reason: StreamEndReason): void {
-    for (const [id, channel] of this.channels)
-      if (channel.cmd === cmd && channel.scope === scope) this.closeChannel(id, reason);
+    for (const core of coresByWorld.get(this.world) ?? [this])
+      for (const [id, channel] of core.channels)
+        if (channel.cmd === cmd && channel.scope === scope) core.closeChannel(id, reason);
   }
 
   /** The newest open subscription of a command, if any. */
@@ -285,8 +299,9 @@ export class FakeCore implements Transport {
   /** Push one event to every matching subscription, as the real stream hub does. */
   pushAll(target: ChannelCommand, body: ChannelBody, scope?: string): number {
     let delivered = 0;
-    for (const [id, channel] of this.channels)
-      if (channel.cmd === target && (scope === undefined || channel.scope === scope) && this.push(id, body) !== null) delivered++;
+    for (const core of coresByWorld.get(this.world) ?? [this])
+      for (const [id, channel] of core.channels)
+        if (channel.cmd === target && (scope === undefined || channel.scope === scope) && core.push(id, body) !== null) delivered++;
     return delivered;
   }
 
@@ -294,6 +309,7 @@ export class FakeCore implements Transport {
     this.timers.forEach(clearTimeout);
     this.timers.clear();
     this.channels.clear();
+    coresByWorld.get(this.world)?.delete(this);
   }
 
   async invoke(cmd: CommandName, args: unknown, onMessage?: (message: unknown) => void): Promise<unknown> {
