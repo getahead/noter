@@ -105,6 +105,10 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const [now, setNow] = useState(() => Date.now());
 
   const callId = cap?.call_id ?? null;
+  const key = (action: HotkeyAction) => {
+    const b = hotkeys?.find((h) => h.action === action);
+    return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
+  };
   const notice = cap && !stopped(cap) && cap.notice?.type !== "stopped_automatically" ? cap.notice : null;
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden
@@ -176,10 +180,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const navigate = (target: NavTarget) => void bridge.core.windowNavigate({ target });
   const openInNoter = () => navigate({ type: "call_page", call_id: callId, tab: "summary" });
   const busy = (cmd: CommandName) => commands[cmd]?.state === "WAITING";
-  const key = (action: HotkeyAction) => {
-    const b = hotkeys?.find((h) => h.action === action);
-    return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
-  };
 
   // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-user-action
   // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-match-action

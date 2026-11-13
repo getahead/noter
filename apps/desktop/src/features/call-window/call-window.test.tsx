@@ -109,6 +109,18 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(args("window_announce")).toContainEqual({ text: "The call seems to have ended. Noter stops recording in 10 seconds. Press Control-Option-Command-N, then Return, to keep recording.", politeness: "assertive" });
   });
 
+  it("keeps announcement effects safe while the call-window snapshot is still missing", async () => {
+    await open({ phase: "recording", call_id: "call_live" });
+    bridge!.store.setState((state) => {
+      const { callWindow: _callWindow, ...whole } = state.whole;
+      return { ...state, whole };
+    });
+    html();
+    const captureEffect = effects.find((effect) => effect.toString().includes("captureAnnouncements"));
+    expect(captureEffect).toBeDefined();
+    expect(captureEffect!).not.toThrow();
+  });
+
   it("shows a person chip per participant from the transcript", async () => {
     await open();
     await bridge!.subscribe("transcript_subscribe", live);
