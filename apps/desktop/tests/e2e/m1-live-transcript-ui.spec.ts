@@ -323,6 +323,9 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
       world: liveWith(many(60), false),
     });
     await expect(rowWith(page, "Test line number 59")).toBeInViewport(); // the log has drawn and follows the end
+    // Reproduce a wheel animation's first one-pixel frame, before scrolling the rest of the way up (#576).
+    await log(page).locator(".cw-tv__scroll").evaluate((el) => el.scrollTo({ top: el.scrollTop - 1, behavior: "instant" }));
+    await expect(log(page)).toHaveAttribute("data-state", "detached");
     await wheelUpTo(log(page), rowWith(page, ANNA_LINE));
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible();
