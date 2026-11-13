@@ -577,6 +577,7 @@ impl Core {
             let all = segments_of(c, &CallId::new(&id), None)?;
             Ok((crate::library::speakers_of(c, &id)?, all))
         })?;
+        self.refresh_live_speakers(call_id, &speakers);
         let segments: Vec<SegmentView> = segments
             .into_iter()
             .filter(|s| changed.contains(&s.id))

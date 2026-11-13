@@ -268,6 +268,19 @@ impl Core {
             .map_or(0, |live| live.speakers.len())
     }
 
+    // @cpt-flow:cpt-noter-flow-core-speakers-audio-name:p1
+    pub(crate) fn refresh_live_speakers(&self, call_id: &CallId, speakers: &[SpeakerView]) {
+        // Preserve engine-label keys and speakers whose first batch has not committed yet.
+        let mut state = lock(&self.transcript.state);
+        if let Some(live) = state.calls.get_mut(call_id) {
+            for known in live.speakers.values_mut() {
+                if let Some(fresh) = speakers.iter().find(|s| s.id == known.id) {
+                    *known = fresh.clone();
+                }
+            }
+        }
+    }
+
     /// The state of a call that captures, loaded from its stored speakers the first time.
     fn live<'a>(&self, state: &'a mut State, call_id: &CallId) -> Result<&'a mut Live, CoreError> {
         if !state.calls.contains_key(call_id) {
