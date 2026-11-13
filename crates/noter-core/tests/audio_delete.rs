@@ -84,8 +84,14 @@ fn seed(core: &Core, dir: &Path) {
     for (id, mib) in [("old", 3), ("fresh", 1), ("live", 1)] {
         let folder = dir.join("audio").join(id);
         std::fs::create_dir_all(&folder).unwrap();
-        std::fs::write(folder.join("mic.1.aac"), vec![0u8; mib * MIB]).unwrap();
-        std::fs::write(folder.join("sys.1.aac"), vec![0u8; 10]).unwrap();
+        let (mic, sys) = if id == "live" {
+            ("mic.1.aac", "sys.1.aac")
+        } else {
+            ("mic.m4a", "sys.m4a")
+        };
+        std::fs::write(folder.join(mic), vec![0u8; mib * MIB]).unwrap();
+        std::fs::write(folder.join(sys), vec![0u8; 10]).unwrap();
+        std::fs::write(folder.join("timeline.json"), "{}").unwrap();
         std::fs::write(folder.join("transcript.jsonl"), "{}\n").unwrap();
         std::fs::write(folder.join("constraints.json"), "{}").unwrap();
     }
@@ -147,11 +153,11 @@ async fn deleting_audio_keeps_the_transcript_reports_the_freed_space_and_cannot_
     );
     assert_eq!(
         files(dir.path(), "old"),
-        ["constraints.json", "transcript.jsonl"]
+        ["constraints.json", "timeline.json", "transcript.jsonl"]
     );
     assert_eq!(
         files(dir.path(), "fresh").len(),
-        4,
+        5,
         "another call is untouched"
     );
     assert_eq!(row(&core, "old"), (true, Some(NOW)));
@@ -207,6 +213,25 @@ async fn deleting_audio_keeps_the_transcript_reports_the_freed_space_and_cannot_
 }
 
 #[tokio::test]
+async fn deleting_audio_also_removes_parts_and_legacy_formats() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core, dir.path());
+    let folder = dir.path().join("audio/old");
+    for name in ["mic.1.aac", "sys.caf", "mic.wav", "sys.pcm", "capture.ring"] {
+        std::fs::write(folder.join(name), vec![0u8; MIB]).unwrap();
+    }
+
+    let done = delete(&core, &["old"]).await.unwrap();
+
+    assert_eq!((done.calls, done.freed_mb), (1, 8));
+    assert_eq!(
+        files(dir.path(), "old"),
+        ["constraints.json", "timeline.json", "transcript.jsonl"]
+    );
+}
+
+#[tokio::test]
 async fn deleting_twice_or_deleting_audio_that_was_never_stored_counts_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open(dir.path());
@@ -234,7 +259,7 @@ async fn deleting_refuses_a_live_call_and_an_unknown_one_before_touching_anythin
     let unknown = delete(&core, &["nope"]).await.unwrap_err();
     assert_eq!(unknown.code, ErrorCode::NotFound);
 
-    assert_eq!(files(dir.path(), "old").len(), 4, "nothing was removed");
+    assert_eq!(files(dir.path(), "old").len(), 5, "nothing was removed");
     assert_eq!(row(&core, "old"), (false, None));
 }
 
@@ -247,10 +272,14 @@ async fn deleting_by_age_takes_only_old_stored_calls_and_never_a_live_one() {
     let done = older(&core, 30).await.unwrap();
 
     assert_eq!((done.calls, done.freed_mb), (1, 3));
+    assert_eq!(
+        files(dir.path(), "old"),
+        ["constraints.json", "timeline.json", "transcript.jsonl"]
+    );
     assert!(row(&core, "old").0);
     assert!(!row(&core, "fresh").0, "too recent");
     assert!(!row(&core, "live").0, "capturing");
-    assert_eq!(files(dir.path(), "live").len(), 4);
+    assert_eq!(files(dir.path(), "live").len(), 5);
     assert_eq!(
         older(&core, 30).await.unwrap().calls,
         0,
@@ -268,7 +297,7 @@ async fn a_file_that_cannot_be_removed_keeps_the_audio_available_and_a_retry_fin
     let (core, _) = open(dir.path());
     seed(&core, dir.path());
     // A directory where a file belongs: removal fails for this one name.
-    let blocker = dir.path().join("audio/old/sys.1.aac");
+    let blocker = dir.path().join("audio/old/sys.m4a");
     std::fs::remove_file(&blocker).unwrap();
     std::fs::create_dir(&blocker).unwrap();
     std::fs::write(blocker.join("keep"), "x").unwrap();

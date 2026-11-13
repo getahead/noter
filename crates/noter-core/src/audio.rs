@@ -17,9 +17,9 @@ use crate::{internal, Core};
 
 const DAY_MS: i64 = 86_400_000;
 const MIB: u64 = 1_048_576;
-/// The stored audio of a call: its AAC parts and the capture ring. Everything else in the call's
+/// The stored audio of a call: its M4A tracks, AAC parts and capture ring. Everything else in the call's
 /// folder (transcript, constraints, item files) is text and stays.
-const AUDIO_EXTENSIONS: [&str; 5] = ["aac", "caf", "wav", "pcm", "ring"];
+const AUDIO_EXTENSIONS: [&str; 6] = ["m4a", "aac", "caf", "wav", "pcm", "ring"];
 
 impl Core {
     // @cpt-flow:cpt-noter-flow-core-speakers-audio-delete:p1
