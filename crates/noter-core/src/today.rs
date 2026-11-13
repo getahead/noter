@@ -78,14 +78,14 @@ fn texts(values: &[String]) -> Vec<Sql> {
     values.iter().cloned().map(Sql::Text).collect()
 }
 
-/// The person a calendar attendee is, by the name a named speaker carries.
-// shortcut: no `people` table before library-people (M3), so a person is a named speaker and an
-// attendee matches by name ignoring case.
+/// The person a calendar attendee is, by a named speaker's persisted person identity.
 fn known_person(c: &Connection, name: &str) -> Db<Option<PersonChip>> {
     let person: Option<String> = c
         .query_row(
-            "SELECT person_id FROM speakers WHERE person_id IS NOT NULL AND lower(label) = lower(?1)
-             ORDER BY rowid DESC LIMIT 1",
+            "SELECT p.id FROM speakers s JOIN people p ON p.id = s.person_id
+             WHERE lower(p.display_name) = lower(trim(?1))
+                OR EXISTS (SELECT 1 FROM person_aliases a WHERE a.person_id = p.id AND lower(a.alias) = lower(trim(?1)))
+             ORDER BY s.rowid DESC LIMIT 1",
             [name.trim()],
             |r| r.get(0),
         )

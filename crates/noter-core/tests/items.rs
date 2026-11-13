@@ -139,9 +139,11 @@ fn speaker(id: &str, call_id: &str, label: &str, person: &str) -> Insert {
         &[
             ("id", json!(id)),
             ("call_id", json!(call_id)),
-            ("label", json!(label)),
+            ("label", json!("spk_1")),
+            ("n", json!(1)),
             ("channel", json!("sys")),
             ("person_id", json!(person)),
+            ("name", json!(label)),
             ("named_by", json!("you")),
             ("pass", json!("live")),
         ],

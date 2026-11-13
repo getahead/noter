@@ -35,6 +35,15 @@ describe("transcript_rename_speaker", () => {
     expect(done.speakers.find((x) => x.id === "spk_3")?.label).toMatchObject({ type: "person", person: { display_name: "Lena" } });
   });
 
+  it("keeps call_get speaker labels in sync with the transcript after a rename", async () => {
+    ok(await main.transcriptRenameSpeaker({ call_id: LIVE_CALL, speaker_id: "spk_3", person: anna, scope: { type: "whole_call" } }));
+    const detail = ok(await main.callGet({ call_id: LIVE_CALL }));
+    expect(detail.speakers.find((speaker) => speaker.id === "spk_3")?.label).toMatchObject({
+      type: "person",
+      person: { id: "per_anna" },
+    });
+  });
+
   it("refuses an unknown call, speaker or person and a blank name", async () => {
     const base = { call_id: LIVE_CALL, speaker_id: "spk_3", person: anna, scope: { type: "whole_call" as const } };
     expect(refused(await main.transcriptRenameSpeaker({ ...base, call_id: "call_nobody" })).code).toBe("not_found");
@@ -68,6 +77,11 @@ describe("transcript_name_speakers", () => {
     expect(done.speakers.find((x) => x.id === "spk_3")?.label).toMatchObject({ type: "person", person: { id: "per_anna" } });
     expect(done.speakers.find((x) => x.id === "spk_you")?.label.type ?? "you").toBe("you");
     expect(done.change_id).toBeTruthy();
+    const detail = ok(await main.callGet({ call_id: LIVE_CALL }));
+    expect(detail.speakers.find((speaker) => speaker.id === "spk_3")?.label).toMatchObject({
+      type: "person",
+      person: { id: "per_anna" },
+    });
   });
 
   it("refuses an unknown call or speaker", async () => {

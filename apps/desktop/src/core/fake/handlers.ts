@@ -24,6 +24,7 @@ import type {
   SectionKind,
   SourceRow,
   SpeakerLabel,
+  SpeakerView,
   TimestampMs,
   TopicRow,
   TodayView,
@@ -48,6 +49,13 @@ function pageRows<T>(page: { cursor?: string | null; limit?: number | null } | u
 // ── helpers ──────────────────────────────────────────────────────────────
 
 const speakerName = (label: SpeakerLabel): string => label.type === "person" ? label.person.display_name : label.type === "you" ? "You" : label.type === "unnamed" ? `Speaker ${label.n}` : "Guest";
+
+function speakerLists(world: World, callId: string): SpeakerView[][] {
+  return [
+    world.transcripts.find((x) => x.call_id === callId)?.speakers,
+    world.call_details.find((x) => x.call.id === callId)?.speakers,
+  ].filter((list): list is SpeakerView[] => !!list);
+}
 
 // @cpt-algo:cpt-noter-algo-core-speakers-audio-correct:p1
 function namedSections(world: World, callId: string, names: [string, string][]): OutputSection[] {
@@ -654,7 +662,8 @@ export const defaultHandlers: Handlers = {
   },
   transcript_rename_speaker: (a, { world, emit, fake }) => {
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
-    const spk = t?.speakers.find((s) => s.id === a.speaker_id);
+    const lists = speakerLists(world, a.call_id);
+    const spk = lists.flat().find((s) => s.id === a.speaker_id);
     if (!t || !spk) throw coreError("not_found");
     const p = a.person.type === "existing" ? person(world, a.person.person_id) : undefined;
     const name = p?.display_name ?? (a.person.type === "new" ? a.person.display_name : "Unknown");
@@ -663,7 +672,7 @@ export const defaultHandlers: Handlers = {
     const oldName = speakerName(spk.label);
     const oldLabel = structuredClone(spk.label);
     const oldNamedBy = spk.named_by;
-    const assigned = { type: "person" as const, person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
+    const assigned: SpeakerLabel = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
     const segmentId = a.scope.type === "one_segment" ? a.scope.segment_id : null;
     if (a.scope.type === "one_segment") {
       const segment = t.segments.find((s) => s.id === segmentId && s.speaker.speaker_id === spk.id);
@@ -675,8 +684,10 @@ export const defaultHandlers: Handlers = {
       spk.named_by = oldNamedBy;
       segment.speaker = { speaker_id: resultSpeaker.id, label: assigned };
     } else {
-      spk.label = assigned;
-      spk.named_by = "you";
+      for (const speaker of lists.flat().filter((s) => s.id === a.speaker_id)) {
+        speaker.label = assigned;
+        speaker.named_by = "you";
+      }
     }
     if (segmentId) fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [t.segments.find((s) => s.id === segmentId)!] } });
     emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
@@ -706,22 +717,26 @@ export const defaultHandlers: Handlers = {
     return { segment: seg, change_id, glossary_term_id: a.add_to_glossary ? newId("gls") : null, proposal_queued: a.add_to_glossary };
   },
   transcript_name_speakers: (a, { world, emit }) => {
-    const t = world.transcripts.find((x) => x.call_id === a.call_id) ?? world.call_details.find((d) => d.call.id === a.call_id);
-    if (!t) throw coreError("not_found", `call ${a.call_id}`);
+    const lists = speakerLists(world, a.call_id);
+    const speakers = lists[0];
+    if (!speakers) throw coreError("not_found", `call ${a.call_id}`);
     const before = JSON.stringify(namingState(world, a.call_id));
     const names: [string, string][] = [];
     const named = a.assignments.flatMap((as) => {
-      const spk = t.speakers.find((s) => s.id === as.speaker_id);
+      const spk = speakers.find((s) => s.id === as.speaker_id);
       if (!spk) throw coreError("not_found", `speaker ${as.speaker_id}`);
       if (!as.person) return [];
       const p = as.person.type === "existing" ? person(world, as.person.person_id) : null;
       const name = p?.display_name ?? (as.person.type === "new" ? as.person.display_name : "Unknown");
       names.push([speakerName(spk.label), name]);
-      spk.label = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: false } };
-      spk.named_by = "you";
+      const label: SpeakerLabel = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: false } };
+      for (const speaker of lists.flat().filter((s) => s.id === as.speaker_id)) {
+        speaker.label = label;
+        speaker.named_by = "you";
+      }
       return [spk];
     });
-    emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
+    emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers });
     for (const section of namedSections(world, a.call_id, names)) emit("entity:changed", { type: "section", call_id: a.call_id, section });
     return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, field: "naming", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named ${named.length} speakers` }) };
   },

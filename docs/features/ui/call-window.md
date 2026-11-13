@@ -2,7 +2,7 @@
 title: "Feature — Call window: call screen and floating panel"
 description: "One non-activating, content-protected call window with a dedicated layout on a second display and a floating layout beside the call app: recording state, capture notices, degraded banners, capture controls, layout switch, collapse, hide and hide for presenting, in the copilot-off layout of M1."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-call-window
 milestone: M1
@@ -454,7 +454,7 @@ The system **MUST** show each capture problem in its banner slot with its fix, t
 
 - [x] `p2` - **ID**: `cpt-noter-dod-ui-call-window-person-chip`
 
-The system **MUST** show a person chip per participant in CS-R1 (with **You** and unnamed **Speaker 3**), with the person chip's variants and states as `C.personChip` renders them; the rename popover behind a chip arrives with `cpt-noter-feature-ui-speakers` (M2).
+The system **MUST** show a person chip per participant in CS-R1 (with **You** and unnamed **Speaker 3**), with the person chip's variants and states as `C.personChip` renders them; when M2 speaker naming is delivered, clicking a non-You participant chip opens its Rename Speaker popover.
 
 **Implements**:
 - `cpt-noter-flow-ui-call-window-controls`
@@ -463,6 +463,8 @@ The system **MUST** show a person chip per participant in CS-R1 (with **You** an
 
 **Touches**:
 - Tests: screenshot specs of the header with resolved, unnamed and **You** chips
+
+**Changelog.** v1.1 (13 Nov 2026): delivered participant chips open the speaker rename popover.
 
 ## 6. Acceptance Criteria
 

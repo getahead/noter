@@ -688,17 +688,28 @@ impl Harness {
             };
             for sp in d["speakers"].as_array().unwrap_or(&empty) {
                 let label = &sp["label"];
-                let (text, n, person) = match label["type"].as_str() {
-                    Some("you") => (json!("you"), Value::Null, Value::Null),
-                    Some("guest_your_side") => (json!("guest_your_side"), Value::Null, Value::Null),
-                    Some("person") => (
-                        label["person"]["display_name"].clone(),
+                let (text, n, person, name) = match label["type"].as_str() {
+                    Some("you") => (json!("you"), Value::Null, Value::Null, Value::Null),
+                    Some("guest_your_side") => (
+                        json!("guest_your_side"),
                         Value::Null,
-                        label["person"]["id"].clone(),
+                        Value::Null,
+                        Value::Null,
                     ),
+                    Some("person") => {
+                        let id = sp["id"].as_str().unwrap_or_default();
+                        let n = id.strip_prefix("spk_").and_then(|n| n.parse::<i64>().ok());
+                        (
+                            json!(id),
+                            n.map_or(Value::Null, |n| json!(n)),
+                            label["person"]["id"].clone(),
+                            label["person"]["display_name"].clone(),
+                        )
+                    }
                     _ => (
                         json!(format!("spk_{}", label["n"])),
                         label["n"].clone(),
+                        Value::Null,
                         Value::Null,
                     ),
                 };
@@ -711,6 +722,7 @@ impl Harness {
                         ("n", n),
                         ("channel", sp["channel"].clone()),
                         ("person_id", person),
+                        ("name", name),
                         ("named_by", sp["named_by"].clone()),
                         ("pass", pass.clone()),
                     ],
@@ -1454,7 +1466,7 @@ fn engine_segment(h: &SegmentView, state: EngineSegmentState) -> EngineSegment {
         lang: h.lang.clone(),
         lang_p: h.lang_p,
         speaker_label: match &h.speaker.label {
-            SpeakerLabel::Person { person } => person.display_name.clone(),
+            SpeakerLabel::Person { .. } => h.speaker.speaker_id.to_string(),
             SpeakerLabel::Unnamed { n } => format!("spk_{n}"),
             SpeakerLabel::GuestYourSide => "guest_your_side".into(),
             SpeakerLabel::You => "you".into(),

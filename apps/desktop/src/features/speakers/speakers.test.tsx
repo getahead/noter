@@ -127,12 +127,14 @@ describe("PersonPicker keys and choices", () => {
     field.onChange({ target: { value: "Pa" } });
     expect(calls.pick).toHaveBeenCalledWith(null, "Pa");
   });
-  it("Return on the highlighted person confirms it as an existing person (ArrowDown highlights from the list start)", () => {
+  it("Return selects the first matching person without requiring an arrow key", () => {
     const { calls, field } = input("Pavel");
-    field.onKeyDown(keyEv("ArrowDown"));
-    field.onKeyDown(keyEv("ArrowUp"));
-    field.onKeyDown(keyEv("Enter")); // nothing is highlighted in this render: Return does nothing
-    expect(calls.confirm).not.toHaveBeenCalled();
+    field.onKeyDown(keyEv("Enter"));
+    expect(calls.confirm).toHaveBeenCalledWith(
+      { type: "existing", person_id: "p1" },
+      "Pavel Romanov",
+      false,
+    );
   });
   it("with no match the New Person… entry is the one Return opens, and the first Esc clears the query", () => {
     const { calls, field } = input("Zoya");
@@ -216,6 +218,14 @@ describe("NewPersonForm", () => {
     button("Create and Name").onAction();
     expect(calls.confirm).not.toHaveBeenCalled();
   });
+  it("Esc returns to the list with the current name", () => {
+    const { calls, tree } = form("Zoya");
+    const input = find(tree, (pr) => pr["aria-label"] === "Name").props as {
+      onKeyDown: (event: Ev & { preventDefault: () => void }) => void;
+    };
+    input.onKeyDown({ ...keyEv("Escape"), preventDefault: vi.fn() });
+    expect(calls.back).toHaveBeenCalledWith("Zoya");
+  });
   it("the form is titled, its fields carry placeholders, and the footer pairs Back with the confirm", () => {
     const html = renderToString(
       <NewPersonForm
@@ -231,6 +241,8 @@ describe("NewPersonForm", () => {
     expect(html).toContain("New person");
     expect(html).toContain('placeholder="name@company.com"');
     expect(html).toContain('placeholder="Designer"');
+    expect(html).toContain('aria-label="Role"');
+    expect(html).toContain('disabled=""');
   });
 });
 

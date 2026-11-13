@@ -70,7 +70,13 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     });
   }
 
-  test("UI — empty path: No matching person — Zoya shows No one called “Zoya” and New Person “Zoya”…, the form has Name, Email, Role, Create and Name says You added Zoya and named Speaker 3 as Zoya", async ({ page }) => {
+  test("UI — CS-R1 participant chip opens Rename Speaker", async ({ page }) => {
+    await live(page);
+    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+    await expect(popover(page, "Rename Speaker 3")).toBeVisible();
+  });
+
+  test("UI — empty path: No matching person — Zoya shows No one called “Zoya” and New Person “Zoya”…, the form has Name and Email, Create and Name says You added Zoya and named Speaker 3 as Zoya", async ({ page }) => {
     await live(page);
     await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
     const rename = popover(page, "Rename Speaker 3");
@@ -78,17 +84,78 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
     await expect(rename).toContainText("No one called “Zoya”");
     await expect(rename.getByRole("option", { name: "New Person “Zoya”…" })).toBeVisible();
     await page.keyboard.press("Enter"); // on New Person “Zoya”…
-    for (const field of ["Name", "Email", "Role"]) await expect(rename.getByRole("textbox", { name: field })).toBeVisible();
+    for (const field of ["Name", "Email"]) await expect(rename.getByRole("textbox", { name: field })).toBeVisible();
+    await expect(rename.getByRole("textbox", { name: "Role" })).toBeDisabled();
     await expect(rename.getByRole("textbox", { name: "Name" })).toHaveValue("Zoya");
     await expect(rename.getByRole("textbox", { name: "Name" })).toBeFocused(); // the list's combobox is gone: the form takes focus
     await rename.getByRole("textbox", { name: "Email" }).fill("zoya@example.com");
-    await rename.getByRole("button", { name: "Create and Name" }).click();
+    await rename.getByRole("textbox", { name: "Name" }).press("Enter");
 
     expect(await sent(page, "transcript_rename_speaker")).toEqual([
       expect.objectContaining({ speaker_id: "spk_3", person: { type: "new", display_name: "Zoya", email: "zoya@example.com" } }),
     ]);
     await expect(strip(page)).toContainText(new RegExp(`You added Zoya and named Speaker 3 as Zoya · ${LINES.source}`));
     await expect(transcript(page).getByText("Speaker 3")).toHaveCount(0);
+  });
+
+  test("UI — duplicate path: Use remains available after the name field blurs", async ({ page }) => {
+    await live(page);
+    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+    const rename = popover(page, "Rename Speaker 3");
+    const picker = rename.getByRole("combobox", { name: "Name…" });
+    await picker.fill("Anna");
+    await expect(rename.getByRole("option", { name: /^Anna/ }).first()).toBeVisible(); // the directory is loaded before the form opens
+    await picker.fill("Zoya draft");
+    await rename.getByRole("option", { name: /New Person/ }).click();
+    await rename.getByRole("textbox", { name: "Name" }).fill("Anna Kuznetsova");
+    await rename.getByRole("textbox", { name: "Name" }).press("Enter");
+    const use = rename.getByRole("button", { name: /Use Anna/ });
+    await expect(use).toBeVisible();
+    await use.click();
+    await expect.poll(async () => (await sent(page, "transcript_rename_speaker")).length).toBe(1);
+    expect(((await sent(page, "transcript_rename_speaker"))[0].person as { type: string }).type).toBe("existing");
+  });
+
+  test("UI — duplicate path: Create Anyway remains available after the name field blurs", async ({ page }) => {
+    await live(page);
+    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+    const rename = popover(page, "Rename Speaker 3");
+    const picker = rename.getByRole("combobox", { name: "Name…" });
+    await picker.fill("Anna");
+    await expect(rename.getByRole("option", { name: /^Anna/ }).first()).toBeVisible(); // the directory is loaded before the form opens
+    await picker.fill("Zoya draft");
+    await rename.getByRole("option", { name: /New Person/ }).click();
+    await rename.getByRole("textbox", { name: "Name" }).fill("Anna Kuznetsova");
+    await rename.getByRole("textbox", { name: "Name" }).press("Enter");
+    const anyway = rename.getByRole("button", { name: "Create Anyway" });
+    await expect(anyway).toBeVisible();
+    await anyway.click();
+    await expect.poll(async () => (await sent(page, "transcript_rename_speaker")).length).toBe(1);
+    expect(((await sent(page, "transcript_rename_speaker"))[0].person as { type: string }).type).toBe("new");
+  });
+
+  test("UI — New person keyboard flow: ⌘N opens the form and Esc returns with the name", async ({ page }) => {
+    await live(page);
+    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+    const rename = popover(page, "Rename Speaker 3");
+    await rename.getByRole("combobox", { name: "Name…" }).dispatchEvent("keydown", { key: "n", code: "KeyN", metaKey: true, bubbles: true });
+    const name = rename.getByRole("textbox", { name: "Name" });
+    await name.fill("Zoya draft");
+    await rename.getByRole("textbox", { name: "Email" }).fill("draft@example.com");
+    await page.keyboard.press("Escape");
+    await expect(rename.getByRole("combobox", { name: "Name…" })).toHaveValue("Zoya draft");
+  });
+
+  test("UI — person picker Return selects a single matching person without ArrowDown", async ({ page }) => {
+    await live(page);
+    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+    const rename = popover(page, "Rename Speaker 3");
+    const field = rename.getByRole("combobox", { name: "Name…" });
+    await field.fill("Pavel Romanov");
+    await expect(rename.getByRole("option", { selected: true })).toHaveCount(1);
+    await page.keyboard.press("Enter");
+    await expect.poll(async () => (await sent(page, "transcript_rename_speaker")).length).toBe(1);
+    expect(((await sent(page, "transcript_rename_speaker"))[0].person as { type: string }).type).toBe("existing");
   });
 
   test("UI — error path: a failed rename keeps the draft and the focus, shows the error and retries only on Rename", async ({ page }) => {
@@ -168,6 +235,16 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await row.getByRole("button", { name: "Name", exact: true }).click();
     await expect(page.getByText(new RegExp(`Named Speaker 3 as Pavel[^·]* · ${LINES.source}`))).toBeVisible();
     await expect(panel(page)).toContainText("Name speakers · 2 not named");
+  });
+
+  test("UI — switching calls resets hidden naming-panel state", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => S.unnamed(w, 1) });
+    await navigate(page, "summary", S.CALL);
+    await expect(panel(page)).toContainText("Name speakers");
+    await panel(page).getByRole("button", { name: "Hide ▴" }).click();
+    await navigate(page, "summary", W.PAST_CALL);
+    await navigate(page, "summary", S.CALL);
+    await expect(panel(page)).toContainText("Name speakers");
   });
 
   test("UI — happy path: naming the last speaker says All speakers named · Undo, and Undo restores the row", async ({ page }) => {

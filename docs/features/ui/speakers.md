@@ -2,7 +2,7 @@
 title: "Feature — Speaker naming and transcript corrections"
 description: "Name speakers during or after a call and correct transcript terms without losing focus or evidence."
 status: DRAFT
-version: "1.1"
+version: "1.2"
 date: "2026-11-07"
 feature: cpt-noter-feature-ui-speakers
 milestone: M2
@@ -86,14 +86,14 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 - Speaker 3 → **Rename Speaker 3** → Oleg M. → Rename: every line uses Oleg M.; status **Named Speaker 3 as Oleg M. · 12 lines**; Esc returns typing to Teams.
 
 **Error Scenarios**:
-- No match for Lena: **No one called “Lena”** → **New Person “Lena”…** → Name, Email, Role → **Create and Name**.
+- No match for Lena: **No one called “Lena”** → **New Person “Lena”…** → Name, Email and disabled Role → **Create and Name**; Role cannot be entered until the command contract can persist it.
 - Call app takes focus: the popover and draft stay; clicking a field or ⌃⌥⌘N resumes typing. Empty name or invalid email stays inline.
 
 **Steps**:
 1. [x] - `p1` - User clicks the speaker label; open the 320-pt popover anchored to it, make the panel key for editing and focus **Name…** without moving the panel - `inst-open`
 2. [x] - `p1` - Show **In this call** then **Recent people**, role/source captions, Whole call selected and Only this line; the picker process filters suggestions - `inst-picker`
 3. [x] - `p1` - User chooses a person by click or arrows/Return; Rename remains disabled until selection is valid - `inst-select`
-4. [x] - `p1` - **IF** the user chooses New Person: replace the list with Name, Email, Role, Back and Create and Name; validate and check duplicates without opening a sheet - `inst-new`
+4. [x] - `p1` - **IF** the user chooses New Person: replace the list with Name, Email, disabled Role, Back and Create and Name; validate and check duplicates without opening a sheet - `inst-new`
 5. [x] - `p1` - User confirms; API: `transcript_rename_speaker` with call id, speaker id, existing or new PersonRef and whole_call or one_segment scope; never submit during composition - `inst-rename`
 6. [x] - `p1` - **IF** the command fails: keep the draft and focus, show the typed error with explicit retry; a missing speaker refreshes the transcript before another attempt - `inst-error`
 7. [x] - `p1` - **ELSE** apply the returned speakers and core events to every affected line and header; announce the actual affected count when supplied and retain change_id for Undo - `inst-result`
@@ -162,8 +162,8 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 2. [x] - `p1` - Limit inline groups to five visible entries each and popover list to eight before scrolling; New Person… remains last - `inst-groups`
 3. [x] - `p1` - **IF** no match: show No one called the query and New Person with the quoted query, not an empty menu - `inst-empty`
 4. [x] - `p1` - New form trims Name to 1–80 characters; empty submit says **Enter a name.**; invalid non-empty Email on blur says **Enter an email like name@company.com.** - `inst-validate`
-5. [x] - `p1` - **IF** a duplicate is returned: show **Lena K. (QA) is already in your people.**, **Use Lena K.**, **Create Anyway**; require the user's choice - `inst-duplicate`
-6. [x] - `p1` - Keep draft when focus leaves; suppress Return, Esc submission and review/card keys during composition; first Esc clears query and a second closes the picker - `inst-focus`
+5. [x] - `p1` - **IF** a duplicate is returned: show **Lena K. (QA) is already in your people.**, **Use Lena K.**, **Create Anyway**; keep both choices mounted through field blur and require the user's choice - `inst-duplicate`
+6. [x] - `p1` - Keep draft when focus leaves; suppress Return, Esc submission and review/card keys during composition; first Esc in the New person form returns to the list without losing the draft, first Esc clears a non-empty query, ⌘N opens New person, and Return chooses the first matching person - `inst-focus`
 7. [x] - `p1` - **RETURN** existing or new PersonRef for the host command; owner hosts use Create and Assign, speaker hosts Create and Name; the picker creates no voice profile - `inst-return`
 
 ## 4. States (CDSL)
@@ -223,7 +223,7 @@ The system **MUST** render the picker, New person form, live rename and PC-R9 wi
 
 **Touches**:
 - Commands: `transcript_rename_speaker`, `transcript_name_speakers`, `audio_play`, `audio_stop`, `change_undo`; M3 `people_list`, `person_create` via fake in M2
-- Tests: unit matching, duplicates, validation, composition, draft retention and panel timers; conformance whole-call/one-segment, skip, labels/owners/prose propagation and inverse changes; E2E `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers` (all paths); XCUITest `test_cpt_noter_seq_call_screen_name_speaker` for key-panel and call-app focus; screenshots picker/new/duplicate, selected/named/skipped/compact and audio-gone panel
+- Tests: unit matching, duplicates through blur and button activation, validation, composition, form Esc/back draft retention, ⌘N and default Return selection, per-call panel reset and timers; conformance whole-call/one-segment, fake call-detail snapshot parity, skip, labels/owners/prose propagation and inverse changes; E2E `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers` (all paths); XCUITest `test_cpt_noter_seq_call_screen_name_speaker` for key-panel and call-app focus; screenshots picker/new/duplicate, selected/named/skipped/compact and audio-gone panel
 
 ### Correct terms with glossary intent
 
@@ -264,6 +264,6 @@ The system **MUST** preserve the selected range and original wording, apply only
 
 **Data and non-applicability.** The UI owns no tables. Identity, glossary writes and undo are core responsibilities; no voice profile is created here. Network calls, credential handling, migrations, deployment and earlier-call reconciliation are not applicable to this UI feature. Bridge logs omit names, selected text and replacements.
 
-**Changelog.** v1.1 (7 Nov 2026): record the owner-approved disabled Fix Term Language control and its frozen-contract limit.
+**Changelog.** v1.2 (13 Nov 2026): specify duplicate choices surviving blur, New person keyboard behavior, disabled non-persistent Role, and per-call naming-panel state. v1.1 (7 Nov 2026): record the owner-approved disabled Fix Term Language control and its frozen-contract limit.
 
 **Slice 2 verification limits.** The existing implementation ticks on the partial live-name row are retained because the current validator treats their retained markers as orphaned when the rows are unticked; they do not establish complete acceptance, and the feature/DoD remain unchecked. Live-name `inst-open` remains partial: opening live Rename now requests `window_show_call` before focusing the field. Regaining key after an external focus loss still depends on the assigned core/Tauri focus-sync gap (outside the UI lane), and its native key-panel/focus XCUITest remains pending; browser focus alone does not prove it. Fix-term `inst-error` explicitly refreshes the span after stale-range errors and disables resubmission until the user reselects. Post-call `inst-update` awaits the core's `OutputSection.names_updated` field; do not infer it from client-side edits or regenerate automatically. The Summary mount and other unchecked rows remain outside this delivered slice.

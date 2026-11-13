@@ -72,7 +72,7 @@ export function PersonPicker(p: PersonPickerProps) {
   const quoted = query.trim();
   const none = !!quoted && flat.length === 0;
   const newIndex = flat.length;
-  const current = active ?? (none ? newIndex : -1);
+  const current = active ?? (quoted && flat.length ? 0 : none ? newIndex : -1);
 
   const pick = (e: Entry) => {
     setQuery(e.display_name);
@@ -90,6 +90,11 @@ export function PersonPicker(p: PersonPickerProps) {
   // @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-focus
   const key = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return; // Return, Esc and arrows belong to the input method
+    if (e.metaKey && e.key.toLowerCase() === "n") {
+      e.preventDefault();
+      openForm();
+      return;
+    }
     const last = newIndex;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -128,7 +133,10 @@ export function PersonPicker(p: PersonPickerProps) {
         confirmLabel={p.confirmLabel}
         error={p.error}
         disabled={p.disabled}
-        onBack={() => setForm(null)}
+        onBack={(name) => {
+          setQuery(name);
+          setForm(null);
+        }}
         onPick={p.onPick}
         onConfirm={p.onConfirm}
       />
@@ -261,7 +269,7 @@ interface NewFormProps extends Pick<
 > {
   initial: string;
   people: readonly PersonRow[] | null;
-  onBack: () => void;
+  onBack: (name: string) => void;
 }
 
 /** The New person form, in place of the list: Name prefilled with the query, Email, Role, a duplicate check against the people. */
@@ -310,6 +318,7 @@ export function NewPersonForm(p: NewFormProps) {
     label: string,
     msg?: string,
     placeholder?: string,
+    disabled = false,
   ) => (
     <label className="cw-pp__lbl">
       {label}
@@ -319,16 +328,22 @@ export function NewPersonForm(p: NewFormProps) {
           type="text"
           aria-label={label}
           autoFocus={name === "name"} // the combobox that had focus unmounted with the list
+          disabled={p.disabled || disabled}
           placeholder={placeholder}
           aria-invalid={(msg && form.shown) || undefined}
           value={form[name]}
           onChange={(e) => set({ [name]: e.target.value })}
-          onBlur={() => set({ shown: true })}
-          onKeyDown={(e) =>
-            e.key === "Enter" &&
-            !e.nativeEvent.isComposing &&
-            (e.preventDefault(), submit())
-          }
+          onBlur={() => setForm((f) => ({ ...f, shown: true }))}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === "Escape") {
+              e.preventDefault();
+              p.onBack(form.name);
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
         />
       </span>
       {msg && form.shown && (
@@ -359,12 +374,7 @@ export function NewPersonForm(p: NewFormProps) {
         errors.email,
         t("speakers.new.email_ph"),
       )}
-      {field(
-        "role",
-        t("speakers.new.role"),
-        undefined,
-        t("speakers.new.role_ph"),
-      )}
+      {field("role", t("speakers.new.role"), undefined, t("speakers.new.role_ph"), true)}
       {form.dup && (
         <div className="cw-pp__dup" role="status">
           <Icon name="info" size={13} />
@@ -397,7 +407,7 @@ export function NewPersonForm(p: NewFormProps) {
         </span>
       )}
       <div className="cw-pp__foot">
-        <PushButton label={t("speakers.new.back")} onAction={p.onBack} />
+        <PushButton label={t("speakers.new.back")} onAction={() => p.onBack(form.name)} />
         <PushButton
           label={p.confirmLabel}
           variant="primary"

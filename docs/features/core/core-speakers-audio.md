@@ -2,7 +2,7 @@
 title: "Feature: Speaker naming, term fixes and audio deletion"
 description: "Logged transcript corrections that survive the archive pass, post-call naming and permanent audio deletion."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M2
 lane: core
@@ -95,7 +95,7 @@ A name or term corrected once stays corrected after offline transcription, and d
 1. [x] - `p1` - API: `transcript_rename_speaker { call_id, speaker_id, person, scope }` or `transcript_name_speakers { call_id, assignments }` - `inst-name-request`
 2. [x] - `p1` - Validate every speaker and optional segment belongs to the call; resolve existing `PersonRef` values or create the named person as part of the same logged batch - `inst-name-validate`
 3. [x] - `p1` - Leave null assignments unchanged; for each actual assignment run `cpt-noter-algo-core-speakers-audio-correct` - `inst-name-correct`
-4. [x] - `p1` - Commit one logged batch, then publish changed speakers and segments and whole affected entities; return `SpeakerMutation` with its undo handle - `inst-name-publish`
+4. [x] - `p1` - Commit one logged batch, then publish changed speakers and segments and whole affected entities; return `SpeakerMutation` with its undo handle; fake handlers keep transcript and call-detail speaker snapshots in sync - `inst-name-publish`
 5. [x] - `p1` - Keep text-only naming available when audio is gone; sample replay uses existing `audio_play` when available - `inst-name-no-audio`
 6. [x] - `p1` - **RETURN** names and counts through the existing view models; undo uses `change_undo` - `inst-name-return`
 
@@ -232,3 +232,5 @@ The system **MUST** pass unit tests for line scope, call scope, Unicode term ran
 - [x] Both deletion commands succeed in real-core E2E; replay after deletion returns `audio_deleted`, text evidence still opens and undo returns `not_undoable`.
 - [x] Unit and conformance tests cover missing ids, cross-call input, invalid ranges and failed file removal without false freed-byte counts.
 - [x] `just gate` passes.
+
+**Changelog.** v0.2 (13 Nov 2026): fake naming updates both transcript and call-detail speaker snapshots.

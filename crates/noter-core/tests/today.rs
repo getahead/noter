@@ -127,14 +127,17 @@ fn call(id: &str, started: i64, status: &str) -> Insert {
 }
 
 fn speaker(id: &str, call_id: &str, label: &str, person: &str) -> Insert {
+    let n = id.chars().rev().find(|c| c.is_ascii_digit()).unwrap_or('1');
     row(
         "speakers",
         &[
             ("id", json!(id)),
             ("call_id", json!(call_id)),
-            ("label", json!(label)),
+            ("label", json!(format!("spk_{n}"))),
+            ("n", json!(n.to_digit(10).unwrap_or(1))),
             ("channel", json!("sys")),
             ("person_id", json!(person)),
+            ("name", json!(label)),
             ("named_by", json!("you")),
             ("pass", json!("live")),
         ],
@@ -461,6 +464,24 @@ fn people_world(core: &Core) {
     insert(
         core,
         vec![
+            row(
+                "people",
+                &[
+                    ("id", json!("per_anna")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Anna Koval")),
+                    ("short_name", json!("Anna K.")),
+                ],
+            ),
+            row(
+                "people",
+                &[
+                    ("id", json!("per_bob")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Bob Ray")),
+                    ("short_name", json!("Bob Ray")),
+                ],
+            ),
             call("old", NOW - 20 * DAY, "ready"),
             call("mid", NOW - 10 * DAY, "ready"),
             call("new", NOW - 3 * DAY, "ready"),
@@ -588,6 +609,15 @@ async fn rank(dir: &Path, ranking: TodayRanking) -> Vec<String> {
     insert(
         &core,
         vec![
+            row(
+                "people",
+                &[
+                    ("id", json!("per_anna")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Anna Koval")),
+                    ("short_name", json!("Anna K.")),
+                ],
+            ),
             call("c_old", NOW - 9 * DAY, "ready"),
             call("c_new", NOW - 2 * DAY, "ready"),
             speaker("a1", "c_old", "Anna Koval", "per_anna"),
@@ -782,8 +812,8 @@ async fn review_links_include_suggestions_and_only_visible_unnamed_speakers() {
     exec(
         dir.path(),
         "UPDATE speakers SET person_id = NULL, n = 1, named_by = NULL WHERE id = 's4';
-        INSERT INTO speakers (id, call_id, label, channel, person_id, pass)
-        VALUES ('archive_named', 'bob', 'Bob Ray', 'sys', 'per_bob', 'archive');
+        INSERT INTO speakers (id, call_id, label, n, channel, person_id, name, pass)
+        VALUES ('archive_named', 'bob', 'spk_4', 4, 'sys', 'per_bob', 'Bob Ray', 'archive');
         UPDATE speakers SET person_id = NULL, n = 1, named_by = NULL WHERE id = 's2';",
     );
     let view = serde_json::to_value(today(&core).await.unwrap()).unwrap();

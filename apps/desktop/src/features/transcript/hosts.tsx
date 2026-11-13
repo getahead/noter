@@ -406,16 +406,23 @@ export async function readNaming(bridge: Bridge, callId: string): Promise<{ spea
 
 /** PC-R9 above the Summary: one read of the speakers and lines, no Channel (the Transcript tab owns the one Channel slot); a naming re-reads. */
 export function SummaryNamingPanel({ bridge, callId, detail }: { bridge: Bridge; callId: string; detail: AudioFacts }) {
-  const [read, setRead] = useState<Awaited<ReturnType<typeof readNaming>>>(null);
+  const [read, setRead] = useState<{ callId: string; data: Awaited<ReturnType<typeof readNaming>> } | null>(null);
   const named = useWindow(bridge, (s) => s.entities.speaker);
-  // shortcut: a slow older read can land after a newer one, a naming re-reads again at once; no cancel until a DOM test harness exists
-  useEffect(() => void readNaming(bridge, callId).then(setRead), [bridge, callId, named]);
-  return read ? (
+  // Ignore a previous call's read when navigation changes before it completes.
+  useEffect(() => {
+    let current = true;
+    setRead(null);
+    void readNaming(bridge, callId).then((data) => current && setRead({ callId, data }));
+    return () => { current = false; };
+  }, [bridge, callId, named]);
+  const current = read?.callId === callId ? read.data : null;
+  return current ? (
     <SpeakerNamingPanel
+      key={callId}
       bridge={bridge}
       callId={callId}
-      speakers={read.speakers}
-      segments={read.segments}
+      speakers={current.speakers}
+      segments={current.segments}
       participants={detail.call.participants ?? []}
       audio={!detail.call.audio_deleted && !detail.audio_not_stored}
     />
