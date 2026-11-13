@@ -371,7 +371,7 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
         std::fs::write(rig.folder.join(name), bytes).unwrap();
     }
     std::fs::write(
-        rig.folder.join("zz-valid.md"),
+        rig.folder.join("~z-valid.md"),
         "# Later document\n\nStill indexed.",
     )
     .unwrap();
@@ -387,7 +387,7 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
     assert_eq!(settled.last_sync_at, Some(TimestampMs(T0)));
     assert_eq!(settled.documents, 7);
     let before = chunk_ids(&rig.core);
-    assert!(before.contains_key("zz-valid.md"));
+    assert!(before.contains_key("~z-valid.md"));
     assert_eq!(before.len(), 7);
 
     // A previously indexed file becomes unreadable, another vanishes, and a later file arrives.
@@ -400,7 +400,7 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
         .unwrap();
     std::fs::remove_file(rig.folder.join("retry.rs")).unwrap();
     std::fs::write(
-        rig.folder.join("zzz-new.md"),
+        rig.folder.join("~zz-new.md"),
         "# New document\n\nAfter the lock file.",
     )
     .unwrap();
@@ -419,7 +419,7 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
     let after = chunk_ids(&rig.core);
     assert_eq!(after["spec.docx"], before["spec.docx"]);
     assert!(!after.contains_key("retry.rs"));
-    assert!(after.contains_key("zzz-new.md"));
+    assert!(after.contains_key("~zz-new.md"));
     assert_eq!(after.len(), 7);
     assert_eq!(
         count(
