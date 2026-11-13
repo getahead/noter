@@ -41,7 +41,7 @@ pub(crate) fn tokens(text: &str) -> usize {
 }
 
 /// Splits long paragraphs at character boundaries so an unbroken minified line is bounded too.
-// @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
+// @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
 fn pieces(paragraph: &str) -> Vec<String> {
     if tokens(paragraph) <= MAX_TOKENS {
         return vec![paragraph.to_string()];
@@ -76,6 +76,7 @@ fn pieces(paragraph: &str) -> Vec<String> {
     }
     out
 }
+// @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
 
 /// The chunks of an extracted document, in order.
 pub(crate) fn chunks(doc: &Extracted) -> Vec<Chunk> {

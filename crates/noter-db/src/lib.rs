@@ -242,7 +242,7 @@ impl Store {
         // @cpt-end:cpt-noter-algo-core-storage-snapshot-read:p2:inst-if-snapshot
     }
 
-    // @cpt-flow:cpt-noter-flow-core-storage-open:p1
+    // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-commit
     /// Reclaim free pages after a large deletion, yielding to queued writer work between batches.
     pub fn incremental_vacuum(&self) -> Result<(), CoreError> {
         let mut previous = i64::MAX;
@@ -264,6 +264,7 @@ impl Store {
                 .map_err(internal)
         })
     }
+    // @cpt-end:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-commit
 
     /// Shut down: the writer drains its queue and checkpoints, then every connection closes.
     /// Later calls answer `internal`. Idempotent; also runs on drop.
