@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.10](https://github.com/getahead/noter/compare/v0.22.9...v0.22.10) (2026-11-13)
+
+
+### Bug fixes
+
+* **core:** prevent partial person-name leaks in cloud pseudonyms ([#761](https://github.com/getahead/noter/issues/761)) ([095c78a](https://github.com/getahead/noter/commit/095c78ac2222aafd01c5d1047c6e861e31b5ac3a))
+* **host:** isolate core harness behind opt-in test hooks ([#770](https://github.com/getahead/noter/issues/770)) ([6096c37](https://github.com/getahead/noter/commit/6096c375eb76b4ffe26f0650bcbbe9ebce101ee0))
+
 ## [0.22.9](https://github.com/getahead/noter/compare/v0.22.8...v0.22.9) (2026-11-13)
 
 
