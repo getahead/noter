@@ -247,6 +247,23 @@ describe("holdFix (the Undo of a term fix)", () => {
 });
 
 describe("fake transcript corrections", () => {
+  it("removes and restores a one-line speaker split through undo and redo", async () => {
+    const { fake, bridge: b } = await open("main");
+    const transcript = fake.world.transcripts[0]!;
+    const segment = transcript.segments.find((line) => line.speaker.speaker_id === "spk_3")!;
+    const speakerCount = transcript.speakers.length;
+    const renamed = await b.core.transcriptRenameSpeaker({ call_id: transcript.call_id, speaker_id: "spk_3", person: { type: "existing", person_id: "per_anna" }, scope: { type: "one_segment", segment_id: segment.id } });
+    expect(renamed.status).toBe("ok");
+    expect(transcript.speakers).toHaveLength(speakerCount + 1);
+    if (renamed.status !== "ok") return;
+    await b.core.changeUndo({ target: { type: "change", change_id: renamed.data.change_id } });
+    expect(transcript.segments.find((line) => line.id === segment.id)?.speaker.speaker_id).toBe("spk_3");
+    expect(transcript.speakers).toHaveLength(speakerCount);
+    await b.core.changeRedo({ target: { type: "change", change_id: renamed.data.change_id } });
+    expect(transcript.speakers).toHaveLength(speakerCount + 1);
+    expect(transcript.segments.find((line) => line.id === segment.id)?.speaker.speaker_id).not.toBe("spk_3");
+  });
+
   it("shifts later correction ranges when an earlier term grows and rejects invalid ranges", async () => {
     const { fake, bridge: b } = await open("main", (w) => {
       const transcript = w.transcripts[0]!;

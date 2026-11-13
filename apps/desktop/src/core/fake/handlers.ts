@@ -135,9 +135,14 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     if (r.field === "naming" && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
       for (const speakers of [world.transcripts.find((t) => t.call_id === state.callId)?.speakers, world.call_details.find((d) => d.call.id === state.callId)?.speakers]) {
+        if (!speakers) continue;
+        for (let i = speakers.length - 1; i >= 0; i--) {
+          if (!state.speakers.some((restored) => restored.id === speakers[i]!.id)) speakers.splice(i, 1);
+        }
         for (const restored of state.speakers) {
           const speaker = speakers?.find((s) => s.id === restored.id);
           if (speaker) Object.assign(speaker, restored);
+          else speakers.push(structuredClone(restored));
         }
       }
       const transcript = world.transcripts.find((t) => t.call_id === state.callId);
