@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { dockQuietly, inspectorFocus, returnTarget, layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
+import { dockQuietly, inspectorDefinitionFocus, inspectorFocus, returnTarget, layoutFor, exitMs, leaveTimer, openFocus, actionEvent, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
 
 describe("shell actions", () => {
   it("turns each action into its view-state event", () => {
@@ -137,6 +137,32 @@ describe("effects", () => {
 });
 
 describe("inspector exit (D-13)", () => {
+  it("focuses an override when its definition changes and leaves its explicit close handler in charge of return focus", () => {
+    const focus = vi.fn();
+    const returnFocus = vi.fn();
+    expect(inspectorDefinitionFocus(undefined, true, true, false, { focus }, () => ({ focus: returnFocus }))).toBeUndefined();
+    expect(focus).toHaveBeenCalledOnce();
+
+    expect(inspectorDefinitionFocus(undefined, true, false, true, { focus }, () => ({ focus: returnFocus }))).toBeUndefined();
+    expect(focus).toHaveBeenCalledOnce();
+    expect(returnFocus).not.toHaveBeenCalled();
+  });
+
+  it("keeps the page inspector's normal quiet-open and user-open focus behavior", () => {
+    const quiet = { current: true };
+    const focus = vi.fn();
+    const openerFocus = vi.fn();
+    expect(inspectorDefinitionFocus(quiet, true, false, false, { focus }, () => ({ focus: openerFocus, isConnected: true }))).toBeUndefined();
+    expect(quiet.current).toBe(false);
+    expect(focus).not.toHaveBeenCalled();
+
+    const close = inspectorDefinitionFocus(quiet, true, false, false, { focus }, () => ({ focus: openerFocus, isConnected: true }));
+    expect(close).toBeTypeOf("function");
+    expect(focus).toHaveBeenCalledOnce();
+    close?.();
+    expect(openerFocus).toHaveBeenCalledOnce();
+  });
+
   it("slides out for 250 ms, and not at all under Reduce Motion", () => {
     expect(exitMs()).toBe(250); // no matchMedia in the unit environment
     vi.stubGlobal("matchMedia", () => ({ matches: true }));

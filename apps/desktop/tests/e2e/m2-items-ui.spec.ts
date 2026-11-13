@@ -448,29 +448,36 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     await field.fill("Send the drawer spec to Anna");
     await page.evaluate(() => {
       const win = globalThis as unknown as {
-        __noterFake: { invoke: (command: string, args: unknown) => Promise<unknown> };
+        __noterFake?: { invoke: (command: string, ...args: unknown[]) => Promise<unknown> };
+        __TAURI_INTERNALS__?: { invoke: (command: string, ...args: unknown[]) => Promise<unknown> };
         __itemCreateStarted: Promise<void>;
+        __itemCreateCalls: number;
         __releaseItemCreate: () => void;
       };
+      const host = win.__noterFake ?? win.__TAURI_INTERNALS__;
+      if (!host) throw new Error("No E2E IPC host is installed");
       let started!: () => void;
       let release!: () => void;
       win.__itemCreateStarted = new Promise((resolve) => (started = resolve));
+      win.__itemCreateCalls = 0;
       win.__releaseItemCreate = () => release();
-      const invoke = win.__noterFake.invoke.bind(win.__noterFake);
-      win.__noterFake.invoke = async (command, args) => {
+      const invoke = host.invoke.bind(host);
+      host.invoke = async (command, ...args) => {
         if (command === "item_create") {
+          win.__itemCreateCalls += 1;
           started();
           await new Promise<void>((resolve) => (release = resolve));
         }
-        return invoke(command, args);
+        return invoke(command, ...args);
       };
     });
     await page.keyboard.press("Enter");
     await page.evaluate(() => (globalThis as unknown as { __itemCreateStarted: Promise<void> }).__itemCreateStarted);
     await expect(field).toBeDisabled();
     await page.evaluate(() => document.querySelector<HTMLInputElement>('[placeholder="What needs doing, and who does it?"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
-    await expect.poll(async () => (await sent(page, "item_create")).length).toBe(1);
+    await expect.poll(async () => page.evaluate(() => (globalThis as unknown as { __itemCreateCalls: number }).__itemCreateCalls)).toBe(1);
     await page.evaluate(() => (globalThis as unknown as { __releaseItemCreate: () => void }).__releaseItemCreate());
+    await expect.poll(async () => (await sent(page, "item_create")).length).toBe(1);
     expect(await sent(page, "item_create")).toEqual([{ call_id: W.PAST_CALL, kind: "action_item", text: "Send the drawer spec to Anna" }]);
     // the section is read again for the new row (the fake does not add it to the written outputs; the real core does)
     await expect.poll(async () => (await sent(page, "outputs_get")).length).toBeGreaterThan(1);

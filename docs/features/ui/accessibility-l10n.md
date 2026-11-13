@@ -104,6 +104,7 @@ It implements the **Keyboard and VoiceOver** and **Localisation rules for contro
 
 **Success Scenarios**:
 - Tab and ⇧Tab move through every control whatever the macOS keyboard-navigation setting (D51)
+- Opening an item inspector focuses it even when a page inspector is already docked; closing it returns focus to the invoking control
 - After a popover, sheet or inspector closes, focus is back on the control that opened it
 - A single-key action (A, E, R, T, U) works on a Russian layout because the physical key is matched
 
