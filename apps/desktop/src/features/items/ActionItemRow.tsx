@@ -4,6 +4,7 @@
 import { useId, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
+import { isTyping } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { ItemView, PersonChip } from "../../core/bindings";
 import { dayOf, locale, quote, t } from "../../i18n/format";
@@ -42,7 +43,15 @@ export function focusNext(id: string): boolean {
   const rows = Array.from(globalThis.document?.querySelectorAll<HTMLElement>("[data-item-id]") ?? []);
   const next = nextSuggested(rows.map((r) => ({ id: r.dataset.itemId!, review: r.dataset.review! })), id);
   // @cpt-begin:cpt-noter-flow-ui-items-review:p1:inst-return
-  rows.find((r) => r.dataset.itemId === next)?.focus();
+  const target = rows.find((r) => r.dataset.itemId === next);
+  if (target) target.focus();
+  else {
+    const section = rows.find((r) => r.dataset.itemId === id)?.closest(".pc-sec") as HTMLElement | null;
+    if (section) {
+      section.tabIndex = -1;
+      section.focus();
+    }
+  }
   return next !== null;
   // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-return
 }
@@ -132,6 +141,12 @@ export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEv
   }
   if (local.asking && e.key === "Escape") return stop(), void answerHandoff(bridge, it, "keep_open");
   if (e.metaKey && e.code === "KeyI" && slots.inspect) return stop(), slots.inspect(bridge, it.id);
+  const rowFocused = !e.currentTarget || e.target === e.currentTarget;
+  if (rowFocused && !isTyping(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === " " && it.kind === "action_item") return stop(), void setDone(bridge, it, it.status !== "done");
+  if (rowFocused && !isTyping(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "Enter" && it.spans[0]) {
+    const span = it.spans[0];
+    return stop(), void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }), { screen: "main-window-shell" });
+  }
   const key = keyOf(e);
   if (it.review !== "suggested" || !key) return;
   stop();

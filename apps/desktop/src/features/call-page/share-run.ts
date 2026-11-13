@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import type { ShareFormat } from "../../core/bindings";
+import type { ItemView, ShareFormat } from "../../core/bindings";
 import { copiedLabel, scopeOf, shareState, type ShareOrigin } from "./share-logic";
 import { copyShare } from "./share-actions";
 import { getOutputs } from "./outputs-cache";
@@ -19,8 +19,12 @@ export const useShareStatus = (): ShareStatus => useSyncExternalStore((l) => (li
 export const exportOpener: { open: ((origin: ShareOrigin) => void) | null } = { open: null };
 
 /** Suggested rows the scope would carry, for the notice that makes their inclusion explicit. */
-export function unreviewedIn(callId: string, origin: ShareOrigin): number {
-  return (getOutputs(callId)?.sections ?? []).filter((s) => origin.type === "toolbar" || s.kind === origin.kind).flatMap((s) => s.items).filter((i) => i.review === "suggested" && (origin.type !== "row" || i.id === origin.id)).length;
+export function unreviewedIn(callId: string, origin: ShareOrigin, records?: Record<string, ItemView>): number {
+  return (getOutputs(callId)?.sections ?? []).filter((s) => origin.type === "toolbar" || s.kind === origin.kind).flatMap((s) => s.items).filter((item) => {
+    const current = records?.[item.id];
+    const i = current && current.rev >= item.rev ? current : item;
+    return i.review === "suggested" && (origin.type !== "row" || i.id === origin.id);
+  }).length;
 }
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-share:p1
@@ -30,7 +34,7 @@ export async function runShare(bridge: Bridge, callId: string, origin: ShareOrig
   if (!shareState(outputs).ready) return setShareStatus({ callId, origin, kind: "nothing" });
   const r = await copyShare(bridge, callId, scopeOf(origin, includeUnreviewed), format);
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-review
-  if (r.status === "error") return setShareStatus(r.error.code === "unreviewed_in_scope" ? { callId, origin, kind: "unreviewed", count: unreviewedIn(callId, origin), format } : { callId, origin, kind: r.error.code === "outputs_not_ready" ? "nothing" : "failed" });
+  if (r.status === "error") return setShareStatus(r.error.code === "unreviewed_in_scope" ? { callId, origin, kind: "unreviewed", count: unreviewedIn(callId, origin, bridge.store.getState().entities.item), format } : { callId, origin, kind: r.error.code === "outputs_not_ready" ? "nothing" : "failed" });
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-review
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-copied
   setShareStatus({ callId, origin, kind: "copied", text: copiedLabel(format, r.data.sensitive) });

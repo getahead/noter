@@ -435,7 +435,7 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     await expect(rowOf(page, SPEC)).toBeFocused(); // focus returns to the row
   });
 
-  test("UI — Add Action Item on an empty section adds it (item_create sends no owner: the core has none to default to yet)", async ({ page }) => {
+  test("UI — Add Action Item ignores a second submit while item_create is in flight", async ({ page }) => {
     await openCall(page, (w) => {
       O.written(w);
       const s = O.sectionOf(w, "action_items");
@@ -444,8 +444,33 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
       w.items = w.items.filter((i) => !(i.call.id === W.PAST_CALL && i.kind === "action_item"));
     });
     await button(page, "Add Action Item").click();
-    await page.getByPlaceholder("What needs doing, and who does it?").fill("Send the drawer spec to Anna");
+    const field = page.getByPlaceholder("What needs doing, and who does it?");
+    await field.fill("Send the drawer spec to Anna");
+    await page.evaluate(() => {
+      const win = globalThis as unknown as {
+        __noterFake: { invoke: (command: string, args: unknown) => Promise<unknown> };
+        __itemCreateStarted: Promise<void>;
+        __releaseItemCreate: () => void;
+      };
+      let started!: () => void;
+      let release!: () => void;
+      win.__itemCreateStarted = new Promise((resolve) => (started = resolve));
+      win.__releaseItemCreate = () => release();
+      const invoke = win.__noterFake.invoke.bind(win.__noterFake);
+      win.__noterFake.invoke = async (command, args) => {
+        if (command === "item_create") {
+          started();
+          await new Promise<void>((resolve) => (release = resolve));
+        }
+        return invoke(command, args);
+      };
+    });
     await page.keyboard.press("Enter");
+    await page.evaluate(() => (globalThis as unknown as { __itemCreateStarted: Promise<void> }).__itemCreateStarted);
+    await expect(field).toBeDisabled();
+    await page.evaluate(() => document.querySelector<HTMLInputElement>('[placeholder="What needs doing, and who does it?"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    await expect.poll(async () => (await sent(page, "item_create")).length).toBe(1);
+    await page.evaluate(() => (globalThis as unknown as { __releaseItemCreate: () => void }).__releaseItemCreate());
     expect(await sent(page, "item_create")).toEqual([{ call_id: W.PAST_CALL, kind: "action_item", text: "Send the drawer spec to Anna" }]);
     // the section is read again for the new row (the fake does not add it to the written outputs; the real core does)
     await expect.poll(async () => (await sent(page, "outputs_get")).length).toBeGreaterThan(1);

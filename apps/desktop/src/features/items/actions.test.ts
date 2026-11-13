@@ -65,6 +65,7 @@ describe("review (flow inst-accept, inst-reject, inst-restore, inst-error)", () 
     await ready();
     await review(bridge, item("itm_replay"), "reject");
     expect(localOf("itm_replay").outcome).toMatchObject({ text: "Rejected", ms: 10_000 });
+    expect(undoMode()).toBe("undo");
   });
 
   it("restore returns the row to Suggested with no outcome", async () => {
@@ -73,6 +74,7 @@ describe("review (flow inst-accept, inst-reject, inst-restore, inst-error)", () 
     await review(bridge, item("itm_replay"), "restore");
     expect(item("itm_replay").review).toBe("suggested");
     expect(localOf("itm_replay").outcome).toBeUndefined();
+    expect(undoMode()).toBe("undo");
   });
 
   it("a refused review keeps the row Suggested, shows no success and reads the item again on a conflict", async () => {
@@ -207,6 +209,7 @@ describe("setDone, answerHandoff, reopen", () => {
     await reopen(bridge, item("itm_token"));
     expect(seen).toContainEqual(["item_reopen", { item_id: "itm_token", rev: 1 }]);
     expect(localOf("itm_token").outcome?.text).toBe("Reopened");
+    expect(undoMode()).toBe("undo");
   });
 
   it("a failed command keeps the previous view and names the error", async () => {
@@ -263,6 +266,7 @@ describe("saveDraft (algo save)", () => {
     expect(seen.map((s) => s[0])).toEqual(["item_edit"]);
     expect(item("itm_a11y")).toMatchObject({ text: "New text", review: "suggested" });
     expect(localOf("itm_a11y").outcome).toMatchObject({ text: "Saved", ms: 2000 });
+    expect(undoMode()).toBe("undo");
   });
 
   it("empty text sends nothing and keeps the draft", async () => {

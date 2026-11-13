@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import { useWindow } from "../../app/use-window";
 import type { MsgKey } from "../../i18n/en";
 import type { CallRow, OutputSection as Section, UiPrefs, VersionMeta } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -15,7 +16,7 @@ import { MarkdownBody } from "./markdown";
 import { OutputItemRow } from "./OutputItemRow";
 import { commitDraft, loadVersions, readVersion } from "./outputs-actions";
 import { bodyOf, useVersions } from "./outputs-cache";
-import { isProse, versionName, metaLine, SECTION_LABEL, sectionCounts, sectionId } from "./outputs-logic";
+import { currentItems, isProse, versionName, metaLine, SECTION_LABEL, sectionCounts, sectionId } from "./outputs-logic";
 import { ShareMenu } from "./ShareMenu";
 import { slots } from "./slots";
 import { VersionSwitcher } from "./VersionSwitcher";
@@ -41,7 +42,8 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   useEffect(() => {
     if (section.regenerated_with_edits && section.summary_id && !versions) void loadVersions(bridge, section.summary_id);
   }, [bridge, section.regenerated_with_edits, section.summary_id, versions]);
-  const counts = sectionCounts(section);
+  const itemRecords = useWindow(bridge, (s) => s.entities.item);
+  const counts = sectionCounts({ ...section, items: currentItems(section.items, itemRecords) });
   const Row = section.kind === "action_items" ? slots.actionItemRow : null;
   const RejectedList = slots.rejectedList;
 
@@ -151,7 +153,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   };
 
   return (
-    <section className="pc-sec" data-component="cpt-noter-component-ui-output-section" data-kind={section.kind} data-state={state} aria-label={heading}>
+    <section className="pc-sec" data-component="cpt-noter-component-ui-output-section" data-kind={section.kind} data-state={state} aria-label={heading} tabIndex={-1}>
       <div className="pc-sec__head">
         <span className="pc-sec__title">
           {heading}
