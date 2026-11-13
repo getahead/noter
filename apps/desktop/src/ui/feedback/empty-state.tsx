@@ -9,6 +9,7 @@ export interface EmptyStateProps {
   title: string;
   body?: string;
   icon?: IconName;
+  actionId?: string;
   actionLabel?: string;
   onAction?: () => void;
   linkLabel?: string;
@@ -20,7 +21,7 @@ export interface EmptyStateProps {
 const root = (variant: string) => ({ "data-component": "cpt-noter-component-ui-empty-state", "data-variant": variant });
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
-export function EmptyState({ variant = "first-use", title, body, icon = "inbox", actionLabel, onAction, linkLabel, onLink, heading }: EmptyStateProps) {
+export function EmptyState({ variant = "first-use", title, body, icon = "inbox", actionId, actionLabel, onAction, linkLabel, onLink, heading }: EmptyStateProps) {
   if (variant === "section") return <div {...root(variant)} className="np-empty np-empty--section">{title}</div>;
   return (
     <div {...root(variant)} className={`np-empty np-empty--${variant}`}>
@@ -39,7 +40,7 @@ export function EmptyState({ variant = "first-use", title, body, icon = "inbox",
       {body && <div className="np-empty__body">{body}</div>}
       {actionLabel && (
         <div className="np-empty__act">
-          <PushButton label={actionLabel} variant={variant === "filtered" ? "secondary" : "primary"} onAction={onAction} />
+          <PushButton id={actionId} label={actionLabel} variant={variant === "filtered" ? "secondary" : "primary"} onAction={onAction} />
         </div>
       )}
       {linkLabel && (
