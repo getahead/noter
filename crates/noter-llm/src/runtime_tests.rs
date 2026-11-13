@@ -985,6 +985,45 @@ async fn verifying_a_key_runs_once_on_its_runtime_with_the_candidate_through_the
     assert_eq!(f.secrets.get("anthropic").unwrap(), None);
 }
 
+// cpt-noter-algo-core-credentials-privacy-check-account:inst-check-test
+#[tokio::test]
+async fn an_account_check_cannot_fall_back_to_local_when_cloud_is_forbidden() {
+    for runtime in [RuntimeChoice::ClaudeAccount, RuntimeChoice::ChatgptAccount] {
+        let f = fixture(None);
+        for privacy in [
+            Privacy {
+                mode: PrivacyMode::LocalOnly,
+                ..cloud()
+            },
+            Privacy {
+                offline: true,
+                ..cloud()
+            },
+        ] {
+            let result = f.llm.verify_account(runtime, privacy).await;
+            assert!(
+                matches!(result, Err(Failure::Unavailable(_))),
+                "{runtime:?}: {result:?}"
+            );
+        }
+        assert!(f.scripted.received().is_empty());
+        assert_eq!(f.count("SELECT COUNT(*) FROM llm_runs"), 0);
+    }
+}
+
+// cpt-noter-algo-core-credentials-privacy-check-account:inst-check-test
+#[tokio::test]
+async fn an_account_check_and_its_repair_stay_on_the_account_without_a_key() {
+    for runtime in [RuntimeChoice::ClaudeAccount, RuntimeChoice::ChatgptAccount] {
+        let f = fixture(Some(r#"{"on":"ask-answer","output":{"nope":1}}"#));
+        f.llm.verify_account(runtime, cloud()).await.unwrap();
+        let got = f.scripted.received();
+        assert_eq!(got.len(), 2);
+        assert!(got.iter().all(|r| r.runtime == runtime && r.key.is_none()));
+        assert_eq!(f.count("SELECT COUNT(*) FROM audit_log"), 2);
+    }
+}
+
 #[tokio::test]
 async fn a_rejected_candidate_fails_with_the_runtime_code_on_that_runtime_only() {
     let f = fixture(Some(r#"{"on": "ask-answer", "fail": "key_rejected"}"#));
