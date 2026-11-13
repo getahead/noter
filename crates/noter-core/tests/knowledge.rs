@@ -399,6 +399,93 @@ async fn changing_one_file_re_embeds_only_that_file_and_same_content_adds_nothin
     );
 }
 
+// cpt-noter-algo-core-knowledge-sync-v2: one bad file must not starve later files or pruning.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync() {
+    let rig = open().await;
+    for (name, bytes) in [
+        ("00-malformed.pdf", b"not a PDF".as_slice()),
+        ("01-empty.docx", b"".as_slice()),
+        ("~$report.docx", b"Word lock file".as_slice()),
+    ] {
+        std::fs::write(rig.folder.join(name), bytes).unwrap();
+    }
+    std::fs::write(
+        rig.folder.join("~z-valid.md"),
+        "# Later document\n\nStill indexed.",
+    )
+    .unwrap();
+    let row = rig
+        .core
+        .source_add_folder(&ctx(), folder_args())
+        .await
+        .unwrap();
+    let settled = rig
+        .until(|r| r.last_sync_at.is_some() || matches!(r.status, SourceStatus::Failed { .. }))
+        .await;
+    assert_eq!(settled.status, SourceStatus::Idle);
+    assert_eq!(settled.last_sync_at, Some(TimestampMs(T0)));
+    assert_eq!(settled.documents, 7);
+    let before = chunk_ids(&rig.core);
+    assert!(before.contains_key("~z-valid.md"));
+    assert_eq!(before.len(), 7);
+
+    // A previously indexed file becomes unreadable, another vanishes, and a later file arrives.
+    std::fs::write(rig.folder.join("spec.docx"), b"broken Word document").unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(rig.folder.join("spec.docx"))
+        .unwrap()
+        .set_modified(SystemTime::now() + Duration::from_secs(60))
+        .unwrap();
+    std::fs::remove_file(rig.folder.join("retry.rs")).unwrap();
+    std::fs::write(
+        rig.folder.join("~zz-new.md"),
+        "# New document\n\nAfter the lock file.",
+    )
+    .unwrap();
+    for at in [T0 + 1_000, T0 + 2_000] {
+        rig.reindex(at, &row.id).await;
+        let settled = rig
+            .until(|r| {
+                r.last_sync_at == Some(TimestampMs(at))
+                    || matches!(r.status, SourceStatus::Failed { .. })
+            })
+            .await;
+        assert_eq!(settled.status, SourceStatus::Idle);
+        assert_eq!(settled.last_sync_at, Some(TimestampMs(at)));
+        assert_eq!(settled.documents, 7);
+    }
+    let after = chunk_ids(&rig.core);
+    assert_eq!(after["spec.docx"], before["spec.docx"]);
+    assert!(!after.contains_key("retry.rs"));
+    assert!(after.contains_key("~zz-new.md"));
+    assert_eq!(after.len(), 7);
+    assert_eq!(
+        count(
+            &rig.core,
+            "SELECT COUNT(*) FROM sync_runs WHERE error IS NOT NULL"
+        ),
+        0
+    );
+    let progress = rig.events.named("jobs:progress");
+    assert!(progress.iter().any(|p| p["run"]["status"] == "succeeded"
+        && p["run"]["counts"].as_array().is_some_and(|counts| counts
+            .iter()
+            .any(|c| c["label"] == "skipped" && c["n"].as_u64().is_some_and(|n| n >= 4)))));
+    assert!(!format!("{progress:?}").contains("Word lock file"));
+
+    // A skipped file is retried after repair; failure never stores a successful hash.
+    std::fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../noter-knowledge/tests/fixtures/spec.docx"),
+        rig.folder.join("01-empty.docx"),
+    )
+    .unwrap();
+    rig.reindex(T0 + 3_000, &row.id).await;
+    assert_eq!(rig.synced_at(T0 + 3_000).await.documents, 8);
+    assert!(chunk_ids(&rig.core).contains_key("01-empty.docx"));
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_cancelled_picker_writes_nothing() {
     let rig = open().await;

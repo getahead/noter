@@ -351,7 +351,7 @@ pub fn revoke(
     secrets.remove(&account).map_err(|_| keychain_locked())?;
     // @cpt-end:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoke
     // @cpt-begin:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoked
-    // @cpt-begin:cpt-noter-state-core-knowledge-source:p1:inst-status-revoked
+    // @cpt-begin:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-revoked
     meta.undoable = false;
     let id = id.clone();
     let written = store.write_with(meta, move |tx| {
@@ -378,7 +378,7 @@ pub fn revoke(
         Ok((row, vec![logged]))
     })?;
     Ok(written.value)
-    // @cpt-end:cpt-noter-state-core-knowledge-source:p1:inst-status-revoked
+    // @cpt-end:cpt-noter-state-core-knowledge-source-v2:p1:inst-status-revoked
     // @cpt-end:cpt-noter-flow-core-knowledge-remove:p1:inst-remove-revoked
 }
 
