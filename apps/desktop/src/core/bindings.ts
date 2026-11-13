@@ -3227,6 +3227,8 @@ export type SubscribeLevelsArgs = {
 
 export type SubscriptionHandle = {
 	subscription_id: SubscriptionId,
+	/**  The Channel starts strictly after this stream sequence, including on resubscribe. */
+	last_seq: Seq,
 };
 
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
@@ -3621,7 +3623,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.7";
+export const CONTRACT_VERSION = "2.8";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

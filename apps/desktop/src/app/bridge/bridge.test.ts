@@ -227,6 +227,25 @@ describe("streams", () => {
     expect(levels?.seq).toBeGreaterThanOrEqual(3);
   });
 
+  it("levels use the returned baseline when samples arrive before the subscription response", async () => {
+    vi.useFakeTimers();
+    const { b, count, state } = setup("first-run", {
+      handlers: {
+        levels_subscribe: (_a, { send }) => {
+          send({ seq: 4, at_ms: 400, mic_db: -32, sys_db: -38 });
+          send({ seq: 5, at_ms: 500, mic_db: -30, sys_db: -38 });
+          return { subscription_id: "sub_late", last_seq: 3 };
+        },
+      },
+    });
+    await b.open();
+    await b.subscribe("levels_subscribe", { call_id: null });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(state().streams.levels_subscribe?.data?.levels).toMatchObject({ seq: 5, mic_db: -30 });
+    expect(count("levels_subscribe")).toBe(1);
+    expect(state().status).toBe("READY");
+  });
+
   it("self-test messages arrive in order and the stream ends with its reason", async () => {
     vi.useFakeTimers();
     const { b, state } = setup("first-run");

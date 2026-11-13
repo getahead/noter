@@ -585,7 +585,7 @@ export const defaultHandlers: Handlers = {
       if (fake.push(sub, { at_ms: t, mic_db: -30 - Math.random() * 20, sys_db: -25 - Math.random() * 20 }) !== null && t < 30_000) fake.later(100, tick);
     };
     fake.later(100, tick);
-    return { subscription_id: sub };
+    return { subscription_id: sub, last_seq: 0 };
   },
   transcript_rename_speaker: (a, { world, emit }) => {
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
@@ -1893,7 +1893,7 @@ export const defaultHandlers: Handlers = {
     fake.openChannel(sub, "self_test_run", send as (m: unknown) => void);
     if (fake.holdSelfTest) {
       fake.holdSelfTest = false;
-      return { subscription_id: sub };
+      return { subscription_id: sub, last_seq: 0 };
     }
     const at = (ms: number, event: Parameters<typeof fake.push<"self_test_run">>[1]["event"]) => fake.later(ms, () => fake.push(sub, { event }));
     at(300, { type: "stream_arrived", channel: "mic" });
@@ -1907,7 +1907,7 @@ export const defaultHandlers: Handlers = {
       publish("setup:changed");
     });
     at(1600, { type: "ended", reason: "call_stopped" });
-    return { subscription_id: sub };
+    return { subscription_id: sub, last_seq: 0 };
   },
   setup_set_call_display: (a, { world, publish }) => {
     if (a.display_id && !world.app.environment.displays.some((d) => d.id === a.display_id)) throw coreError("not_found", `display ${a.display_id}`);

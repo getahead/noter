@@ -131,6 +131,7 @@ impl Core {
         tokio::spawn(async move { core.drive_self_test(ctx, key, args.play_clip).await });
         Ok(SubscriptionHandle {
             subscription_id: sub.subscription_id,
+            last_seq: sub.last_seq,
         })
     }
 
