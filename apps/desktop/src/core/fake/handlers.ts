@@ -656,12 +656,11 @@ export const defaultHandlers: Handlers = {
     const oldLabel = structuredClone(spk.label);
     const oldNamedBy = spk.named_by;
     const assigned = { type: "person" as const, person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
-    let resultSpeaker = spk;
     const segmentId = a.scope.type === "one_segment" ? a.scope.segment_id : null;
     if (a.scope.type === "one_segment") {
       const segment = t.segments.find((s) => s.id === segmentId && s.speaker.speaker_id === spk.id);
       if (!segment) throw coreError("not_found", "segment");
-      resultSpeaker = { ...structuredClone(spk), id: newId("spk"), label: assigned, named_by: "you", segment_count: 1 };
+      const resultSpeaker: typeof spk = { ...structuredClone(spk), id: newId("spk"), label: assigned, named_by: "you", segment_count: 1 };
       t.speakers.push(resultSpeaker);
       spk.segment_count = Math.max(0, spk.segment_count - 1);
       spk.label = oldLabel;
