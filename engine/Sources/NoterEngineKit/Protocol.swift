@@ -74,6 +74,7 @@ public struct StartSession: Equatable, Sendable {
 }
 
 /// A live transcript segment (`EngineSegment`): hypotheses, then one confirmed with the same id.
+// @cpt-dod:cpt-noter-dod-core-engine-foundation-package:p1
 public struct Segment: Codable, Equatable, Sendable {
     public struct Correction: Codable, Equatable, Sendable {
         public var from: String
@@ -110,7 +111,12 @@ public struct Segment: Codable, Equatable, Sendable {
         try c.encode(t0Ms, forKey: .t0Ms)
         try c.encode(t1Ms, forKey: .t1Ms)
         try c.encode(state, forKey: .state)
-        try c.encode(lang, forKey: .lang)
+        // Rust Lang reserves strings for these three languages; other codes use an object.
+        if ["en", "ru", "de"].contains(lang) {
+            try c.encode(lang, forKey: .lang)
+        } else {
+            try c.encode(["code": lang], forKey: .lang)
+        }
         try c.encode(langP, forKey: .langP)
         try c.encode(speakerLabel, forKey: .speakerLabel)
         try c.encode(text, forKey: .text)
@@ -122,7 +128,35 @@ public struct Segment: Codable, Equatable, Sendable {
     }
 }
 
-// @cpt-dod:cpt-noter-dod-core-engine-foundation-package:p1
+extension Segment {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let lang: String
+        if let code = try? c.decode(String.self, forKey: .lang) {
+            lang = code
+        } else {
+            let value = try c.nestedContainer(keyedBy: AnyKey.self, forKey: .lang)
+            lang = try value.decode(String.self, forKey: AnyKey("code"))
+        }
+        self.init(
+            id: try c.decode(String.self, forKey: .id),
+            callId: try c.decode(String.self, forKey: .callId),
+            channel: try c.decode(Channel.self, forKey: .channel),
+            t0Ms: try c.decode(Int.self, forKey: .t0Ms),
+            t1Ms: try c.decode(Int.self, forKey: .t1Ms),
+            state: try c.decode(String.self, forKey: .state),
+            lang: lang,
+            langP: try c.decode(Float.self, forKey: .langP),
+            speakerLabel: try c.decode(String.self, forKey: .speakerLabel),
+            text: try c.decode(String.self, forKey: .text),
+            wordsPath: try c.decodeIfPresent(String.self, forKey: .wordsPath),
+            avgLogprob: try c.decode(Float.self, forKey: .avgLogprob),
+            noSpeechP: try c.decode(Float.self, forKey: .noSpeechP),
+            corrections: try c.decode([Correction].self, forKey: .corrections),
+            crosstalkLabels: try c.decode([String].self, forKey: .crosstalkLabels))
+    }
+}
+
 public enum EngineCommand: Equatable, Sendable {
     case ping
     case shutdown

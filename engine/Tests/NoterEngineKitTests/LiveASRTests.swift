@@ -53,6 +53,19 @@ final class LiveASRTests: XCTestCase {
     private var segments: [[String: Any]] { lines.events.compactMap { $0["segment"] as? [String: Any] } }
     private var confirmed: [[String: Any]] { segments.filter { $0["state"] as? String == "confirmed" } }
 
+    // cpt-noter-algo-core-engine-capture-live-asr
+    func testUnrestrictedLanguageSegmentsUseTheCoreWireShape() throws {
+        let transcriber = FakeTranscriber("hello there")
+        transcriber.lang = "uk"
+        let a = asr(transcriber, languages: .array([]))
+        play(a, .mic, from: 0, 2500, speaking: true)
+        play(a, .mic, from: 2500, 1000, speaking: false)
+        XCTAssertFalse(confirmed.isEmpty)
+        for segment in segments {
+            XCTAssertEqual(segment["lang"] as? [String: String], ["code": "uk"])
+        }
+    }
+
     func testSpeechGetsAHypothesisAboutEverySecondThenOneConfirmedSegment() throws {
         let a = asr(FakeTranscriber("hello there"))
         play(a, .mic, from: 0, 2500, speaking: true)

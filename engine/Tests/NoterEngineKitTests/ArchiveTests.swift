@@ -94,6 +94,23 @@ final class ArchiveTests: XCTestCase {
         return (try JSONDecoder().decode(ArchiveResult.self, from: Data(contentsOf: out)), progress)
     }
 
+    // cpt-noter-algo-core-engine-offline-decode
+    func testUnrestrictedLanguageArchiveUsesTheCoreWireShape() throws {
+        try storeCall(in: session, seconds: 3, mic: [(0, 2)], sys: [])
+        let decoder = FakeDecoder()
+        decoder.probabilities = ["uk": 0.95]
+        decoder.texts = ["uk": ("hello there", -0.3)]
+        let result = try archive(decoder).result
+        XCTAssertFalse(result.segments.isEmpty)
+        XCTAssertTrue(result.segments.allSatisfy { $0.lang == "uk" })
+        let data = try Data(contentsOf: container.appendingPathComponent(pass.resultPath))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let segments = try XCTUnwrap(json["segments"] as? [[String: Any]])
+        for segment in segments {
+            XCTAssertEqual(segment["lang"] as? [String: String], ["code": "uk"])
+        }
+    }
+
     private func near(_ a: Int, _ b: Int, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertLessThanOrEqual(abs(a - b), 100, "\(what): \(a) vs \(b)", file: file, line: line)
     }
