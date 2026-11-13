@@ -411,7 +411,7 @@ export function SummaryNamingPanel({ bridge, callId, detail }: { bridge: Bridge;
   // Ignore a previous call's read when navigation changes before it completes.
   useEffect(() => {
     let current = true;
-    setRead(null);
+    setRead((previous) => previous?.callId === callId ? previous : null);
     void readNaming(bridge, callId).then((data) => current && setRead({ callId, data }));
     return () => { current = false; };
   }, [bridge, callId, named]);

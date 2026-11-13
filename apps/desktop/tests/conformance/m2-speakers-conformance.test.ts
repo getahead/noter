@@ -4,7 +4,8 @@
 // @cpt-dod:cpt-noter-dod-core-speakers-audio-tests:p1
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { Core } from "../../src/core/bindings";
+import { createCore, type Core } from "../../src/core/bindings";
+import { FakeCore } from "../../src/core/fake/fake-core";
 import { exercised } from "../support/core";
 import { ok, refused } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
@@ -71,6 +72,21 @@ describe("transcript_fix_term", () => {
 });
 
 describe("transcript_name_speakers", () => {
+  it("keeps naming available from call details when no transcript snapshot exists in the fake", async () => {
+    const fake = new FakeCore({ window: "main" });
+    try {
+      fake.world.transcripts = fake.world.transcripts.filter((transcript) => transcript.call_id !== LIVE_CALL);
+      expect(fake.world.transcripts.some((transcript) => transcript.call_id === LIVE_CALL)).toBe(false);
+      const core = createCore(fake);
+      const done = ok(await core.transcriptNameSpeakers({ call_id: LIVE_CALL, assignments: [{ speaker_id: "spk_3", person: anna }] }));
+      expect(done.speakers.find((speaker) => speaker.id === "spk_3")?.label).toMatchObject({ type: "person", person: { id: "per_anna" } });
+      const detail = ok(await core.callGet({ call_id: LIVE_CALL }));
+      expect(detail.speakers.find((speaker) => speaker.id === "spk_3")?.label).toMatchObject({ type: "person", person: { id: "per_anna" } });
+    } finally {
+      fake.dispose();
+    }
+  });
+
   it("names the assigned speakers and skips a null person", async () => {
     const done = ok(await main.transcriptNameSpeakers({ call_id: LIVE_CALL, assignments: [{ speaker_id: "spk_3", person: anna }, { speaker_id: "spk_you", person: null }] }));
     // The real core returns every speaker of the call, the fake only the named ones.

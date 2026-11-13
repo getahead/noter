@@ -1571,6 +1571,27 @@ export const defaultHandlers: Handlers = {
   person_delete: (a, { world, emit }) => {
     const p = person(world, a.person_id);
     if (p.is_you) throw coreError("invalid_input", "cannot delete yourself", { type: "validation", field: "person_id", rule: "invalid_format" });
+    const calls = new Set<string>();
+    for (const callId of new Set([...world.transcripts.map((t) => t.call_id), ...world.call_details.map((d) => d.call.id)])) {
+      const lists = speakerLists(world, callId);
+      for (const speaker of lists.flat()) {
+        if (speaker.label.type !== "person" || speaker.label.person.id !== p.id) continue;
+        const n = Number(speaker.id.match(/(\d+)$/)?.[1]);
+        if (!Number.isSafeInteger(n) || n < 1) continue;
+        speaker.label = { type: "unnamed", n };
+        speaker.named_by = null;
+        calls.add(callId);
+      }
+    }
+    for (const callId of calls) {
+      const transcript = world.transcripts.find((t) => t.call_id === callId);
+      const speakers = speakerLists(world, callId)[0];
+      for (const segment of transcript?.segments ?? []) {
+        const speaker = speakers?.find((s) => s.id === segment.speaker.speaker_id);
+        if (speaker) segment.speaker.label = speaker.label;
+      }
+      if (speakers) emit("entity:changed", { type: "speakers", call_id: callId, speakers });
+    }
     world.people = world.people.filter((x) => x !== p);
     world.items.forEach((i) => i.owner?.id === p.id && (i.owner = null));
     emit("entity:changed", { type: "removed", kind: "person", id: p.id });

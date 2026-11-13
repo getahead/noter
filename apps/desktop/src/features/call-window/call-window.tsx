@@ -30,6 +30,22 @@ import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 
 const NO_STATES: readonly DegradedState[] = [];
 const NO_IDS: ReadonlySet<string> = new Set();
+// @cpt-component:cpt-noter-component-shell-call-window:p1
+export function loadParticipants(
+  bridge: Bridge,
+  callId: string | null,
+  update: (participants: PersonChipView[]) => void,
+): () => void {
+  if (!callId) {
+    update([]);
+    return () => {};
+  }
+  let current = true;
+  void bridge.core.callGet({ call_id: callId }).then((r) => {
+    if (current) update(r.status === "ok" ? r.data.call.participants ?? [] : []);
+  });
+  return () => { current = false; };
+}
 const DEFAULT_KEYS: Partial<Record<HotkeyAction, string>> = {
   mark_moment: "⌃⌥⌘M",
   pause: "⌃⌥⌘P",
@@ -112,17 +128,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     const b = hotkeys?.find((h) => h.action === action);
     return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
   };
-  useEffect(() => {
-    if (!callId) {
-      setParticipants([]);
-      return;
-    }
-    let current = true;
-    void bridge.core.callGet({ call_id: callId }).then((r) => {
-      if (current) setParticipants(r.status === "ok" ? r.data.call.participants ?? [] : []);
-    });
-    return () => { current = false; };
-  }, [bridge, callId]);
+  useEffect(() => loadParticipants(bridge, callId, setParticipants), [bridge, callId]);
   const notice = cap && !stopped(cap) && cap.notice?.type !== "stopped_automatically" ? cap.notice : null;
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden

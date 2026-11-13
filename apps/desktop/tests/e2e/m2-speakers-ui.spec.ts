@@ -247,6 +247,19 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await expect(panel(page)).toContainText("Name speakers");
   });
 
+  test("UI — a speaker update keeps the naming panel hidden", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => S.unnamed(w, 1), latency: 100 });
+    await navigate(page, "summary", S.CALL);
+    await expect(panel(page)).toContainText("Name speakers");
+    await panel(page).getByRole("button", { name: "Hide ▴" }).click();
+    await page.evaluate(async (callId) => {
+      const fake = (globalThis as unknown as { __noterFake: { invoke(command: string, args: unknown): Promise<unknown> } }).__noterFake;
+      await fake.invoke("transcript_name_speakers", { call_id: callId, assignments: [{ speaker_id: "spk_3", person: { type: "existing", person_id: "per_pavel" } }] });
+    }, S.CALL);
+    await expect(panel(page)).toContainText("1 speaker not named");
+    await expect(panel(page).getByRole("button", { name: "Show" })).toBeVisible();
+  });
+
   test("UI — happy path: naming the last speaker says All speakers named · Undo, and Undo restores the row", async ({ page }) => {
     await open(page, () => {});
     await pick(rowOf(page, "Speaker 3"));
