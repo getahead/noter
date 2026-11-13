@@ -23,11 +23,12 @@ export function CallScreenPane({ bridge, settings }: PaneProps) {
   const { call_screen: call, menu_bar: bar } = settings;
   const rowError = useRowErrors(bridge);
   const displays = useWindow(bridge, (s) => s.whole.environment?.displays) ?? [];
+  const displayError = useWindow(bridge, (s) => s.commands["display:set"]?.state === "ERROR");
   return (
     <>
       <Group title={t("settings.call.screen")}>
         {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-display */}
-        <Row label={t("settings.call.display")} stack>
+        <Row label={t("settings.call.display")} stack error={displayError ? t("settings.error.row") : undefined}>
           <DisplayPicker
             name="st-display"
             picker={defaultDisplay(displays, call.display_id ?? null)}
@@ -50,7 +51,7 @@ export function CallScreenPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.call.quick_actions")} error={rowError("menu_bar", "hidden_actions")}>
           <div className="st-checks">
             {QUICK.map(({ action: a, label }) => (
-              <Checkbox key={a} label={label} checked={!bar.hidden_actions.includes(a)} onAction={(on) => void saveSection(bridge, "menu_bar", { hidden_actions: on ? bar.hidden_actions.filter((x) => x !== a) : [...bar.hidden_actions, a] })} />
+              <Checkbox key={a} label={label} checked={!bar.hidden_actions.includes(a)} onAction={(on) => void saveSection(bridge, "menu_bar", (current) => ({ hidden_actions: on ? current.hidden_actions.filter((x) => x !== a) : [...current.hidden_actions, a] }))} />
             ))}
           </div>
         </Row>

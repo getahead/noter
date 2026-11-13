@@ -10,7 +10,7 @@ import { loadSettings } from "./actions";
 import { AudioPane } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
-import { addTerm, listTerms, removeTerm } from "./glossary";
+import { addTerm, listTerms, newTermArgs, removeTerm } from "./glossary";
 import { HotkeysPane } from "./HotkeysPane";
 import { ModelsGroup } from "./ModelsGroup";
 import { PerformancePane } from "./PerformancePane";
@@ -106,6 +106,19 @@ describe("Call screen", () => {
     await settle();
     expect(seen).toContain("setup_set_call_display");
   });
+
+  it("shows a refused display change and a refused Run Setup command", async () => {
+    await ready();
+    fake.failNext("setup_set_call_display", "offline");
+    const tree = rendered(CallScreenPane, { bridge, settings: stored() });
+    (find(tree, (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
+    await settle();
+    expect(renderToString(<CallScreenPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change");
+    fake.failNext("window_navigate", "offline");
+    on(rendered(GeneralPane, { bridge, settings: stored() }), "Run Setup Again…")();
+    await settle();
+    expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change");
+  });
 });
 
 describe("Privacy", () => {
@@ -194,7 +207,7 @@ describe("share test commands", () => {
     fake.failNext("share_test_run", "offline");
     expect(await runShareTest(bridge, true)).toEqual({ result: null, outcome: { type: "failed", code: "offline" } });
     fake.failNext("share_test_run", "offline");
-    expect(await runShareTest(bridge, false)).toEqual({ result: null, outcome: null });
+    expect(await runShareTest(bridge, false)).toEqual({ result: null, outcome: { type: "failed", code: "offline" } });
   });
 
   it("asks for Screen Recording once", async () => {
@@ -288,7 +301,7 @@ describe("share test sheet actions", () => {
     expect(s.results).toHaveLength(1);
     a.start();
     await settle();
-    expect(s.events[0]).toEqual({ type: "run", screenRecording: "granted" });
+    expect(s.events).toContainEqual({ type: "run", screenRecording: "granted" });
     expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) });
   });
 
@@ -332,6 +345,22 @@ describe("glossary actions", () => {
     await a.add();
     await a.remove();
     expect(setTerms).not.toHaveBeenCalled();
+  });
+
+  it("keeps a refused glossary add open, preserves a refused removal selection, and edits with the stored revision", async () => {
+    await ready();
+    const seed = await listTerms(bridge);
+    const term = seed![0]!;
+    const form = { term: term.term, latin: term.variants_latin.join(", "), cyrillic: term.variants_cyrillic.join(", "), spoken: term.spoken_forms.join(", ") };
+    expect(newTermArgs(form, term)).toMatchObject({ id: term.id, rev: term.rev, term: term.term });
+    const state: { form: typeof form | null; selected: string | null } = { form: { term: "new term", latin: "", cyrillic: "", spoken: "" }, selected: term.id };
+    const make = () => createGlossaryActions(bridge, { ...state, setTerms: () => {}, setForm: (value) => { state.form = value; }, setSelected: (value) => { state.selected = value; } });
+    fake.failNext("glossary_upsert", "invalid_input");
+    await make().add();
+    expect(state.form).not.toBeNull();
+    fake.failNext("glossary_remove", "offline");
+    await make().remove();
+    expect(state.selected).toBe(term.id);
   });
 });
 

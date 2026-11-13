@@ -88,6 +88,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 - Error — Shortcut used by VoiceOver: **Used by VoiceOver** under the row; a different chord clears it
 - Error — Card key used by another app: **Card key** ⌃⌥⌘3 **is used by another app** under **Pin a card**; reopening **Hotkeys** after freeing it clears it
 - Error — Shortcut without a modifier: **Add Command, Option or Control**; the old chord stays
+- When a reported chord conflict disappears after clearing or restoring defaults, the stale **Used by …** line clears without requiring pane navigation
 - Empty — No setting matches the search: “zoom calls”, which matches no pane name or keyword (HoD decision D-2; plain “zoom” finds Privacy and Call Screen & Menu Bar), shows the search field's empty state **No settings match “zoom calls”** in place of the pane list; the E2E test types the same words
 
 **Steps**:
@@ -121,6 +122,10 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 **Error Scenarios**:
 - The core rejects the section (`conflict`, `invalid_input`): the control returns to the stored value and the pane shows its error under the row
 - **Offer to record when a call starts** is disabled until the audio self-test passes, with **Needs a passed audio self-test** · **Run Audio Self-Test…**
+- Rapid edits within one section are serialized against the latest revision; list edits compose with the preceding edit
+- Glossary list, add/edit and remove refusals remain visible; the list can be retried, and editing a term preserves its id and revision
+- Returning to Settings after opening System Settings rechecks System Audio Recording and refreshes the audio self-test state
+- Refused display and navigation commands show an actionable error; unknown repository mapping failures show the generic mapping error
 - **Storage location** in iCloud Drive or Dropbox: the warning line under the path
 
 **Steps**:

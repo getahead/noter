@@ -32,7 +32,7 @@ const stateName = (s: RecorderState, caps: string) => (s.type === "IDLE" && !cap
 export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, conflict, onRecord, onClear }: HotkeyRecorderProps) {
   const [state, dispatch] = useReducer(recorderReduce, IDLE_RECORDER);
   useEffect(() => dispatch({ type: disabled ? "disable" : "enable" }), [disabled]);
-  useEffect(() => void (conflict && dispatch({ type: "refused", message: conflict })), [conflict]);
+  useEffect(() => dispatch(conflict ? { type: "refused", message: conflict } : { type: "dismiss" }), [conflict]);
 
   const held = useRef<ChordModifiers | null>(null); // a modifier set collects its keys until they are released
   const recording = state.type === "RECORDING";

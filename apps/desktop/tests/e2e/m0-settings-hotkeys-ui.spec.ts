@@ -79,6 +79,17 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await expect(pane(page)).not.toContainText("is used by another app");
   });
 
+  test("UI — clears a pane-reported conflict as soon as the shortcut is cleared", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => { const binding = w.hotkeys.bindings.find((item) => item.action === "mark_moment"); if (binding) binding.status = { type: "conflict", owner: "Zoom" }; } });
+    await openHotkeys(page);
+    await expect(pane(page)).toContainText("Used by Zoom");
+    await pane(page).locator('[data-component="cpt-noter-component-ui-hotkey-recorder"]').filter({ hasText: "Mark moment" }).getByRole("button", { name: "Clear shortcut" }).click();
+    expect(await sent(page, "hotkey_set")).toContainEqual({ action: "mark_moment", shortcut: null });
+    await expect(field(page, "Mark moment")).toContainText("None");
+    await steer.change((w) => { const binding = w.hotkeys.bindings.find((item) => item.action === "mark_moment"); if (binding) binding.status = { type: "registered" }; });
+    await expect(pane(page)).not.toContainText("Used by Zoom");
+  });
+
   test("UI — error path: Shortcut without a modifier — Add Command, Option or Control, the old chord stays, then ⌃⌥⌘O", async ({ page }) => {
     await openWindow(page, "settings");
     await openHotkeys(page);

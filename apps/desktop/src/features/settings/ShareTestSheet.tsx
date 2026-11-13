@@ -20,6 +20,7 @@ const HIDE_DEFAULT = "Ctrl+Alt+Super+0";
 export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
   const [state, dispatch] = useReducer(shareTestReduce, "TABLE");
   const [result, setResult] = useState<ShareTestResult | null>(null);
+  const failedCapture = useRef(false);
   // @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-if-call
   const call = useWindow(bridge, (s) => s.whole.capture?.phase === "recording" || s.whole.capture?.phase === "paused");
   // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-if-call
@@ -27,7 +28,8 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
   const display = useWindow(bridge, (s) => s.whole.environment?.displays.find((d) => !d.holds_call_app)?.name ?? s.whole.environment?.displays[0]?.name ?? "");
   const hide = useWindow(bridge, (s) => s.whole.hotkeys?.bindings.find((b) => b.action === "hide_for_presenting")?.shortcut ?? HIDE_DEFAULT);
 
-  const { run, start, answer } = createShareActions(bridge, { permission, dispatch, setResult });
+  const { run, start: startCapture, answer } = createShareActions(bridge, { permission, dispatch, setResult });
+  const start = () => { failedCapture.current = true; startCapture(); };
   // the table answers on its own, also during a call
   const asked = useRef(false);
   useEffect(() => {
@@ -119,9 +121,9 @@ export function ShareTestSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
         {state === "FAILED" && (
           <div className="dlg-perm dlg-warn" role="alert">
             <Icon name="warning" size={13} />
-            <span>{t("settings.share.failed")}</span>
+            <span>{t(failedCapture.current ? "settings.share.failed" : "settings.share.read_failed")}</span>
             <span className="np-tb__spacer" />
-            <PushButton label={t("settings.share.try_again")} size="small" onAction={start} />
+            <PushButton label={t("settings.share.try_again")} size="small" onAction={() => failedCapture.current ? start() : void run(false)} />
           </div>
         )}
         <InlineBanner banner={{ id: "share-limits", severity: "info", dismissible: false, text: t("settings.share.limits", { chord: capsOf(hide) }) }} />

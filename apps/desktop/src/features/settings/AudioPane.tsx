@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useWindow } from "../../app/use-window";
+import { applySnapshot } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
@@ -27,6 +28,18 @@ export function AudioPane({ bridge, settings }: PaneProps) {
   const device = useWindow(bridge, (s) => s.whole.environment?.output_device);
   const permissions = useWindow(bridge, (s) => s.whole.setup?.permissions);
   const [selfTest, setSelfTest] = useState(false);
+  const recheckPermission = useRef(false);
+  useEffect(() => {
+    const onFocus = async () => {
+      if (!recheckPermission.current) return;
+      recheckPermission.current = false;
+      await bridge.act("permission:system_audio", "permission_request", () => bridge.core.permissionRequest({ kind: "system_audio" }));
+      const snapshot = await bridge.core.appSnapshot({});
+      if (snapshot.status === "ok") bridge.store.setState((state) => applySnapshot(state, snapshot.data));
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [bridge]);
   const rowError = useRowErrors(bridge);
   const headphones = device ? audio.output.headphones_devices.includes(device.uid) : false;
   const save = (edits: Partial<typeof audio>) => void saveSection(bridge, "audio", edits);
@@ -38,7 +51,7 @@ export function AudioPane({ bridge, settings }: PaneProps) {
             <Checkbox
               label={t("settings.audio.headphones", { device: device.name })}
               checked={headphones}
-              onAction={(on) => save({ output: { headphones_devices: on ? [...audio.output.headphones_devices, device.uid] : audio.output.headphones_devices.filter((u) => u !== device.uid) } })}
+              onAction={(on) => void saveSection(bridge, "audio", (current) => ({ output: { headphones_devices: on ? [...current.output.headphones_devices, device.uid] : current.output.headphones_devices.filter((u) => u !== device.uid) } }))}
             />
           </Row>
         )}
@@ -57,7 +70,7 @@ export function AudioPane({ bridge, settings }: PaneProps) {
       <GlossaryGroup bridge={bridge} />
       <Group title={t("settings.audio.permissions")}>
         <PermissionCheckRow id="mic" variant="status" label={t("permission.mic")} state={rowState("microphone", permissions)} onAllow={() => void bridge.act("permission:microphone", "permission_request", () => bridge.core.permissionRequest({ kind: "microphone" }))} onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "microphone" } })} />
-        <PermissionCheckRow id="sys" variant="status" label={t("permission.sys")} state={rowState("system_audio", permissions)} onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "system_audio" } })} />
+        <PermissionCheckRow id="sys" variant="status" label={t("permission.sys")} state={rowState("system_audio", permissions)} onOpenSettings={() => { recheckPermission.current = true; void bridge.core.openExternal({ target: { type: "system_settings", permission: "system_audio" } }); }} />
         <Row label={t("settings.audio.self_test")} note={t("settings.audio.self_test_note")}>
           {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-selftest */}
           <PushButton label={t("settings.general.run_self_test")} onAction={() => setSelfTest(true)} />
