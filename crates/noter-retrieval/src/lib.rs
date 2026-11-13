@@ -59,6 +59,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "topic alias ids and the item topic index",
         sql: include_str!("../migrations/0003_topic_alias_ids.sql"),
     },
+    Migration {
+        owner: "noter-retrieval",
+        version: 4,
+        name: "Unicode keyword word boundaries",
+        sql: include_str!("../migrations/0004_keyword_boundaries.sql"),
+    },
 ];
 
 #[cfg(test)]

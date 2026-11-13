@@ -11,13 +11,14 @@
 // @cpt-component:cpt-noter-component-core-changelog:p1
 
 mod change;
+mod keyword;
 mod migrate;
 mod replay;
 
 use std::fs::{DirBuilder, OpenOptions};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Mutex, MutexGuard, Once};
+use std::sync::{mpsc, Mutex, MutexGuard, OnceLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -327,7 +328,7 @@ fn create_private(path: &Path) -> std::io::Result<()> {
 }
 
 fn open_writer(path: &Path) -> rusqlite::Result<Connection> {
-    load_extensions();
+    load_extensions()?;
     let conn = Connection::open(path)?;
     // Before the first table exists, or it has no effect.
     conn.pragma_update(None, "auto_vacuum", "INCREMENTAL")?;
@@ -346,19 +347,31 @@ fn open_reader(path: &Path) -> rusqlite::Result<Connection> {
     Ok(conn)
 }
 
-/// FTS5 is compiled into the bundled SQLite; sqlite-vec registers itself for every connection.
-fn load_extensions() {
-    static ONCE: Once = Once::new();
-    ONCE.call_once(|| {
-        // SAFETY: the documented way to register the statically linked sqlite-vec entry point;
-        // its signature is the extension-init signature sqlite3_auto_extension expects.
+/// FTS5 is bundled; register sqlite-vec and keyword boundaries for every connection.
+fn load_extensions() -> rusqlite::Result<()> {
+    static RESULT: OnceLock<i32> = OnceLock::new();
+    let code = *RESULT.get_or_init(|| {
+        // SAFETY: both static entry points follow SQLite's extension-init contract and
+        // neither closes the connection, opens another one, nor changes the extension list.
         unsafe {
             #[allow(clippy::missing_transmute_annotations)]
-            rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
+            let code = rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
                 sqlite_vec::sqlite3_vec_init as *const (),
             )));
+            if code != rusqlite::ffi::SQLITE_OK {
+                return code;
+            }
+            rusqlite::ffi::sqlite3_auto_extension(Some(keyword::init))
         }
     });
+    if code == rusqlite::ffi::SQLITE_OK {
+        Ok(())
+    } else {
+        Err(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(code),
+            None,
+        ))
+    }
 }
 
 fn sqlite_err(e: rusqlite::Error) -> OpenError {
