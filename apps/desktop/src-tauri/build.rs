@@ -20,7 +20,10 @@ fn main() {
             WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
         )
         .then(|| "dialog:allow-message".to_string());
-        let permissions: Vec<String> = std::iter::once("core:default".to_string())
+        // @cpt-algo:cpt-noter-algo-core-ipc-host-scope-check:p1
+        let permissions: Vec<String> = ["core:event:allow-listen", "core:event:allow-unlisten"]
+            .into_iter()
+            .map(str::to_string)
             .chain(dialogs)
             .chain(
                 COMMANDS
