@@ -322,6 +322,10 @@ async fn create_encrypts_every_centroid_and_returns_only_counts() {
                 _ => continue,
             };
             assert!(
+                !bytes.windows(blob.len()).any(|window| window == blob),
+                "stored biometric bytes in change log"
+            );
+            assert!(
                 !bytes
                     .windows(serialized_blob.len())
                     .any(|window| window == serialized_blob.as_bytes()),
