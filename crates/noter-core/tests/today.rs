@@ -269,6 +269,86 @@ async fn tags_are_unique_ignoring_case_and_repeats_change_nothing() {
     assert_eq!(tag_list(&core).await, [("Alpha".to_string(), 1)]);
 }
 
+// cpt-noter-flow-core-items-today-tags: reject contradictory normalized intents atomically.
+#[tokio::test]
+async fn overlapping_tag_add_and_remove_is_invalid_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    insert(&core, vec![call("c1", NOW - DAY, "ready")]);
+    let first = tags(&core, &["c1"], &["Alpha"], &[]).await.unwrap();
+    events.named(event_names::ENTITY_CHANGED);
+    let changes = count(&core, "changes");
+
+    for (add, remove) in [
+        (vec!["Alpha"], "alpha"),
+        (vec![" ALPHA "], "alpha"),
+        (vec!["new"], "NEW"),
+        (vec!["other", "Alpha"], "alpha"),
+    ] {
+        let error = tags(&core, &["c1"], &add, &[remove]).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidInput);
+        assert_eq!(
+            error.detail,
+            Some(ErrorDetail::Validation {
+                field: "add".into(),
+                rule: noter_protocol::error::ValidationRule::Duplicate,
+            })
+        );
+    }
+    let current = tags(&core, &["c1"], &[], &[]).await.unwrap();
+    assert_eq!(current.calls, first.calls);
+    assert_eq!(current.change_id, first.change_id);
+    assert_eq!(count(&core, "changes"), changes);
+    assert!(events.named(event_names::ENTITY_CHANGED).is_empty());
+}
+
+// cpt-noter-flow-core-items-today-tags: exercise an empty write after a positive preflight.
+#[tokio::test]
+async fn tags_unchanged_inside_the_transaction_return_the_existing_result() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    insert(&core, vec![call("c1", NOW - DAY, "ready")]);
+    let first = tags(&core, &["c1"], &["Alpha"], &[]).await.unwrap();
+    events.named(event_names::ENTITY_CHANGED);
+    let changes = count(&core, "changes");
+    // Keep the tag in place while exercising the real writer's before/after comparison.
+    exec(
+        dir.path(),
+        "CREATE TRIGGER retain_tag AFTER DELETE ON call_tags BEGIN
+        INSERT INTO call_tags (call_id, tag, tag_norm) VALUES (OLD.call_id, OLD.tag, OLD.tag_norm);
+        END;",
+    );
+    let unchanged = tags(&core, &["c1"], &[], &["Alpha"]).await.unwrap();
+    assert_eq!(unchanged.calls, first.calls);
+    assert_eq!(unchanged.change_id, first.change_id);
+    assert_eq!(unchanged.batch_id, None);
+    assert_eq!(count(&core, "changes"), changes);
+    assert!(events.named(event_names::ENTITY_CHANGED).is_empty());
+}
+
+// cpt-noter-flow-core-items-today-tags: a failed write is not an unchanged result.
+#[tokio::test]
+async fn tag_write_errors_still_fail_and_roll_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    insert(&core, vec![call("c1", NOW - DAY, "ready")]);
+    exec(
+        dir.path(),
+        "CREATE TRIGGER fail_tag BEFORE INSERT ON call_tags BEGIN
+        SELECT RAISE(ABORT, 'tag write failed'); END;",
+    );
+    assert_eq!(
+        tags(&core, &["c1"], &["Alpha"], &[])
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal
+    );
+    assert!(tag_list(&core).await.is_empty());
+    assert_eq!(count(&core, "changes"), 0);
+    assert!(events.named(event_names::ENTITY_CHANGED).is_empty());
+}
+
 #[tokio::test]
 async fn invalid_tags_and_missing_calls_write_nothing() {
     let dir = tempfile::tempdir().unwrap();

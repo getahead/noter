@@ -651,6 +651,61 @@ async fn review_all_accepts_the_suggested_rows_as_one_batch_and_counts_the_rest(
     }
 }
 
+// cpt-noter-flow-core-items-today-review: nothing suggested on the writer is an unchanged batch.
+#[tokio::test]
+async fn repeated_bulk_review_has_no_batch_changes_revisions_or_events() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    world(&core);
+    let first = review_all(&core, "call_a", vec![]).await.unwrap();
+    events.named(event_names::ENTITY_CHANGED);
+    let changes = core
+        .store()
+        .read(|c| c.query_row("SELECT count(*) FROM changes", [], |r| r.get::<_, u32>(0)))
+        .unwrap();
+
+    let again = review_all(&core, "call_a", vec![]).await.unwrap();
+    assert!(again.items.is_empty());
+    assert_eq!(again.batch_id, None);
+    assert_eq!(again.skipped, first.skipped + first.items.len() as u32);
+    for item in first.items {
+        assert_eq!(view(&core, item.id.as_str()).await, item);
+    }
+    assert_eq!(
+        core.store()
+            .read(|c| c.query_row("SELECT count(*) FROM changes", [], |r| r.get::<_, u32>(0)))
+            .unwrap(),
+        changes
+    );
+    assert!(events.named(event_names::ENTITY_CHANGED).is_empty());
+}
+
+// cpt-noter-flow-core-items-today-review: only an empty selection is a successful no-op.
+#[tokio::test]
+async fn bulk_review_write_errors_still_fail_and_roll_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    world(&core);
+    let before = view(&core, "itm_1").await;
+    exec(
+        dir.path(),
+        "CREATE TRIGGER fail_review BEFORE UPDATE ON items BEGIN
+        SELECT RAISE(ABORT, 'review write failed'); END;",
+    );
+    assert_eq!(
+        review_all(&core, "call_a", vec![]).await.unwrap_err().code,
+        ErrorCode::Internal
+    );
+    assert_eq!(view(&core, "itm_1").await, before);
+    assert_eq!(
+        core.store()
+            .read(|c| c.query_row("SELECT count(*) FROM changes", [], |r| r.get::<_, u32>(0)))
+            .unwrap(),
+        0
+    );
+    assert!(events.named(event_names::ENTITY_CHANGED).is_empty());
+}
+
 #[tokio::test]
 async fn review_all_by_kind_leaves_other_kinds_and_an_empty_selection_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
