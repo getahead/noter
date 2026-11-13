@@ -74,7 +74,10 @@ describe("fake core stream and record parity", () => {
     const fake = core("settings");
     const target = fake.world.hotkeys.bindings.find((b) => b.action === "start_stop")!;
     const owner = fake.world.hotkeys.bindings.find((b) => b.action === "open_call_screen")!;
-    await expect(fake.invoke("hotkey_set", { action: target!.action, shortcut: owner!.shortcut! })).rejects.toMatchObject({ code: "hotkey_conflict" });
+    await expect(fake.invoke("hotkey_set", { action: target!.action, shortcut: owner!.shortcut! })).rejects.toMatchObject({
+      code: "hotkey_conflict",
+      detail: { type: "hotkey_owner", owner: owner!.action },
+    });
   });
 
   it("keeps levels flowing after thirty seconds and stops after unsubscribe", async () => {

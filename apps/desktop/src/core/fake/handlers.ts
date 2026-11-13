@@ -1624,8 +1624,8 @@ export const defaultHandlers: Handlers = {
     if (a.shortcut === "Super+Q" || a.shortcut === "Super+Tab") throw coreError("hotkey_reserved");
     const b = world.hotkeys.bindings.find((x) => x.action === a.action);
     if (!b) throw coreError("not_found", `hotkey ${a.action}`);
-    if (a.shortcut && world.hotkeys.bindings.some((x) => x.action !== a.action && x.shortcut === a.shortcut))
-      throw coreError("hotkey_conflict", "shortcut is already assigned", { type: "hotkey_owner", owner: "Noter" });
+    const owner = a.shortcut && world.hotkeys.bindings.find((x) => x.action !== a.action && x.shortcut === a.shortcut);
+    if (owner) throw coreError("hotkey_conflict", "shortcut in use", { type: "hotkey_owner", owner: owner.action });
     b.shortcut = a.shortcut ?? null;
     b.status = b.shortcut ? (b.action === "undo_card_action" ? { type: "registered_during_capture" } : { type: "registered" }) : { type: "not_set" };
     publish("hotkeys:changed");
