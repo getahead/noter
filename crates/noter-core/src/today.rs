@@ -346,6 +346,9 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-items-today-tags:p1:inst-tags-set
         let add = tags_of(&args.add, "add")?;
         let remove = tags_of(&args.remove, "remove")?;
+        if add.iter().any(|(_, a)| remove.iter().any(|(_, r)| a == r)) {
+            return Err(invalid("add", ValidationRule::Duplicate));
+        }
         let mut calls: Vec<String> = vec![];
         for id in &args.call_ids {
             if !calls.iter().any(|c| c == id.as_str()) {
@@ -374,6 +377,8 @@ impl Core {
             Err(missing) => return Err(missing),
             Ok(false) => (vec![], self.last_tags_change(&wanted.0[0])?, None),
             Ok(true) => {
+                let unchanged = CoreError::new(ErrorCode::NotFound, "tags already unchanged");
+                let no_change = unchanged.clone();
                 let written = self.store().write_with(meta, move |tx| {
                     let (calls, add, remove) = wanted;
                     let (mut changed, mut logged) = (vec![], vec![]);
@@ -410,13 +415,21 @@ impl Core {
                             delta: None,
                         });
                     }
+                    if logged.is_empty() {
+                        // Another writer may already have applied the intent after the read.
+                        return Err(no_change);
+                    }
                     Ok((changed, logged))
-                })?;
-                (
-                    written.value,
-                    written.change_ids[0].clone(),
-                    written.batch_id,
-                )
+                });
+                match written {
+                    Ok(written) => (
+                        written.value,
+                        written.change_ids[0].clone(),
+                        written.batch_id,
+                    ),
+                    Err(e) if e == unchanged => (vec![], self.last_tags_change(&calls[0])?, None),
+                    Err(e) => return Err(e),
+                }
             }
         };
         // @cpt-end:cpt-noter-flow-core-items-today-tags:p1:inst-tags-write

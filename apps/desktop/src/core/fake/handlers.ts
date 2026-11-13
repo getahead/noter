@@ -1156,8 +1156,11 @@ export const defaultHandlers: Handlers = {
     emit("entity:changed", { type: "call", call: c });
     return { call: c, change_id: logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, field: "title", before, after: c.title, summary: "Changed call info" }) };
   },
+  // @cpt-flow:cpt-noter-flow-core-items-today-tags:p1
   call_tags_set: (a, { world }) => {
     for (const t of a.add) if (t.length < 1 || t.length > 32) throw coreError("invalid_input", "tag length", { type: "validation", field: "add", rule: t.length ? "too_long" : "too_short" });
+    const remove = new Set(a.remove.map((tag) => tag.trim().toLowerCase()));
+    if (a.add.some((tag) => remove.has(tag.trim().toLowerCase()))) throw coreError("invalid_input", "tag in add and remove", { type: "validation", field: "add", rule: "duplicate" });
     const calls = a.call_ids.map((id) => call(world, id));
     // One change row a call, under one batch when several change together (as the core logs it).
     const batch_id = calls.length > 1 ? newId("bat") : null;

@@ -119,7 +119,7 @@ The user can review what a call produced, check the words behind an item, tick w
 
 **Steps**:
 1. [x] - `p1` - API: `item_review { item_id, rev, decision }` applies accept, reject or restore without changing item status - `inst-review-single`
-2. [x] - `p1` - API: `items_review_all { call_id, kinds }` selects current suggested rows of those kinds, or all kinds when empty; accept eligible rows under one batch id and report skipped rows - `inst-review-batch`
+2. [x] - `p1` - API: `items_review_all { call_id, kinds }` selects current suggested rows of those kinds, or all kinds when empty; accept eligible rows under one batch id and report skipped rows; if none remain suggested in the transaction, return no items and no batch handle without writing or publishing - `inst-review-batch`
 3. [x] - `p1` - API: `item_edit { item_id, rev, patch }` validates wanted fields, treating omitted fields as unchanged and explicit set-or-clear values as the nullable-field operation - `inst-review-edit`
 4. [x] - `p1` - Preserve the generated text for edit comparison; saving in the review row can then accept through `item_review` with the returned revision; inspector save alone need not accept - `inst-review-accept-edit`
 5. [x] - `p1` - API: `item_create { call_id, kind, text, owner, due, span }` creates a user-authored, accepted item and validates any optional evidence span - `inst-review-create`
@@ -202,8 +202,8 @@ The user can review what a call produced, check the words behind an item, tick w
 - A tag outside 1–32 characters is `invalid_input`; a deleted target call is `not_found`.
 
 **Steps**:
-1. [x] - `p1` - API: `call_tags_set { call_ids, add, remove }`; validate calls and tags, normalize case for uniqueness and deduplicate - `inst-tags-set`
-2. [x] - `p1` - DB: apply explicit tag additions and removals to every selected call under the writer, advance affected call revisions and append the logged change in one transaction; repeated additions or removals have no duplicate effect - `inst-tags-write`
+1. [x] - `p1` - API: `call_tags_set { call_ids, add, remove }`; validate calls and tags, normalize case for uniqueness and deduplicate; reject any normalized tag present in both add and remove as `invalid_input` on add with rule duplicate before writing - `inst-tags-set`
+2. [x] - `p1` - DB: apply explicit tag additions and removals to every selected call under the writer, advance affected call revisions and append the logged change in one transaction; repeated additions or removals have no duplicate effect; if nothing changes in the transaction, return the existing no-change result without a revision, change row or event - `inst-tags-write`
 3. [x] - `p1` - Publish whole changed calls and return `TagsSetResult` with the calls and undo handle - `inst-tags-publish`
 4. [x] - `p1` - API: `tags_list {}` reads distinct currently used tags and their counts for `TagList`; do not generate model suggestions - `inst-tags-list`
 5. [x] - `p1` - **RETURN** the tag result - `inst-tags-return`
@@ -363,4 +363,5 @@ Not covered here: the built-app clipboard and save-panel XCUITest is UI M2 (owne
 - [ ] Real-core E2E `cpt-noter-seq-call-page-check-evidence` opens current evidence with archive pending, after archive upgrade and after audio deletion; inspector edits and History remain available.
 - [ ] All fourteen commands succeed in real-core E2E, with native-app coverage for actual clipboard and panels; conformance checks scopes, revisions, errors and complete view models.
 - [ ] Unit tests prove deterministic ranking, no implicit calendar request, no duplicate tag usage, correct set/clear patches and rollback without orphan changes.
+- [ ] Regressions in `crates/noter-core/tests/today.rs` and `crates/noter-core/tests/items.rs` prove normalized tag overlap is rejected atomically and empty transactional writes return no-change results. Conformance in `apps/desktop/tests/conformance/m2-items-conformance.test.ts` checks tag overlap against both cores; the existing real-core E2E `cpt-noter-seq-call-page-review-suggested-items` retains bulk review coverage.
 - [ ] `just gate` passes.

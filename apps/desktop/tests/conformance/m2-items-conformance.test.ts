@@ -125,6 +125,15 @@ describe("today_get", () => {
 });
 
 describe("call_tags_set and tags_list", () => {
+  it("rejects the same normalized tag in add and remove without changing calls", async () => {
+    const before = structuredClone(ok(await main.callTagsSet({ call_ids: [PAST_CALL], add: ["Alpha"], remove: [] })));
+    const error = refused(await main.callTagsSet({ call_ids: [PAST_CALL], add: ["other", " ALPHA "], remove: ["alpha"] }));
+    expect(error).toMatchObject({ code: "invalid_input", detail: { type: "validation", field: "add", rule: "duplicate" } });
+    const after = ok(await main.callGet({ call_id: PAST_CALL }));
+    expect(after.call.tags).toEqual(before.calls[0].tags);
+    expect(after.call.rev).toBe(before.calls[0].rev);
+  });
+
   it("sets tags across calls under one batch id and lists their use", async () => {
     const set = ok(await main.callTagsSet({ call_ids: [LIVE_CALL, PAST_CALL], add: ["Launch"], remove: [] }));
     expect(set.calls.map((c) => c.id).sort()).toEqual([LIVE_CALL, PAST_CALL].sort());

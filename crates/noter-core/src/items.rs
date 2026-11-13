@@ -660,37 +660,48 @@ impl Core {
         // @cpt-begin:cpt-noter-algo-core-items-today-mutate:p1:inst-mutate-bulk
         // The rows are selected and written in one writer transaction, so none can go stale in
         // between; rows that are not suggested are counted as skipped.
-        let (eligible, skipped) = self.store().read({
+        let unchanged = CoreError::new(ErrorCode::NotFound, "no suggested items");
+        let no_change = unchanged.clone();
+        let custom = self.store().write_with(meta, {
             let (call_id, kinds) = (call_id.clone(), kinds.clone());
-            move |c| suggested_in(c, &call_id, &kinds)
-        })?;
-        if eligible.is_empty() {
-            return Ok(ItemsBatchResult {
-                items: vec![],
-                batch_id: None,
-                skipped,
-            });
-        }
-        let custom = self.store().write_with(meta, move |tx| {
-            let (ids, skipped) = suggested_in(tx, &call_id, &kinds).map_err(internal)?;
-            let mut logged = vec![];
-            for id in &ids {
-                tx.execute(
-                    "UPDATE items SET review_state = 'accepted', rev = rev + 1 WHERE id = ?1",
-                    [id],
-                )
-                .map_err(internal)?;
-                logged.push(Logged {
-                    entity_type: "item",
-                    entity_id: id.clone(),
-                    field: Some("review_state".into()),
-                    before: Some("suggested".into()),
-                    after: Some("accepted".into()),
-                    delta: None,
+            move |tx| {
+                let (ids, skipped) = suggested_in(tx, &call_id, &kinds).map_err(internal)?;
+                if ids.is_empty() {
+                    return Err(no_change);
+                }
+                let mut logged = vec![];
+                for id in &ids {
+                    tx.execute(
+                        "UPDATE items SET review_state = 'accepted', rev = rev + 1 WHERE id = ?1",
+                        [id],
+                    )
+                    .map_err(internal)?;
+                    logged.push(Logged {
+                        entity_type: "item",
+                        entity_id: id.clone(),
+                        field: Some("review_state".into()),
+                        before: Some("suggested".into()),
+                        after: Some("accepted".into()),
+                        delta: None,
+                    });
+                }
+                Ok(((ids, skipped), logged))
+            }
+        });
+        let custom = match custom {
+            Ok(custom) => custom,
+            Err(e) if e == unchanged => {
+                let (_, skipped) = self
+                    .store()
+                    .read(move |c| suggested_in(c, &call_id, &kinds))?;
+                return Ok(ItemsBatchResult {
+                    items: vec![],
+                    batch_id: None,
+                    skipped,
                 });
             }
-            Ok(((ids, skipped), logged))
-        })?;
+            Err(e) => return Err(e),
+        };
         // @cpt-end:cpt-noter-algo-core-items-today-mutate:p1:inst-mutate-bulk
         let (ids, skipped) = custom.value;
         let items = ids
