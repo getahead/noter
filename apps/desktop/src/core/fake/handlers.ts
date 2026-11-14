@@ -130,9 +130,11 @@ function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
 }
 
 function namingState(world: World, callId: string) {
-  const speakers = (world.transcripts.find((t) => t.call_id === callId) ?? world.call_details.find((d) => d.call.id === callId))?.speakers ?? [];
+  const transcript = world.transcripts.find((t) => t.call_id === callId);
+  const speakers = (transcript ?? world.call_details.find((d) => d.call.id === callId))?.speakers ?? [];
+  const segments = transcript?.segments ?? [];
   const sections = (world.outputs.find((o) => o.call_id === callId)?.sections ?? []).map((section) => ({ section: { ...section, rev: null }, versions: versionsOf(section) }));
-  return { callId, speakers, sections };
+  return { callId, speakers, segments, sections };
 }
 
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
@@ -141,10 +143,20 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     if (r.field === "naming" && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
       for (const speakers of [world.transcripts.find((t) => t.call_id === state.callId)?.speakers, world.call_details.find((d) => d.call.id === state.callId)?.speakers]) {
+        if (!speakers) continue;
+        for (let i = speakers.length - 1; i >= 0; i--) {
+          if (!state.speakers.some((restored) => restored.id === speakers[i]!.id)) speakers.splice(i, 1);
+        }
         for (const restored of state.speakers) {
           const speaker = speakers?.find((s) => s.id === restored.id);
           if (speaker) Object.assign(speaker, restored);
+          else speakers.push(structuredClone(restored));
         }
+      }
+      const transcript = world.transcripts.find((t) => t.call_id === state.callId);
+      for (const restored of state.segments ?? []) {
+        const segment = transcript?.segments.find((s) => s.id === restored.id);
+        if (segment) segment.speaker = restored.speaker;
       }
       emit("entity:changed", { type: "speakers", call_id: state.callId, speakers: state.speakers });
       for (const restored of state.sections) {
@@ -160,8 +172,11 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     const fixed = value === "before" && r.entity.kind === "segment" && r.field === "text" ? world.transcripts.flatMap((t) => t.segments).find((x) => x.id === r.entity.id) : undefined;
     const fix = fixed?.corrections.slice().reverse().find((c) => fixed.text.slice(c.range.start, c.range.end) === r.after);
     if (fixed && fix) {
-      fixed.text = fixed.text.slice(0, fix.range.start) + r.before + fixed.text.slice(fix.range.end);
-      fixed.corrections.splice(fixed.corrections.indexOf(fix), 1);
+      fixed.text = fixed.text.slice(0, fix.range.start) + (r.before ?? "") + fixed.text.slice(fix.range.end);
+      const delta = (r.before ?? "").length - (fix.range.end - fix.range.start);
+      fixed.corrections = fixed.corrections.filter((correction) => correction !== fix).map((correction) => correction.range.start >= fix.range.end
+        ? { ...correction, range: { start: correction.range.start + delta, end: correction.range.end + delta } }
+        : correction);
       fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [fixed] } }); // the stream carries the restored words
     }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
@@ -637,7 +652,7 @@ export const defaultHandlers: Handlers = {
     fake.later(100, tick);
     return { subscription_id: sub, last_seq: 0 };
   },
-  transcript_rename_speaker: (a, { world, emit }) => {
+  transcript_rename_speaker: (a, { world, emit, fake }) => {
     const t = world.transcripts.find((x) => x.call_id === a.call_id);
     const spk = t?.speakers.find((s) => s.id === a.speaker_id);
     if (!t || !spk) throw coreError("not_found");
@@ -646,22 +661,46 @@ export const defaultHandlers: Handlers = {
     if (!name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "person", rule: "required" });
     const before = JSON.stringify(namingState(world, a.call_id));
     const oldName = speakerName(spk.label);
-    spk.label = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
-    spk.named_by = "you";
+    const oldLabel = structuredClone(spk.label);
+    const oldNamedBy = spk.named_by;
+    const assigned = { type: "person" as const, person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
+    const segmentId = a.scope.type === "one_segment" ? a.scope.segment_id : null;
+    if (a.scope.type === "one_segment") {
+      const segment = t.segments.find((s) => s.id === segmentId && s.speaker.speaker_id === spk.id);
+      if (!segment) throw coreError("not_found", "segment");
+      const resultSpeaker: typeof spk = { ...structuredClone(spk), id: newId("spk"), label: assigned, named_by: "you", segment_count: 1 };
+      t.speakers.push(resultSpeaker);
+      spk.segment_count = Math.max(0, spk.segment_count - 1);
+      spk.label = oldLabel;
+      spk.named_by = oldNamedBy;
+      segment.speaker = { speaker_id: resultSpeaker.id, label: assigned };
+    } else {
+      spk.label = assigned;
+      spk.named_by = "you";
+    }
+    if (segmentId) fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [t.segments.find((s) => s.id === segmentId)!] } });
     emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
     if (a.scope.type === "whole_call") {
       for (const section of namedSections(world, a.call_id, [[oldName, name]])) emit("entity:changed", { type: "section", call_id: a.call_id, section });
     }
     const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, field: "naming", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
-    return { speakers: [spk], change_id };
+    return { speakers: t.speakers, change_id };
   },
   transcript_fix_term: (a, { world, fake }) => {
-    const seg = world.transcripts.flatMap((t) => t.segments).find((s) => s.id === a.segment_id);
+    const seg = world.transcripts.find((t) => t.call_id === a.call_id)?.segments.find((s) => s.id === a.segment_id);
     if (!seg) throw coreError("not_found");
     if (!a.replacement.trim()) throw coreError("invalid_input", "replacement", { type: "validation", field: "replacement", rule: "required" });
+    if (a.range.start < 0 || a.range.end <= a.range.start || a.range.end > seg.text.length) throw coreError("invalid_input", "range", { type: "validation", field: "range", rule: "out_of_range" });
     const original = seg.text.slice(a.range.start, a.range.end);
     seg.text = seg.text.slice(0, a.range.start) + a.replacement + seg.text.slice(a.range.end);
+    const delta = a.replacement.length - (a.range.end - a.range.start);
+    seg.corrections = seg.corrections.flatMap((correction) => {
+      if (correction.range.end <= a.range.start) return [correction];
+      if (correction.range.start >= a.range.end) return [{ ...correction, range: { start: correction.range.start + delta, end: correction.range.end + delta } }];
+      return [];
+    });
     seg.corrections.push({ range: { start: a.range.start, end: a.range.start + a.replacement.length }, original });
+    seg.corrections.sort((x, y) => x.range.start - y.range.start);
     fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [seg] } });
     const change_id = logChange(world, { entity: { kind: "segment", id: seg.id, label: "Transcript line" }, field: "text", before: original, after: a.replacement, summary: `Fixed “${original}” to “${a.replacement}”` });
     return { segment: seg, change_id, glossary_term_id: a.add_to_glossary ? newId("gls") : null, proposal_queued: a.add_to_glossary };

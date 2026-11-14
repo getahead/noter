@@ -720,6 +720,7 @@ export const en = {
   "speakers.fix.info": "Older calls get a proposal in Activity",
   "speakers.fix.apply": "Fix",
   "speakers.fix.menu": "Fix Term…",
+  "speakers.fix.heard_as": "Heard as “{text}”",
   "speakers.fix.copy": "Copy",
   "speakers.fix.done": "Fixed “{to}”",
   "speakers.fix.done_glossary": "Fixed “{to}” · added to the glossary",

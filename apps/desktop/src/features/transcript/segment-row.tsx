@@ -1,6 +1,6 @@
 // Transcript segment row with its gap, mark and hypothesis variants (DESIGN › Transcript segment row; prototype
 // src/js/20-b-components.js C.segmentRow). Markup and classes as the prototype's; the view decides the play control.
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 
 import type { SegmentView, SpeakerView, TextRange } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -38,6 +38,7 @@ export interface SegmentRowProps {
   onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
   /** Fix Term… on the selected words of this line (context menu): the range is in UTF-16 units of the line's text. */
   onFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
+  onReopenFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
   onReason?: (key: string, text: string) => void;
   onStatusDone?: () => void;
   ref?: Ref<HTMLDivElement>;
@@ -78,8 +79,24 @@ function Text({ text, find }: { text: string; find?: string }) {
   );
 }
 
+function CorrectedText({ seg, find, onReopen }: { seg: SegmentView; find?: string; onReopen?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void }) {
+  const corrections = [...seg.corrections].sort((a, b) => a.range.start - b.range.start);
+  if (!corrections.length) return <Text text={seg.text} find={find} />;
+  const parts: ReactNode[] = [];
+  let at = 0;
+  for (const correction of corrections) {
+    const { start, end } = correction.range;
+    if (start < at || end > seg.text.length || start >= end) continue;
+    parts.push(<Text key={`before-${start}`} text={seg.text.slice(at, start)} find={find} />);
+    parts.push(<button key={`fix-${start}`} type="button" className="cw-term" title={t("speakers.fix.heard_as", { text: correction.original })} aria-label={t("speakers.fix.heard_as", { text: correction.original })} onClick={(e) => onReopen?.(seg, correction.range, e.currentTarget)}><Text text={seg.text.slice(start, end)} find={find} /></button>);
+    at = end;
+  }
+  parts.push(<Text key="after" text={seg.text.slice(at)} find={find} />);
+  return <>{parts}</>;
+}
+
 // @cpt-component:cpt-noter-component-ui-transcript-segment-row:p1
-export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, stop, status, timeHelp, onPlay, onRename, onFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
+export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, stop, status, timeHelp, onPlay, onRename, onFixTerm, onReopenFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
   const tail = variant === "tail";
   if (row.kind === "gap") {
     return (
@@ -163,7 +180,7 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
         title={low ? t("transcript.low_confidence") : undefined}
         onContextMenu={onFixTerm && !tail ? (e) => openFixMenu(e, e.currentTarget) : undefined}
       >
-        <Text text={seg.text} find={find} />
+        <CorrectedText seg={seg} find={find} onReopen={onReopenFixTerm} />
       </span>
       <span className="cw-seg__end">
         {shown && (

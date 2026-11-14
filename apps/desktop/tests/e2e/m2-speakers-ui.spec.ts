@@ -107,13 +107,23 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
   });
 
   test("UI — other path: Only this line renames that line and leaves the speaker's others as Speaker 3", async ({ page }) => {
-    await live(page);
-    await transcript(page).getByRole("button", { name: "Speaker 3" }).first().click();
+    await live(page, (w) => {
+      const snapshot = w.transcripts.find((x) => x.call_id === S.CALL)!;
+      const source = snapshot.segments.find((x) => x.speaker.speaker_id === "spk_3")!;
+      snapshot.segments.push({ ...structuredClone(source), id: "seg_live_999", t0_ms: source.t0_ms + 5000, t1_ms: source.t1_ms + 5000 });
+      snapshot.speakers.find((x) => x.id === "spk_3")!.segment_count += 1;
+    });
+    const chosen = transcript(page).getByRole("button", { name: "Speaker 3" }).first();
+    const line = chosen.locator("xpath=ancestor::*[@data-segment-id][1]");
+    const segmentId = await line.getAttribute("data-segment-id");
+    await chosen.click();
     const rename = popover(page, "Rename Speaker 3");
     await rename.getByRole("radio", { name: "Only this line" }).check();
     await rename.getByRole("option", { name: /^Pavel/ }).click();
     await rename.getByRole("button", { name: "Rename" }).click();
     expect(await sent(page, "transcript_rename_speaker")).toEqual([expect.objectContaining({ scope: expect.objectContaining({ type: "one_segment" }) })]);
+    await expect(transcript(page).locator(`[data-segment-id="${segmentId}"]`)).toContainText("Pavel");
+    await expect(transcript(page).getByText("Speaker 3", { exact: true })).toBeVisible();
   });
 });
 
@@ -264,11 +274,35 @@ test("cpt-noter-seq-call-page-name-speakers — selected text menu offers Copy a
   await fix.getByRole("button", { name: "Fix", exact: true }).click();
   await expect(fix).toHaveCount(0);
   await expect(text).toContainText("corrected");
+  const corrected = text.getByRole("button", { name: "Heard as “" + selected + "”" });
+  await expect(corrected).toBeVisible();
+  await corrected.click();
+  await expect(page.getByRole("dialog", { name: "Fix term", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   expect(await sent(page, "transcript_fix_term")).toEqual([expect.objectContaining({ replacement: "corrected" })]);
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(text).not.toContainText("corrected");
   await expect(text).toContainText(selected!);
   expect((await sent(page, "change_undo")).length).toBe(1);
+});
+
+test("cpt-noter-seq-call-screen-name-speaker — live confirmed words offer Fix Term from the selection menu", async ({ page }) => {
+  await live(page);
+  const line = transcript(page).locator("[data-segment-id]").first();
+  const text = line.locator(".cw-seg__text");
+  await text.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el.firstChild!);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+  });
+  const menu = page.getByRole("menu", { name: "Fix Term…" });
+  await expect(menu.getByRole("menuitem", { name: "Fix Term…", exact: true })).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Fix Term…", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Fix term", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
 });
 
 test("cpt-noter-flow-ui-live-transcript-stored — the stored transcript is one Tab stop; ↑/↓, Home/End and ⌘↑/⌘↓ move between lines", async ({ page }) => {
@@ -293,6 +327,11 @@ test("cpt-noter-flow-ui-live-transcript-stored — the stored transcript is one 
   await page.keyboard.press("End");
   await expect(lines.last()).toBeFocused();
   await page.keyboard.press("Home");
+  await expect(lines.first()).toBeFocused();
+  await page.keyboard.press("Meta+KeyF");
+  const find = page.getByPlaceholder("Find in transcript");
+  await expect(find).toBeFocused();
+  await page.keyboard.press("Escape");
   await expect(lines.first()).toBeFocused();
 });
 

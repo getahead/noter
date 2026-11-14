@@ -10,11 +10,12 @@ import { find, rendered } from "../../ui/testing";
 import { audioLine, holdFix, readNaming, StoredTranscript, TranscriptBar, TranscriptLog, useTranscript, type TranscriptHandle } from "./hosts";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { buildRows, type Row } from "./model";
+import { LogScroller } from "./follow";
 import { resetUndo, undoLast } from "../history/undo";
 import { PlaybackBar } from "./playback-bar";
 import { SegmentRow } from "./segment-row";
 import { ANNA, S3, seg, YOU } from "./testing";
-import { TranscriptView } from "./transcript-view";
+import { moveLineFocus, TranscriptView } from "./transcript-view";
 
 const LIVE = "call_live";
 const PAST = "call_backend";
@@ -37,6 +38,23 @@ describe("speaker label and language tag", () => {
 });
 
 describe("SegmentRow (cpt-noter-component-ui-transcript-segment-row)", () => {
+  it("marks corrected words with accessible original wording and reopens their correction", () => {
+    const corrected = seg("term", 0, { text: "ArchiMate is here", corrections: [
+      { range: { start: 0, end: 9 }, original: "a chi" },
+      { range: { start: 50, end: 55 }, original: "missing" },
+    ] });
+    const onReopenFixTerm = vi.fn();
+    const props = { row: rowOf(corrected), variant: "stored" as const, speakers: [], onReopenFixTerm };
+    expect(renderToString(<SegmentRow {...props} />)).toContain('aria-label="Heard as “a chi”"');
+    const row = rendered(SegmentRow, props);
+    const correctedText = find(row, (p) => p.seg === corrected);
+    const text = (correctedText.type as (p: unknown) => React.ReactNode)(correctedText.props);
+    const button = find(text, (p) => p.className === "cw-term");
+    const anchor = {} as HTMLElement;
+    (button.props.onClick as (e: unknown) => void)({ currentTarget: anchor });
+    expect(onReopenFixTerm).toHaveBeenCalledWith(corrected, { start: 0, end: 9 }, anchor);
+  });
+
   it("selected words open the Copy / Fix Term menu by pointer or keyboard, and the label opens Rename", () => {
     const r = rowOf();
     const onFixTerm = vi.fn();
@@ -219,6 +237,40 @@ describe("TranscriptView (cpt-noter-component-ui-transcript-view)", () => {
     (row.props.onStatusDone as () => void)();
     expect(onRefusedDone).toHaveBeenCalledOnce();
   });
+
+  it("moves line focus through the complete list for arrows, Home, End and Command arrows", () => {
+    const list = [rowOf(seg("first", 0)), { kind: "gap" as const, key: "gap", at: 1, gap: { call_id: LIVE, t0_ms: 1, t1_ms: 2, reason: "paused" as const } }, rowOf(seg("last", 5000))];
+    const keys = list.map((row) => row.key);
+    const log = new LogScroller(32);
+    const area = { scrollTop: 0, clientHeight: 96, scrollHeight: 1000, scrollTo: ({ top }: { top: number }) => { area.scrollTop = top; } } as unknown as HTMLDivElement;
+    const setPos = vi.fn();
+    const move = (key: string, metaKey = false, id = "first") => {
+      const preventDefault = vi.fn();
+      moveLineFocus({ key, metaKey, target: { closest: () => ({ getAttribute: () => id }) }, preventDefault } as never, list, keys, log, area, setPos);
+      return preventDefault;
+    };
+    expect(move("ArrowDown")).toHaveBeenCalledOnce();
+    expect(log.focusKey).toBe("last");
+    expect(setPos).toHaveBeenCalledWith({ top: area.scrollTop, height: area.clientHeight });
+    expect(move("ArrowUp", true)).toHaveBeenCalledOnce();
+    expect(log.focusKey).toBe("first");
+    expect(move("ArrowDown", true)).toHaveBeenCalledOnce();
+    expect(log.focusKey).toBe("last");
+    expect(move("Home")).toHaveBeenCalledOnce();
+    expect(log.focusKey).toBe("first");
+    expect(move("End")).toHaveBeenCalledOnce();
+    expect(log.focusKey).toBe("last");
+    expect(move("x")).not.toHaveBeenCalled();
+  });
+
+  it("routes scroll-area focus and ignores keys outside the line navigation map", () => {
+    const tree = rendered(TranscriptView, { variant: "stored", rows, speakers: [], loaded: true });
+    const scroll = find(tree, (p) => p.className === "cw-tv__scroll");
+    const event = { key: "x", metaKey: false, target: { closest: () => null }, preventDefault: vi.fn() };
+    (scroll.props.onKeyDown as (e: unknown) => void)(event);
+    (scroll.props.onFocus as (e: unknown) => void)({ target: { closest: () => ({ getAttribute: () => "a" }) } });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
 });
 
 let bridge: Bridge | null = null;
@@ -246,6 +298,52 @@ describe("holdFix (the Undo of a term fix)", () => {
   });
 });
 
+describe("fake transcript corrections", () => {
+  it("removes and restores a one-line speaker split through undo and redo", async () => {
+    const { fake, bridge: b } = await open("main");
+    const transcript = fake.world.transcripts[0]!;
+    const segment = transcript.segments.find((line) => line.speaker.speaker_id === "spk_3")!;
+    const speakerCount = transcript.speakers.length;
+    const renamed = await b.core.transcriptRenameSpeaker({ call_id: transcript.call_id, speaker_id: "spk_3", person: { type: "existing", person_id: "per_anna" }, scope: { type: "one_segment", segment_id: segment.id } });
+    expect(renamed.status).toBe("ok");
+    expect(transcript.speakers).toHaveLength(speakerCount + 1);
+    if (renamed.status !== "ok") return;
+    await b.core.changeUndo({ target: { type: "change", change_id: renamed.data.change_id } });
+    expect(transcript.segments.find((line) => line.id === segment.id)?.speaker.speaker_id).toBe("spk_3");
+    expect(transcript.speakers).toHaveLength(speakerCount);
+    await b.core.changeRedo({ target: { type: "change", change_id: renamed.data.change_id } });
+    expect(transcript.speakers).toHaveLength(speakerCount + 1);
+    expect(transcript.segments.find((line) => line.id === segment.id)?.speaker.speaker_id).not.toBe("spk_3");
+    expect((await b.core.transcriptRenameSpeaker({ call_id: transcript.call_id, speaker_id: "spk_3", person: { type: "existing", person_id: "per_anna" }, scope: { type: "whole_call" } })).status).toBe("ok");
+  });
+
+  it("shifts later correction ranges when an earlier term grows and rejects invalid ranges", async () => {
+    const { fake, bridge: b } = await open("main", (w) => {
+      const transcript = w.transcripts[0]!;
+      transcript.segments[0]!.text = "abcdefghijklmno";
+      transcript.segments[0]!.corrections = [];
+    });
+    const transcript = fake.world.transcripts[0]!;
+    const line = transcript.segments[0]!;
+    const first = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 10, end: 12 }, replacement: "XYZ", add_to_glossary: false });
+    expect(first.status).toBe("ok");
+    const earlier = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 0, end: 2 }, replacement: "longer", add_to_glossary: false });
+    expect(earlier.status).toBe("ok");
+    expect(line.text).toBe("longercdefghijXYZmno");
+    expect(line.corrections.map((c) => c.range)).toEqual([{ start: 0, end: 6 }, { start: 14, end: 17 }]);
+    if (earlier.status === "ok") await b.core.changeUndo({ target: { type: "change", change_id: earlier.data.change_id } });
+    expect(line.text).toBe("abcdefghijXYZmno");
+    expect(line.corrections).toHaveLength(1);
+    expect(line.corrections[0]!.range).toEqual({ start: 10, end: 13 });
+    const invalid = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 9000, end: 9005 }, replacement: "oops", add_to_glossary: false });
+    expect(invalid.status).toBe("error");
+    expect(line.text).toBe("abcdefghijXYZmno");
+    const overlapping = await b.core.transcriptFixTerm({ call_id: transcript.call_id, segment_id: line.id, range: { start: 11, end: 12 }, replacement: "Q", add_to_glossary: false });
+    expect(overlapping.status).toBe("ok");
+    expect(line.corrections.map((c) => c.range)).toEqual([{ start: 11, end: 12 }]);
+  });
+});
+
 describe("readNaming (the Summary's naming panel)", () => {
   it("reads the call's speakers and lines once, or nothing for a call the core does not know", async () => {
     const { bridge: b } = await open("main");
@@ -257,6 +355,20 @@ describe("readNaming (the Summary's naming panel)", () => {
 });
 
 describe("useTranscript and TranscriptPanel (hosts)", () => {
+  it("offers term fixes and corrected-word reopening in live and stored logs", async () => {
+    const { bridge: b } = await open("main");
+    await b.subscribe("transcript_subscribe", { call_id: LIVE });
+    const tr = hookOf(b, LIVE);
+    const range = { start: 0, end: 1 };
+    const anchor = {} as HTMLElement;
+    for (const variant of ["live", "stored"] as const) {
+      const tree = rendered(TranscriptLog, { tr, variant });
+      const row = find(tree, (p) => typeof p.onFixTerm === "function");
+      (row.props.onFixTerm as (s: unknown, r: unknown, a: unknown) => void)(tr.data!.segments[0], range, anchor);
+      (row.props.onReopenFixTerm as (s: unknown, r: unknown, a: unknown) => void)(tr.data!.segments[0], range, anchor);
+    }
+  });
+
   it("requests the native call window key before live rename, but never for stored rename", async () => {
     const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
     await b.subscribe("transcript_subscribe", { call_id: LIVE });

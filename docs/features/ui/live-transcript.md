@@ -141,6 +141,7 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 **Success Scenarios**:
 - On a call's page the transcript shows every row with a play control on any output, a find bar (⌘F) with **3 of 120 lines**, and the header line about the audio
 - An evidence link opens the row highlighted for 3 s with focus on its first line
+- ⌘↑/⌘↓ focus the first or last confirmed line in the complete transcript, scrolling it into view; virtualization keeps the focused line mounted. Closing Find returns focus to its invoking line.
 
 **Error Scenarios**:
 - Loading longer than 300 ms: skeleton rows

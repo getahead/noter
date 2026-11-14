@@ -71,19 +71,33 @@ export const after = (ms: number, fn: () => void) => {
 };
 
 /** Highlight the rows a span covers; when none of them is loaded, ask the core for the span's segments. */
-export function showSpan(bridge: Pick<Bridge, "core">, span: TimeSpan, rows: readonly Row[], highlight: (keys: string[]) => void): void {
+export function showSpan(bridge: Pick<Bridge, "core">, span: TimeSpan, rows: readonly Row[], highlight: (keys: string[]) => void, current: () => boolean = () => true): void {
   const keys = spanKeys(rows, span);
   if (keys.length) return highlight(keys);
-  void bridge.core.transcriptSpan({ span }).then((r) => r.status === "ok" && highlight(r.data.segments.map((s) => s.id)));
+  void bridge.core.transcriptSpan({ span }).then((r) => current() && r.status === "ok" && highlight(r.data.segments.map((s) => s.id)));
 }
 
 /** What the archive pass did to an evidence span: its words before and after, `{ change: null }` when it replaced the lines, `null` for nothing to say. */
-export async function spanArchiveNote(bridge: Pick<Bridge, "core">, span: TimeSpan, set: (note: ArchiveNote | null) => void): Promise<void> {
+export async function spanArchiveNote(bridge: Pick<Bridge, "core">, span: TimeSpan, set: (note: ArchiveNote | null) => void, current: () => boolean = () => true): Promise<void> {
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-archive
   const r = await bridge.core.transcriptSpan({ span });
+  if (!current()) return;
   if (r.status === "ok") set(r.data.archive_change ? { change: r.data.archive_change } : null);
   else set(r.error.code === "transcript_upgraded" ? { change: null } : null);
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-archive
+}
+
+export function evidenceSpanEffect(bridge: Pick<Bridge, "core">, span: TimeSpan | null | undefined, loaded: boolean, rows: readonly Row[], highlight: (keys: string[]) => void): () => void {
+  let current = true;
+  if (span && loaded) showSpan(bridge, span, rows, highlight, () => current);
+  return () => { current = false; };
+}
+
+export function spanArchiveEffect(bridge: Pick<Bridge, "core">, span: TimeSpan | null | undefined, set: (note: ArchiveNote | null) => void): () => void {
+  let current = true;
+  if (span) { set(null); void spanArchiveNote(bridge, span, set, () => current); }
+  else set(null);
+  return () => { current = false; };
 }
 
 // @cpt-flow:cpt-noter-flow-ui-live-transcript-replay-line:p1
@@ -129,8 +143,8 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   const span = o.span;
   const loaded = !!data;
   const [archive, setArchive] = useState<ArchiveNote | null>(null);
-  useEffect(() => void (span && loaded && showSpan(bridge, span, rows, setHighlight)), [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
-  useEffect(() => void (span ? spanArchiveNote(bridge, span, setArchive) : setArchive(null)), [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => evidenceSpanEffect(bridge, span, loaded, rows, setHighlight), [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
+  useEffect(() => spanArchiveEffect(bridge, span, setArchive), [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => (highlight.length ? after(HIGHLIGHT_MS, () => setHighlight([])) : undefined), [highlight]);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
 
@@ -254,11 +268,11 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   const segments = tr.data?.segments;
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
-  useEffect(() => (variant === "stored" ? watchFixTermMenu(document, () => globalThis.getSelection(), () => segmentsRef.current ?? [], (enabled) => void tr.bridge.core.windowSetFixTermEnabled({ enabled })) : undefined), [variant, tr.bridge]);
+  useEffect(() => (variant !== "tail" ? watchFixTermMenu(document, () => globalThis.getSelection(), () => segmentsRef.current ?? [], (enabled) => void tr.bridge.core.windowSetFixTermEnabled({ enabled })) : undefined), [variant, tr.bridge]);
   const chosen = useWindow(tr.bridge, (s) => s.fixTerm);
   const handled = useRef(chosen);
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
-  useEffect(() => followFixTermChoice(handled, chosen, () => (variant === "stored" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null), (picked) => setFixing({ ...picked, menu: false })), [chosen, variant]);
+  useEffect(() => followFixTermChoice(handled, chosen, () => (variant !== "tail" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null), (picked) => setFixing({ ...picked, menu: false })), [chosen, variant]);
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
   const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
   const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
@@ -291,7 +305,8 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
         setRenaming({ speakerId, segmentId: seg.id, anchor });
       }}
       // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
-      onFixTerm={variant === "stored" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
+      onFixTerm={variant !== "tail" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
+      onReopenFixTerm={variant !== "tail" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: false }) : undefined}
       // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
     />
     {fixing?.menu && (

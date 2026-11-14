@@ -11,7 +11,6 @@ import { LevelMeter } from "../../ui/primitives/level-meter";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { holdFollow, LogScroller, newLines, viewState, type Follow, type RowList } from "./follow";
-import { moveFocus } from "../../ui/primitives/roving";
 import { findMatches, lineKey, meterLevel, tabStop, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
 import { SegmentRow } from "./segment-row";
@@ -48,10 +47,24 @@ export interface TranscriptViewProps {
   onPlay?: (seg: SegmentView) => void;
   onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
   onFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
+  onReopenFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
 }
 
 const smooth = (): ScrollBehavior => (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth");
 const segments = (rows: readonly Row[]) => rows.reduce((n, r) => n + (r.kind === "segment" ? 1 : 0), 0);
+
+export function moveLineFocus(e: Pick<KeyboardEvent, "key" | "metaKey" | "target" | "preventDefault">, rows: readonly Row[], keys: readonly string[], log: LogScroller, area: HTMLDivElement, setPos: (pos: { top: number; height: number }) => void): void {
+  const key = lineKey(e);
+  const lines = rows.filter((r) => r.kind === "segment");
+  const from = lines.findIndex((r) => r.key === (e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id"));
+  const to = key === "Home" ? 0 : key === "End" ? lines.length - 1 : key === "ArrowUp" ? Math.max(0, from - 1) : key === "ArrowDown" ? Math.min(lines.length - 1, from + 1) : -1;
+  if (to >= 0 && lines[to]) {
+    e.preventDefault();
+    log.focusKey = lines[to]!.key;
+    log.scrollToRow(area, keys, lines[to]!.key, "instant");
+    setPos({ top: area.scrollTop, height: area.clientHeight });
+  }
+}
 
 // @cpt-component:cpt-noter-component-ui-transcript-view:p1
 // @cpt-dod:cpt-noter-dod-ui-live-transcript-view:p1
@@ -69,6 +82,7 @@ export function TranscriptView(p: TranscriptViewProps) {
   const held = holdFollow(follow, !!p.holdFollow, confirmed); // what the view shows; the real follow state resumes when the hold ends
   const [find, setFind] = useState<{ query: string; at: number } | null>(null);
   const [lastFocus, setLastFocus] = useState<string | null>(null);
+  const findReturn = useRef<string | null>(null);
   const [status, setStatus] = useState<{ key: string; text: string } | null>(null);
   const keys = useMemo(() => rows.map((r) => r.key), [rows]);
   const matches = useMemo(() => (find ? findMatches(rows, find.query) : []), [rows, find]);
@@ -85,7 +99,20 @@ export function TranscriptView(p: TranscriptViewProps) {
   };
   // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-jump
   const moveMatch = (by: number) => setFind((f) => f && { ...f, at: f.at + by });
-  const openFind = () => setFind((f) => f ?? { query: "", at: 0 });
+  const openFind = () => setFind((f) => {
+    if (!f) findReturn.current = lastFocus ?? rows.find((r) => r.kind === "segment")?.key ?? null;
+    return f ?? { query: "", at: 0 };
+  });
+  const closeFind = () => {
+    setFind(null);
+    const key = findReturn.current;
+    if (key && el()) {
+      log.current.focusKey = key;
+      log.current.scrollToRow(el()!, keys, key, "instant");
+      setPos({ top: el()!.scrollTop, height: el()!.clientHeight });
+      requestAnimationFrame(() => Array.from(list.current?.querySelectorAll<HTMLElement>("[data-segment-id]") ?? []).find((row) => row.dataset.segmentId === key)?.focus({ preventScroll: true }));
+    }
+  };
   useWindowShortcuts(useMemo((): ShortcutTable => (live ? { "Meta+KeyJ": jump } : variant === "stored" && p.loaded ? { "Meta+KeyF": openFind } : {}), [live, variant, p.loaded, confirmed]), variant === "stored"); // stored: ⌘F is the find bar here, not the shell's search
 
   // After every render: measure the drawn rows, keep the rows in view where they were, and keep the end in view while following.
@@ -125,8 +152,11 @@ export function TranscriptView(p: TranscriptViewProps) {
   }
 
   const win = variant === "tail" ? { start: 0, end: rows.length, before: 0, after: 0 } : log.current.window(keys, pos.top, pos.height);
+  const pinnedIndex = lastFocus ? keys.indexOf(lastFocus) : -1;
   const shown = rows.slice(win.start, win.end);
-  const stopKey = tabStop(shown, lastFocus);
+  const pinned = pinnedIndex >= 0 && (pinnedIndex < win.start || pinnedIndex >= win.end) && rows[pinnedIndex]?.kind === "segment" ? rows[pinnedIndex] : null;
+  const pinnedTop = pinned ? log.current.sizes(keys.slice(0, pinnedIndex)).reduce((n, h) => n + h, 0) : 0;
+  const stopKey = pinned ? pinned.key : tabStop(shown, lastFocus);
   const count = newLines(held, confirmed);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-user-scroll
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-follow
@@ -142,7 +172,7 @@ export function TranscriptView(p: TranscriptViewProps) {
     // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-find
     if (e.key === "Enter") moveMatch(e.shiftKey ? -1 : 1);
     // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-find
-    else if (e.key === "Escape") setFind(null);
+    else if (e.key === "Escape") closeFind();
   };
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-return-follow
   return (
@@ -165,7 +195,7 @@ export function TranscriptView(p: TranscriptViewProps) {
           <IconButton icon="chevronUp" label={t("transcript.find.previous")} size="inline" onAction={() => moveMatch(-1)} />
           <IconButton icon="chevronDown" label={t("transcript.find.next")} size="inline" onAction={() => moveMatch(1)} />
           <span className="np-tb__spacer" />
-          <IconButton icon="x" label={t("transcript.find.close")} size="inline" onAction={() => setFind(null)} />
+          <IconButton icon="x" label={t("transcript.find.close")} size="inline" onAction={closeFind} />
         </div>
       )}
       {/* @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-user-find */}
@@ -178,14 +208,13 @@ export function TranscriptView(p: TranscriptViewProps) {
           ))}
         </div>
       )}
-      <div className="cw-tv__scroll" ref={scroller} onScroll={scroll}>
+      <div className="cw-tv__scroll" ref={scroller} onScroll={scroll}
+        onKeyDown={(e) => moveLineFocus(e, rows, keys, log.current, el()!, setPos)}
+        onFocus={(e) => { const key = (e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id"); if (key) setLastFocus(key); }}>
         <div
           ref={list}
           className="cw-tv__rows"
           style={{ paddingTop: win.before, paddingBottom: win.after }}
-          // roving focus (DESIGN transcript keyboard table): ↑/↓ between lines, ⌘↑/⌘↓ to the first and last
-          onKeyDown={(e) => void moveFocus(e, "[data-segment-id]", false, lineKey(e))}
-          onFocus={(e) => setLastFocus((e.target as HTMLElement).closest("[data-segment-id]")?.getAttribute("data-segment-id") ?? lastFocus)}
         >
           {shown.map((row) => (
             <SegmentRow
@@ -204,11 +233,17 @@ export function TranscriptView(p: TranscriptViewProps) {
               onPlay={p.onPlay}
               onRename={p.onRename}
               onFixTerm={p.onFixTerm}
+              onReopenFixTerm={p.onReopenFixTerm}
               onReason={(key, text) => setStatus({ key, text })}
               onStatusDone={() => (setStatus(null), p.onRefusedDone?.())}
             />
           ))}
         </div>
+        {pinned?.kind === "segment" && (
+          <div className="cw-tv__pinned" style={{ top: pinnedTop }}>
+            <SegmentRow row={pinned} variant={variant} speakers={p.speakers} control={p.control?.(pinned)} playing={p.playingKey === pinned.key} highlighted={p.highlight?.includes(pinned.key)} find={find?.query} current={current === pinned.key} stop timeHelp={p.timeHelp} onPlay={p.onPlay} onRename={p.onRename} onFixTerm={p.onFixTerm} onReopenFixTerm={p.onReopenFixTerm} />
+          </div>
+        )}
       </div>
       {/* @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-detach */}
       {live && count > 0 && (

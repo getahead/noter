@@ -130,11 +130,13 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 **Actor**: Primary user
 
 **Success Scenarios**:
-- Fix term shows selected words, Correct term, glossary suggestions, Language disabled and showing the transcript language, and Add to glossary checked; applying leaves original wording in the corrected word's help tag.
+- Fix term shows selected words, Correct term, glossary suggestions, Language disabled and showing the transcript language, and Add to glossary checked; applying leaves original wording in the corrected word's help tag. The corrected range remains visibly marked and can reopen Fix Term… from the live or stored transcript.
 
 **Error Scenarios**:
 - Empty replacement disables Fix; stale selection after archive replacement must be resolved again, not applied to a different word.
 - Esc cancels and returns focus; during capture the call app regains typing focus.
+- A one-line speaker rename updates the selected segment's speaker assignment and leaves other segments assigned to their prior speaker.
+- Fix Term… is available from confirmed selected words in both live call and stored transcript hosts; corrected text and its original wording remain available accessibly.
 
 **Steps**:
 1. [x] - `p1` - User opens Fix Term… from the selected text's context menu or Edit menu; anchor the 280–360-pt popover to that selection - `inst-open`
