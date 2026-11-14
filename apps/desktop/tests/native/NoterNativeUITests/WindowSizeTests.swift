@@ -37,14 +37,16 @@ final class WindowSizeTests: NoterTestCase {
         let paneList = settings.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Settings panes")).firstMatch
         let pane = settings.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "General"))
             .matching(NSPredicate(format: "elementType != %d", XCUIElement.ElementType.link.rawValue)).firstMatch
-        let close = settings.buttons["_XCUI:CloseWindow"]
-        let minimize = settings.buttons["_XCUI:MinimizeWindow"]
-        let fullScreen = settings.buttons["_XCUI:FullScreenWindow"]
+        // AppKit exposes overlay titlebar controls through the app query, not as children of
+        // the webview window. Select the controls whose actual hit frames belong to Settings.
+        let settingsTrafficLights = ["_XCUI:CloseWindow", "_XCUI:MinimizeWindow", "_XCUI:FullScreenWindow"].compactMap { identifier in
+            app.buttons.matching(identifier: identifier).allElementsBoundByIndex.first { settings.frame.contains($0.frame) }
+        }
         XCTAssertTrue(search.waitForExistence(timeout: 5), "the Settings search field is accessible")
-        XCTAssertTrue(close.exists && minimize.exists && fullScreen.exists, "the Settings traffic light targets exist")
+        XCTAssertEqual(settingsTrafficLights.count, 3, "the Settings window exposes all three native traffic light hit targets")
 
         func assertHeaderHitTargetsClear(_ size: String, expectedSearchWidth: CGFloat) {
-            for trafficLight in [close, minimize, fullScreen] {
+            for trafficLight in settingsTrafficLights {
                 XCTAssertFalse(search.frame.intersects(trafficLight.frame), "Settings search clears the native traffic light hit target at \(size)")
             }
             XCTAssertEqual(search.frame.width, expectedSearchWidth, accuracy: 14, "the search input fills its available pane width at \(size)")

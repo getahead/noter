@@ -249,14 +249,9 @@ final class NativeAppMenuTests: NoterTestCase {
     }
 
     private func assertReviewedRowUndo(main: XCUIElement, row: XCUIElement, title: String, rowUndo: XCUIElement) {
-        bringRowIntoView(main: main, row: row)
-        row.click()
-        let edit = app.menuBars.menuBarItems["Edit"]
-        edit.click()
-        XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && !app.menuItems["Accept Item"].isEnabled && !app.menuItems["Reject Item"].isEnabled }, "the selected reviewed item is no longer Suggested")
-        app.typeKey(.escape, modifierFlags: [])
-
-        XCTAssertTrue(waitUntil(5) { rowUndo.exists && rowUndo.isHittable }, "the selected row exposes its own accessible, hittable Undo link")
+        // The row outcome offers Undo briefly. Check and activate that exact item's action
+        // immediately after the menu dispatch, before any focus/menu work can expire it.
+        XCTAssertTrue(waitUntil(2) { rowUndo.exists }, "the menu action adds Undo to the selected row")
         XCTAssertTrue(main.buttons["Undo"].exists, "the global Undo strip remains a separate native button")
         let hierarchy = main.debugDescription
         let accessibility = XCTAttachment(string: hierarchy)
@@ -265,10 +260,12 @@ final class NativeAppMenuTests: NoterTestCase {
         add(accessibility)
         XCTAssertTrue(hierarchy.contains(title) && hierarchy.contains("Undo: \(title)"), "the native accessibility tree names this row's outcome and its specific Undo action")
 
+        bringRowIntoView(main: main, row: row)
+        XCTAssertTrue(rowUndo.isHittable, "the selected row exposes its own accessible, hittable Undo link")
         rowUndo.click()
         XCTAssertTrue(waitUntil(10) { !rowUndo.exists }, "activating the row Undo clears only that row outcome action")
-        bringRowIntoView(main: main, row: row)
         row.click()
+        let edit = app.menuBars.menuBarItems["Edit"]
         edit.click()
         XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && app.menuItems["Accept Item"].isEnabled && app.menuItems["Reject Item"].isEnabled }, "row Undo restores this selected item to Suggested")
         app.typeKey(.escape, modifierFlags: [])
