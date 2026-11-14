@@ -2,6 +2,8 @@
 //! suggested items with their evidence, the merge regeneration, the archive pass and the
 //! Summary-ready notification. The scripted runtime and the scripted engine answer; paused time.
 
+#[path = "common/postcall.rs"]
+mod postcall_common;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::sync::{Arc, Mutex};
@@ -12,7 +14,6 @@ use noter_core::{
     Adapters, Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement, Scripted,
     Surfaces, TrayModel,
 };
-use noter_db::Insert;
 use noter_engine_client::scripted::{Script, ScriptedEngine};
 use noter_jobs::{Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
@@ -231,60 +232,10 @@ async fn archive_install_keeps_speaker_and_term_edits_made_during_the_offline_pa
     );
 }
 
-fn ins(table: &'static str, values: Vec<(&'static str, Value)>) -> Insert {
-    Insert { table, values }
-}
-
 /// A stopped planning call, still `processing`, with `segments` live segments of a speaker the
 /// user named.
 fn seed_call(core: &Core, id: &str, segments: i64) {
-    let mut rows = vec![
-        ins(
-            "calls",
-            vec![
-                ("id", json!(id)),
-                ("rev", json!(1)),
-                ("started_at", json!(NOW - 3_600_000)),
-                ("ended_at", json!(NOW - 60_000)),
-                ("title", json!("Planning")),
-                ("call_type", json!("planning")),
-                ("status", json!("processing")),
-                ("mode_used", json!("cloud")),
-            ],
-        ),
-        ins(
-            "speakers",
-            vec![
-                ("id", json!(format!("{id}_spk"))),
-                ("call_id", json!(id)),
-                ("label", json!("spk_1")),
-                ("name", json!("Anna Lee")),
-                ("n", json!(1)),
-                ("channel", json!("sys")),
-                ("pass", json!("live")),
-                ("named_by", json!("you")),
-                ("person_id", json!("per_anna")),
-            ],
-        ),
-    ];
-    for n in 0..segments {
-        rows.push(ins(
-            "segments",
-            vec![
-                ("id", json!(format!("{id}_seg_{n}"))),
-                ("call_id", json!(id)),
-                ("speaker_id", json!(format!("{id}_spk"))),
-                ("channel", json!("sys")),
-                ("t0_ms", json!(n * 10_000)),
-                ("t1_ms", json!(n * 10_000 + 5_000)),
-                ("text", json!(format!("We agree on step {n}."))),
-                ("text_norm", json!(format!("we agree on step {n}."))),
-                ("lang", json!("en")),
-                ("pass", json!("live")),
-            ],
-        ));
-    }
-    core.store().insert_batch(rows).unwrap();
+    postcall_common::seed_live_call(core, id, segments, NOW, Some("Anna Lee"));
 }
 
 fn trigger(core: &Core, kind: JobKind, id: &str) -> JobRunId {

@@ -2,6 +2,8 @@
 //! live transcript section by section through the router (the scripted runtime here), and the
 //! outputs commands read, edit, compare and undo them. Paused tokio time throughout.
 
+#[path = "common/postcall.rs"]
+mod postcall_common;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::sync::{Arc, Mutex};
@@ -230,50 +232,7 @@ fn ins(table: &'static str, values: Vec<(&'static str, Value)>) -> Insert {
 
 /// A stopped planning call, still `processing`, with `segments` live segments.
 fn seed_call(core: &Core, id: &str, segments: i64) {
-    let mut rows = vec![
-        ins(
-            "calls",
-            vec![
-                ("id", json!(id)),
-                ("rev", json!(1)),
-                ("started_at", json!(NOW - 3_600_000)),
-                ("ended_at", json!(NOW - 60_000)),
-                ("title", json!("Planning")),
-                ("call_type", json!("planning")),
-                ("status", json!("processing")),
-                ("mode_used", json!("cloud")),
-            ],
-        ),
-        ins(
-            "speakers",
-            vec![
-                ("id", json!(format!("{id}_spk"))),
-                ("call_id", json!(id)),
-                ("label", json!("spk_1")),
-                ("n", json!(1)),
-                ("channel", json!("sys")),
-                ("pass", json!("live")),
-            ],
-        ),
-    ];
-    for n in 0..segments {
-        rows.push(ins(
-            "segments",
-            vec![
-                ("id", json!(format!("{id}_seg_{n}"))),
-                ("call_id", json!(id)),
-                ("speaker_id", json!(format!("{id}_spk"))),
-                ("channel", json!("sys")),
-                ("t0_ms", json!(n * 10_000)),
-                ("t1_ms", json!(n * 10_000 + 5_000)),
-                ("text", json!(format!("We agree on step {n}."))),
-                ("text_norm", json!(format!("we agree on step {n}."))),
-                ("lang", json!("en")),
-                ("pass", json!("live")),
-            ],
-        ));
-    }
-    core.store().insert_batch(rows).unwrap();
+    postcall_common::seed_live_call(core, id, segments, NOW, None);
 }
 
 fn post_call(core: &Core, id: &str) -> JobRunId {
