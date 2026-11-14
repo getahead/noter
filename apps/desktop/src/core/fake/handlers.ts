@@ -670,18 +670,17 @@ export const defaultHandlers: Handlers = {
     if (!name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "person", rule: "required" });
     const before = JSON.stringify(namingState(world, a.call_id));
     const oldName = speakerName(spk.label);
-    const oldLabel = structuredClone(spk.label);
-    const oldNamedBy = spk.named_by;
     const assigned: SpeakerLabel = { type: "person", person: { id: p?.id ?? newId("per"), display_name: name, short_name: p?.short_name ?? name, initials: p?.initials ?? name.slice(0, 2).toUpperCase(), is_you: p?.is_you ?? false } };
     const segmentId = a.scope.type === "one_segment" ? a.scope.segment_id : null;
     if (a.scope.type === "one_segment") {
       const segment = t.segments.find((s) => s.id === segmentId && s.speaker.speaker_id === spk.id);
       if (!segment) throw coreError("not_found", "segment");
       const resultSpeaker: typeof spk = { ...structuredClone(spk), id: newId("spk"), label: assigned, named_by: "you", segment_count: 1 };
-      t.speakers.push(resultSpeaker);
-      spk.segment_count = Math.max(0, spk.segment_count - 1);
-      spk.label = oldLabel;
-      spk.named_by = oldNamedBy;
+      for (const list of new Set(lists)) {
+        const original = list.find((speaker) => speaker.id === spk.id);
+        if (original) original.segment_count = Math.max(0, original.segment_count - 1);
+        if (!list.some((speaker) => speaker.id === resultSpeaker.id)) list.push(structuredClone(resultSpeaker));
+      }
       segment.speaker = { speaker_id: resultSpeaker.id, label: assigned };
     } else {
       for (const speaker of lists.flat().filter((s) => s.id === a.speaker_id)) {
@@ -1576,9 +1575,12 @@ export const defaultHandlers: Handlers = {
       const lists = speakerLists(world, callId);
       for (const speaker of lists.flat()) {
         if (speaker.label.type !== "person" || speaker.label.person.id !== p.id) continue;
-        const n = Number(speaker.id.match(/(\d+)$/)?.[1]);
-        if (!Number.isSafeInteger(n) || n < 1) continue;
-        speaker.label = { type: "unnamed", n };
+        if (speaker.channel === "mic") {
+          speaker.label = { type: "guest_your_side" };
+        } else {
+          const n = Number(speaker.id.match(/^spk_(?:b_)?(\d+)$/)?.[1] ?? 0);
+          speaker.label = { type: "unnamed", n: Number.isSafeInteger(n) && n > 0 ? n : 0 };
+        }
         speaker.named_by = null;
         calls.add(callId);
       }

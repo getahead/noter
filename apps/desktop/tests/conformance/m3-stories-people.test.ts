@@ -57,8 +57,8 @@ const containsBytes = (haystack: Uint8Array, needle: Uint8Array) =>
 const unnamedVoice = (w: World) => {
   const detail = w.call_details.find((d) => d.call.id === PAST_CALL)!;
   const snap = w.transcripts.find((t) => t.call_id === PAST_CALL)!;
-  const speaker = { ...structuredClone(detail.speakers[0]), id: "spk_b_3", label: { type: "unnamed" as const, n: 3 }, named_by: null };
-  const line = { ...structuredClone(snap.segments[1]), id: "seg_backend_003", text: "Let's keep the old drawer for now", speaker: { speaker_id: "spk_b_3", label: speaker.label } };
+  const speaker = { ...structuredClone(detail.speakers[0]), id: "spk_b_3", channel: "sys" as const, label: { type: "unnamed" as const, n: 3 }, named_by: null };
+  const line = { ...structuredClone(snap.segments[1]), id: "seg_backend_003", channel: "sys" as const, text: "Let's keep the old drawer for now", speaker: { speaker_id: "spk_b_3", label: speaker.label } };
   detail.speakers.push(speaker);
   snap.speakers.push(structuredClone(speaker));
   snap.segments.push(line);
@@ -181,6 +181,27 @@ describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
       expect(await count("SELECT count(*) AS n FROM segments WHERE call_id = ?", PAST_CALL)).toBe(segments);
       expect(await rows(s, "SELECT person_id FROM speakers WHERE id = 'spk_b_3'")).toEqual([{ person_id: null }]);
     }
+  });
+
+  it("other — deleting a person after a one-line rename restores the unnamed fallback", async () => {
+    open(unnamedVoice);
+    const p = await make("Line Only");
+    const renamed = ok(await main.transcriptRenameSpeaker({
+      call_id: PAST_CALL,
+      speaker_id: "spk_b_3",
+      person: { type: "existing", person_id: p.id },
+      scope: { type: "one_segment", segment_id: "seg_backend_003" },
+    }));
+    const splitSpeakerId = renamed.speakers.find((speaker) => speaker.id !== "spk_b_3" && speaker.label.type === "person" && speaker.label.person.id === p.id)!.id;
+    expect(ok(await main.callGet({ call_id: PAST_CALL })).speakers.find((speaker) => speaker.id === splitSpeakerId)?.label).toMatchObject({
+      type: "person",
+      person: { id: p.id },
+    });
+
+    ok(await main.personDelete({ person_id: p.id }));
+
+    const splitSpeaker = ok(await main.callGet({ call_id: PAST_CALL })).speakers.find((speaker) => speaker.id === splitSpeakerId);
+    expect(splitSpeaker?.label).toMatchObject({ type: "unnamed", n: 0 });
   });
 });
 
