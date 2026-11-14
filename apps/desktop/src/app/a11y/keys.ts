@@ -56,7 +56,7 @@ export function isTyping(target: EventTarget | null): boolean {
   return el.tagName === "INPUT" && TEXT_INPUTS.has(el.type ?? "");
 }
 
-// @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
+// @cpt-dod:cpt-noter-dod-ui-accessibility-l10n-keyboard:p1
 export function isModalOpen(): boolean {
   return typeof document !== "undefined" && typeof document.querySelector === "function" && document.querySelector('[aria-modal="true"]') !== null;
 }
@@ -90,7 +90,6 @@ export function matchShortcut(
 }
 
 // @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
-// @cpt-dod:cpt-noter-dod-ui-accessibility-l10n-keyboard:p1
 /** Runs the matched action and consumes the event; true when one ran. An event a deeper handler already consumed is left alone (⌘F: the transcript's find bar, not the shell's search). */
 export function handleShortcut(
   e: ShortcutEvent,
