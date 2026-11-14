@@ -17,7 +17,9 @@ mod test_hooks;
 pub mod updater;
 pub mod webview_watch;
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::sync::{Arc, OnceLock};
 
 use noter_core::{
@@ -25,7 +27,7 @@ use noter_core::{
     PinnedModels, ShortcutRegistrar, ShortcutTaken, Surfaces, SystemClock,
 };
 use noter_engine_client::ProcessLauncher;
-use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
+use noter_protocol::ipc::{Caller, CommandCtx, Sink, dispatch_json};
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
 use serde_json::Value;
@@ -43,10 +45,19 @@ pub struct Booted(pub Result<Arc<Core>, String>);
 /// managed as `Booted` once it started; until then every command answers `not_ready`.
 pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder
+        .manage(PendingNavigation::default())
         .invoke_handler(invoke::<R>)
         .on_page_load(|webview, payload| {
             let (label, event) = (webview.label(), payload.event());
+            if event == PageLoadEvent::Finished {
+                if let Some(pending) = webview.try_state::<PendingNavigation>() {
+                    pending.page_loaded(webview);
+                }
+            }
             if event == PageLoadEvent::Started {
+                if let Some(pending) = webview.try_state::<PendingNavigation>() {
+                    pending.page_unloaded(label);
+                }
                 page_load_started(label, webview.try_state::<Booted>().as_deref());
             }
             // A page that never finishes gets a new web process (#521).
@@ -73,6 +84,9 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             }
             WindowEvent::Destroyed => {
                 window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
+                if let Some(pending) = window.try_state::<PendingNavigation>() {
+                    pending.page_unloaded(window.label());
+                }
                 if let Some(watch) = window.try_state::<webview_watch::Watch>() {
                     webview_watch::lock(&watch).closed(window.label());
                 }
@@ -111,11 +125,28 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_nspanel::init())
         .menu(surfaces::app_menu)
+        // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
         .on_menu_event(|app, event| {
             if event.id() == surfaces::APP_QUIT {
                 surfaces::quit(app);
             } else if event.id() == surfaces::APP_FIX_TERM {
                 surfaces::fix_term_chosen(app);
+            } else if event.id() == surfaces::APP_SETTINGS {
+                surfaces::navigate_from_menu(
+                    app,
+                    noter_protocol::model::NavTarget::Settings {
+                        pane: noter_protocol::model::SettingsPane::General,
+                    },
+                );
+            } else if event.id() == surfaces::APP_SETUP {
+                surfaces::navigate_from_menu(
+                    app,
+                    noter_protocol::model::NavTarget::FirstRun { step: None },
+                );
+            } else if let Some(main) = app.get_webview_window(WindowLabel::Main.as_str()) {
+                let _ = main.show();
+                let _ = main.set_focus();
+                let _ = main.emit(surfaces::APP_MENU_ACTION, event.id().as_ref());
             }
         })
         .setup(move |app| {
@@ -443,9 +474,101 @@ pub fn hotkey_pressed<R: Runtime>(
 #[derive(Default)]
 struct TauriEvents(OnceLock<tauri::AppHandle>);
 
+#[derive(Default)]
+struct PendingNavigation {
+    state: Mutex<NavigationState>,
+}
+
+#[derive(Default)]
+struct NavigationState {
+    loaded: HashSet<String>,
+    targets: HashMap<String, Value>,
+}
+
+impl NavigationState {
+    // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-navigate
+    fn queue_or_deliver(&mut self, label: &str, payload: Value) -> Option<Value> {
+        if self.loaded.contains(label) {
+            Some(payload)
+        } else {
+            self.targets.insert(label.to_owned(), payload);
+            None
+        }
+    }
+
+    fn loaded(&mut self, label: &str) -> Option<Value> {
+        self.loaded.insert(label.to_owned());
+        self.targets.remove(label)
+    }
+
+    fn unloaded(&mut self, label: &str) {
+        self.loaded.remove(label);
+    }
+    // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-navigate
+}
+
+impl PendingNavigation {
+    fn label(target: &noter_protocol::model::NavTarget) -> &'static str {
+        use noter_protocol::model::NavTarget;
+        match target {
+            NavTarget::Settings { .. } => WindowLabel::Settings.as_str(),
+            NavTarget::FirstRun { .. } => WindowLabel::FirstRun.as_str(),
+            _ => WindowLabel::Main.as_str(),
+        }
+    }
+
+    fn emit_or_queue<R: Runtime>(&self, app: &AppHandle<R>, payload: Value) {
+        let Ok(target) = serde_json::from_value(payload.clone()) else {
+            return;
+        };
+        let label = Self::label(&target);
+        if let Some(payload) = self
+            .state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .queue_or_deliver(label, payload)
+        {
+            if let Some(window) = app.get_webview_window(label) {
+                let _ = window.emit(noter_protocol::ipc::event_names::NAV_REQUEST, payload);
+            }
+        }
+    }
+
+    fn page_loaded<R: Runtime>(&self, webview: &tauri::Webview<R>) {
+        let label = webview.label();
+        if let Some(payload) = self
+            .state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .loaded(label)
+        {
+            let _ = webview.emit(noter_protocol::ipc::event_names::NAV_REQUEST, payload);
+        }
+    }
+
+    fn page_unloaded(&self, label: &str) {
+        self.state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .unloaded(label);
+    }
+}
+
+pub(crate) fn emit_navigation<R: Runtime>(app: &AppHandle<R>, payload: Value) {
+    if let Some(pending) = app.try_state::<PendingNavigation>() {
+        pending.emit_or_queue(app, payload);
+    } else {
+        let _ = app.emit(noter_protocol::ipc::event_names::NAV_REQUEST, payload);
+    }
+}
+
 impl EventEmitter for TauriEvents {
     fn emit(&self, event: &'static str, payload: Value) {
         if let Some(app) = self.0.get() {
+            if event == noter_protocol::ipc::event_names::NAV_REQUEST {
+                emit_navigation(app, payload);
+                return;
+            }
             let _ = app.emit(event, payload);
         }
     }
@@ -455,10 +578,72 @@ impl EventEmitter for TauriEvents {
 mod tests {
     use super::*;
     use noter_core::{StreamMsg, SystemClock};
+    use noter_protocol::Seq;
     use noter_protocol::ipc::Sink;
     use noter_protocol::model::{StreamEndReason, WindowLabel};
-    use noter_protocol::Seq;
     use std::sync::Mutex;
+
+    #[test]
+    fn navigation_waits_for_the_target_webview_to_finish_loading() {
+        let mut state = NavigationState::default();
+        let target = serde_json::json!({ "type": "today" });
+
+        assert_eq!(
+            state.queue_or_deliver(WindowLabel::Main.as_str(), target.clone()),
+            None
+        );
+        assert_eq!(
+            state.loaded(WindowLabel::Main.as_str()),
+            Some(target.clone())
+        );
+        assert_eq!(
+            state.queue_or_deliver(WindowLabel::Main.as_str(), target.clone()),
+            Some(target)
+        );
+    }
+
+    #[test]
+    fn navigation_load_completion_only_drains_its_own_window() {
+        let mut state = NavigationState::default();
+        let main = serde_json::json!({ "type": "today" });
+        let settings = serde_json::json!({ "type": "settings", "pane": "privacy" });
+        state.queue_or_deliver(WindowLabel::Main.as_str(), main.clone());
+        state.queue_or_deliver(WindowLabel::Settings.as_str(), settings.clone());
+
+        assert_eq!(state.loaded(WindowLabel::Settings.as_str()), Some(settings));
+        assert_eq!(state.loaded(WindowLabel::Main.as_str()), Some(main));
+    }
+
+    #[test]
+    fn a_recreated_window_waits_for_its_new_page_load() {
+        let mut state = NavigationState::default();
+        let target = serde_json::json!({ "type": "today" });
+        state.loaded(WindowLabel::Main.as_str());
+        state.unloaded(WindowLabel::Main.as_str());
+
+        assert_eq!(
+            state.queue_or_deliver(WindowLabel::Main.as_str(), target.clone()),
+            None
+        );
+        assert_eq!(state.loaded(WindowLabel::Main.as_str()), Some(target));
+    }
+
+    #[test]
+    fn notification_navigation_is_queued_for_a_new_main_window() {
+        let app = tauri::test::mock_builder()
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        app.manage(PendingNavigation::default());
+
+        crate::surfaces::notification_clicked(app.handle(), noter_protocol::model::NavTarget::Today);
+
+        let pending = app.state::<PendingNavigation>();
+        let state = pending.state.lock().unwrap_or_else(|e| e.into_inner());
+        assert_eq!(
+            state.targets.get(WindowLabel::Main.as_str()),
+            Some(&serde_json::json!({ "type": "today" }))
+        );
+    }
 
     struct NoEvents;
 

@@ -10,19 +10,19 @@ use noter_core::{
     Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement, Surfaces, SystemClock,
     TrayAction, TrayEntry, TrayGlyph, TrayItem, TrayModel,
 };
-use noter_desktop::surfaces::{
-    action_of, call_frame, clamp_frame, frame_of, glyph_image, is_panel, notification_clicked,
-    posted, prompt_display, prompt_frame, quit_alert, running_call, same_shape, settings_url,
-    tray_command, SavedFrames, TauriSurfaces,
-};
 use noter_desktop::Booted;
+use noter_desktop::surfaces::{
+    SavedFrames, TauriSurfaces, action_of, call_frame, clamp_frame, frame_of, glyph_image,
+    is_panel, notification_clicked, posted, prompt_display, prompt_frame, quit_alert, running_call,
+    same_shape, settings_url, tray_command,
+};
 use noter_native::Frame;
-use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
+use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, NativeSurface, dispatch_json, event_names};
 use noter_protocol::model::{
     CallLayout, CallPageTab, CapturePhase, DegradedState, DisplayInfo, NavTarget, WindowLabel,
 };
 use noter_protocol::{CallId, DisplayId, ErrorCode, NoArgs, PermissionKind, TimestampMs};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::test::{mock_builder, mock_context, noop_assets};
 use tauri::{Listener, Manager};
 
@@ -535,9 +535,10 @@ fn the_host_creates_the_core_windows_on_first_use() {
     );
     surfaces.restore_all();
     assert!(surfaces.hidden_for_presenting().is_empty());
-    assert!(app
-        .get_webview_window(WindowLabel::Settings.as_str())
-        .is_some());
+    assert!(
+        app.get_webview_window(WindowLabel::Settings.as_str())
+            .is_some()
+    );
 }
 
 // The mock runtime's windows are always "visible" and its show/hide do nothing, so these read the

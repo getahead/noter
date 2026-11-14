@@ -21,10 +21,16 @@ fn main() {
         )
         .then(|| "dialog:allow-message".to_string());
         // @cpt-algo:cpt-noter-algo-core-ipc-host-scope-check:p1
+        let dragging = matches!(
+            w,
+            WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
+        )
+        .then(|| "core:window:allow-start-dragging".to_string());
         let permissions: Vec<String> = ["core:event:allow-listen", "core:event:allow-unlisten"]
             .into_iter()
             .map(str::to_string)
             .chain(dialogs)
+            .chain(dragging)
             .chain(
                 COMMANDS
                     .iter()

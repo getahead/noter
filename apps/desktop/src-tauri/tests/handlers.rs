@@ -6,14 +6,14 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use noter_core::{Core, CoreDeps, EventEmitter, SystemClock};
-use noter_desktop::{builder, hotkey_pressed, Booted};
+use noter_desktop::{Booted, builder, hotkey_pressed};
 use noter_protocol::ipc::COMMANDS;
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody};
 use tauri::test::{
-    get_ipc_response, mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY,
+    INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder, mock_context, noop_assets,
 };
 use tauri::webview::InvokeRequest;
 use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -180,6 +180,7 @@ fn each_window_capability_allows_only_listening_dialogs_and_its_commands() {
             WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
         ) {
             expected.insert("dialog:allow-message".to_string());
+            expected.insert("core:window:allow-start-dragging".to_string());
         }
         assert_eq!(allowed, expected, "{}", w.as_str());
     }
