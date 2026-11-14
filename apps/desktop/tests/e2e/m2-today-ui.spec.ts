@@ -120,7 +120,7 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
     expect(await sent(page, "change_undo")).toHaveLength(1);
   });
   test("UI — body blur after a blank click keeps the scrolled position on rerender", async ({ page }) => {
-    const steer = await openToday(page, manyDueWorld);
+    await openToday(page, manyDueWorld);
     const row = due(page).locator('[data-item-id="itm_spec"]');
     const root = page.locator('[data-component="cpt-noter-component-screen-today"]');
     const scroll = page.locator(".np-content");
