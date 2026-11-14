@@ -803,9 +803,21 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-engine-stop
         // Without the engine's answer in time the call still ends, at the stop.
         self.finish_stop(&mut session, &args.call_id)?;
+        drop(session);
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-return-stop
         Ok(self.capture_now())
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-return-stop
+    }
+
+    pub(crate) async fn finish_pending_update(&self) {
+        if !self.take_pending_update() {
+            return;
+        }
+        if let Err(e) = self.install_update().await {
+            self.log(crate::object(json!({
+                "level": "error", "module": "update", "code": e.code
+            })));
+        }
     }
 
     /// The stop's second half, once: the call row, phase `stopped`, the Continue window and
@@ -1006,7 +1018,9 @@ impl Core {
         self.clear_engine_states();
         *session = session.restart(0);
         let idle = self.set_capture(to_idle);
+        drop(session);
         self.release_held();
+        self.finish_pending_update().await;
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-discard
         Ok(idle)

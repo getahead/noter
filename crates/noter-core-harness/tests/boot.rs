@@ -2090,7 +2090,15 @@ async fn power_battery_holds_the_jobs_that_need_mains_and_the_flag_parses() {
                     .into_iter()
                     .find(|x| x.id == id)
                 {
-                    if run.status != JobRunStatus::Running {
+                    if (battery && run.status == JobRunStatus::Queued)
+                        || (!battery
+                            && matches!(
+                                run.status,
+                                JobRunStatus::Succeeded
+                                    | JobRunStatus::Failed
+                                    | JobRunStatus::Cancelled
+                            ))
+                    {
                         break run;
                     }
                 }

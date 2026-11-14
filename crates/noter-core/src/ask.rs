@@ -102,6 +102,12 @@ enum Ended {
     Cancelled,
 }
 
+enum StopOutcome {
+    Missing,
+    Done,
+    Stopped(Active),
+}
+
 impl From<CoreError> for Ended {
     fn from(e: CoreError) -> Self {
         Ended::Failed(e)
@@ -327,17 +333,17 @@ impl Core {
             asked_at: job.asked_at,
         };
         // @cpt-end:cpt-noter-algo-core-retrieval-ask-citations:p1:inst-cite-flags
+        // @cpt-end:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-validate-answer
+        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-finish
+        let Some(()) = self.claim(&job.turn, TurnState::Done) else {
+            return Err(Ended::Cancelled);
+        };
         for line in answer.answer_md.split_inclusive('\n') {
             self.emit(&job.turn, AskEvent::Delta { text: line.into() })?;
         }
         for citation in &answer.citations {
             let citation = citation.clone();
             self.emit(&job.turn, AskEvent::Citation { citation })?;
-        }
-        // @cpt-end:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-validate-answer
-        // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-finish
-        if !lock(&self.ask.0).contains_key(job.turn.as_str()) {
-            return Err(Ended::Cancelled);
         }
         let meta = run
             .as_ref()
@@ -352,15 +358,19 @@ impl Core {
             self.deps.clock.now(),
         );
         match stored {
-            Ok(()) => {}
+            Ok(()) => {
+                self.finish_claimed(&job.turn, AskEvent::Done { answer });
+            }
             // The thread was deleted meanwhile: its late answer is dropped.
             Err(e) if e.code == ErrorCode::NotFound => {
-                self.settle(&job.turn, TurnState::Cancelled, None);
+                self.finish_claimed(&job.turn, None);
                 return Err(Ended::Cancelled);
             }
-            Err(e) => return Err(Ended::Failed(e)),
+            Err(e) => {
+                self.finish_claimed(&job.turn, AskEvent::Failed { error: e.clone() });
+                return Err(Ended::Failed(e));
+            }
         }
-        self.settle(&job.turn, TurnState::Done, AskEvent::Done { answer });
         Ok(())
         // @cpt-end:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-finish
     }
@@ -507,6 +517,55 @@ impl Core {
         Some(active)
     }
 
+    /// Atomically decides whether Stop or the final answer owns persistence.
+    fn settle_stop(&self, turn: &AskTurnId, terminal: AskEvent) -> StopOutcome {
+        let active = {
+            let mut turns = lock(&self.ask.0);
+            let Some(active) = turns.get(turn.as_str()) else {
+                return StopOutcome::Missing;
+            };
+            if active.state == TurnState::Done {
+                return StopOutcome::Done;
+            }
+            let Some(mut active) = turns.remove(turn.as_str()) else {
+                return StopOutcome::Missing;
+            };
+            debug_assert!(active.state.can(TurnState::Cancelled));
+            active.state = TurnState::Cancelled;
+            active.cancel.cancel();
+            active
+        };
+        let hub = self.ask_hub();
+        hub.publish(
+            turn.as_str(),
+            AskMsg {
+                seq: Seq(0),
+                event: terminal,
+            },
+        );
+        hub.close(turn.as_str());
+        StopOutcome::Stopped(active)
+    }
+
+    /// Claims the final write before awaiting the store so Stop cannot race it.
+    fn claim(&self, turn: &AskTurnId, state: TurnState) -> Option<()> {
+        let mut turns = lock(&self.ask.0);
+        let active = turns.get_mut(turn.as_str())?;
+        debug_assert!(active.state.can(state));
+        active.state = state;
+        Some(())
+    }
+
+    /// Publishes the result after a claimed final write, then closes its channel.
+    fn finish_claimed(&self, turn: &AskTurnId, terminal: impl Into<Option<AskEvent>>) {
+        lock(&self.ask.0).remove(turn.as_str());
+        let hub = self.ask_hub();
+        if let Some(event) = terminal.into() {
+            hub.publish(turn.as_str(), AskMsg { seq: Seq(0), event });
+        }
+        hub.close(turn.as_str());
+    }
+
     // @cpt-flow:cpt-noter-flow-core-retrieval-ask-threads:p1
     /// `ask_stop`: the turn and its runtime are cancelled, its partial answer kept as stopped.
     pub(crate) fn stop_ask(&self, args: AskTurnArgs) -> Result<Ack, CoreError> {
@@ -514,21 +573,25 @@ impl Core {
         let stopped = AskEvent::Failed {
             error: CoreError::new(ErrorCode::AnswerStopped, "the answer was stopped"),
         };
-        let Some(active) = self.settle(&args.turn_id, TurnState::Cancelled, stopped) else {
-            let turn = args.turn_id.as_str().to_owned();
-            let known = self.store().read(move |c| {
-                c.query_row(
-                    "SELECT count(*) FROM ask_turns WHERE id = ?1",
-                    [&turn],
-                    |r| r.get::<_, i64>(0),
-                )
-            })?;
-            // A turn that already ended has nothing left to stop.
-            return if known > 0 {
-                Ok(Ack {})
-            } else {
-                Err(CoreError::new(ErrorCode::NotFound, "no such Ask turn"))
-            };
+        let active = match self.settle_stop(&args.turn_id, stopped) {
+            StopOutcome::Done => return Ok(Ack {}),
+            StopOutcome::Stopped(active) => active,
+            StopOutcome::Missing => {
+                let turn = args.turn_id.as_str().to_owned();
+                let known = self.store().read(move |c| {
+                    c.query_row(
+                        "SELECT count(*) FROM ask_turns WHERE id = ?1",
+                        [&turn],
+                        |r| r.get::<_, i64>(0),
+                    )
+                })?;
+                // A turn that already ended has nothing left to stop.
+                return if known > 0 {
+                    Ok(Ack {})
+                } else {
+                    Err(CoreError::new(ErrorCode::NotFound, "no such Ask turn"))
+                };
+            }
         };
         let route = self.ask_route();
         let partial = AskAnswer {
@@ -586,7 +649,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-retrieval-ask-threads:p1:inst-thread-delete
         let running: Vec<String> = lock(&self.ask.0)
             .iter()
-            .filter(|(_, a)| a.thread == args.thread_id)
+            .filter(|(_, a)| a.thread == args.thread_id && a.state != TurnState::Done)
             .map(|(turn, _)| turn.clone())
             .collect();
         for turn in running {

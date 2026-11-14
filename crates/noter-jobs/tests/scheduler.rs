@@ -462,6 +462,51 @@ async fn continue_recording_cancels_the_same_calls_pipeline_and_rejects_late_res
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_trigger_during_cancelled_run_winding_down_queues_a_fresh_generation() {
+    let mut r = rig().await;
+    r.live(true, None);
+    settle().await;
+    let running = r.go(r.post_call("call_1"));
+    settle().await;
+    assert_eq!(r.started.recv().await.unwrap().0, JobKind::PostCall);
+
+    r.live(true, Some("call_1"));
+    settle().await;
+    r.live(false, None);
+    settle().await;
+    let fresh = r.go(r.post_call("call_1"));
+    assert_ne!(
+        fresh, running,
+        "cancelled work must not absorb a new trigger"
+    );
+
+    r.step(JobKind::PostCall, Step::Done);
+    settle().await;
+    assert_eq!(r.status(&running), JobRunStatus::Cancelled);
+    assert_eq!(r.status(&fresh), JobRunStatus::Running);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_on_demand_regeneration_gets_a_distinct_run_while_one_is_running() {
+    let mut r = rig().await;
+    let request = || {
+        Request::for_call(
+            JobKind::Regeneration,
+            Trigger::OnDemand,
+            &CallId::new("call_1"),
+        )
+    };
+    let running = r.go(request());
+    settle().await;
+    assert_eq!(r.started.recv().await.unwrap().0, JobKind::Regeneration);
+
+    let fresh = r.go(request());
+    assert_ne!(fresh, running);
+    assert_ne!(r.status(&fresh), JobRunStatus::Cancelled);
+    assert_eq!(r.status(&running), JobRunStatus::Running);
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_post_call_triggered_for_the_resumed_call_is_cancelled_instead_of_admitted() {
     let r = rig().await;
     r.live(true, Some("call_1"));

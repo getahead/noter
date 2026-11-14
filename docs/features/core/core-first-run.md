@@ -2,7 +2,7 @@
 title: "Feature: First run, permissions and environment"
 description: "Setup status, resumable model downloads with checksums, permission requests at the step that needs them, the self-test stream, the call display and audio storage choices, the environment state, launch at login and update install; none of it ever gates a start."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M0
 lane: core (src-tauri, noter-core) and engine (noter-native)
@@ -40,6 +40,7 @@ design: docs/DESIGN-core.md
   - [Self-test and detection](#self-test-and-detection)
   - [Login item and update install](#login-item-and-update-install)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [7. Change log](#7-change-log)
 
 <!-- /toc -->
 
@@ -186,6 +187,7 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 
 **Success Scenarios**:
 - The update was downloaded and verified by the updater; the user installs it and Noter restarts.
+- If requested during capture, the accepted install starts automatically after capture ends, without another user action.
 
 **Error Scenarios**:
 - A capture is running: the install waits until the capture stops, so a restart never cuts a call (the command still answers `Ack` at once).
@@ -379,3 +381,7 @@ The system **MUST** apply `launch_at_login` through SMAppService and install a v
 - [x] A checksum mismatch deletes the partial file and reports `checksum_failed`.
 - [x] Every M0 first-run command succeeds at least once in E2E runs against the real core.
 - [x] `just gate` passes.
+
+## 7. Change log
+
+- 2026-11-14: Clarified that an install requested during capture starts automatically after capture ends.
