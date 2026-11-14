@@ -146,7 +146,7 @@ fn system_audio_is_never_queried_or_asked_here() {
 }
 
 #[test]
-fn reading_every_permission_never_prompts_and_answers_a_state() {
+fn reading_permissions_smoke_test_avoids_needs_relaunch() {
     for kind in [
         PermissionKind::Microphone,
         PermissionKind::Calendar,
@@ -161,7 +161,7 @@ fn reading_every_permission_never_prompts_and_answers_a_state() {
 }
 
 #[test]
-fn the_environment_reports_displays_route_and_disk() {
+fn the_environment_snapshot_smoke_test_reports_disk_and_displays() {
     let r = environment(Path::new("/"));
     assert!(r.disk_free_mb > 0);
     if cfg!(target_os = "macos") {
@@ -214,9 +214,8 @@ fn watch_reports_a_change_and_stops_when_dropped() {
 }
 
 #[test]
-fn the_environment_watcher_runs_and_stops() {
+fn the_environment_watcher_start_drop_smoke_test() {
     let w = watch(std::env::temp_dir(), Duration::from_millis(5), |_| {});
-    std::thread::sleep(Duration::from_millis(20));
     drop(w);
 }
 

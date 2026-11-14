@@ -944,10 +944,32 @@ async fn regenerate_refuses_a_section_the_call_type_does_not_have() {
         .await
         .unwrap_err();
     assert_eq!(extras.code, ErrorCode::InvalidInput);
-    // No sections means all of them.
-    core.outputs_regenerate(&main_window(), args(vec![]))
+    // No sections means all sections allowed for this call type.
+    let accepted = core
+        .outputs_regenerate(&main_window(), args(vec![]))
         .await
         .unwrap();
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    assert_eq!(
+        run_status(&core, &accepted.job_run_id).0,
+        JobRunStatus::Succeeded
+    );
+    let output = outputs(&core, "call_1on1").await;
+    assert_eq!(
+        output
+            .sections
+            .iter()
+            .map(|section| section.kind)
+            .collect::<Vec<_>>(),
+        [
+            SectionKind::Summary,
+            SectionKind::Decisions,
+            SectionKind::ActionItems,
+            SectionKind::OpenQuestions,
+            SectionKind::PerParticipant,
+            SectionKind::Risks,
+        ]
+    );
 }
 
 #[tokio::test(start_paused = true)]

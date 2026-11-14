@@ -8,13 +8,25 @@ use noter_protocol::fixtures::{world, FakeWorld};
 
 const ROUNDS: usize = 40;
 
-fn main() {
+fn roundtrip(rounds: usize) -> usize {
     let mut bytes = 0usize;
-    for _ in 0..ROUNDS {
+    for _ in 0..rounds {
         let json = serde_json::to_string(&world()).expect("fixtures serialize");
         let back: FakeWorld = serde_json::from_str(&json).expect("fixtures deserialize");
         bytes += json.len();
         std::hint::black_box(back);
     }
-    println!("{bytes}");
+    bytes
+}
+
+fn main() {
+    println!("{}", roundtrip(ROUNDS));
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn one_round_serializes_and_deserializes_the_fixture_world() {
+        assert!(super::roundtrip(1) > 0);
+    }
 }

@@ -2,7 +2,7 @@
 title: "Feature: Knowledge sources"
 description: "Folder and indexed MCP ingestion, source privacy and scope, sync jobs and source removal."
 status: PROPOSED
-version: "0.2"
+version: "0.4"
 date: "2026-11-13"
 milestone: M3
 lane: core
@@ -43,7 +43,7 @@ design: docs/DESIGN-core.md
 
 - [x] `p4` - `cpt-noter-feature-core-knowledge`
 
-**Change log**: Version 0.2 isolates unreadable local files, counts skipped attempts and preserves complete-listing pruning; sync algorithm and source state IDs advance to v2.
+**Change log**: Version 0.2 isolates unreadable local files, counts skipped attempts and preserves complete-listing pruning; sync algorithm and source state IDs advance to v2. Version 0.3 decodes BOM-marked UTF-8 and UTF-16 Markdown/text/code files before extraction. Version 0.4 distinguishes an OAuth `access_denied` response from a sign-in deadline at the transport seam while preserving cancellation behavior through the knowledge API.
 
 ## 1. Feature Context
 
@@ -125,6 +125,7 @@ Live lookups belong to `cpt-noter-feature-core-mcp` (D1). Activity's M5 commands
 
 **Error Scenarios**:
 - OAuth cancelled, offline server or invalid server configuration: typed failure, no leaked token or half-enabled sync.
+- The OAuth redirect's explicit `error=access_denied` is distinct from a sign-in deadline at the transport seam; both map to cancellation for the knowledge API and leave no source or token.
 
 **Steps**:
 1. [x] - `p1` - API: `source_add_mcp { server, mode, schedule, privacy, scope }`; validate the server and an indexed source's schedule - `inst-mcp-request`
@@ -195,7 +196,7 @@ Previous revision, retained as a trace alias for `cpt-noter-algo-core-knowledge-
 3. [x] - `p1` - **ELSE** read the token through Keychain, list server resources or crawl seed queries when resources are unavailable; each remote lookup passes the egress gate and is audited before forwarding - `inst-sync-remote`
 4. [x] - `p1` - **FOR EACH** file or page in bounded batches - `inst-sync-each`
    1. [x] - `p1` - Read its identity, URI, metadata and content hash; skip unchanged content unless a full reindex is required, and persist the new modification time when the content hash matches - `inst-sync-hash`
-   2. [x] - `p1` - Extract Markdown, text, PDF, Word, HTML or code text; chunk by heading into bounded 200–400 token estimates with title and heading path prepended, splitting long unbroken text at character boundaries - `inst-sync-extract`
+   2. [x] - `p1` - Extract Markdown, text, PDF, Word, HTML or code text; decode BOM-marked UTF-8 and UTF-16 for Markdown, text and code; chunk by heading into bounded 200–400 token estimates with title and heading path prepended, splitting long unbroken text at character boundaries - `inst-sync-extract`
    3. [x] - `p1` - Produce bge-m3 embeddings locally through the engine, outside writer transactions - `inst-sync-embed`
    4. [x] - `p1` - Recheck source existence, revision and privacy; in a writer transaction replace this document's canonical chunks, normalized FTS entries and `doc_vec` rows with a change row - `inst-sync-persist`
    5. [x] - `p1` - Publish committed source progress without file contents or tokens in logs - `inst-sync-progress`
@@ -264,7 +265,7 @@ Removal ends this lifecycle and deletes the row. OAuth renewal for an existing r
 
 - [x] `p4` - **ID**: `cpt-noter-dod-core-knowledge-ingestion`
 
-The system **MUST** add watched folders with bookmarks and indexed MCP sources with Keychain-only OAuth tokens, extract the six supported text formats, chunk by heading, embed locally and skip unchanged hashes. Jobs report counts, errors, progress and last successful sync. Reads use the pool; batch writes use the single writer and log; network and engine work hold no SQLite transaction.
+The system **MUST** add watched folders with bookmarks and indexed MCP sources with Keychain-only OAuth tokens, extract the six supported text formats, decode BOM-marked UTF-8 and UTF-16 for Markdown/text/code, chunk by heading, embed locally and skip unchanged hashes. Jobs report counts, errors, progress and last successful sync. Reads use the pool; batch writes use the single writer and log; network and engine work hold no SQLite transaction.
 
 **Implements**:
 - `cpt-noter-flow-core-knowledge-folder`

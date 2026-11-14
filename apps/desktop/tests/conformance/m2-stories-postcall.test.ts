@@ -8,8 +8,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { CallId, CallOutputs, OutputsProgress, OutputSection, SectionKind } from "../../src/core/bindings";
@@ -17,26 +15,19 @@ import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { dataDir, rows as scenarioRows } from "./history-support";
 
 let s: Scenario;
 let dir: string;
+const rows = async <T>(sql: string, ...params: string[]): Promise<T[]> => {
+  const result = await scenarioRows<T>(s, sql, ...params);
+  if (!result) throw new Error("the post-call stories run against the real core");
+  return result;
+};
 afterEach(async () => {
   await s.dispose();
   rmSync(dir, { recursive: true, force: true });
 });
-
-const harness = () => (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<unknown> } }).process;
-
-/** Rows of the real core's database, read-only. */
-async function rows<T>(sql: string, ...params: string[]): Promise<T[]> {
-  const { path } = (await harness().invoke("main", "harness.data_dir", {})) as { path: string };
-  const db = new DatabaseSync(join(path, "noter.db"), { readOnly: true });
-  try {
-    return db.prepare(sql).all(...params) as T[];
-  } finally {
-    db.close();
-  }
-}
 
 /** What the core asked the scripted Mac to post, as `post_notification <kind> <call id>`. */
 const notifications = async () => ((await s.surfaces()) ?? []).filter((c) => c.startsWith("post_notification"));
@@ -114,7 +105,8 @@ async function stop(call: CallId): Promise<void> {
 }
 
 async function giveCallAudio(call: CallId): Promise<void> {
-  const { path } = (await harness().invoke("main", "harness.data_dir", {})) as { path: string };
+  const path = await dataDir(s);
+  if (!path) throw new Error("the real core exposes its data directory");
   const audio = join(path, "audio", call);
   mkdirSync(audio, { recursive: true });
   writeFileSync(join(audio, "mic.wav"), "fixture audio");

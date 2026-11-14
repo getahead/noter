@@ -495,7 +495,10 @@ fn a_failure_part_way_leaves_nothing_restored_and_no_orphan_row() {
          BEGIN SELECT RAISE(ABORT, 'boom'); END;",
     )
     .unwrap();
-    assert!(redo(&store, Handle::Batch(batch)).is_err());
+    assert_eq!(
+        redo(&store, Handle::Batch(batch)).unwrap_err().code,
+        ErrorCode::Internal
+    );
     assert_eq!(count(&store, "SELECT count(*) FROM changes"), before);
     assert_eq!(title(&store, "n1").as_deref(), Some("a1"));
     assert_eq!(title(&store, "n2").as_deref(), Some("a2"));

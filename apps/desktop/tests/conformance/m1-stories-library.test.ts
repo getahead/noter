@@ -6,19 +6,16 @@
 // call_types_list and calls_delete.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 import { exercised } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario, type World } from "../support/scenario";
 import { LIVE_CALL, PAST_CALL, morePastCalls } from "../support/world-presets";
+import { dataDir, rows } from "./history-support";
 
 let s: Scenario;
-let folder: string | null | undefined; // asked once per scenario
 function open(world: (w: World) => void = () => {}): void {
-  folder = undefined;
   s = openScenario({ alsoRecord: exercised, world });
 }
 afterEach(async () => {
@@ -28,31 +25,10 @@ afterEach(async () => {
 const listedRows = async () => ok(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} })).rows;
 const listed = async () => (await listedRows()).map((r) => r.id);
 
-/** The real core's data folder; null on the fake. */
-async function dataDir(): Promise<string | null> {
-  if (s.target === "fake") return null;
-  await listed(); // the starting world is applied before the first command answers
-  // The Scenario keeps its StdioCore private; a control is a request on the same wire.
-  const core = (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<{ path: string }> } }).process;
-  return (folder ??= (await core.invoke("main", "harness.data_dir", {})).path);
-}
-
-/** Rows of the real core's database, read-only; null where there is no folder to look in (the fake). */
-async function rows<T>(sql: string, ...params: string[]): Promise<T[] | null> {
-  const dir = await dataDir();
-  if (!dir) return null;
-  const db = new DatabaseSync(join(dir, "noter.db"), { readOnly: true });
-  try {
-    return db.prepare(sql).all(...params) as T[];
-  } finally {
-    db.close();
-  }
-}
-
 type Change = { entity_type: string; entity_id: string; undoable: number; field: string | null; before: string | null; after: string | null };
 // The harness's own re-seed of a changed world leaves rows with another summary; the core's are these.
 const deletions = (id: string) =>
-  rows<Change>(
+  rows<Change>(s,
     "SELECT entity_type, entity_id, undoable, field, before, after FROM changes WHERE entity_type = 'call' AND entity_id = ? AND summary = 'Deleted a call'",
     id,
   );
@@ -62,7 +38,7 @@ describe("cpt-noter-seq-dialogs-delete-call", () => {
     open();
     const main = s.core("main");
     const removed = await s.events("entity:changed");
-    const data = await dataDir();
+    const data = await dataDir(s);
     const audio = data ? join(data, "audio", PAST_CALL) : null;
     if (data) {
       const folder = audio!;
@@ -85,7 +61,7 @@ describe("cpt-noter-seq-dialogs-delete-call", () => {
     // rows and files (real core): nothing of the call is left, and one change row says so, not undoable and without content (D-22)
     if (audio) expect(existsSync(audio)).toBe(false);
     for (const table of ["calls", "segments", "speakers", "marks", "gaps", "call_tags"]) {
-      const left = await rows(`SELECT 1 FROM ${table} WHERE ${table === "calls" ? "id" : "call_id"} = ?`, PAST_CALL);
+      const left = await rows(s, `SELECT 1 FROM ${table} WHERE ${table === "calls" ? "id" : "call_id"} = ?`, PAST_CALL);
       if (left) expect(left, table).toEqual([]);
     }
     const changes = await deletions(PAST_CALL);
@@ -99,7 +75,7 @@ describe("cpt-noter-seq-dialogs-delete-call", () => {
     });
     const main = s.core("main");
     await listed(); // the starting world is in place
-    await dataDir();
+    await dataDir(s);
     const ids = [PAST_CALL, ...extra];
     expect(ids).toHaveLength(3);
     expect(await listed()).toEqual(expect.arrayContaining(ids));
@@ -118,7 +94,7 @@ describe("cpt-noter-seq-dialogs-delete-call", () => {
 
   it("error path — the call being recorded cannot be deleted: already_recording, nothing is deleted (D-31)", async () => {
     open();
-    await dataDir();
+    await dataDir(s);
     const refusal = refused(await s.core("main").callsDelete({ call_ids: [PAST_CALL, LIVE_CALL] }));
     expect(refusal.code).toBe("already_recording");
     // nothing at all went: not the live call, and not the past call named beside it

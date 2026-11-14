@@ -3,6 +3,7 @@
 
 use noter_db::{ChangeMeta, Insert, Mutation, Store};
 use noter_protocol::model::Actor;
+use noter_protocol::ErrorCode;
 use serde_json::{json, Value};
 
 fn open(dir: &tempfile::TempDir) -> Store {
@@ -193,7 +194,7 @@ fn the_tables_refuse_what_the_design_does_not_allow() {
         ("mode_used", json!("cloud_raw")),
     ] {
         let refused = store.write(call("call_x", std::slice::from_ref(&bad)), meta("start"));
-        assert!(refused.is_err(), "{bad:?}");
+        assert_eq!(refused.unwrap_err().code, ErrorCode::Internal, "{bad:?}");
     }
     store.write(call("call_1", &[]), meta("start")).unwrap();
     let base = capture("call_1", "1");
@@ -216,13 +217,26 @@ fn the_tables_refuse_what_the_design_does_not_allow() {
         let mut rows = base.clone();
         let i = rows.iter().position(|r| r.table == bad.table).unwrap();
         rows[i] = bad;
-        assert!(store.insert_batch(rows).is_err(), "{what}");
+        assert_eq!(
+            store.insert_batch(rows).unwrap_err().code,
+            ErrorCode::Internal,
+            "{what}"
+        );
     }
     store.insert_batch(base.clone()).unwrap();
     // One speaker per label and pass; one gap per start offset.
     let same_label = with(&base, 0, "id", json!("spk_9"));
-    assert!(store.insert_batch(vec![same_label.clone()]).is_err());
+    assert_eq!(
+        store
+            .insert_batch(vec![same_label.clone()])
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal
+    );
     let archive = with(&[same_label], 0, "pass", json!("archive"));
     store.insert_batch(vec![archive]).unwrap();
-    assert!(store.insert_batch(vec![base[3].clone()]).is_err());
+    assert_eq!(
+        store.insert_batch(vec![base[3].clone()]).unwrap_err().code,
+        ErrorCode::Internal
+    );
 }

@@ -417,7 +417,7 @@ fn engine_errors_map_to_the_contract_codes_it_has() {
 }
 
 #[tokio::test]
-async fn engine_stderr_is_counted_never_kept() {
+async fn engine_stderr_line_count_reports_drained_lines() {
     let ready = r#"{"seq":1,"at":0,"event":{"type":"ready","protocol_version":"2.0","engine_version":"sh","models":[],"sandboxed":false}}"#;
     let launcher = ProcessLauncher::new("/bin/sh").args([
         "-c",

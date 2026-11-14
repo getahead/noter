@@ -2,6 +2,7 @@
 
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::{mpsc, Arc, Barrier};
 
 use noter_db::rusqlite::{Connection, MAIN_DB};
 use noter_db::{ChangeMeta, Insert, Migration, Mutation, OpenError, Store, StoreState, MIGRATIONS};
@@ -110,7 +111,7 @@ fn second_start_runs_no_migration() {
 }
 
 #[test]
-fn failed_migration_keeps_the_previous_version_and_accepts_no_writes() {
+fn failed_migration_keeps_the_previous_version() {
     let dir = tempfile::tempdir().unwrap();
     let path = db_path(&dir);
     open(&path).close();
@@ -652,17 +653,29 @@ fn close_drains_the_queue_checkpoints_and_refuses_later_work() {
     let dir = tempfile::tempdir().unwrap();
     let path = db_path(&dir);
     let store = open(&path);
+    let start = Arc::new(Barrier::new(21));
+    let (tx, rx) = mpsc::channel();
     std::thread::scope(|s| {
         for i in 0..20 {
             let store = &store;
+            let start = start.clone();
+            let tx = tx.clone();
             s.spawn(move || {
-                store
-                    .write(note(&format!("not_{i}"), None, "x"), meta("load"))
-                    .unwrap()
+                start.wait();
+                tx.send(store.write(note(&format!("not_{i}"), None, "x"), meta("load")))
+                    .unwrap();
             });
         }
+        start.wait();
+        store.close();
     });
-    store.close();
+    drop(tx);
+    let outcomes: Vec<_> = rx.into_iter().collect();
+    let accepted = outcomes.iter().filter(|result| result.is_ok()).count();
+    assert!(
+        accepted > 0,
+        "the concurrent writers reached the store before close"
+    );
     assert_eq!(store.state(), StoreState::Closed);
     let wal = PathBuf::from(format!("{}-wal", path.display()));
     assert!(
@@ -688,7 +701,8 @@ fn close_drains_the_queue_checkpoints_and_refuses_later_work() {
     let n: i64 = raw(&path)
         .query_row("SELECT count(*) FROM changes", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(n, 20);
+    assert_eq!(outcomes.len(), 20);
+    assert_eq!(n, accepted as i64, "every accepted write is durable");
 }
 
 #[test]

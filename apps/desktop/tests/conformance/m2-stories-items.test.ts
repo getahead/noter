@@ -11,15 +11,13 @@ import { exercised } from "../support/core";
 import { ok, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { LIVE_CALL, PAST_CALL } from "../support/world-presets";
-import { cancelNextSavePanel, rows } from "./history-support";
+import { cancelNextSavePanel, rows, wire } from "./history-support";
 
 let s: Scenario;
 afterEach(async () => {
   await s.dispose();
 });
 
-type Wire = { invoke(window: string, cmd: string, args: unknown): Promise<unknown> };
-const wire = (): Wire => (s as unknown as { process: Wire }).process;
 const everyone = { sections: [], item_ids: [], include_unreviewed: true };
 const reviewed = { sections: [], item_ids: [], include_unreviewed: false };
 
@@ -72,11 +70,11 @@ describe("cpt-noter-seq-today-review-before-call", () => {
   it("empty path: with the calendar denied Today still lists items, with no protected events", async () => {
     s = openScenario({ alsoRecord: exercised });
     if (s.target === "fake") return; // the fake has no calendar permission to deny
-    const world = (await wire().invoke("main", "harness.world_get", {})) as { app: { setup: { permissions: { kind: string; state: unknown }[] } } };
+    const world = (await wire(s).invoke("main", "harness.world_get", {})) as { app: { setup: { permissions: { kind: string; state: unknown }[] } } };
     const calendar = world.app.setup.permissions.find((p) => p.kind === "calendar");
     expect(calendar).toBeDefined();
     calendar!.state = "denied";
-    await wire().invoke("main", "harness.world_set", { world });
+    await wire(s).invoke("main", "harness.world_set", { world });
     const today = ok(await s.core("main").todayGet({}));
     expect(today.calendar).toBe("denied");
     expect(today.today).toEqual([]);
@@ -211,7 +209,7 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
     expect(picked.text).toContain(item.text.slice(0, 20));
 
     if (s.target === "stdio") {
-      const log = (await wire().invoke("main", "harness.native_log", {})) as { clipboard: { plain: string; markdown: string; html: string }[] };
+      const log = (await wire(s).invoke("main", "harness.native_log", {})) as { clipboard: { plain: string; markdown: string; html: string }[] };
       expect(log.clipboard.length).toBe(5);
       expect(log.clipboard[0].plain).toBe(whole.text);
       for (const c of log.clipboard) {
@@ -230,7 +228,7 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
     if (res.status === "error") expect(res.error.code).toBe("outputs_not_ready");
     if (s.target === "stdio") {
       expect(res.status === "error" && res.error.code).toBe("outputs_not_ready");
-      const log = (await wire().invoke("main", "harness.native_log", {})) as { clipboard: unknown[] };
+      const log = (await wire(s).invoke("main", "harness.native_log", {})) as { clipboard: unknown[] };
       expect(log.clipboard).toEqual([]);
     }
   });

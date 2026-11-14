@@ -332,6 +332,27 @@ async fn rename_merge_undo_and_keep_separate_through_the_core() {
     );
 
     // Keep Separate survives a restart.
+    let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+    db.execute(
+        "INSERT INTO topic_suggestions (topic_id, target_id, similarity) VALUES (?1, ?2, 0.95)
+         ON CONFLICT(topic_id) DO UPDATE SET target_id = excluded.target_id, similarity = excluded.similarity",
+        [decided.id.as_str(), acted.id.as_str()],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO topic_suggestions (topic_id, target_id, similarity) VALUES (?1, NULL, NULL)
+         ON CONFLICT(topic_id) DO UPDATE SET target_id = NULL, similarity = NULL",
+        [acted.id.as_str()],
+    )
+    .unwrap();
+    let before_separation = topics(&core).await;
+    assert_eq!(
+        named(&before_separation, "Decisions")
+            .merge_suggestion
+            .as_ref()
+            .map(|suggestion| suggestion.name.as_str()),
+        Some("Rollout")
+    );
     let pair = |a: &TopicId, b: &TopicId| TopicPairArgs {
         a: a.clone(),
         b: b.clone(),

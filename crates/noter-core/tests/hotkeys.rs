@@ -463,7 +463,7 @@ async fn only_the_settings_window_sets_hotkeys() {
 }
 
 #[test]
-fn the_default_registrar_accepts_every_chord() {
+fn the_default_registrar_registration_smoke_test_accepts_a_chord() {
     let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
     assert!(deps.shortcuts.register("Ctrl+Alt+Super+R").is_ok());
     deps.shortcuts.unregister("Ctrl+Alt+Super+R");

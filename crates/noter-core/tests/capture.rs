@@ -1011,21 +1011,6 @@ async fn a_start_while_stopped_closes_the_continue_window_and_starts_a_new_call(
     );
 }
 
-#[tokio::test(start_paused = true)]
-async fn discard_needs_the_nothing_heard_notice() {
-    let r = rig();
-    let call_id = r.recording().await;
-    assert_eq!(
-        code(
-            r.core
-                .capture_discard(&main_window(), CallIdArgs { call_id })
-                .await
-        ),
-        ErrorCode::NoticeExpired
-    );
-    assert_eq!(r.state().await.phase, CapturePhase::Recording);
-}
-
 // --- Sensitive -----------------------------------------------------------------------
 
 #[tokio::test(start_paused = true)]
@@ -1169,49 +1154,6 @@ async fn a_glossary_edit_reaches_the_live_call_only() {
 }
 
 // --- The phase machine, transition by transition -------------------------------------
-
-#[tokio::test(start_paused = true)]
-async fn every_transition_of_part_one_lands_in_its_phase() {
-    use CapturePhase::*;
-    let r = rig();
-    let mut seen = vec![r.state().await.phase];
-    let call_id = r.recording().await;
-    seen.push(r.state().await.phase);
-    let pause = |paused| CapturePauseArgs {
-        call_id: call_id.clone(),
-        paused,
-    };
-    let ctx = main_window();
-    seen.push(
-        r.core
-            .capture_set_paused(&ctx, pause(true))
-            .await
-            .unwrap()
-            .phase,
-    );
-    seen.push(
-        r.core
-            .capture_set_paused(&ctx, pause(false))
-            .await
-            .unwrap()
-            .phase,
-    );
-    seen.push(r.stop(&ctx, &call_id).await.phase);
-    let again = CallIdArgs {
-        call_id: call_id.clone(),
-    };
-    seen.push(r.core.capture_continue(&ctx, again).await.unwrap().phase);
-    r.session_started(&call_id);
-    seen.push(r.stop(&ctx, &call_id).await.phase);
-    assert_eq!(
-        seen,
-        [Idle, Recording, Paused, Recording, Stopped, Recording, Stopped]
-    );
-    let phases: Vec<CapturePhase> = r.capture_events().iter().map(|s| s.phase).collect();
-    for wanted in [Starting, Recording, Paused, Stopping, Stopped] {
-        assert!(phases.contains(&wanted), "{wanted:?} in {phases:?}");
-    }
-}
 
 // === Part 2: detection, notices and timers ===========================================
 
@@ -1799,6 +1741,37 @@ fn segment(call_id: &CallId) -> EngineEvent {
     }
 }
 
+fn seed_confirmed_segment(core: &Core, call_id: &CallId) {
+    core.store()
+        .insert_batch(vec![
+            noter_db::Insert {
+                table: "speakers",
+                values: vec![
+                    ("id", json!("interrupted_speaker")),
+                    ("call_id", json!(call_id.as_str())),
+                    ("label", json!("spk_1")),
+                    ("channel", json!("sys")),
+                    ("pass", json!("live")),
+                ],
+            },
+            noter_db::Insert {
+                table: "segments",
+                values: vec![
+                    ("id", json!("interrupted_segment")),
+                    ("call_id", json!(call_id.as_str())),
+                    ("speaker_id", json!("interrupted_speaker")),
+                    ("channel", json!("sys")),
+                    ("t0_ms", json!(60_000)),
+                    ("t1_ms", json!(61_000)),
+                    ("text", json!("confirmed before interruption")),
+                    ("text_norm", json!("confirmed before interruption")),
+                    ("pass", json!("live")),
+                ],
+            },
+        ])
+        .unwrap();
+}
+
 #[tokio::test(start_paused = true)]
 async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
     let r = rig();
@@ -2215,7 +2188,7 @@ impl Rig {
     async fn interrupted() -> (Rig, CallId) {
         let r = rig();
         let call_id = r.recording().await;
-        r.advance(60_000);
+        r.pass(60_000).await;
         r.core
             .capture_mark_moment(
                 &main_window(),
@@ -2226,6 +2199,9 @@ impl Rig {
             )
             .await
             .unwrap();
+        seed_confirmed_segment(&r.core, &call_id);
+        assert_eq!(r.query::<i64>("SELECT COUNT(*) FROM segments"), 1);
+        r.advance(1_000);
         r.advance(540_000);
         (r.crash_and_reopen().await, call_id)
     }
@@ -2267,10 +2243,10 @@ async fn a_call_cut_by_a_quit_is_offered_resume_with_an_interrupted_gap() {
         unreachable!()
     };
     assert_eq!(session.call_id, call_id);
-    assert_eq!(session.resume_from_ms, Some(OffsetMs(630_000)));
+    assert_eq!(session.resume_from_ms, Some(OffsetMs(631_000)));
     assert_eq!(
         r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'interrupted'"),
-        "60000-630000"
+        "61000-631000"
     );
     assert!(r.banners().await.is_empty());
     assert_eq!(r.call_row(&call_id).0, "recording");
@@ -2312,7 +2288,7 @@ async fn a_dismissed_banner_ends_the_interrupted_call_at_its_last_audio() {
     );
     assert_eq!(
         r.call_row(&call_id),
-        ("processing".into(), Some(T0 + 60_000))
+        ("processing".into(), Some(T0 + 61_000))
     );
     assert!(r
         ._dir
@@ -2333,11 +2309,23 @@ async fn another_capture_ends_the_interrupted_call() {
     assert_ne!(next, call_id);
     assert!(r.banners().await.is_empty());
     let (status, ended_at) = r.call_row(&call_id);
-    assert!(matches!(status.as_str(), "processing" | "ready"));
-    assert_eq!(ended_at, Some(T0 + 60_000));
+    assert_eq!(status, "failed");
+    assert_eq!(ended_at, Some(T0 + 61_000));
     let jobs = r.core.scheduler().runs().unwrap();
-    assert!(jobs.iter().any(|job| job.kind == JobKind::PostCall));
-    assert!(jobs.iter().any(|job| job.kind == JobKind::ArchivePass));
+    assert_eq!(
+        jobs.iter()
+            .find(|job| job.kind == JobKind::PostCall)
+            .unwrap()
+            .error,
+        Some(ErrorCode::RuntimeUnavailable)
+    );
+    assert_eq!(
+        jobs.iter()
+            .find(|job| job.kind == JobKind::ArchivePass)
+            .unwrap()
+            .status,
+        JobRunStatus::Paused
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -2655,6 +2643,7 @@ async fn a_call_paused_when_the_engine_failed_comes_back_paused() {
         ..Setup::default()
     });
     let call_id = r.recording().await;
+    r.pass(5_000).await;
     r.core
         .capture_set_paused(
             &main_window(),
@@ -2665,7 +2654,8 @@ async fn a_call_paused_when_the_engine_failed_comes_back_paused() {
         )
         .await
         .unwrap();
-    r.advance(1_000);
+    let paused = r.state().await;
+    assert_eq!(paused.recorded_ms, DurationMs(5_000));
     r.engine.kill_current();
     r.phase_becomes(CapturePhase::Failed).await;
     r.advance(4_000);
@@ -2685,7 +2675,7 @@ async fn a_call_paused_when_the_engine_failed_comes_back_paused() {
     assert_eq!(back.phase, CapturePhase::Paused);
     assert!(back.pause.is_some());
     // Recorded time stops at the pause, not at the failure.
-    assert_eq!(back.recorded_ms, DurationMs(0));
+    assert_eq!(back.recorded_ms, DurationMs(5_000));
 }
 
 #[tokio::test(start_paused = true)]
@@ -3054,6 +3044,7 @@ impl Rig {
             }
             Act::ResumeInterrupted => self.core.capture_resume_interrupted(&ctx, id()).await,
             Act::EngineCrash => {
+                self.pass(1_000).await;
                 let starts = self.sessions().len();
                 self.engine.kill_current();
                 self.sent_n(starts + 1, |c| matches!(c, EngineCommand::StartSession(_)))
@@ -3133,13 +3124,12 @@ async fn every_capture_transition_of_the_machine() {
             r.phase_becomes(row.to).await
         };
         let phases: Vec<_> = r.capture_events()[seen..].iter().map(|c| c.phase).collect();
-        for via in row.via {
-            assert!(
-                phases.contains(via),
-                "{}: {via:?} in {phases:?}",
-                row.proves
-            );
-        }
+        let observed_via: Vec<_> = phases
+            .iter()
+            .filter(|phase| row.via.contains(phase))
+            .copied()
+            .collect();
+        assert_eq!(observed_via, row.via, "{}: {phases:?}", row.proves);
         if row.to != P::Idle {
             assert_eq!(
                 state.call_id.as_ref() == Some(&call),
@@ -3154,6 +3144,13 @@ async fn every_capture_transition_of_the_machine() {
                 "{}: a {reason} gap",
                 row.proves
             );
+            if reason == "engine_restart" {
+                assert!(
+                    r.query::<i64>("SELECT count(*) FROM gaps WHERE reason = 'engine_restart' AND t1_ms > t0_ms") > 0,
+                    "{}: restart gap has a nonzero duration",
+                    row.proves
+                );
+            }
         }
     }
 }

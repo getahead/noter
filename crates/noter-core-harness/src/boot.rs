@@ -322,9 +322,10 @@ impl Harness {
         };
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-inject
         let native = Arc::new(ScriptedNative::new(&w.app.environment));
-        let updater = Arc::new(ScriptedUpdater(Mutex::new(
-            w.app.environment.update.clone(),
-        )));
+        let updater = Arc::new(ScriptedUpdater {
+            ready: Mutex::new(w.app.environment.update.clone()),
+            failure: Mutex::new(None),
+        });
         let models = Arc::new(TinyModels::new(&w.app.setup.models, native.clone()));
         models
             .place(&dir.join("models"), &w.app.setup.models)
@@ -1304,7 +1305,7 @@ impl Harness {
                 .map(|r| r.state)
                 .filter(|s| *s != PermissionState::NotAsked);
             noter_core::testing::seed_system_audio(&self.core, heard);
-            *lock(&self.updater.0) = env.update.clone();
+            *lock(&self.updater.ready) = env.update.clone();
             // The Mac says it changed: the core re-reads what was granted outside it.
             self.native.changed();
         }
@@ -1587,6 +1588,52 @@ impl Controls for Harness {
                 }
                 // `{}`: the launches and clipboard writes so far, oldest first.
                 "native_log" => Ok(lock(&self.panel.log).clone()),
+                // `{ op, code }`: fail the next permission request, login-item change or
+                // updater installation with a typed host error.
+                "native_fail" => {
+                    #[derive(serde::Deserialize)]
+                    struct Failure {
+                        op: String,
+                        code: ErrorCode,
+                    }
+                    let failure: Failure = parse(args, "harness.native_fail needs { op, code }")?;
+                    match failure.op.as_str() {
+                        "permission_request" if failure.code == ErrorCode::PermissionDenied => {
+                            self.native.fail_once(failure.op, failure.code);
+                        }
+                        "permission_request" => {
+                            return Err(CoreError::new(
+                                ErrorCode::InvalidInput,
+                                "harness.native_fail permission_request only accepts permission_denied",
+                            ));
+                        }
+                        "set_login_item" => {
+                            self.native.fail_once(failure.op, failure.code);
+                        }
+                        "updater_install" => self.updater.fail_once(failure.code),
+                        _ => {
+                            return Err(CoreError::new(
+                                ErrorCode::InvalidInput,
+                                "harness.native_fail op must be permission_request, set_login_item or updater_install",
+                            ));
+                        }
+                    }
+                    Ok(json!({}))
+                }
+                // `{ minutes: -840..=840 }`: the Mac's local UTC offset for deterministic text.
+                "set_utc_offset" => {
+                    let minutes = args["minutes"]
+                        .as_i64()
+                        .filter(|n| (-840..=840).contains(n))
+                        .ok_or_else(|| {
+                            CoreError::new(
+                                ErrorCode::InvalidInput,
+                                "harness.set_utc_offset needs { minutes: -840..=840 }",
+                            )
+                        })?;
+                    self.native.4.store(minutes, Ordering::SeqCst);
+                    Ok(json!({}))
+                }
                 "set_output_route" => self.set_output_route(args),
                 "set_free_disk" => self.set_free_disk(args),
                 "engine_fact" => self.engine_fact(args),
@@ -1877,6 +1924,10 @@ struct ScriptedNative(
     Mutex<Option<OnChange>>,
     /// The calendar's events: the cards the world's Today shows, as EventKit would list them.
     Mutex<Vec<CalendarEvent>>,
+    /// One-shot typed failures for native operations (`harness.native_fail`).
+    Mutex<HashMap<String, ErrorCode>>,
+    /// A fixed local offset for deterministic host-time tests.
+    AtomicI64,
 );
 
 impl ScriptedNative {
@@ -1889,6 +1940,8 @@ impl ScriptedNative {
             Mutex::new((HashMap::new(), EnvironmentReading::default())),
             Mutex::new(None),
             Mutex::new(vec![]),
+            Mutex::new(HashMap::new()),
+            AtomicI64::new(0),
         );
         native.set(env, &env.permissions);
         native
@@ -1926,6 +1979,14 @@ impl ScriptedNative {
         }
     }
 
+    fn fail_once(&self, operation: String, code: ErrorCode) {
+        lock(&self.3).insert(operation, code);
+    }
+
+    fn take_failure(&self, operation: &str) -> Option<ErrorCode> {
+        lock(&self.3).remove(operation)
+    }
+
     fn set(&self, env: &EnvironmentState, setup_rows: &[PermissionRow]) {
         let mut state = lock(&self.0);
         // The setup status and the environment show the same rows (`W.permission` writes both);
@@ -1958,9 +2019,13 @@ impl NativeServices for ScriptedNative {
     /// A prompt the user allows; an answered permission keeps its answer.
     fn request_permission(&self, kind: PermissionKind) -> CoreFuture<'_, PermissionState> {
         let mut state = lock(&self.0);
-        let answer = match state.0.get(&kind) {
-            None | Some(PermissionState::NotAsked) => PermissionState::Granted,
-            Some(s) => *s,
+        let answer = if self.take_failure("permission_request").is_some() {
+            PermissionState::Denied
+        } else {
+            match state.0.get(&kind) {
+                None | Some(PermissionState::NotAsked) => PermissionState::Granted,
+                Some(s) => *s,
+            }
         };
         state.0.insert(kind, answer);
         // The notification centre's own state follows the answer, as macOS reports it.
@@ -1983,7 +2048,29 @@ impl NativeServices for ScriptedNative {
     }
 
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
-        Ok(())
+        match self.take_failure("set_login_item") {
+            Some(code) => Err(CoreError::new(code, "scripted login-item change failed")),
+            None => Ok(()),
+        }
+    }
+
+    fn calendar_event_near(&self, at: TimestampMs) -> Option<CalendarEventRef> {
+        if self.permission(PermissionKind::Calendar) != PermissionState::Granted {
+            return None;
+        }
+        let latest = at.0.saturating_add(10 * 60 * 1000);
+        lock(&self.2)
+            .iter()
+            .filter(|event| {
+                event.event.starts_at.0 <= at.0 && event.event.ends_at.0 > at.0
+                    || (at.0..=latest).contains(&event.event.starts_at.0)
+            })
+            .min_by_key(|event| event.event.starts_at.0.abs_diff(at.0))
+            .map(|event| event.event.clone())
+    }
+
+    fn utc_offset_minutes(&self, _: TimestampMs) -> i32 {
+        self.4.load(Ordering::SeqCst) as i32
     }
 
     fn calendar_events(
@@ -1994,7 +2081,7 @@ impl NativeServices for ScriptedNative {
         let events = lock(&self.2).clone();
         Ok(events
             .into_iter()
-            .filter(|e| (from.0..to.0).contains(&e.event.starts_at.0))
+            .filter(|e| e.event.starts_at.0 < to.0 && e.event.ends_at.0 > from.0)
             .collect())
     }
 }
@@ -2014,8 +2101,8 @@ struct TinyModels {
 /// Each tiny bundle is one file in its folder.
 const TINY_FILE: &str = "model.bin";
 
-/// The bundles capture needs are big enough to show a partial download in whole megabytes.
-const LIVE_BUNDLE_BYTES: usize = 4 << 20;
+/// Two megabytes keep the partial-download fixture observable in whole megabytes.
+const LIVE_BUNDLE_BYTES: usize = 2 << 20;
 
 impl TinyModels {
     fn new(models: &ModelsStatus, native: Arc<ScriptedNative>) -> Self {
@@ -2335,7 +2422,11 @@ impl Surfaces for ScriptedSurfaces {
         self.note("restore_all");
     }
     fn set_tray(&self, tray: &TrayModel) {
-        self.note(format!("set_tray {:?} {}", tray.glyph, tray.lines()[0]));
+        self.note(format!(
+            "set_tray {:?} {}",
+            tray.glyph,
+            tray.lines().join(" | ")
+        ));
     }
     fn announce(&self, text: &str, _politeness: Politeness) {
         self.note(format!("announce {text}"));
@@ -2368,15 +2459,28 @@ impl Surfaces for ScriptedSurfaces {
     }
 }
 
-struct ScriptedUpdater(Mutex<Option<UpdateInfo>>);
+struct ScriptedUpdater {
+    ready: Mutex<Option<UpdateInfo>>,
+    failure: Mutex<Option<ErrorCode>>,
+}
+
+impl ScriptedUpdater {
+    fn fail_once(&self, code: ErrorCode) {
+        *lock(&self.failure) = Some(code);
+    }
+}
 
 impl Updater for ScriptedUpdater {
     fn ready(&self) -> Option<UpdateInfo> {
-        lock(&self.0).clone()
+        lock(&self.ready).clone()
     }
 
     fn install(&self) -> CoreFuture<'_, Result<(), CoreError>> {
-        Box::pin(async { Ok(()) })
+        let result = match lock(&self.failure).take() {
+            Some(code) => Err(CoreError::new(code, "scripted updater installation failed")),
+            None => Ok(()),
+        };
+        Box::pin(async move { result })
     }
 }
 
@@ -2557,4 +2661,51 @@ fn summary_rows(wanted: &Value) -> Vec<noter_db::Insert> {
         }
     }
     rows
+}
+
+#[cfg(test)]
+mod scripted_native_tests {
+    use super::*;
+    use noter_protocol::CalendarEventId;
+
+    #[test]
+    fn calendar_reads_include_overlaps_and_host_time_uses_the_configured_offset() {
+        let mut env = world().app.environment;
+        env.permissions
+            .retain(|permission| permission.kind != PermissionKind::Calendar);
+        env.permissions.push(PermissionRow {
+            kind: PermissionKind::Calendar,
+            state: PermissionState::Granted,
+        });
+        let native = ScriptedNative::new(&env);
+        let event = CalendarEvent {
+            event: CalendarEventRef {
+                id: CalendarEventId::new("evt_overlap"),
+                title: "Overlapping meeting".into(),
+                starts_at: TimestampMs(100),
+                ends_at: TimestampMs(300),
+            },
+            platform: Some("zoom".into()),
+            attendees: vec![CalendarAttendee {
+                name: "Ada Lovelace".into(),
+                email: Some("ada@example.com".into()),
+            }],
+        };
+        lock(&native.2).push(event.clone());
+
+        assert_eq!(
+            native
+                .calendar_events(TimestampMs(200), TimestampMs(250))
+                .unwrap(),
+            vec![event],
+            "a calendar range read includes events that began before the range"
+        );
+        assert_eq!(
+            native.calendar_event_near(TimestampMs(200)).unwrap().id,
+            CalendarEventId::new("evt_overlap"),
+            "the meeting running at the requested time is a nearby event"
+        );
+        native.4.store(90, Ordering::SeqCst);
+        assert_eq!(native.utc_offset_minutes(TimestampMs(200)), 90);
+    }
 }

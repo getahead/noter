@@ -393,7 +393,7 @@ pub fn login_item() -> LoginItem {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn wait_for_returns_once_the_completion_handler_ran() {
+    fn wait_for_completion_callback_smoke_test() {
         let started = std::time::Instant::now();
         super::wait_for(|done| std::thread::spawn(done).join().unwrap());
         assert!(started.elapsed() < super::PROMPT_TIMEOUT);

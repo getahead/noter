@@ -586,7 +586,10 @@ async fn a_run_cancels_from_queued_running_and_paused() {
     settle().await;
     assert_eq!(r.status(&archive), JobRunStatus::Cancelled);
     // A finished run cannot be cancelled again.
-    assert!(r.sched.cancel(&archive).is_err());
+    assert_eq!(
+        r.sched.cancel(&archive).unwrap_err().code,
+        ErrorCode::NotFound
+    );
 }
 
 #[tokio::test(start_paused = true)]

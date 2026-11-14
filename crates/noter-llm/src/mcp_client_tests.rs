@@ -691,12 +691,12 @@ async fn a_silent_connection_does_not_stall_the_oauth_callback() {
 }
 
 #[tokio::test]
-async fn a_refused_sign_in_is_cancelled() {
+async fn a_refused_sign_in_reports_the_explicit_access_denial() {
     let world = OAuthWorld::new(None);
     let audit = |_: &str, _: &[u8]| true;
     let server = world.resource.url("/mcp");
     let e = world.client(Browser::Deny).sign_in(&server, &audit).await;
-    assert_eq!(e.err(), Some(McpClientError::Cancelled));
+    assert_eq!(e.err(), Some(McpClientError::AccessDenied));
     assert!(world.auth.requests().iter().all(|r| r.path != "/token"));
 }
 

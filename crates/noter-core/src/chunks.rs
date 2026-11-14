@@ -248,7 +248,7 @@ mod tests {
     fn embeddings_are_kept_as_little_endian_floats() {
         assert_eq!(
             blob(&[1.0, -2.5]),
-            [1f32.to_le_bytes(), (-2.5f32).to_le_bytes()].concat()
+            [0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x20, 0xc0]
         );
         assert_eq!(noter_retrieval::estimate_tokens("a b c"), 4);
     }

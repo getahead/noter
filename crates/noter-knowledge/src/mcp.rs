@@ -21,8 +21,8 @@ pub type Listing = Resources;
 
 pub(crate) fn mcp_error(error: McpError) -> CoreError {
     match error {
-        McpError::Cancelled => {
-            CoreError::new(ErrorCode::SignInCancelled, "the sign-in was cancelled")
+        McpError::Cancelled | McpError::AccessDenied => {
+            CoreError::new(ErrorCode::SignInCancelled, "the sign-in was not completed")
         }
         McpError::Offline => CoreError::new(ErrorCode::Offline, "the server is offline"),
         McpError::Unauthorized => {

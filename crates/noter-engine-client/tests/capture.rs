@@ -208,7 +208,11 @@ async fn q7_drill_a_killed_engine_resumes_the_same_call_with_one_short_gap() {
         (g.reason, g.t0_ms),
         (GapReason::EngineRestart, OffsetMs(9001))
     );
-    assert!(g.t1_ms.0 - g.t0_ms.0 <= 2000, "{g:?}");
+    assert_eq!(
+        g.t1_ms,
+        OffsetMs(9_301),
+        "the paused restart window is exact"
+    );
 }
 
 #[tokio::test(start_paused = true)]

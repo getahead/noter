@@ -14,7 +14,7 @@ design: docs/DESIGN-core.md
 
 > **Change log (v0.2):** The fixture seeds engine-named audio files and the scripted stop writes physical recordings.
 > **Change log (v0.3):** The built-in offline archive returns live transcript segments when call audio exists and fails when it does not.
-> **Change log (v0.4):** Protocol fixtures and TypeScript-export dependencies are feature-gated so ordinary application builds omit them; the harness and export binary opt into the needed features.
+> **Change log (v0.4):** Protocol fixtures and TypeScript-export dependencies are feature-gated so ordinary application builds omit them; the harness and export binary opt into the needed features. Scripted native services mirror calendar range/attendee/time-zone behavior and expose deterministic failures for permission, login-item and updater operations.
 
 <!-- toc -->
 
@@ -197,6 +197,8 @@ The system **MUST** speak exactly the request, result, error, channel-message an
 
 The system **MUST** load `contracts/fixtures/world.json` into a fresh database with `--fixture world`, inject a fixed clock on request, and replace the engine and the runtime with scripted ones behind the same seams the app uses; it is never shipped in the app bundle.
 
+The scripted native services must match the host contracts used by the core: calendar range reads include events overlapping the requested interval, nearby-event lookup returns the seeded event and attendees, and local-time formatting uses a configurable UTC offset. Permission requests, login-item changes and updater installation must be able to return a configured typed failure so tests can verify recovery in the core rather than the fake's own success result.
+
 The scripted runtime arrives with the LLM runtime in M2 (decision D8); in M0 the harness scripts the engine.
 
 **Implements**:
@@ -234,4 +236,10 @@ The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playw
 
 **Verification in this change**: unit tests in `crates/noter-engine-client/tests/offline.rs` cover the built-in success and no-audio answers; real-core tests in `crates/noter-core/tests/postcall_archive.rs` cover installation and failure; conformance coverage in `apps/desktop/tests/conformance/m2-stories-postcall.test.ts` uses no explicit offline script. The call-page review outputs DESIGN story runs against the real core. These additional criteria remain unchecked until `just gate` passes.
 
-**Change log**: 0.4 (2026-11-14) records release feature-gating for fixtures/export tooling. Version 0.3 specifies built-in archive behavior and regression criteria; implementation and focused regressions are in that change, with the definition-of-done gate still outstanding. Version 0.2 records fixture audio seeding and physical recordings on scripted stop.
+**Additional native-parity regression criteria** (issue #681; not included in the checked M0 criteria above):
+
+- Calendar range reads return events overlapping the requested interval, including an event that starts before the interval; nearby-event lookup returns the matching seeded event and attendees; configured UTC offsets affect local-time text.
+- A configured `harness.native_fail` operation produces its typed error for permission requests, login-item changes and updater installation, and the real core remains available to answer the next request.
+- These criteria are tested through the real core harness and remain unchecked until `just gate` passes.
+
+**Change log**: 0.4 (2026-11-14) records release feature-gating for fixtures/export tooling and scripted native parity/failure seams. Version 0.3 specifies built-in archive behavior and regression criteria; implementation and focused regressions are in that change, with the definition-of-done gate still outstanding. Version 0.2 records fixture audio seeding and physical recordings on scripted stop.

@@ -84,8 +84,11 @@ struct Whisper;
 
 /// The live model, already downloaded.
 fn live_model(dir: &Path) -> Arc<dyn ModelSource> {
-    std::fs::create_dir_all(dir.join("models")).unwrap();
-    std::fs::write(dir.join("models/whisper-turbo"), b"model").unwrap();
+    let bundle = dir.join("models/whisper-turbo");
+    std::fs::create_dir_all(&bundle).unwrap();
+    let model = bundle.join("model.bin");
+    std::fs::write(&model, b"model").unwrap();
+    assert!(bundle.is_dir() && model.is_file());
     Arc::new(Whisper)
 }
 

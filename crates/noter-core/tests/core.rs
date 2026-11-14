@@ -324,6 +324,7 @@ async fn shutdown_closes_the_store_and_a_new_core_opens_the_same_folder() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open(dir.path());
     core.shutdown().await;
+    assert_eq!(core.store().state(), noter_db::StoreState::Closed);
     core.shutdown().await;
     drop(core);
     let (again, _) = open(dir.path());

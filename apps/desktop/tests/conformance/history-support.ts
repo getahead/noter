@@ -9,6 +9,8 @@ import type { Scenario } from "../support/scenario";
 type Wire = { invoke(window: string, cmd: string, args: unknown): Promise<unknown> };
 export const wire = (s: Scenario) => (s as unknown as { process: Wire }).process;
 
+const dataDirs = new WeakMap<Scenario, Promise<string | null>>();
+
 /** The next save panel answers cancelled, once. On the fake the next `command` (an export) fails `cancelled`. */
 export async function cancelNextSavePanel(s: Scenario, command: "history_export" | "calls_export" = "history_export"): Promise<void> {
   if (s.target === "fake") return s.failNext("main", command, "cancelled");
@@ -17,8 +19,17 @@ export async function cancelNextSavePanel(s: Scenario, command: "history_export"
 
 /** The real core's data folder; null on the fake. */
 export async function dataDir(s: Scenario): Promise<string | null> {
-  if (s.target === "fake") return null;
-  return ((await wire(s).invoke("main", "harness.data_dir", {})) as { path: string }).path;
+  let path = dataDirs.get(s);
+  if (!path) {
+    path = (async () => {
+      if (s.target === "fake") return null;
+      // The scenario applies its fixture world on the first command.
+      await wire(s).invoke("main", "app_snapshot", {});
+      return ((await wire(s).invoke("main", "harness.data_dir", {})) as { path: string }).path;
+    })();
+    dataDirs.set(s, path);
+  }
+  return path;
 }
 
 /** Rows of the real core's database, read-only; null on the fake. */
