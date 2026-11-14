@@ -215,7 +215,7 @@ describe("RegenerateSheet", () => {
     const seen = sent();
     const tree = rendered(RegenerateSheet, { bridge, callId: id, sections: ["summary"], close: () => {} });
     const sheet = find(tree, (p) => typeof p.onCancel === "function");
-    sheetKey({ key: "Enter", target: { tagName: "INPUT" }, preventDefault: () => {} } as never, () => {}, sheet.props.onDefault as (() => void) | undefined);
+    sheetKey({ key: "Enter", target: { tagName: "INPUT" }, nativeEvent: { isComposing: false }, preventDefault: () => {} } as never, () => {}, sheet.props.onDefault as (() => void) | undefined);
     await settle();
     expect(seen.find(([c]) => c === "outputs_regenerate")?.[1]).toMatchObject({ call_id: id, sections: ["summary", "decisions", "action_items", "open_questions"] });
   });
