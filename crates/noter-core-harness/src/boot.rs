@@ -2018,7 +2018,7 @@ impl TinyModels {
                             b.name.replace(' ', "-")
                         ),
                         size_bytes: bytes.len() as u64,
-                        sha256: hex(&Sha256::digest(&bytes)),
+                        sha256: noter_db::hex(&Sha256::digest(&bytes)),
                     }],
                     required_for_capture: b.required_for_capture,
                 };
@@ -2103,10 +2103,6 @@ impl ModelSource for TinyModels {
             Ok(())
         })
     }
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// A downloaded update, as the world says. The core shuts down after `update_install` answers (its

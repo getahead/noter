@@ -63,6 +63,4 @@ pub const MIGRATIONS: &[Migration] = &[
     },
 ];
 
-fn internal(e: impl std::fmt::Display) -> noter_protocol::CoreError {
-    noter_protocol::CoreError::new(noter_protocol::ErrorCode::Internal, e.to_string())
-}
+use noter_protocol::internal;

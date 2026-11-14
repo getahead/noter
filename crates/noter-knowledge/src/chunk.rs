@@ -2,8 +2,6 @@
 //! (200–400 when the section is long enough) on paragraph boundaries, with the title and
 //! heading path prepended, and the keyword text normalised as retrieval normalises queries.
 
-use unicode_normalization::UnicodeNormalization;
-
 use crate::extract::Extracted;
 
 /// A section long enough is cut into chunks of at least this many tokens (its last may be less).
@@ -23,22 +21,11 @@ pub struct Chunk {
 
 /// NFKC, lower case, ё → е, ß → ss: the keyword index's text (the same rule as 2.22's query
 /// side).
-pub fn normalize(text: &str) -> String {
-    text.nfkc()
-        .collect::<String>()
-        .to_lowercase()
-        .replace('ё', "е")
-        .replace('ß', "ss")
-}
+pub use noter_retrieval::normalize;
 
 /// shortcut: about four tokens per three words, not the bge-m3 tokenizer; good enough for chunk
 /// sizes, upgrade if retrieval needs exact budgets.
-// @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
-pub(crate) fn tokens(text: &str) -> usize {
-    (text.split_whitespace().count() * 4)
-        .div_ceil(3)
-        .max(text.chars().count().div_ceil(4))
-}
+pub(crate) use noter_retrieval::estimate_tokens as tokens;
 
 /// Splits long paragraphs at character boundaries so an unbroken minified line is bounded too.
 // @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract

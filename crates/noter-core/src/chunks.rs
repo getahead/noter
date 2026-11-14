@@ -36,10 +36,6 @@ pub(crate) struct Indexed {
 
 /// shortcut: about four tokens per three words, not the bge-m3 tokenizer; retrieval (M3) counts
 /// with the real one.
-fn tokens(text: &str) -> usize {
-    (text.split_whitespace().count() * 4).div_ceil(3)
-}
-
 // @cpt-algo:cpt-noter-algo-core-postcall-chunks:p1
 /// Ordered lines `(t0, t1, "Speaker: text")` grouped into chunks under `header`.
 pub(crate) fn group(header: &str, lines: &[(i64, i64, String)]) -> Vec<Chunk> {
@@ -54,13 +50,13 @@ pub(crate) fn group(header: &str, lines: &[(i64, i64, String)]) -> Vec<Chunk> {
         Chunk {
             t0_ms: open[0].0,
             t1_ms: open.iter().map(|l| l.1).max().unwrap_or(open[0].1),
-            token_count: tokens(&text),
+            token_count: noter_retrieval::estimate_tokens(&text),
             text,
         }
         // @cpt-end:cpt-noter-algo-core-postcall-chunks:p1:inst-chunk-normalize
     };
     for line in lines {
-        let t = tokens(&line.2);
+        let t = noter_retrieval::estimate_tokens(&line.2);
         if !open.is_empty() && (n >= MAX_TOKENS || (n >= MIN_TOKENS && n + t > MAX_TOKENS)) {
             out.push(close(&open));
             open.clear();
@@ -98,7 +94,7 @@ impl Core {
             let lines: Vec<(i64, i64, String)> = crate::transcript::segments_of(c, &id, None)?
                 .into_iter()
                 .map(|s| {
-                    let who = crate::postcall::speaker_name(&s.speaker.label);
+                    let who = crate::speakers::speaker_name(&s.speaker.label);
                     (
                         i64::from(s.t0_ms.0),
                         i64::from(s.t1_ms.0),
@@ -254,6 +250,6 @@ mod tests {
             blob(&[1.0, -2.5]),
             [1f32.to_le_bytes(), (-2.5f32).to_le_bytes()].concat()
         );
-        assert_eq!(tokens("a b c"), 4);
+        assert_eq!(noter_retrieval::estimate_tokens("a b c"), 4);
     }
 }

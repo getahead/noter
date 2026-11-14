@@ -28,14 +28,9 @@ const OPEN: &str = "i.status IN ('open', 'carried') AND i.review_state != 'rejec
 const THEIR_CALLS: &str = "SELECT call_id FROM call_participants WHERE person_id = ?1
      UNION SELECT call_id FROM speakers WHERE person_id = ?1";
 
-/// Lookup form of a name: whitespace collapsed, lower case, `ё` as `е`.
-// shortcut: no NFKC or stemming; the retrieval normaliser (2.22) replaces this when it lands.
+/// Lookup form shared with transcript and document keyword search.
 pub(crate) fn norm(text: &str) -> String {
-    text.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-        .replace('ё', "е")
+    noter_retrieval::normalize(text.trim())
 }
 
 /// "Anna Koval" is "Anna K."; one word stays as it is.
@@ -65,6 +60,70 @@ pub(crate) fn db<T>(r: Db<T>) -> Result<T, CoreError> {
 
 /// A named speaker's or item owner's chip from the person row, so a rename needs no transcript
 /// rewrite; `None` when the person is gone.
+/// Resolve a person by email first, then by display name or normalized alias.
+pub(crate) fn by_name(c: &Connection, name: &str, email: Option<&str>) -> Db<Option<String>> {
+    if let Some(email) = email.filter(|email| !email.trim().is_empty()) {
+        let person = c
+            .query_row(
+                "SELECT id FROM people WHERE lower(email) = lower(?1) ORDER BY rowid LIMIT 1",
+                [email.trim()],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if person.is_some() {
+            return Ok(person);
+        }
+    }
+    let wanted = norm(name);
+    if wanted.is_empty() {
+        return Ok(None);
+    }
+    let aliases: Vec<(String, String)> = c
+        .prepare(
+            "SELECT a.person_id, a.alias FROM person_aliases a JOIN people p ON p.id = a.person_id
+             ORDER BY a.rowid",
+        )?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    if let Some((id, _)) = aliases.into_iter().find(|(_, alias)| norm(alias) == wanted) {
+        return Ok(Some(id));
+    }
+    let people: Vec<(String, String)> = c
+        .prepare("SELECT id, display_name FROM people ORDER BY rowid")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    if let Some((id, _)) = people
+        .into_iter()
+        .find(|(_, display)| norm(display) == wanted)
+    {
+        return Ok(Some(id));
+    }
+    let speakers: Vec<(String, String)> = c
+        .prepare(
+            "SELECT person_id, label FROM speakers WHERE person_id IS NOT NULL ORDER BY rowid DESC",
+        )?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    Ok(speakers
+        .into_iter()
+        .find(|(_, label)| norm(label) == wanted)
+        .map(|(id, _)| id))
+}
+
+pub(crate) fn chip_from_name(person_id: &str, name: &str) -> PersonChip {
+    PersonChip {
+        id: PersonId::new(person_id),
+        display_name: name.to_owned(),
+        short_name: short_of(name),
+        initials: initials_of(name),
+        is_you: false,
+    }
+}
+
+pub(crate) fn chip_for(c: &Connection, person_id: &str, fallback_name: &str) -> Db<PersonChip> {
+    Ok(chip_of(c, person_id)?.unwrap_or_else(|| chip_from_name(person_id, fallback_name)))
+}
+
 pub(crate) fn chip_of(c: &Connection, person_id: &str) -> Db<Option<PersonChip>> {
     c.query_row(
         "SELECT display_name, short_name, is_you FROM people WHERE id = ?1",
@@ -281,14 +340,6 @@ pub(crate) fn logged(entity_type: &'static str, id: &str, pairs: Pairs<'_>) -> L
         before: None,
         after: None,
         delta: Some(Value::Object(columns)),
-    }
-}
-
-fn sql_of(v: &Value) -> Sql {
-    match v {
-        Value::Null => Sql::Null,
-        Value::Number(n) => Sql::Integer(n.as_i64().unwrap_or_default()),
-        other => Sql::Text(other.as_str().unwrap_or_default().to_string()),
     }
 }
 
@@ -619,7 +670,7 @@ impl Core {
             }
             sets.push(("rev", json!(rev), json!(rev + 1)));
             let assigns: Vec<String> = sets.iter().map(|(c, _, _)| format!("{c} = ?")).collect();
-            let mut values: Vec<Sql> = sets.iter().map(|(_, _, after)| sql_of(after)).collect();
+            let mut values: Vec<Sql> = sets.iter().map(|(_, _, after)| noter_db::to_sql(after)).collect();
             values.push(Sql::Text(target.clone()));
             db(tx.execute(
                 &format!("UPDATE people SET {} WHERE id = ?", assigns.join(", ")),
@@ -636,7 +687,11 @@ impl Core {
                 .map(|r| (text(&r[0]), text(&r[1]), text(&r[2])))
                 .collect();
                 for (alias_id, alias, n) in &held {
-                    match wanted.iter().find(|(_, wanted_norm)| wanted_norm == n) {
+                    let normalized = norm(alias);
+                    match wanted
+                        .iter()
+                        .find(|(_, wanted_norm)| wanted_norm == &normalized)
+                    {
                         None => {
                             db(tx.execute("DELETE FROM person_aliases WHERE id = ?1", [alias_id]))?;
                             log.push(logged(
@@ -649,21 +704,27 @@ impl Core {
                                 ],
                             ));
                         }
-                        Some((spelling, _)) if spelling != alias => {
+                        Some((spelling, wanted_norm)) if spelling != alias || n != wanted_norm => {
+                            let mut changes = Vec::new();
+                            if spelling != alias {
+                                changes.push(("alias", json!(alias), json!(spelling)));
+                            }
+                            if n != wanted_norm {
+                                changes.push(("alias_norm", json!(n), json!(wanted_norm)));
+                            }
                             db(tx.execute(
-                                "UPDATE person_aliases SET alias = ?1 WHERE id = ?2",
-                                params![spelling, alias_id],
+                                "UPDATE person_aliases SET alias = ?1, alias_norm = ?2 WHERE id = ?3",
+                                params![spelling, wanted_norm, alias_id],
                             ))?;
-                            log.push(logged(
-                                "person_aliases",
-                                alias_id,
-                                vec![("alias", json!(alias), json!(spelling))],
-                            ));
+                            log.push(logged("person_aliases", alias_id, changes));
                         }
                         Some(_) => {}
                     }
                 }
-                for (spelling, n) in wanted.iter().filter(|(_, n)| !held.iter().any(|h| &h.2 == n)) {
+                for (spelling, n) in wanted
+                    .iter()
+                    .filter(|(_, n)| !held.iter().any(|h| norm(&h.1) == *n))
+                {
                     let alias_id = new_id("pal");
                     db(tx.execute(
                         "INSERT INTO person_aliases (id, person_id, alias, alias_norm) VALUES (?1, ?2, ?3, ?4)",
@@ -911,27 +972,28 @@ fn merge_tx(
     // @cpt-begin:cpt-noter-algo-core-people-merge:p1:inst-merge-aliases
     let mut seen: BTreeSet<String> = rows(
         tx,
-        "SELECT alias_norm FROM person_aliases WHERE person_id = ?1",
+        "SELECT alias FROM person_aliases WHERE person_id = ?1",
         target,
     )?
     .iter()
-    .map(|r| text(&r[0]))
+    .map(|r| norm(&text(&r[0])))
     .collect();
     seen.insert(norm(&tgt.display_name));
     let source_aliases =
         "SELECT id, alias, alias_norm FROM person_aliases WHERE person_id = ?1 ORDER BY rowid";
     for row in rows(tx, source_aliases, source)? {
         let (id, alias, n) = (text(&row[0]), text(&row[1]), text(&row[2]));
-        if seen.insert(n.clone()) {
+        let normalized = norm(&alias);
+        if seen.insert(normalized.clone()) {
+            let mut changes = vec![("person_id", json!(source), json!(target))];
+            if n != normalized {
+                changes.push(("alias_norm", json!(n), json!(normalized)));
+            }
             db(tx.execute(
-                "UPDATE person_aliases SET person_id = ?1 WHERE id = ?2",
-                params![target, id],
+                "UPDATE person_aliases SET person_id = ?1, alias_norm = ?2 WHERE id = ?3",
+                params![target, normalized, id],
             ))?;
-            log.push(logged(
-                "person_aliases",
-                &id,
-                vec![("person_id", json!(source), json!(target))],
-            ));
+            log.push(logged("person_aliases", &id, changes));
         } else {
             db(tx.execute("DELETE FROM person_aliases WHERE id = ?1", [&id]))?;
             log.push(logged(

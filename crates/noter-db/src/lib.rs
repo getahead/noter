@@ -22,10 +22,10 @@ use std::sync::{mpsc, Mutex, MutexGuard, OnceLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use noter_protocol::{CoreError, ErrorCode};
+use noter_protocol::CoreError;
 use rusqlite::{Connection, ErrorCode as SqliteCode, OpenFlags};
 
-pub use change::{ChangeMeta, Custom, Insert, Logged, Mutation, Written};
+pub use change::{to_sql, ChangeMeta, Custom, Insert, Logged, Mutation, Written};
 pub use migrate::{Migration, MIGRATIONS};
 pub use replay::{call_tags_text, redoable, replayable, Direction, Handle, Reversed};
 pub use rusqlite;
@@ -408,9 +408,7 @@ fn sqlite_err(e: rusqlite::Error) -> OpenError {
 }
 
 /// `internal`: developer text for the log only, never record text.
-fn internal(e: impl std::fmt::Display) -> CoreError {
-    CoreError::new(ErrorCode::Internal, e.to_string())
-}
+use noter_protocol::internal;
 
 fn now_ms() -> i64 {
     let since = std::time::SystemTime::now()
@@ -419,8 +417,13 @@ fn now_ms() -> i64 {
     since.as_millis() as i64
 }
 
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+pub fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Lowercase hexadecimal encoding used for SHA-256 digests.
+pub fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(test)]

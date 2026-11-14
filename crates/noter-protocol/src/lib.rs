@@ -27,7 +27,7 @@ pub mod model;
 pub mod skills;
 
 pub use common::*;
-pub use error::{CoreError, ErrorCode, ErrorDetail};
+pub use error::{internal, invalid, CoreError, ErrorCode, ErrorDetail};
 
 /// Version of the UI ↔ core contract. Bumped on every change to a frozen
 /// command, event or Channel (see DESIGN-core 4.1, Contract governance).

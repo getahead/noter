@@ -1,8 +1,6 @@
 //! The handoff commands (FEATURE cpt-noter-feature-core-handoff): noter-handoff's prompts,
 //! versions, mappings and launch order wired to the items, the router and `NativeOps`.
 
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -449,7 +447,7 @@ impl Core {
             ));
         }
         let file = self.data_dir.join(noter_handoff::file_path(item_id));
-        write_private(&file, &md)?;
+        crate::util::write_private(&file, md.as_bytes())?;
         // @cpt-end:cpt-noter-flow-core-handoff-use:p1:inst-use-file
         // @cpt-begin:cpt-noter-flow-core-handoff-use:p1:inst-use-open
         // @cpt-begin:cpt-noter-algo-core-handoff-launch:p1:inst-launch-handlers
@@ -524,21 +522,4 @@ impl Core {
             item: mutation.item,
         })
     }
-}
-
-/// Writes `text` to `path` readable by the user only, replacing it whole.
-fn write_private(path: &Path, text: &str) -> Result<(), CoreError> {
-    let dir = path.parent().ok_or_else(|| internal("no folder"))?;
-    std::fs::create_dir_all(dir).map_err(internal)?;
-    let tmp = path.with_extension("md.tmp");
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(&tmp)
-        .map_err(internal)?;
-    file.write_all(text.as_bytes()).map_err(internal)?;
-    file.sync_all().map_err(internal)?;
-    std::fs::rename(&tmp, path).map_err(internal)
 }

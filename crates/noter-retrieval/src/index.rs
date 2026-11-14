@@ -178,9 +178,7 @@ fn failed(e: impl std::fmt::Display) -> Stop {
     Stop::Failed(CoreError::new(ErrorCode::Internal, e.to_string()))
 }
 
-fn internal(e: noter_db::rusqlite::Error) -> CoreError {
-    CoreError::new(ErrorCode::Internal, e.to_string())
-}
+use noter_protocol::internal;
 
 /// The change row of one index batch: which table, how many rows; no content.
 fn logged(table: &str, rows: usize) -> Logged {

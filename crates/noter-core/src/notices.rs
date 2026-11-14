@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use noter_protocol::engine::EngineCommand;
-use noter_protocol::ipc::{event_names, Caller, CommandCtx};
+use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::*;
 
@@ -72,11 +72,7 @@ fn detection_expired() -> CoreError {
 
 /// A timer's own caller: the user, from no window.
 fn timer_ctx() -> CommandCtx {
-    CommandCtx {
-        caller: Caller::Window {
-            label: WindowLabel::Main,
-        },
-    }
+    crate::util::main_window_ctx()
 }
 
 impl WholeState for DetectionChanged {

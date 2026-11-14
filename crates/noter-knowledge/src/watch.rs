@@ -2,18 +2,15 @@
 //! reads marks its source changed and asks for a sync. The sync job reads every file's
 //! modification time and hash, so a burst of events for the same files coalesces into one run.
 
+use noter_db::lock;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use noter_protocol::SourceId;
 use notify::{EventKind, RecursiveMode, Watcher};
 
 use crate::extract::Format;
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-}
 
 /// The watched folders, and the sources changed since their sync last looked.
 #[derive(Default)]

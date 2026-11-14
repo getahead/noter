@@ -482,39 +482,7 @@ fn runtime_choice(value: &str) -> Option<RuntimeChoice> {
 
 const DAY_MS: i64 = 86_400_000;
 
-/// Days since 1970-01-01 of a `YYYY-MM-DD` date; `None` for anything else.
-fn day_number(date: &LocalDate) -> Option<i64> {
-    let mut parts = date.0.split('-');
-    let (y, m, d) = (parts.next()?, parts.next()?, parts.next()?);
-    if parts.next().is_some() || y.len() != 4 || m.len() != 2 || d.len() != 2 {
-        return None;
-    }
-    let (y, m, d): (i64, i64, i64) = (y.parse().ok()?, m.parse().ok()?, d.parse().ok()?);
-    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
-    let last = match m {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if leap => 29,
-        2 => 28,
-        _ => return None,
-    };
-    if !(1..=last).contains(&d) {
-        return None;
-    }
-    Some(days_from_civil(y, m, d))
-}
-
-/// Howard Hinnant's days-from-civil.
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
-    let y = if m <= 2 { y - 1 } else { y };
-    let era = y.div_euclid(400);
-    let yoe = y - era * 400;
-    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
-}
-
-/// `YYYY-MM-DD` of a day number (the inverse of [`days_from_civil`]).
+/// `YYYY-MM-DD` of a day number (the inverse of the shared retrieval date converter).
 fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719_468;
     let era = z.div_euclid(146_097);
@@ -714,7 +682,8 @@ impl Core {
             LogScope::Last30Days => period(today - 29, today, "last-30-days".into()),
             LogScope::Period { from, to } => {
                 let day = |d: &LocalDate, field| {
-                    day_number(d).ok_or_else(|| invalid(field, ValidationRule::InvalidFormat))
+                    crate::library::day_number(d)
+                        .ok_or_else(|| invalid(field, ValidationRule::InvalidFormat))
                 };
                 let (a, b) = (day(from, "scope.from")?, day(to, "scope.to")?);
                 if a > b {

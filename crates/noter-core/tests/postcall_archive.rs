@@ -752,6 +752,19 @@ async fn a_call_whose_sections_all_failed_gets_the_failed_notice_unless_its_page
 async fn a_failed_archive_keeps_the_live_transcript_and_sends_the_users_names() {
     let r = open("", true).await;
     seed_call(&r.core, CALL, 3);
+    r.core
+        .transcript_fix_term(
+            &main_window(),
+            FixTermArgs {
+                call_id: CallId::new(CALL),
+                segment_id: SegmentId::new(format!("{CALL}_seg_0")),
+                range: TextRange { start: 3, end: 8 },
+                replacement: "concur".into(),
+                add_to_glossary: true,
+            },
+        )
+        .await
+        .unwrap();
     let run = trigger(&r.core, JobKind::ArchivePass, CALL);
     settle(&r.core, &run).await;
     // The scripted engine's archive heard nothing: the live copy stays and the call says so.
@@ -772,6 +785,12 @@ async fn a_failed_archive_keeps_the_live_transcript_and_sends_the_users_names() 
     )
     .unwrap();
     assert_eq!(constraints["speaker_names"], json!({"spk_1": "Anna Lee"}));
+    assert_eq!(constraints["languages"], json!(["en"]));
+    assert!(constraints["glossary"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|term| term["term"] == "concur"));
     assert_eq!(constraints["must_link"], json!([]));
     // No audio: failed without asking the engine.
     seed_call(&r.core, "call_mute", 1);

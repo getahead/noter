@@ -10,7 +10,7 @@ use std::sync::{Arc, Weak};
 use noter_db::rusqlite::Connection;
 use noter_db::Insert;
 use noter_jobs::{BoxFuture, JobHandler, Request, RunCtx, Stop, Trigger};
-use noter_protocol::engine::{ArchiveResult, AsrBackend, EngineSegment, OfflineConstraints};
+use noter_protocol::engine::{ArchiveResult, AsrBackend, EngineSegment};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
@@ -399,22 +399,6 @@ pub(crate) fn install_rows(
     // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-install
 }
 
-/// The constraints the pass reads when the speakers feature wrote none: the live names only.
-pub(crate) fn live_constraints(speakers: &[LiveSpeaker]) -> OfflineConstraints {
-    let speaker_names = speakers
-        .iter()
-        .filter_map(|s| Some((s.label.clone(), s.name.clone()?)))
-        .collect();
-    OfflineConstraints {
-        languages: vec![],
-        glossary: vec![],
-        speaker_priors: vec![],
-        must_link: vec![],
-        cannot_link: vec![],
-        speaker_names,
-    }
-}
-
 impl Core {
     fn set_archive(&self, ctx: &RunCtx, call: &CallId, status: &str) -> Result<(), Stop> {
         let meta = ctx.change_meta("archive").ok_or(Stop::Cancelled)?;
@@ -447,17 +431,18 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-archive-fail
     }
 
-    /// The constraints file the pass reads: the speakers feature's if it wrote one, else the live
-    /// names. `None` without a container (the pass then fails on its own).
-    fn constraints_file(&self, call: &CallId, speakers: &[LiveSpeaker]) -> Option<String> {
+    /// Ensure the archive pass receives the same complete constraints as the speakers flow.
+    fn constraints_file(&self, call: &CallId) -> Result<Option<String>, CoreError> {
+        let Some(container) = self.deps.engine.container() else {
+            return Ok(None);
+        };
+        self.write_constraints_file(call)?;
         let rel = format!("audio/{call}/constraints.json");
-        let path = self.deps.engine.container()?.join(&rel);
-        if !path.exists() {
-            let body = serde_json::to_vec(&live_constraints(speakers)).ok()?;
-            std::fs::create_dir_all(path.parent()?).ok()?;
-            std::fs::write(&path, body).ok()?;
+        if container.join(&rel).exists() {
+            Ok(Some(rel))
+        } else {
+            Err(crate::internal("archive constraints file was not written"))
         }
-        Some(rel)
     }
 
     /// The archive pass of `call`. A run stopped after it started leaves the call as it found
@@ -503,8 +488,8 @@ impl Core {
         }
         self.set_archive(ctx, call, "running")?;
         let id = call.as_str().to_owned();
-        let (speakers, live) = self.store().read(move |c| live_of(c, &id))?;
-        let constraints = self.constraints_file(call, &speakers);
+        let (_, live) = self.store().read(move |c| live_of(c, &id))?;
+        let constraints = self.constraints_file(call).map_err(Stop::Failed)?;
         let result_path = format!("audio/{call}/archive-{}.json", ulid::Ulid::generate());
         let pass = self
             .engine
@@ -889,9 +874,5 @@ mod tests {
             serde_json::from_str(get(segs[1], "crosstalk_with").as_str().unwrap()).unwrap();
         assert_eq!(crosstalk, vec![get(spk[0], "id"), get(spk[1], "id")]);
         assert_eq!(get(segs[0], "crosstalk_with"), "[]");
-        // With no constraints file, the pass gets the names the user gave.
-        let c = live_constraints(&speakers);
-        assert_eq!(c.speaker_names.len(), 1);
-        assert_eq!(c.speaker_names["spk_1"], "Anna Lee");
     }
 }

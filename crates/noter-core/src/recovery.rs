@@ -3,7 +3,7 @@
 
 use noter_db::rusqlite::OptionalExtension;
 use noter_engine_client::{CaptureFact, Degraded, EngineSession};
-use noter_protocol::ipc::{Caller, CommandCtx};
+use noter_protocol::ipc::CommandCtx;
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
@@ -12,11 +12,7 @@ use crate::notify::{Notification, NotificationKind};
 use crate::Core;
 
 fn main_ctx() -> CommandCtx {
-    CommandCtx {
-        caller: Caller::Window {
-            label: WindowLabel::Main,
-        },
-    }
+    crate::util::main_window_ctx()
 }
 
 impl Core {

@@ -153,7 +153,7 @@ The user can review what a call produced, check the words behind an item, tick w
 **Actor**: Primary user (main window)
 
 **Success Scenarios**:
-- Today shows upcoming calls, last-time lines, carried work, due items without a call, done today, review counts and current proposals; a live call is represented first.
+- Today shows upcoming calls, last-time lines, carried work, due items without a call, done today, review counts and current proposals; a live call is represented first. Calendar attendees match people by email, display name or alias, and the matched person is shown on the card and used for carry-forward.
 - No recorded calls or no calendar events produces the contract's empty state without fabricated data.
 
 **Error Scenarios**:

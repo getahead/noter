@@ -184,16 +184,7 @@ impl Core {
         };
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-export
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-write
-        // Complete or absent: written beside the target, then renamed over it.
-        let tmp = path.with_extension("noter-tmp");
-        let written = self.write_audit(&tmp, &args);
-        let done = written.and_then(|()| {
-            std::fs::rename(&tmp, &path).map_err(|e| crate::internal(format!("export: {e}")))
-        });
-        if let Err(e) = done {
-            let _ = std::fs::remove_file(&tmp);
-            return Err(e);
-        }
+        self.write_audit(&path, &args)?;
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-write
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-complete
         Ok(ExportResult {
@@ -205,36 +196,38 @@ impl Core {
 
     /// Streams the range into `file` in batches of `EXPORT_BATCH` rows.
     fn write_audit(&self, file: &std::path::Path, args: &AuditExportArgs) -> Result<(), CoreError> {
-        let io = |e: std::io::Error| crate::internal(format!("cannot write the export: {e}"));
-        let mut out = std::io::BufWriter::new(std::fs::File::create(file).map_err(io)?);
-        let json = args.format == LogFormat::Json;
-        out.write_all(if json { b"[" } else { b"# Noter audit log\n\n" })
-            .map_err(io)?;
-        let mut cursor = None;
-        let mut first = true;
-        loop {
-            let rows = self.audit_rows(args.from, args.to, cursor.take(), EXPORT_BATCH)?;
-            for row in &rows {
-                if json {
-                    let sep = if first { "\n" } else { ",\n" };
-                    let body = serde_json::to_string(row).map_err(crate::internal)?;
-                    write!(out, "{sep}{body}").map_err(io)?;
-                } else {
-                    writeln!(out, "{}", markdown_row(row)).map_err(io)?;
+        crate::util::write_private_with(file, |file| {
+            let io = |e: std::io::Error| crate::internal(format!("cannot write the export: {e}"));
+            let mut out = std::io::BufWriter::new(file);
+            let json = args.format == LogFormat::Json;
+            out.write_all(if json { b"[" } else { b"# Noter audit log\n\n" })
+                .map_err(io)?;
+            let mut cursor = None;
+            let mut first = true;
+            loop {
+                let rows = self.audit_rows(args.from, args.to, cursor.take(), EXPORT_BATCH)?;
+                for row in &rows {
+                    if json {
+                        let sep = if first { "\n" } else { ",\n" };
+                        let body = serde_json::to_string(row).map_err(crate::internal)?;
+                        write!(out, "{sep}{body}").map_err(io)?;
+                    } else {
+                        writeln!(out, "{}", markdown_row(row)).map_err(io)?;
+                    }
+                    first = false;
                 }
-                first = false;
-            }
-            match rows.last() {
-                Some(last) if rows.len() == EXPORT_BATCH as usize => {
-                    cursor = Some((last.at.0, last.id.as_str().to_owned()));
+                match rows.last() {
+                    Some(last) if rows.len() == EXPORT_BATCH as usize => {
+                        cursor = Some((last.at.0, last.id.as_str().to_owned()));
+                    }
+                    _ => break,
                 }
-                _ => break,
             }
-        }
-        if json {
-            out.write_all(b"\n]\n").map_err(io)?;
-        }
-        out.flush().map_err(io)
+            if json {
+                out.write_all(b"\n]\n").map_err(io)?;
+            }
+            out.flush().map_err(io)
+        })
     }
 }
 

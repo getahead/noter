@@ -29,6 +29,4 @@ pub const MIGRATIONS: &[Migration] = &[Migration {
     sql: include_str!("../migrations/0001_prompt_versions.sql"),
 }];
 
-fn internal(e: impl std::fmt::Display) -> noter_protocol::CoreError {
-    noter_protocol::CoreError::new(noter_protocol::ErrorCode::Internal, e.to_string())
-}
+use noter_protocol::internal;

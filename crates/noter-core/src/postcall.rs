@@ -6,8 +6,6 @@
 //! commands read, edit and compare them. The archive pass itself is `archive.rs`.
 
 use std::collections::HashMap;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 use std::sync::{Arc, Weak};
 
 use noter_db::rusqlite::{params, Connection, OptionalExtension};
@@ -27,6 +25,7 @@ use serde_json::{json, Value};
 
 use crate::merge::merge;
 use crate::notify::{Notification, NotificationKind};
+use crate::speakers::speaker_name;
 use crate::{lock, object, to_json, Core};
 
 /// The post-call skill's contract version, as `summary_versions.skill_version` records it.
@@ -448,15 +447,6 @@ fn body_of(kind: SectionKind, out: &PostCallOutput) -> String {
         SectionKind::PerParticipant => participants_md(&out.per_participant),
         SectionKind::CallTypeExtras => out.extras_md.as_deref().unwrap_or("").trim().to_owned(),
         SectionKind::RoleReviews => String::new(),
-    }
-}
-
-pub(crate) fn speaker_name(label: &SpeakerLabel) -> String {
-    match label {
-        SpeakerLabel::You => "You".into(),
-        SpeakerLabel::Person { person } => person.display_name.clone(),
-        SpeakerLabel::Unnamed { n } => format!("Speaker {n}"),
-        SpeakerLabel::GuestYourSide => "Guest".into(),
     }
 }
 
@@ -1140,17 +1130,7 @@ impl Core {
             let dir = self.call_dir(call);
             let internal = |e: std::io::Error| CoreError::new(ErrorCode::Internal, e.to_string());
             std::fs::create_dir_all(&dir).map_err(internal)?;
-            let tmp = dir.join("summary.md.tmp");
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&tmp)
-                .map_err(internal)?;
-            file.write_all(body.as_bytes()).map_err(internal)?;
-            file.sync_all().map_err(internal)?;
-            std::fs::rename(&tmp, dir.join("summary.md")).map_err(internal)
+            crate::util::write_private(&dir.join("summary.md"), body.as_bytes())
         });
         if let Err(e) = written {
             self.log(object(json!({

@@ -546,6 +546,39 @@ async fn known_attendees_carry_open_work_from_the_last_two_calls() {
 }
 
 #[tokio::test]
+async fn attendee_alias_is_resolved_on_the_today_card_and_carry_query() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open_with(
+        dir.path(),
+        Some(granted(vec![event(
+            "e_alias",
+            "1:1 Anna",
+            NOW + HOUR,
+            &["Annie   K"],
+        )])),
+    );
+    people_world(&core);
+    core.store()
+        .insert_batch(vec![row(
+            "person_aliases",
+            &[
+                ("id", json!("alias_anna")),
+                ("person_id", json!("per_anna")),
+                ("alias", json!("Annie K")),
+                ("alias_norm", json!("annie k")),
+            ],
+        )])
+        .unwrap();
+
+    let card = today(&core).await.unwrap().today.remove(0);
+    assert_eq!(
+        card.attendees[0].person.as_ref().unwrap().id.as_str(),
+        "per_anna"
+    );
+    assert!(card.items.iter().any(|item| item.id.as_str() == "i_new"));
+}
+
+#[tokio::test]
 async fn unknown_attendees_alone_carry_nothing() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open_with(

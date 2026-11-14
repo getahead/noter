@@ -23,7 +23,7 @@ pub use ask::{
     NOT_FOUND_MD,
 };
 pub use index::{embed_query, missing, rebuild, stale, Embedder, Index, Readiness, Run, DIMS};
-pub use normalize::{normalize, terms};
+pub use normalize::{estimate_tokens, normalize, terms};
 pub use presets::scope_presets;
 pub use retrieve::{
     day_number, prepare, retrieve, DocHits, DocQuery, DocumentSource, Evidence, Hit, NoDocuments,

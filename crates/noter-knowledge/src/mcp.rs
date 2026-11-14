@@ -3,8 +3,9 @@
 //! streamable-HTTP transport with the server's OAuth is noter-llm's; nothing here reaches the
 //! network.
 
+use noter_db::lock;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use noter_jobs::BoxFuture;
 use noter_protocol::error::ValidationRule;
@@ -172,10 +173,6 @@ impl Default for ScriptedMcp {
     fn default() -> Self {
         Self::new(Arc::new(|| TimestampMs(0)))
     }
-}
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 impl ScriptedMcp {
