@@ -878,7 +878,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - **Depends On**: `cpt-noter-feature-core-storage`, `cpt-noter-feature-core-settings`
 
 - **Scope**:
-  - `LlmRuntime` with Claude Code, Codex and Ollama adapters; version pins; schema validation and retry
+  - `Llm` router with Claude Code, Codex and Ollama runtime adapters; version pins; schema validation and retry
   - Run lockdown flags and the run-lockdown CI test
   - Egress gate: privacy mode, sensitive flag, redaction, `audit_log` before send; `llm_runs`
   - `accounts_get` and `api_key_set` (owner decision of 18 Oct, discrepancy 1): runtime availability and verified API keys in the Keychain, steps 1 to 5 of `cpt-noter-flow-core-credentials-privacy-keys`
