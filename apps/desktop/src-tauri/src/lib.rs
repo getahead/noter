@@ -187,6 +187,7 @@ fn boot<R: Runtime>(
     let engine = ProcessLauncher::from_env(bundled).app_group(&group);
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
     let deps = CoreDeps::new(Arc::new(SystemClock), events)
+        .with_power(Arc::new(native::MacPower))
         .with_app_version(env!("CARGO_PKG_VERSION"))
         .with_shortcuts(shortcuts)
         .with_engine(Arc::new(engine))

@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
-    BoxFuture, CalendarEvent, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps, NativeServices,
-    SaveKind,
+    BoxFuture, CalendarEvent, ClipboardText, EnvironmentReading, LaunchRequest, NativeOps,
+    NativeServices, PowerSource, SaveKind,
 };
 use noter_native::{PanelRequest, ParentWindow};
 use noter_protocol::model::{
@@ -16,6 +16,15 @@ use noter_protocol::model::{
 };
 use noter_protocol::{CoreError, ErrorCode, PermissionKind, PermissionState, TimestampMs};
 use tauri::{AppHandle, Runtime};
+
+// @cpt-algo:cpt-noter-algo-core-jobs-scheduler-admit:p1
+pub struct MacPower;
+
+impl PowerSource for MacPower {
+    fn on_battery(&self) -> bool {
+        noter_native::on_battery()
+    }
+}
 
 /// What `MacOps` needs of the app's windows, read on the main thread: each surface's
 /// `CGWindowID` for the Screen Share Test, and the focused window a panel attaches to.

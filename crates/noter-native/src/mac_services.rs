@@ -24,8 +24,49 @@ use objc2_foundation::{
 };
 
 use crate::services::{
-    pasteboard_entries, ClipboardText, LaunchSystem, PanelRequest, WindowState, ITERM_APP,
+    is_battery_power, pasteboard_entries, ClipboardText, LaunchSystem, PanelRequest, WindowState,
+    ITERM_APP,
 };
+
+#[link(name = "IOKit", kind = "framework")]
+unsafe extern "C" {
+    fn IOPSCopyPowerSourcesInfo() -> *const std::ffi::c_void;
+    fn IOPSGetProvidingPowerSourceType(info: *const std::ffi::c_void) -> *const std::ffi::c_void;
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFEqual(a: *const std::ffi::c_void, b: *const std::ffi::c_void) -> u8;
+    fn CFStringCreateWithCString(
+        alloc: *const std::ffi::c_void,
+        string: *const std::ffi::c_char,
+        encoding: u32,
+    ) -> *const std::ffi::c_void;
+    fn CFRelease(value: *const std::ffi::c_void);
+}
+
+/// Reads the current power source without prompting; unavailable data follows the scheduler's
+/// mains-power fallback.
+pub fn on_battery() -> bool {
+    let info = unsafe { IOPSCopyPowerSourcesInfo() };
+    if info.is_null() {
+        return is_battery_power(None);
+    }
+    let source = unsafe { IOPSGetProvidingPowerSourceType(info) };
+    let battery = unsafe {
+        CFStringCreateWithCString(std::ptr::null(), c"Battery Power".as_ptr(), 0x0800_0100)
+    };
+    let on_battery = if source.is_null() || battery.is_null() {
+        None
+    } else {
+        Some(unsafe { CFEqual(source, battery) != 0 })
+    };
+    if !battery.is_null() {
+        unsafe { CFRelease(battery) };
+    }
+    unsafe { CFRelease(info) };
+    is_battery_power(on_battery)
+}
 
 /// Runs `f` on the main thread and waits for its answer: inline when already there, else on
 /// the main queue. Never call it from a tokio worker: the main thread may itself be waiting
