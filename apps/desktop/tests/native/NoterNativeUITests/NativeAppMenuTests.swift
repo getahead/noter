@@ -190,7 +190,8 @@ final class NativeAppMenuTests: NoterTestCase {
     }
 
     private func attachScreenshot(_ name: String) {
-        let build = ProcessInfo.processInfo.environment["NOTER_BUILD_SHA"] ?? "unset"
+        let environment = ProcessInfo.processInfo.environment
+        let build = environment["GITHUB_SHA"] ?? environment["NOTER_BUILD_SHA"] ?? "unset"
         let appearance = NSApp.effectiveAppearance.name.rawValue
         let scale = NSScreen.main?.backingScaleFactor ?? 0
         let metadata = XCTAttachment(string: "build_sha=\(build)\nos=\(ProcessInfo.processInfo.operatingSystemVersionString)\nappearance=\(appearance)\nscale=\(scale)x")
