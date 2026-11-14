@@ -30,14 +30,52 @@ describe("Menu (cpt-noter-dod-ui-primitives-controls)", () => {
 });
 
 describe("menuKey", () => {
-  const event = (key: string) => ({ key, target: null, preventDefault: vi.fn(), stopPropagation: vi.fn(), currentTarget: { querySelectorAll: () => [] } }) as unknown as KeyboardEvent<HTMLElement>;
-  it("closes on Esc and lets arrows move between items", () => {
+  const event = (key: string, target: HTMLElement, items: HTMLElement[]) => ({
+    key,
+    target,
+    preventDefault: vi.fn(),
+    stopPropagation: vi.fn(),
+    currentTarget: { querySelectorAll: () => items },
+  }) as unknown as KeyboardEvent<HTMLElement>;
+
+  it("moves focus with arrows and prevents default only for handled navigation", () => {
+    const first = { focus: vi.fn(), contains: () => false } as unknown as HTMLElement;
+    const second = { focus: vi.fn(), contains: () => false } as unknown as HTMLElement;
+    const items = [first, second];
+
+    const down = event("ArrowDown", first, items);
+    menuKey(down);
+    expect(second.focus).toHaveBeenCalledOnce();
+    expect(first.focus).not.toHaveBeenCalled();
+    expect(down.preventDefault).toHaveBeenCalledOnce();
+
+    const up = event("ArrowUp", second, items);
+    menuKey(up);
+    expect(first.focus).toHaveBeenCalledOnce();
+    expect(up.preventDefault).toHaveBeenCalledOnce();
+
+    const wrapsAtStart = event("ArrowUp", first, items);
+    menuKey(wrapsAtStart);
+    expect(second.focus).toHaveBeenCalledTimes(2);
+    expect(wrapsAtStart.preventDefault).toHaveBeenCalledOnce();
+
+    const wrapsAtEnd = event("ArrowDown", second, items);
+    menuKey(wrapsAtEnd);
+    expect(first.focus).toHaveBeenCalledTimes(2);
+    expect(wrapsAtEnd.preventDefault).toHaveBeenCalledOnce();
+
+    const unhandled = event("Tab", first, items);
+    menuKey(unhandled);
+    expect(unhandled.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("closes on Esc and stops it reaching an enclosing control", () => {
     const onClose = vi.fn();
-    menuKey(event("Escape"), onClose);
+    const escape = event("Escape", {} as HTMLElement, []);
+    menuKey(escape, onClose);
     expect(onClose).toHaveBeenCalledOnce();
-    menuKey(event("ArrowDown"), onClose);
-    menuKey(event("Escape"));
-    expect(onClose).toHaveBeenCalledOnce();
+    expect(escape.stopPropagation).toHaveBeenCalledOnce();
+    expect(escape.preventDefault).toHaveBeenCalledOnce();
   });
 });
 
