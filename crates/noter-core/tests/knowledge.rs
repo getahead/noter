@@ -457,7 +457,7 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
         rig.reindex(at, &row.id).await;
         let settled = rig
             .until(|r| {
-                r.last_sync_at == Some(TimestampMs(at))
+                (r.status == SourceStatus::Idle && r.last_sync_at == Some(TimestampMs(at)))
                     || matches!(r.status, SourceStatus::Failed { .. })
             })
             .await;

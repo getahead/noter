@@ -752,6 +752,7 @@ pub(crate) fn segments_of(
         let channel: AudioChannel = word(&r.get::<_, String>(1)?).unwrap_or(AudioChannel::Mic);
         let label: Option<String> = r.get(9)?;
         let named_by: Option<String> = r.get(11)?;
+        let pass: String = r.get(12)?;
         crosstalk.push(serde_json::from_str(&r.get::<_, String>(15)?).unwrap_or_default());
         Ok(SegmentView {
             id: SegmentId::new(r.get::<_, String>(0)?),
@@ -761,12 +762,15 @@ pub(crate) fn segments_of(
                 speaker_id: SpeakerId::new(r.get::<_, Option<String>>(8)?.unwrap_or_default()),
                 label: speaker_label_of(
                     c,
-                    channel,
-                    label.as_deref().unwrap_or(""),
-                    r.get(10)?,
-                    named_by.as_deref(),
-                    r.get::<_, Option<String>>(13)?,
-                    None,
+                    SpeakerRow {
+                        pass: &pass,
+                        channel,
+                        label: label.as_deref().unwrap_or(""),
+                        n: r.get(10)?,
+                        named_by: named_by.as_deref(),
+                        person_id: r.get(13)?,
+                        name: None,
+                    },
                 )?,
             },
             crosstalk_with: vec![],
@@ -822,21 +826,25 @@ fn speaker_refs(
 ) -> noter_db::rusqlite::Result<HashMap<String, SpeakerRef>> {
     let mut stmt = c.prepare(
         "SELECT id, label, n, channel, named_by, person_id,
-                COALESCE((SELECT display_name FROM people WHERE id = speakers.person_id), name)
+                COALESCE((SELECT display_name FROM people WHERE id = speakers.person_id), name), pass
          FROM speakers WHERE call_id = ?1",
     )?;
     let rows = stmt.query_map([call_id.as_str()], |r| {
         let id: String = r.get(0)?;
         let channel: AudioChannel = word(&r.get::<_, String>(3)?).unwrap_or(AudioChannel::Sys);
         let named_by: Option<String> = r.get(4)?;
+        let pass: String = r.get(7)?;
         let label = speaker_label_of(
             c,
-            channel,
-            &r.get::<_, String>(1)?,
-            r.get(2)?,
-            named_by.as_deref(),
-            r.get(5)?,
-            r.get::<_, Option<String>>(6)?.as_deref(),
+            SpeakerRow {
+                pass: &pass,
+                channel,
+                label: &r.get::<_, String>(1)?,
+                n: r.get(2)?,
+                named_by: named_by.as_deref(),
+                person_id: r.get(5)?,
+                name: r.get::<_, Option<String>>(6)?.as_deref(),
+            },
         )?;
         Ok((
             id.clone(),
@@ -849,14 +857,14 @@ fn speaker_refs(
     rows.collect()
 }
 
-/// The call's live speakers with the engine label each was created for.
+/// The call's current-pass speakers with the engine label each was created for.
 fn speakers_of(
     c: &Connection,
     call_id: &CallId,
 ) -> noter_db::rusqlite::Result<Vec<(String, SpeakerView)>> {
     let mut stmt = c.prepare(
         "SELECT id, label, n, channel, named_by, person_id,
-                COALESCE((SELECT display_name FROM people WHERE id = speakers.person_id), name)
+                COALESCE((SELECT display_name FROM people WHERE id = speakers.person_id), name), pass
          FROM speakers
          WHERE call_id = ?1 AND pass = (CASE WHEN EXISTS
                (SELECT 1 FROM speakers WHERE call_id = ?1 AND pass = 'archive')
@@ -867,16 +875,20 @@ fn speakers_of(
         let channel: AudioChannel = word(&r.get::<_, String>(3)?).unwrap_or(AudioChannel::Sys);
         let label: String = r.get(1)?;
         let named_by: Option<String> = r.get(4)?;
+        let pass: String = r.get(7)?;
         let speaker = SpeakerRef {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
             label: speaker_label_of(
                 c,
-                channel,
-                &label,
-                r.get(2)?,
-                named_by.as_deref(),
-                r.get::<_, Option<String>>(5)?,
-                r.get::<_, Option<String>>(6)?.as_deref(),
+                SpeakerRow {
+                    pass: &pass,
+                    channel,
+                    label: &label,
+                    n: r.get(2)?,
+                    named_by: named_by.as_deref(),
+                    person_id: r.get(5)?,
+                    name: r.get::<_, Option<String>>(6)?.as_deref(),
+                },
             )?,
         };
         let mut view = speaker_view(call_id, &speaker, channel);
@@ -1005,16 +1017,40 @@ fn speaker_label(
     }
 }
 
+struct SpeakerRow<'a> {
+    pass: &'a str,
+    channel: AudioChannel,
+    label: &'a str,
+    n: Option<i64>,
+    named_by: Option<&'a str>,
+    person_id: Option<String>,
+    name: Option<&'a str>,
+}
+
 fn speaker_label_of(
     c: &Connection,
-    channel: AudioChannel,
-    label: &str,
-    n: Option<i64>,
-    named_by: Option<&str>,
-    person_id: Option<String>,
-    name: Option<&str>,
+    row: SpeakerRow<'_>,
 ) -> noter_db::rusqlite::Result<SpeakerLabel> {
-    let fallback = speaker_label(channel, label, n, named_by, person_id, name);
+    let fallback = if row.pass == "archive"
+        && row.channel == AudioChannel::Mic
+        && row.person_id.is_none()
+        && row.named_by != Some("you")
+        && row.label != "you"
+        && row.label != "guest_your_side"
+    {
+        SpeakerLabel::Unnamed {
+            n: row.n.unwrap_or(0) as u16,
+        }
+    } else {
+        speaker_label(
+            row.channel,
+            row.label,
+            row.n,
+            row.named_by,
+            row.person_id,
+            row.name,
+        )
+    };
     match fallback {
         SpeakerLabel::Person { person } => Ok(SpeakerLabel::Person {
             person: crate::people::chip_for(c, person.id.as_str(), &person.display_name)?,

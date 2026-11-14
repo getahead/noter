@@ -559,26 +559,15 @@ async fn attendee_alias_is_resolved_on_the_today_card_and_carry_query() {
     );
     people_world(&core);
     core.store()
-        .insert_batch(vec![
-            row(
-                "people",
-                &[
-                    ("id", json!("per_anna")),
-                    ("rev", json!(1)),
-                    ("display_name", json!("Anna Koval")),
-                    ("short_name", json!("Anna K.")),
-                ],
-            ),
-            row(
-                "person_aliases",
-                &[
-                    ("id", json!("alias_anna")),
-                    ("person_id", json!("per_anna")),
-                    ("alias", json!("Annie")),
-                    ("alias_norm", json!("annie")),
-                ],
-            ),
-        ])
+        .insert_batch(vec![row(
+            "person_aliases",
+            &[
+                ("id", json!("alias_anna")),
+                ("person_id", json!("per_anna")),
+                ("alias", json!("Annie")),
+                ("alias_norm", json!("annie")),
+            ],
+        )])
         .unwrap();
 
     let card = today(&core).await.unwrap().today.remove(0);
