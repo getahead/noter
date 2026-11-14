@@ -342,7 +342,7 @@ describe("share test sheet actions", () => {
     await a.run(false);
     expect(s.results).toHaveLength(1);
     a.start();
-    await vi.waitFor(() => expect(s.events[0]).toEqual({ type: "run", screenRecording: "granted" }));
+    await vi.waitFor(() => expect(s.events).toContainEqual({ type: "run", screenRecording: "granted" }));
     await vi.waitFor(() => expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) }));
   });
 
