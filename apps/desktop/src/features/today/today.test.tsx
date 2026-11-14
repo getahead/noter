@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { t } from "../../i18n/format";
+import { setPseudo, t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
 import { sentCommands } from "../../../tests/support/fake-core";
 import { resetCache, useTypes } from "../call-page/cache";
@@ -13,7 +13,7 @@ import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showP
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
 import { positionOf } from "./position";
-import { TodayPage, watchTodayDate } from "./TodayPage";
+import { shouldClearFocusedRow, TodayPage, watchTodayDate } from "./TodayPage";
 import { TodayToolbar } from "./TodayToolbar";
 import { clockOf } from "./clock";
 import { UpcomingCallCard } from "./UpcomingCallCard";
@@ -22,8 +22,39 @@ let bridge: Bridge;
 let fake: FakeCore;
 
 describe("Today review catalogue", () => {
+  afterEach(() => setPseudo("off"));
   it("keeps the heading and both counts in one reorderable message", () => {
     expect(t("today.review_summary" as never, { items: "1 suggested item", calls: "from 2 calls" })).toBe("To review: 1 suggested item from 2 calls");
+  });
+  it("catalogues full mixed and speaker-only summaries with independent plurals", () => {
+    expect(t("today.review_summary_unnamed", { items: t("today.review_items", { count: 1 }), calls: t("today.review_from", { count: 1 }), speakers: t("today.unnamed", { count: 1 }) })).toBe("To review: 1 suggested item from 1 call · 1 unnamed speaker");
+    expect(t("today.review_summary_unnamed", { items: t("today.review_items", { count: 2 }), calls: t("today.review_from", { count: 3 }), speakers: t("today.unnamed", { count: 2 }) })).toBe("To review: 2 suggested items from 3 calls · 2 unnamed speakers");
+    setPseudo("german");
+    const expanded = t("today.review_summary_unnamed", { items: t("today.review_items", { count: 2 }), calls: t("today.review_from", { count: 3 }), speakers: t("today.unnamed", { count: 2 }) });
+    expect(expanded.length).toBeGreaterThan("To review: 2 suggested items from 3 calls · 2 unnamed speakers".length);
+    const speakerOnly = t("today.review_speakers_only", { speakers: t("today.unnamed", { count: 2 }) });
+    expect(speakerOnly.length).toBeGreaterThan("To review: 2 unnamed speakers".length);
+  });
+});
+
+describe("Today focus pointer target", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("keeps recovery inside a focusable row and clears it for blank/body/non-focusable/outside targets", () => {
+    class FakeElement {
+      constructor(readonly row?: FakeElement, readonly control?: FakeElement) {}
+      closest(selector: string) {
+        return selector === "[data-item-id]" ? this.row : this.control;
+      }
+    }
+    vi.stubGlobal("Element", FakeElement);
+    const control = new FakeElement();
+    const row = new FakeElement();
+    const focused = new FakeElement(row, control);
+    const root = { contains: (target: unknown) => target === row } as unknown as HTMLElement;
+    expect(shouldClearFocusedRow(focused as unknown as EventTarget, root)).toBe(false);
+    expect(shouldClearFocusedRow(new FakeElement(row) as unknown as EventTarget, root)).toBe(true);
+    expect(shouldClearFocusedRow(new FakeElement(new FakeElement(), control) as unknown as EventTarget, root)).toBe(true);
+    expect(shouldClearFocusedRow(null, root)).toBe(true);
   });
 });
 

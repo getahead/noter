@@ -126,6 +126,16 @@ describe("OutputSection", () => {
     expect(asked).toEqual([false]);
   });
 
+  it("renders the regenerated-edit notice and its comparison action", async () => {
+    await open([]);
+    const section = sec("summary", { summary_id: "sum_backend", rev: 3, body_md: "Kept edit", regenerated_with_edits: true });
+    const tree = rendered(OutputSection, props(section));
+    const html = renderToString(tree);
+    expect(html).toContain("Regenerated · your 0 edits kept");
+    expect(html).toContain("Show Diff");
+    await (find(tree, (p) => p.className === "np-link" && p.children === "Show Diff").props.onClick as () => void)();
+  });
+
   it("counts the rejected suggestions a regeneration will not bring back, in the section's meta line", async () => {
     await open([]);
     const items = (n: number) => sec("action_items", { suppressed_count: n, items: [row("Rotate the token")] });

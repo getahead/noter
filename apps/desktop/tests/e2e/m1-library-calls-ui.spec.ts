@@ -312,17 +312,16 @@ const glyph = (page: Page) => page.locator('.np-srclist__item .np-spin');
 test.describe("cpt-noter-flow-ui-library-calls-browse (live status)", () => {
   test("UI — happy path: outputs:progress shows Writing summary… on the row and a glyph beside Calls, and both go when the write ends", async ({ page }) => {
     await openCalls(page);
+    // Advance the fake generator to its writing event, then to completion, so the transient state
+    // stays observable even when the browser batches React work under CI load.
+    await page.clock.install();
     const row = rowOf(page, "Backend sync").first();
     await expect(glyph(page)).toHaveCount(0);
     await steerFor(page).invoke("outputs_regenerate", { call_id: W.PAST_CALL, sections: ["summary"], local: false });
-    // Both cores write asynchronously: watch every frame, not every poll.
-    await page.waitForFunction(
-      () =>
-        document.querySelector('[data-lib-row="call_backend"]')?.textContent?.includes("Writing summary…") &&
-        document.querySelector(".np-srclist__item .np-spin"),
-      null,
-      { polling: "raf" },
-    );
+    await page.clock.runFor(300);
+    await expect(row).toContainText("Writing summary…");
+    await expect(glyph(page)).toHaveCount(1);
+    await page.clock.runFor(300);
     await expect(row).not.toContainText("Writing summary…");
     await expect(glyph(page)).toHaveCount(0);
   });

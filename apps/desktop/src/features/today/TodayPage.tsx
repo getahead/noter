@@ -23,6 +23,14 @@ import { ProposalRow } from "./ProposalRow";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 import "./today.css";
 
+/** A pointer press outside a focusable Today row ends keyboard focus recovery for that row. */
+export function shouldClearFocusedRow(target: EventTarget | null, root: Pick<HTMLElement, "contains"> | null): boolean {
+  const element = target instanceof Element ? target : null;
+  const row = element?.closest<HTMLElement>("[data-item-id]");
+  const control = element?.closest("button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+  return !row || !control || !root?.contains(row);
+}
+
 // @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-date
 /** Refresh the Today projection when its configured calendar day rolls over or the window returns. */
 export function watchTodayDate(refresh: () => void, prefs: UiPrefs | undefined, focusTarget: Pick<Window, "addEventListener" | "removeEventListener"> = window) {
@@ -132,6 +140,16 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       position.group = undefined;
     }
   };
+  useEffect(() => {
+    const onPointerDown = (event: globalThis.PointerEvent) => {
+      if (shouldClearFocusedRow(event.target, root.current)) {
+        position.focused = null;
+        position.group = undefined;
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [position]);
   // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-return
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-return
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-layout
@@ -152,8 +170,13 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       {review && (
         <section data-region="TD-R8" className="td-review">
           <div>
-            <strong>{review.count > 0 ? t("today.review_summary", { items: t("today.review_items", { count: review.count }), calls: t("today.review_from", { count: review.calls.length }) }) : t("today.to_review")}</strong>
-            {review.unnamed > 0 && <>{review.count > 0 ? " · " : " "}{t("today.unnamed", { count: review.unnamed })}</>}
+            <strong>{review.count > 0
+              ? review.unnamed > 0
+                ? t("today.review_summary_unnamed", { items: t("today.review_items", { count: review.count }), calls: t("today.review_from", { count: review.calls.length }), speakers: t("today.unnamed", { count: review.unnamed }) })
+                : t("today.review_summary", { items: t("today.review_items", { count: review.count }), calls: t("today.review_from", { count: review.calls.length }) })
+              : review.unnamed > 0
+                ? t("today.review_speakers_only", { speakers: t("today.unnamed", { count: review.unnamed }) })
+                : t("today.to_review")}</strong>
           </div>
           <div className="td-review__links">
             {review.calls.map((c) => <Link key={c.id} label={`${c.title} ›`} onAction={() => void openReview(bridge, c.id)} />)}
