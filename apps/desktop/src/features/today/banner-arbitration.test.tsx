@@ -109,3 +109,5 @@ it("shows failed-capture recovery ahead of Calendar and resumes the same call", 
   await slot.banners.find((b) => b.id === "today-engine")!.actions![0]!.onAction!();
   expect(resume).toHaveBeenCalledWith({ call_id: "call_live" });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

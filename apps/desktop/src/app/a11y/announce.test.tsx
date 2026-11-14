@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Politeness, Result, Ack } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
@@ -207,3 +207,5 @@ describe("LiveRegions", () => {
     expect(html).not.toContain('role="alert"'); // an empty region must not read as an error alert
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

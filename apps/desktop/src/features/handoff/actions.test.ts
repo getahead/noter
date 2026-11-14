@@ -256,3 +256,5 @@ describe("handoff context from a fresh item-only entry point", () => {
     expect(seen.map((s) => s[0])).toContain("outputs_get");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

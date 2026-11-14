@@ -25,7 +25,6 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const harness = () => (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<unknown> } }).process;
 
 /** Rows of the real core's database, read-only. */
@@ -247,7 +246,6 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
       { kind: "decision", text: "Scripted decision", review_state: "suggested", spans: 1 },
       { kind: "action_item", text: "Scripted action item", review_state: "suggested", spans: 1 },
     ]);
-    await sleep(300);
     expect(await notifications()).toEqual([]);
     await stop(oneOnOne);
     await written(oneOnOne);
@@ -259,7 +257,6 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
     ok(await s.core("main").windowReportView({ call_id: shown }));
     await stop(shown);
     await written(shown);
-    await sleep(300);
     expect(await notifications()).toHaveLength(2);
   });
 

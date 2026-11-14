@@ -69,6 +69,12 @@ describe("permission-check-row (cpt-noter-component-ui-permission-check-row)", (
     expect(row({ state: "MISSING", howto: "How to allow it" })).toContain("How to allow it");
   });
 
+  it("reserves the microphone meter slot before levels arrive", () => {
+    expect(row({ id: "mic", state: "GRANTED" })).toContain('class="fr-perm__meter"');
+    expect(row({ id: "mic", state: "NOT_ASKED" })).not.toContain('class="fr-perm__meter"');
+    expect(row({ id: "mic", state: "DENIED" })).not.toContain('class="fr-perm__meter"');
+  });
+
   it("hides the reason, the how-to and the meter in the status variant, and asks Continue in the test-only one", () => {
     const status = row({ variant: "status", state: "MISSING", howto: "How to allow it" });
     expect(status).not.toContain("Records your side");

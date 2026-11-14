@@ -323,7 +323,7 @@ The system **MUST** show the three model bundles with progress, **Pause** and **
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-components`
 
-The system **MUST** provide the permission check row (setup, status and test-only variants), the self-test panel (step and sheet variants) and the display picker (several displays, one display, remembered display absent) as reusable components with the prototype's markup, so Settings and the self-test sheet use the same ones.
+The system **MUST** provide the permission check row (setup, status and test-only variants), the self-test panel (step and sheet variants) and the display picker (several displays, one display, remembered display absent) as reusable components with the prototype's markup, so Settings and the self-test sheet use the same ones. The first-run microphone row reserves the meter's space before levels arrive so the **Run Test** control does not move when metering starts.
 
 **Implements**:
 - `cpt-noter-flow-ui-first-run-self-test`

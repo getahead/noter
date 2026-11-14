@@ -195,3 +195,5 @@ describe("focusInside", () => {
     expect(focusInside(node([a]), null)).toBe(false);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

@@ -399,3 +399,5 @@ describe("createWizard", () => {
     expect(speechPercent(bridge.store.getState().whole.setup!.models.bundles)).toBe(100);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

@@ -191,3 +191,5 @@ it("a review request is dropped when another call opens or after ten seconds", a
   expect(focus).not.toHaveBeenCalled();
   vi.useRealTimers();
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

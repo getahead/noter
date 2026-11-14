@@ -1,7 +1,6 @@
 //! noter-native: the pure mappings on every system, and the macOS readings that never prompt.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_native::*;
@@ -177,8 +176,7 @@ fn the_environment_reports_displays_route_and_disk() {
 
 #[test]
 fn watch_reports_a_change_and_stops_when_dropped() {
-    let seen = Arc::new(Mutex::new(Vec::new()));
-    let s = seen.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
     let mut readings = vec![
         Reading::default(),
         Reading::default(),
@@ -191,15 +189,15 @@ fn watch_reports_a_change_and_stops_when_dropped() {
     let w = watch_with(
         move || readings.next().unwrap_or_default(),
         Duration::from_millis(5),
-        move |r| s.lock().unwrap().push(r.disk_free_mb),
+        move |r| tx.send(r.disk_free_mb).unwrap(),
     );
-    std::thread::sleep(Duration::from_millis(100));
+    assert_eq!(rx.recv_timeout(Duration::from_secs(1)).unwrap(), 7);
+    assert_eq!(rx.recv_timeout(Duration::from_secs(1)).unwrap(), 0);
     drop(w);
-    let after = seen.lock().unwrap().clone();
-    // The first reading is the baseline; then 7 arrives, then the default again.
-    assert_eq!(after, vec![7, 0]);
-    std::thread::sleep(Duration::from_millis(30));
-    assert_eq!(*seen.lock().unwrap(), after, "no callback after drop");
+    assert!(matches!(
+        rx.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Disconnected)
+    ));
 }
 
 #[test]
@@ -297,9 +295,23 @@ fn off_macos_the_surfaces_do_nothing() {
 
 #[test]
 fn the_local_offset_follows_the_time_zone_of_the_process() {
-    // The only test that touches TZ in this binary.
-    std::env::set_var("TZ", "Asia/Kolkata");
-    assert_eq!(utc_offset_minutes(1_792_137_600_000), 330);
-    std::env::set_var("TZ", "UTC");
-    assert_eq!(utc_offset_minutes(1_792_137_600_000), 0);
+    for (zone, expected) in [("Asia/Kolkata", 330), ("UTC", 0)] {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "timezone_offset_child", "--nocapture"])
+            .env("TZ", zone)
+            .env("NOTER_EXPECTED_TZ_OFFSET", expected.to_string())
+            .status()
+            .unwrap();
+        assert!(status.success(), "timezone subprocess failed for {zone}");
+    }
+}
+
+#[test]
+fn timezone_offset_child() {
+    if let Ok(expected) = std::env::var("NOTER_EXPECTED_TZ_OFFSET") {
+        assert_eq!(
+            utc_offset_minutes(1_792_137_600_000),
+            expected.parse::<i32>().unwrap()
+        );
+    }
 }

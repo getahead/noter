@@ -4,6 +4,7 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
+use std::time::Duration;
 
 use noter_core::{allowed_download_url, BundleFile, FetchError, ModelSource, PinnedModels};
 use noter_llm::{PinnedFile, RangeFetcher};
@@ -46,6 +47,10 @@ fn server(body: &'static [u8]) -> u16 {
 }
 
 fn local(url: String) -> PinnedModels {
+    local_with_stall(url, Duration::from_secs(30))
+}
+
+fn local_with_stall(url: String, stall: Duration) -> PinnedModels {
     PinnedModels::with(
         vec![PinnedFile {
             bundle: "whisper-turbo".into(),
@@ -55,7 +60,7 @@ fn local(url: String) -> PinnedModels {
             sha256: String::new(),
             required_for_capture: true,
         }],
-        RangeFetcher::for_local_tests(),
+        RangeFetcher::for_local_tests_with_stall(stall),
     )
 }
 
@@ -115,12 +120,13 @@ async fn a_file_is_fetched_whole_and_resumed_from_a_byte() {
 
 #[tokio::test]
 async fn no_server_is_offline_and_a_host_off_the_list_is_refused_without_a_request() {
-    let closed = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    let (offline, _) = fetch(&local(format!("http://127.0.0.1:{closed}/m")), 0).await;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let offline_models = local_with_stall(
+        format!("http://127.0.0.1:{port}/m"),
+        Duration::from_millis(100),
+    );
+    let (offline, _) = fetch(&offline_models, 0).await;
     assert_eq!(offline, Err(FetchError::Offline));
     // The real fetcher: an unlisted host never gets a request (the core then fails the bundle).
     let off_list = PinnedModels::with(

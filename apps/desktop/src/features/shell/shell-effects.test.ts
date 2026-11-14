@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { dockQuietly, inspectorDefinitionFocus, inspectorFocus, returnTarget, layoutFor, exitMs, leaveTimer, openFocus, actionEvent, runShellAction, createScrollMemory, escapeEvent, focusEffect, focusHeading, navEffect, navMove, scrollEffect, scrollSaver, tickWhile, watchWidth } from "./shell-effects";
 
@@ -276,3 +276,5 @@ describe("the inspector and focus (D81)", () => {
     expect(returnTarget({ activeElement: null, body, querySelector: query })).toBe(content);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

@@ -72,3 +72,5 @@ describe("Add Mapping sheet", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

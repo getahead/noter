@@ -120,7 +120,6 @@ describe("cpt-noter-seq-record-prompt-start-recording", () => {
     const prompts = async () => (await s.surfaces())!.filter((c: string) => c === "show_record_prompt").length;
     const shown = await prompts();
     await fact({ type: "call_detected", ...safari, pid: 78 });
-    await sleep(100);
     expect(await prompts()).toBe(shown);
   });
 });
@@ -134,7 +133,6 @@ describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     expect(await s.surfaces()).toContain("close_record_prompt");
     expect(ok(await s.core("main").appSnapshot({})).detection.detection?.id).toBe(detection.id); // kept for the menu
     await fact({ type: "call_detected", ...TEAMS, pid: 4242 });
-    await sleep(100);
     expect((await s.surfaces())!.filter((c: string) => c === "show_record_prompt")).toHaveLength(1); // no second prompt
 
     ok(await s.core("main").captureStart({ source: "menu_bar", sensitive: false, detection_id: detection.id }));
@@ -171,7 +169,6 @@ describe("cpt-noter-seq-call-screen-recover-capture", () => {
     ok(await s.core("call-screen").captureKeepSource({ call_id: callId, bundle_id: zoom.bundle_id }));
     expect(types(await degraded())).not.toContain("second_audio_source");
     await fact({ type: "audio_source_added", call_id: callId, ...zoom });
-    await sleep(100);
     expect(types(await degraded())).not.toContain("second_audio_source");
   });
 

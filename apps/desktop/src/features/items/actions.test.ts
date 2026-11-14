@@ -343,3 +343,5 @@ it("inline completion Undo switches History to Redo instead of retaining an alre
   await undoRow(bridge, "itm_spec", target);
   expect(undoMode()).toBe("redo");
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

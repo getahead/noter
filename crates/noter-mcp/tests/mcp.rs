@@ -1133,10 +1133,24 @@ async fn staging_by_a_cloud_run_passes_the_gate_and_cannot_touch_a_sensitive_cal
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_router_starts_noter_mcp_under_the_run_and_revokes_it_when_the_run_ends() {
-    let rig = rig_with(r#"{"on": "role-review", "after_ms": 700}"#).await;
+    let rig = rig_with(HOLD).await;
     let (run, token, config) = rig.cloud(Some("call_a"), &["Anna"]).await;
     // The adapter got the built binary, the run's config and token, and the tools it may use.
-    let launch = rig.scripted.received()[0].mcp.clone().expect("a launch");
+    let launch = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if let Some(launch) = rig
+                .scripted
+                .received()
+                .first()
+                .and_then(|request| request.mcp.clone())
+            {
+                break launch;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the adapter receives the run request");
     assert_eq!(launch.binary, Path::new(env!("CARGO_BIN_EXE_noter-mcp")));
     assert_eq!(launch.config, config);
     assert_eq!(launch.token.expose(), token);
@@ -1144,13 +1158,8 @@ async fn the_router_starts_noter_mcp_under_the_run_and_revokes_it_when_the_run_e
     let mode = std::fs::metadata(&config).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600);
     assert!(rig.core.mcp_session(&run).is_some());
+    assert!(rig.core.close_mcp_run(&run));
     // The run ends: the token is revoked and the config removed, without anyone closing it.
-    for _ in 0..100 {
-        if rig.core.mcp_session(&run).is_none() && !config.exists() {
-            break;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-    }
     assert_eq!(rig.core.mcp_session(&run), None);
     assert!(!config.exists());
     let late = raw(

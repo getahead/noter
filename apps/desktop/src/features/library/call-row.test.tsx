@@ -62,8 +62,9 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
 
   it("writes the time as Today or the day, and a type id as words", () => {
     const now = Date.UTC(2026, 9, 2, 20);
-    expect(whenOf(Date.UTC(2026, 9, 2, 12), now)).toMatch(/^Today \d\d:\d\d$/);
-    expect(whenOf(Date.UTC(2026, 8, 1, 12), now)).toMatch(/^1 Sep \d\d:\d\d$/);
+    const prefs = { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as const;
+    expect(whenOf(Date.UTC(2026, 9, 2, 12), now, prefs)).toMatch(/^Today \d\d:\d\d$/);
+    expect(whenOf(Date.UTC(2026, 8, 1, 12), now, prefs)).toMatch(/^1 Sep \d\d:\d\d$/);
     expect(typeLabel("one_on_one")).toBe("One on one");
   });
 

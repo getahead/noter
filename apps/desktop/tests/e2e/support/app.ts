@@ -13,7 +13,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import fixture from "../../../../../contracts/fixtures/world.json" with { type: "json" };
 import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type HotkeyAction, type WindowLabel } from "../../../src/core/bindings";
 import type { ChannelBody } from "../../../src/core/fake/fake-core";
-import type { World } from "../../support/scenario";
+import type { EngineFact, World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
 
 export interface CorePlan {
@@ -23,6 +23,8 @@ export interface CorePlan {
   contractVersion?: string;
   /** Artificial latency per command, in ms. */
   latency?: number;
+  /** Restrict `latency` to this command so setup/navigation stays responsive. */
+  latencyFor?: CommandName;
   /** Page Date and the real core use the fixture's clock; browser timers still run. */
   fixedClock?: boolean;
   /** The real core's scripted host refuses this initially bound chord. */
@@ -44,6 +46,9 @@ export interface Steer {
   releaseDownload(): Promise<void>;
   /** Hold the next self-test script for manually injected events. */
   holdNextSelfTest(): Promise<void>;
+  captureStart(): Promise<{ call_id: string }>;
+  captureStop(callId: string): Promise<void>;
+  engineFact(event: EngineFact): Promise<boolean>;
 }
 
 export interface Call {
@@ -73,7 +78,7 @@ const HOOK = `
         }
         (plan.fail ?? []).forEach((f) => this.failNext(f.cmd, f.code));
         if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
-        if (plan.latency) this.latency = plan.latency;
+        if (plan.latency && !plan.latencyFor) this.latency = plan.latency;
         if (plan.corruptNextDownload) {
           if (!this.corruptNextDownload) throw new Error("the fake core has no corruptNextDownload yet (backend ask in _team/ui/e2e/M0-coverage.md)");
           this.corruptNextDownload();
@@ -82,7 +87,10 @@ const HOOK = `
     }
     const call = { kind: "invoke", name: cmd, args: structuredClone(args), completed: false };
     calls.push(call);
-    return Promise.resolve(this.__noterPlanned).then(() => invoke.call(this, cmd, args, onMessage)).then((result) => {
+    return Promise.resolve(this.__noterPlanned).then(async () => {
+      if (plan?.latency && plan.latencyFor === cmd) await new Promise((resolve) => setTimeout(resolve, plan.latency));
+      return invoke.call(this, cmd, args, onMessage);
+    }).then((result) => {
       call.completed = true;
       return result;
     });
@@ -170,6 +178,9 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     push: async (cmd, body) => void (await control("harness.push", { cmd, body })),
     releaseDownload: async () => void (await control("harness.release_download", {})),
     holdNextSelfTest: async () => void (await control("harness.hold_next_self_test", {})),
+    captureStart: async () => (await control("capture_start", { source: "menu_bar", sensitive: false })) as { call_id: string },
+    captureStop: async (call_id) => void (await control("capture_stop", { call_id })),
+    engineFact: async (event) => Boolean((await control("harness.engine_fact", { event }) as { delivered: boolean }).delivered),
   };
   if (plan.world) await steer.change(plan.world);
   if (plan.corruptNextDownload) await control("harness.corrupt_next_download", {});
@@ -187,7 +198,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     listeners.delete(`${doc}/${handler}`);
   });
   await page.exposeFunction("__noterInvoke", async (doc: string, cmd: CommandName, args: unknown, channel: number | null): Promise<Answer> => {
-    if (plan.latency) await new Promise((r) => setTimeout(r, plan.latency));
+    if (plan.latency && (!plan.latencyFor || plan.latencyFor === cmd)) await new Promise((r) => setTimeout(r, plan.latency));
     let index = 0;
     const onMessage = channel === null ? undefined : (message: unknown) => void deliver(doc, channel, { index: index++, message });
     try {
@@ -220,6 +231,9 @@ function fakeSteer(page: Page): Steer {
     push: (cmd, body) => page.evaluate(([c, b]) => void (globalThis as unknown as PageFake).__noterFake.push(c, b), [cmd, body] as const),
     releaseDownload: async () => {},
     holdNextSelfTest: () => page.evaluate(() => { (globalThis as unknown as PageFake).__noterFake.holdSelfTest = true; }),
+    captureStart: async () => { throw new Error("the fake core does not start native capture in E2E steering"); },
+    captureStop: async () => {},
+    engineFact: async () => false,
   };
 }
 

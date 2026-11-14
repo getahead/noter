@@ -214,11 +214,16 @@ pub fn environment(storage: &Path) -> Reading {
 /// Stops its watcher when dropped.
 pub struct Watch {
     stop: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Drop for Watch {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            thread.thread().unpark();
+            let _ = thread.join();
+        }
     }
 }
 
@@ -241,10 +246,10 @@ pub fn watch_with(
 ) -> Watch {
     let stop = Arc::new(AtomicBool::new(false));
     let stopped = stop.clone();
-    std::thread::spawn(move || {
+    let thread = std::thread::spawn(move || {
         let mut last = read();
         loop {
-            std::thread::sleep(every);
+            std::thread::park_timeout(every);
             if stopped.load(Ordering::SeqCst) {
                 return;
             }
@@ -255,7 +260,10 @@ pub fn watch_with(
             }
         }
     });
-    Watch { stop }
+    Watch {
+        stop,
+        thread: Some(thread),
+    }
 }
 
 // @cpt-begin:cpt-noter-algo-core-first-run-login-item:p2:inst-login-apply

@@ -95,3 +95,5 @@ describe("useFocusReturn", () => {
     closeSheet();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

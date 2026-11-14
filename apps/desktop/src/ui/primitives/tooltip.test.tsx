@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HELP_TAG_MS, helpTag, Tooltip } from "./tooltip";
 
 describe("Tooltip (cpt-noter-dod-ui-primitives-controls)", () => {
@@ -71,10 +71,13 @@ describe("Tooltip wiring", () => {
     expect(own).toHaveBeenCalledTimes(7);
   });
 
-  it("uses the real timers by default", async () => {
+  it("shows the help tag after the hover delay", async () => {
+    vi.useFakeTimers();
     const show = vi.fn();
     helpTag(show).hover();
-    await new Promise((r) => setTimeout(r, HELP_TAG_MS + 20));
+    await vi.advanceTimersByTimeAsync(HELP_TAG_MS);
     expect(show).toHaveBeenCalledWith(true);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

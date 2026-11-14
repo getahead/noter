@@ -106,3 +106,5 @@ describe("the panel window fits the panel", () => {
     vi.unstubAllGlobals();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

@@ -76,3 +76,5 @@ describe("Repositories pane", () => {
     expect(fake.world.repos.mappings[0]!.default_tool).toBe("codex");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

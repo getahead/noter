@@ -147,3 +147,5 @@ describe("value helpers", () => {
       expect(typeof m === "string" ? m : m.other).not.toBe("");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

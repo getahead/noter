@@ -119,7 +119,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await openCall(page);
     await expect(info(page)).toBeVisible();
     const inInfo = () => page.evaluate(() => document.activeElement?.closest('[data-region="MW-R4"]') !== null);
-    expect(await inInfo()).toBe(false);
+    await expect.poll(inInfo).toBe(false);
     await page.keyboard.press("Alt+Meta+KeyI"); // hide
     await expect(info(page)).toHaveCount(0);
     await page.keyboard.press("Alt+Meta+KeyI"); // show: the user asked for it, so it takes focus

@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BridgeProvider, useBridge } from "../../app/bridge/context";
 import { DialogsProvider } from "../../ui/dialogs/host";
 import { CallsPage } from "./calls-page";
@@ -47,3 +47,5 @@ describe("useBridge", () => {
     expect(() => renderToString(<Probe />)).toThrow("BridgeProvider");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

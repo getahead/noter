@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { Settings } from "../../core/bindings";
@@ -122,12 +122,10 @@ describe("panes", () => {
     const p = await ready((w) => (w.settings.general.ignored_apps = [{ bundle_id: "com.apple.Safari", app_name: "Safari" }]));
     const tree = rendered(GeneralPane, { bridge, settings: stored() });
     control(tree, "Launch at login")(!p.general.launch_at_login);
-    await new Promise((r) => setTimeout(r));
-    expect(stored().general.launch_at_login).toBe(!p.general.launch_at_login);
+    await vi.waitFor(() => expect(stored().general.launch_at_login).toBe(!p.general.launch_at_login));
     expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Safari");
     control(tree, "Remove")();
-    await new Promise((r) => setTimeout(r));
-    expect(stored().general.ignored_apps).toEqual([]);
+    await vi.waitFor(() => expect(stored().general.ignored_apps).toEqual([]));
     expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Noter offers to record calls in every app.");
   });
 
@@ -140,13 +138,10 @@ describe("panes", () => {
     await props();
     const tree = rendered(PrivacyPane, { bridge, settings: stored() });
     (find(tree, (pr) => pr.name === "st-pmode").props.onAction as (v: string) => void)("local_only");
-    await new Promise((r) => setTimeout(r));
-    expect(stored().privacy.mode).toBe("local_only");
+    await vi.waitFor(() => expect(stored().privacy.mode).toBe("local_only"));
     control(tree, "Audio retention")("days7");
     (find(tree, (pr) => typeof pr.ariaLabel === "string" && pr.ariaLabel.startsWith("Show talk-time")).props.onAction as (v: boolean) => void)(true);
-    await new Promise((r) => setTimeout(r));
-    expect(stored().audio.retention).toBe("days7");
-    expect(stored().privacy.behaviour_metrics).toBe(true);
+    await vi.waitFor(() => expect(stored()).toMatchObject({ audio: { retention: "days7" }, privacy: { behaviour_metrics: true } }));
     const html = renderToString(<PrivacyPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Local only");
     expect(html).toContain("In force:");
@@ -166,28 +161,24 @@ describe("panes", () => {
     control(tree, "Layout")("floating");
     control(tree, "Menu bar title")("elapsed_time");
     control(tree, "Pause or resume")(false);
-    await new Promise((r) => setTimeout(r));
-    expect(stored().call_screen.layout).toBe("floating");
-    expect(stored().menu_bar.title).toBe("elapsed_time");
-    expect(stored().menu_bar.hidden_actions).toContain("pause");
+    await vi.waitFor(() => {
+      expect(stored()).toMatchObject({ call_screen: { layout: "floating" }, menu_bar: { title: "elapsed_time" } });
+      expect(stored().menu_bar.hidden_actions).toContain("pause");
+    });
     control(tree, "Open the call screen automatically")(false);
-    await new Promise((r) => setTimeout(r));
-    expect(stored().call_screen.open_automatically).toBe(false);
+    await vi.waitFor(() => expect(stored().call_screen.open_automatically).toBe(false));
   });
 
   it("Performance and Updates save their sections", async () => {
     await props();
     const perf = rendered(PerformancePane, { bridge, settings: stored() });
     control(perf, "Keep metrics for")("365");
-    await new Promise((r) => setTimeout(r));
-    expect(stored().performance.retention_days).toBe(365);
+    await vi.waitFor(() => expect(stored().performance.retention_days).toBe(365));
     expect(renderToString(<PerformancePane bridge={bridge} settings={stored()} />)).toContain("Bottleneck thresholds");
     const upd = rendered(UpdatesPane, { bridge, settings: stored() });
     control(upd, "Channel")("beta");
     (find(upd, (pr) => pr.name === "st-install").props.onAction as (v: string) => void)("ask");
-    await new Promise((r) => setTimeout(r));
-    expect(stored().updates.channel).toBe("beta");
-    expect(stored().updates.install_automatically).toBe(false);
+    await vi.waitFor(() => expect(stored()).toMatchObject({ updates: { channel: "beta", install_automatically: false } }));
     expect(renderToString(<UpdatesPane bridge={bridge} settings={stored()} />)).toContain("Check Now");
   });
 
@@ -204,7 +195,10 @@ describe("panes", () => {
     control(tree, "Treat AirPods Pro as headphones")(true);
     control(tree, "Exclude Noter’s own sounds")(false);
     control(tree, "Live transcription")("parakeet_tdt_v3");
-    await new Promise((r) => setTimeout(r));
+    await vi.waitFor(() => {
+      expect(stored().audio.output.headphones_devices).toContain("uid-1");
+      expect(stored().audio.exclude_own_sounds).toBe(false);
+    });
     expect(stored().audio.output.headphones_devices).toContain("uid-1");
     expect(stored().audio.exclude_own_sounds).toBe(false);
     expect(stored().audio.live_backend).toBe("parakeet_tdt_v3");
@@ -233,11 +227,9 @@ describe("panes", () => {
     expect(html).toContain("Restore Defaults");
     const tree = rendered(HotkeysPane, { bridge });
     control(tree, "Use card keys during calls")(false);
-    await new Promise((r) => setTimeout(r));
-    expect(stored().copilot.card_keys.enabled).toBe(false);
+    await vi.waitFor(() => expect(stored().copilot.card_keys.enabled).toBe(false));
     control(tree, "Dismiss with keys")(true);
-    await new Promise((r) => setTimeout(r));
-    expect(stored().copilot.dismiss_with_keys).toBe(true);
+    await vi.waitFor(() => expect(stored().copilot.dismiss_with_keys).toBe(true));
   });
 });
 

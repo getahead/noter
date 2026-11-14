@@ -67,3 +67,5 @@ describe("cpt-noter-flow-ui-handoff-mapping", () => {
     expect(read).toHaveBeenCalledOnce();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

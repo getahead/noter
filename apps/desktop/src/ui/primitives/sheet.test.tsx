@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from "react";
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Sheet, sheetKey } from "./sheet";
 
 describe("Sheet (cpt-noter-dod-ui-primitives-controls)", () => {
@@ -103,3 +103,5 @@ describe("SheetFooter (cpt-noter-algo-ui-primitives-fit-labels)", () => {
     expect(html).toBe('<div class="np-sheet__foot"><button>Cancel</button><button>Export</button></div>');
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

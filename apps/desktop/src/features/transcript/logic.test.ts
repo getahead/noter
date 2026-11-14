@@ -316,3 +316,5 @@ describe("lineKey", () => {
     expect(lineKey({ key: "c", metaKey: true })).toBe("c");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
