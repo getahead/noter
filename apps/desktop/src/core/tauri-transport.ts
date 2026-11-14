@@ -30,6 +30,9 @@ export const tauriTransport: Transport = {
 
 /** Native application menu selections that target the main-window shell (the menu is owned by macOS). */
 export async function listenNativeMenuAction(handler: (key: string) => void): Promise<() => void> {
+  if (typeof window === "undefined" || typeof (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== "object") {
+    return () => {};
+  }
   return listen<string>("shell:menu-action", (event) => handler(event.payload));
 }
 

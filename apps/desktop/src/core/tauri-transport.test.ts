@@ -1,12 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const invoke = vi.fn();
+const { invoke, listen } = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...a), Channel: class {} }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => listen(...a) }));
 
-const { nativeAsk } = await import("./tauri-transport");
+const { listenNativeMenuAction, nativeAsk } = await import("./tauri-transport");
 
 const alert = { title: "Delete “Backend sync”?", message: "Its audio and transcript are deleted.", kind: "warning" as const, okLabel: "Delete", cancelLabel: "Cancel" };
+
+describe("listenNativeMenuAction", () => {
+  it("does not subscribe when the window is running without the Tauri host", async () => {
+    vi.mocked(listen).mockClear();
+
+    const unlisten = await listenNativeMenuAction(vi.fn());
+
+    expect(listen).not.toHaveBeenCalled();
+    expect(unlisten).toBeTypeOf("function");
+  });
+});
 
 describe("nativeAsk (cpt-noter-seq-dialogs-delete-call)", () => {
   beforeEach(() => invoke.mockReset());
