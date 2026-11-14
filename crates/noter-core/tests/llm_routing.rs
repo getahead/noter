@@ -1,27 +1,19 @@
 //! FEATURE cpt-noter-feature-core-llm-gate, route failover: the production core observes the
 //! router's per-call local switch and publishes it as effective privacy and degraded state.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use noter_core::{
-    Adapters, Core, CoreDeps, EventEmitter, MemorySecrets, Scripted, Secret, SecretStore,
-};
+#[path = "common/events.rs"]
+mod common_events;
+use common_events::Events;
+
+use noter_core::{Adapters, Core, CoreDeps, MemorySecrets, Scripted, Secret, SecretStore};
 use noter_llm::{Packet, PacketContext, Privacy, RunRequest, Skill, SourceClass, TaskKind};
 use noter_protocol::ipc::{event_names, CoreApi};
 use noter_protocol::model::settings::AuditWhat;
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::Value;
 use tokio::sync::watch;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
 
 #[tokio::test]
 async fn two_runtime_failures_publish_local_mode_to_the_core() {
@@ -76,9 +68,10 @@ async fn two_runtime_failures_publish_local_mode_to_the_core() {
             call_id: Some(call_id), ..
         } if *call_id == CallId::new("call_route")
     )));
-    assert!(events.0.lock().unwrap().iter().any(|(event, payload)| {
-        *event == event_names::PRIVACY_CHANGED && payload["effective"] == "switched_to_local"
-    }));
+    assert!(events
+        .named(event_names::PRIVACY_CHANGED)
+        .iter()
+        .any(|payload| payload["effective"] == "switched_to_local"));
 }
 
 fn request(privacy: &watch::Sender<Privacy>) -> RunRequest {

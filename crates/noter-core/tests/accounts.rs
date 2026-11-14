@@ -3,15 +3,16 @@
 //! `-secret-boundary` for API keys, state `-key` without removal): `accounts_get` and
 //! `api_key_set` on the scripted runtime with the in-memory Keychain stand-in (TL-13).
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
+use common_events::Events;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use test_support::FixedClock;
 
-use noter_core::{
-    Adapters, Core, CoreDeps, EventEmitter, MemorySecrets, Scripted, Secret, SecretStore,
-};
+use noter_core::{Adapters, Core, CoreDeps, MemorySecrets, Scripted, Secret, SecretStore};
 use noter_llm::{Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind};
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
@@ -24,32 +25,18 @@ const NOW: TimestampMs = TimestampMs(1_790_000_000_000);
 const KEY: &str = "sk-ant-api03-THE-SECRET-KEY-VALUE";
 const OTHER_KEY: &str = "sk-ant-api03-A-REPLACEMENT-KEY";
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn take(&self) -> Vec<(&'static str, Value)> {
-        std::mem::take(&mut self.0.lock().unwrap())
-    }
-
-    /// The key statuses each `accounts:changed` carried, for `provider`.
-    fn statuses(&self, provider: &str) -> Vec<String> {
-        self.take()
-            .into_iter()
-            .filter(|(e, _)| *e == event_names::ACCOUNTS_CHANGED)
-            .map(|(_, p)| {
-                let keys = p["keys"].as_array().cloned().unwrap_or_default();
-                let key = keys.iter().find(|k| k["provider"] == provider).unwrap();
-                key["status"]["type"].as_str().unwrap().to_owned()
-            })
-            .collect()
-    }
+/// The key statuses each `accounts:changed` carried, for `provider`.
+fn statuses(events: &Events, provider: &str) -> Vec<String> {
+    events
+        .take()
+        .into_iter()
+        .filter(|(e, _)| *e == event_names::ACCOUNTS_CHANGED)
+        .map(|(_, p)| {
+            let keys = p["keys"].as_array().cloned().unwrap_or_default();
+            let key = keys.iter().find(|k| k["provider"] == provider).unwrap();
+            key["status"]["type"].as_str().unwrap().to_owned()
+        })
+        .collect()
 }
 
 struct World {
@@ -250,7 +237,7 @@ async fn a_rejected_first_key_is_rejected_and_stored_nowhere() {
     assert_eq!(err.code, ErrorCode::KeyRejected);
     assert!(!err.message.contains(KEY));
     assert_eq!(w.secrets.get("codex").unwrap(), None);
-    assert_eq!(w.events.statuses("codex"), ["verifying", "rejected"]);
+    assert_eq!(statuses(&w.events, "codex"), ["verifying", "rejected"]);
     let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
     assert_eq!(
         status(&view, KeyProvider::Codex),
@@ -291,7 +278,7 @@ async fn a_failed_replacement_keeps_the_working_key() {
         Some(KEY.to_owned())
     );
     assert_eq!(
-        w.events.statuses("anthropic"),
+        statuses(&w.events, "anthropic"),
         ["verifying", "configured", "verifying", "configured"]
     );
     let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
@@ -363,7 +350,7 @@ async fn a_stored_key_the_provider_rejects_becomes_rejected() {
     let mut req = RunRequest::new(Skill::PostCall, "1", packet, TaskKind::PostCall, privacy);
     req.settings.configured = Some(RuntimeChoice::ClaudeApiKey);
     w.core.llm().run_once(req).await.unwrap_err();
-    assert_eq!(w.events.statuses("anthropic"), ["rejected"]);
+    assert_eq!(statuses(&w.events, "anthropic"), ["rejected"]);
     let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
     assert_eq!(
         status(&view, KeyProvider::Anthropic),

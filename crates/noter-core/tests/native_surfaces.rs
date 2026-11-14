@@ -2,6 +2,8 @@
 //! placement, hide for presenting, the tray model, announcements, navigation and external opens,
 //! over a native layer that records what the core asked of it.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::path::Path;
@@ -9,34 +11,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use test_support::FixedClock;
 
+use common_events::Events;
 use noter_core::{
-    Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, Placement, Surfaces, TrayAction,
-    TrayGlyph, TrayModel,
+    Clock, Core, CoreDeps, EnvironmentReading, Placement, Surfaces, TrayAction, TrayGlyph,
+    TrayModel,
 };
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::Value;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn of(&self, name: &str) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let (hit, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(e, _)| *e == name);
-        *all = rest;
-        hit.into_iter().map(|(_, p)| p).collect()
-    }
-}
 
 /// What the core asked of the native layer, in order.
 #[derive(Default)]
@@ -201,7 +183,7 @@ async fn the_call_window_shows_without_focus_then_takes_it_and_hides() {
     );
     choose(&core, Some("d_side")).await;
     rec.take();
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
     let main = window(WindowLabel::Main);
     let first = core.window_show_call(&main, NoArgs {}).await.unwrap();
     assert!(first.visible && !first.key);
@@ -216,7 +198,7 @@ async fn the_call_window_shows_without_focus_then_takes_it_and_hides() {
     let third = core.window_show_call(&main, NoArgs {}).await.unwrap();
     assert_eq!(third, second);
     assert!(rec.take().is_empty());
-    let sent = events.of(event_names::WINDOW_CALL);
+    let sent = events.named(event_names::WINDOW_CALL);
     assert_eq!(sent.len(), 2);
     assert!(sent[1]["version"].as_u64() > sent[0]["version"].as_u64());
     let hidden = core
@@ -241,14 +223,14 @@ async fn repeated_live_rename_reclaims_focus_without_moving_the_panel() {
     let first = core.window_show_call(&call, NoArgs {}).await.unwrap();
     assert!(first.key);
     rec.take();
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
 
     core.call_window_focus_changed(false);
     let inactive = core.window_call_state(&call, NoArgs {}).await.unwrap();
     assert!(inactive.visible && !inactive.key);
-    assert_eq!(events.of(event_names::WINDOW_CALL)[0]["key"], false);
+    assert_eq!(events.named(event_names::WINDOW_CALL)[0]["key"], false);
     core.call_window_focus_changed(false);
-    assert!(events.of(event_names::WINDOW_CALL).is_empty());
+    assert!(events.named(event_names::WINDOW_CALL).is_empty());
     assert!(rec.take().is_empty());
 
     let again = core.window_show_call(&call, NoArgs {}).await.unwrap();
@@ -256,18 +238,18 @@ async fn repeated_live_rename_reclaims_focus_without_moving_the_panel() {
     assert_eq!(again.layout, first.layout);
     assert_eq!(again.display_id, first.display_id);
     assert_eq!(rec.take(), ["make_call_window_key"]);
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
     core.call_window_focus_changed(true);
-    assert!(events.of(event_names::WINDOW_CALL).is_empty());
+    assert!(events.named(event_names::WINDOW_CALL).is_empty());
 
     core.call_window_focus_changed(false);
     core.call_window_focus_changed(true);
     assert!(core.window_call_state(&call, NoArgs {}).await.unwrap().key);
     core.window_hide_call(&call, NoArgs {}).await.unwrap();
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
     core.call_window_focus_changed(true);
     assert!(!core.window_call_state(&call, NoArgs {}).await.unwrap().key);
-    assert!(events.of(event_names::WINDOW_CALL).is_empty());
+    assert!(events.named(event_names::WINDOW_CALL).is_empty());
 }
 
 #[tokio::test]
@@ -297,7 +279,7 @@ async fn unplugging_and_docking_moves_the_open_window_between_layouts() {
     core.window_show_call(&window(WindowLabel::Main), NoArgs {})
         .await
         .unwrap();
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
     rec.take();
     displays(&core, vec![display("d_main", true)]);
     let state = core
@@ -306,7 +288,7 @@ async fn unplugging_and_docking_moves_the_open_window_between_layouts() {
         .unwrap();
     assert_eq!(state.layout, CallLayout::Floating);
     assert!(state.chosen_display_missing && state.visible);
-    assert_eq!(events.of(event_names::WINDOW_CALL).len(), 1);
+    assert_eq!(events.named(event_names::WINDOW_CALL).len(), 1);
     assert_eq!(rec.take(), ["place_call_window collapsed=false"]);
     displays(
         &core,
@@ -332,7 +314,7 @@ async fn collapse_needs_the_floating_layout_and_the_layout_is_a_setting() {
     choose(&core, Some("d_side")).await;
     let call = window(WindowLabel::CallScreen);
     core.window_show_call(&call, NoArgs {}).await.unwrap();
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
     // Dedicated: collapse is returned unchanged, and the state still goes out whole so the
     // window that asked sees its answer as an event.
     let same = core
@@ -340,7 +322,7 @@ async fn collapse_needs_the_floating_layout_and_the_layout_is_a_setting() {
         .await
         .unwrap();
     assert!(!same.collapsed);
-    assert_eq!(events.of(event_names::WINDOW_CALL).len(), 1);
+    assert_eq!(events.named(event_names::WINDOW_CALL).len(), 1);
     let floating = core
         .window_set_call_layout(
             &call,
@@ -384,14 +366,14 @@ async fn hiding_for_presenting_hides_everything_and_restores_what_was_visible() 
     displays(&core, vec![display("d_main", true)]);
     let call = window(WindowLabel::CallScreen);
     core.window_show_call(&call, NoArgs {}).await.unwrap();
-    events.of(event_names::WINDOW_CALL);
+    events.named(event_names::WINDOW_CALL);
     rec.take();
     let hidden = core
         .app_set_hidden_for_presenting(&call, HiddenArgs { hidden: true })
         .await
         .unwrap();
     assert!(hidden.hidden);
-    assert_eq!(events.of(event_names::APP_PRESENTING).len(), 1);
+    assert_eq!(events.named(event_names::APP_PRESENTING).len(), 1);
     let state = core.window_call_state(&call, NoArgs {}).await.unwrap();
     assert!(!state.visible);
     assert!(rec.take().contains(&"hide_all".to_string()));
@@ -401,7 +383,7 @@ async fn hiding_for_presenting_hides_everything_and_restores_what_was_visible() 
         .await
         .unwrap();
     assert_eq!(again, hidden);
-    assert!(events.of(event_names::APP_PRESENTING).is_empty());
+    assert!(events.named(event_names::APP_PRESENTING).is_empty());
     // A show request while hidden stays hidden.
     let shown = core.window_show_call(&call, NoArgs {}).await.unwrap();
     assert!(!shown.visible);
@@ -567,14 +549,14 @@ async fn announce_navigate_and_external_opens_are_checked_before_the_native_laye
     .await
     .unwrap();
     assert_eq!(rec.take(), ["show_window settings"]);
-    let nav = events.of(event_names::NAV_REQUEST);
+    let nav = events.named(event_names::NAV_REQUEST);
     assert_eq!(nav.len(), 1);
     assert_eq!(nav[0]["type"], "settings");
     core.window_navigate(&main, NavigateArgs { target: None })
         .await
         .unwrap();
     assert_eq!(rec.take(), ["show_window main"]);
-    assert!(events.of(event_names::NAV_REQUEST).is_empty());
+    assert!(events.named(event_names::NAV_REQUEST).is_empty());
 
     let url = |u: &str| ExternalTarget::Url { url: u.into() };
     let reveal = |p: &str| ExternalTarget::RevealInFinder { path: p.into() };

@@ -1,31 +1,25 @@
 //! FEATURE cpt-noter-feature-core-speakers-audio (slice 3): `audio_delete` and
 //! `audio_delete_older`: stored audio goes, the transcript stays, the change is not undoable.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
+use common_events::Events;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use test_support::FixedClock;
 
-use noter_core::{Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps};
 use noter_db::Insert;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 
 const NOW: i64 = 1_792_137_600_000;
 const DAY: i64 = 86_400_000;
 const MIB: usize = 1_048_576;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
 
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
@@ -156,9 +150,10 @@ async fn deleting_audio_keeps_the_transcript_reports_the_freed_space_and_cannot_
         "another call is untouched"
     );
     assert_eq!(row(&core, "old"), (true, Some(NOW)));
-    let published = events.0.lock().unwrap().iter().any(|(e, p)| {
-        *e == "entity:changed" && p["type"] == "call" && p["call"]["audio_deleted_at"] == json!(NOW)
-    });
+    let published = events
+        .named("entity:changed")
+        .iter()
+        .any(|p| p["type"] == "call" && p["call"]["audio_deleted_at"] == json!(NOW));
     assert!(published, "the call is published with its deletion time");
 
     let played = core
