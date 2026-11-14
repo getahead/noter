@@ -1,22 +1,24 @@
 //! FEATURE cpt-noter-feature-core-items-today (slice 2): call tags, the carry-forward query and
 //! Today. Calendar reads go through a scripted `NativeServices`.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use test_support::FixedClock;
 
+use common_events::Events;
 use noter_core::{
-    BoxFuture, CalendarAttendee, CalendarEvent, Core, CoreDeps, EnvironmentReading, EventEmitter,
-    NativeServices,
+    BoxFuture, CalendarAttendee, CalendarEvent, Core, CoreDeps, EnvironmentReading, NativeServices,
 };
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 #[path = "common/row.rs"]
 mod common_row;
 use common_row::row;
@@ -25,26 +27,6 @@ use common_row::row;
 const NOW: i64 = 1_792_137_600_000;
 const HOUR: i64 = 3_600_000;
 const DAY: i64 = 24 * HOUR;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn named(&self, name: &str) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(e, _)| *e == name);
-        *all = kept;
-        taken.into_iter().map(|(_, p)| p).collect()
-    }
-}
 
 /// A Mac whose calendar permission and events the test scripts.
 struct Calendar {

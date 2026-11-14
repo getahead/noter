@@ -2,6 +2,8 @@
 //! through NativeServices, the environment, the login item, the detection rule and
 //! update_install. Models and the self-test come in the next parts.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::collections::HashMap;
@@ -10,31 +12,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use test_support::FixedClock;
 
+use common_events::Events;
 use noter_core::{
-    detection, BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices, Updater,
+    detection, BoxFuture, Core, CoreDeps, EnvironmentReading, NativeServices, Updater,
 };
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::Value;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn names(&self) -> Vec<&'static str> {
-        std::mem::take(&mut *self.0.lock().unwrap())
-            .into_iter()
-            .map(|(n, _)| n)
-            .collect()
-    }
-}
 
 type Listener = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
 
@@ -632,7 +616,7 @@ async fn setup_and_environment_events_continue_the_snapshot_version() {
     let s = open(dir.path());
     s.core.setup_status(&first_run(), NoArgs {}).await.unwrap();
     let snap = s.core.app_snapshot(&first_run(), NoArgs {}).await.unwrap();
-    s.events.0.lock().unwrap().clear();
+    let _ = s.events.take();
 
     s.core
         .setup_set_step(
@@ -657,7 +641,7 @@ async fn setup_and_environment_events_continue_the_snapshot_version() {
     changed.displays.pop();
     s.core.environment_changed(changed);
 
-    let events = std::mem::take(&mut *s.events.0.lock().unwrap());
+    let events = s.events.take();
     let versions = |name: &str| -> Vec<u64> {
         events
             .iter()

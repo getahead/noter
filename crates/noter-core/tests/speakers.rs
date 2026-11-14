@@ -2,13 +2,16 @@
 //! `transcript_name_speakers` and `transcript_fix_term` through the change log, with the
 //! constraints file the archive pass reads.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use test_support::FixedClock;
 
-use noter_core::{Core, CoreDeps, EventEmitter};
+use common_events::Events;
+use noter_core::{Core, CoreDeps};
 use noter_db::Insert;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
@@ -20,26 +23,6 @@ mod common_row;
 use common_row::row;
 
 const NOW: i64 = 1_792_137_600_000;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn named(&self, name: &str) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(e, _)| *e == name);
-        *all = kept;
-        taken.into_iter().map(|(_, p)| p).collect()
-    }
-}
 
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
