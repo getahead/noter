@@ -2,8 +2,8 @@
 title: "Feature: Native surfaces: panels, menu bar, notifications and windows"
 description: "Non-activating, content-protected panels; the call window's two layouts across displays; hide for presenting; the menu bar and tray; notifications through UNUserNotificationCenter; announcements, navigation and external opens; menu and hotkey actions as native callers."
 status: PROPOSED
-version: "0.1"
-date: "2026-10-18"
+version: "0.2"
+date: "2026-11-14"
 milestone: M1
 lane: core (src-tauri) and engine (noter-native)
 decomposition: docs/DECOMPOSITION-core.md
@@ -16,6 +16,7 @@ design: docs/DESIGN-core.md
 
 - [1. Feature Context](#1-feature-context)
   - [1.1 Overview](#11-overview)
+  - [Changelog](#changelog)
   - [1.2 Purpose](#12-purpose)
   - [1.3 Actors](#13-actors)
   - [1.4 References](#14-references)
@@ -54,6 +55,10 @@ design: docs/DESIGN-core.md
 In `apps/desktop/src-tauri` and the `noter-native` crate (objc2), the core builds everything that must work while no WebView has focus. The call window and the record prompt become non-activating, content-protected NSPanels (tauri-nspanel, pinned to a commit), placed by display identity and switched between the dedicated and floating layouts when displays change. Hide for presenting removes every surface. The tray shows the recording state and a menu whose items call the core as `Caller::Native`. Notifications go through `UNUserNotificationCenter` with a thread per call and a `NavTarget`, and a click becomes `nav:request`. EventKit is read for detection matching. Window commands, announcements and external opens complete the set.
 
 > **M1 decisions (Backend Teamlead, 21 Oct 2026).** `CallWindowState`, `PresentingState`, the record prompt request and all ten commands of this feature live in noter-core behind the `Surfaces` trait on `CoreDeps`; `src-tauri` implements it over noter-native and the harness has a scripted implementation that records calls and answers the display list, so the window-free parts of the stories are proven through the harness (TL-2). The tray shows the privacy mode from `Settings.privacy.mode` and updates on `settings:changed`; `PrivacyStatus` is M2 (TL-10). The XCUITest stories (display unplugged, allow notifications, and the AppKit half of the others) wait for the UI lane; until then the core halves are proven by story-named conformance tests (TL-7).
+
+### Changelog
+
+- 2026-11-14: Hide and restore transitions keep the core window-state lock free while the native adapter interacts with AppKit, so a main-thread focus callback can complete during the transition.
 
 ### 1.2 Purpose
 
@@ -309,7 +314,7 @@ The system **MUST** make the call window and the record prompt non-activating, c
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-native-surfaces-presenting`
 
-The system **MUST** hide every surface with one action while recording continues, show state only on the menu bar while hidden, route a new meeting to a menu bar line, and restore what was visible.
+The system **MUST** hide every surface with one action while recording continues, show state only on the menu bar while hidden, route a new meeting to a menu bar line, and restore what was visible. The core releases its window-state lock before native hide and restore calls so main-thread focus events can finish during those calls.
 
 **Implements**:
 - `cpt-noter-flow-core-native-surfaces-presenting`

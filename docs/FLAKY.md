@@ -13,10 +13,11 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#667](https://github.com/getahead/noter/issues/667) | MCP tool router reads the launch before the adapter receives it | 4 / 80 under 16-process local load | pending PR | [#799](https://github.com/getahead/noter/pull/799) |
 | [#392](https://github.com/getahead/noter/issues/392) | First-run self-test lifecycle (E2E, visual) | 83 / 33 | [#423](https://github.com/getahead/noter/pull/423) | open |
 | [#398](https://github.com/getahead/noter/issues/398) | Call-page navigation, missing-call Back | 36 / 4 | [#430](https://github.com/getahead/noter/pull/430) | open |
-| [#396](https://github.com/getahead/noter/issues/396) | Native menu and record prompt | 33 / 14 | #374, #389 | closed |
+| [#396](https://github.com/getahead/noter/issues/396) | Native menu and record prompt | 33 / 14 | #558 and this PR | closed |
 | [#399](https://github.com/getahead/noter/issues/399) | Live and stored transcript navigation, replay | 31 / 3 | none yet | open |
 | [#394](https://github.com/getahead/noter/issues/394) | Core model lifecycle: immediate pause/resume, seeded state | 12 / 4 | none yet | open |
-| [#397](https://github.com/getahead/noter/issues/397) | Native Hide for Presenting query timeouts | 11 / 5 | [#431](https://github.com/getahead/noter/pull/431) (diagnostics) | open |
+| [#397](https://github.com/getahead/noter/issues/397) | Native Hide for Presenting query timeouts | 11 / 5 | [#558](https://github.com/getahead/noter/pull/558), #431 and this PR | closed |
+| [#562](https://github.com/getahead/noter/issues/562) | WebView recovery test initial-load timeout | 2 / 0 | this PR | closed |
 | [#393](https://github.com/getahead/noter/issues/393) | First-run Checking screenshot | 10 / 4 | [#390](https://github.com/getahead/noter/pull/390) (merged), #423 | open |
 | [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | none yet | open |
 | [#400](https://github.com/getahead/noter/issues/400) | Speaker naming Undo restoration | 3 / 1 | [#429](https://github.com/getahead/noter/pull/429) | open |

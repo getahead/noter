@@ -307,6 +307,7 @@ impl Core {
     /// Hide for presenting (wanted state): every surface goes, recording carries on.
     // @cpt-flow:cpt-noter-flow-core-native-surfaces-presenting:p1
     pub(crate) fn set_hidden_for_presenting(&self, hidden: bool) -> PresentingState {
+        let _transition = lock(&self.presenting_transition);
         let state = {
             let mut app = self.app();
             if app.presenting.hidden == hidden {
@@ -318,23 +319,33 @@ impl Core {
             // @cpt-end:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-emit-presenting
         };
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-presenting:p1:inst-hide-restore
-        {
-            let mut w = lock(&self.windows);
-            if hidden {
+        if hidden {
+            {
+                let mut w = lock(&self.windows);
                 // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-presenting
                 w.was_visible = w.call.visible;
                 w.call.visible = false;
                 w.call.key = false;
                 // @cpt-end:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-presenting
-                self.deps.surfaces.hide_all();
+            }
+            // Native visibility queries rendezvous with the main thread, whose focus handler may
+            // take `windows`; never hold that lock across the host call.
+            self.deps.surfaces.hide_all();
+            {
+                let mut w = lock(&self.windows);
                 self.publish_call(&mut w);
-            } else {
-                self.deps.surfaces.restore_all();
+            }
+        } else {
+            let was_visible = {
+                let mut w = lock(&self.windows);
+                std::mem::take(&mut w.was_visible)
+            };
+            self.deps.surfaces.restore_all();
+            if was_visible {
+                let mut w = lock(&self.windows);
                 // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-unhide
-                if std::mem::take(&mut w.was_visible) {
-                    w.call.visible = true;
-                    self.publish_call(&mut w);
-                }
+                w.call.visible = true;
+                self.publish_call(&mut w);
                 // @cpt-end:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-unhide
             }
         }

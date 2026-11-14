@@ -67,10 +67,15 @@ final class MenuBarTests: NoterTestCase {
         launch("idle")
         // The calendar is read a few seconds after launch; an open menu does not follow a rebuild,
         // so reopen it until the line is there.
-        var next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
-        for _ in 0..<10 where !next.waitForExistence(timeout: 1) {
+        let deadline = Date().addingTimeInterval(30)
+        var next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu(timeout: 10))
+        while true {
+            let wait = deadline.timeIntervalSinceNow
+            if wait <= 0 || next.waitForExistence(timeout: min(1, wait)) { break }
             closeMenu()
-            next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu())
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining <= 0 { break }
+            next = infoLine("Next: 1:1 with Anna K. 12:30", in: openMenu(timeout: min(10, remaining)))
         }
         XCTAssertTrue(next.waitForExistence(timeout: 2))
         XCTAssertFalse(next.isEnabled, "Next is calendar information, not a recording action")
