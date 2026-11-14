@@ -15,7 +15,7 @@ import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { dataDir, rows as scenarioRows } from "./history-support";
+import { dataDir, rows as scenarioRows, withCoreCommandArgs } from "./history-support";
 
 let s: Scenario;
 let dir: string;
@@ -66,9 +66,7 @@ function open(opts: { llm?: object[]; engine?: object[] | null; archiveAfterMs?:
   const engine = opts.engine === null ? null : opts.engine ?? [{ on: "offline_pass", after_ms: opts.archiveAfterMs ?? 0, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }];
   const flags = engine === null ? [] : [`--engine-script ${write("engine.jsonl", engine)}`];
   if (opts.llm) flags.push(`--llm-script ${write("llm.jsonl", opts.llm)}`);
-  const base = process.env.NOTER_CORE_CMD;
-  process.env.NOTER_CORE_CMD = `${base} ${flags.join(" ")}`;
-  try {
+  withCoreCommandArgs(flags, () => {
     s = openScenario({
       alsoRecord: exercised,
       world: (w) => {
@@ -77,9 +75,7 @@ function open(opts: { llm?: object[]; engine?: object[] | null; archiveAfterMs?:
         w.app.setup.detection_enabled = true;
       },
     });
-  } finally {
-    process.env.NOTER_CORE_CMD = base;
-  }
+  });
 }
 function write(name: string, lines: object[]): string {
   const file = join(dir, name);

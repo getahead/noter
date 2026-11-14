@@ -9,6 +9,17 @@ import type { Scenario } from "../support/scenario";
 type Wire = { invoke(window: string, cmd: string, args: unknown): Promise<unknown> };
 export const wire = (s: Scenario) => (s as unknown as { process: Wire }).process;
 
+/** Opens a scenario with extra arguments on the real-core command, then restores the environment. */
+export function withCoreCommandArgs<T>(args: string[], run: () => T): T {
+  const base = process.env.NOTER_CORE_CMD;
+  process.env.NOTER_CORE_CMD = `${base} ${args.join(" ")}`;
+  try {
+    return run();
+  } finally {
+    process.env.NOTER_CORE_CMD = base;
+  }
+}
+
 const dataDirs = new WeakMap<Scenario, Promise<string | null>>();
 
 /** The next save panel answers cancelled, once. On the fake the next `command` (an export) fails `cancelled`. */
