@@ -22,7 +22,7 @@ export function ItemTail({ bridge, item }: { bridge: Bridge; item: ItemView }) {
     <>
       {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />}
       {local.outcome && (
-        <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
+        <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} actionAriaLabel={local.outcome.target ? `${t("items.undo")}: ${it.text}` : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
       )}
       {it.review === "suggested" && !local.outcome && <ReviewButtons it={it} bridge={bridge} retryOnly={!!local.retryAccept} edit={inspect} />}
       {local.error && <span className="it-row__error" role="alert">{local.error}</span>}

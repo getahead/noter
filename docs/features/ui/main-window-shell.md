@@ -2,7 +2,7 @@
 title: "Feature — Main window shell and navigation"
 description: "The frame every Noter main-window page lives in: glass sidebar with the live-call row and badges, unified toolbar with one Back and Forward history, banner slot, inspector slot, app menu and collapse order."
 status: DRAFT
-version: "1.1"
+version: "1.2"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-main-window-shell
 milestone: M0
@@ -10,9 +10,16 @@ milestone: M0
 
 # Feature: Main window shell and navigation
 
+## Changelog
+
+- 2026-11-14: The native main window overlays its title bar; the sidebar header supplies the drag region and traffic lights remain visible.
+- 2026-11-14: The host builds the native app menu from this feature's shared label and shortcut model; shell actions use the same handlers as their keyboard shortcuts.
+- 2026-11-14: DESIGN-listed New Question (Ask, M3) and Copilot actions (M4 behind the feature flag) remain visible but disabled until those features are available; M2 Accept/Reject/Accept All menu actions follow focused suggested-item state and reuse the item review handlers.
+
 
 <!-- toc -->
 
+- [Changelog](#changelog)
 - [1. Feature Context](#1-feature-context)
   - [1.1 Overview](#11-overview)
   - [1.2 Purpose](#12-purpose)

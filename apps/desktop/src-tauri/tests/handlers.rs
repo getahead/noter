@@ -175,11 +175,15 @@ fn each_window_capability_allows_only_listening_dialogs_and_its_commands() {
             "core:event:allow-listen".to_string(),
             "core:event:allow-unlisten".to_string(),
         ]);
+        if w == WindowLabel::Main {
+            expected.insert("core:event:allow-emit".to_string());
+        }
         if matches!(
             w,
             WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
         ) {
             expected.insert("dialog:allow-message".to_string());
+            expected.insert("core:window:allow-start-dragging".to_string());
         }
         assert_eq!(allowed, expected, "{}", w.as_str());
     }

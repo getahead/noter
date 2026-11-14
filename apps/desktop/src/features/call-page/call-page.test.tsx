@@ -2,7 +2,7 @@
 // its controls send.
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CallOutputs } from "../../core/bindings";
@@ -14,7 +14,7 @@ import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
-import { CallToolbar, moreItems } from "./CallToolbar";
+import { CallToolbar, moreItems, nativeItemReviewMenuState, runNativeReviewMenuAction, watchNativeMenuContext } from "./CallToolbar";
 import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -23,12 +23,16 @@ import { slots } from "./slots";
 import { StoredTranscript } from "../transcript/hosts";
 import "./register";
 
+vi.mock("../../core/native-menu", () => ({ updateNativeMenuContext: vi.fn() }));
+import { updateNativeMenuContext } from "../../core/native-menu";
+
 let bridge: Bridge;
 let fake: FakeCore;
 let id: string;
 beforeEach(() => (resetCache(), resetOutputsCache()));
 afterEach(() => {
   slots.deleteCall = null;
+  vi.unstubAllGlobals();
   return bridge.close();
 });
 
@@ -119,6 +123,84 @@ describe("CallToolbar", () => {
     const tree = rendered(CallToolbar, { route: route(), bridge, base, inspectorOpen: false, onToggleInspector: () => void toggled++ });
     (find(tree.props.trailing as ReactNode, (p) => p.label === "Show Inspector").props.onAction as () => void)();
     expect(toggled).toBe(1);
+  });
+
+  it("enables native item review only for a focused suggested row, and Accept All only when suggestions remain", () => {
+    expect(nativeItemReviewMenuState(false, true, 3)).toEqual({ acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
+    expect(nativeItemReviewMenuState(true, false, 3)).toEqual({ acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: true });
+    expect(nativeItemReviewMenuState(true, true, 0)).toEqual({ acceptItemEnabled: true, rejectItemEnabled: true, acceptAllSuggestionsEnabled: false });
+  });
+
+  it("routes native menu Accept/Reject to the focused suggested item and Accept All to every kind in that call", async () => {
+    await ready();
+    const selected = fake.world.items.find((item) => item.id === "itm_replay")!;
+    const selectedRev = selected.rev;
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { ...s.entities.item, [selected.id]: selected } } }));
+    const row = { dataset: { callId: selected.call.id, itemId: selected.id, review: "suggested" } };
+    vi.stubGlobal("document", { activeElement: { closest: () => row }, querySelectorAll: () => [] });
+    const reviewCall = vi.spyOn(bridge.core, "itemReview");
+    expect(runNativeReviewMenuAction("menu.accept_item", bridge, selected.call.id, 1)).toBe(true);
+    await settle();
+    expect(reviewCall).toHaveBeenCalledTimes(1);
+    expect(reviewCall).toHaveBeenCalledWith({ item_id: selected.id, rev: selectedRev, decision: "accept" });
+    expect(runNativeReviewMenuAction("menu.reject_item", bridge, selected.call.id, 1)).toBe(false);
+    expect(runNativeReviewMenuAction("menu.accept_all_suggestions", bridge, selected.call.id, 0)).toBe(false);
+
+    const batchCall = vi.spyOn(bridge.core, "itemsReviewAll");
+    expect(runNativeReviewMenuAction("menu.accept_all_suggestions", bridge, selected.call.id, 2)).toBe(true);
+    await settle();
+    expect(batchCall).toHaveBeenCalledTimes(1);
+    expect(batchCall).toHaveBeenCalledWith({ call_id: selected.call.id, kinds: [] });
+  });
+
+  it("keeps native context commands enabled only for a focused, ready call page and clears them on cleanup", async () => {
+    await ready();
+    const call = bridge.store.getState().entities.call[id]!;
+    const browserWindow = new EventTarget();
+    vi.stubGlobal("window", browserWindow);
+    vi.stubGlobal("document", { hasFocus: () => true });
+    const send = vi.mocked(updateNativeMenuContext);
+    send.mockClear();
+
+    const stop = watchNativeMenuContext(call, { status: "writing", sensitive: false } as CallOutputs);
+    expect(send).toHaveBeenLastCalledWith({ focused: true, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
+    browserWindow.dispatchEvent(new Event("blur"));
+    expect(send).toHaveBeenLastCalledWith({ focused: false, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
+    browserWindow.dispatchEvent(new Event("focus"));
+    stop();
+    const callsAfterCleanup = send.mock.calls.length;
+    browserWindow.dispatchEvent(new Event("blur"));
+    expect(send).toHaveBeenCalledWith({ focused: false, exportEnabled: false, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: false, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
+    expect(send).toHaveBeenCalledTimes(callsAfterCleanup);
+  });
+
+  it("disables native item review when the focused row enters edit or save state", async () => {
+    await ready();
+    const call = bridge.store.getState().entities.call[id]!;
+    const source = fake.world.items.find((candidate) => candidate.review === "suggested")!;
+    const item = { ...source, call: { ...source.call, id } };
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { ...s.entities.item, [item.id]: item } } }));
+    const row = { dataset: { callId: id, itemId: item.id, review: "suggested", state: "suggested" } };
+    let mutation: MutationCallback | undefined;
+    let options: MutationObserverInit | undefined;
+    class TestObserver {
+      constructor(callback: MutationCallback) { mutation = callback; }
+      observe(_target: Node, next: MutationObserverInit) { options = next; }
+      disconnect() {}
+    }
+    vi.stubGlobal("MutationObserver", TestObserver);
+    vi.stubGlobal("window", new EventTarget());
+    vi.stubGlobal("document", { body: {}, activeElement: { closest: () => row }, querySelectorAll: () => [row] });
+    const send = vi.mocked(updateNativeMenuContext);
+    send.mockClear();
+
+    const stop = watchNativeMenuContext(call, { status: "ready", sensitive: false, review_waiting: 1 } as CallOutputs, bridge);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ acceptItemEnabled: true, rejectItemEnabled: true }));
+    expect(options?.attributeFilter).toContain("data-state");
+    row.dataset.state = "editing";
+    mutation?.([], {} as MutationObserver);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ acceptItemEnabled: false, rejectItemEnabled: false }));
+    stop();
   });
 
   it("the ⋯ menu offers the M1 items, Delete Call… disabled until the dialogs host registers", async () => {

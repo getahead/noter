@@ -1,7 +1,7 @@
 // One action item, wherever it is listed: the Call page's output section (full), compact lists, Today's Done list
 // and read-only views. Review, tick, edit and handoff answer all go through `actions.ts`; the row only draws what the
 // core and `local.ts` say. Registers itself in the outputs section's seam (`register.tsx`).
-import { useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
 import { elementId } from "../../app/element-id";
@@ -22,7 +22,7 @@ import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
 import type { ActionItemRowProps } from "../call-page/slots";
-import { acceptSaved, answerHandoff, review, reviewAll, reopen, saveDraft, setDone, undoRow } from "./actions";
+import { acceptSaved, answerHandoff, rememberItem, review, reviewAll, reopen, saveDraft, setDone, undoRow } from "./actions";
 import { patchLocal, useLocal, type Local } from "./local";
 import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, SECTION_OF, type Draft } from "./review";
 import { ShareMenu } from "../call-page/ShareMenu";
@@ -169,6 +169,7 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
   const rowId = useId();
   const it = useItem(bridge, item);
+  useEffect(() => rememberItem(bridge, it), [bridge, it]);
   // @cpt-state:cpt-noter-state-ui-core-bridge-command:p1
   const completing = useWindow(bridge, (s) => s.commands["item:done:".concat(it.id)]?.state === "WAITING");
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
@@ -180,7 +181,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
   const asking = completion(it, !!local.asking) === "HANDOFF_QUESTION";
 
   const outcome = local.outcome && (
-    <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
+    <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} actionAriaLabel={local.outcome.target ? `${t("items.undo")}: ${it.text}` : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
   );
   // a rejected row shows its outcome as a ghost line, then folds into the section's **Rejected (n)** list
   if (state === "REJECTED") return null;
@@ -203,6 +204,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     "data-variant": variant,
     "data-state": state === "SUGGESTED" ? "suggested" : (local.outcome ? "outcome" : state.toLowerCase()),
     "data-item-id": it.id,
+    "data-call-id": it.call.id,
     "data-review": it.review,
     lang: langOf(it.lang),
     id: rowId,

@@ -33,6 +33,7 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
   it("draws MW-R1: Back and Forward in one capsule, the title and subtitle, the search field", () => {
     const html = renderToString(<MainToolbar {...props()} />);
     expect(html).toContain('data-region="MW-R1"');
+    expect(html).toContain("data-tauri-drag-region");
     expect(html).toContain('<span class="np-toolbar__nav">');
     expect(html).toContain('<h1 class="np-toolbar__title" title="Calls">Calls</h1>');
     expect(html).toContain("212 calls");

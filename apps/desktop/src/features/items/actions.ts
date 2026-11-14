@@ -23,6 +23,14 @@ export const errorText = (code: ErrorCode) => t(ERRORS[code] ?? "items.err.other
 const current = (bridge: Bridge, item: ItemView): ItemView => bridge.store.getState().entities.item[item.id] ?? item;
 const changeOf = (m: ItemMutation): UndoTarget => ({ type: "change", change_id: m.change_id });
 
+/** Seed a row-provided item once, without replacing an equally new store record on every refresh. */
+export function rememberItem(bridge: Bridge, item: ItemView): void {
+  bridge.store.setState((s) => {
+    const held = s.entities.item[item.id];
+    return held && held.rev >= item.rev ? s : applyRecord(s, "item", item);
+  });
+}
+
 /** `item_get`: the core's current item into the store, after a conflict or an undo. */
 export const refresh = (bridge: Bridge, id: string) => bridge.act(`item:get:${id}`, "item_get", () => bridge.core.itemGet({ item_id: id }), { entity: "item" });
 
@@ -211,6 +219,9 @@ export async function undoRow(bridge: Bridge, id: string, target: UndoTarget) {
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-return
   patchLocal(id, { outcome: undefined, doneTarget: undefined, error: undefined });
   await refresh(bridge, id); // the core's item again, with its prior review and handoff state
+  const row = Array.from(globalThis.document?.querySelectorAll<HTMLElement>("[data-item-id]") ?? [])
+    .find((element) => element.dataset.itemId === id);
+  row?.focus(); // restore keyboard/native-menu context to the item the user just restored
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-return
   holdUndo({ target, mode: "redo", message: t("undo.undone", { count: res.data.undone }), refresh: () => refreshCompletion(bridge, id, target) });
 }

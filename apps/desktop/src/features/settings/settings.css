@@ -2,6 +2,7 @@
 .st-win { max-width: 100%; }
 .st-body { display: flex; flex: 1 1 auto; min-height: 0; height: 100vh; }
 .st-panes { width: 200px; flex: none; background: var(--side-bg); border-right: 1px solid var(--sep); padding: 10px 8px; display: grid; align-content: start; gap: 8px; overflow: auto; }
+.st-titlebar-reserve { height: 32px; flex: none; }
 .st-panelist { display: grid; gap: 1px; }
 .st-pane-item { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: var(--r-control); color: var(--label); text-decoration: none; white-space: nowrap; }
 .st-pane-item .np-ic { color: var(--accent-text); }

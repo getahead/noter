@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useWindow } from "../../app/use-window";
+import { updateNativeMenuContext } from "../../core/native-menu";
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Menu, type MenuItem } from "../../ui/primitives/menu";
@@ -16,16 +17,85 @@ import { MainToolbar } from "../shell/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow, CallTypeInfo, CallPageTab } from "../../core/bindings";
 import { menuActs, saveTitle } from "./actions";
+import { review, reviewAll } from "../items/actions";
+import { focusNext } from "../items/ActionItemRow";
 import { useExtras } from "./cache";
 import { useExport } from "./ExportSheet";
 import { deleteAudio, revealExport } from "./share-actions";
 import { ShareMenu } from "./ShareMenu";
 import { exportOpener } from "./share-run";
+import { useOutputs } from "./outputs-cache";
+import { shareState } from "./share-logic";
 import { useTypes } from "./cache";
 import { useRegenerate } from "./RegenerateSheet";
 import { registeredViews } from "./views";
 import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
 
+export function nativeItemReviewMenuState(focused: boolean, hasActionableSelection: boolean, pendingSuggestions: number) {
+  return {
+    acceptItemEnabled: focused && hasActionableSelection,
+    rejectItemEnabled: focused && hasActionableSelection,
+    acceptAllSuggestionsEnabled: focused && pendingSuggestions > 0,
+  };
+}
+
+// @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
+export function watchNativeMenuContext(call: CallRow | undefined, outputs: ReturnType<typeof useOutputs>, bridge?: Bridge): () => void {
+  const copyReady = outputs !== undefined && shareState(outputs, call?.privacy).ready;
+  let focused = true;
+  const reviewState = (hasFocus: boolean) => {
+    const rows = typeof document.querySelectorAll === "function" ? Array.from(document.querySelectorAll<HTMLElement>("[data-item-id]")).filter((row) => row.dataset.callId === call?.id) : [];
+    const active = document.activeElement?.closest<HTMLElement>("[data-item-id]");
+    const item = active?.dataset.itemId ? bridge?.store.getState().entities.item[active.dataset.itemId] : undefined;
+    const activeIsSuggestion = !!active && rows.includes(active) && active.dataset.review === "suggested" && item?.call.id === call?.id && item?.review === "suggested" && !["editing", "saving"].includes(active.dataset.state ?? "");
+    const knownItems = Object.values(bridge?.store.getState().entities.item ?? {}).filter((entry) => entry.call.id === call?.id);
+    const pendingSuggestions = knownItems.length ? knownItems.filter((entry) => entry.review === "suggested").length : outputs?.review_waiting ?? 0;
+    return nativeItemReviewMenuState(hasFocus, activeIsSuggestion, pendingSuggestions);
+  };
+  const update = (hasFocus = focused) => void updateNativeMenuContext({
+    focused: hasFocus,
+    exportEnabled: !!call,
+    copySlackEnabled: copyReady,
+    copyJiraEnabled: copyReady,
+    copyMarkdownEnabled: copyReady,
+    deleteEnabled: !!call,
+    ...reviewState(hasFocus),
+  });
+  const onFocus = () => (focused = true, update());
+  const onBlur = () => (focused = false, update());
+  const onFocusIn = () => update();
+  const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver(() => update());
+  // Mounting the focused main-window page is the initial active state; native window blur events
+  // take it back to false. document.hasFocus() can still be false during the first WebKit frame.
+  update(true);
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("blur", onBlur);
+  document.addEventListener?.("focusin", onFocusIn);
+  if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-review", "data-state", "data-variant"] });
+  return () => {
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("blur", onBlur);
+    document.removeEventListener?.("focusin", onFocusIn);
+    observer?.disconnect();
+    void updateNativeMenuContext({ focused: false, exportEnabled: false, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: false, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
+  };
+}
+
+// @cpt-flow:cpt-noter-flow-ui-items-review:p1
+/** Route DESIGN's contextual native review commands through the same M2 review handlers as row controls. */
+export function runNativeReviewMenuAction(key: string, bridge: Bridge, callId: string, pendingSuggestions: number): boolean {
+  const row = document.activeElement?.closest<HTMLElement>("[data-item-id]");
+  if (key === "menu.accept_all_suggestions") {
+    if (pendingSuggestions <= 0) return false;
+    void reviewAll(bridge, callId, []);
+    return true;
+  }
+  if ((key !== "menu.accept_item" && key !== "menu.reject_item") || !row || row.dataset.callId !== callId || row.dataset.review !== "suggested" || ["editing", "saving"].includes(row.dataset.state ?? "")) return false;
+  const item = bridge.store.getState().entities.item[row.dataset.itemId!];
+  if (!item || item.review !== "suggested") return false;
+  void review(bridge, item, key === "menu.accept_item" ? "accept" : "reject").then((result) => result.status === "ok" && focusNext(item.id));
+  return true;
+}
 
 /** The ⋯ menu's items for a call (the later items join with their features). */
 export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; deleteAudio?: (() => void) | null; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void }): MenuItem[] {
@@ -48,6 +118,7 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
 export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspector }: PageToolbarProps) {
   const at = parseCallKey(route.key)!;
   const call = useWindow(bridge, (s) => s.entities.call[at.callId]);
+  const outputs = useOutputs(at.callId);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const types = useTypes();
   const openRegenerate = useRegenerate(bridge, at.callId);
@@ -64,6 +135,19 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   }, [exported]);
   // ⌘E reaches the sheet through the page key
   useEffect(() => ((exportOpener.open = openExport), () => void (exportOpener.open = null)), [openExport]);
+  useEffect(() => watchNativeMenuContext(call, outputs, bridge), [bridge, call, outputs]);
+  useEffect(() => {
+    const onMenuAction = (event: Event) => {
+      const key = (event as CustomEvent<string>).detail;
+      if (call) {
+        const currentItems = Object.values(bridge.store.getState().entities.item).filter((item) => item.call.id === call.id);
+        const pending = currentItems.length ? currentItems.filter((item) => item.review === "suggested").length : outputs?.review_waiting ?? 0;
+        runNativeReviewMenuAction(key, bridge, call.id, pending);
+      }
+    };
+    window.addEventListener("shell:native-item-review", onMenuAction);
+    return () => window.removeEventListener("shell:native-item-review", onMenuAction);
+  }, [bridge, call, outputs]);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const { segments, view } = callViews(registeredViews(), at.tab);
   const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));
