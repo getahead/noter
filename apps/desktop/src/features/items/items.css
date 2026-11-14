@@ -48,8 +48,8 @@
 .ii-evidence { min-width: 0; }
 .ii-evidence--linked { display: flex; align-items: flex-start; gap: 8px; }
 .ii-evidence__source { display: flex; flex: none; flex-direction: column; max-width: 100%; }
-.ii-evidence__source .np-prov { flex: none; white-space: nowrap; }
-.ii-evidence__source > :not(.np-prov) { max-width: 100%; overflow-wrap: anywhere; }
+.ii-evidence__source button.np-prov { flex: none; white-space: nowrap; }
+.ii-evidence__source > :not(button) { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
 .ii-evidence__summary { flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }
 .ii-error { color: var(--error); }
 .it-add { display: flex; align-items: flex-start; gap: 6px; padding-top: 6px; }
