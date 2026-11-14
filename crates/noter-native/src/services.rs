@@ -31,7 +31,7 @@ pub fn on_battery() -> bool {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        false
+        is_battery_power(None)
     }
 }
 
