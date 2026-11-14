@@ -5,8 +5,10 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
+import type { ErrorState } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
+import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Menu, type MenuItem } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
@@ -53,6 +55,11 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
 
   const notice = capture?.notice ?? null;
   const key = viewKey(detection, notice);
+  const startError = useWindow(bridge, (s) => s.commands["prompt:start"]?.state === "ERROR" ? s.commands["prompt:start"]?.error : null);
+  const callEndError = useWindow(bridge, (s) => s.commands["prompt:call_end"]?.state === "ERROR" ? s.commands["prompt:call_end"]?.error : null);
+  const newMeetingError = useWindow(bridge, (s) => s.commands["prompt:new_meeting"]?.state === "ERROR" ? s.commands["prompt:new_meeting"]?.error : null);
+  const ignoreError = useWindow(bridge, (s) => s.commands["prompt:ignore"]?.state === "ERROR" ? s.commands["prompt:ignore"]?.error : null);
+  const failureBanner = (command: string, error: ErrorState | null) => error ? <InlineBanner banner={{ id: "record-prompt-action-error", severity: "error", text: t("prompt.action_failed"), actions: error.tryAgain ? [{ label: t("action.try_again"), onAction: () => void bridge.retry(command) }] : [] }} /> : null;
   // what a refusal was made in: it clears when the free space, the model or the core's reason changes
   const world = `${env?.disk_free_mb}/${detection?.blocked}/${setup?.models.bundles.map((b) => b.state).join()}`;
   const refusal = activeRefusal(local, world);
@@ -104,6 +111,9 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     if (reason && detection) void dismiss(bridge, detection.id, reason);
     dispatch({ type: "closing", key });
   };
+  const closeIfOk = async (action: Promise<{ status: "ok" | "error" }>) => {
+    if ((await action).status === "ok") close();
+  };
   // @cpt-end:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-user-dismiss
 
   // the 15 s the prompt waits: it runs for a detection with its buttons showing, and stops while the pointer or focus is on it
@@ -153,6 +163,7 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-refused
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-refused
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-if-already
+    if (!r.ok && r.reason !== "already_recording") return;
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-already
     // started, or already running: the core shows the running call
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-already
@@ -199,10 +210,11 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
         {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
         {/* @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-ended-closing */}
         <div className="rp-r3" data-region="RP-R3">
-          <PushButton label={t("prompt.stop_now")} onAction={() => void answerCallEnd(bridge, callId, "stop_now").then(() => close())} />
+          <PushButton label={t("prompt.stop_now")} onAction={() => void closeIfOk(answerCallEnd(bridge, callId, "stop_now"))} />
           <span className="np-tb__spacer" />
-          <PushButton label={t("prompt.keep_recording")} variant="primary" onAction={() => void answerCallEnd(bridge, callId, "keep_recording").then(() => close())} />
+          <PushButton label={t("prompt.keep_recording")} variant="primary" onAction={() => void closeIfOk(answerCallEnd(bridge, callId, "keep_recording"))} />
         </div>
+        {failureBanner("prompt:call_end", callEndError)}
         {/* @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-ended-closing */}
         {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
         {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-user-notice */}
@@ -223,10 +235,11 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
         {/* @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
         {/* @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-newmeeting-closing */}
         <div className="rp-r3" data-region="RP-R3">
-          <PushButton label={t("prompt.meeting_keep")} onAction={() => void answerNewMeeting(bridge, callId, "keep_in_this_call").then(() => close())} />
+          <PushButton label={t("prompt.meeting_keep")} onAction={() => void closeIfOk(answerNewMeeting(bridge, callId, "keep_in_this_call"))} />
           <span className="np-tb__spacer" />
-          <PushButton label={t("prompt.meeting_new")} variant="primary" onAction={() => void answerNewMeeting(bridge, callId, "start_as_new_call").then(() => close())} />
+          <PushButton label={t("prompt.meeting_new")} variant="primary" onAction={() => void closeIfOk(answerNewMeeting(bridge, callId, "start_as_new_call"))} />
         </div>
+        {failureBanner("prompt:new_meeting", newMeetingError)}
         {/* @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-newmeeting-closing */}
         {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-return-notice */}
         {/* @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-user-notice */}
@@ -260,13 +273,14 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     actions = (
       <div className="rp-inline" role="group" aria-label={t("prompt.dont_ask", { app })}>
         <p>{browser ? t("prompt.browser_line", { app }) : t("prompt.app_line", { app })}</p>
+        {failureBanner("prompt:ignore", ignoreError)}
         <div className="rp-inline__btns">
           <PushButton label={t("prompt.back")} onAction={() => dispatch({ type: "back" })} />
           {/* @cpt-begin:cpt-noter-state-ui-record-prompt-panel:p1:inst-notacall-closing */}
           <PushButton
             label={t("prompt.dont_ask_action")}
             variant="primary"
-            onAction={() => void ignoreApp(bridge, detection).then(() => close())}
+            onAction={() => void closeIfOk(ignoreApp(bridge, detection))}
           />
           {/* @cpt-end:cpt-noter-state-ui-record-prompt-panel:p1:inst-notacall-closing */}
         </div>
@@ -335,6 +349,7 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
         <IconButton icon="x" label={t("prompt.close")} size="inline" onAction={() => close("closed")} />
       </div>
       <div className="rp-r3 rp-r3--stack" data-region="RP-R3">
+        {startError && !["disk_full", "model_missing", "already_recording"].includes(startError.code ?? "") ? failureBanner("prompt:start", startError) : null}
         {actions}
       </div>
     </div>

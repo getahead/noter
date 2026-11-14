@@ -215,7 +215,7 @@ describe("CallBanners", () => {
   it("does not hide the notification offer when another banner closes", async () => {
     await ready();
     holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
-    holdOutputs({ call_id: id, status: "writing", sections: [], archive: "none", review_waiting: 0, sensitive: false, written_locally: false } as CallOutputs);
+    holdOutputs({ call_id: id, status: "writing", sections: [], archive: "not_started", review_waiting: 0, sensitive: false, written_locally: false } as CallOutputs);
     const summaryRoute = { section: "library", key: `call:${id}:summary` } as const;
     const tree = rendered(CallBanners, { route: summaryRoute, bridge, appBanners: 0 });
     expect((find(tree, (p) => Array.isArray(p.banners)).props.banners as Array<{ id: string }>).some((b) => b.id === "writing")).toBe(true);

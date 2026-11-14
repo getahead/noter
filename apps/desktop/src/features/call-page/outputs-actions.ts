@@ -30,10 +30,12 @@ export function saveEdit(bridge: Bridge, callId: string, summaryId: string, rev:
 export function regenerate(bridge: Bridge, args: RegenerateArgs) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-job
-  return bridge.act(`outputs:regen:${args.call_id}`, "outputs_regenerate", () => bridge.core.outputsRegenerate(args));
+  return bridge.act(outputsRegenerateKey(args.call_id), "outputs_regenerate", () => bridge.core.outputsRegenerate(args));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-job
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
 }
+
+export const outputsRegenerateKey = (callId: string) => `outputs:regen:${callId}`;
 
 /** `output_versions`, read when the menu opens and again after an edit changed the list. */
 export async function loadVersions(bridge: Bridge, summaryId: string) {

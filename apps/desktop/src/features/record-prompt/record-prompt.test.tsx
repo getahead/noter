@@ -72,6 +72,17 @@ describe("Default", () => {
     ]);
   });
 
+  it("shows a retryable error when Record is refused for an unexpected reason", async () => {
+    await ready();
+    fake.failNext("capture_start", "internal");
+    press("Record");
+    await settle();
+
+    expect(html()).toContain('role="alert"');
+    expect(html()).toContain("Couldn&#x27;t complete that action. Try again.");
+    expect(bridge.store.getState().commands["prompt:start"]?.state).toBe("ERROR");
+  });
+
   it("announces prompt appearance with its current record chord", async () => {
     await ready();
     const seen = sent();
@@ -183,6 +194,17 @@ describe("the notice variants", () => {
       { call_id: "call_live", choice: "stop_now" },
       { call_id: "call_live", choice: "keep_recording" },
     ]);
+  });
+
+  it("keeps the call-ended prompt visible with an error when Keep Recording is refused", async () => {
+    await ready(live({ type: "call_ended", stops_at: Date.now() + 10_000 }), null);
+    fake.failNext("capture_answer_call_end", "internal");
+    press("Keep Recording");
+    await settle();
+
+    expect(html()).toContain('data-variant="call-ended"');
+    expect(html()).toContain('role="alert"');
+    expect(bridge.store.getState().commands["prompt:call_end"]?.state).toBe("ERROR");
   });
 
   it("gives button guidance when the Keep Recording shortcut is cleared", async () => {
