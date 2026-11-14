@@ -16,7 +16,7 @@ import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario, type World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { LIVE_CALL, PAST_CALL } from "../support/world-presets";
-import { dataDir, rows } from "./history-support";
+import { dataDir, rows, withCoreCommandArgs } from "./history-support";
 
 let s: Scenario;
 let main: Core;
@@ -274,17 +274,13 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
     writeFileSync(archive, JSON.stringify({ call_id: "call_recorded", backend: "whisper_large_v3", segments: LINES.map((t, i) => heard(i, t, "call_recorded")) }));
     const script = join(dir, "engine.jsonl");
     writeFileSync(script, JSON.stringify({ on: "offline_pass", after_ms: whileRecording ? 0 : 6000, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }) + "\n");
-    const base = process.env.NOTER_CORE_CMD;
-    process.env.NOTER_CORE_CMD = `${base} --engine-script ${script}`;
-    try {
+    withCoreCommandArgs([`--engine-script ${script}`], () => {
       open((w) => {
         W.idle(w);
         w.app.setup.self_test = { type: "passed", at: Date.now() };
         w.app.setup.detection_enabled = true;
       });
-    } finally {
-      process.env.NOTER_CORE_CMD = base;
-    }
+    });
     const call = ok(await main.captureStart({ source: "today", sensitive: false })).call_id!;
     await until(async () => ok(await main.appSnapshot({})).capture.phase === "recording", "recording");
     for (const [n, text] of LINES.entries()) {
