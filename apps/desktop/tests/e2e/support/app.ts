@@ -23,6 +23,8 @@ export interface CorePlan {
   contractVersion?: string;
   /** Artificial latency per command, in ms. */
   latency?: number;
+  /** Restrict `latency` to this command so setup/navigation stays responsive. */
+  latencyFor?: CommandName;
   /** Page Date and the real core use the fixture's clock; browser timers still run. */
   fixedClock?: boolean;
   /** The real core's scripted host refuses this initially bound chord. */
@@ -76,7 +78,7 @@ const HOOK = `
         }
         (plan.fail ?? []).forEach((f) => this.failNext(f.cmd, f.code));
         if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
-        if (plan.latency) this.latency = plan.latency;
+        if (plan.latency && !plan.latencyFor) this.latency = plan.latency;
         if (plan.corruptNextDownload) {
           if (!this.corruptNextDownload) throw new Error("the fake core has no corruptNextDownload yet (backend ask in _team/ui/e2e/M0-coverage.md)");
           this.corruptNextDownload();
@@ -85,7 +87,10 @@ const HOOK = `
     }
     const call = { kind: "invoke", name: cmd, args: structuredClone(args), completed: false };
     calls.push(call);
-    return Promise.resolve(this.__noterPlanned).then(() => invoke.call(this, cmd, args, onMessage)).then((result) => {
+    return Promise.resolve(this.__noterPlanned).then(async () => {
+      if (plan?.latency && plan.latencyFor === cmd) await new Promise((resolve) => setTimeout(resolve, plan.latency));
+      return invoke.call(this, cmd, args, onMessage);
+    }).then((result) => {
       call.completed = true;
       return result;
     });
@@ -193,7 +198,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
     listeners.delete(`${doc}/${handler}`);
   });
   await page.exposeFunction("__noterInvoke", async (doc: string, cmd: CommandName, args: unknown, channel: number | null): Promise<Answer> => {
-    if (plan.latency) await new Promise((r) => setTimeout(r, plan.latency));
+    if (plan.latency && (!plan.latencyFor || plan.latencyFor === cmd)) await new Promise((r) => setTimeout(r, plan.latency));
     let index = 0;
     const onMessage = channel === null ? undefined : (message: unknown) => void deliver(doc, channel, { index: index++, message });
     try {
