@@ -319,12 +319,23 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
   });
 
   test("UI — happy path: ⌘J follows live again while the panel is key", async ({ page }) => {
+    await page.addInitScript(() => {
+      const seen = new WeakSet<Element>();
+      Object.defineProperty(window, "__noterTranscriptScrollEvents", { value: seen });
+      document.addEventListener("scroll", (event) => {
+        if (event.target instanceof Element && event.target.matches(".cw-tv__scroll")) seen.add(event.target);
+      }, true);
+    });
     const steer = await openWindow(page, "call-screen", {
       world: liveWith(many(60), false),
     });
     await expect(rowWith(page, "Test line number 59")).toBeInViewport(); // the log has drawn and follows the end
     // Reproduce a wheel animation's first one-pixel frame, before scrolling the rest of the way up (#576).
-    await log(page).locator(".cw-tv__scroll").evaluate((el) => el.scrollTo({ top: el.scrollTop - 1, behavior: "instant" }));
+    const scroller = log(page).locator(".cw-tv__scroll");
+    await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThanOrEqual(1);
+    // Wait until the initial programmatic jump's native scroll event has passed through the view's handler.
+    await expect.poll(() => scroller.evaluate((el) => (window as unknown as { __noterTranscriptScrollEvents: WeakSet<Element> }).__noterTranscriptScrollEvents.has(el))).toBe(true);
+    await scroller.evaluate((el) => el.scrollTo({ top: el.scrollTop - 1, behavior: "instant" }));
     await expect(log(page)).toHaveAttribute("data-state", "detached");
     await wheelUpTo(log(page), rowWith(page, ANNA_LINE));
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
