@@ -68,9 +68,11 @@ fn open(dir: &Path, script: Option<&str>) -> World {
     let events = Arc::new(Events::default());
     let secrets = Arc::new(MemorySecrets::default());
     let scripted = script.map_or_else(Scripted::new, |s| Scripted::parse(s).unwrap());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_llm(Adapters::scripted(&scripted))
-        .with_secrets(secrets.clone());
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        secrets: secrets.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Core::open(dir, deps).expect("core opens");
     World {
         core,

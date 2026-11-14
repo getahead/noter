@@ -90,7 +90,7 @@ fn open_with(dir: &Path, native: Option<Calendar>) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
     let mut deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
     if let Some(native) = native {
-        deps = deps.with_native(Arc::new(native));
+        deps.native = Arc::new(native);
     }
     (Core::open(dir, deps).expect("core opens"), events)
 }

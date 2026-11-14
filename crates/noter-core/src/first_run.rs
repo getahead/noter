@@ -318,12 +318,6 @@ impl Core {
         if let Ok(runtime) = tokio::runtime::Handle::try_current() {
             let _ = self.runtime.set(runtime);
         }
-        let weak: Weak<Core> = Arc::downgrade(self);
-        self.on_settings_changed(move |section| {
-            if let Some(core) = weak.upgrade() {
-                core.settings_section_changed(section);
-            }
-        });
         let weak = Arc::downgrade(self);
         self.deps.native.on_change(Box::new(move |reading| {
             if let Some(core) = weak.upgrade() {
@@ -360,7 +354,7 @@ impl Core {
     }
 
     /// Runs inside the settings write (settings lock held): uses the section, never the lock.
-    fn settings_section_changed(&self, section: &SettingsSection) {
+    pub(crate) fn settings_section_changed(&self, section: &SettingsSection) {
         match section {
             SettingsSection::General(g) => {
                 let self_test = {
@@ -644,7 +638,7 @@ impl Core {
         let retention = match (args.never_store_audio, args.retention) {
             (true, _) => AudioRetention::NeverStore,
             (false, AudioRetention::NeverStore) => {
-                return Err(settings::invalid("retention", ValidationRule::OutOfRange))
+                return Err(settings::invalid("retention", ValidationRule::OutOfRange));
             }
             (false, r) => r,
         };

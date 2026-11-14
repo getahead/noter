@@ -149,7 +149,10 @@ async fn presenting_does_not_hold_window_lock_while_hiding_native_surfaces() {
 fn open(dir: &Path) -> (Core, Arc<Events>, Arc<Rec>) {
     let events = Arc::new(Events::default());
     let rec = Arc::new(Rec::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone()).with_surfaces(rec.clone());
+    let deps = CoreDeps {
+        surfaces: rec.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     (Core::open(dir, deps).expect("core opens"), events, rec)
 }
 
@@ -719,9 +722,11 @@ async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
     ] {
         let dir = tempfile::tempdir().unwrap();
         let rec = Arc::new(Rec::default());
-        let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
-            .with_surfaces(rec.clone())
-            .with_native(Arc::new(Calendar { access, failed }));
+        let deps = CoreDeps {
+            surfaces: rec.clone(),
+            native: Arc::new(Calendar { access, failed }),
+            ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        };
         let core = Core::open(dir.path(), deps).unwrap();
         core.refresh_tray();
         let model = rec.tray.lock().unwrap();

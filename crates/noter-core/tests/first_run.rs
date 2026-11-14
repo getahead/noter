@@ -148,9 +148,11 @@ fn open(dir: &Path) -> Setup {
     let events = Arc::new(Events::default());
     let native = Arc::new(FakeNative::default());
     let updater = Arc::new(FakeUpdater::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_native(native.clone())
-        .with_updater(updater.clone());
+    let deps = CoreDeps {
+        native: native.clone(),
+        updater: updater.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Setup {

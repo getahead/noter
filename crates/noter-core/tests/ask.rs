@@ -107,9 +107,11 @@ struct World {
 async fn world(script: &str) -> World {
     let dir = tempfile::tempdir().unwrap();
     let llm = Scripted::parse(script).unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
-        .with_llm(Adapters::scripted(&llm))
-        .with_engine(Arc::new(ScriptedEngine::new().with_container(dir.path())));
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&llm),
+        engine: Arc::new(ScriptedEngine::new().with_container(dir.path())),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     core.store()

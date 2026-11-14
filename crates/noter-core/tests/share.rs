@@ -63,7 +63,10 @@ fn open_with(dir: &Path, answer: Option<PathBuf>, clipboard_fails: bool) -> (Cor
         folder_asked: Mutex::default(),
         clipboard_fails,
     });
-    let deps = CoreDeps::new(Arc::new(SystemClock), Arc::new(Noop)).with_native_ops(native.clone());
+    let deps = CoreDeps {
+        native_ops: native.clone(),
+        ..CoreDeps::new(Arc::new(SystemClock), Arc::new(Noop))
+    };
     (Core::open(dir, deps).expect("core opens"), native)
 }
 

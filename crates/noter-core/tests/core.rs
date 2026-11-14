@@ -343,8 +343,10 @@ fn the_system_clock_is_epoch_milliseconds() {
 #[tokio::test]
 async fn the_snapshot_carries_the_app_version_the_host_gives() {
     let dir = tempfile::tempdir().unwrap();
-    let deps =
-        CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default())).with_app_version("0.2.0");
+    let deps = CoreDeps {
+        app_version: "0.2.0".into(),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+    };
     let core = Core::open(dir.path(), deps).unwrap();
     let snap = core
         .app_snapshot(&from(WindowLabel::Main), NoArgs {})

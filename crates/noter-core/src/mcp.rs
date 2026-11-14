@@ -1449,7 +1449,7 @@ fn word_of<T: serde::Serialize>(v: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::McpSource;
+    use crate::{CoreDeps, McpSource};
 
     struct Quiet;
 
@@ -1524,8 +1524,10 @@ mod tests {
         );
         let core = Core::open(
             &dir.path().join("data"),
-            crate::CoreDeps::new(Arc::new(crate::SystemClock), Arc::new(Quiet))
-                .with_mcp_source(mcp.clone()),
+            crate::CoreDeps {
+                mcp_source: mcp.clone(),
+                ..CoreDeps::new(Arc::new(crate::SystemClock), Arc::new(Quiet))
+            },
         )
         .unwrap();
         let conn = noter_db::rusqlite::Connection::open(dir.path().join("data/noter.db")).unwrap();

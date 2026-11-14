@@ -9,10 +9,9 @@ use noter_protocol::*;
 use serde_json::{json, Map, Value};
 
 use crate::settings::invalid;
-use crate::{internal, lock, Core};
+use crate::{internal, Core};
 
-const COLUMNS: &str =
-    "id, rev, term, variants_latin, variants_cyrillic, spoken_forms, lang, always_apply, added_from";
+const COLUMNS: &str = "id, rev, term, variants_latin, variants_cyrillic, spoken_forms, lang, always_apply, added_from";
 
 pub(crate) fn read_terms(c: &Connection) -> noter_db::rusqlite::Result<Vec<GlossaryTerm>> {
     let mut stmt = c.prepare(&format!("SELECT {COLUMNS} FROM glossary ORDER BY rowid"))?;
@@ -61,12 +60,6 @@ impl Core {
         Ok(GlossaryList {
             terms: self.store().read(read_terms)?,
         })
-    }
-
-    /// Hears every glossary change after it committed (the capture session hands the new glossary
-    /// to a live engine, M1). Hooks run after the write, outside any core lock.
-    pub fn on_glossary_changed(&self, hook: impl Fn(&GlossaryList) + Send + Sync + 'static) {
-        lock(&self.glossary_hooks).push(Box::new(hook));
     }
 
     // @cpt-flow:cpt-noter-flow-core-settings-glossary:p2
@@ -191,9 +184,7 @@ impl Core {
     pub(crate) fn glossary_written(&self) -> Result<GlossaryList, CoreError> {
         let list = self.glossary()?;
         // @cpt-begin:cpt-noter-flow-core-settings-glossary:p2:inst-glossary-live
-        for hook in lock(&self.glossary_hooks).iter() {
-            hook(&list);
-        }
+        self.glossary_changed(&list);
         // @cpt-end:cpt-noter-flow-core-settings-glossary:p2:inst-glossary-live
         // @cpt-begin:cpt-noter-flow-core-settings-glossary:p2:inst-glossary-return
         Ok(list)

@@ -68,8 +68,10 @@ async fn open(script: &str) -> (Arc<Core>, Arc<Events>, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let events = Arc::new(Events::default());
     let scripted = Scripted::parse(script).unwrap();
-    let deps =
-        CoreDeps::new(Arc::new(FixedClock), events.clone()).with_llm(Adapters::scripted(&scripted));
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     tokio::time::sleep(Duration::from_millis(10)).await;
@@ -175,8 +177,10 @@ async fn postcall_applies_the_enabled_name_pseudonym_policy_to_its_cloud_packet(
     let dir = tempfile::tempdir().unwrap();
     let events = Arc::new(Events::default());
     let scripted = Scripted::parse("").unwrap();
-    let deps =
-        CoreDeps::new(Arc::new(FixedClock), events.clone()).with_llm(Adapters::scripted(&scripted));
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     let ctx = CommandCtx {

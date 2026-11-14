@@ -6,14 +6,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{
-    BoxFuture, BundleFile, BundleSpec, CaptureEvent, ChunkSink, Clock, Core, CoreDeps,
-    EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices, Notification,
-    NotificationKind, Surfaces,
+    BoxFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
+    EventEmitter, FetchError, ModelSource, NativeServices, Notification, NotificationKind,
+    Surfaces,
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
 use noter_protocol::engine::{EngineCommand, EngineEvent, StartSession};
-use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
+use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
@@ -129,7 +129,6 @@ struct Rig {
     clock: Arc<TestClock>,
     events: Arc<Events>,
     shown: Arc<Shown>,
-    captured: Arc<Mutex<Vec<CaptureEvent>>>,
     _dir: tempfile::TempDir,
 }
 
@@ -183,13 +182,15 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
     let events = Arc::new(Events::default());
     let shown = Arc::new(Shown::default());
-    let deps = CoreDeps::new(clock.clone(), events.clone())
-        .with_native(Arc::new(Mac {
+    let deps = CoreDeps {
+        native: Arc::new(Mac {
             disk_free_mb: setup.disk_free_mb,
-        }))
-        .with_engine(launcher)
-        .with_models(Arc::new(Whisper))
-        .with_surfaces(shown.clone());
+        }),
+        engine: launcher,
+        models: Arc::new(Whisper),
+        surfaces: shown.clone(),
+        ..CoreDeps::new(clock.clone(), events.clone())
+    };
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     if setup.self_test_passed {
         noter_core::testing::seed_self_test(
@@ -200,16 +201,12 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
         );
     }
     core.start_first_run();
-    let captured = Arc::new(Mutex::new(Vec::new()));
-    let c = captured.clone();
-    core.on_capture_event(move |e| c.lock().unwrap().push(e.clone()));
     Rig {
         core,
         engine,
         clock,
         events,
         shown,
-        captured,
         _dir: dir,
     }
 }
@@ -248,6 +245,20 @@ fn code<T: std::fmt::Debug>(r: Result<T, CoreError>) -> ErrorCode {
 }
 
 impl Rig {
+    async fn subscribe_transcript(&self, call_id: CallId) -> Arc<Mutex<Vec<TranscriptEvent>>> {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink_events = events.clone();
+        let sink = Sink::new(move |msg: TranscriptMsg| {
+            sink_events.lock().unwrap().push(msg.event);
+            true
+        });
+        self.core
+            .transcript_subscribe(&main_window(), TranscriptSubscribeArgs { call_id }, sink)
+            .await
+            .unwrap();
+        events
+    }
+
     fn advance(&self, ms: i64) {
         self.clock.0.fetch_add(ms, Ordering::SeqCst);
     }
@@ -573,6 +584,7 @@ async fn an_engine_that_cannot_start_leaves_the_call_failed_not_refused() {
 async fn pause_and_resume_record_a_paused_gap_and_wanted_state_is_idempotent() {
     let r = rig();
     let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
     r.advance(60_000);
     let pause = |paused| CapturePauseArgs {
         call_id: call_id.clone(),
@@ -625,9 +637,10 @@ async fn pause_and_resume_record_a_paused_gap_and_wanted_state_is_idempotent() {
         })
         .unwrap();
     assert_eq!(gap, (60_000, 90_000, "paused".into()));
-    assert!(r.captured.lock().unwrap().iter().any(|e| matches!(
-        e,
-        CaptureEvent::Gap(g) if g.reason == GapReason::Paused && g.t1_ms == OffsetMs(90_000)
+    assert!(transcript.lock().unwrap().iter().any(|event| matches!(
+        event,
+        TranscriptEvent::Gap { gap }
+            if gap.reason == GapReason::Paused && gap.t1_ms == OffsetMs(90_000)
     )));
 
     // Another call id, or no live call, is not recording.
@@ -662,6 +675,7 @@ async fn a_mark_is_stored_at_the_call_offset_and_handed_to_the_transcript() {
         ErrorCode::NotRecording
     );
     let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
     r.advance(1_260_000);
     let mark = r
         .core
@@ -693,11 +707,10 @@ async fn a_mark_is_stored_at_the_call_offset_and_handed_to_the_transcript() {
         0,
         "capture data has no change row (TL-1)"
     );
-    assert!(r
-        .captured
+    assert!(transcript
         .lock()
         .unwrap()
-        .contains(&CaptureEvent::Mark(mark)));
+        .contains(&TranscriptEvent::Mark { mark }));
 }
 
 // --- Stop, continue, discard ---------------------------------------------------------
@@ -706,6 +719,7 @@ async fn a_mark_is_stored_at_the_call_offset_and_handed_to_the_transcript() {
 async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
     let r = rig();
     let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
     r.advance(120_000);
     r.core
         .capture_set_paused(
@@ -737,10 +751,12 @@ async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
         r.query::<i64>("SELECT t1_ms FROM gaps WHERE reason = 'paused'"),
         140_000
     );
-    assert!(r.captured.lock().unwrap().contains(&CaptureEvent::Stopped {
-        call_id: call_id.clone(),
-        reason: StreamEndReason::CallStopped,
-    }));
+    assert!(transcript
+        .lock()
+        .unwrap()
+        .contains(&TranscriptEvent::Ended {
+            reason: StreamEndReason::CallStopped,
+        }));
     // A second stop of the stopped call answers the state.
     let again = r
         .core
@@ -1776,6 +1792,7 @@ fn seed_confirmed_segment(core: &Core, call_id: &CallId) {
 async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
     let r = rig();
     let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
     let started = r.now();
     r.pass(299_000).await;
     assert_eq!(r.state().await.notice, None);
@@ -1829,10 +1846,12 @@ async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
         r.query::<i64>("SELECT count(*) FROM changes WHERE entity_type = 'call' AND undoable = 0 AND field IS NULL AND delta IS NULL AND reason = 'capture_discard'"),
         1
     );
-    assert!(r.captured.lock().unwrap().contains(&CaptureEvent::Stopped {
-        call_id,
-        reason: StreamEndReason::Discarded,
-    }));
+    assert!(transcript
+        .lock()
+        .unwrap()
+        .contains(&TranscriptEvent::Ended {
+            reason: StreamEndReason::Discarded,
+        }));
 }
 
 #[tokio::test(start_paused = true)]
@@ -2444,6 +2463,7 @@ fn is_engine_state(s: &DegradedState) -> bool {
 async fn engine_gaps_and_degraded_states_reach_the_rows_the_set_and_nt3() {
     let r = rig();
     let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
     r.inject(EngineEvent::DeviceChanged {
         call_id: call_id.clone(),
         device_name: "AirPods Pro".into(),
@@ -2465,12 +2485,10 @@ async fn engine_gaps_and_degraded_states_reach_the_rows_the_set_and_nt3() {
         r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'device_changed'"),
         "1000-1500"
     );
-    assert!(r
-        .captured
-        .lock()
-        .unwrap()
-        .iter()
-        .any(|e| matches!(e, CaptureEvent::Gap(g) if g.reason == GapReason::DeviceChanged)));
+    assert!(transcript.lock().unwrap().iter().any(|event| matches!(
+        event,
+        TranscriptEvent::Gap { gap } if gap.reason == GapReason::DeviceChanged
+    )));
     assert!(r.posted().is_empty(), "a device change is not NT-3");
 
     // NT-3 with no call surface visible and not hidden for presenting: sent at once, once.
