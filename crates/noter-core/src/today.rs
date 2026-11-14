@@ -191,13 +191,21 @@ fn card_of(
         .flatten()
         .map(|i| i.id.as_str().to_string())
         .collect();
-    let call_id: Option<String> = c
+    // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-carry
+    let linked_call: Option<(String, String)> = c
         .query_row(
-            "SELECT id FROM calls WHERE calendar_event_id = ?1 ORDER BY started_at DESC LIMIT 1",
+            "SELECT id, privacy_class FROM calls WHERE calendar_event_id = ?1 ORDER BY started_at DESC LIMIT 1",
             [&event.event.id.0],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()?;
+    let last_time = last_time(
+        c,
+        &people,
+        event.event.starts_at.0,
+        linked_call.as_ref().map(|(id, _)| id.as_str()),
+    )?;
+    // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-carry
     let card = UpcomingCall {
         event_id: event.event.id.clone(),
         title: event.event.title.clone(),
@@ -205,10 +213,14 @@ fn card_of(
         ends_at: event.event.ends_at,
         platform: event.platform.clone(),
         attendees,
-        // shortcut: no advance sensitivity mark and no summaries before post-call (2.17).
-        sensitive: false,
-        call_id: call_id.map(CallId::new),
-        last_time: None,
+        // Calendar events have no separate sensitivity flag; reflect the linked call's privacy.
+        // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-carry
+        sensitive: linked_call
+            .as_ref()
+            .is_some_and(|(_, privacy)| privacy == "sensitive"),
+        call_id: linked_call.map(|(id, _)| CallId::new(id)),
+        last_time,
+        // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-carry
         open_count: shown.len() as u32,
         items: carried.items,
         questions: carried.questions,
@@ -216,6 +228,63 @@ fn card_of(
     };
     Ok((card, shown))
 }
+
+// @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-carry
+fn last_time(
+    c: &Connection,
+    people: &[String],
+    before: i64,
+    current_call_id: Option<&str>,
+) -> Db<Option<LastTimeLine>> {
+    if people.is_empty() {
+        return Ok(None);
+    }
+    let mut args = vec![
+        Sql::Integer(before),
+        Sql::Text(current_call_id.unwrap_or_default().to_owned()),
+    ];
+    args.extend(texts(people));
+    let found = c
+        .prepare(&format!(
+            "SELECT c.id, c.title, c.started_at, c.call_type, v.body_md
+             FROM calls c
+             JOIN summaries s ON s.call_id = c.id AND s.kind = 'summary'
+             JOIN summary_versions v ON v.id = s.current_version_id
+             WHERE c.started_at < ?1 AND c.id != ?2
+               AND c.status NOT IN ('recording', 'paused')
+               AND trim(v.body_md) != ''
+               AND EXISTS (
+                   SELECT 1 FROM speakers sp
+                   WHERE sp.call_id = c.id AND sp.person_id IN ({})
+                     AND sp.pass = {}
+               )
+             ORDER BY c.started_at DESC, c.id DESC LIMIT 1",
+            crate::util::marks(people.len()),
+            SHOWN_PASS.replace("?1", "c.id"),
+        ))?
+        .query_row(params_from_iter(args), |r| {
+            Ok((
+                CallRef {
+                    id: CallId::new(r.get::<_, String>(0)?),
+                    title: r.get(1)?,
+                    started_at: TimestampMs(r.get(2)?),
+                    call_type: CallTypeId(r.get(3)?),
+                },
+                r.get::<_, String>(4)?,
+            ))
+        })
+        .optional()?;
+    Ok(found.and_then(|(call, body)| {
+        body.lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(|line| LastTimeLine {
+                call,
+                line: line.to_owned(),
+            })
+    }))
+}
+// @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-carry
 
 /// The sections of Today that come from local records and the calendar cards.
 struct Sections {

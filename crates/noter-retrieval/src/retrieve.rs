@@ -134,8 +134,10 @@ pub trait DocumentSource: Send + Sync {
     ) -> noter_db::rusqlite::Result<DocHits>;
 }
 
+#[cfg(test)]
 pub struct NoDocuments;
 
+#[cfg(test)]
 impl DocumentSource for NoDocuments {
     fn permitted_chunks(
         &self,

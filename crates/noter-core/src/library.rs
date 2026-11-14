@@ -587,32 +587,46 @@ impl Core {
             let Some(s) = select_call(c, &id)? else {
                 return Ok(None);
             };
+            let calendar_event_id: Option<String> = c.query_row(
+                "SELECT calendar_event_id FROM calls WHERE id = ?1",
+                [&id],
+                |r| r.get(0),
+            )?;
             let (mode_used, audio_not_stored) = (word(s.mode_used.clone())?, s.audio_not_stored);
             let call = assemble(c, s, now, retention_days(c)?)?;
             let speakers = speakers_of(c, &id)?;
             let call_id = CallId::new(&id);
             let marks = crate::transcript::marks_of(c, &call_id)?;
             let gaps = crate::transcript::gaps_of(c, &call_id)?;
-            // shortcut: "the only call so far" stands for the first recorded call; a stored flag
-            // replaces it with the notifications feature (M2).
+            // The first saved call supplies the notification opt-in banner (D68).
             let calls: u32 = c.query_row("SELECT count(*) FROM calls", [], |r| r.get(0))?;
-            Ok(Some(CallDetail {
-                call,
-                // Calendar events are read by the calendar feature (M2).
-                calendar_event: None,
-                speakers,
-                marks,
-                gaps,
-                mode_used,
-                audio_not_stored,
-                first_recorded_call: calls == 1,
-                folder,
-            }))
+            Ok(Some((
+                CallDetail {
+                    call,
+                    calendar_event: None,
+                    speakers,
+                    marks,
+                    gaps,
+                    mode_used,
+                    audio_not_stored,
+                    first_recorded_call: calls == 1,
+                    folder,
+                },
+                calendar_event_id,
+            )))
             // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-select
         })?;
         // @cpt-begin:cpt-noter-flow-core-library-calls-get:p1:inst-get-missing
         // @cpt-begin:cpt-noter-flow-core-library-calls-get:p1:inst-get-return
-        found.ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))
+        let (mut detail, calendar_event_id) = found
+            .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))?;
+        detail.calendar_event = calendar_event_id.and_then(|id| {
+            self.deps
+                .native
+                .calendar_event_near(detail.call.started_at)
+                .filter(|event| event.id.0 == id)
+        });
+        Ok(detail)
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-return
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-missing
     }

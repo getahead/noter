@@ -126,7 +126,7 @@ impl Core {
         let vectors = vectors.unwrap_or_default();
         // @cpt-end:cpt-noter-algo-core-postcall-chunks:p1:inst-chunk-fail
         // @cpt-begin:cpt-noter-algo-core-postcall-chunks:p1:inst-chunk-store
-        // shortcut: no `chunk_vec` or FTS rows yet: M3 builds both from these columns.
+        // noter-retrieval's triggers maintain FTS and vector rows from these columns.
         let mut first = true;
         let total = chunks.len();
         let mut rows = chunks.into_iter().enumerate().peekable();

@@ -3,14 +3,15 @@
 //!
 //! JSON Lines over the engine's stdin/stdout, one message per line, UTF-8.
 //! The JSON Schema exported from these types (`contracts/engine.schema.json`)
-//! generates the Swift `Codable` types of the engine (quicktype or
-//! swift-json-schema), so the Rust types here are the source of truth.
+//! and `contracts/fixtures/engine-lines.json` document the wire format. The
+//! engine's Swift `Codable` types are hand-written and checked against those
+//! examples by `RoundTripTests`.
 //!
 //! Rules (PRD › Audio capture › Buffers, REVIEW › A6):
 //! * stdout carries protocol messages only; logs go to stderr.
-//! * Every event has a `seq` that increases by 1; a gap means the engine's
-//!   bounded queue dropped something (only `levels` and stale `hypothesis`
-//!   segments may be dropped; anything else is a bug the core logs).
+//! * Every event has a `seq` that increases by 1. A gap means an event was
+//!   lost; only `levels` and stale `hypothesis` segments may be dropped by
+//!   the producer, and anything else is a bug the core logs.
 //! * Bulky payloads (word arrays, offline results, embedding batches) go to
 //!   files referenced by path inside the session or scratch directory.
 //! * Every command has an `id`; the engine answers with `ack` or `error`

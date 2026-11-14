@@ -25,9 +25,11 @@ pub use ask::{
 pub use index::{embed_query, missing, rebuild, stale, Embedder, Index, Readiness, Run, DIMS};
 pub use normalize::{estimate_tokens, normalize, terms};
 pub use presets::scope_presets;
+#[cfg(test)]
+pub use retrieve::NoDocuments;
 pub use retrieve::{
-    day_number, prepare, retrieve, DocHits, DocQuery, DocumentSource, Evidence, Hit, NoDocuments,
-    Prepared, Privacy, Query, Retrieved, Scope, MIN_SIMILARITY, OVER_FETCH, RRF_K,
+    day_number, prepare, retrieve, DocHits, DocQuery, DocumentSource, Evidence, Hit, Prepared,
+    Privacy, Query, Retrieved, Scope, MIN_SIMILARITY, OVER_FETCH, RRF_K,
 };
 pub use search::{search, search_request, DEFAULT_LIMIT, MAX_LIMIT};
 pub use topics::{
