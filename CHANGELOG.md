@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.13](https://github.com/getahead/noter/compare/v0.22.12...v0.22.13) (2026-11-14)
+
+
+### Bug fixes
+
+* **native:** avoid transient status menu snapshot queries ([#839](https://github.com/getahead/noter/issues/839)) ([c004de7](https://github.com/getahead/noter/commit/c004de79a3d68341e52aa15486708cf354bbb904)), closes [#837](https://github.com/getahead/noter/issues/837)
+
 ## [0.22.12](https://github.com/getahead/noter/compare/v0.22.11...v0.22.12) (2026-11-14)
 
 
